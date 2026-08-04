@@ -160,15 +160,16 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
   }, [deleteItem]);
 
   /** Commits the queued deletions in ONE system dialog. If the user cancels,
-   * the photos stay unreviewed and resurface in a later batch. */
+   * the photos stay unreviewed and resurface in a later batch. Undo history is
+   * cleared only after the delete succeeds, so canceling preserves the ability
+   * to undo prior keep/save decisions. */
   const commitDeletes = useCallback(async () => {
     const queue = pendingDeletesRef.current;
     if (queue.length === 0) return;
 
-    // Committed deletes can no longer be undone.
+    // Detach the queue immediately so a concurrent onDecision can't push into
+    // a batch we're about to delete.
     pendingDeletesRef.current = [];
-    historyRef.current = [];
-    setCanUndo(false);
     setPendingDeleteCount(0);
 
     try {
@@ -176,10 +177,20 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       markReviewed(queue.map((photo) => photo.id));
       noteDeleted(queue.length);
       setCounts((c) => ({ ...c, deleted: c.deleted + queue.length }));
+
+      // Only after a successful commit are deletes (and their history) final.
+      // Remove delete entries from history, keeping keep/save entries undoable.
+      historyRef.current = historyRef.current.filter(
+        (h) => h.action !== 'delete',
+      );
+      setCanUndo(historyRef.current.length > 0);
     } catch (error) {
-      // User canceled the system dialog (or deletion failed): the photos are
-      // left unreviewed so they show up again in a future batch.
+      // User canceled the system dialog (or deletion failed): restore the
+      // queue so the photos stay unreviewed and resurface in a future batch.
+      // Prior undo history is preserved.
       console.warn('Tidy delete commit skipped', error);
+      pendingDeletesRef.current = queue;
+      setPendingDeleteCount(queue.length);
     }
   }, [noteDeleted]);
 

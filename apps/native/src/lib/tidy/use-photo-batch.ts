@@ -37,6 +37,12 @@ type Params = {
  * photos. The deck array is REVERSED — newest photo at the highest index —
  * because the card stack renders the top card last and counts its index down.
  * Switching source resets paging and loads a fresh batch.
+ *
+ * A cancellation token guards the async collect loop: when the source changes
+ * mid-load, the effect bumps the token so the stale collectBatch stops
+ * mutating shared refs (offsetRef / exhaustedRef) after its next await
+ * resolves. Without this, a source switch during an in-flight media-store
+ * query corrupts the new source's paging state.
  */
 export function usePhotoBatch({ album, sourceId, enabled }: Params) {
   const [batch, setBatch] = useState<TidyPhoto[] | null>(null);
@@ -49,36 +55,46 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
   // store under us, so completed batches subtract what they removed.
   const offsetRef = useRef(0);
   const exhaustedRef = useRef(false);
+  // Incremented on every source switch. collectBatch captures the current
+  // token and bails out of its loop after an await if the token changed,
+  // preventing a stale closure from corrupting the new source's refs.
+  const epochRef = useRef(0);
 
   // Pages the media store until BATCH_SIZE unreviewed photos are collected or
   // the source is exhausted. Kept separate so the caller's setState is always
   // after this `await` — no synchronous render cascade when run from an effect.
-  const collectBatch = useCallback(async (): Promise<TidyPhoto[]> => {
-    const collected: TidyPhoto[] = [];
-    while (collected.length < BATCH_SIZE && !exhaustedRef.current) {
-      let query = new Query()
-        .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
-        .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
-        .offset(offsetRef.current)
-        .limit(PAGE_SIZE);
-      if (album) {
-        query = query.album(album);
-      }
-      const page = await query.exeForMetadata();
+  const collectBatch = useCallback(
+    async (epoch: number): Promise<TidyPhoto[]> => {
+      const collected: TidyPhoto[] = [];
+      while (collected.length < BATCH_SIZE && !exhaustedRef.current) {
+        let query = new Query()
+          .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
+          .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
+          .offset(offsetRef.current)
+          .limit(PAGE_SIZE);
+        if (album) {
+          query = query.album(album);
+        }
+        const page = await query.exeForMetadata();
 
-      offsetRef.current += page.length;
-      if (page.length < PAGE_SIZE) {
-        exhaustedRef.current = true;
-      }
-      for (const asset of page) {
-        if (!isReviewed(asset.id)) {
-          collected.push(toTidyPhoto(asset));
-          if (collected.length === BATCH_SIZE) break;
+        // Source switched while we were awaiting — stop mutating shared refs.
+        if (epochRef.current !== epoch) return collected.reverse();
+
+        offsetRef.current += page.length;
+        if (page.length < PAGE_SIZE) {
+          exhaustedRef.current = true;
+        }
+        for (const asset of page) {
+          if (!isReviewed(asset.id)) {
+            collected.push(toTidyPhoto(asset));
+            if (collected.length === BATCH_SIZE) break;
+          }
         }
       }
-    }
-    return collected.reverse();
-  }, [album]);
+      return collected.reverse();
+    },
+    [album],
+  );
 
   const loadNextBatch = useCallback(
     async (options?: { reset?: boolean }) => {
@@ -86,7 +102,7 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
         offsetRef.current = 0;
         exhaustedRef.current = false;
       }
-      const collected = await collectBatch();
+      const collected = await collectBatch(epochRef.current);
       setBatch(collected);
       setBatchId((id) => id + 1);
       setLoadedSourceId(sourceId);
@@ -99,14 +115,14 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
   // the async load resolves. `loading` is derived from the source mismatch.
   // loadNextBatch's identity changes exactly when album/sourceId change, so
   // depending on it reloads on every source switch (and on first grant).
+  // Bumping epochRef invalidates any in-flight collectBatch from a prior source.
   useEffect(() => {
     if (!enabled) return;
     offsetRef.current = 0;
     exhaustedRef.current = false;
+    epochRef.current += 1;
     // loadNextBatch only setState()s after awaiting the media-store query, so
-    // there is no synchronous render cascade; the linter can't trace past the
-    // await, hence the disable.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // there is no synchronous render cascade.
     loadNextBatch();
   }, [enabled, loadNextBatch]);
 

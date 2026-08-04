@@ -33,7 +33,7 @@ export async function runIntent(kind: IntentKind, value: string): Promise<void> 
       break;
     case 'copy':
       await Clipboard.setStringAsync(value);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       break;
     case 'web_search':
       await WebBrowser.openBrowserAsync(
