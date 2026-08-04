@@ -1,0 +1,39 @@
+apps/native/src/app/(app)/camera.tsx
+  s_de1d3b98021c9d::t_1bf3a3bd82ee4c 304
+apps/native/src/app/(app)/manage-spaces.tsx
+  s_de1d3b98021c9d::t_465c5055ec6ed8 54-63
+apps/native/src/app/(app)/item/[id].tsx
+  s_de1d3b98021c9d::t_b5fcda57cbe7ca 210-212
+  s_de1d3b98021c9d::t_26f29e9221e3e7 233-235
+apps/native/src/components/item-detail.tsx
+  s_de1d3b98021c9d::t_3f11624eb870bc 218
+apps/native/src/app/(app)/(tabs)/(search)/index.tsx
+  s_de1d3b98021c9d::t_d66307c6df0ee1 25-28
+apps/native/modules/progressive-blur/index.tsx
+  s_de1d3b98021c9d::t_3cc2c48780f8a0 2
+apps/native/convex/ai.ts
+  s_de1d3b98021c9d::t_905215073f5be5 72-74,78-80
+apps/native/src/app/(app)/profile.tsx
+  s_de1d3b98021c9d::t_da79439f9bbab6 32
+apps/native/src/lib/tidy/use-single-haptic-on-pan.ts
+  s_de1d3b98021c9d::t_e248b696aa598a 43
+apps/native/src/lib/tidy/use-photo-batch.ts
+  s_de1d3b98021c9d::t_97efe567c67550 83-87,89,92-95,98-105
+  s_de1d3b98021c9d::t_de131eeac2103d 106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "f02eaa5fd0c33509515ab4bb8a28c052f8a53f0a",
+  "prompts": {},
+  "sessions": {
+    "s_de1d3b98021c9d": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "3e70ad90-811d-42f4-b3a4-0379943a904b",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
