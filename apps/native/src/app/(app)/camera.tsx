@@ -301,7 +301,7 @@ export default function CameraScreen() {
           ) : null}
 
           <View style={[styles.bottomBar, { bottom: insets.bottom + 24 }]}>
-            <Pressable style={styles.libraryButton} onPress={pickFromLibrary}>
+            <Pressable style={styles.libraryButton} onPress={pickFromLibrary} disabled={busy}>
               <SymbolView name="photo.on.rectangle" size={20} tintColor="#fff" />
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={busy}>

@@ -51,8 +51,16 @@ export default function ManageSpacesScreen() {
       values.set(spaceId, next);
       return { itemId: id, values };
     });
-    if (next) addItemToSpace({ itemId: id, spaceId });
-    else removeItemFromSpace({ itemId: id, spaceId });
+    const mutation = next ? addItemToSpace : removeItemFromSpace;
+    mutation({ itemId: id, spaceId }).catch(() => {
+      // Revert the optimistic override so the switch reflects server state.
+      setOverride((current) => {
+        if (current?.itemId !== id) return current;
+        const values = new Map(current.values);
+        values.delete(spaceId);
+        return values.size > 0 ? { itemId: id, values } : null;
+      });
+    });
   };
 
   // The item may be `null` (deleted, or not ours) — distinct from `undefined`

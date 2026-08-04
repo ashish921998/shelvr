@@ -69,11 +69,15 @@ function decodeEntities(text: string): string {
   return text
     .replace(/&#(\d+);/g, (_, code) => {
       const n = Number(code);
-      return Number.isFinite(n) ? String.fromCodePoint(n) : "";
+      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
+        ? String.fromCodePoint(n)
+        : "";
     })
     .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
       const n = parseInt(code, 16);
-      return Number.isFinite(n) ? String.fromCodePoint(n) : "";
+      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
+        ? String.fromCodePoint(n)
+        : "";
     })
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")

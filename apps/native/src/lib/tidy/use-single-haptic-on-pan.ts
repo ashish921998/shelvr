@@ -40,6 +40,7 @@ export function useSingleHapticOnPan({ thresholdX, thresholdY }: Params) {
         Math.abs(event.translationX) > thresholdX || -event.translationY > thresholdY;
 
       if (overThreshold && !isTriggered.get()) {
+        isTriggered.set(true);
         scheduleOnRN(fire);
       }
       if (!overThreshold && isTriggered.get()) {

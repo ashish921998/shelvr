@@ -28,8 +28,8 @@ export default function ProfileScreen() {
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         onPress={async () => {
-          router.back();
           await signOut();
+          router.back();
         }}
       >
         <Text style={styles.signOutText}>Sign out</Text>

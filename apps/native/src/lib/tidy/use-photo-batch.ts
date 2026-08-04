@@ -80,15 +80,29 @@ export function usePhotoBatch({ album, sourceId, enabled }: Params) {
         // Source switched while we were awaiting — stop mutating shared refs.
         if (epochRef.current !== epoch) return collected.reverse();
 
-        offsetRef.current += page.length;
-        if (page.length < PAGE_SIZE) {
-          exhaustedRef.current = true;
-        }
+        // Advance the offset by the number of assets actually consumed from
+        // this page, not by page.length. When the batch fills mid-page, the
+        // unconsumed assets must remain reachable for the next loadNextBatch.
+        let consumed = 0;
+        let batchFull = false;
         for (const asset of page) {
+          consumed += 1;
           if (!isReviewed(asset.id)) {
             collected.push(toTidyPhoto(asset));
-            if (collected.length === BATCH_SIZE) break;
+            if (collected.length === BATCH_SIZE) {
+              batchFull = true;
+              break;
+            }
           }
+        }
+        offsetRef.current += consumed;
+        // The source is exhausted only when we drained the entire page.
+        if (page.length < PAGE_SIZE) {
+          exhaustedRef.current = true;
+        } else if (batchFull) {
+          // Batch filled before draining the page; clear exhausted so the
+          // remaining assets are fetched on the next loadNextBatch call.
+          exhaustedRef.current = false;
         }
       }
       return collected.reverse();

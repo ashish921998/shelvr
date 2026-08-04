@@ -207,6 +207,9 @@ export default function ItemScreen() {
 
   const onDismiss = useCallback(async () => {
     if (!spaceId || !activeId || !items) return;
+    // Cancel any pending debounced setParams so it doesn't revert the
+    // immediate param write below to the just-dismissed item.
+    if (paramTimer.current) clearTimeout(paramTimer.current);
     // The dismissed item leaves the space's list; slide to a neighbour first,
     // mirroring delete, so the pager never lands on a vanished page.
     const idx = items.findIndex((i) => i._id === activeId);
@@ -227,6 +230,9 @@ export default function ItemScreen() {
 
   const onDelete = useCallback(async () => {
     if (!activeItem || !items) return;
+    // Cancel any pending debounced setParams so it doesn't revert the
+    // immediate param write below to the just-deleted item.
+    if (paramTimer.current) clearTimeout(paramTimer.current);
     const idx = items.findIndex((i) => i._id === activeItem._id);
     const neighbor = items[idx + 1] ?? items[idx - 1];
     if (neighbor) {

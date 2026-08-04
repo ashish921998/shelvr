@@ -1,5 +1,5 @@
 import { requireNativeView } from 'expo';
-import { useHeaderHeight } from 'expo-router/build/react-navigation';
+import { useHeaderHeight } from 'expo-router/build/react-navigation/elements';
 import { Platform, StyleSheet, type ViewProps } from 'react-native';
 
 // View modules resolve on iOS only; on Android (or an unlinked build) there's no

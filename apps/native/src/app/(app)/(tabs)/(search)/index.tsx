@@ -22,7 +22,10 @@ export default function SearchScreen() {
   const [search, setSearch] = useState('');
   const query = useDebounced(search.trim(), 250);
 
-  const { data: results } = useQuery(convexQuery(api.items.searchItems, { query }));
+  const { data: results } = useQuery({
+    ...convexQuery(api.items.searchItems, { query }),
+    enabled: query.length > 0,
+  });
 
   return (
     <View style={styles.container}>

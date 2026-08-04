@@ -215,7 +215,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <ProductsSection item={item} />
         ) : null}
 
-        {item.type === 'note' && item.note && item.title ? (
+        {item.type === 'note' && item.note ? (
           <Text selectable style={styles.paragraph}>
             {item.note}
           </Text>
