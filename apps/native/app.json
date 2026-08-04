@@ -1,9 +1,9 @@
 {
   "expo": {
     "newArchEnabled": true,
-    "name": "Amber",
-    "slug": "amber",
-    "scheme": "amber",
+    "name": "Shelvr",
+    "slug": "shelvr",
+    "scheme": "shelvr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,19 +11,19 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#C47B2C"
+      "backgroundColor": "#E4572E"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.amber.save"
+      "bundleIdentifier": "app.shelvr.save"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#C47B2C"
+        "backgroundColor": "#E4572E"
       },
-      "package": "app.amber.save"
+      "package": "app.shelvr.save"
     },
     "web": {
       "bundler": "metro",

@@ -8,6 +8,10 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { missingEnvVariableUrl } from "./utils";
 
+const MAX_HTML_BYTES = 1_500_000;
+const MAX_RECLASSIFY_ITEMS = 2_000;
+const RECLASSIFY_PAGE_SIZE = 100;
+
 const classificationSchema = z.object({
   title: z.string().describe("Short, specific title for the saved item"),
   description: z
@@ -91,7 +95,7 @@ export const processItem = internalAction({
         model: "google/gemini-3.1-flash-lite",
         schema: classificationSchema,
         prompt: [
-          "You classify saved-for-later items for a personal knowledge hub called Amber.",
+          "You classify saved-for-later items for a personal knowledge hub called Shelvr.",
           "Produce a clear title, short description, topical tags, and which existing spaces the item belongs to.",
           "Only assign spaceNames that exactly match names from the user's space list. Prefer fewer accurate spaces over many loose ones.",
           "",
@@ -152,9 +156,35 @@ export const reclassifyForNewSpace = internalAction({
     try {
       assertAiGatewayConfigured();
 
-      const items = await ctx.runQuery(internal.items.listReadyItemsForUser, {
-        userId: spaces.userId,
-      });
+      type ReadyItem = {
+        _id: Id<"items">;
+        title?: string;
+        description?: string;
+        tags?: string[];
+        type: "link" | "image" | "note";
+        url?: string;
+        note?: string;
+        extractedText?: string;
+      };
+      const items: ReadyItem[] = [];
+      let cursor: string | null = null;
+      for (;;) {
+        const page: {
+          page: ReadyItem[];
+          isDone: boolean;
+          continueCursor: string;
+        } = await ctx.runQuery(internal.items.listReadyItemsPage, {
+          userId: spaces.userId,
+          paginationOpts: {
+            numItems: RECLASSIFY_PAGE_SIZE,
+            cursor,
+          },
+        });
+        items.push(...page.page);
+        if (page.isDone || items.length >= MAX_RECLASSIFY_ITEMS) break;
+        cursor = page.continueCursor;
+      }
+
       if (items.length === 0) return null;
 
       // Batch in chunks to stay within model context
@@ -235,27 +265,34 @@ type ExtractedPage = {
 };
 
 async function extractLinkContent(url: string): Promise<ExtractedPage> {
+  const safeUrl = assertSafePublicHttpUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(safeUrl.toString(), {
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "AmberBot/1.0 (+https://amber.app; save-for-later content extractor)",
+          "ShelvrBot/1.0 (+https://shelvr.app; save-for-later content extractor)",
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",
     });
 
+    // Re-validate the post-redirect URL so open redirects cannot hit internals.
+    if (response.url) {
+      assertSafePublicHttpUrl(response.url);
+    }
+
     if (!response.ok) {
       throw new Error(`Fetch failed with status ${response.status}`);
     }
 
-    const html = await response.text();
-    const og = extractOpenGraph(html);
-    const articleText = await extractArticleText(html, url);
+    const html = await readResponseTextLimited(response, MAX_HTML_BYTES);
+    const pageUrl = response.url || safeUrl.toString();
+    const og = extractOpenGraph(html, pageUrl);
+    const articleText = await extractArticleText(html, pageUrl);
 
     let imageAspectRatio: number | undefined;
     if (og.imageUrl) {
@@ -274,7 +311,7 @@ async function extractLinkContent(url: string): Promise<ExtractedPage> {
   }
 }
 
-function extractOpenGraph(html: string) {
+function extractOpenGraph(html: string, pageUrl: string) {
   const getMeta = (keys: string[]) => {
     for (const key of keys) {
       const propRe = new RegExp(
@@ -292,15 +329,18 @@ function extractOpenGraph(html: string) {
   };
 
   const titleTag = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1];
+  const rawImage = getMeta(["og:image", "twitter:image", "twitter:image:src"]);
 
   return {
-    title: getMeta(["og:title", "twitter:title"]) ?? (titleTag ? decodeHtmlEntities(titleTag.trim()) : undefined),
+    title:
+      getMeta(["og:title", "twitter:title"]) ??
+      (titleTag ? decodeHtmlEntities(titleTag.trim()) : undefined),
     description: getMeta([
       "og:description",
       "twitter:description",
       "description",
     ]),
-    imageUrl: getMeta(["og:image", "twitter:image", "twitter:image:src"]),
+    imageUrl: resolveHttpUrl(rawImage, pageUrl),
   };
 }
 
@@ -344,15 +384,22 @@ async function probeImageAspectRatio(
   imageUrl: string,
 ): Promise<number | undefined> {
   try {
+    const safeUrl = assertSafePublicHttpUrl(imageUrl);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
     try {
-      const response = await fetch(imageUrl, {
+      const response = await fetch(safeUrl.toString(), {
         signal: controller.signal,
         headers: { Range: "bytes=0-65535" },
+        redirect: "follow",
       });
+      if (response.url) {
+        assertSafePublicHttpUrl(response.url);
+      }
       if (!response.ok && response.status !== 206) return undefined;
-      const buffer = new Uint8Array(await response.arrayBuffer());
+      const buffer = new Uint8Array(
+        await readResponseArrayBufferLimited(response, 65_536),
+      );
       const dims = readImageSize(buffer);
       if (!dims || dims.height === 0) return undefined;
       return dims.width / dims.height;
@@ -362,6 +409,187 @@ async function probeImageAspectRatio(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Only allow public http(s) URLs. Blocks private/link-local/metadata hosts and
+ * non-http schemes to reduce SSRF risk from user-supplied link saves.
+ */
+function assertSafePublicHttpUrl(raw: string): URL {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Invalid URL");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Only http(s) URLs are allowed");
+  }
+
+  if (url.username || url.password) {
+    throw new Error("URLs with credentials are not allowed");
+  }
+
+  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (!hostname) {
+    throw new Error("Invalid URL host");
+  }
+
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "0.0.0.0" ||
+    hostname === "::" ||
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname.endsWith(".intranet")
+  ) {
+    throw new Error("Private/local URLs are not allowed");
+  }
+
+  if (isPrivateOrReservedIp(hostname)) {
+    throw new Error("Private/local URLs are not allowed");
+  }
+
+  return url;
+}
+
+function resolveHttpUrl(
+  value: string | undefined,
+  baseUrl: string,
+): string | undefined {
+  if (!value) return undefined;
+  try {
+    const resolved = new URL(value, baseUrl);
+    assertSafePublicHttpUrl(resolved.toString());
+    return resolved.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function isPrivateOrReservedIp(hostname: string): boolean {
+  // IPv4
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+    const parts = hostname.split(".").map((p) => Number(p));
+    if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+      return true;
+    }
+    const [a, b] = parts as [number, number, number, number];
+    if (a === 0) return true; // "this" network
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 127) return true; // loopback
+    if (a === 169 && b === 254) return true; // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
+    if (a === 192 && b === 0 && parts[2] === 0) return true; // IETF protocol assignments
+    if (a >= 224) return true; // multicast / reserved
+    return false;
+  }
+
+  // IPv6 (including IPv4-mapped)
+  if (hostname.includes(":")) {
+    const normalized = hostname.toLowerCase();
+    if (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") || // unique local
+      normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") ||
+      normalized.startsWith("fea") ||
+      normalized.startsWith("feb") // link-local fe80::/10
+    ) {
+      return true;
+    }
+    // IPv4-mapped IPv6 ::ffff:a.b.c.d (Node's URL may also emit ::ffff:xxxx:yyyy
+    // hex form, which is not caught by the dotted regex above). Treat any
+    // ::ffff: prefix as suspect: parse it to an IPv4 if possible, otherwise
+    // block to prevent hex-encoded loopback bypasses (e.g. ::ffff:7f00:1).
+    if (normalized.startsWith("::ffff:")) {
+      const rest = normalized.slice("::ffff:".length);
+      // Dotted-decimal form
+      const v4mapped = rest.match(/^\d{1,3}(?:\.\d{1,3}){3}$/);
+      if (v4mapped) {
+        return isPrivateOrReservedIp(rest);
+      }
+      // Hex form: xxxx:yyyy
+      const hexMapped = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+      if (hexMapped) {
+        const high = parseInt(hexMapped[1], 16);
+        const low = parseInt(hexMapped[2], 16);
+        const a = (high >> 8) & 0xff;
+        const b = high & 0xff;
+        const c = (low >> 8) & 0xff;
+        const d = low & 0xff;
+        return isPrivateOrReservedIp(`${a}.${b}.${c}.${d}`);
+      }
+      // Unknown ::ffff: form — block defensively
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function readResponseTextLimited(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
+  const contentLength = response.headers.get("content-length");
+  if (contentLength && Number(contentLength) > maxBytes) {
+    throw new Error("Page too large to extract");
+  }
+
+  const bytes = await readResponseArrayBufferLimited(response, maxBytes);
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+async function readResponseArrayBufferLimited(
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  if (!response.body) {
+    const buf = new Uint8Array(await response.arrayBuffer());
+    if (buf.byteLength > maxBytes) {
+      throw new Error("Page too large to extract");
+    }
+    return buf;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        throw new Error("Page too large to extract");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // ignore
+    }
+  }
+
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
 }
 
 function readImageSize(
@@ -405,7 +633,12 @@ function readImageSize(
     bytes[11] === 0x50
   ) {
     // VP8X
-    if (bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38 && bytes[15] === 0x58) {
+    if (
+      bytes[12] === 0x56 &&
+      bytes[13] === 0x50 &&
+      bytes[14] === 0x38 &&
+      bytes[15] === 0x58
+    ) {
       const width = 1 + (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16));
       const height = 1 + (bytes[27]! | (bytes[28]! << 8) | (bytes[29]! << 16));
       return { width, height };

@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import { Platform, StatusBar, View } from "react-native";
 import ConvexClientProvider from "../../ConvexClientProvider";
 
-const AMBER = "#C47B2C";
+const AMBER = "#E4572E";
 const statusBarHeight =
   Platform.OS === "ios" ? 50 : (StatusBar.currentHeight ?? 0);
 
@@ -24,7 +24,7 @@ export default function RootLayout() {
 
   return (
     <ConvexClientProvider>
-      <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+      <View style={{ flex: 1, backgroundColor: "#F7F1E8" }}>
         <View style={{ height: statusBarHeight, backgroundColor: AMBER }}>
           <StatusBar
             translucent

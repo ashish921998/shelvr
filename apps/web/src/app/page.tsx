@@ -1,19 +1,23 @@
-"use client";
-
 import Header from "@/components/Header";
-import Benefits from "@/components/home/Benefits";
+import FAQ from "@/components/home/FAQ";
+import Features from "@/components/home/Features";
 import Footer from "@/components/home/Footer";
 import FooterHero from "@/components/home/FooterHero";
 import Hero from "@/components/home/Hero";
-import Testimonials from "@/components/home/Testimonials";
+import HowItWorks from "@/components/home/HowItWorks";
+import Spaces from "@/components/home/Spaces";
+import Stats from "@/components/home/Stats";
 
 export default function Home() {
   return (
-    <main>
+    <main className="min-h-screen bg-paper">
       <Header />
       <Hero />
-      <Benefits />
-      <Testimonials />
+      <Stats />
+      <HowItWorks />
+      <Features />
+      <Spaces />
+      <FAQ />
       <FooterHero />
       <Footer />
     </main>

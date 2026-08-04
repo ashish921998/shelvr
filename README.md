@@ -1,28 +1,31 @@
-# Amber
+# Shelvr
 
-Amber is a save-for-later hub. Capture links, images, and notes; Convex + an LLM
+Shelvr is a save-for-later hub. Capture links, images, and notes; Convex + an LLM
 classify each item (title, description, tags, spaces). Everything lands in a
 searchable feed, organized into themed **spaces**.
 
+The product is **mobile-first**: the native app is the full experience. The web
+site is marketing only.
+
 This monorepo was bootstrapped from the
 [Convex monorepo template](https://www.convex.dev/templates/monorepo) and reshaped
-for Amber.
+for Shelvr.
 
 ## Stack
 
 - [Turborepo](https://turbo.build/repo) + [pnpm](https://pnpm.io/)
-- [Next.js](https://nextjs.org/) (`apps/web`)
-- [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`)
+- [Next.js](https://nextjs.org/) (`apps/web`) — marketing landing only
+- [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`) — product app
 - [Convex](https://convex.dev/) (`packages/backend`)
-- [Clerk](https://clerk.com/) auth
+- [Clerk](https://clerk.com/) auth (native + Convex)
 - Vercel AI SDK via AI Gateway (`google/gemini-3.1-flash-lite`)
 
 ## What’s inside
 
 | Path | Purpose |
 | --- | --- |
-| `apps/web` | Next.js marketing site + authenticated app (`/app`) |
-| `apps/native` | Expo native client |
+| `apps/web` | Next.js marketing / landing site |
+| `apps/native` | Expo native client (full product) |
 | `packages/backend` | Convex schema, queries/mutations, AI pipeline |
 
 ## Quick start
@@ -59,19 +62,16 @@ For AI classification, also set:
 pnpm --filter @packages/backend exec convex env set AI_GATEWAY_API_KEY <your-vercel-ai-gateway-key>
 ```
 
-### 4. App env files
-
-Copy the example env files:
+### 4. Native env
 
 ```sh
-cp apps/web/.example.env apps/web/.env.local
 cp apps/native/.example.env apps/native/.env.local
 ```
 
-- `NEXT_PUBLIC_CONVEX_URL` / `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from
-  `packages/backend/.env.local`
-- Clerk publishable key in both apps
-- `CLERK_SECRET_KEY` in `apps/web/.env.local`
+- `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `packages/backend/.env.local`
+- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` from the Clerk dashboard
+
+The web marketing site needs no env vars.
 
 ### 5. Run
 
@@ -79,7 +79,7 @@ cp apps/native/.example.env apps/native/.env.local
 pnpm dev
 ```
 
-Runs backend, web, and native via Turbo.
+Runs backend, web (landing), and native via Turbo.
 
 ## Domain model (Convex)
 
@@ -93,11 +93,13 @@ from Clerk via `model/auth.ts` — never from a client argument.
 
 ## Deploying web
 
+The marketing site is a plain Next.js build — no Convex URL injection required:
+
 ```sh
-cd packages/backend && pnpm exec convex deploy --cmd 'cd ../../apps/web && pnpm build' --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL
+pnpm --filter web-app build
 ```
 
-`apps/web/vercel.json` is set up for this flow on Vercel.
+`apps/web/vercel.json` uses `turbo run build`.
 
 ## Adding dependencies
 
@@ -112,5 +114,5 @@ pnpm --filter @packages/backend add mypackage@latest
 ## Notes
 
 - Native routes live under `apps/native/src/app`
-- Web app routes are under `/app` (Clerk-protected via `apps/web/src/proxy.ts`)
+- Web is marketing only at `/` — no authenticated `/app` product surface
 - See root `CLAUDE.md` for architecture guidance when working with agents

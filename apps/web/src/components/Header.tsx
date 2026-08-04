@@ -6,144 +6,78 @@ import {
   DisclosurePanel,
 } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import Logo from "./common/Logo";
-import { UserNav } from "./common/UserNav";
-import { usePathname } from "next/navigation";
 
-type NavigationItem = {
-  name: string;
-  href: string;
-  current: boolean;
-};
-
-const navigation: NavigationItem[] = [
-  { name: "Benefits", href: "#Benefits", current: true },
-  { name: "Reviews", href: "#reviews", current: false },
+const navigation = [
+  { name: "How it works", href: "#how" },
+  { name: "Features", href: "#features" },
+  { name: "FAQ", href: "#faq" },
 ];
 
 export default function Header() {
-  const { user } = useUser();
-  const pathname = usePathname();
-
   return (
-    <Disclosure as="nav" className=" ">
+    <Disclosure
+      as="nav"
+      className="sticky top-0 z-50 border-b border-line/80 bg-paper/90 backdrop-blur-xl"
+    >
       {({ open }) => (
         <>
-          <div className="flex items-center bg-white h-16 sm:h-20">
-            <div className="container px-2 sm:px-0">
-              <div className="relative flex h-16 items-center justify-between">
-                <div className="flex sm:hidden shrink-0 items-center">
-                  <Logo isMobile={true} />
-                </div>
-                <div className="sm:flex hidden shrink-0 items-center">
-                  <Logo />
-                </div>
-                {pathname === "/" && (
-                  <div className="flex flex-1 items-center justify-center ">
-                    <div className="hidden sm:ml-6 sm:block">
-                      <ul className="flex space-x-28">
-                        {navigation.map((item) => (
-                          <li key={item.name}>
-                            <Link
-                              href={item.href}
-                              className="text-[#2D2D2D] text-center text-xl not-italic font-normal leading-[normal]"
-                              aria-current={item.current ? "page" : undefined}
-                            >
-                              {item.name}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-                {user ? (
-                  <div className="hidden sm:flex absolute inset-y-0 right-0 gap-6 items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-                    <Link href="/app">
-                      <button
-                        type="button"
-                        className=" text-white text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-[22px] py-[11px] button"
-                      >
-                        Open Amber
-                      </button>
-                    </Link>
-                    <UserNav
-                      image={user?.imageUrl}
-                      name={user?.fullName ?? "Account"}
-                      email={user?.primaryEmailAddress?.emailAddress ?? ""}
-                    />
-                  </div>
+          <div className="container flex h-16 items-center justify-between">
+            <Logo />
+
+            <ul className="hidden md:flex items-center gap-8">
+              {navigation.map((item) => (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className="text-sm font-medium text-muted hover:text-ink transition-colors"
+                  >
+                    {item.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden sm:flex items-center">
+              <Link
+                href="#get-app"
+                className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-soft transition-colors"
+              >
+                Get the app
+              </Link>
+            </div>
+
+            <div className="sm:hidden">
+              <DisclosureButton className="inline-flex items-center justify-center rounded-lg p-2 text-ink">
+                <span className="sr-only">Open main menu</span>
+                {open ? (
+                  <XMarkIcon className="h-6 w-6" aria-hidden="true" />
                 ) : (
-                  <div className="hidden sm:flex absolute inset-y-0 right-0 gap-6 items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-                    <Link
-                      href="/app"
-                      className="border rounded-lg border-solid border-[#2D2D2D] text-[#2D2D2D] text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-[22px] py-2.5"
-                    >
-                      Sign in
-                    </Link>
-                    <Link
-                      href="/app"
-                      className=" text-white text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-[22px] py-[11px] button"
-                    >
-                      Get Started
-                    </Link>
-                  </div>
+                  <Bars3Icon className="h-6 w-6" aria-hidden="true" />
                 )}
-                <div className="block sm:hidden">
-                  <DisclosureButton className="relative inline-flex  items-center justify-center rounded-md p-2 text-gray-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-white">
-                    <span className="absolute -inset-0.5" />
-                    <span className="sr-only">Open main menu</span>
-                    {open ? (
-                      <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
-                    ) : (
-                      <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
-                    )}
-                  </DisclosureButton>
-                </div>
-              </div>
+              </DisclosureButton>
             </div>
           </div>
 
-          <DisclosurePanel className="sm:hidden">
-            <div className="space-y-1 px-2 pb-3 pt-2 flex flex-col gap-3 items-start">
+          <DisclosurePanel className="sm:hidden border-t border-line bg-cream">
+            <div className="container py-4 flex flex-col gap-2">
               {navigation.map((item) => (
                 <DisclosureButton
                   key={item.name}
                   as={Link}
                   href={item.href}
-                  className="text-[#2D2D2D] text-center text-xl not-italic font-normal leading-[normal]"
-                  aria-current={item.current ? "page" : undefined}
+                  className="py-2 text-base font-medium text-ink"
                 >
                   {item.name}
                 </DisclosureButton>
               ))}
-              {user ? (
-                <div className="flex gap-6 items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-                  <Link
-                    href="/app"
-                    className="text-white text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-5 py-1.5 button"
-                  >
-                    Open Amber
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex gap-6 items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-                  <Link
-                    href="/app"
-                    className="border rounded-lg border-solid border-[#2D2D2D] text-[#2D2D2D] text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-5 py-[5px]"
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    href="/app"
-                    className=" text-white text-center text-xl not-italic font-normal leading-[normal] font-montserrat px-5 py-1.5 button"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              )}
+              <Link
+                href="#get-app"
+                className="mt-2 rounded-full bg-ink px-4 py-2.5 text-center text-sm font-semibold text-white"
+              >
+                Get the app
+              </Link>
             </div>
           </DisclosurePanel>
         </>

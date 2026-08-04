@@ -1,5 +1,8 @@
 import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import {
   internalMutation,
   internalQuery,
@@ -45,6 +48,17 @@ const itemValidator = v.object({
   spaceIds: v.array(v.id("spaces")),
 });
 
+const readyItemPreviewValidator = v.object({
+  _id: v.id("items"),
+  title: v.optional(v.string()),
+  description: v.optional(v.string()),
+  tags: v.optional(v.array(v.string())),
+  type: itemTypeValidator,
+  url: v.optional(v.string()),
+  note: v.optional(v.string()),
+  extractedText: v.optional(v.string()),
+});
+
 async function enrichItem(
   ctx: QueryCtx | MutationCtx,
   item: Doc<"items">,
@@ -65,6 +79,34 @@ async function enrichItem(
   };
 }
 
+function assertHttpUrl(raw: string) {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Link items require a valid http(s) URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Link items require a valid http(s) URL");
+  }
+  return url.toString();
+}
+
+async function deleteAllLinksForItem(ctx: MutationCtx, itemId: Id<"items">) {
+  for (;;) {
+    const batch = await ctx.db
+      .query("spaceItems")
+      .withIndex("by_item", (q) => q.eq("itemId", itemId))
+      .take(500);
+
+    if (batch.length === 0) break;
+    for (const link of batch) {
+      await ctx.db.delete(link._id);
+    }
+    if (batch.length < 500) break;
+  }
+}
+
 /** Generate a short-lived upload URL for image items. */
 export const generateUploadUrl = mutation({
   args: {},
@@ -80,11 +122,7 @@ export const listItems = query({
   args: {
     paginationOpts: paginationOptsValidator,
   },
-  returns: v.object({
-    page: v.array(itemValidator),
-    isDone: v.boolean(),
-    continueCursor: v.string(),
-  }),
+  returns: paginationResultValidator(itemValidator),
   handler: async (ctx, args) => {
     const userId = await getUserId(ctx);
     if (!userId) {
@@ -162,9 +200,16 @@ export const createItem = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
 
-    if (args.type === "link" && !args.url?.trim()) {
-      throw new Error("Link items require a url");
+    let url: string | undefined;
+    if (args.type === "link") {
+      if (!args.url?.trim()) {
+        throw new Error("Link items require a url");
+      }
+      url = assertHttpUrl(args.url.trim());
+    } else if (args.url?.trim()) {
+      url = args.url.trim();
     }
+
     if (args.type === "note" && !args.note?.trim()) {
       throw new Error("Note items require note text");
     }
@@ -176,10 +221,10 @@ export const createItem = mutation({
       userId,
       type: args.type,
       status: "processing",
-      url: args.url?.trim(),
+      url,
       note: args.note?.trim(),
       storageId: args.storageId,
-      searchText: [args.url, args.note].filter(Boolean).join(" "),
+      searchText: [url, args.note].filter(Boolean).join(" "),
     });
 
     await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
@@ -202,14 +247,7 @@ export const deleteItem = mutation({
       throw new Error(`User '${userId}' cannot delete item '${args.itemId}'`);
     }
 
-    const links = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_item", (q) => q.eq("itemId", args.itemId))
-      .take(500);
-
-    for (const link of links) {
-      await ctx.db.delete(link._id);
-    }
+    await deleteAllLinksForItem(ctx, args.itemId);
 
     if (item.storageId) {
       await ctx.storage.delete(item.storageId);
@@ -312,17 +350,18 @@ export const finalizeItem = internalMutation({
       error: undefined,
     });
 
-    // Replace space memberships with the classified set
+    // Union AI space suggestions with any memberships added while processing.
+    // Never wipe manual links the user already created.
     const existing = await ctx.db
       .query("spaceItems")
       .withIndex("by_item", (q) => q.eq("itemId", args.itemId))
       .take(200);
-    for (const link of existing) {
-      await ctx.db.delete(link._id);
-    }
+    const existingIds = new Set(existing.map((link) => link.spaceId));
 
     const uniqueSpaceIds = [...new Set(args.spaceIds)];
     for (const spaceId of uniqueSpaceIds) {
+      if (existingIds.has(spaceId)) continue;
+
       const space = await ctx.db.get(spaceId);
       if (!space || space.userId !== item.userId) continue;
 
@@ -358,39 +397,37 @@ export const markItemFailed = internalMutation({
   },
 });
 
-export const listReadyItemsForUser = internalQuery({
-  args: { userId: v.string() },
-  returns: v.array(
-    v.object({
-      _id: v.id("items"),
-      title: v.optional(v.string()),
-      description: v.optional(v.string()),
-      tags: v.optional(v.array(v.string())),
-      type: itemTypeValidator,
-      url: v.optional(v.string()),
-      note: v.optional(v.string()),
-      extractedText: v.optional(v.string()),
-    }),
-  ),
+/** Paginated ready-item catalog for new-space reclassification. */
+export const listReadyItemsPage = internalQuery({
+  args: {
+    userId: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: paginationResultValidator(readyItemPreviewValidator),
   handler: async (ctx, args) => {
-    const items = await ctx.db
+    // Paginate the user's items, then keep only ready ones. Callers loop until
+    // isDone so older ready items are not dropped by a fixed take() window.
+    const result = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
-      .take(200);
+      .paginate(args.paginationOpts);
 
-    return items
-      .filter((item) => item.status === "ready")
-      .map((item) => ({
-        _id: item._id,
-        title: item.title,
-        description: item.description,
-        tags: item.tags,
-        type: item.type,
-        url: item.url,
-        note: item.note,
-        extractedText: item.extractedText,
-      }));
+    return {
+      ...result,
+      page: result.page
+        .filter((item) => item.status === "ready")
+        .map((item) => ({
+          _id: item._id,
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          type: item.type,
+          url: item.url,
+          note: item.note,
+          extractedText: item.extractedText,
+        })),
+    };
   },
 });
 
@@ -402,6 +439,12 @@ export const linkItemToSpaceInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const space = await ctx.db.get(args.spaceId);
+    if (!space || space.userId !== args.userId) return null;
+
+    const item = await ctx.db.get(args.itemId);
+    if (!item || item.userId !== args.userId) return null;
+
     const existing = await ctx.db
       .query("spaceItems")
       .withIndex("by_space_and_item", (q) =>

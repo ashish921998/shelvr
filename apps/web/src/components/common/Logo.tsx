@@ -1,22 +1,25 @@
-import Image from "next/image";
 import Link from "next/link";
-import React from "react";
 
 interface Props {
-  isMobile?: boolean;
+  tone?: "light" | "dark";
 }
 
-const Logo = ({ isMobile }: Props) => {
+const Logo = ({ tone = "dark" }: Props) => {
+  const textClass = tone === "light" ? "text-white" : "text-ink";
+  const markClass =
+    tone === "light" ? "bg-white text-ink" : "bg-ink text-white";
+
   return (
-    <Link href={"/"}>
-      <div className="flex gap-2 items-center">
-        <Image src={"/images/logo.png"} width={26} height={26} alt="logo" />
-        {!isMobile ? (
-          <h1 className="font-montserrat text-black text-3xl sm:text-[35px] not-italic font-normal leading-[90.3%] tracking-[-0.875px]">
-            Amber
-          </h1>
-        ) : null}
-      </div>
+    <Link href="/" className="inline-flex items-center gap-2.5 group">
+      <span
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${markClass} text-sm font-bold tracking-tight`}
+        aria-hidden
+      >
+        S
+      </span>
+      <span className={`text-[1.15rem] font-semibold tracking-tight ${textClass}`}>
+        Shelvr
+      </span>
     </Link>
   );
 };

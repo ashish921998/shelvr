@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,12 +13,12 @@ import { Feather, AntDesign } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
 import { useUser } from "@clerk/clerk-expo";
 import { api } from "@packages/backend/convex/_generated/api";
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { type Href, useRouter } from "expo-router";
 
-const AMBER = "#C47B2C";
-const AMBER_DARK = "#8A4F12";
-const CREAM = "#FFF8F0";
+const AMBER = "#E4572E";
+const AMBER_DARK = "#2A241F";
+const CREAM = "#F7F1E8";
 
 export default function HomeFeedScreen() {
   const router = useRouter();
@@ -26,35 +26,28 @@ export default function HomeFeedScreen() {
   const imageUrl = user?.user?.imageUrl;
   const firstName = user?.user?.firstName;
   const [search, setSearch] = useState("");
+  const query = search.trim();
+  const isSearching = query.length > 0;
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.items.listItems,
-    {},
+    isSearching ? "skip" : {},
     { initialNumItems: 30 },
   );
+  const searchResults = useQuery(
+    api.items.searchItems,
+    isSearching ? { query, limit: 50 } : "skip",
+  );
 
-  const items = useMemo(() => {
-    if (!search.trim()) return results;
-    const q = search.toLowerCase();
-    return results.filter((item) => {
-      const haystack = [
-        item.title,
-        item.description,
-        item.url,
-        item.note,
-        ...(item.tags ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [results, search]);
+  const items = isSearching ? (searchResults ?? []) : results;
+  const loading =
+    (!isSearching && status === "LoadingFirstPage") ||
+    (isSearching && searchResults === undefined);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.brand}>Amber</Text>
+        <Text style={styles.brand}>Shelvr</Text>
       </View>
 
       <View style={styles.topRow}>
@@ -93,12 +86,14 @@ export default function HomeFeedScreen() {
         </TouchableOpacity>
       </View>
 
-      {status === "LoadingFirstPage" ? (
+      {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={AMBER} />
       ) : items.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
-            Save a link, image, or note{"\n"}to get started
+            {isSearching
+              ? `No saves match “${query}”`
+              : "Save a link, image, or note\nto get started"}
           </Text>
         </View>
       ) : (
@@ -107,7 +102,7 @@ export default function HomeFeedScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
           onEndReached={() => {
-            if (status === "CanLoadMore") loadMore(20);
+            if (!isSearching && status === "CanLoadMore") loadMore(20);
           }}
           renderItem={({ item }) => (
             <TouchableOpacity

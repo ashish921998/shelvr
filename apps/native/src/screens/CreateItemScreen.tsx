@@ -15,9 +15,9 @@ import { api } from "@packages/backend/convex/_generated/api";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 
-const AMBER = "#C47B2C";
-const AMBER_DARK = "#8A4F12";
-const CREAM = "#FFF8F0";
+const AMBER = "#E4572E";
+const AMBER_DARK = "#2A241F";
+const CREAM = "#F7F1E8";
 
 type ItemType = "link" | "note";
 
@@ -71,7 +71,7 @@ export default function CreateItemScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.header}>
-        <Text style={styles.brand}>Amber</Text>
+        <Text style={styles.brand}>Shelvr</Text>
       </View>
 
       <View style={styles.topRow}>
@@ -119,7 +119,7 @@ export default function CreateItemScreen() {
               style={styles.input}
             />
             <Text style={styles.help}>
-              Amber will fetch the page, extract the article, and classify it
+              Shelvr will fetch the page, extract the article, and classify it
               into spaces.
             </Text>
           </>

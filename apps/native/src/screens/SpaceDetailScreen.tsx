@@ -13,9 +13,9 @@ import type { Id } from "@packages/backend/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 
-const AMBER = "#C47B2C";
-const AMBER_DARK = "#8A4F12";
-const CREAM = "#FFF8F0";
+const AMBER = "#E4572E";
+const AMBER_DARK = "#2A241F";
+const CREAM = "#F7F1E8";
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
@@ -32,7 +32,7 @@ export default function SpaceDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.brand}>Amber</Text>
+        <Text style={styles.brand}>Shelvr</Text>
       </View>
 
       <View style={styles.topRow}>
@@ -51,6 +51,8 @@ export default function SpaceDetailScreen() {
 
       {items === undefined || space === undefined ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={AMBER} />
+      ) : space === null ? (
+        <Text style={styles.empty}>Space not found</Text>
       ) : items.length === 0 ? (
         <Text style={styles.empty}>
           No items in this space yet. New matching saves will land here.

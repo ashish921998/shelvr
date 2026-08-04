@@ -1,35 +1,39 @@
-import Image from "next/image";
 import Link from "next/link";
-import React from "react";
 
 const FooterHero = () => {
   return (
-    <div className="bg-primary">
-      <div className="flex flex-wrap md:flex-nowrap justify-between container py-20 px-6 sm:px-0">
-        <div className="max-w-[802px]">
-          <h2 className="font-montserrat text-wrap text-white not-italic text-3xl md:text-[57px] font-semibold sm:leading-[109.3%] sm:tracking-[-1.425px] leading-[97.3%] tracking-[-0.75px] pb-[31px] sm:pb-[38px]">
-            Start saving with Amber
-          </h2>
-          <p className="text-white max-w-[681px] text-xl sm:text-3xl not-italic font-normal leading-[103.3%] tracking-[-0.75px] font-montserrat pb-[66px] sm:pb-[53px]">
-            Sign up and turn every link, image, and note into an organized,
-            searchable library.
-          </p>
-          <Link href={"/app"}>
-            <button className="linear_gradient flex max-w-[438px] w-full justify-center items-center gap-2.5 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)] px-8 py-4 rounded-[11px]  text-black text-xl sm:text-3xl not-italic font-semibold leading-[90.3%] tracking-[-0.75px]">
-              Get Started For Free
-            </button>
-          </Link>
-        </div>
-        <div className="mt-20 md:mt-0">
-          <Image
-            src="/images/monitor.png"
-            alt="hero"
-            width={560}
-            height={456}
-          />
+    <section id="get-app" className="py-16 sm:py-20">
+      <div className="container">
+        <div className="relative overflow-hidden rounded-[2rem] bg-ink text-white px-6 py-14 sm:px-12 sm:py-16 text-center">
+          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-ember/30 blur-3xl" />
+          <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-shelf/25 blur-3xl" />
+
+          <div className="relative mx-auto max-w-2xl">
+            <p className="text-xs font-semibold tracking-[0.18em] uppercase text-[#F0B59A]">
+              Mobile-first
+            </p>
+            <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl sm:text-5xl tracking-[-0.03em] leading-[1.08] font-medium">
+              Put the internet back on a shelf
+            </h2>
+            <p className="mt-4 text-base sm:text-lg text-white/70 leading-relaxed">
+              Shelvr lives on your phone. Capture the next thing you care about
+              before the tab disappears forever.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <span className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm sm:text-base font-semibold text-ink">
+                iOS app coming soon
+              </span>
+              <Link
+                href="#how"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3.5 text-sm sm:text-base font-medium text-white/90 hover:border-white/40 transition-colors"
+              >
+                See how it works
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

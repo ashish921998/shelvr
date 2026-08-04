@@ -2,8 +2,11 @@ import { v } from "convex/values";
 import {
   mutation,
   query,
+  type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { getUserId, requireUserId } from "./model/auth";
 
 const spaceValidator = v.object({
@@ -34,6 +37,35 @@ const itemPreviewValidator = v.object({
   imageAspectRatio: v.optional(v.number()),
 });
 
+async function countSpaceItems(
+  ctx: { db: QueryCtx["db"] },
+  spaceId: Id<"spaces">,
+) {
+  // Soft cap for UI display; spaces with more still work, count may plateau.
+  const links = await ctx.db
+    .query("spaceItems")
+    .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+    .take(500);
+  return links.length;
+}
+
+async function deleteAllLinksForSpace(
+  ctx: MutationCtx,
+  spaceId: Id<"spaces">,
+) {
+  for (;;) {
+    const batch = await ctx.db
+      .query("spaceItems")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+      .take(500);
+    if (batch.length === 0) break;
+    for (const link of batch) {
+      await ctx.db.delete(link._id);
+    }
+    if (batch.length < 500) break;
+  }
+}
+
 /** List spaces for the current user. */
 export const listSpaces = query({
   args: {},
@@ -49,13 +81,10 @@ export const listSpaces = query({
       .take(200);
 
     return await Promise.all(
-      spaces.map(async (space) => {
-        const links = await ctx.db
-          .query("spaceItems")
-          .withIndex("by_space", (q) => q.eq("spaceId", space._id))
-          .take(500);
-        return { ...space, itemCount: links.length };
-      }),
+      spaces.map(async (space) => ({
+        ...space,
+        itemCount: await countSpaceItems(ctx, space._id),
+      })),
     );
   },
 });
@@ -71,12 +100,10 @@ export const getSpace = query({
     const space = await ctx.db.get(args.spaceId);
     if (!space || space.userId !== userId) return null;
 
-    const links = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_space", (q) => q.eq("spaceId", space._id))
-      .take(500);
-
-    return { ...space, itemCount: links.length };
+    return {
+      ...space,
+      itemCount: await countSpaceItems(ctx, space._id),
+    };
   },
 });
 
@@ -146,9 +173,7 @@ export const createSpace = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(200);
 
-    if (
-      existing.some((s) => s.name.toLowerCase() === name.toLowerCase())
-    ) {
+    if (existing.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
       throw new Error(`You already have a space named "${name}"`);
     }
 
@@ -194,6 +219,22 @@ export const updateSpace = mutation({
     if (args.name !== undefined) {
       const name = args.name.trim();
       if (!name) throw new Error("Space name is required");
+
+      const siblings = await ctx.db
+        .query("spaces")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .take(200);
+
+      if (
+        siblings.some(
+          (s) =>
+            s._id !== args.spaceId &&
+            s.name.toLowerCase() === name.toLowerCase(),
+        )
+      ) {
+        throw new Error(`You already have a space named "${name}"`);
+      }
+
       patch.name = name;
     }
     if (args.description !== undefined) {
@@ -221,15 +262,7 @@ export const deleteSpace = mutation({
       throw new Error(`User '${userId}' cannot delete space '${args.spaceId}'`);
     }
 
-    const links = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
-      .take(1000);
-
-    for (const link of links) {
-      await ctx.db.delete(link._id);
-    }
-
+    await deleteAllLinksForSpace(ctx, args.spaceId);
     await ctx.db.delete(args.spaceId);
     return null;
   },

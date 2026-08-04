@@ -10,7 +10,7 @@ This file provides guidance when working with code in this repository.
 
 ## What this is
 
-**Amber** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
+**Shelvr** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
 backend action fetches/extracts content and an LLM classifies each item (title, description,
 tags, and which "spaces" it belongs to). Clients render a feed of saves. Items can be
 organized into **spaces** (themed collections), and creating a new space retroactively pulls
@@ -20,7 +20,7 @@ in matching existing items.
 
 | Path | Role |
 | --- | --- |
-| `apps/web` | Next.js marketing site + authenticated app at `/app` |
+| `apps/web` | Next.js marketing / landing site only |
 | `apps/native` | Expo Router native app |
 | `packages/backend` | Convex backend (schema, functions, AI pipeline) |
 
@@ -72,17 +72,15 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 ### Web (`apps/web`)
 
-- Next.js App Router + Clerk + `ConvexProviderWithClerk`
-- Marketing landing at `/`; authenticated product at `/app`, `/app/items/[itemId]`,
-  `/app/spaces`, `/app/spaces/[spaceId]`
-- Route protection via `src/proxy.ts` (`/app(.*)`)
+- Next.js App Router marketing site only (no Clerk, no Convex)
+- Landing page at `/` — product experience lives in the native app
 
 ### Native (`apps/native`)
 
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups
 - Clerk Expo + `ConvexProviderWithClerk` in `ConvexClientProvider.tsx`
 - Screens: home feed, save item, item detail, spaces list/detail
-- Scheme / bundle id: `amber` / `app.amber.save`
+- Scheme / bundle id: `shelvr` / `app.shelvr.save`
 
 ## Path aliases
 
@@ -94,8 +92,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 **Client**
 
-- Web (`.env.local`): `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CONVEX_URL`,
-  `CLERK_SECRET_KEY`
+- Web: no backend/auth env vars (static marketing site)
 - Native (`.env.local`): `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `EXPO_PUBLIC_CONVEX_URL`
 
 **Convex deployment** (via `convex env set` or dashboard):

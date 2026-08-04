@@ -7,8 +7,8 @@ import { useRouter } from "expo-router";
 
 type OAuthStrategy = "oauth_google" | "oauth_apple";
 
-const AMBER = "#C47B2C";
-const CREAM = "#FFF8F0";
+const AMBER = "#E4572E";
+const CREAM = "#F7F1E8";
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -37,9 +37,9 @@ const LoginScreen = () => {
         <View style={styles.logoMark}>
           <Text style={styles.logoLetter}>A</Text>
         </View>
-        <Text style={styles.title}>Welcome to Amber</Text>
+        <Text style={styles.title}>Welcome to Shelvr</Text>
         <Text style={styles.subtitle}>
-          Save links, images, and notes. Amber classifies them into spaces for
+          Save links, images, and notes. Shelvr classifies them into spaces for
           later.
         </Text>
         <TouchableOpacity
