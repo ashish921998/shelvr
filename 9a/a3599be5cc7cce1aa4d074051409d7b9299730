@@ -1,0 +1,137 @@
+apps/web/src/components/home/Spaces.tsx
+  s_5bbd53cc8c770b::t_3697f0d56e3c6a 1-10,12-16,18-20,22,24-25,27,30-31,33-36,38,42,45-49,51-54,57,59-60,62-63,65-69,72-73,75-76,78-80
+  s_4b5ceff72d0981::t_94dc0858a9740b 11,17,26,28-29,32,37,39-41,43-44,55-56,64
+apps/web/src/components/home/Footer.tsx
+  s_a4b0e3fa40d1af::t_deb86523d50f50 9
+  s_5bbd53cc8c770b::t_9067e8f9541d9b 1,4-5,7,14-16,18-28,31-38,41
+  s_4b5ceff72d0981::t_10b1afb4994067 6,8
+apps/web/src/app/page.tsx
+  s_4b5ceff72d0981::t_5bf5c75c82cc60 2-3,9,16,18,20
+  s_5bbd53cc8c770b::t_f9d069b4b1f665 7-8,13,17,19
+apps/native/src/screens/SpaceDetailScreen.tsx
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 35
+  s_5bbd53cc8c770b::t_f3eb2833808e02 54-55
+  s_5bbd53cc8c770b::t_0bf278edf1339d 16-18
+apps/web/src/components/home/FooterHero.tsx
+  s_4b5ceff72d0981::t_04ecfcf86e66af 7-9,11,15,18,20,22-23,27-28,30
+  s_5bbd53cc8c770b::t_05d9bb83b6acd8 6,10,12,14,16-17,21,26,29,31-33,36
+  s_a4b0e3fa40d1af::t_2623c4aea1da2c 5,13,19,24-25
+CLAUDE.md
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 13,83
+  s_a4b0e3fa40d1af::t_09ac259bf920b5 23,75-76,95
+apps/web/src/components/home/PhoneMockups.tsx
+  s_4b5ceff72d0981::t_925179809e185b 3-25,27-31,33-37,39-41,43-49,52-54,56-89,91-99,101-116,118-160,162-164,166-171,173-176,178-190,193,195,197-206,208-261,263-270
+  s_4b5ceff72d0981::t_663a52cdb850de 50
+  s_4b5ceff72d0981::t_38a62a624f7226 1
+  s_4b5ceff72d0981::t_40ebd6180bcb0b 38
+apps/web/vercel.json
+  s_a4b0e3fa40d1af::t_d678b7285c187f 2
+apps/native/src/screens/LoginScreen.tsx
+  s_5bbd53cc8c770b::t_0bf278edf1339d 10-11
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 40,42
+.gitignore
+  s_4b5ceff72d0981::t_417323370c8be0 42
+apps/native/app.json
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 4-6,19,26
+  s_5bbd53cc8c770b::t_e49d8242d9d1a3 14,24
+packages/backend/convex/items.ts
+  s_5bbd53cc8c770b::t_0f8ca860d3bd7e 250
+  s_5bbd53cc8c770b::t_78f6ad70713fd8 3-5,51-61,82-94,96,101-109,125,203-210,212,224,227,353-354,359,363-364,400-406,408-410,414,416-430,442-447
+  s_5bbd53cc8c770b::t_fd7d181e9b5ded 95,97-100
+  s_5bbd53cc8c770b::t_ebb7ce63d73b74 2
+apps/web/src/app/globals.css
+  s_4b5ceff72d0981::t_058ea570ac58f0 70-72,74-75,82,85-86,88,95-96
+  s_4b5ceff72d0981::t_3112f156115aad 29-31
+  s_4b5ceff72d0981::t_33818e5c3bcdcd 11-20,23-27,63,66,68-69,76,79-81,83-84,87,89,92-94,98-110
+  s_5bbd53cc8c770b::t_b96b0becaa338e 1,8-9,21-22,36-38,47-51,53-62,64-65,73
+  s_4b5ceff72d0981::t_f369ce0d73a4bd 67
+README.md
+  s_a4b0e3fa40d1af::t_bf3fd33b64766f 3,7-9,12,17-18,20,27-28,65,71-74,82,96-97,99,102,117
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 1
+apps/native/src/screens/ItemDetailScreen.tsx
+  s_5bbd53cc8c770b::t_0bf278edf1339d 19-21
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 50
+apps/native/src/screens/SpacesScreen.tsx
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 54
+  s_5bbd53cc8c770b::t_0bf278edf1339d 18-20
+apps/native/src/screens/HomeFeedScreen.tsx
+  s_5bbd53cc8c770b::t_cb59f13d2226da 1,16,29-30,34,37-40,42-45,89,94-96,105
+  s_5bbd53cc8c770b::t_0bf278edf1339d 19-21
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 50
+apps/web/src/components/home/FAQ.tsx
+  s_4b5ceff72d0981::t_cd6cc1ace5e813 3-4,6-27,29,31-37,39-60,63-64,66-68
+apps/web/src/components/Header.tsx
+  s_a4b0e3fa40d1af::t_674bb986a42ae4 20-21,23,29-33,36-41,43-44,46-48,70
+  s_5bbd53cc8c770b::t_9c81394df46e11 12-13,49-55,57,59,63
+  s_4b5ceff72d0981::t_988355d48bd499 14-15,22,26-27,34,42,45,64,75-80
+apps/web/src/components/common/Logo.tsx
+  s_5bbd53cc8c770b::t_d2eb2068ac91f8 4,9,11,13-14,16-19
+  s_4b5ceff72d0981::t_abd715590b5a25 7-8,10,15,20-22
+apps/web/src/components/home/HowItWorks.tsx
+  s_5bbd53cc8c770b::t_4a27207b616cfc 3,17,21,31-34,39,42-43,48-50,52,58
+  s_4b5ceff72d0981::t_a3a6e8f71e7936 1,5-7,10-12,15-16,23-30,35-36,38,40-41,44-47
+apps/web/src/app/layout.tsx
+  s_a4b0e3fa40d1af::t_e31a4d461fe0ed 32
+  s_5bbd53cc8c770b::t_73b64da660ec17 7,10,13,16,19,21
+  s_4b5ceff72d0981::t_dd04ceba53cae2 2,6,8-9,11-12,14-15,31
+packages/backend/convex/spaces.ts
+  s_5bbd53cc8c770b::t_d988603d2eceb2 40-44
+  s_5bbd53cc8c770b::t_4d362f214b7788 5,9,45-68,84-87,103-106,176,222-237,265
+  s_5bbd53cc8c770b::t_8502c60c7be74e 6
+apps/native/src/screens/CreateItemScreen.tsx
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 74,122
+  s_5bbd53cc8c770b::t_0bf278edf1339d 18-20
+apps/web/.example.env
+  s_a4b0e3fa40d1af::t_c0be8453fd43eb 1
+apps/web/src/components/home/Features.tsx
+  s_4b5ceff72d0981::t_0d58cf4ee9c4e8 1,5-6,9,11-12,15,17-18,21,23-24,28,30-41,44-48,50-56,65
+apps/native/src/app/_layout.tsx
+  s_5bbd53cc8c770b::t_e49d8242d9d1a3 6,27
+apps/web/src/components/home/Stats.tsx
+  s_4b5ceff72d0981::t_b0db058e9e3f4d 1-29
+apps/web/src/components/home/Hero.tsx
+  s_4b5ceff72d0981::t_8a84b649c5bf41 2,8-12,16-37,40-41
+  s_5bbd53cc8c770b::t_357b5c431b36de 14
+  s_4b5ceff72d0981::t_476a9265612508 6-7,15
+apps/web/package.json
+  s_a4b0e3fa40d1af::t_09ac259bf920b5 15
+packages/backend/convex/ai.ts
+  s_5bbd53cc8c770b::t_4776c8b498dde7 11-14,170-171,177-187,268,273,283-287,292-295,314,332,335-337,343,387,391,394,396-398,400-402,414-507,532-594,636-641
+  s_5bbd53cc8c770b::t_c6242141b466c8 159-169,172-176
+  s_4b5ceff72d0981::t_765cabf5637e06 508-531
+  s_5bbd53cc8c770b::t_bb5ef758dac5c5 98,277
+pnpm-lock.yaml
+  s_a4b0e3fa40d1af::t_e049c716f918d5 126-128,7554,7591,9466-9467
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "9aa3599be5cc7cce1aa4d074051409d7b9299730",
+  "prompts": {},
+  "sessions": {
+    "s_4b5ceff72d0981": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "65e9075a-90ee-418b-b875-38d80c044dd2",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_5bbd53cc8c770b": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "d51312f2-caaf-4c51-ae41-179862d16e16",
+        "model": "grok-4.5"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_a4b0e3fa40d1af": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "585b3762-b6f6-42ba-b743-435c0d3c246d",
+        "model": "grok-4.5"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
