@@ -1,0 +1,85 @@
+apps/native/convex/_generated/server.js
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-93
+apps/native/convex/_generated/api.js
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-23
+apps/native/tsconfig.json
+  s_d3da21aaa13ae5::t_3cd12070bea6ce 7
+apps/native/convex/crons.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-16
+apps/native/convex/_generated/server.d.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-143
+apps/native/convex/model/memberships.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-26
+apps/native/convex/model/externalUrl.test.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-148
+apps/native/modules/progressive-blur/ios/ProgressiveBlurView.swift
+  s_d3da21aaa13ae5::t_0c6458065b8e85 1-82
+apps/native/convex/model/auth.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-15
+apps/native/convex/_generated/ai/ai-files.state.json
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-41
+apps/native/modules/progressive-blur/ios/ProgressiveBlurModule.swift
+  s_d3da21aaa13ae5::t_0c6458065b8e85 1-13
+apps/native/convex/_generated/ai/guidelines.md
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-458
+apps/native/convex/ai.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-1146
+apps/native/convex/auth.config.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-8
+README.md
+  s_d3da21aaa13ae5::t_e425ba3cedc18c 55,61
+  s_d3da21aaa13ae5::t_082ee1d1974f01 70
+  s_d3da21aaa13ae5::t_a7ee1570857e6a 28
+  s_d3da21aaa13ae5::t_2ba80c4b76aad7 19
+  s_d3da21aaa13ae5::t_a690f9dfd046dd 41,45
+apps/native/convex/items.test.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-943
+apps/native/convex/items.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-1225
+apps/native/convex/model/safeFetch.test.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-770
+apps/native/modules/progressive-blur/ios/ProgressiveBlur.podspec
+  s_d3da21aaa13ae5::t_0c6458065b8e85 1-22
+apps/native/convex/_generated/dataModel.d.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-60
+package.json
+  s_d3da21aaa13ae5::t_2e99f16209a692 19
+CLAUDE.md
+  s_d3da21aaa13ae5::t_4bc81bbafbc1c0 120
+  s_d3da21aaa13ae5::t_36417547eab390 115
+  s_d3da21aaa13ae5::t_b281c517cba6a0 33,36-37
+  s_d3da21aaa13ae5::t_1f744f43e733a0 45
+  s_d3da21aaa13ae5::t_4aebb94556dabe 24,26,87-88
+apps/native/convex/_generated/api.d.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-59
+apps/native/convex/model/memberships.test.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-57
+apps/native/convex/schema.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-170
+apps/native/convex/spaces.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-488
+apps/native/convex/model/externalUrl.ts
+  s_d3da21aaa13ae5::t_c00cbfa8c9475d 1-131
+apps/native/modules/subject-lift/ios/SubjectLift.podspec
+  s_d3da21aaa13ae5::t_68ad1f44ee76b9 1-22
+apps/native/modules/subject-lift/ios/SubjectLiftModule.swift
+  s_d3da21aaa13ae5::t_3924af62894106 1-275
+pnpm-lock.yaml
+  s_d3da21aaa13ae5::t_1d89db99462c15 25,31,37,40,58,61,64,67,70,73,76,82,85,88,91,97,103,106,109,112,115,121,124,127,130,133,148,151,154,157,160,163,166,169,172,175,178,221,7242,7248,7284,7286,7290,7292-7293,7296-7298,7301,7515,7525,7551,7577-7578,7640,7645,7647,7649,7651,7712,7714,7716,7718,7721,7723,7725,7727,7756,7774,7776,7778,7781,7858-7860,7864-7865,7881,7883,7885,7891,8394,8397,8400,8403,8481,8491,8568,8572-8573,8585,8590,8599,8607,8612,8614,8620,8686,8690,8693,8703-8704,8708,8710,8719,8726,8731,8733-8735,8742,8745,8750,8752,8763,8826,8828,9816,10534,10565,10736,10738,10741,10743,10745,10747,10751,10753,10756-10757,10759,10764,10767,10769-10770,10773,10778,10780,10782,10784,10786-10787,10789,10791,10793,10795,10798-10799,10805,10807,10809-10811,10818,10821-10822,10824,10828,10830,10832,10834,10838,10840-10841,10843,10845,10848,10850,10852,10854,10858,10862,10866,10869,10871,10873,10882,10885,10887,10890,10897,10900,10902,10904,10906,10908-10909,10921,10924,10927,10929,10931,10933,10935,10937-10938,10941,10943-10944,10946,10948-10949,10951,10954,10961-10964,10966,10974-10977,10985-10986,11000,11004,11009,11011,11016,11018,11020,11022,11025-11026,11028,11031,11035-11036,11044,11046,11048-11049,11051,11054,11057,11060,11065-11068,11071,11074,11078-11079,11082,11698,12342,12351,12737,12741-12743,12746,12753,12755,12758,12760,12763-12764,12766,12769-12770,12772,12775,12777,12780-12782,12785,12788,12790,12794,12805,12810-12811,12813,12815,12817,12820,12823-12825,12843,12848,12851,12864,12867,12872,12876,12880,13092,13421
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "0d1be673ce94b6e068a36a47d3d7ccf79dc3ca2b",
+  "prompts": {},
+  "sessions": {
+    "s_d3da21aaa13ae5": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "4131650d-c9ec-4410-a321-64263a5302ef",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
