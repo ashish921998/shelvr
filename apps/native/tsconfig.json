@@ -4,7 +4,7 @@
     "strict": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@convex/*": ["../../packages/backend/convex/*"],
+      "@convex/*": ["./convex/*"],
       "subject-lift": ["./modules/subject-lift"],
       "progressive-blur": ["./modules/progressive-blur"]
     }

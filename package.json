@@ -16,8 +16,7 @@
     "node": ">=20.20.0"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "packageManager": "pnpm@10.33.0"
 }
