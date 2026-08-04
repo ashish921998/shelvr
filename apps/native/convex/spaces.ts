@@ -21,7 +21,7 @@ const spaceFields = {
   dynamic: v.optional(v.boolean()),
 };
 
-/** A space's joins split by who owns them: the user (saved) vs Amber (suggested). */
+/** A space's joins split by who owns them: the user (saved) vs Shelvr (suggested). */
 async function splitJoins(ctx: QueryCtx, spaceId: Id<"spaces">) {
   const joins = await ctx.db
     .query("spaceItems")

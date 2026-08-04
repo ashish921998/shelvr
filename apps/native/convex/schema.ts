@@ -83,7 +83,7 @@ export default defineSchema({
     userId: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
-    // Dynamic = Amber keeps suggesting new saves into this space. Absent means
+    // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
   }).index("by_user", ["userId"]),

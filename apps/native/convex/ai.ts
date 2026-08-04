@@ -21,7 +21,7 @@ import {
 const MODEL = "google/gemini-3.1-flash-lite";
 
 const SYSTEM_PROMPT =
-  "You are the classifier for Amber, a save-it-for-later app. Titles must be short and " +
+  "You are the classifier for Shelvr, a save-it-for-later app. Titles must be short and " +
   "punchy — like a label on a folder, not a headline. Aim for 2-4 words, never a full " +
   "sentence, and never end with a period.";
 
@@ -851,7 +851,7 @@ export const recommendForSpace = internalAction({
         model: MODEL,
         schema: recommendSchema,
         prompt: [
-          "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Amber recommends a few existing saves for it — the user decides which to keep.",
+          "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Shelvr recommends a few existing saves for it — the user decides which to keep.",
           `Space name: "${space.name}"${space.description ? `\nSpace description: ${space.description}` : ""}`,
           "Below is a numbered list of the user's saved items. Return the numbers of a handful of items that CLEARLY belong in this space — quality over quantity, high-confidence picks only, at most 8. If nothing clearly fits, return an empty array.",
           itemLines,
