@@ -1,0 +1,430 @@
+apps/web/src/components/items/ItemDetails.tsx
+  s_d378bbde4a4186::t_e493a5eaac9467 1-101
+apps/web/src/components/home/Benefits.tsx
+  s_d378bbde4a4186::t_a1ec05cde6bd4f 5-45
+  s_d378bbde4a4186::t_e6cbf3ddff4522 2-4
+  s_d378bbde4a4186::t_6324cd538fb967 46-48
+  s_d378bbde4a4186::t_a6e706f7feef9e 1,49-95
+apps/native/src/screens/SpaceDetailScreen.tsx
+  s_d378bbde4a4186::t_42426ba0d30289 1-156
+apps/native/src/app/_layout.tsx
+  s_d378bbde4a4186::t_2dd2cb47f9ca4d 6-31
+  s_d378bbde4a4186::t_f7916020b83360 3-5
+  s_d378bbde4a4186::t_3b92384d385d5d 32-34
+  s_d378bbde4a4186::t_097255f870cd69 1-2,35-39
+apps/web/src/app/app/spaces/page.tsx
+  s_d378bbde4a4186::t_9ae0a13a8314e3 1-11
+apps/native/src/screens/CreateItemScreen.tsx
+  s_d378bbde4a4186::t_bf353b37a064ed 1-254
+apps/web/src/components/items/CreateItem.tsx
+  s_d378bbde4a4186::t_193781bce21a67 1-147
+apps/native/src/screens/HomeFeedScreen.tsx
+  s_d378bbde4a4186::t_0d92645216658e 1-353
+apps/web/src/app/app/page.tsx
+  s_d378bbde4a4186::t_71a9adb3a41062 1-11
+apps/native/src/app/(app)/spaces/[spaceId].tsx
+  s_d378bbde4a4186::t_56f77ab09c78b4 1
+README.md
+  s_d378bbde4a4186::t_5c663cefd3b1b0 1-116
+apps/native/app.json
+  s_d378bbde4a4186::t_7b05d35d099d41 4-26
+  s_d378bbde4a4186::t_83953f810e8294 1-3
+  s_d378bbde4a4186::t_29fb05cb46b8e5 27-29
+  s_d378bbde4a4186::t_efd63b65a34019 30-46
+apps/native/src/screens/LoginScreen.tsx
+  s_d378bbde4a4186::t_e9bc46d9b4f02a 10-165,170
+  s_d378bbde4a4186::t_22d67ea98e8f3c 7-9
+  s_d378bbde4a4186::t_98e0de514b8b52 166-169
+  s_d378bbde4a4186::t_48af35d96ee113 171-173
+  s_d378bbde4a4186::t_c8e028e464b380 1-6
+apps/web/src/components/items/ItemsFeed.tsx
+  s_d378bbde4a4186::t_200cb7c72215c9 1-149
+apps/native/src/app/(app)/items/[itemId].tsx
+  s_d378bbde4a4186::t_243a481034743c 1
+apps/web/src/app/app/items/[itemId]/page.tsx
+  s_d378bbde4a4186::t_0612b573eb0f0c 1-17
+apps/web/src/components/spaces/SpacesPanel.tsx
+  s_d378bbde4a4186::t_4478729424590b 1-108
+CLAUDE.md
+  s_d378bbde4a4186::t_628f0121c7d5b4 3-124
+  s_d378bbde4a4186::t_a304cdab963bfd 1-2
+  s_d378bbde4a4186::t_65d94830958d78 125-126
+apps/web/src/components/home/Hero.tsx
+  s_d378bbde4a4186::t_64127782a2a16d 11-27
+  s_d378bbde4a4186::t_88bc4bbf540ad5 8-10
+  s_d378bbde4a4186::t_94b9b64ad587a5 28-30
+  s_d378bbde4a4186::t_c7085b5ee3d143 1-7,31-53
+packages/backend/convex/tsconfig.json
+  s_d378bbde4a4186::t_8442231581a8ee 10
+  s_d378bbde4a4186::t_9775342f7f3e53 7-9
+  s_d378bbde4a4186::t_1f639cf51004a2 11-13
+  s_d378bbde4a4186::t_986365f5cf3c6d 1-6,14-25
+apps/web/src/components/common/Logo.tsx
+  s_d378bbde4a4186::t_3ce762e35e2b91 16
+  s_d378bbde4a4186::t_2492ebca1b8349 13-15
+  s_d378bbde4a4186::t_6778c421727b7c 17-19
+  s_d378bbde4a4186::t_204d689c20ba49 1-12,20-24
+apps/web/src/components/home/Footer.tsx
+  s_d378bbde4a4186::t_12c8d52f76b8d5 16-65
+  s_d378bbde4a4186::t_9731a55ed2ef47 13-15
+  s_d378bbde4a4186::t_260c6607a59002 66-68
+  s_d378bbde4a4186::t_0e48a286491d8f 1-12,69-72
+apps/web/src/proxy.ts
+  s_d378bbde4a4186::t_157ba06935243c 3
+  s_d378bbde4a4186::t_e6a86c32785377 1-2
+  s_d378bbde4a4186::t_6a0cd87557417b 4-6
+  s_d378bbde4a4186::t_0acb137d259f49 7-16
+packages/backend/package.json
+  s_d378bbde4a4186::t_9b36db51c88755 13-20
+  s_d378bbde4a4186::t_5be74945b858a5 21
+  s_d378bbde4a4186::t_a0c5e3f9c49b6b 1-12,22-24
+.gitignore
+  s_5bbd53cc8c770b::t_d3b7d2cdc48817 39-41
+  s_5bbd53cc8c770b::t_5f6b2546080e16 1-38
+apps/web/src/components/home/Testimonials.tsx
+  s_d378bbde4a4186::t_9eca3900b7a18b 8-25
+  s_d378bbde4a4186::t_cd4ee03fbe47ce 5-7
+  s_d378bbde4a4186::t_aedffbdaee27ea 26-28
+  s_d378bbde4a4186::t_9b526be33ac028 1-4,29-78
+apps/native/src/app/(app)/spaces/index.tsx
+  s_d378bbde4a4186::t_4198ff4ae8c5a2 1
+apps/native/src/app/(app)/index.tsx
+  s_d378bbde4a4186::t_1525c8b583dfc0 1
+apps/web/src/components/home/FooterHero.tsx
+  s_d378bbde4a4186::t_694b68ba4a8a23 11-17
+  s_d378bbde4a4186::t_80619a812a5d88 8-10
+  s_d378bbde4a4186::t_d56111fbfad6d3 18-20
+  s_d378bbde4a4186::t_758ed0a32f33f8 1-7,21-36
+apps/web/src/components/common/UserNav.tsx
+  s_d378bbde4a4186::t_28c76ca5a1347f 54
+  s_d378bbde4a4186::t_e2992b205d2d9e 51-53
+  s_d378bbde4a4186::t_ba736305de870f 55-57
+  s_d378bbde4a4186::t_323a2068245dd7 1-50,58-72
+apps/web/src/app/app/spaces/[spaceId]/page.tsx
+  s_d378bbde4a4186::t_bb1d0ef325f1dc 1-17
+apps/native/src/app/(app)/items/new.tsx
+  s_d378bbde4a4186::t_4cfba703e01caa 1
+apps/web/src/components/Header.tsx
+  s_d378bbde4a4186::t_1e16411ba2bf4c 64-140
+  s_d378bbde4a4186::t_d64e2de65766e4 61-63
+  s_d378bbde4a4186::t_6b76381806a290 141-143
+  s_d378bbde4a4186::t_ce916cb032f8f4 1-60,144-153
+apps/web/src/components/spaces/SpaceDetails.tsx
+  s_d378bbde4a4186::t_e51f152e40be6d 1-63
+apps/web/src/app/layout.tsx
+  s_d378bbde4a4186::t_4b1294f829a3f4 13-15
+  s_d378bbde4a4186::t_2fe412f0352a73 10-12
+  s_d378bbde4a4186::t_aa69fe91a2eb20 16-18
+  s_d378bbde4a4186::t_83bc972ddea70d 1-9,19-34
+apps/native/src/screens/ItemDetailScreen.tsx
+  s_d378bbde4a4186::t_eb8eca3b24faa4 1-244
+packages/backend/convex/_generated/api.d.ts
+  s_d378bbde4a4186::t_9b36db51c88755 11-29
+  s_d378bbde4a4186::t_7f51b49d8fd6da 1-10,30-59
+apps/native/src/screens/SpacesScreen.tsx
+  s_d378bbde4a4186::t_c6ceefd965d083 1-250
+pnpm-lock.yaml
+  s_d378bbde4a4186::t_bc0c114a8f7548 1-15271
+.cursor/rules/convex_rules.mdc
+  s_d378bbde4a4186::t_39ed02f5096a6e 1-463
+.prettierrc
+  s_d378bbde4a4186::t_e7b3a36cb11739 1-3
+LICENSE
+  s_d378bbde4a4186::t_a766119483d39f 1-202
+apps/native/.example.env
+  s_d378bbde4a4186::t_91130c4cb09ae9 1-2
+apps/native/.gitignore
+  s_d378bbde4a4186::t_f2bb45fc3149ae 1-23
+apps/native/ConvexClientProvider.tsx
+  s_d378bbde4a4186::t_c824659eeb449b 1-34
+apps/native/babel.config.js
+  s_d378bbde4a4186::t_2739d11f81209b 1-6
+apps/native/index.tsx
+  s_d378bbde4a4186::t_02f22c381e9339 1-5
+apps/native/metro.config.js
+  s_d378bbde4a4186::t_8f9bc5158395cf 1-3
+apps/native/package.json
+  s_d378bbde4a4186::t_5ce1f1271db57b 1-50
+apps/native/src/app/(app)/_layout.tsx
+  s_d378bbde4a4186::t_3bbd7bb087c5d2 1-12
+apps/native/src/app/(auth)/_layout.tsx
+  s_d378bbde4a4186::t_e913169e6ffadf 1-12
+apps/native/src/app/(auth)/sign-in.tsx
+  s_d378bbde4a4186::t_335adb908394f0 1
+apps/native/tsconfig.json
+  s_d378bbde4a4186::t_32159279ce37be 1-10
+apps/web/.example.env
+  s_d378bbde4a4186::t_0740e3b8218c22 1-3
+apps/web/.gitignore
+  s_d378bbde4a4186::t_9d54f2dde8f59d 1-36
+apps/web/eslint.config.mjs
+  s_d378bbde4a4186::t_87b9cfb4391190 1-7
+apps/web/package.json
+  s_d378bbde4a4186::t_41cc34988badef 1-41
+apps/web/postcss.config.js
+  s_d378bbde4a4186::t_dc1567971cbe52 1-5
+apps/web/public/images/blue-circle-right.svg
+  s_d378bbde4a4186::t_a8ad6d139b4498 1-12
+apps/web/public/images/blue-circle.svg
+  s_d378bbde4a4186::t_e8b0e6ec950fbe 1-12
+apps/web/public/images/cricle.svg
+  s_d378bbde4a4186::t_b6870954a6062d 1-12
+apps/web/public/images/delete.svg
+  s_d378bbde4a4186::t_ba004906cec021 1-5
+apps/web/public/images/hero_image_bg.svg
+  s_d378bbde4a4186::t_ceed5e897bd070 1-12
+apps/web/public/images/message-left.svg
+  s_d378bbde4a4186::t_0328487aec2a73 1-10
+apps/web/public/images/message-right.svg
+  s_d378bbde4a4186::t_5ea211730a52a2 1-10
+apps/web/public/images/search.svg
+  s_d378bbde4a4186::t_da2e06cc44e4f1 1-3
+apps/web/public/images/star.svg
+  s_d378bbde4a4186::t_0d65d9b35716ed 1-3
+apps/web/public/next.svg
+  s_d378bbde4a4186::t_353e4367013768 1
+apps/web/public/vercel.svg
+  s_d378bbde4a4186::t_ce86748b74ab75 1
+apps/web/src/app/ConvexClientProvider.tsx
+  s_d378bbde4a4186::t_2c5049137283bd 1-25
+apps/web/src/app/globals.css
+  s_d378bbde4a4186::t_32a143da50ae62 1-76
+apps/web/src/app/page.tsx
+  s_d378bbde4a4186::t_e71d0c6a0981ac 1-21
+apps/web/src/components/common/Menu.tsx
+  s_d378bbde4a4186::t_c34f4a2900382c 1-27
+apps/web/src/components/common/TestTimonialCard.tsx
+  s_d378bbde4a4186::t_1db46e0c20786d 1-72
+apps/web/src/components/common/avatar.tsx
+  s_d378bbde4a4186::t_4cd6f36659f27a 1-47
+apps/web/src/components/common/button.tsx
+  s_d378bbde4a4186::t_7e407c2ef5b5df 1-58
+apps/web/src/components/common/dropdown-menu.tsx
+  s_d378bbde4a4186::t_3bcd2713fce01e 1-197
+apps/web/src/components/home/ComplexToggle.tsx
+  s_d378bbde4a4186::t_6b2bb7704aa4fe 1-51
+apps/web/src/lib/utils.ts
+  s_d378bbde4a4186::t_ab50bb7d80ec39 1-6
+apps/web/tsconfig.json
+  s_d378bbde4a4186::t_000d5694de3147 1-33
+apps/web/vercel.json
+  s_d378bbde4a4186::t_70504a582aa3ff 1-3
+package.json
+  s_d378bbde4a4186::t_c455e8f00fff31 1-23
+packages/backend/.agents/skills/convex-add/SKILL.md
+  s_d378bbde4a4186::t_36e0a20813fd50 1-26
+packages/backend/.agents/skills/convex-advisor/SKILL.md
+  s_d378bbde4a4186::t_109c9a9b450026 1-32
+packages/backend/.agents/skills/convex-agent/SKILL.md
+  s_d378bbde4a4186::t_f6f54f1d8e17d5 1-23
+packages/backend/.agents/skills/convex-auth/SKILL.md
+  s_d378bbde4a4186::t_9b3f2ccc7edb57 1-29
+packages/backend/.agents/skills/convex-authz/SKILL.md
+  s_d378bbde4a4186::t_dd8062fefd3462 1-36
+packages/backend/.agents/skills/convex-backup/SKILL.md
+  s_d378bbde4a4186::t_0908c9ad545952 1-33
+packages/backend/.agents/skills/convex-billing/SKILL.md
+  s_d378bbde4a4186::t_0d366a6a658567 1-69
+packages/backend/.agents/skills/convex-cost/SKILL.md
+  s_d378bbde4a4186::t_b6dce99cd67586 1-29
+packages/backend/.agents/skills/convex-create-component/SKILL.md
+  s_d378bbde4a4186::t_d0c8860d6b57f7 1-325
+packages/backend/.agents/skills/convex-create-component/agents/openai.yaml
+  s_d378bbde4a4186::t_84aee07a46ccaf 1-14
+packages/backend/.agents/skills/convex-create-component/assets/icon.svg
+  s_d378bbde4a4186::t_3b7b26a6412dd0 1-3
+packages/backend/.agents/skills/convex-create-component/references/advanced-patterns.md
+  s_d378bbde4a4186::t_a40280d84e3f34 1-140
+packages/backend/.agents/skills/convex-create-component/references/hybrid-components.md
+  s_d378bbde4a4186::t_fa30e7ab34b595 1-38
+packages/backend/.agents/skills/convex-create-component/references/local-components.md
+  s_d378bbde4a4186::t_c240afdbfbe9ff 1-39
+packages/backend/.agents/skills/convex-create-component/references/packaged-components.md
+  s_d378bbde4a4186::t_f099bdfaac0b27 1-54
+packages/backend/.agents/skills/convex-crons/SKILL.md
+  s_d378bbde4a4186::t_fdabd302f8feda 1-23
+packages/backend/.agents/skills/convex-deploy-guard/SKILL.md
+  s_d378bbde4a4186::t_095b5c20f0148c 1-29
+packages/backend/.agents/skills/convex-design/SKILL.md
+  s_d378bbde4a4186::t_3dc3815a671e71 1-30
+packages/backend/.agents/skills/convex-docs/SKILL.md
+  s_d378bbde4a4186::t_3c628d41b81360 1-31
+packages/backend/.agents/skills/convex-domains/SKILL.md
+  s_d378bbde4a4186::t_f64d60b1fcf941 1-26
+packages/backend/.agents/skills/convex-env/SKILL.md
+  s_d378bbde4a4186::t_0ae3aa5be0e441 1-23
+packages/backend/.agents/skills/convex-expert/SKILL.md
+  s_d378bbde4a4186::t_d02f0252fbfb78 1-38
+packages/backend/.agents/skills/convex-explain-app/SKILL.md
+  s_d378bbde4a4186::t_d65f9d71410349 1-29
+packages/backend/.agents/skills/convex-improve-convex-plugin/SKILL.md
+  s_d378bbde4a4186::t_2d611a40b48c8a 1-24
+packages/backend/.agents/skills/convex-insights/SKILL.md
+  s_d378bbde4a4186::t_4949db0bb199b6 1-32
+packages/backend/.agents/skills/convex-launch-readiness/SKILL.md
+  s_d378bbde4a4186::t_88f983674c4f7f 1-35
+packages/backend/.agents/skills/convex-migrate-rehearse/SKILL.md
+  s_d378bbde4a4186::t_5d330488f81860 1-31
+packages/backend/.agents/skills/convex-migrate/SKILL.md
+  s_d378bbde4a4186::t_f724f50d03cb15 1-23
+packages/backend/.agents/skills/convex-monitor/SKILL.md
+  s_d378bbde4a4186::t_1efb80b1fe08e1 1-22
+packages/backend/.agents/skills/convex-optimize/SKILL.md
+  s_d378bbde4a4186::t_795dcffa38a1bf 1-26
+packages/backend/.agents/skills/convex-quickstart/SKILL.md
+  s_d378bbde4a4186::t_035a7efcdd9e91 1-29
+packages/backend/.agents/skills/convex-quickstart/agents/openai.yaml
+  s_d378bbde4a4186::t_8cf990fbdaf3fd 1-14
+packages/backend/.agents/skills/convex-quickstart/assets/icon.svg
+  s_d378bbde4a4186::t_01861174f19e6a 1-4
+packages/backend/.agents/skills/convex-reviewer/SKILL.md
+  s_d378bbde4a4186::t_2ba721d2260e55 1-26
+packages/backend/.agents/skills/convex-seed/SKILL.md
+  s_d378bbde4a4186::t_eedcbdc46582e8 1-23
+packages/backend/.agents/skills/convex-self-heal/SKILL.md
+  s_d378bbde4a4186::t_868dfc354680f1 1-38
+packages/backend/.agents/skills/convex-sentinel/SKILL.md
+  s_d378bbde4a4186::t_5ce546df576938 1-25
+packages/backend/.agents/skills/convex-suggest/SKILL.md
+  s_d378bbde4a4186::t_66e611cb64b022 1-27
+packages/backend/.agents/skills/convex-test/SKILL.md
+  s_d378bbde4a4186::t_79880de82728d3 1-23
+packages/backend/.agents/skills/convex-verify/SKILL.md
+  s_d378bbde4a4186::t_f7db052bd7c88d 1-34
+packages/backend/.agents/skills/convex/SKILL.md
+  s_d378bbde4a4186::t_78ac96448af6cf 1-69
+packages/backend/.claude/skills/convex
+  s_d378bbde4a4186::t_fcaf1d127f62de 1
+packages/backend/.claude/skills/convex-add
+  s_d378bbde4a4186::t_695669addaca74 1
+packages/backend/.claude/skills/convex-advisor
+  s_d378bbde4a4186::t_7fb946de512df9 1
+packages/backend/.claude/skills/convex-agent
+  s_d378bbde4a4186::t_980a6d5c56f700 1
+packages/backend/.claude/skills/convex-auth
+  s_d378bbde4a4186::t_6a8e0b6f26764d 1
+packages/backend/.claude/skills/convex-authz
+  s_d378bbde4a4186::t_499d0e0d94e164 1
+packages/backend/.claude/skills/convex-backup
+  s_d378bbde4a4186::t_81d6571b3afe71 1
+packages/backend/.claude/skills/convex-billing
+  s_d378bbde4a4186::t_d20b87a8c826ad 1
+packages/backend/.claude/skills/convex-cost
+  s_d378bbde4a4186::t_911a4fe5588cd2 1
+packages/backend/.claude/skills/convex-create-component
+  s_d378bbde4a4186::t_a9f0f328f0dfb7 1
+packages/backend/.claude/skills/convex-crons
+  s_d378bbde4a4186::t_d689404e94c101 1
+packages/backend/.claude/skills/convex-deploy-guard
+  s_d378bbde4a4186::t_7267c76db1e353 1
+packages/backend/.claude/skills/convex-design
+  s_d378bbde4a4186::t_55794188645bb1 1
+packages/backend/.claude/skills/convex-docs
+  s_d378bbde4a4186::t_6e9429849e6f8d 1
+packages/backend/.claude/skills/convex-domains
+  s_d378bbde4a4186::t_6569936c03e9a3 1
+packages/backend/.claude/skills/convex-env
+  s_d378bbde4a4186::t_547791d6c30f30 1
+packages/backend/.claude/skills/convex-expert
+  s_d378bbde4a4186::t_6ce8a7ac294b37 1
+packages/backend/.claude/skills/convex-explain-app
+  s_d378bbde4a4186::t_196ac3a30a2ec7 1
+packages/backend/.claude/skills/convex-improve-convex-plugin
+  s_d378bbde4a4186::t_4b346850d33b11 1
+packages/backend/.claude/skills/convex-insights
+  s_d378bbde4a4186::t_27e5ea808aeb1d 1
+packages/backend/.claude/skills/convex-launch-readiness
+  s_d378bbde4a4186::t_38ae904bc261f6 1
+packages/backend/.claude/skills/convex-migrate
+  s_d378bbde4a4186::t_7b621d622847b4 1
+packages/backend/.claude/skills/convex-migrate-rehearse
+  s_d378bbde4a4186::t_d790e036e6eddb 1
+packages/backend/.claude/skills/convex-monitor
+  s_d378bbde4a4186::t_1f9dba3982e520 1
+packages/backend/.claude/skills/convex-optimize
+  s_d378bbde4a4186::t_21b037230cd4de 1
+packages/backend/.claude/skills/convex-quickstart
+  s_d378bbde4a4186::t_de839469d27495 1
+packages/backend/.claude/skills/convex-reviewer
+  s_d378bbde4a4186::t_a637f5052c7b9d 1
+packages/backend/.claude/skills/convex-seed
+  s_d378bbde4a4186::t_05bce1b746dfff 1
+packages/backend/.claude/skills/convex-self-heal
+  s_d378bbde4a4186::t_4bdcb90fa8db79 1
+packages/backend/.claude/skills/convex-sentinel
+  s_d378bbde4a4186::t_0fe01799cc7d72 1
+packages/backend/.claude/skills/convex-suggest
+  s_d378bbde4a4186::t_efe3895ea741e4 1
+packages/backend/.claude/skills/convex-test
+  s_d378bbde4a4186::t_ec06ab4af57678 1
+packages/backend/.claude/skills/convex-verify
+  s_d378bbde4a4186::t_834d5eb77c7fd9 1
+packages/backend/.gitignore
+  s_d378bbde4a4186::t_ad28e625e46876 1-2
+packages/backend/AGENTS.md
+  s_d378bbde4a4186::t_5ca80e26f30516 1-7
+packages/backend/CLAUDE.md
+  s_d378bbde4a4186::t_7a3640f0fb75aa 1-7
+packages/backend/convex/README.md
+  s_d378bbde4a4186::t_6d90109e068860 1-90
+packages/backend/convex/_generated/ai/ai-files.state.json
+  s_d378bbde4a4186::t_f15db22471d51f 1-41
+packages/backend/convex/_generated/ai/guidelines.md
+  s_d378bbde4a4186::t_1ad5ccb2932129 1-458
+packages/backend/convex/_generated/api.js
+  s_d378bbde4a4186::t_e849384f3df4dc 1-23
+packages/backend/convex/_generated/dataModel.d.ts
+  s_d378bbde4a4186::t_a7606ae8b187aa 1-60
+packages/backend/convex/_generated/server.d.ts
+  s_d378bbde4a4186::t_5af6484c8a96c1 1-143
+packages/backend/convex/_generated/server.js
+  s_d378bbde4a4186::t_aab89c9082ce22 1-93
+packages/backend/convex/ai.ts
+  s_d378bbde4a4186::t_7f39434bdc40b9 1-465
+packages/backend/convex/auth.config.ts
+  s_d378bbde4a4186::t_3ec6bea80b626b 1-17
+packages/backend/convex/items.ts
+  s_d378bbde4a4186::t_3b3e21e559d2b5 1-438
+packages/backend/convex/model/auth.ts
+  s_d378bbde4a4186::t_6ac3921333805e 1-19
+packages/backend/convex/schema.ts
+  s_d378bbde4a4186::t_844894e6322078 1-59
+packages/backend/convex/spaces.ts
+  s_d378bbde4a4186::t_b60842af48f57c 1-301
+packages/backend/convex/spacesInternal.ts
+  s_d378bbde4a4186::t_723d859bb51bc9 1-26
+packages/backend/convex/utils.ts
+  s_d378bbde4a4186::t_584a46e12a2928 1-16
+packages/backend/skills-lock.json
+  s_d378bbde4a4186::t_c49def0668c7bc 1-203
+pnpm-workspace.yaml
+  s_d378bbde4a4186::t_42a43e6b413dbe 1-14
+renovate.json
+  s_d378bbde4a4186::t_78dc727b2bebaf 1-14
+turbo.json
+  s_d378bbde4a4186::t_17c251641c3c10 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e9bc012cd116a1477b1fb1bd871287abf950c725",
+  "prompts": {},
+  "sessions": {
+    "s_5bbd53cc8c770b": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "d51312f2-caaf-4c51-ae41-179862d16e16",
+        "model": "grok-4.5"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_d378bbde4a4186": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "8395dd7b-9bd4-4918-b52c-a24be87f98af",
+        "model": "grok-4.5"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
