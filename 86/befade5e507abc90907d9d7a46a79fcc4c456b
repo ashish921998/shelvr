@@ -1,0 +1,18 @@
+apps/native/convex/ai.ts
+  h_fcdce7b1b8bf31 24,854
+apps/native/convex/schema.ts
+  h_fcdce7b1b8bf31 86
+apps/native/convex/spaces.ts
+  h_fcdce7b1b8bf31 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "86befade5e507abc90907d9d7a46a79fcc4c456b",
+  "prompts": {},
+  "humans": {
+    "h_fcdce7b1b8bf31": {
+      "author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
