@@ -29,7 +29,14 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "predictiveBackGestureEnabled": false,
       "package": "app.shelvr.save"
@@ -100,8 +107,26 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": ""
+        "projectId": "c6c97aa7-6676-47a1-8ffc-9a1339c2bc19",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "expo-sharing-extension",
+                  "bundleIdentifier": "app.shelvr.save.expo-sharing-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.app.shelvr.save"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
-    }
+    },
+    "owner": "ashish921998"
   }
 }
