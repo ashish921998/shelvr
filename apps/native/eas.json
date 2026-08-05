@@ -9,18 +9,42 @@
       "distribution": "internal",
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "hooks": {
+        "postInstall": [
+          {
+            "node": "20",
+            "cmd": "npx install-skia"
+          }
+        ]
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "hooks": {
+        "postInstall": [
+          {
+            "node": "20",
+            "cmd": "npx install-skia"
+          }
+        ]
       }
     },
     "production": {
       "autoIncrement": true,
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "hooks": {
+        "postInstall": [
+          {
+            "node": "20",
+            "cmd": "npx install-skia"
+          }
+        ]
       }
     }
   },
