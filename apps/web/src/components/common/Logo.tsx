@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 interface Props {
@@ -6,17 +7,10 @@ interface Props {
 
 const Logo = ({ tone = "dark" }: Props) => {
   const textClass = tone === "light" ? "text-white" : "text-ink";
-  const markClass =
-    tone === "light" ? "bg-white text-ink" : "bg-ink text-white";
 
   return (
     <Link href="/" className="inline-flex items-center gap-2.5 group">
-      <span
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${markClass} text-sm font-bold tracking-tight`}
-        aria-hidden
-      >
-        S
-      </span>
+      <Image src="/shelvr-mark.svg" alt="" width={32} height={32} aria-hidden />
       <span className={`text-[1.15rem] font-semibold tracking-tight ${textClass}`}>
         Shelvr
       </span>
