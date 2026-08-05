@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 
@@ -443,6 +444,7 @@ export const beginImageImport = mutation({
   ),
   handler: async (ctx, args): Promise<BeginImageImportResult> => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     requireOperationId(args.operationId);
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
@@ -537,6 +539,7 @@ export const attachImageUpload = mutation({
   returns: v.object({ storageId: v.id("_storage") }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     requireOperationId(args.operationId);
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
@@ -620,6 +623,7 @@ export const finalizeImageImport = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     requireOperationId(args.operationId);
 
     const op = await loadItemOperation(ctx, userId, args.operationId);
@@ -894,6 +898,7 @@ export const createLinkItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     // Centralized syntactic URL policy: rejects non-http(s) schemes, embedded
     // credentials, non-default ports, missing hosts, and oversized URLs before
     // the item is ever inserted or scheduled. Network-destination safety (private
@@ -919,6 +924,7 @@ export const createNoteItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
       userId,
@@ -938,6 +944,7 @@ export const findLinks = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");

@@ -1,4 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
+import { presentPaywall, useEntitlement } from '@/lib/entitlement';
 import { useClerk, useUser } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
@@ -10,6 +11,16 @@ export default function ProfileScreen() {
   const { signOut } = useClerk();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const { status } = useEntitlement();
+
+  const proLabel =
+    status === 'trialing'
+      ? 'Pro — Trial'
+      : status === 'pro'
+        ? 'Pro'
+        : status === 'lapsed'
+          ? 'Pro — Lapsed'
+          : 'Start free trial';
 
   return (
     <View style={styles.content}>
@@ -24,6 +35,17 @@ export default function ProfileScreen() {
           {user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}
         </Text>
       </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.proRow, pressed && { opacity: 0.7 }]}
+        onPress={() => {
+          if (!presentPaywall()) router.push('/(app)/paywall');
+        }}
+      >
+        <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
+        <Text style={styles.proLabel}>{proLabel}</Text>
+        <Icon name="chevron.right" size={16} tintColor={theme.colors.muted} />
+      </Pressable>
 
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
@@ -74,6 +96,24 @@ const styles = StyleSheet.create((theme) => ({
   email: {
     flex: 1,
     fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  proRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.gap(1.25),
+    alignSelf: 'stretch',
+    padding: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  proLabel: {
+    flex: 1,
+    fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.foreground,
   },

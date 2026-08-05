@@ -1,4 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
+import { usePaywallGuard } from '@/lib/entitlement';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { Platform, PlatformColor } from 'react-native';
@@ -7,6 +8,7 @@ import { useUnistyles } from 'react-native-unistyles';
 export default function HomeStackLayout() {
   const router = useRouter();
   const { theme } = useUnistyles();
+  const guard = usePaywallGuard();
 
   // PlatformColor('label') is iOS-only; on Android fall back to the theme's
   // foreground color.
@@ -14,11 +16,19 @@ export default function HomeStackLayout() {
 
   // Native bar-button items don't run JS on tap the way a Pressable does, so
   // the light haptic HeaderButton used to give is fired here instead.
-  const tap = (href: '/profile' | '/add' | '/map') => () => {
+  const tap = (href: '/profile') => () => {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     router.push(href);
+  };
+
+  // Add and Map are Pro features — route to the paywall unless entitled.
+  const guardedTap = (href: '/add' | '/map') => () => {
+    if (process.env.EXPO_OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    guard(() => router.push(href));
   };
 
   return (
@@ -45,14 +55,14 @@ export default function HomeStackLayout() {
           <Stack.Toolbar.Button
             icon="map"
             tintColor={labelColor}
-            onPress={tap('/map')}
+            onPress={guardedTap('/map')}
           >
             Map
           </Stack.Toolbar.Button>
           <Stack.Toolbar.Button
             icon="plus"
             tintColor={labelColor}
-            onPress={tap('/add')}
+            onPress={guardedTap('/add')}
           >
             Add
           </Stack.Toolbar.Button>

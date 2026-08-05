@@ -167,4 +167,28 @@ export default defineSchema({
     // pages through image rows only and can't be starved by stale link/note
     // rows once plans 004/005 create them.
     .index("by_kind_status_updated", ["kind", "status", "updatedAt"]),
+
+  // Pro subscription / entitlement state. One row per user, keyed by the Clerk
+  // `sub` (the same userId every other table uses). Written exclusively by the
+  // RevenueCat webhook (http.ts -> upsertSubscription); read by getEntitlement
+  // (client) and requireProEntitlement (gated mutations). The lifecycle is:
+  //
+  //   trialing (7-day trial) -> pro (paid) -> lapsed (trial/subscription ended)
+  //
+  // A lapsed user is read-only: they can view and search existing saves and
+  // spaces, but every save and Pro feature is gated behind an active trial or
+  // subscription. `expiresAt` is the end of the current period/trial (ms epoch);
+  // the server re-checks it against Date.now() inside mutations (queries never
+  // read the wall clock), and the client computes `entitled` from its own clock.
+  subscriptions: defineTable({
+    userId: v.string(),
+    status: v.union(
+      v.literal("trialing"),
+      v.literal("pro"),
+      v.literal("lapsed"),
+    ),
+    expiresAt: v.number(),
+    productId: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 });

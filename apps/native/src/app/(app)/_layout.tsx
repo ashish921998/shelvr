@@ -100,6 +100,16 @@ export default function AppLayout() {
             contentStyle: { backgroundColor: theme.colors.background },
           }}
         />
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: 'formSheet',
+            headerShown: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: 'fitToContents',
+            contentStyle: { backgroundColor: theme.colors.background },
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={!onboarded}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

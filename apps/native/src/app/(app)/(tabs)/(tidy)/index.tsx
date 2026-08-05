@@ -1,21 +1,31 @@
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { usePermissions, type PermissionResponse } from 'expo-media-library';
-import { Stack, useFocusEffect } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState, type FC } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { EmptyState } from '@/components/empty-state';
+import { Icon } from '@/components/symbol';
 import { TidyDeck } from '@/components/tidy/tidy-deck';
 import { TidyDone } from '@/components/tidy/tidy-done';
-import { DeckAnimationProvider, useDeckAnimation } from '@/lib/tidy/deck-animation';
+import { presentPaywall, useEntitlement } from '@/lib/entitlement';
+import {
+  DeckAnimationProvider,
+  useDeckAnimation,
+} from '@/lib/tidy/deck-animation';
 import { getSelectedAlbumId, setSelectedAlbumId } from '@/lib/tidy/storage';
-import { ALL_PHOTOS_ID, useAlbums, type TidySource } from '@/lib/tidy/use-albums';
+import {
+  ALL_PHOTOS_ID,
+  useAlbums,
+  type TidySource,
+} from '@/lib/tidy/use-albums';
 import { usePhotoBatch, type TidyPhoto } from '@/lib/tidy/use-photo-batch';
 import { useTidyActions } from '@/lib/tidy/use-tidy-actions';
 
 export default function TidyScreen() {
+  const { entitled, loading: entitlementLoading } = useEntitlement();
   const [permission, requestPermission] = usePermissions();
   const granted = permission?.granted ?? false;
 
@@ -28,23 +38,35 @@ export default function TidyScreen() {
     [sources, selectedId],
   );
 
-  const { batch, batchId, loading, loadNextBatch, noteDeleted } = usePhotoBatch({
-    album: source.album,
-    sourceId: source.id,
-    enabled: granted,
-  });
+  const { batch, batchId, loading, loadNextBatch, noteDeleted } = usePhotoBatch(
+    {
+      album: source.album,
+      sourceId: source.id,
+      enabled: granted,
+    },
+  );
 
   const selectSource = useCallback((id: string) => {
     setSelectedId(id);
     setSelectedAlbumId(id === ALL_PHOTOS_ID ? null : id);
   }, []);
 
-  if (!permission) {
+  if (!permission || entitlementLoading) {
     return <Loading />;
   }
 
+  // Tidy is a Pro feature. A lapsed user sees a paywall CTA instead of the deck.
+  if (!entitled) {
+    return <ProGate />;
+  }
+
   if (!granted) {
-    return <PermissionGate permission={permission} requestPermission={requestPermission} />;
+    return (
+      <PermissionGate
+        permission={permission}
+        requestPermission={requestPermission}
+      />
+    );
   }
 
   // `loading` is true until the batch for the active source has resolved
@@ -90,8 +112,15 @@ const TidyDeckView: FC<DeckViewProps> = ({
   noteDeleted,
 }) => {
   const { undoIndex } = useDeckAnimation();
-  const { topIndex, counts, pendingDeleteCount, canUndo, onDecision, undo, commitDeletes } =
-    useTidyActions({ batch, noteDeleted });
+  const {
+    topIndex,
+    counts,
+    pendingDeleteCount,
+    canUndo,
+    onDecision,
+    undo,
+    commitDeletes,
+  } = useTidyActions({ batch, noteDeleted });
   const [continuing, setContinuing] = useState(false);
 
   // Leaving the tab (or backgrounding the screen) flushes queued deletions so
@@ -134,15 +163,25 @@ const TidyDeckView: FC<DeckViewProps> = ({
       {/* Native header controls (note 3): undo on the left, delete on the
           right with a live count badge. */}
       <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button icon="arrow.uturn.backward" hidden={!canUndo} onPress={handleUndo}>
+        <Stack.Toolbar.Button
+          icon="arrow.uturn.backward"
+          hidden={!canUndo}
+          onPress={handleUndo}
+        >
           Undo
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button icon="trash" hidden={pendingDeleteCount === 0} onPress={commitDeletes}>
+        <Stack.Toolbar.Button
+          icon="trash"
+          hidden={pendingDeleteCount === 0}
+          onPress={commitDeletes}
+        >
           <Stack.Toolbar.Label>Delete</Stack.Toolbar.Label>
           {pendingDeleteCount > 0 && (
-            <Stack.Toolbar.Badge>{String(pendingDeleteCount)}</Stack.Toolbar.Badge>
+            <Stack.Toolbar.Badge>
+              {String(pendingDeleteCount)}
+            </Stack.Toolbar.Badge>
           )}
         </Stack.Toolbar.Button>
         <Stack.Toolbar.Menu icon="photo.on.rectangle.angled">
@@ -180,7 +219,10 @@ const TidyDeckView: FC<DeckViewProps> = ({
       </View>
 
       {limitedAccess && (
-        <Pressable style={styles.limitedBanner} onPress={() => Linking.openSettings()}>
+        <Pressable
+          style={styles.limitedBanner}
+          onPress={() => Linking.openSettings()}
+        >
           <Text style={styles.limitedText}>
             Shelvr can only see some photos — tap to manage access.
           </Text>
@@ -224,6 +266,35 @@ const Loading: FC = () => (
     <ActivityIndicator />
   </View>
 );
+
+/** Pro gate shown to lapsed users on the Tidy tab. */
+const ProGate: FC = () => {
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.proGate}>
+      <View style={styles.proGateIcon}>
+        <Icon name="sparkles" size={28} tintColor={theme.colors.primaryText} />
+      </View>
+      <Text style={styles.proGateTitle}>Tidy is a Pro feature</Text>
+      <Text style={styles.proGateMessage}>
+        Sweep through your photo library and clear out the clutter. Start a free
+        trial to unlock Tidy and every other Pro feature.
+      </Text>
+      <Pressable
+        style={({ pressed }) => [
+          styles.proGateCta,
+          pressed && { opacity: 0.85 },
+        ]}
+        onPress={() => {
+          if (!presentPaywall()) router.push('/(app)/paywall');
+        }}
+      >
+        <Text style={styles.proGateCtaText}>Start 7-day free trial</Text>
+      </Pressable>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: {
@@ -288,5 +359,48 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.background,
+  },
+  proGate: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.gap(4),
+    gap: theme.gap(1.5),
+    backgroundColor: theme.colors.background,
+  },
+  proGateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.gap(0.5),
+  },
+  proGateTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 18,
+    color: theme.colors.foreground,
+  },
+  proGateMessage: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: theme.colors.muted,
+    textAlign: 'center',
+  },
+  proGateCta: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    paddingVertical: theme.gap(1.75),
+    paddingHorizontal: theme.gap(4),
+    alignItems: 'center',
+    marginTop: theme.gap(1),
+  },
+  proGateCtaText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 16,
+    color: '#fff',
   },
 }));

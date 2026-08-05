@@ -1,4 +1,5 @@
 import { OnboardingProvider } from '@/lib/onboarding';
+import { useEntitlementSync } from '@/lib/entitlement';
 import { convex, persister, queryClient } from '@/lib/query-client';
 import { ClerkProvider, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
@@ -60,6 +61,7 @@ export default function RootLayout() {
             persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
           >
             <OnboardingProvider>
+              <EntitlementSync />
               <NavThemeProvider>
                 <Slot />
                 <StatusBar style="auto" />
@@ -70,4 +72,11 @@ export default function RootLayout() {
       </ClerkProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Configures RevenueCat and logs the Clerk user in so webhook events carry the
+ * same `userId` every Convex table keys on. Rendered once inside the providers. */
+function EntitlementSync() {
+  useEntitlementSync();
+  return null;
 }

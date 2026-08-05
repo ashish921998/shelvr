@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
 
@@ -196,6 +197,7 @@ export const createSpace = mutation({
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     const name = args.name.trim();
     if (name === "") {
       throw new Error("Space name is empty");
@@ -243,6 +245,10 @@ export const updateSpace = mutation({
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
     const wasDynamic = space.dynamic === true;
     if (args.dynamic === true && !wasDynamic) {
+      // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
+      // saves into the space). A lapsed user editing a space's name or turning
+      // dynamic off is allowed, but enabling it requires an active trial/pro.
+      await requireProEntitlement(ctx, userId);
       await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
         spaceId: space._id,
       });
