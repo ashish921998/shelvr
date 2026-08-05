@@ -1,0 +1,19 @@
+apps/native/app.json
+  s_af1fe2a0880c17::t_a00fbe01a509a9 32-39,110-127,129-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "446cafb2bd517acf373b287f664dae3a4a71af85",
+  "prompts": {},
+  "sessions": {
+    "s_af1fe2a0880c17": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "37df7d26-31ba-40c7-9442-7d961c2d4ee0",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
