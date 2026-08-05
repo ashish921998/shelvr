@@ -51,6 +51,7 @@
     "expo-status-bar": "~57.0.0",
     "expo-symbols": "~57.0.0",
     "expo-system-ui": "~57.0.0",
+    "expo-updates": "~57.0.12",
     "expo-web-browser": "~57.0.0",
     "ipaddr.js": "^2.4.0",
     "linkedom": "^0.18.12",

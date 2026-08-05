@@ -15,6 +15,7 @@ import type * as items from "../items.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_memberships from "../model/memberships.js";
+import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/externalUrl": typeof model_externalUrl;
   "model/memberships": typeof model_memberships;
+  "model/revenuecat": typeof model_revenuecat;
   "model/safeFetch": typeof model_safeFetch;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;
