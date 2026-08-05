@@ -1,10 +1,16 @@
 import { Wordmark } from '@/components/wordmark';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
-import { PlatformColor } from 'react-native';
+import { Platform, PlatformColor } from 'react-native';
+import { useUnistyles } from 'react-native-unistyles';
 
 export default function HomeStackLayout() {
   const router = useRouter();
+  const { theme } = useUnistyles();
+
+  // PlatformColor('label') is iOS-only; on Android fall back to the theme's
+  // foreground color.
+  const labelColor = Platform.OS === 'ios' ? PlatformColor('label') : theme.colors.foreground;
 
   // Native bar-button items don't run JS on tap the way a Pressable does, so
   // the light haptic HeaderButton used to give is fired here instead.
@@ -29,7 +35,7 @@ export default function HomeStackLayout() {
         <Stack.Toolbar placement="left">
           <Stack.Toolbar.Button
             icon="person"
-            tintColor={PlatformColor('label')}
+            tintColor={labelColor}
             onPress={tap('/profile')}
           >
             Profile
@@ -38,14 +44,14 @@ export default function HomeStackLayout() {
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             icon="map"
-            tintColor={PlatformColor('label')}
+            tintColor={labelColor}
             onPress={tap('/map')}
           >
             Map
           </Stack.Toolbar.Button>
           <Stack.Toolbar.Button
             icon="plus"
-            tintColor={PlatformColor('label')}
+            tintColor={labelColor}
             onPress={tap('/add')}
           >
             Add

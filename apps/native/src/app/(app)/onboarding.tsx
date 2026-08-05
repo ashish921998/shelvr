@@ -2,7 +2,7 @@ import { Wordmark } from '@/components/wordmark';
 import { useOnboarding } from '@/lib/onboarding';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ function FeatureRow({
   message,
   delay,
 }: {
-  icon: SFSymbol;
+  icon: string;
   title: string;
   message: string;
   delay: number;
@@ -24,7 +24,7 @@ function FeatureRow({
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={styles.feature}>
       <View style={styles.featureIcon}>
-        <SymbolView name={icon} size={20} tintColor={theme.colors.primaryText} />
+        <Icon name={icon} size={20} tintColor={theme.colors.primaryText} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.featureTitle}>{title}</Text>
@@ -40,7 +40,7 @@ function PermissionButton({
   granted,
   onPress,
 }: {
-  icon: SFSymbol;
+  icon: string;
   label: string;
   granted: boolean;
   onPress: () => void;
@@ -55,7 +55,7 @@ function PermissionButton({
         pressed && !granted && { opacity: 0.8 },
       ]}
     >
-      <SymbolView
+      <Icon
         name={granted ? 'checkmark.circle.fill' : icon}
         size={18}
         tintColor={granted ? theme.colors.primary : theme.colors.foreground}

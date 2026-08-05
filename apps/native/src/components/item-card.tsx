@@ -1,4 +1,5 @@
 import { SuggestedBadge } from '@/components/suggested-badge';
+import { showActionSheet } from '@/lib/action-sheet';
 import { displayHost } from '@/lib/url';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -6,8 +7,8 @@ import { useMutation } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { ActionSheetIOS, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
+import { Icon } from '@/components/symbol';
+import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
 import Animated, { FadeIn, ZoomOut } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -97,17 +98,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
         run: () => deleteItem({ id: item._id }),
       });
     }
-    const destructiveIndex = actions.findIndex((a) => a.destructive);
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: [...actions.map((a) => a.label), 'Cancel'],
-        destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
-        cancelButtonIndex: actions.length,
-      },
-      (index) => {
-        actions[index]?.run();
-      },
-    );
+    showActionSheet(actions.map(({ label, destructive, run }) => ({ label, destructive, onPress: run })));
   };
 
   return (
@@ -140,7 +131,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
             ) : (
               <View style={[styles.textFace, item.type === 'note' && styles.noteFace]}>
                 {item.type === 'link' && (
-                  <SymbolView
+                  <Icon
                     name="link"
                     size={13}
                     tintColor={theme.colors.faint}
@@ -163,7 +154,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
                     <Text style={styles.captionHost} numberOfLines={1}>
                       {displayHost(item.url)}
                     </Text>
-                    <SymbolView
+                    <Icon
                       name="arrow.up.right"
                       size={9}
                       tintColor={theme.colors.faint}
@@ -172,7 +163,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
                 ) : null}
               </View>
               <Pressable hitSlop={10} onPress={openMenu} style={styles.menuButton}>
-                <SymbolView name="ellipsis" size={15} tintColor={theme.colors.foreground} />
+                <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
               </Pressable>
             </View>
 

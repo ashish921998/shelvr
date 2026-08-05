@@ -9,11 +9,13 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as crons from "../crons.js";
 import type * as items from "../items.js";
 import type * as model_auth from "../model/auth.js";
+import type * as model_externalUrl from "../model/externalUrl.js";
+import type * as model_memberships from "../model/memberships.js";
+import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as spaces from "../spaces.js";
-import type * as spacesInternal from "../spacesInternal.js";
-import type * as utils from "../utils.js";
 
 import type {
   ApiFromModules,
@@ -23,11 +25,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  crons: typeof crons;
   items: typeof items;
   "model/auth": typeof model_auth;
+  "model/externalUrl": typeof model_externalUrl;
+  "model/memberships": typeof model_memberships;
+  "model/safeFetch": typeof model_safeFetch;
   spaces: typeof spaces;
-  spacesInternal: typeof spacesInternal;
-  utils: typeof utils;
 }>;
 
 /**

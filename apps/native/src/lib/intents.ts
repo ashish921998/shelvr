@@ -4,6 +4,7 @@ import { createEventInCalendarAsync } from 'expo-calendar/legacy';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 // The closed set of action kinds the AI can attach to an item. Mirrors the
@@ -42,7 +43,9 @@ export async function runIntent(kind: IntentKind, value: string): Promise<void> 
       break;
     case 'open_maps':
       await Linking.openURL(
-        `https://maps.apple.com/?q=${encodeURIComponent(value)}`,
+        Platform.OS === 'ios'
+          ? `https://maps.apple.com/?q=${encodeURIComponent(value)}`
+          : `geo:0,0?q=${encodeURIComponent(value)}`,
       );
       break;
     case 'call':

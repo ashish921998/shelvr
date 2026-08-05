@@ -1,5 +1,5 @@
-import { GlassView } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
+import { GlassView } from '@/components/glass';
+import { Icon } from '@/components/symbol';
 import { Pressable, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -24,7 +24,7 @@ export function SuggestedBadge({
       glassEffectStyle="regular"
       isInteractive={onPress !== undefined}
     >
-      <SymbolView
+      <Icon
         name="sparkles"
         size={size * 0.55}
         tintColor={theme.colors.primary}

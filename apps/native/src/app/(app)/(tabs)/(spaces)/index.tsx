@@ -1,3 +1,4 @@
+import { showActionSheet } from '@/lib/action-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { SuggestedBadge } from '@/components/suggested-badge';
 import { api } from '@convex/_generated/api';
@@ -8,9 +9,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
-import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -140,11 +141,9 @@ export default function SpacesScreen() {
   };
 
   const openMenu = (id: Id<'spaces'>) =>
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Delete', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1 },
-      (index) => {
-        if (index === 0) confirmDelete(id);
-      },
+    showActionSheet(
+      [{ label: 'Delete', destructive: true, onPress: () => confirmDelete(id) }],
+      { title: 'Space actions' },
     );
 
   if (spaces === undefined) {
@@ -200,7 +199,7 @@ export default function SpacesScreen() {
                         onPress={() => openMenu(space._id)}
                         style={styles.menuButton}
                       >
-                        <SymbolView name="ellipsis" size={15} tintColor={theme.colors.foreground} />
+                        <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
                       </Pressable>
                     </View>
                   </Pressable>

@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
-import { GlassView } from 'expo-glass-effect';
+import { GlassView } from '@/components/glass';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -315,7 +315,12 @@ export default function ItemScreen() {
           style={[styles.decisionBar, { bottom: insets.bottom + theme.gap(1.5) }]}
         >
           <Pressable onPress={onDismiss} style={styles.dismissWrap}>
-            <GlassView glassEffectStyle="regular" isInteractive style={styles.decisionButton}>
+            <GlassView
+              glassEffectStyle="regular"
+              isInteractive
+              style={styles.decisionButton}
+              fallbackStyle={{ backgroundColor: theme.colors.surface }}
+            >
               <Text style={styles.dismissText}>Dismiss</Text>
             </GlassView>
           </Pressable>
@@ -325,8 +330,9 @@ export default function ItemScreen() {
               isInteractive
               tintColor={theme.colors.primary}
               style={styles.decisionButton}
+              fallbackStyle={{ backgroundColor: theme.colors.primary }}
             >
-              <SymbolView name="sparkles" size={15} tintColor="#fff" />
+              <Icon name="sparkles" size={15} tintColor="#fff" />
               <Text style={styles.acceptText}>Add to space</Text>
             </GlassView>
           </Pressable>

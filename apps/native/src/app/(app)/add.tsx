@@ -9,7 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -22,7 +22,7 @@ function ActionButton({
   onPress,
   disabled,
 }: {
-  icon: SFSymbol;
+  icon: string;
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -35,7 +35,7 @@ function ActionButton({
       style={[styles.action, disabled && { opacity: 0.4 }]}
     >
       <View style={styles.actionIcon}>
-        <SymbolView name={icon} size={40} tintColor={theme.colors.foreground} />
+        <Icon name={icon} size={40} tintColor={theme.colors.foreground} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>

@@ -5,7 +5,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -221,7 +221,7 @@ export default function CameraScreen() {
 
   const renderFallback = (title: string, message: string, action?: React.ReactNode) => (
     <View style={styles.fallback}>
-      <SymbolView name="camera" size={40} tintColor="#8d8271" />
+      <Icon name="camera" size={40} tintColor="#8d8271" />
       <Text style={styles.fallbackTitle}>{title}</Text>
       <Text style={styles.fallbackMessage}>{message}</Text>
       {action}
@@ -267,14 +267,14 @@ export default function CameraScreen() {
 
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
         <Pressable style={styles.roundButton} onPress={() => router.back()}>
-          <SymbolView name="xmark" size={17} tintColor="#fff" weight="semibold" />
+          <Icon name="xmark" size={17} tintColor="#fff" weight="semibold" />
         </Pressable>
         {showControls ? (
           <Pressable
             style={styles.roundButton}
             onPress={() => setPosition((p) => (p === 'back' ? 'front' : 'back'))}
           >
-            <SymbolView
+            <Icon
               name="arrow.triangle.2.circlepath.camera"
               size={17}
               tintColor="#fff"
@@ -302,7 +302,7 @@ export default function CameraScreen() {
 
           <View style={[styles.bottomBar, { bottom: insets.bottom + 24 }]}>
             <Pressable style={styles.libraryButton} onPress={pickFromLibrary} disabled={busy}>
-              <SymbolView name="photo.on.rectangle" size={20} tintColor="#fff" />
+              <Icon name="photo.on.rectangle" size={20} tintColor="#fff" />
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
               {busy ? (

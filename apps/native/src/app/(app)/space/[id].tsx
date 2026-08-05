@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { useMemo } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
@@ -122,7 +122,7 @@ export default function SpaceScreen() {
                 exiting={FadeOut.duration(200)}
                 style={styles.suggestionsPill}
               >
-                <SymbolView name="sparkles" size={14} tintColor={theme.colors.primaryText} />
+                <Icon name="sparkles" size={14} tintColor={theme.colors.primaryText} />
                 <Text style={styles.suggestionsText}>
                   {suggestionCount === 1
                     ? '1 suggestion'

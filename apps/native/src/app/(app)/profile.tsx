@@ -1,7 +1,7 @@
 import { Wordmark } from '@/components/wordmark';
 import { useClerk, useUser } from '@clerk/expo';
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -18,7 +18,7 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <SymbolView name="person.fill" size={20} tintColor={theme.colors.primaryText} />
+          <Icon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
           {user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}

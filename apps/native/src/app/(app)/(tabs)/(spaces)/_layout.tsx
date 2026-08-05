@@ -1,10 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
-import { PlatformColor, Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Platform, PlatformColor, Text } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function SpacesStackLayout() {
   const router = useRouter();
+  const { theme } = useUnistyles();
+
+  const labelColor = Platform.OS === 'ios' ? PlatformColor('label') : theme.colors.foreground;
 
   // Native bar-button items don't run JS on tap the way a Pressable does, so
   // the light haptic HeaderButton used to give is fired here instead.
@@ -29,7 +32,7 @@ export default function SpacesStackLayout() {
         <Stack.Toolbar placement="right">
           <Stack.Toolbar.Button
             icon="plus"
-            tintColor={PlatformColor('label')}
+            tintColor={labelColor}
             onPress={newSpace}
           >
             New space

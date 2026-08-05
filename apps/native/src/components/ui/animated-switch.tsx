@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import { useEffect } from 'react';
 import { Pressable } from 'react-native';
 import Animated, {
@@ -72,11 +72,11 @@ export function AnimatedSwitch({ value, onValueChange }: Props) {
           {/* Key swap re-triggers the ZoomIn as the state icon changes. */}
           {value ? (
             <Animated.View key="on" entering={ZoomIn}>
-              <SymbolView name="checkmark" size={11} weight="black" tintColor={trackOn} />
+              <Icon name="checkmark" size={11} weight="black" tintColor={trackOn} />
             </Animated.View>
           ) : (
             <Animated.View key="off" entering={ZoomIn}>
-              <SymbolView name="xmark" size={11} weight="bold" tintColor={trackOff} />
+              <Icon name="xmark" size={11} weight="bold" tintColor={trackOff} />
             </Animated.View>
           )}
         </Animated.View>

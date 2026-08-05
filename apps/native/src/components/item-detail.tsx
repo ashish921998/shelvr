@@ -9,7 +9,7 @@ import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/build/react-navigation';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
 import { memo } from 'react';
@@ -147,11 +147,11 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               style={styles.sourceRow}
               onPress={() => WebBrowser.openBrowserAsync(item.url!)}
             >
-              <SymbolView name="safari" size={15} tintColor={theme.colors.muted} />
+              <Icon name="safari" size={15} tintColor={theme.colors.muted} />
               <Text style={styles.sourceText}>
                 {item.siteName ?? displayHost(item.url)}
               </Text>
-              <SymbolView
+              <Icon
                 name="arrow.up.right"
                 size={11}
                 tintColor={theme.colors.faint}
@@ -202,7 +202,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               asChild
             >
               <Pressable style={styles.manageSpacesChip}>
-                <SymbolView name="plus" size={11} tintColor={theme.colors.primaryText} />
+                <Icon name="plus" size={11} tintColor={theme.colors.primaryText} />
                 <Text style={styles.manageSpacesLabel}>
                   {spaces.length > 0 ? 'Spaces' : 'Add to space'}
                 </Text>
@@ -284,7 +284,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
                 />
               ) : (
                 <View style={[styles.productImage, styles.productImageEmpty]}>
-                  <SymbolView name="bag" size={22} tintColor={theme.colors.faint} />
+                  <Icon name="bag" size={22} tintColor={theme.colors.faint} />
                 </View>
               )}
               <Text style={styles.productName} numberOfLines={2}>
@@ -314,7 +314,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
         onPress={() => findLinks({ id: item._id })}
         hitSlop={6}
       >
-        <SymbolView name="bag" size={14} tintColor={theme.colors.primaryText} />
+        <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />
         <Text style={styles.findLinksLabel}>
           {item.productsStatus === 'failed'
             ? 'Find links — try again'
