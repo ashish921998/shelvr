@@ -1098,4 +1098,21 @@ describe("Pro entitlement gate", () => {
     expect(ent.status).toBe("pro");
     expect(ent.expiresAt).toBe(farFuture);
   });
+
+  it("lapses an existing subscription while retaining its expiration", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "expired" });
+    const periodEnd = Date.now() - 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "expired",
+      status: "pro",
+      expiresAt: periodEnd,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "expired",
+      status: "lapsed",
+      expiresAt: periodEnd,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });
+  });
 });

@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { parseRevenueCatEvent } from "./model/revenuecat";
 
 const http = httpRouter();
 
@@ -35,20 +36,38 @@ http.route({
     } catch {
       return new Response("Bad payload", { status: 400 });
     }
-    const event = readRecord(readRecord(body)?.event);
-    const type = readString(event?.type);
-    // The client logs in to RevenueCat with the Clerk user id, which RevenueCat
-    // sends as the current app_user_id. original_app_user_id may still be an
-    // anonymous pre-login alias, so it must not be used as our ownership key.
-    const userId = readString(event?.app_user_id);
-    const expiresAt = readNumber(event?.expiration_at_ms);
-    const productId = readString(event?.product_id);
-
-    if (type === undefined || userId === undefined || expiresAt === undefined) {
+    const event = parseRevenueCatEvent(body);
+    if (event === undefined) {
       return new Response("Bad payload", { status: 400 });
     }
+    const { type, userId, expiresAt, productId } = event;
 
     const status = mapStatus(type);
+
+    // RevenueCat may omit the timestamp on a legitimate EXPIRATION. Preserve
+    // the period end we already stored and mark that row lapsed. If no row
+    // exists, there is no entitlement to revoke, so acknowledge the event.
+    if (status === "lapsed" && expiresAt === undefined) {
+      const current = await ctx.runQuery(
+        internal.subscriptions.getSubscriptionInternal,
+        { userId },
+      );
+      if (current === null) {
+        return new Response(null, { status: 200 });
+      }
+      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
+        userId,
+        status,
+        expiresAt: current.expiresAt,
+        productId,
+      });
+      return new Response(null, { status: 200 });
+    }
+
+    // The parser requires an expiry for every remaining event path.
+    if (expiresAt === undefined) {
+      return new Response("Bad payload", { status: 400 });
+    }
 
     // Events that preserve the existing status (CANCELLATION, etc.) still
     // refresh `expiresAt` so the row tracks the current period end. Resolve the
@@ -108,22 +127,6 @@ function mapStatus(type: string): "trialing" | "pro" | "lapsed" | null {
     default:
       return null;
   }
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function readRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
 }
 
 export default http;
