@@ -94,7 +94,10 @@ function SpaceForm(props: SpaceFormProps) {
     if (!trimmed || saving) return;
     // Creating any space is Pro; editing is Pro only when turning dynamic on.
     const needsPro = props.mode === 'create' || (props.mode === 'edit' && dynamic && !(props.space.dynamic ?? false));
-    if (needsPro && !guard()) return;
+    if (needsPro) {
+      const ok = await guard();
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       if (props.mode === 'edit') {

@@ -189,6 +189,11 @@ export default defineSchema({
     ),
     expiresAt: v.number(),
     productId: v.optional(v.string()),
+    // RevenueCat `event_timestamp_ms` — a monotonic event timestamp from the
+    // webhook payload. Used to order events so a newer event can move expiry in
+    // either direction (e.g. a refund shortens the period). Optional for
+    // backward compatibility with rows created before this field existed.
+    eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 });

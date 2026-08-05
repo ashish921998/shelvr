@@ -44,7 +44,10 @@ function fitCamera(items: Located[]) {
 export default function MapScreen() {
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
-  const { data: items } = useQuery(convexQuery(api.items.listItems, {}));
+  const { data: items } = useQuery({
+    ...convexQuery(api.items.listItems, {}),
+    enabled: !entitlementLoading && entitled,
+  });
 
   const located = useMemo(
     () =>

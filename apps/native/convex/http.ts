@@ -34,66 +34,35 @@ http.route({
     try {
       body = await req.json();
     } catch {
+      // Unreadable/non-JSON body — RevenueCat should not retry these.
       return new Response("Bad payload", { status: 400 });
     }
     const event = parseRevenueCatEvent(body);
     if (event === undefined) {
+      // Body was not a readable object — reject so RevenueCat doesn't retry.
       return new Response("Bad payload", { status: 400 });
     }
-    const { type, userId, expiresAt, productId } = event;
 
+    // A readable event missing required fields (type or app_user_id) is
+    // malformed but acknowledged — return 200 so RevenueCat stops retrying
+    // a non-actionable event rather than hammering the endpoint.
+    if (event.type === undefined || event.userId === undefined) {
+      return new Response(null, { status: 200 });
+    }
+
+    const { type, userId, expiresAt, productId, eventTimestampMs } = event;
     const status = mapStatus(type);
 
-    // RevenueCat may omit the timestamp on a legitimate EXPIRATION. Preserve
-    // the period end we already stored and mark that row lapsed. If no row
-    // exists, there is no entitlement to revoke, so acknowledge the event.
-    if (status === "lapsed" && expiresAt === undefined) {
-      const current = await ctx.runQuery(
-        internal.subscriptions.getSubscriptionInternal,
-        { userId },
-      );
-      if (current === null) {
-        return new Response(null, { status: 200 });
-      }
-      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
-        userId,
-        status,
-        expiresAt: current.expiresAt,
-        productId,
-      });
-      return new Response(null, { status: 200 });
-    }
-
-    // The parser requires an expiry for every remaining event path.
-    if (expiresAt === undefined) {
-      return new Response("Bad payload", { status: 400 });
-    }
-
-    // Events that preserve the existing status (CANCELLATION, etc.) still
-    // refresh `expiresAt` so the row tracks the current period end. Resolve the
-    // current status server-side so the mutation doesn't have to parse webhook
-    // semantics.
-    if (status === null) {
-      const current = await ctx.runQuery(
-        internal.subscriptions.getSubscriptionInternal,
-        { userId },
-      );
-      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
-        userId,
-        // Let upsert keep the existing status (or default to pro for a first
-        // event that arrived without a status signal).
-        status: current?.status,
-        expiresAt,
-        productId,
-      });
-      return new Response(null, { status: 200 });
-    }
-
+    // Events that preserve the existing status (CANCELLATION, etc.) pass
+    // `status: undefined` so upsertSubscription keeps the current status
+    // transactionally — no separate read here that could race with a
+    // concurrent event.
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
-      status,
-      expiresAt,
+      status: status ?? undefined,
+      expiresAt: expiresAt ?? 0,
       productId,
+      eventTimestampMs,
     });
     return new Response(null, { status: 200 });
   }),

@@ -1,7 +1,7 @@
 import { AnimatedText } from '@/components/animated-text';
 import { parseExifDate } from '@/lib/date';
 import { parseExifLocation } from '@/lib/exif';
-import { usePaywallGuard } from '@/lib/entitlement';
+import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
 import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -58,6 +58,7 @@ export default function AddScreen() {
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
   const guard = usePaywallGuard();
+  const { loading: entitlementLoading } = useEntitlement();
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -229,19 +230,19 @@ export default function AddScreen() {
             icon="square.and.pencil"
             label="Note"
             onPress={() => guard(() => openComposer('note'))}
-            disabled={saving}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="link"
             label="Article"
             onPress={() => guard(() => openComposer('article'))}
-            disabled={saving}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="photo.on.rectangle"
             label="Photos"
             onPress={() => guard(pickImages)}
-            disabled={saving}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="camera"
@@ -255,7 +256,7 @@ export default function AddScreen() {
                 });
               })
             }
-            disabled={saving}
+            disabled={saving || entitlementLoading}
           />
         </View>
       )}

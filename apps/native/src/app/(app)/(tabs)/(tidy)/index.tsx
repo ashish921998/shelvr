@@ -42,7 +42,7 @@ export default function TidyScreen() {
     {
       album: source.album,
       sourceId: source.id,
-      enabled: granted,
+      enabled: granted && !entitlementLoading && entitled,
     },
   );
 
@@ -287,7 +287,9 @@ const ProGate: FC = () => {
           pressed && { opacity: 0.85 },
         ]}
         onPress={() => {
-          if (!presentPaywall()) router.push('/(app)/paywall');
+          void presentPaywall().then((ok) => {
+            if (!ok) router.push('/(app)/paywall');
+          });
         }}
       >
         <Text style={styles.proGateCtaText}>Start 7-day free trial</Text>

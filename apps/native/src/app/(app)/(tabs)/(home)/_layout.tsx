@@ -1,5 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
-import { usePaywallGuard } from '@/lib/entitlement';
+import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { Platform, PlatformColor } from 'react-native';
@@ -9,6 +9,7 @@ export default function HomeStackLayout() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const guard = usePaywallGuard();
+  const { loading: entitlementLoading } = useEntitlement();
 
   // PlatformColor('label') is iOS-only; on Android fall back to the theme's
   // foreground color.
@@ -24,11 +25,14 @@ export default function HomeStackLayout() {
   };
 
   // Add and Map are Pro features — route to the paywall unless entitled.
+  // Suppress haptic until entitlement resolves — firing it during loading
+  // would imply the action is about to run when the guard will drop it.
   const guardedTap = (href: '/add' | '/map') => () => {
+    if (entitlementLoading) return;
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    guard(() => router.push(href));
+    void guard(() => router.push(href));
   };
 
   return (

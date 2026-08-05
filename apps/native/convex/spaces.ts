@@ -230,6 +230,15 @@ export const updateSpace = mutation({
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
     }
+    const wasDynamic = space.dynamic === true;
+    // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
+    // saves into the space). A lapsed user editing a space's name or turning
+    // dynamic off is allowed, but enabling it requires an active trial/pro.
+    // Check BEFORE patching so a lapsed user can't flip the flag and trigger
+    // the recommendation pass before being rejected.
+    if (args.dynamic === true && !wasDynamic) {
+      await requireProEntitlement(ctx, userId);
+    }
     const patch: { name?: string; dynamic?: boolean } = {};
     if (args.name !== undefined) {
       const name = args.name.trim();
@@ -243,12 +252,7 @@ export const updateSpace = mutation({
     }
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
-    const wasDynamic = space.dynamic === true;
     if (args.dynamic === true && !wasDynamic) {
-      // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
-      // saves into the space). A lapsed user editing a space's name or turning
-      // dynamic off is allowed, but enabling it requires an active trial/pro.
-      await requireProEntitlement(ctx, userId);
       await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
         spaceId: space._id,
       });

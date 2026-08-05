@@ -33,15 +33,26 @@ async function as(userId: string): Promise<TestCtx> {
   return t;
 }
 
-/** Insert an active Pro subscription for `userId` so gated mutations succeed. */
+/** Insert an active Pro subscription for `userId` so gated mutations succeed.
+ * Idempotent: if a row already exists it is patched, otherwise a new one is
+ * inserted — so calling `seedPro` twice (e.g. in a shared helper) doesn't
+ * violate the `by_user` unique index. */
 async function seedPro(t: TestCtx, userId: string): Promise<void> {
   await t.run(async (ctx) => {
-    await ctx.db.insert("subscriptions", {
-      userId,
-      status: "pro",
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    const fields = {
+      status: "pro" as const,
       expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
       updatedAt: Date.now(),
-    });
+    };
+    if (existing !== null) {
+      await ctx.db.patch(existing._id, fields);
+    } else {
+      await ctx.db.insert("subscriptions", { userId, ...fields });
+    }
   });
 }
 
@@ -163,6 +174,47 @@ describe("image import lifecycle", () => {
     });
     expect(opA?.itemId).toBe(aId);
     expect(opB?.itemId).toBe(bId);
+  });
+
+  it("returns the completed itemId to a lapsed user without checking Pro", async () => {
+    // A user who saved an image while Pro, then lapsed, must still retrieve
+    // the completed itemId — the idempotent read path is not gated on Pro.
+    const t = await as("user-a");
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    const storageId = await storeBlob(t);
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId,
+    });
+    const itemId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+    });
+
+    // Lapse the subscription.
+    await t.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .unique();
+      if (sub) {
+        await ctx.db.patch(sub._id, {
+          status: "lapsed",
+          expiresAt: Date.now() - 1000,
+        });
+      }
+    });
+
+    // begin returns the completed itemId without throwing Pro required.
+    const began = await t.mutation(api.items.beginImageImport, {
+      operationId: OP_ID,
+    });
+    expect(began).toEqual({ kind: "complete", itemId });
+
+    // finalize also returns the same id without throwing.
+    const again = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+    });
+    expect(again).toBe(itemId);
   });
 
   it("rejects reusing an operation id with a different kind", async () => {
@@ -993,6 +1045,32 @@ describe("Pro entitlement gate", () => {
     ).rejects.toThrow(/Pro required/);
   });
 
+  it("blocks a lapsed user from retrying a pending image import", async () => {
+    // A user who began an import while Pro, then lapsed, must NOT be able to
+    // retry the pending operation: begin would otherwise hand back a fresh
+    // upload URL and refresh updatedAt, pinning the row alive past the cron.
+    const t = convexTest(schema, modules).withIdentity({ subject: "pend-lapse" });
+    await seedPro(t, "pend-lapse");
+    // Begin while Pro (creates the pending row), then lapse the subscription.
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await t.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", "pend-lapse"))
+        .unique();
+      if (sub) {
+        await ctx.db.patch(sub._id, {
+          status: "lapsed",
+          expiresAt: Date.now() - 1000,
+        });
+      }
+    });
+    // Retrying begin on the existing pending op must now throw Pro required.
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow(/Pro required/);
+  });
+
   it("blocks Find links for a lapsed user", async () => {
     const t = convexTest(schema, modules).withIdentity({ subject: "lapsed" });
     // Seed a subscription whose trial already expired.
@@ -1066,12 +1144,15 @@ describe("Pro entitlement gate", () => {
       userId: "rc",
       status: "pro",
       expiresAt: farFuture,
+      eventTimestampMs: 2000,
     });
-    // A stale EXPIRATION event with an earlier expiry must not regress the row.
+    // A stale EXPIRATION event with an earlier event timestamp must not
+    // regress the row, even though its expiry is earlier.
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId: "rc",
       status: "lapsed",
       expiresAt: farFuture - 1000,
+      eventTimestampMs: 1000,
     });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent.status).toBe("pro");
@@ -1087,16 +1168,129 @@ describe("Pro entitlement gate", () => {
       userId: "rc-active",
       status: "pro",
       expiresAt: farFuture,
+      eventTimestampMs: 2000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId: "rc-active",
       status: "pro",
       expiresAt: farFuture - 1000,
       productId: "stale-product",
+      eventTimestampMs: 1000,
     });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent.status).toBe("pro");
     expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("a newer refund event can move expiry backward", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-refund" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-refund",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // A newer EXPIRATION event shortens the period (e.g. a refund).
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-refund",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("lapsed");
+    expect(ent.expiresAt).toBe(farFuture - 1000);
+  });
+
+  it("an equal-timestamp event is dropped (not strictly newer)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-eq" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-eq",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-eq",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("identical event replay is idempotent", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-replay" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    const event = {
+      userId: "rc-replay",
+      status: "pro" as const,
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+      productId: "prod-1",
+    };
+    await t.mutation(internal.subscriptions.upsertSubscription, event);
+    // Replaying the exact same event (same timestamp) is a no-op.
+    await t.mutation(internal.subscriptions.upsertSubscription, event);
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("omitted status preserves the existing status", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-cancel" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-cancel",
+      status: "trialing",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // A CANCELLATION event (status omitted) preserves `trialing` but
+    // refreshes expiresAt from the event.
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-cancel",
+      expiresAt: farFuture + 1000,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("trialing");
+    expect(ent.expiresAt).toBe(farFuture + 1000);
+  });
+
+  it("an event with no expiry preserves the existing expiresAt", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-noexp" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-noexp",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // An event with expiresAt=0 preserves the existing expiresAt.
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-noexp",
+      expiresAt: 0,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("an event with no expiry and no existing row creates nothing", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-empty" });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-empty",
+      expiresAt: 0,
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("none");
   });
 
   it("lapses an existing subscription while retaining its expiration", async () => {
@@ -1106,11 +1300,13 @@ describe("Pro entitlement gate", () => {
       userId: "expired",
       status: "pro",
       expiresAt: periodEnd,
+      eventTimestampMs: 1000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId: "expired",
       status: "lapsed",
       expiresAt: periodEnd,
+      eventTimestampMs: 2000,
     });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });

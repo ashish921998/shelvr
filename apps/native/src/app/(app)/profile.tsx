@@ -11,7 +11,7 @@ export default function ProfileScreen() {
   const { signOut } = useClerk();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { status } = useEntitlement();
+  const { status, loading } = useEntitlement();
 
   const proLabel =
     status === 'trialing'
@@ -20,7 +20,9 @@ export default function ProfileScreen() {
         ? 'Pro'
         : status === 'lapsed'
           ? 'Pro — Lapsed'
-          : 'Start free trial';
+          : loading
+            ? '…'
+            : 'Start free trial';
 
   return (
     <View style={styles.content}>
@@ -37,9 +39,17 @@ export default function ProfileScreen() {
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.proRow, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [
+          styles.proRow,
+          pressed && { opacity: 0.7 },
+          loading && { opacity: 0.4 },
+        ]}
+        disabled={loading}
         onPress={() => {
-          if (!presentPaywall()) router.push('/(app)/paywall');
+          if (loading) return;
+          void presentPaywall().then((ok) => {
+            if (!ok) router.push('/(app)/paywall');
+          });
         }}
       >
         <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />

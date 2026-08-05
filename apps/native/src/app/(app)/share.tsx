@@ -175,7 +175,9 @@ export default function ShareScreen() {
       // Saving is Pro — a lapsed user sharing into Shelvr is routed to the
       // paywall instead of failing every entry against the server gate.
       if (!entitled) {
-        if (!presentPaywall()) router.push('/(app)/paywall');
+        void presentPaywall().then((ok) => {
+          if (!ok) router.push('/(app)/paywall');
+        });
         return;
       }
       runningSessionId.current = session.sessionId;
@@ -364,6 +366,13 @@ export default function ShareScreen() {
   }, [clearSharedPayloads, router]);
 
   // --- Phase render ---------------------------------------------------------
+
+  // Entitlement is still loading — don't fall through to the idle/complete
+  // render. The effect also blocks on entitlementLoading, so no save starts
+  // until it resolves.
+  if (entitlementLoading && phase.kind === 'idle') {
+    return <Centered label="Checking subscription…" spinner theme={theme} />;
+  }
 
   // Derived resolution states take precedence over the session-driven phases
   // stored in `phase`: they are pure functions of the hook props and avoid the

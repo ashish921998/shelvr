@@ -1,31 +1,32 @@
 export type RevenueCatEvent = {
-  type: string;
-  userId: string;
+  type?: string;
+  userId?: string;
   expiresAt?: number;
   productId?: string;
+  eventTimestampMs?: number;
 };
 
 /** Parse the subset of a RevenueCat webhook used by the entitlement sync.
- * EXPIRATION is the only event accepted without an expiration timestamp: in
- * that case the handler lapses the existing row while retaining its period end.
+ * Returns `undefined` only when the body is not a readable object — the caller
+ * then returns HTTP 400. A readable event missing `type` or `app_user_id`
+ * returns a partial object with those fields as `undefined` so the caller can
+ * respond HTTP 200 (acknowledging the event so RevenueCat stops retrying)
+ * without acting on it. `expiresAt` is optional for all event types; the
+ * handler decides what to do when it's missing.
  */
 export function parseRevenueCatEvent(
   body: unknown,
 ): RevenueCatEvent | undefined {
   const event = readRecord(readRecord(body)?.event);
+  if (event === undefined) return undefined;
+
   const type = readString(event?.type);
   const userId = readString(event?.app_user_id);
   const expiresAt = readNumber(event?.expiration_at_ms);
   const productId = readString(event?.product_id);
+  const eventTimestampMs = readNumber(event?.event_timestamp_ms);
 
-  if (type === undefined || userId === undefined) return undefined;
-  if (
-    expiresAt === undefined &&
-    !(type === "EXPIRATION" && event?.expiration_at_ms === null)
-  ) {
-    return undefined;
-  }
-  return { type, userId, expiresAt, productId };
+  return { type, userId, expiresAt, productId, eventTimestampMs };
 }
 
 function readString(value: unknown): string | undefined {

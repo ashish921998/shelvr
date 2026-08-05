@@ -57,10 +57,14 @@ let _rcui:
   | undefined;
 function getRCUI() {
   if (_rcui !== undefined) return _rcui;
+  // react-native-purchases-ui registers its native module as `RNPaywalls`
+  // (plural). The older `RNPaywall` (singular) name is retained as a fallback
+  // for any older linking variant.
   const linked =
+    NativeModules.RNPaywalls ||
+    NativeModules.RNPaywall ||
     NativeModules.RNRevenueCatUI ||
-    NativeModules.RCPurchasesUiModule ||
-    NativeModules.RNPaywall;
+    NativeModules.RCPurchasesUiModule;
   if (!linked) {
     _rcui = null;
     return _rcui;
@@ -86,6 +90,40 @@ export type Entitlement = {
   loading: boolean;
   expiresAt?: number;
 };
+
+// ---------------------------------------------------------------------------
+// RevenueCat identity sync readiness
+// ---------------------------------------------------------------------------
+
+/**
+ * Tracks whether RevenueCat's app user id has been synced with the Clerk `sub`.
+ * The paywall must not be presented until `rcSyncReady` is true — otherwise a
+ * purchase could be attributed to an anonymous RevenueCat user instead of the
+ * Clerk `sub` the webhook keys on. This is a module-level state so any caller
+ * of `presentPaywall` can observe it without a direct hook dependency.
+ */
+let _rcSyncReady = false;
+const _rcSyncListeners = new Set<(ready: boolean) => void>();
+
+// Maximum time presentPaywall waits for RC identity sync before giving up and
+// letting the caller fall back to the paywall route. Long enough to cover a
+// normal logIn round-trip, short enough that a missing/unconfigured RC SDK
+// (Expo Go, unset key, outage) doesn't freeze the UI.
+const SYNC_READY_TIMEOUT_MS = 5000;
+
+function setRcSyncReady(ready: boolean) {
+  if (_rcSyncReady === ready) return;
+  _rcSyncReady = ready;
+  for (const fn of _rcSyncListeners) fn(ready);
+}
+
+/** Subscribe to RevenueCat sync-readiness changes. Returns an unsubscribe fn. */
+function onRcSyncReady(fn: (ready: boolean) => void): () => void {
+  _rcSyncListeners.add(fn);
+  return () => {
+    _rcSyncListeners.delete(fn);
+  };
+}
 
 // ---------------------------------------------------------------------------
 // RevenueCat configuration
@@ -116,6 +154,10 @@ export async function configureRevenueCat(): Promise<void> {
  * Keep RevenueCat's app user id in sync with the Clerk `sub`. RevenueCat's
  * `original_app_user_id` becomes the `userId` the webhook writes, so it must
  * match the Clerk `sub` every other table keys on. Call once after sign-in.
+ *
+ * `logged.current` is set only AFTER `rc.logIn` succeeds, so a failed login
+ * can be retried on the next effect run. The sync-ready state is flipped to
+ * true only after a successful login so `presentPaywall` can gate on it.
  */
 export function useEntitlementSync(): void {
   const { user, isSignedIn } = useUser();
@@ -129,11 +171,16 @@ export function useEntitlementSync(): void {
       if (logged.current === sub) return;
       const rc = getPurchases();
       if (!rc) return;
-      logged.current = sub;
-      rc.logIn(sub).catch(() => {
-        // A failed logIn (e.g. RC not configured) is non-fatal — the webhook
-        // simply won't fire until RC is wired; entitlement stays `none`.
-      });
+      rc.logIn(sub)
+        .then(() => {
+          logged.current = sub;
+          setRcSyncReady(true);
+        })
+        .catch(() => {
+          // A failed logIn (e.g. RC not configured) is non-fatal — the webhook
+          // simply won't fire until RC is wired; entitlement stays `none`.
+          // `logged.current` is NOT set, so the next effect run retries.
+        });
     });
   }, [isSignedIn, user]);
 }
@@ -179,17 +226,55 @@ export function useEntitlement(): Entitlement {
 // ---------------------------------------------------------------------------
 
 /**
- * Present the RevenueCat paywall natively (sheet on iOS). Falls back to
- * returning false if the RC UI SDK isn't linked; callers can then route to the
- * paywall route as a dev fallback.
+ * Present the RevenueCat paywall natively (sheet on iOS). Returns `true` only
+ * when the paywall was presented AND the user completed a purchase or restore.
+ * Returns `false` if the RC UI SDK isn't linked, the paywall wasn't presented,
+ * the user cancelled, or an error occurred. Callers should fall back to
+ * routing to the paywall route when this returns `false`.
+ *
+ * The paywall is NOT presented until RevenueCat identity sync is ready (the
+ * Clerk `sub` has been logged in to RC), so a purchase is always attributed to
+ * the correct user.
  */
-export function presentPaywall(): boolean {
-  const rcui = getRCUI();
-  if (rcui) {
-    rcui.presentPaywall().catch(() => {});
-    return true;
+export async function presentPaywall(): Promise<boolean> {
+  // Block until RC identity sync completes — a purchase before login would be
+  // attributed to an anonymous RC user, breaking the webhook's userId mapping.
+  // Capped at SYNC_READY_TIMEOUT_MS so a missing/unconfigured RC SDK (Expo Go,
+  // unset API key, logIn failure, RC outage) cannot wedge the UI forever: if
+  // sync never completes we fall through, and the caller routes to the paywall
+  // screen instead of hanging on a frozen gesture.
+  if (!_rcSyncReady) {
+    await new Promise<void>((resolve) => {
+      if (_rcSyncReady) return resolve();
+      let done = false;
+      const unsub = onRcSyncReady(() => {
+        if (done) return;
+        done = true;
+        unsub();
+        resolve();
+      });
+      // Resolve on timeout so the caller's fallback route can still fire.
+      setTimeout(() => {
+        if (done) return;
+        done = true;
+        unsub();
+        resolve();
+      }, SYNC_READY_TIMEOUT_MS);
+    });
   }
-  return false;
+
+  const rcui = getRCUI();
+  if (!rcui) return false;
+  try {
+    const result = await rcui.presentPaywall();
+    // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
+    return (
+      result === 'PURCHASED' ||
+      result === 'RESTORED'
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -199,25 +284,29 @@ export function presentPaywall(): boolean {
 /**
  * Returns a guard that runs `action` only when the user is entitled, otherwise
  * presents the RevenueCat paywall (native sheet). If the RC UI SDK isn't linked
- * yet, falls back to routing to the paywall route. Use this at every Pro-gated
- * affordance (Save, dynamic spaces, Find links, Tidy, Map) so the paywall
- * appears at a moment of felt need rather than blocking the whole app. The
- * server re-checks entitlement on every gated mutation, so this client guard is
- * advisory only.
+ * or the paywall is dismissed without purchase, falls back to routing to the
+ * paywall route. Use this at every Pro-gated affordance (Save, dynamic spaces,
+ * Find links, Tidy, Map) so the paywall appears at a moment of felt need rather
+ * than blocking the whole app. The server re-checks entitlement on every gated
+ * mutation, so this client guard is advisory only.
+ *
+ * While entitlement is loading, the guard returns `false` without acting —
+ * callers should disable the affordance or show a loading state.
  */
-export function usePaywallGuard(): (action?: () => void) => boolean {
+export function usePaywallGuard(): (action?: () => void) => Promise<boolean> {
   const { entitled, loading } = useEntitlement();
   const router = useRouter();
   return useCallback(
-    (action?: () => void) => {
+    async (action?: () => void) => {
       if (loading) return false;
       if (entitled) {
         action?.();
         return true;
       }
-      if (!presentPaywall()) {
-        // Fallback: route to the paywall screen (only reached in dev without
-        // native build).
+      const presented = await presentPaywall();
+      if (!presented) {
+        // Fallback: route to the paywall screen (reached when native SDK
+        // isn't linked, or the user dismissed without purchasing).
         router.push('/(app)/paywall');
       }
       return false;
