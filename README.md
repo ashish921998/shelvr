@@ -16,7 +16,7 @@ for Shelvr.
 - [Turborepo](https://turbo.build/repo) + [pnpm](https://pnpm.io/)
 - [Next.js](https://nextjs.org/) (`apps/web`) — marketing landing only
 - [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`) — product app
-- [Convex](https://convex.dev/) (`packages/backend`)
+- [Convex](https://convex.dev/) (`apps/native/convex/`)
 - [Clerk](https://clerk.com/) auth (native + Convex)
 - Vercel AI SDK via AI Gateway (`google/gemini-3.1-flash-lite`)
 
@@ -25,8 +25,7 @@ for Shelvr.
 | Path | Purpose |
 | --- | --- |
 | `apps/web` | Next.js marketing / landing site |
-| `apps/native` | Expo native client (full product) |
-| `packages/backend` | Convex schema, queries/mutations, AI pipeline |
+| `apps/native` | Expo native client (full product) + Convex backend |
 
 ## Quick start
 
@@ -39,11 +38,11 @@ pnpm install
 ### 2. Configure Convex
 
 ```sh
-pnpm --filter @packages/backend setup
+cd apps/native && npx convex dev --until-success
 ```
 
 This logs you into Convex, connects a project, and writes
-`packages/backend/.env.local`.
+`apps/native/.env.local`.
 
 ### 3. Clerk ↔ Convex
 
@@ -53,13 +52,13 @@ In Clerk, enable the Convex JWT template (`applicationID: "convex"`). Set the
 issuer on your Convex deployment:
 
 ```sh
-pnpm --filter @packages/backend exec convex env set CLERK_JWT_ISSUER_DOMAIN https://your-frontend-api.clerk.accounts.dev
+cd apps/native && npx convex env set CLERK_JWT_ISSUER_DOMAIN https://your-frontend-api.clerk.accounts.dev
 ```
 
 For AI classification, also set:
 
 ```sh
-pnpm --filter @packages/backend exec convex env set AI_GATEWAY_API_KEY <your-vercel-ai-gateway-key>
+cd apps/native && npx convex env set AI_GATEWAY_API_KEY <your-vercel-ai-gateway-key>
 ```
 
 ### 4. Native env
@@ -68,7 +67,7 @@ pnpm --filter @packages/backend exec convex env set AI_GATEWAY_API_KEY <your-ver
 cp apps/native/.example.env apps/native/.env.local
 ```
 
-- `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `packages/backend/.env.local`
+- `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `apps/native/.env.local`
 - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` from the Clerk dashboard
 
 The web marketing site needs no env vars.
@@ -108,7 +107,6 @@ Install in the package that uses them:
 ```sh
 pnpm --filter web-app add mypackage@latest
 pnpm --filter native-app add mypackage@latest
-pnpm --filter @packages/backend add mypackage@latest
 ```
 
 ## Notes

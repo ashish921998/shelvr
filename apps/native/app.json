@@ -1,6 +1,5 @@
 {
   "expo": {
-    "newArchEnabled": true,
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
@@ -8,39 +7,101 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#E4572E"
-    },
-    "assetBundlePatterns": ["**/*"],
+    "backgroundColor": "#faf6ee",
     "ios": {
       "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Shelvr uses your camera so you can capture things you want to save for later.",
+        "NSMicrophoneUsageDescription": "Shelvr needs access to your Microphone to record audio for video recordings.",
+        "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub.",
+        "NSPhotoLibraryAddUsageDescription": "Shelvr can save images back to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "bundleIdentifier": "app.shelvr.save"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E4572E"
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "predictiveBackGestureEnabled": false,
       "package": "app.shelvr.save"
     },
     "web": {
-      "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
-        "expo-router",
+        "expo-font",
         {
-          "root": "./src/app"
+          "fonts": [
+            "./assets/fonts/ExposureTrial-0.otf",
+            "./assets/fonts/Satoshi-Regular.otf",
+            "./assets/fonts/Satoshi-Medium.otf",
+            "./assets/fonts/Satoshi-Bold.otf"
+          ]
         }
       ],
-      "expo-font",
-      "expo-secure-store"
+      "expo-image",
+      "expo-router",
+      "expo-status-bar",
+      "@clerk/expo",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Shelvr adds events to your calendar from things you've saved."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Shelvr lets you tidy your photo library — keep, delete, or save photos into your hub.",
+          "savePhotosPermission": "Shelvr can save images back to your photo library."
+        }
+      ],
+      [
+        "expo-sharing",
+        {
+          "ios": {
+            "enabled": true,
+            "activationRule": {
+              "supportsImageWithMaxCount": 10,
+              "supportsWebUrlWithMaxCount": 1,
+              "supportsText": true
+            }
+          },
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": [
+              "image/*",
+              "text/*"
+            ],
+            "multipleShareMimeTypes": [
+              "image/*"
+            ]
+          }
+        }
+      ],
+      "expo-maps"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": ""
+      }
     }
   }
 }

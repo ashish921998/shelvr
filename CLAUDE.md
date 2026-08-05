@@ -21,21 +21,20 @@ in matching existing items.
 | Path | Role |
 | --- | --- |
 | `apps/web` | Next.js marketing / landing site only |
-| `apps/native` | Expo Router native app |
-| `packages/backend` | Convex backend (schema, functions, AI pipeline) |
+| `apps/native` | Expo Router native app (includes `convex/` backend) |
 
-Shared Convex types/API are imported as `@packages/backend/convex/_generated/*`.
+Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
 ## Toolchain & commands
 
 **Use `pnpm`** (workspace package manager). Root scripts go through Turbo.
 
 - `pnpm install` — install deps
-- `pnpm dev` — run backend + web + native via Turbo
+- `pnpm dev` — run web + native via Turbo
 - `pnpm typecheck` — typecheck all packages
-- `pnpm --filter @packages/backend dev` / `pnpm --filter @packages/backend exec convex dev` —
-  Convex backend against the dev deployment; keeps `convex/_generated/*` in sync
 - `pnpm --filter native-app start` — Expo Metro
+- `pnpm --filter native-app exec convex dev` —
+  Convex backend against the dev deployment; keeps `convex/_generated/*` in sync
 - `pnpm --filter web-app dev` — Next.js dev server
 - `pnpm --filter web-app lint` — ESLint
 
@@ -43,7 +42,7 @@ There is no test suite yet.
 
 ## Architecture
 
-### Backend (`packages/backend/convex/`) — source of truth
+### Backend (`apps/native/convex/`) — source of truth
 
 Convex is the reactive backend + database + file storage + AI orchestration. Auth is Clerk,
 wired via `auth.config.ts` (Clerk JWT template `applicationID: "convex"`).
@@ -85,8 +84,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 ## Path aliases
 
 - Web: `@/*` → `apps/web/src/*`
-- Backend package: `@packages/backend` → `packages/backend`
-- Import Convex API as `@packages/backend/convex/_generated/api`
+- Native: `@/*` → `apps/native/src/*`, `@convex/*` → `apps/native/convex/*`
+- Import Convex API as `@convex/_generated/api`
 
 ## Environment variables
 
@@ -113,11 +112,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read
-`packages/backend/convex/_generated/ai/guidelines.md` first** for important guidelines on
+`apps/native/convex/_generated/ai/guidelines.md` first** for important guidelines on
 how to correctly use Convex APIs and patterns. The file contains rules that
 override what you may have learned about Convex from training data.
 
 Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install` from `packages/backend`.
+`npx convex ai-files install` from `apps/native`.
 
 <!-- convex-ai-end -->
