@@ -43,15 +43,18 @@ http.route({
       return new Response("Bad payload", { status: 400 });
     }
 
-    // A readable event missing required fields (type or app_user_id) is
-    // malformed but acknowledged — return 200 so RevenueCat stops retrying
-    // a non-actionable event rather than hammering the endpoint.
-    if (event.type === undefined || event.userId === undefined) {
+    // A readable event missing required identity or ordering fields is
+    // malformed but acknowledged — return 200 so RevenueCat stops retrying a
+    // non-actionable event rather than hammering the endpoint.
+    if (
+      event.type === undefined ||
+      event.userId === undefined ||
+      event.eventTimestampMs === undefined
+    ) {
       return new Response(null, { status: 200 });
     }
 
     const { type, userId, expiresAt, productId, eventTimestampMs } = event;
-    const status = mapStatus(type);
 
     // Events that preserve the existing status (CANCELLATION, etc.) pass
     // `status: undefined` so upsertSubscription keeps the current status
@@ -59,7 +62,7 @@ http.route({
     // concurrent event.
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
-      status: status ?? undefined,
+      status: mapStatus(type),
       expiresAt: expiresAt ?? 0,
       productId,
       eventTimestampMs,
@@ -69,17 +72,20 @@ http.route({
 });
 
 /**
- * Map a RevenueCat `notification_type` to an entitlement status, or `null`
- * when the event should preserve the existing status (e.g. CANCELLATION, which
- * only signals the user turned off auto-renew — they keep access until the
- * period ends, at which point a separate EXPIRATION event flips them to lapsed).
+ * Map a RevenueCat `notification_type` to an entitlement status, or
+ * `undefined` when the event should preserve the existing status (e.g.
+ * CANCELLATION, which only signals the user turned off auto-renew — they keep
+ * access until the period ends, at which point a separate EXPIRATION event
+ * flips them to lapsed).
  *
  * The trial/pro distinction is advisory only — both are `entitled` for gating.
  * INITIAL_PURCHASE is treated as `trialing` because the only entry point into
  * Shelvr is the 7-day introductory trial; a direct paid purchase (no trial)
  * would still be entitled, just labeled `trialing` until the next event.
  */
-function mapStatus(type: string): "trialing" | "pro" | "lapsed" | null {
+function mapStatus(
+  type: string,
+): "trialing" | "pro" | "lapsed" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
     case "TRIAL_STARTED":
@@ -94,7 +100,7 @@ function mapStatus(type: string): "trialing" | "pro" | "lapsed" | null {
     // CANCELLATION, SUBSCRIPTION_PAUSED, BILLING_ISSUE_DETECTED, etc. preserve
     // the current status; the row's expiresAt is still refreshed by the caller.
     default:
-      return null;
+      return undefined;
   }
 }
 

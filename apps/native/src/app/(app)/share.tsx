@@ -16,7 +16,7 @@ import {
   type ShareSession,
 } from '@/lib/share/storage';
 import { useSaveImages } from '@/lib/use-save-image';
-import { presentPaywall, useEntitlement } from '@/lib/entitlement';
+import { openPaywall, useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import { useUser } from '@clerk/expo';
 import { useMutation } from 'convex/react';
@@ -175,9 +175,7 @@ export default function ShareScreen() {
       // Saving is Pro — a lapsed user sharing into Shelvr is routed to the
       // paywall instead of failing every entry against the server gate.
       if (!entitled) {
-        void presentPaywall().then((ok) => {
-          if (!ok) router.push('/(app)/paywall');
-        });
+        void openPaywall(router);
         return;
       }
       runningSessionId.current = session.sessionId;

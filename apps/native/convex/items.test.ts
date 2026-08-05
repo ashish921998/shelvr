@@ -1182,6 +1182,27 @@ describe("Pro entitlement gate", () => {
     expect(ent.expiresAt).toBe(farFuture);
   });
 
+  it("ignores a timestamp-less event after ordered state exists", async () => {
+    const t = convexTest(schema, modules).withIdentity({
+      subject: "rc-no-timestamp",
+    });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-no-timestamp",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 2000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-no-timestamp",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
   it("a newer refund event can move expiry backward", async () => {
     const t = convexTest(schema, modules).withIdentity({ subject: "rc-refund" });
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;

@@ -1,7 +1,7 @@
 import { AnimatedText } from '@/components/animated-text';
 import { parseExifDate } from '@/lib/date';
 import { parseExifLocation } from '@/lib/exif';
-import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
+import { usePaywallGuard } from '@/lib/entitlement';
 import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -57,8 +57,7 @@ export default function AddScreen() {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const guard = usePaywallGuard();
-  const { loading: entitlementLoading } = useEntitlement();
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;

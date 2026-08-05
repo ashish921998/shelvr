@@ -1,5 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
-import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
+import { usePaywallGuard } from '@/lib/entitlement';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { Platform, PlatformColor } from 'react-native';
@@ -8,8 +8,7 @@ import { useUnistyles } from 'react-native-unistyles';
 export default function HomeStackLayout() {
   const router = useRouter();
   const { theme } = useUnistyles();
-  const guard = usePaywallGuard();
-  const { loading: entitlementLoading } = useEntitlement();
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
 
   // PlatformColor('label') is iOS-only; on Android fall back to the theme's
   // foreground color.

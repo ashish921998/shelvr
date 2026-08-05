@@ -1,4 +1,5 @@
 import { EmptyState } from '@/components/empty-state';
+import { ProGate as ProGateView } from '@/components/pro-gate';
 import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
@@ -6,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 // The accent color matches theme.colors.primary (identical in both themes).
@@ -139,23 +140,13 @@ export default function MapScreen() {
 }
 
 function MapProGate() {
-  const guard = usePaywallGuard();
+  const { guard } = usePaywallGuard();
   return (
-    <View style={styles.proGate}>
-      <Text style={styles.proGateTitle}>Map is a Pro feature</Text>
-      <Text style={styles.proGateMessage}>
-        See every saved photo by location with a Shelvr Pro subscription.
-      </Text>
-      <Pressable
-        style={({ pressed }) => [
-          styles.proGateCta,
-          pressed && { opacity: 0.85 },
-        ]}
-        onPress={() => guard()}
-      >
-        <Text style={styles.proGateCtaText}>Start 7-day free trial</Text>
-      </Pressable>
-    </View>
+    <ProGateView
+      title="Map is a Pro feature"
+      message="See every saved photo by location with a Shelvr Pro subscription."
+      onPress={() => guard()}
+    />
   );
 }
 
@@ -168,38 +159,5 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.background,
-  },
-  proGate: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: theme.gap(4),
-    gap: theme.gap(1.5),
-    backgroundColor: theme.colors.background,
-  },
-  proGateTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
-    color: theme.colors.foreground,
-  },
-  proGateMessage: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-    textAlign: 'center',
-  },
-  proGateCta: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    paddingVertical: theme.gap(1.75),
-    paddingHorizontal: theme.gap(4),
-    marginTop: theme.gap(1),
-  },
-  proGateCtaText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: '#fff',
   },
 }));

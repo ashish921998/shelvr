@@ -1,5 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
-import { presentPaywall, useEntitlement } from '@/lib/entitlement';
+import { openPaywall, useEntitlement } from '@/lib/entitlement';
 import { useClerk, useUser } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
@@ -47,9 +47,7 @@ export default function ProfileScreen() {
         disabled={loading}
         onPress={() => {
           if (loading) return;
-          void presentPaywall().then((ok) => {
-            if (!ok) router.push('/(app)/paywall');
-          });
+          void openPaywall(router);
         }}
       >
         <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />

@@ -106,14 +106,13 @@ export const upsertSubscription = internalMutation({
     const status: SubscriptionStatus = args.status ?? existing?.status ?? "pro";
 
     // Event-timestamp ordering: if this event is not newer than the stored one,
-    // it's stale or a duplicate — drop it. When no event timestamp is available
-    // (legacy events or older rows), fall back to accepting the event (the
-    // old behavior) so we don't block legitimate updates.
+    // it's stale or a duplicate — drop it. Once a row has an ordering timestamp,
+    // an event without one is also unsafe to apply because its age is unknown.
     if (
       existing !== null &&
-      args.eventTimestampMs !== undefined &&
       existing.eventTimestampMs !== undefined &&
-      args.eventTimestampMs <= existing.eventTimestampMs
+      (args.eventTimestampMs === undefined ||
+        args.eventTimestampMs <= existing.eventTimestampMs)
     ) {
       return null;
     }
@@ -129,31 +128,25 @@ export const upsertSubscription = internalMutation({
     const expiresAt =
       args.expiresAt === 0 ? (existing?.expiresAt ?? 0) : args.expiresAt;
 
-    if (existing !== null) {
-      await ctx.db.patch(existing._id, {
-        status,
-        expiresAt,
-        ...(args.productId !== undefined ? { productId: args.productId } : {}),
-        ...(args.eventTimestampMs !== undefined
-          ? { eventTimestampMs: args.eventTimestampMs }
-          : {}),
-        updatedAt: Date.now(),
-      });
-      return null;
-    }
-
-    await ctx.db.insert("subscriptions", {
-      userId: args.userId,
+    // Build the shared fields once. productId is only set on the insert path:
+    // for an existing row it's optional and omitted-preserve is equivalent to
+    // passing undefined, but the explicit object keeps both branches readable.
+    const doc = {
       status,
       expiresAt,
-      productId: args.productId,
+      ...(args.productId !== undefined ? { productId: args.productId } : {}),
       ...(args.eventTimestampMs !== undefined
         ? { eventTimestampMs: args.eventTimestampMs }
         : {}),
       updatedAt: Date.now(),
-    });
+    };
+
+    if (existing !== null) {
+      await ctx.db.patch(existing._id, doc);
+      return null;
+    }
+
+    await ctx.db.insert("subscriptions", { userId: args.userId, ...doc });
     return null;
   },
 });
-
-

@@ -1,6 +1,6 @@
 import { IntentChip } from '@/components/intent-chip';
 import { TagChip } from '@/components/tag-chip';
-import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
+import { usePaywallGuard } from '@/lib/entitlement';
 import { runIntent } from '@/lib/intents';
 import { displayHost } from '@/lib/url';
 import { convexQuery } from '@convex-dev/react-query';
@@ -248,8 +248,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 function ProductsSection({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const findLinks = useMutation(api.items.findLinks);
-  const guard = usePaywallGuard();
-  const { loading: entitlementLoading } = useEntitlement();
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
   const products = item.products;
   const searching = item.productsStatus === 'searching';
 

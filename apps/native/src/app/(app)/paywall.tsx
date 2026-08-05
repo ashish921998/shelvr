@@ -5,8 +5,8 @@
  * yet (e.g. running in Expo Go or a dev build without `expo prebuild`), or
  * when the user dismisses the native paywall without purchasing.
  *
- * Once `expo prebuild` is run and the app is rebuilt, users will never see this
- * screen — they'll get the full native paywall sheet rendered by the SDK.
+ * It deliberately avoids pricing copy because RevenueCat remains the source of
+ * truth for current offerings.
  */
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -18,8 +18,8 @@ export default function PaywallScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Shelvr Pro</Text>
       <Text style={styles.message}>
-        Start your 7-day free trial to save links, photos, and notes. After the
-        trial, it&apos;s just $4.99/month or $39.99/year.
+        RevenueCat is unavailable right now. Please try again in a moment to
+        view the latest Shelvr Pro options.
       </Text>
       <Pressable
         style={({ pressed }) => [styles.button, pressed && { opacity: 0.8 }]}

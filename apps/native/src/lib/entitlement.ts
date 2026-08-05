@@ -3,7 +3,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useUser } from '@clerk/expo';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NativeModules } from 'react-native';
 
 /**
@@ -31,52 +31,47 @@ import { NativeModules } from 'react-native';
 // missing.
 // ---------------------------------------------------------------------------
 
-let _purchases:
-  | typeof import('react-native-purchases').default
-  | null
-  | undefined;
-function getPurchases() {
-  if (_purchases !== undefined) return _purchases;
-  const linked = NativeModules.RNPurchases || NativeModules.RNPurchasesModule;
-  if (!linked) {
-    _purchases = null;
-    return _purchases;
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _purchases = require('react-native-purchases').default;
-  } catch {
-    _purchases = null;
-  }
-  return _purchases;
+/**
+ * Builds a lazy accessor for a native module: returns the module's default
+ * export once it's been confirmed linked (via one of `nativeNames` on
+ * NativeModules), or `null` permanently if it isn't. The `require` lives in a
+ * static thunk so Metro can statically discover and bundle it.
+ */
+function makeLazyModule<T>(
+  nativeNames: string[],
+  load: () => { default: T },
+): () => T | null {
+  let cached: T | null | undefined;
+  return () => {
+    if (cached !== undefined) return cached;
+    const linked = nativeNames.some((n) => NativeModules[n as keyof typeof NativeModules]);
+    if (!linked) {
+      cached = null;
+      return cached;
+    }
+    try {
+      cached = load().default;
+    } catch {
+      cached = null;
+    }
+    return cached;
+  };
 }
 
-let _rcui:
-  | typeof import('react-native-purchases-ui').default
-  | null
-  | undefined;
-function getRCUI() {
-  if (_rcui !== undefined) return _rcui;
+const getPurchases = makeLazyModule<typeof import('react-native-purchases').default>(
+  ['RNPurchases', 'RNPurchasesModule'],
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  () => require('react-native-purchases'),
+);
+
+const getRCUI = makeLazyModule<typeof import('react-native-purchases-ui').default>(
   // react-native-purchases-ui registers its native module as `RNPaywalls`
   // (plural). The older `RNPaywall` (singular) name is retained as a fallback
   // for any older linking variant.
-  const linked =
-    NativeModules.RNPaywalls ||
-    NativeModules.RNPaywall ||
-    NativeModules.RNRevenueCatUI ||
-    NativeModules.RCPurchasesUiModule;
-  if (!linked) {
-    _rcui = null;
-    return _rcui;
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _rcui = require('react-native-purchases-ui').default;
-  } catch {
-    _rcui = null;
-  }
-  return _rcui;
-}
+  ['RNPaywalls', 'RNPaywall', 'RNRevenueCatUI', 'RCPurchasesUiModule'],
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  () => require('react-native-purchases-ui'),
+);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,14 +91,15 @@ export type Entitlement = {
 // ---------------------------------------------------------------------------
 
 /**
- * Tracks whether RevenueCat's app user id has been synced with the Clerk `sub`.
- * The paywall must not be presented until `rcSyncReady` is true — otherwise a
+ * Tracks which Clerk user RevenueCat is targeting and which user has actually
+ * been synced. The paywall is ready only when both ids match — otherwise a
  * purchase could be attributed to an anonymous RevenueCat user instead of the
  * Clerk `sub` the webhook keys on. This is a module-level state so any caller
  * of `presentPaywall` can observe it without a direct hook dependency.
  */
-let _rcSyncReady = false;
-const _rcSyncListeners = new Set<(ready: boolean) => void>();
+let _rcTargetUserId: string | null = null;
+let _rcSyncedUserId: string | null = null;
+let _rcIdentitySync = Promise.resolve();
 
 // Maximum time presentPaywall waits for RC identity sync before giving up and
 // letting the caller fall back to the paywall route. Long enough to cover a
@@ -111,18 +107,19 @@ const _rcSyncListeners = new Set<(ready: boolean) => void>();
 // (Expo Go, unset key, outage) doesn't freeze the UI.
 const SYNC_READY_TIMEOUT_MS = 5000;
 
-function setRcSyncReady(ready: boolean) {
-  if (_rcSyncReady === ready) return;
-  _rcSyncReady = ready;
-  for (const fn of _rcSyncListeners) fn(ready);
+function setRcTargetUserId(userId: string | null) {
+  if (_rcTargetUserId === userId) return;
+  _rcTargetUserId = userId;
+  _rcSyncedUserId = null;
 }
 
-/** Subscribe to RevenueCat sync-readiness changes. Returns an unsubscribe fn. */
-function onRcSyncReady(fn: (ready: boolean) => void): () => void {
-  _rcSyncListeners.add(fn);
-  return () => {
-    _rcSyncListeners.delete(fn);
-  };
+function markRcUserSynced(userId: string) {
+  if (_rcTargetUserId !== userId) return;
+  _rcSyncedUserId = userId;
+}
+
+function isRcSyncReady() {
+  return _rcTargetUserId !== null && _rcSyncedUserId === _rcTargetUserId;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,34 +152,42 @@ export async function configureRevenueCat(): Promise<void> {
  * `original_app_user_id` becomes the `userId` the webhook writes, so it must
  * match the Clerk `sub` every other table keys on. Call once after sign-in.
  *
- * `logged.current` is set only AFTER `rc.logIn` succeeds, so a failed login
- * can be retried on the next effect run. The sync-ready state is flipped to
- * true only after a successful login so `presentPaywall` can gate on it.
+ * Identity changes are serialized, and readiness is recorded for the current
+ * `sub` only after `rc.logIn` succeeds. Sign-out or a user change clears it
+ * immediately so `presentPaywall` cannot use a previous account's session.
  */
 export function useEntitlementSync(): void {
   const { user, isSignedIn } = useUser();
-  const logged = useRef<string | null>(null);
+  const sub = isSignedIn ? (user?.id ?? null) : null;
 
   useEffect(() => {
-    if (!isSignedIn || !user) return;
-    const sub = user.id;
-    // Configure first, then log in. logIn is idempotent for the same id.
-    configureRevenueCat().then(() => {
-      if (logged.current === sub) return;
-      const rc = getPurchases();
-      if (!rc) return;
-      rc.logIn(sub)
-        .then(() => {
-          logged.current = sub;
-          setRcSyncReady(true);
-        })
-        .catch(() => {
-          // A failed logIn (e.g. RC not configured) is non-fatal — the webhook
-          // simply won't fire until RC is wired; entitlement stays `none`.
-          // `logged.current` is NOT set, so the next effect run retries.
-        });
-    });
-  }, [isSignedIn, user]);
+    setRcTargetUserId(sub);
+    if (sub === null) return;
+
+    let cancelled = false;
+    // Serialize identity changes so an older in-flight logIn cannot finish
+    // after a newer one and leave the native SDK on the wrong account.
+    _rcIdentitySync = _rcIdentitySync
+      .catch(() => {})
+      .then(async () => {
+        if (cancelled || _rcTargetUserId !== sub) return;
+        await configureRevenueCat();
+        if (cancelled || _rcTargetUserId !== sub) return;
+        const rc = getPurchases();
+        if (!rc) return;
+        await rc.logIn(sub);
+        if (!cancelled) markRcUserSynced(sub);
+      })
+      .catch(() => {
+        // Missing configuration or a failed login leaves this user unready;
+        // presentPaywall will time out and use the safe fallback route.
+      });
+
+    return () => {
+      cancelled = true;
+      if (_rcTargetUserId === sub) setRcTargetUserId(null);
+    };
+  }, [sub]);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,11 +207,15 @@ export function useEntitlement(): Entitlement {
   // between Convex updates flips `entitled` without a server push. Seeding via
   // a useState initializer (and updating inside the effect) keeps Date.now
   // out of the render body — the React compiler flags impure calls there.
+  // The interval only runs while there's an expiry to count down — a user with
+  // no subscription never ticks, avoiding a per-screen 60s rerender.
   const [now, setNow] = useState(() => Date.now());
+  const hasExpiry = data?.expiresAt !== undefined;
   useEffect(() => {
+    if (!hasExpiry) return;
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [hasExpiry]);
 
   if (!data || data.status === 'none') {
     return { status: 'none', entitled: false, loading: data === undefined };
@@ -241,26 +250,16 @@ export async function presentPaywall(): Promise<boolean> {
   // attributed to an anonymous RC user, breaking the webhook's userId mapping.
   // Capped at SYNC_READY_TIMEOUT_MS so a missing/unconfigured RC SDK (Expo Go,
   // unset API key, logIn failure, RC outage) cannot wedge the UI forever: if
-  // sync never completes we fall through, and the caller routes to the paywall
-  // screen instead of hanging on a frozen gesture.
-  if (!_rcSyncReady) {
-    await new Promise<void>((resolve) => {
-      if (_rcSyncReady) return resolve();
-      let done = false;
-      const unsub = onRcSyncReady(() => {
-        if (done) return;
-        done = true;
-        unsub();
-        resolve();
-      });
-      // Resolve on timeout so the caller's fallback route can still fire.
-      setTimeout(() => {
-        if (done) return;
-        done = true;
-        unsub();
-        resolve();
-      }, SYNC_READY_TIMEOUT_MS);
-    });
+  // sync never completes we return false, and the caller routes to the paywall
+  // screen without ever opening a purchase flow under an unsafe identity.
+  // Identity changes are serialized on `_rcIdentitySync`, so racing it against
+  // a timeout observes the in-flight `logIn` without a listener set.
+  if (!isRcSyncReady()) {
+    const ready = await Promise.race([
+      _rcIdentitySync.then(() => isRcSyncReady()),
+      new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
+    ]);
+    if (!ready) return false;
   }
 
   const rcui = getRCUI();
@@ -268,13 +267,24 @@ export async function presentPaywall(): Promise<boolean> {
   try {
     const result = await rcui.presentPaywall();
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
-    return (
-      result === 'PURCHASED' ||
-      result === 'RESTORED'
-    );
+    return result === 'PURCHASED' || result === 'RESTORED';
   } catch {
     return false;
   }
+}
+
+/**
+ * Present the RevenueCat paywall, and if it can't be presented (SDK not linked,
+ * user dismissed without purchase, or sync timed out), fall back to routing to
+ * the paywall screen. Returns `true` only when the paywall was presented and
+ * resulted in a purchase/restore. The one call every Pro-gated affordance and
+ * the profile row shares — keeps the `'/(app)/paywall'` route string in one
+ * place.
+ */
+export async function openPaywall(router: ReturnType<typeof useRouter>): Promise<boolean> {
+  const ok = await presentPaywall();
+  if (!ok) router.push('/(app)/paywall');
+  return ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,26 +301,28 @@ export async function presentPaywall(): Promise<boolean> {
  * mutation, so this client guard is advisory only.
  *
  * While entitlement is loading, the guard returns `false` without acting —
- * callers should disable the affordance or show a loading state.
+ * callers should disable the affordance or show a loading state. The hook also
+ * returns `loading` so callers can read it without a second `useEntitlement`.
  */
-export function usePaywallGuard(): (action?: () => void) => Promise<boolean> {
+export function usePaywallGuard(): {
+  guard: (action?: () => void) => Promise<boolean>;
+  loading: boolean;
+} {
   const { entitled, loading } = useEntitlement();
   const router = useRouter();
-  return useCallback(
+  const guard = useCallback(
     async (action?: () => void) => {
       if (loading) return false;
       if (entitled) {
         action?.();
         return true;
       }
-      const presented = await presentPaywall();
-      if (!presented) {
-        // Fallback: route to the paywall screen (reached when native SDK
-        // isn't linked, or the user dismissed without purchasing).
-        router.push('/(app)/paywall');
-      }
+      // Fallback to the paywall screen is handled by openPaywall (reached when
+      // the native SDK isn't linked, or the user dismissed without purchasing).
+      await openPaywall(router);
       return false;
     },
     [entitled, loading, router],
   );
+  return { guard, loading };
 }

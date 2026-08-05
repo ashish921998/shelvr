@@ -1,16 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { usePermissions, type PermissionResponse } from 'expo-media-library';
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState, type FC } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { StyleSheet } from 'react-native-unistyles';
 
 import { EmptyState } from '@/components/empty-state';
-import { Icon } from '@/components/symbol';
+import { ProGate as ProGateView } from '@/components/pro-gate';
 import { TidyDeck } from '@/components/tidy/tidy-deck';
 import { TidyDone } from '@/components/tidy/tidy-done';
-import { presentPaywall, useEntitlement } from '@/lib/entitlement';
+import { useEntitlement } from '@/lib/entitlement';
 import {
   DeckAnimationProvider,
   useDeckAnimation,
@@ -268,35 +268,13 @@ const Loading: FC = () => (
 );
 
 /** Pro gate shown to lapsed users on the Tidy tab. */
-const ProGate: FC = () => {
-  const router = useRouter();
-  const { theme } = useUnistyles();
-  return (
-    <View style={styles.proGate}>
-      <View style={styles.proGateIcon}>
-        <Icon name="sparkles" size={28} tintColor={theme.colors.primaryText} />
-      </View>
-      <Text style={styles.proGateTitle}>Tidy is a Pro feature</Text>
-      <Text style={styles.proGateMessage}>
-        Sweep through your photo library and clear out the clutter. Start a free
-        trial to unlock Tidy and every other Pro feature.
-      </Text>
-      <Pressable
-        style={({ pressed }) => [
-          styles.proGateCta,
-          pressed && { opacity: 0.85 },
-        ]}
-        onPress={() => {
-          void presentPaywall().then((ok) => {
-            if (!ok) router.push('/(app)/paywall');
-          });
-        }}
-      >
-        <Text style={styles.proGateCtaText}>Start 7-day free trial</Text>
-      </Pressable>
-    </View>
-  );
-};
+const ProGate: FC = () => (
+  <ProGateView
+    icon="sparkles"
+    title="Tidy is a Pro feature"
+    message="Sweep through your photo library and clear out the clutter. Start a free trial to unlock Tidy and every other Pro feature."
+  />
+);
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: {
@@ -361,48 +339,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.background,
-  },
-  proGate: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: theme.gap(4),
-    gap: theme.gap(1.5),
-    backgroundColor: theme.colors.background,
-  },
-  proGateIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.gap(0.5),
-  },
-  proGateTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
-    color: theme.colors.foreground,
-  },
-  proGateMessage: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-    textAlign: 'center',
-  },
-  proGateCta: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    paddingVertical: theme.gap(1.75),
-    paddingHorizontal: theme.gap(4),
-    alignItems: 'center',
-    marginTop: theme.gap(1),
-  },
-  proGateCtaText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: '#fff',
   },
 }));

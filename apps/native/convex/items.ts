@@ -448,6 +448,20 @@ export const beginImageImport = mutation({
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
 
+    // Idempotent read path: a complete operation whose item still exists
+    // returns the itemId WITHOUT a Pro check — a lapsed user must still
+    // retrieve an already-completed save. Hoisted before the gate so every
+    // path below is new or recycled work and can be gated uniformly.
+    if (op?.status === "complete" && op.itemId !== undefined) {
+      const item = await ctx.db.get(op.itemId);
+      if (item !== null) {
+        return { kind: "complete", itemId: op.itemId };
+      }
+    }
+
+    // Every remaining path creates, recycles, or refreshes work — gate once.
+    await requireProEntitlement(ctx, userId);
+
     if (op === null) {
       // (userId, operationId) uniqueness is enforced by Convex's serializable
       // transactions: if two begins race on an empty index range, only one
@@ -455,10 +469,6 @@ export const beginImageImport = mutation({
       // the row above as a pending op. No application-level unique index exists
       // because Convex has no unique secondary indexes — this OCC + retry is
       // the supported idiom.
-      // Entitlement is checked here (before creating new work) but NOT before
-      // the idempotent early return below — a lapsed user must still retrieve
-      // an already-completed itemId.
-      await requireProEntitlement(ctx, userId);
       await ctx.db.insert("itemOperations", {
         userId,
         operationId: args.operationId,
@@ -473,43 +483,13 @@ export const beginImageImport = mutation({
     }
 
     if (op.status === "complete") {
-      // A complete operation whose item was explicitly deleted is recyclable:
-      // reset to pending so the durable operationId performs a fresh save.
-      if (op.itemId !== undefined) {
-        const item = await ctx.db.get(op.itemId);
-        if (item === null) {
-          // Recycle is new work — gate on Pro.
-          await requireProEntitlement(ctx, userId);
-          // Release the now-orphaned storage object before resetting the row,
-          // otherwise the blob leaks (the cleanup cron only sweeps pending
-          // rows, and this row is currently complete). Guarded so a blob some
-          // other item/operation still depends on — or one already deleted —
-          // can't corrupt them or wedge this recycle path.
-          if (
-            op.storageId !== undefined &&
-            (await isStorageUnreferenced(ctx, op.storageId, op._id))
-          ) {
-            await safeDeleteStorage(ctx, op.storageId);
-          }
-          await ctx.db.patch(op._id, {
-            status: "pending",
-            itemId: undefined,
-            storageId: undefined,
-            updatedAt: now,
-          });
-          return {
-            kind: "upload",
-            uploadUrl: await ctx.storage.generateUploadUrl(),
-          };
-        }
-        return { kind: "complete", itemId: op.itemId };
-      }
-      // Defensive: a complete row with no itemId is inconsistent; recycle it
-      // the same way as above — release the blob (guarded) and CLEAR the stale
-      // storageId, otherwise attach would treat it as canonical and delete the
-      // fresh re-upload as "redundant".
-      // Recycle is new work — gate on Pro.
-      await requireProEntitlement(ctx, userId);
+      // Recycle: the item was deleted ( itemId set but gone) or the row is
+      // inconsistent (no itemId). Release the orphaned storage object before
+      // resetting, otherwise the blob leaks (the cleanup cron only sweeps
+      // pending rows, and this row is currently complete). Guarded so a blob
+      // some other item/operation still depends on — or one already deleted —
+      // can't corrupt them or wedge this recycle path. Clearing itemId is
+      // redundant for the no-itemId case but harmless.
       if (
         op.storageId !== undefined &&
         (await isStorageUnreferenced(ctx, op.storageId, op._id))
@@ -518,6 +498,7 @@ export const beginImageImport = mutation({
       }
       await ctx.db.patch(op._id, {
         status: "pending",
+        itemId: undefined,
         storageId: undefined,
         updatedAt: now,
       });
@@ -529,10 +510,9 @@ export const beginImageImport = mutation({
 
     // Pending: refresh updatedAt (a begin is active interest) and hand back a
     // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
-    // the first storageId and discards the redundant blob. Still gated on Pro:
-    // a lapsed user retrying a pending op must not mint a fresh upload URL or
-    // refresh updatedAt (which would keep the row alive past the cleanup cron).
-    await requireProEntitlement(ctx, userId);
+    // the first storageId and discards the redundant blob. A lapsed user
+    // retrying a pending op must not mint a fresh upload URL or refresh
+    // updatedAt (which would keep the row alive past the cleanup cron).
     await ctx.db.patch(op._id, { updatedAt: now });
     return {
       kind: "upload",
