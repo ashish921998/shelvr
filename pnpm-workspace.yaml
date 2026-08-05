@@ -2,6 +2,7 @@ packages:
   - "apps/*"
 allowBuilds:
   '@clerk/shared': true
+  '@shopify/react-native-skia': true
   browser-tabs-lock: true
   bufferutil: true
   core-js: true

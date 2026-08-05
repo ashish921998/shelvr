@@ -79,8 +79,5 @@
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   },
-  "private": true,
-  "trustedDependencies": [
-    "@shopify/react-native-skia"
-  ]
+  "private": true
 }
