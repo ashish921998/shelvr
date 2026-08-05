@@ -1,0 +1,103 @@
+apps/native/src/app/(app)/(tabs)/(spaces)/index.tsx
+  s_6b0c345a7a8743::t_3a12b4c0932280 144-146
+  s_6b0c345a7a8743::t_279838b2e552c1 1
+  s_6b0c345a7a8743::t_19f301a00912cf 12
+  s_6b0c345a7a8743::t_c502315f8e1ddf 14
+  s_6b0c345a7a8743::t_4b411cac0e1589 202
+apps/native/src/components/intent-chip.tsx
+  s_6b0c345a7a8743::t_a9b1c7b9c313c6 2,9
+  s_6b0c345a7a8743::t_40485f5304b9b0 37
+apps/native/src/app/(app)/onboarding.tsx
+  s_6b0c345a7a8743::t_7185550c88d608 5
+  s_6b0c345a7a8743::t_9a1569df547f65 18,27,43,58
+apps/native/src/app/(app)/(tabs)/(spaces)/_layout.tsx
+  s_6b0c345a7a8743::t_272f3777683642 3-4,8-10,35
+apps/native/src/components/ui/animated-switch.tsx
+  s_6b0c345a7a8743::t_04fe787f21266f 75,79
+  s_6b0c345a7a8743::t_b3ee47c0c90df8 2
+apps/native/src/app/(app)/(tabs)/(home)/_layout.tsx
+  s_6b0c345a7a8743::t_3f4ffd4d35d49f 4-5,9-13,38,47,54
+apps/native/src/lib/intents.ts
+  s_6b0c345a7a8743::t_bdb41efeacbcda 7
+  s_6b0c345a7a8743::t_57d73d25e52906 46-48
+apps/native/src/app/(app)/add.tsx
+  s_6b0c345a7a8743::t_e1a91c1cabdbfe 38
+  s_6b0c345a7a8743::t_f0b66b5152892e 12
+  s_6b0c345a7a8743::t_dd7f63273f1f86 25
+apps/native/src/app/(app)/(tabs)/_layout.tsx
+  s_6b0c345a7a8743::t_7c1c793b62273d 2,5,15,22,29
+apps/native/src/components/symbol.tsx
+  s_6b0c345a7a8743::t_99110793bd86f5 1-60,64-108
+  s_023a0c39acc55b::t_102bc511a0f414 61-63
+apps/native/convex/_generated/api.d.ts
+  s_d0314e5d2cd875::t_21e08663525f9c 12,15-17,28,31-33
+apps/native/src/components/suggested-badge.tsx
+  s_6b0c345a7a8743::t_e3b9f7fc55033f 27
+  s_6b0c345a7a8743::t_f815cbac1d242c 2
+  s_6b0c345a7a8743::t_81632fe3825617 1
+apps/native/src/components/item-detail.tsx
+  s_6b0c345a7a8743::t_ac409a7b323be7 12
+  s_6b0c345a7a8743::t_02b7c275bb2afe 150,154,205,287,317
+apps/native/src/components/tidy/tidy-hints.tsx
+  s_6b0c345a7a8743::t_b2156cb6ae215f 60,115,118
+  s_6b0c345a7a8743::t_ed33c86c0cf924 2
+apps/native/src/components/item-card.tsx
+  s_6b0c345a7a8743::t_f4816ad7dab125 10
+  s_6b0c345a7a8743::t_02b7c275bb2afe 134,157,166
+  s_6b0c345a7a8743::t_f36a84ade250bf 101
+  s_6b0c345a7a8743::t_a77b4a17afcb34 11
+  s_6b0c345a7a8743::t_9a2edf696c603b 2
+apps/native/src/app/(app)/space/[id].tsx
+  s_6b0c345a7a8743::t_9d6a29da8d68ec 125
+  s_6b0c345a7a8743::t_80dcfd552b40e4 11
+apps/native/src/components/glass.tsx
+  s_6b0c345a7a8743::t_787c7a8dc12613 1-44
+apps/native/src/app/(app)/camera.tsx
+  s_6b0c345a7a8743::t_2a570be96688ba 224,270,277,305
+  s_6b0c345a7a8743::t_18c251facba6cd 8
+apps/native/src/app/(app)/item/[id].tsx
+  s_6b0c345a7a8743::t_9bc3ecf8bbdba3 25
+  s_6b0c345a7a8743::t_c433cf8b799ba1 12
+  s_6b0c345a7a8743::t_e9bb516b94b2e7 318-323,333
+  s_6b0c345a7a8743::t_d210a0798d4a0d 335
+apps/native/src/app/(app)/profile.tsx
+  s_6b0c345a7a8743::t_3b121dc338722c 4
+  s_6b0c345a7a8743::t_a3bfa237af8758 21
+apps/native/src/lib/action-sheet.ts
+  s_6b0c345a7a8743::t_7a6e2a0175a231 1-35,56-59,61-63
+  s_023a0c39acc55b::t_4d68090716908b 36,40-43,45,48-50,55
+  s_6b0c345a7a8743::t_7953e5c00421e4 51-54,60
+  s_023a0c39acc55b::t_3f48b97fb5c6c7 37-39,44,46-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "e7594f8cf41b19161ce2399d2988449805e673b8",
+  "prompts": {},
+  "sessions": {
+    "s_023a0c39acc55b": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "68d50935-1f12-4fef-8dae-0a0946e25144",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_6b0c345a7a8743": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "865a9430-1d7f-4525-a0e2-ecd22fc7ee60",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_d0314e5d2cd875": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "ad2fc0cf-79d4-47f0-9dea-251f6f57fa18",
+        "model": "custom:GLM-5.2-0"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
