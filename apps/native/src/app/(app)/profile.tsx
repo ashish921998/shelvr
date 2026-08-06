@@ -58,6 +58,13 @@ export default function ProfileScreen() {
         disabled={loading}
         onPress={async () => {
           if (loading) return;
+          // RevenueCat UI (paywall / Customer Center) presents from the root
+          // view controller, and UIKit refuses to present while this profile
+          // sheet is up ("already presenting RNSScreen") — the native promise
+          // then never settles. Dismiss the sheet and let its animation finish
+          // before presenting any RevenueCat UI.
+          router.back();
+          await new Promise((r) => setTimeout(r, 600));
           // An active/lapsed subscriber manages their existing subscription
           // via Customer Center; a `none` user is sent to the paywall to start
           // one. Customer Center is the modern RevenueCat way to expose
