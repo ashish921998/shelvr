@@ -1,14 +1,17 @@
 import { Wordmark } from '@/components/wordmark';
-import { openPaywall, presentCustomerCenter, useEntitlement } from '@/lib/entitlement';
-import { useClerk, useUser } from '@clerk/expo';
+import { openPaywall, presentCustomerCenter, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+import { useAuthActions } from '@convex-dev/auth/react';
+import { api } from '@convex/_generated/api';
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useAuthActions();
+  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
   const router = useRouter();
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
@@ -27,13 +30,42 @@ export default function ProfileScreen() {
               : 'Start free trial';
 
   // Customer Center is only relevant to users who have (or had) a subscription
-  // — trialing/pro/lifetime/lapsed. A `none` user has nothing to manage and
-  // should see the "Start free trial" paywall row instead.
-  const hasSubscription =
-    status === 'trialing' ||
-    status === 'pro' ||
-    status === 'lifetime' ||
-    status === 'lapsed';
+  // — any non-`none` status. A `none` user has nothing to manage and should see
+  // the "Start free trial" paywall row instead.
+  const hasSubscription = status !== 'none' && !loading;
+
+  // RevenueCat UI (paywall / Customer Center) presents from the root view
+  // controller, and UIKit refuses to present while this profile sheet is up
+  // ("already presenting RNSScreen"). Dismiss the sheet first, let it settle,
+  // then route: an active/lapsed subscriber to Customer Center (cancel/refund/
+  // change-plan/restore), a `none` user to the paywall to start a trial.
+  const manageSubscription = async () => {
+    if (loading) return;
+    router.back();
+    await waitForSheetTransition();
+    if (hasSubscription) {
+      const presented = await presentCustomerCenter();
+      // Customer Center isn't linked/configured, or identity sync timed out —
+      // fall back to the platform's own subscription management page rather
+      // than leaving the tap with no visible effect.
+      if (!presented) {
+        Alert.alert('Manage subscription', 'Manage your subscription in the App Store.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open App Store',
+            onPress: () =>
+              void Linking.openURL(
+                Platform.OS === 'ios'
+                  ? 'https://apps.apple.com/account/subscriptions'
+                  : 'https://play.google.com/store/account/subscriptions',
+              ),
+          },
+        ]);
+      }
+    } else {
+      void openPaywall(router);
+    }
+  };
 
   return (
     <View style={styles.content}>
@@ -45,7 +77,7 @@ export default function ProfileScreen() {
           <Icon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
-          {user?.primaryEmailAddress?.emailAddress ?? 'Signed in'}
+          {user?.email ?? 'Signed in'}
         </Text>
       </View>
 
@@ -56,42 +88,7 @@ export default function ProfileScreen() {
           loading && { opacity: 0.4 },
         ]}
         disabled={loading}
-        onPress={async () => {
-          if (loading) return;
-          // RevenueCat UI (paywall / Customer Center) presents from the root
-          // view controller, and UIKit refuses to present while this profile
-          // sheet is up ("already presenting RNSScreen") — the native promise
-          // then never settles. Dismiss the sheet and let its animation finish
-          // before presenting any RevenueCat UI.
-          router.back();
-          await new Promise((r) => setTimeout(r, 600));
-          // An active/lapsed subscriber manages their existing subscription
-          // via Customer Center; a `none` user is sent to the paywall to start
-          // one. Customer Center is the modern RevenueCat way to expose
-          // cancel/refund/change-plan/restore without leaving the app.
-          if (hasSubscription) {
-            const presented = await presentCustomerCenter();
-            // Customer Center isn't linked/configured, or identity sync timed
-            // out — fall back to the platform's own subscription management
-            // page rather than leaving the tap with no visible effect.
-            if (!presented) {
-              Alert.alert('Manage subscription', 'Manage your subscription in the App Store.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Open App Store',
-                  onPress: () =>
-                    void Linking.openURL(
-                      Platform.OS === 'ios'
-                        ? 'https://apps.apple.com/account/subscriptions'
-                        : 'https://play.google.com/store/account/subscriptions',
-                    ),
-                },
-              ]);
-            }
-          } else {
-            void openPaywall(router);
-          }
-        }}
+        onPress={manageSubscription}
       >
         <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
         <Text style={styles.proLabel}>{proLabel}</Text>

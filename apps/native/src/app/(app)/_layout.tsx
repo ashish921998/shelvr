@@ -1,18 +1,18 @@
 import { useOnboarding } from '@/lib/onboarding';
-import { useAuth } from '@clerk/expo';
+import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
 
 export default function AppLayout() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
 
-  if (!isLoaded) {
+  if (isLoading) {
     return null;
   }
 
-  if (!isSignedIn) {
+  if (!isAuthenticated) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

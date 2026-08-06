@@ -1,76 +1,50 @@
-import { useSSO, useSignIn } from '@clerk/expo';
-import { useSignInWithApple } from '@clerk/expo/apple';
-import React from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { useAuthActions } from '@convex-dev/auth/react';
+import * as WebBrowser from 'expo-web-browser';
+import * as React from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+/**
+ * Convex Auth OAuth sign-in (React Native).
+ *
+ * The flow is provider-agnostic: `signIn(provider)` returns a `redirect` URL
+ * hosted on the Convex backend. We open it in a system browser session
+ * (expo-web-browser `openAuthSessionAsync`); after the user authenticates the
+ * browser redirects back to the app with a `?code=` param. We extract that code
+ * and call `signIn(provider, { code })` to complete the handshake.
+ *
+ * Google and Apple are configured on the backend (convex/auth.ts). The
+ * "Continue" / "Dev login" button is only shown when Anonymous is enabled on the
+ * deployment (AUTH_ENABLE_ANONYMOUS=true).
+ */
 export default function Page() {
-  const { startSSOFlow } = useSSO();
-  const { startAppleAuthenticationFlow } = useSignInWithApple();
-  const { signIn } = useSignIn();
-  const [pending, setPending] = React.useState(false);
+  const { signIn } = useAuthActions();
+  const [pending, setPending] = React.useState<string | null>(null);
 
-  const handleDevLogin = async () => {
-    if (!signIn) return;
-    const ticket = process.env.EXPO_PUBLIC_DEV_TICKET;
-    if (!ticket) {
-      console.warn('Dev login: set EXPO_PUBLIC_DEV_TICKET in .env.local');
-      return;
-    }
-    setPending(true);
+  const handleOAuth = async (provider: string) => {
+    setPending(provider);
     try {
-      // Clerk v3: factor-specific methods return { error }, not a session.
-      // The created session lives on `signIn` itself; finalize() activates it.
-      const { error } = await signIn.ticket({ ticket });
-      if (error) {
-        console.error('Dev login failed:', error);
-      } else if (signIn.status === 'complete') {
-        await signIn.finalize();
-      } else {
-        console.warn('Dev login incomplete:', signIn.status);
-      }
+      const { redirect } = await signIn(provider);
+      // `redirect` is undefined for providers that sign in immediately
+      // (Anonymous) — nothing more to do, the session is established.
+      if (!redirect) return;
+      const result = await WebBrowser.openAuthSessionAsync(
+        redirect.toString(),
+        'shelvr://',
+      );
+      if (result.type !== 'success') return;
+      // Hand the callback URL's code back to the provider to finish the sign-in.
+      const code = new URL(result.url).searchParams.get('code');
+      if (!code) return;
+      await signIn(provider, { code });
     } catch (err) {
-      console.error('Dev login error:', err);
+      console.error(`${provider} sign-in failed`, err);
     } finally {
-      setPending(false);
+      setPending(null);
     }
   };
 
-  const activate = async ({
-    createdSessionId,
-    setActive,
-  }: Pick<Awaited<ReturnType<typeof startSSOFlow>>, 'createdSessionId' | 'setActive'>) => {
-    // A null createdSessionId means the user cancelled — not an error
-    if (createdSessionId && setActive) {
-      await setActive({ session: createdSessionId });
-    }
-  };
-
-  const handleApple = async () => {
-    setPending(true);
-    try {
-      if (Platform.OS === 'ios') {
-        await activate(await startAppleAuthenticationFlow());
-      } else {
-        await activate(await startSSOFlow({ strategy: 'oauth_apple' }));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const handleGoogle = async () => {
-    setPending(true);
-    try {
-      await activate(await startSSOFlow({ strategy: 'oauth_google' }));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setPending(false);
-    }
-  };
+  const anonEnabled = process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
 
   return (
     <View style={styles.container}>
@@ -81,37 +55,37 @@ export default function Page() {
         <Pressable
           style={({ pressed }) => [
             styles.appleButton,
-            pending && styles.buttonDisabled,
+            pending !== null && styles.buttonDisabled,
             pressed && styles.buttonPressed,
           ]}
-          onPress={handleApple}
-          disabled={pending}
+          onPress={() => handleOAuth('apple')}
+          disabled={pending !== null}
         >
           <Text style={styles.appleButtonText}> Continue with Apple</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [
             styles.googleButton,
-            pending && styles.buttonDisabled,
+            pending !== null && styles.buttonDisabled,
             pressed && styles.buttonPressed,
           ]}
-          onPress={handleGoogle}
-          disabled={pending}
+          onPress={() => handleOAuth('google')}
+          disabled={pending !== null}
         >
           <Text style={styles.googleButtonText}>Continue with Google</Text>
         </Pressable>
-        {__DEV__ && (
+        {anonEnabled && (
           <Pressable
             testID="dev-login-button"
             style={({ pressed }) => [
               styles.appleButton,
-              pending && styles.buttonDisabled,
+              pending !== null && styles.buttonDisabled,
               pressed && styles.buttonPressed,
             ]}
-            onPress={handleDevLogin}
-            disabled={pending}
+            onPress={() => handleOAuth('anonymous')}
+            disabled={pending !== null}
           >
-            <Text style={styles.appleButtonText}>🔧 Dev login</Text>
+            <Text style={styles.appleButtonText}>🔧 Continue without account</Text>
           </Pressable>
         )}
       </View>

@@ -73,7 +73,7 @@ export type ShareEntry = {
 export type ShareSession = {
   version: number;
   fingerprint: string;
-  /** The authenticated user (Clerk subject) this session belongs to. A record
+  /** The authenticated user (Convex Auth user id) this session belongs to. A record
    * left by a prior account must never be matched by a new user, even if the
    * share content is identical — otherwise switching accounts can silently drop
    * the new user's share by matching a stale completed session. loadSession and

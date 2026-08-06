@@ -1,7 +1,14 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // Convex Auth session/account tables (users, authSessions, authAccounts,
+  // authRefreshTokens, authVerificationCodes, authVerifiers, authRateLimits).
+  // The `users` table is the source of truth for the signed-in user's identity:
+  // `ctx.auth.getUserIdentity().subject` == the `users` document id.
+  ...authTables,
+
   items: defineTable({
     userId: v.string(),
     type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
@@ -168,10 +175,11 @@ export default defineSchema({
     // rows once plans 004/005 create them.
     .index("by_kind_status_updated", ["kind", "status", "updatedAt"]),
 
-  // Pro subscription / entitlement state. One row per user, keyed by the Clerk
-  // `sub` (the same userId every other table uses). Written exclusively by the
-  // RevenueCat webhook (http.ts -> upsertSubscription); read by getEntitlement
-  // (client) and requireProEntitlement (gated mutations). The lifecycle is:
+  // Pro subscription / entitlement state. One row per user, keyed by the Convex
+  // Auth user id (the same userId every other table uses). Written exclusively by
+  // the RevenueCat webhook (http.ts -> upsertSubscription); read by
+  // getEntitlement (client) and requireProEntitlement (gated mutations). The
+  // lifecycle is:
   //
   //   trialing (7-day trial) -> pro (paid) -> lapsed (trial/subscription ended)
   //

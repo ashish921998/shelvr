@@ -1,6 +1,7 @@
 import { api } from '@convex/_generated/api';
+import { isEntitled } from '@convex/model/entitlement';
 import { convexQuery } from '@convex-dev/react-query';
-import { useUser } from '@clerk/expo';
+import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -91,10 +92,10 @@ export type Entitlement = {
 // ---------------------------------------------------------------------------
 
 /**
- * Tracks which Clerk user RevenueCat is targeting and which user has actually
+ * Tracks which Convex user RevenueCat is targeting and which user has actually
  * been synced. The paywall is ready only when both ids match — otherwise a
  * purchase could be attributed to an anonymous RevenueCat user instead of the
- * Clerk `sub` the webhook keys on. This is a module-level state so any caller
+ * Convex user id the webhook keys on. This is a module-level state so any caller
  * of `presentPaywall` can observe it without a direct hook dependency.
  */
 let _rcTargetUserId: string | null = null;
@@ -120,6 +121,34 @@ function markRcUserSynced(userId: string) {
 
 function isRcSyncReady() {
   return _rcTargetUserId !== null && _rcSyncedUserId === _rcTargetUserId;
+}
+
+/**
+ * Block until RevenueCat identity sync completes, or give up after
+ * `SYNC_READY_TIMEOUT_MS`. A purchase/management action before login would be
+ * attributed to an anonymous RC user, breaking the webhook's userId mapping.
+ * The timeout caps the wait so a missing/unconfigured RC SDK (Expo Go, unset
+ * key, logIn failure, RC outage) cannot wedge the UI forever — callers fall
+ * back to a safe route. Shared by `presentPaywall` and `presentCustomerCenter`.
+ */
+async function awaitRcSyncReady(): Promise<boolean> {
+  if (isRcSyncReady()) return true;
+  return Promise.race([
+    _rcIdentitySync.then(() => isRcSyncReady()),
+    new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
+  ]);
+}
+
+/**
+ * Delay before presenting RevenueCat UI after a sheet/stack transition. UIKit
+ * refuses to present while a dismiss is mid-flight ("already presenting
+ * RNSScreen"), so callers `router.back()` / complete a transition first, then
+ * await this. One home for the magic number so it can't drift between screens.
+ */
+export const SHEET_SETTLE_MS = 600;
+
+export function waitForSheetTransition(): Promise<void> {
+  return new Promise((r) => setTimeout(r, SHEET_SETTLE_MS));
 }
 
 // ---------------------------------------------------------------------------
@@ -148,17 +177,19 @@ export async function configureRevenueCat(): Promise<void> {
 }
 
 /**
- * Keep RevenueCat's app user id in sync with the Clerk `sub`. RevenueCat's
- * `original_app_user_id` becomes the `userId` the webhook writes, so it must
- * match the Clerk `sub` every other table keys on. Call once after sign-in.
+ * Keep RevenueCat's app user id in sync with the Convex Auth user id.
+ * RevenueCat's `original_app_user_id` becomes the `userId` the webhook writes,
+ * so it must match the `users` document id every other table keys on. Call once
+ * after sign-in.
  *
  * Identity changes are serialized, and readiness is recorded for the current
- * `sub` only after `rc.logIn` succeeds. Sign-out or a user change clears it
+ * user id only after `rc.logIn` succeeds. Sign-out or a user change clears it
  * immediately so `presentPaywall` cannot use a previous account's session.
  */
 export function useEntitlementSync(): void {
-  const { user, isSignedIn } = useUser();
-  const sub = isSignedIn ? (user?.id ?? null) : null;
+  const { isAuthenticated } = useConvexAuth();
+  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
+  const sub = isAuthenticated ? (user?._id ?? null) : null;
 
   useEffect(() => {
     setRcTargetUserId(sub);
@@ -221,12 +252,9 @@ export function useEntitlement(): Entitlement {
     return { status: 'none', entitled: false, loading: data === undefined };
   }
   const expiresAt = data.expiresAt;
-  // Lifetime is permanently entitled — its sentinel expiry is far-future, but
-  // check the status explicitly so a lifetime user never reads as lapsed even
-  // if the client clock is wrong.
-  const active =
-    data.status === 'lifetime' ||
-    (data.status !== 'lapsed' && (expiresAt ?? 0) > now);
+  // The shared gate — same logic the server uses in requireProEntitlement, so
+  // the client's advisory view can never grant access the server denies.
+  const active = isEntitled(data.status, expiresAt, now);
   return {
     status: active ? data.status : 'lapsed',
     entitled: active,
@@ -247,25 +275,15 @@ export function useEntitlement(): Entitlement {
  * routing to the paywall route when this returns `false`.
  *
  * The paywall is NOT presented until RevenueCat identity sync is ready (the
- * Clerk `sub` has been logged in to RC), so a purchase is always attributed to
- * the correct user.
+ * Convex user id has been logged in to RC), so a purchase is always attributed
+ * to the correct user.
  */
 export async function presentPaywall(): Promise<boolean> {
   // Block until RC identity sync completes — a purchase before login would be
   // attributed to an anonymous RC user, breaking the webhook's userId mapping.
-  // Capped at SYNC_READY_TIMEOUT_MS so a missing/unconfigured RC SDK (Expo Go,
-  // unset API key, logIn failure, RC outage) cannot wedge the UI forever: if
-  // sync never completes we return false, and the caller routes to the paywall
-  // screen without ever opening a purchase flow under an unsafe identity.
-  // Identity changes are serialized on `_rcIdentitySync`, so racing it against
-  // a timeout observes the in-flight `logIn` without a listener set.
-  if (!isRcSyncReady()) {
-    const ready = await Promise.race([
-      _rcIdentitySync.then(() => isRcSyncReady()),
-      new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
-    ]);
-    if (!ready) return false;
-  }
+  // The awaitRcSyncReady timeout returns false so the caller routes to the
+  // paywall screen without ever opening a purchase flow under an unsafe identity.
+  if (!(await awaitRcSyncReady())) return false;
 
   const rcui = getRCUI();
   if (!rcui) return false;
@@ -302,7 +320,7 @@ export async function openPaywall(router: ReturnType<typeof useRouter>): Promise
  * restore purchases, cancel, or open a configured deeplink/URL. Like the
  * paywall, this is NOT presented until RC identity sync is ready — management
  * actions (restore, refund, plan change) must be attributed to the signed-in
- * Clerk user so the webhook's `app_user_id` matches.
+ * Convex user so the webhook's `app_user_id` matches.
  *
  * Returns `true` if the Customer Center sheet was presented at all (regardless
  * of what the user did inside it); `false` if the RC UI SDK isn't linked or
@@ -315,14 +333,8 @@ export async function openPaywall(router: ReturnType<typeof useRouter>): Promise
 export async function presentCustomerCenter(): Promise<boolean> {
   // Same identity-sync gate as presentPaywall: a restore or refund before login
   // would be attributed to an anonymous RC user and not reflected in the
-  // Clerk-keyed subscriptions row.
-  if (!isRcSyncReady()) {
-    const ready = await Promise.race([
-      _rcIdentitySync.then(() => isRcSyncReady()),
-      new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
-    ]);
-    if (!ready) return false;
-  }
+  // subscriptions row keyed on the Convex user id.
+  if (!(await awaitRcSyncReady())) return false;
 
   const rcui = getRCUI();
   if (!rcui || typeof rcui.presentCustomerCenter !== 'function') return false;

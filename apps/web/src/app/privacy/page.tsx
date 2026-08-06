@@ -37,7 +37,8 @@ export default function PrivacyPage() {
               <li>
                 <strong>Account information.</strong> When you sign up we
                 collect your email address (and your name, if your sign-in
-                provider shares it). Authentication is handled by Clerk.
+                provider shares it). Authentication is handled by our backend
+                provider, Convex.
               </li>
               <li>
                 <strong>Content you save.</strong> The links, notes, and images
@@ -78,7 +79,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-2">
               We never sell your data. We share it only with the service
-              providers named above (Clerk, Convex, RevenueCat, and our AI
+              providers named above (Convex, RevenueCat, and our AI
               processing provider), strictly to operate Shelvr, and where
               required by law.
             </p>

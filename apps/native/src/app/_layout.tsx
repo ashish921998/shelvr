@@ -1,11 +1,10 @@
 import { OnboardingProvider } from '@/lib/onboarding';
 import { useEntitlementSync } from '@/lib/entitlement';
 import { convex, persister, queryClient } from '@/lib/query-client';
-import { ClerkProvider, useAuth } from '@clerk/expo';
-import { tokenCache } from '@clerk/expo/token-cache';
+import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
-import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
@@ -13,11 +12,14 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUnistyles } from 'react-native-unistyles';
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
-if (!publishableKey) {
-  throw new Error('Add your Clerk Publishable Key to the .env file');
-}
+// Convex Auth persists its JWT + refresh token client-side. In React Native we
+// must supply the storage ourselves — wrap Keychain-backed expo-secure-store
+// behind the synchronous-looking TokenStorage interface the provider expects.
+const authStorage: TokenStorage = {
+  getItem: (key) => SecureStore.getItem(key),
+  setItem: (key, value) => void SecureStore.setItem(key, value),
+  removeItem: (key) => void SecureStore.deleteItemAsync(key),
+};
 
 // Single source of truth for the native route background. The navigator paints
 // every screen's container with the navigation theme's `background`, so setting
@@ -52,30 +54,42 @@ function NavThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const router = useRouter();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
-          >
-            <OnboardingProvider>
-              <EntitlementSync />
-              <NavThemeProvider>
-                <Slot />
-                <StatusBar style="auto" />
-              </NavThemeProvider>
-            </OnboardingProvider>
-          </PersistQueryClientProvider>
-        </ConvexProviderWithClerk>
-      </ClerkProvider>
+      <ConvexAuthProvider
+        client={convex}
+        storage={authStorage}
+        // After an OAuth sign-in completes, Convex Auth redirects back to the
+        // app with a `?code=` query param. With Expo Router we must navigate to
+        // the cleaned URL ourselves so the param doesn't linger and re-trigger.
+        replaceURL={(url) => {
+          // `url` is a relative href (e.g. "/"); typed routes can't prove it's
+          // in the union, so cast through the href type Expo Router expects.
+          router.replace(url as never);
+          return Promise.resolve();
+        }}
+      >
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
+        >
+          <OnboardingProvider>
+            <EntitlementSync />
+            <NavThemeProvider>
+              <Slot />
+              <StatusBar style="auto" />
+            </NavThemeProvider>
+          </OnboardingProvider>
+        </PersistQueryClientProvider>
+      </ConvexAuthProvider>
     </GestureHandlerRootView>
   );
 }
 
-/** Configures RevenueCat and logs the Clerk user in so webhook events carry the
- * same `userId` every Convex table keys on. Rendered once inside the providers. */
+/** Configures RevenueCat and logs the Convex Auth user in so webhook events
+ * carry the same `userId` every Convex table keys on. Rendered once inside the
+ * providers. */
 function EntitlementSync() {
   useEntitlementSync();
   return null;

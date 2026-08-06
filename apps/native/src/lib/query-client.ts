@@ -4,8 +4,8 @@ import { QueryClient } from '@tanstack/react-query';
 import { ConvexReactClient } from 'convex/react';
 import { createMMKV } from 'react-native-mmkv';
 
-// Single Convex socket shared by ConvexProviderWithClerk (reactive mutations)
-// and the TanStack adapter (persisted reactive queries). One client => one
+// Single Convex socket shared by ConvexAuthProvider (reactive mutations) and
+// the TanStack adapter (persisted reactive queries). One client => one
 // WebSocket => shared auth.
 export const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,

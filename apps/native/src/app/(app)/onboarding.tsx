@@ -1,5 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
-import { presentPaywall, useEntitlement } from '@/lib/entitlement';
+import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -73,7 +73,7 @@ export default function OnboardingScreen() {
   const { hasPermission: cameraGranted, requestPermission: requestCamera } =
     useCameraPermission();
   const [libraryPermission, requestLibrary] = ImagePicker.useMediaLibraryPermissions();
-  const { status } = useEntitlement();
+  const { entitled } = useEntitlement();
 
   const finish = async () => {
     if (process.env.EXPO_OS === 'ios') {
@@ -85,9 +85,8 @@ export default function OnboardingScreen() {
     // delay lets the stack transition settle — RC UI presents from the root
     // view controller). Soft paywall: dismissing just lands on the feed.
     // Skip it for an already-entitled user (reinstall with a live sub).
-    const entitled = status === 'trialing' || status === 'pro' || status === 'lifetime';
     if (!entitled) {
-      await new Promise((r) => setTimeout(r, 600));
+      await waitForSheetTransition();
       void presentPaywall();
     }
   };

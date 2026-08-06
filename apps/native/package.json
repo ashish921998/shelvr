@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.15",
-    "@clerk/expo": "^3.6.5",
+    "@auth/core": "0.41.1",
+    "@convex-dev/auth": "^0.0.82",
     "@convex-dev/react-query": "^0.1.0",
     "@expo/ui": "~57.0.3",
     "@mozilla/readability": "^0.6.0",

@@ -1,6 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
 import { ProGate as ProGateView } from '@/components/pro-gate';
-import { useEntitlement, usePaywallGuard } from '@/lib/entitlement';
+import { useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
@@ -77,9 +77,15 @@ export default function MapScreen() {
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
-  // paywall instead of seeing the map.
+  // paywall instead of seeing the map. ProGate's default CTA already presents
+  // the paywall, so no guard wrapper is needed.
   if (!entitled) {
-    return <MapProGate />;
+    return (
+      <ProGateView
+        title="Map is a Pro feature"
+        message="See every saved photo by location with a Shelvr Pro subscription."
+      />
+    );
   }
 
   if (items === undefined) {
@@ -135,17 +141,6 @@ export default function MapScreen() {
         title: item.title,
       }))}
       onMarkerClick={(marker) => openItem(marker.id)}
-    />
-  );
-}
-
-function MapProGate() {
-  const { guard } = usePaywallGuard();
-  return (
-    <ProGateView
-      title="Map is a Pro feature"
-      message="See every saved photo by location with a Shelvr Pro subscription."
-      onPress={() => guard()}
     />
   );
 }

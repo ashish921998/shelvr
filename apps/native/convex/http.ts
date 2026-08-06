@@ -1,9 +1,13 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { auth } from "./auth";
 import { parseRevenueCatEvent } from "./model/revenuecat";
 
 const http = httpRouter();
+
+// Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
+auth.addHttpRoutes(http);
 
 /**
  * RevenueCat webhook receiver. RevenueCat posts server-to-server events here
@@ -12,10 +16,10 @@ const http = httpRouter();
  * in the RevenueCat dashboard and stored in the `REVENUECAT_WEBHOOK_SECRET`
  * Convex deployment env var, then map the event to an entitlement row.
  *
- * The Clerk `sub` is configured as the RevenueCat app user id (the client calls
- * `Purchases.logIn(clerkSub)` on sign-in), so the event's current `app_user_id`
- * is the same `userId` every other table keys on — no client-supplied id is
- * trusted.
+ * The Convex Auth user id is configured as the RevenueCat app user id (the
+ * client calls `Purchases.logIn(convexUserId)` on sign-in), so the event's
+ * current `app_user_id` is the same `userId` every other table keys on — no
+ * client-supplied id is trusted.
  */
 http.route({
   path: "/webhooks/revenuecat",
@@ -25,8 +29,8 @@ http.route({
     if (!secret) {
       return new Response("Webhook secret not configured", { status: 500 });
     }
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${secret}`) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    if (authHeader !== `Bearer ${secret}`) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -56,13 +60,20 @@ http.route({
 
     const { type, userId, expiresAt, productId, eventTimestampMs } = event;
 
-    // Events that preserve the existing status (CANCELLATION, etc.) pass
-    // `status: undefined` so upsertSubscription keeps the current status
-    // transactionally — no separate read here that could race with a
-    // concurrent event.
+    // Lifetime-ness is decided once, here at the edge, from the product id —
+    // not re-derived in the handler. A lifetime purchase carries
+    // `status: "lifetime"` into upsertSubscription; every other event is mapped
+    // by type. Events that preserve the existing status (CANCELLATION, etc.)
+    // pass `status: undefined` so upsertSubscription keeps the current status
+    // transactionally — no separate read here that could race with a concurrent
+    // event.
+    const status =
+      productId !== undefined && isLifetimeProduct(productId)
+        ? "lifetime"
+        : mapStatus(type);
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
-      status: mapStatus(type),
+      status,
       expiresAt: expiresAt ?? 0,
       productId,
       eventTimestampMs,
@@ -70,6 +81,17 @@ http.route({
     return new Response(null, { status: 200 });
   }),
 });
+
+/**
+ * Product ids (as configured in RevenueCat) that grant a lifetime (permanent,
+ * non-expiring) entitlement instead of a time-limited subscription. Add a
+ * product id here when you create a new lifetime product in RevenueCat.
+ */
+const LIFETIME_PRODUCT_IDS = new Set<string>(["lifetime"]);
+
+function isLifetimeProduct(productId: string): boolean {
+  return LIFETIME_PRODUCT_IDS.has(productId);
+}
 
 /**
  * Map a RevenueCat `notification_type` to an entitlement status, or
@@ -83,19 +105,15 @@ http.route({
  * Shelvr is the 7-day introductory trial; a direct paid purchase (no trial)
  * would still be entitled, just labeled `trialing` until the next event.
  *
- * `lifetime` is written for a non-renewing (non-consumable / lifetime) purchase.
- * The status alone doesn't distinguish lifetime from a one-off — the
- * `upsertSubscription` handler also checks the product id against the lifetime
- * set so a regular non-renewing consumable isn't accidentally promoted to
- * permanent. A lifetime row carries a sentinel far-future expiry; note that
- * `mapStatus` itself has no memory of the existing row and WILL map an
- * EXPIRATION to `lapsed` here — the stickiness that keeps a lifetime row from
- * ever lapsing (an EXPIRATION for its own or an unrelated product) lives in
- * `upsertSubscription`, not here.
+ * A non-renewing purchase that is NOT a lifetime product maps to `undefined`
+ * (preserve status) — it's a consumable/one-time purchase, not a subscription
+ * change, so it must not relabel a trialing or lapsed subscriber. Lifetime
+ * products are intercepted by `isLifetimeProduct` at the call site and never
+ * reach this switch.
  */
 function mapStatus(
   type: string,
-): "trialing" | "pro" | "lapsed" | "lifetime" | undefined {
+): "trialing" | "pro" | "lapsed" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
     case "TRIAL_STARTED":
@@ -105,16 +123,12 @@ function mapStatus(
     case "PRODUCT_CHANGE":
     case "UNCANCELLATION":
       return "pro";
-    case "NON_RENEWING_PURCHASE":
-      // A non-renewing purchase (lifetime / non-consumable). The
-      // upsertSubscription handler grants the sentinel expiry only for product
-      // ids in the lifetime set; a non-lifetime non-renewing purchase is still
-      // entitled, just labeled `pro` with whatever expiry the event carries.
-      return "lifetime";
     case "EXPIRATION":
       return "lapsed";
-    // CANCELLATION, SUBSCRIPTION_PAUSED, BILLING_ISSUE_DETECTED, etc. preserve
-    // the current status; the row's expiresAt is still refreshed by the caller.
+    // NON_RENEWING_PURCHASE (a consumable or one-time, non-lifetime product)
+    // and advisory events (CANCELLATION, SUBSCRIPTION_PAUSED,
+    // BILLING_ISSUE_DETECTED, etc.) preserve the current status — a
+    // consumable purchase shouldn't relabel a trialing or lapsed subscriber.
     default:
       return undefined;
   }

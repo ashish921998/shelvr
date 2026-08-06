@@ -18,7 +18,8 @@ import {
 import { useSaveImages } from '@/lib/use-save-image';
 import { openPaywall, useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
-import { useUser } from '@clerk/expo';
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -75,7 +76,7 @@ type Phase =
 export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { user } = useUser();
+  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const {
     sharedPayloads,
@@ -256,9 +257,9 @@ export default function ShareScreen() {
   // once resolution has settled AND there are payloads to save, so it contains
   // no synchronous setState for the derived states.
   useEffect(() => {
-    // No authenticated user yet (Clerk still loading): nothing to reconcile.
+    // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
-    const userId = user.id;
+    const userId = user._id;
     // Derived guards: while resolving, after a resolution error, or with no
     // payloads, render handles the phase — nothing for the effect to do.
     if (isResolving || error !== null || sharedPayloads.length === 0) {
