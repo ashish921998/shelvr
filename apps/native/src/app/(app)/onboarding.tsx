@@ -1,4 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
+import { presentPaywall, useEntitlement } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -72,12 +73,23 @@ export default function OnboardingScreen() {
   const { hasPermission: cameraGranted, requestPermission: requestCamera } =
     useCameraPermission();
   const [libraryPermission, requestLibrary] = ImagePicker.useMediaLibraryPermissions();
+  const { status } = useEntitlement();
 
-  const finish = () => {
+  const finish = async () => {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     completeOnboarding();
+    // The post-onboarding moment is where subscription apps convert best:
+    // offer the trial as soon as the home feed replaces this screen (the
+    // delay lets the stack transition settle — RC UI presents from the root
+    // view controller). Soft paywall: dismissing just lands on the feed.
+    // Skip it for an already-entitled user (reinstall with a live sub).
+    const entitled = status === 'trialing' || status === 'pro' || status === 'lifetime';
+    if (!entitled) {
+      await new Promise((r) => setTimeout(r, 600));
+      void presentPaywall();
+    }
   };
 
   return (
