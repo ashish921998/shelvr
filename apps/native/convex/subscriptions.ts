@@ -7,9 +7,29 @@ export const subscriptionStatusValidator = v.union(
   v.literal("trialing"),
   v.literal("pro"),
   v.literal("lapsed"),
+  v.literal("lifetime"),
 );
 
-export type SubscriptionStatus = "trialing" | "pro" | "lapsed";
+export type SubscriptionStatus = "trialing" | "pro" | "lapsed" | "lifetime";
+
+/**
+ * Product ids (as configured in RevenueCat) that grant a lifetime (permanent,
+ * non-expiring) entitlement instead of a time-limited subscription. A purchase
+ * of one of these writes `status: "lifetime"` and a sentinel far-future expiry
+ * so the existing `expiresAt > Date.now()` gates pass forever without a special
+ * case in every read path. Add a product id here when you create a new lifetime
+ * product in RevenueCat.
+ */
+const LIFETIME_PRODUCT_IDS = new Set<string>(["lifetime"]);
+
+/**
+ * Sentinel expiry for lifetime entitlements. ~1000 years from any plausible
+ * `Date.now()` — far enough that the gate (`expiresAt > Date.now()`) is always
+ * true, close enough to `Number.MAX_SAFE_INTEGER`'s scale that it won't
+ * overflow any downstream arithmetic. NOT `Number.MAX_SAFE_INTEGER` itself, so
+ * accidental `expiresAt + delta` stays finite.
+ */
+const LIFETIME_EXPIRES_AT = 33_000_000_000_000; // ~1035 years from epoch
 
 /**
  * The entitlement a client renders. `status` is the stored subscription state
@@ -65,7 +85,12 @@ export async function requireProEntitlement(
   if (sub === null) {
     throw new Error(PRO_REQUIRED);
   }
-  const active = sub.status !== "lapsed" && sub.expiresAt > Date.now();
+  // Lifetime is permanently entitled — its sentinel expiry is far-future, but
+  // check the status explicitly so a future schema change to the sentinel can't
+  // accidentally gate a lifetime user.
+  const active =
+    sub.status === "lifetime" ||
+    (sub.status !== "lapsed" && sub.expiresAt > Date.now());
   if (!active) {
     throw new Error(PRO_REQUIRED);
   }
@@ -100,10 +125,22 @@ export const upsertSubscription = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
 
+    // A lifetime purchase never expires in RevenueCat's model, so once a row
+    // is `lifetime` it is sticky against every OTHER event: a stray
+    // CANCELLATION, an EXPIRATION (its own or an unrelated product's, since
+    // this table is one row per user, not per-product), all preserved as-is.
+    // Only a fresh lifetime purchase itself (`isLifetime`, checked below) may
+    // touch status/expiresAt/productId again.
+    const isLifetime =
+      args.productId !== undefined && LIFETIME_PRODUCT_IDS.has(args.productId);
+    const stickyLifetime = existing?.status === "lifetime" && !isLifetime;
+
     // Resolve the effective status: an explicit event status wins, otherwise
     // keep the existing row's status, otherwise default to `pro` (a first-ever
     // event with no trial signal is still an active paid period).
-    const status: SubscriptionStatus = args.status ?? existing?.status ?? "pro";
+    const status: SubscriptionStatus = stickyLifetime
+      ? "lifetime"
+      : args.status ?? existing?.status ?? "pro";
 
     // Event-timestamp ordering: if this event is not newer than the stored one,
     // it's stale or a duplicate — drop it. Once a row has an ordering timestamp,
@@ -118,23 +155,41 @@ export const upsertSubscription = internalMutation({
     }
 
     // If the event has no expiry and no existing row, there is nothing to
-    // update — acknowledge without creating a row.
-    if (existing === null && args.expiresAt === 0) {
+    // update — acknowledge without creating a row. EXCEPTION: a lifetime (non-
+    // consumable) purchase reports `expiresAt: 0` because it never expires.
+    // We detect it by product id and grant a far-future expiry so the server
+    // gate (`expiresAt > Date.now()`) and the client's `entitled` both pass
+    // forever. The product id must be the lifetime product configured in the
+    // RevenueCat offering (see `LIFETIME_PRODUCT_IDS`).
+    if (existing === null && args.expiresAt === 0 && !isLifetime) {
       return null;
     }
 
     // For an existing row, an event with no expiry preserves the current
-    // expiresAt (e.g. a CANCELLATION that doesn't carry expiration_at_ms).
-    const expiresAt =
-      args.expiresAt === 0 ? (existing?.expiresAt ?? 0) : args.expiresAt;
+    // expiresAt (e.g. a CANCELLATION that doesn't carry expiration_at_ms). A
+    // lifetime purchase sets a sentinel far-future expiry instead. A sticky
+    // lifetime row keeps its sentinel regardless of what this event carries
+    // (e.g. an EXPIRATION for an unrelated product would otherwise overwrite
+    // it with that product's — irrelevant — expiry).
+    const expiresAt = isLifetime
+      ? LIFETIME_EXPIRES_AT
+      : stickyLifetime
+        ? (existing?.expiresAt ?? LIFETIME_EXPIRES_AT)
+        : args.expiresAt === 0
+          ? (existing?.expiresAt ?? 0)
+          : args.expiresAt;
 
     // Build the shared fields once. productId is only set on the insert path:
     // for an existing row it's optional and omitted-preserve is equivalent to
     // passing undefined, but the explicit object keeps both branches readable.
+    // A sticky lifetime row keeps its productId too, for the same reason as
+    // expiresAt above.
     const doc = {
       status,
       expiresAt,
-      ...(args.productId !== undefined ? { productId: args.productId } : {}),
+      ...(!stickyLifetime && args.productId !== undefined
+        ? { productId: args.productId }
+        : {}),
       ...(args.eventTimestampMs !== undefined
         ? { eventTimestampMs: args.eventTimestampMs }
         : {}),

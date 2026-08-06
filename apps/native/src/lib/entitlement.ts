@@ -77,7 +77,7 @@ const getRCUI = makeLazyModule<typeof import('react-native-purchases-ui').defaul
 // Types
 // ---------------------------------------------------------------------------
 
-export type EntitlementStatus = 'trialing' | 'pro' | 'lapsed' | 'none';
+export type EntitlementStatus = 'trialing' | 'pro' | 'lapsed' | 'lifetime' | 'none';
 
 export type Entitlement = {
   status: EntitlementStatus;
@@ -221,7 +221,12 @@ export function useEntitlement(): Entitlement {
     return { status: 'none', entitled: false, loading: data === undefined };
   }
   const expiresAt = data.expiresAt;
-  const active = data.status !== 'lapsed' && (expiresAt ?? 0) > now;
+  // Lifetime is permanently entitled — its sentinel expiry is far-future, but
+  // check the status explicitly so a lifetime user never reads as lapsed even
+  // if the client clock is wrong.
+  const active =
+    data.status === 'lifetime' ||
+    (data.status !== 'lapsed' && (expiresAt ?? 0) > now);
   return {
     status: active ? data.status : 'lapsed',
     entitled: active,
@@ -285,6 +290,48 @@ export async function openPaywall(router: ReturnType<typeof useRouter>): Promise
   const ok = await presentPaywall();
   if (!ok) router.push('/(app)/paywall');
   return ok;
+}
+
+// ---------------------------------------------------------------------------
+// Customer Center
+// ---------------------------------------------------------------------------
+
+/**
+ * Present the RevenueCat Customer Center natively (sheet on iOS), where the
+ * user can manage their subscription: change plan, request a refund (iOS),
+ * restore purchases, cancel, or open a configured deeplink/URL. Like the
+ * paywall, this is NOT presented until RC identity sync is ready — management
+ * actions (restore, refund, plan change) must be attributed to the signed-in
+ * Clerk user so the webhook's `app_user_id` matches.
+ *
+ * Returns `true` if the Customer Center sheet was presented at all (regardless
+ * of what the user did inside it); `false` if the RC UI SDK isn't linked or
+ * identity sync didn't complete in time. Callers should hide the "manage"
+ * affordance or fall back to a help link when this returns `false`.
+ *
+ * Requires `react-native-purchases-ui` >= 8.7.0 and Customer Center to be
+ * configured in the RevenueCat dashboard (Project Settings → Customer Center).
+ */
+export async function presentCustomerCenter(): Promise<boolean> {
+  // Same identity-sync gate as presentPaywall: a restore or refund before login
+  // would be attributed to an anonymous RC user and not reflected in the
+  // Clerk-keyed subscriptions row.
+  if (!isRcSyncReady()) {
+    const ready = await Promise.race([
+      _rcIdentitySync.then(() => isRcSyncReady()),
+      new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
+    ]);
+    if (!ready) return false;
+  }
+
+  const rcui = getRCUI();
+  if (!rcui || typeof rcui.presentCustomerCenter !== 'function') return false;
+  try {
+    await rcui.presentCustomerCenter();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

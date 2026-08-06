@@ -82,10 +82,20 @@ http.route({
  * INITIAL_PURCHASE is treated as `trialing` because the only entry point into
  * Shelvr is the 7-day introductory trial; a direct paid purchase (no trial)
  * would still be entitled, just labeled `trialing` until the next event.
+ *
+ * `lifetime` is written for a non-renewing (non-consumable / lifetime) purchase.
+ * The status alone doesn't distinguish lifetime from a one-off — the
+ * `upsertSubscription` handler also checks the product id against the lifetime
+ * set so a regular non-renewing consumable isn't accidentally promoted to
+ * permanent. A lifetime row carries a sentinel far-future expiry; note that
+ * `mapStatus` itself has no memory of the existing row and WILL map an
+ * EXPIRATION to `lapsed` here — the stickiness that keeps a lifetime row from
+ * ever lapsing (an EXPIRATION for its own or an unrelated product) lives in
+ * `upsertSubscription`, not here.
  */
 function mapStatus(
   type: string,
-): "trialing" | "pro" | "lapsed" | undefined {
+): "trialing" | "pro" | "lapsed" | "lifetime" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
     case "TRIAL_STARTED":
@@ -95,6 +105,12 @@ function mapStatus(
     case "PRODUCT_CHANGE":
     case "UNCANCELLATION":
       return "pro";
+    case "NON_RENEWING_PURCHASE":
+      // A non-renewing purchase (lifetime / non-consumable). The
+      // upsertSubscription handler grants the sentinel expiry only for product
+      // ids in the lifetime set; a non-lifetime non-renewing purchase is still
+      // entitled, just labeled `pro` with whatever expiry the event carries.
+      return "lifetime";
     case "EXPIRATION":
       return "lapsed";
     // CANCELLATION, SUBSCRIPTION_PAUSED, BILLING_ISSUE_DETECTED, etc. preserve

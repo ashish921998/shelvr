@@ -186,6 +186,7 @@ export default defineSchema({
       v.literal("trialing"),
       v.literal("pro"),
       v.literal("lapsed"),
+      v.literal("lifetime"),
     ),
     expiresAt: v.number(),
     productId: v.optional(v.string()),

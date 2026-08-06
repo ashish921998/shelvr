@@ -1,9 +1,9 @@
 import { Wordmark } from '@/components/wordmark';
-import { openPaywall, useEntitlement } from '@/lib/entitlement';
+import { openPaywall, presentCustomerCenter, useEntitlement } from '@/lib/entitlement';
 import { useClerk, useUser } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
@@ -18,11 +18,22 @@ export default function ProfileScreen() {
       ? 'Pro — Trial'
       : status === 'pro'
         ? 'Pro'
-        : status === 'lapsed'
-          ? 'Pro — Lapsed'
-          : loading
-            ? '…'
-            : 'Start free trial';
+        : status === 'lifetime'
+          ? 'Pro — Lifetime'
+          : status === 'lapsed'
+            ? 'Pro — Lapsed'
+            : loading
+              ? '…'
+              : 'Start free trial';
+
+  // Customer Center is only relevant to users who have (or had) a subscription
+  // — trialing/pro/lifetime/lapsed. A `none` user has nothing to manage and
+  // should see the "Start free trial" paywall row instead.
+  const hasSubscription =
+    status === 'trialing' ||
+    status === 'pro' ||
+    status === 'lifetime' ||
+    status === 'lapsed';
 
   return (
     <View style={styles.content}>
@@ -45,9 +56,34 @@ export default function ProfileScreen() {
           loading && { opacity: 0.4 },
         ]}
         disabled={loading}
-        onPress={() => {
+        onPress={async () => {
           if (loading) return;
-          void openPaywall(router);
+          // An active/lapsed subscriber manages their existing subscription
+          // via Customer Center; a `none` user is sent to the paywall to start
+          // one. Customer Center is the modern RevenueCat way to expose
+          // cancel/refund/change-plan/restore without leaving the app.
+          if (hasSubscription) {
+            const presented = await presentCustomerCenter();
+            // Customer Center isn't linked/configured, or identity sync timed
+            // out — fall back to the platform's own subscription management
+            // page rather than leaving the tap with no visible effect.
+            if (!presented) {
+              Alert.alert('Manage subscription', 'Manage your subscription in the App Store.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Open App Store',
+                  onPress: () =>
+                    void Linking.openURL(
+                      Platform.OS === 'ios'
+                        ? 'https://apps.apple.com/account/subscriptions'
+                        : 'https://play.google.com/store/account/subscriptions',
+                    ),
+                },
+              ]);
+            }
+          } else {
+            void openPaywall(router);
+          }
         }}
       >
         <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
