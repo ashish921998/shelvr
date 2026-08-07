@@ -19,7 +19,6 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Shelvr uses your camera so you can capture things you want to save for later.",
-        "NSMicrophoneUsageDescription": "Shelvr does not record audio. This permission is declared because the camera library we use includes audio support; Shelvr never activates the microphone.",
         "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
         "NSPhotoLibraryAddUsageDescription": "Shelvr can save images back to your photo library.",
         "ITSAppUsesNonExemptEncryption": false
@@ -42,6 +41,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "predictiveBackGestureEnabled": false,
       "package": "app.shelvr.save"
     },
@@ -75,7 +75,8 @@
         "expo-media-library",
         {
           "photosPermission": "Shelvr lets you tidy your photo library — keep, delete, or save photos into your hub.",
-          "savePhotosPermission": "Shelvr can save images back to your photo library."
+          "savePhotosPermission": "Shelvr can save images back to your photo library.",
+          "granularPermissions": ["photo"]
         }
       ],
       [

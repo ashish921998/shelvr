@@ -552,7 +552,7 @@ export default function ShareScreen() {
         title="Saved, but couldn’t finish"
         theme={theme}
         cancelLabel="Cancel"
-        onCancel={() => router.replace('/')}
+        onCancel={abandon}
         retryLabel="Try again"
         onRetry={() => completeSession(phase.session)}
       />

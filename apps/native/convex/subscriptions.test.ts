@@ -79,6 +79,7 @@ describe("RevenueCat subscription webhook writes", () => {
 
   it("does not resurrect a deleted user's row on a renewal webhook", async () => {
     const t = signedInAs("user-gone");
+    const originalExpiresAt = Date.now() + 60_000;
 
     const userId = await t.run(async (ctx) => {
       const id = await ctx.db.insert("users", { email: "gone@example.com" });
@@ -88,7 +89,7 @@ describe("RevenueCat subscription webhook writes", () => {
       await ctx.db.insert("subscriptions", {
         userId: id as string,
         status: "trialing",
-        expiresAt: Date.now() + 60_000,
+        expiresAt: originalExpiresAt,
         updatedAt: Date.now(),
         eventTimestampMs: 1,
       });
@@ -111,6 +112,10 @@ describe("RevenueCat subscription webhook writes", () => {
         .unique(),
     );
     // The stale row is neither patched nor a fresh one inserted.
-    expect(row?.status).toBe("trialing");
+    expect(row).toMatchObject({
+      status: "trialing",
+      expiresAt: originalExpiresAt,
+      eventTimestampMs: 1,
+    });
   });
 });

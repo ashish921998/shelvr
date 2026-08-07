@@ -21,7 +21,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - **Link:** Add → paste URL → save. Item enters processing, then ready with title/description/tags when AI completes.
 - **Note:** Add → type note → save. Content remains if AI classification fails.
 - **Image:** Camera capture or library import. Upload progress and retry are shown on failure.
-- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out or mid-onboarding, Shelvr preserves the intent and resumes after auth.
+- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out or mid-onboarding, Shelvr preserves the intent and resumes after auth. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 

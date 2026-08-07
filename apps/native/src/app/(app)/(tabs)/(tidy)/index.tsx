@@ -26,7 +26,9 @@ import { useTidyActions } from '@/lib/tidy/use-tidy-actions';
 
 export default function TidyScreen() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
-  const [permission, requestPermission] = usePermissions();
+  const [permission, requestPermission] = usePermissions({
+    granularPermissions: ['photo'],
+  });
   const granted = permission?.granted ?? false;
 
   const sources = useAlbums(granted);
