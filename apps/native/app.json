@@ -8,6 +8,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#faf6ee",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c6c97aa7-6676-47a1-8ffc-9a1339c2bc19"
+    },
     "ios": {
       "appleTeamId": "WJP847UZY2",
       "supportsTablet": true,
@@ -60,7 +66,6 @@
       "expo-image",
       "expo-router",
       "expo-status-bar",
-      "@clerk/expo",
       "expo-secure-store",
       "expo-web-browser",
       [
@@ -99,7 +104,8 @@
           }
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

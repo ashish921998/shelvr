@@ -7,12 +7,14 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
       }
     },
     "development-simulator": {
       "extends": "development",
+      "channel": "development",
       "ios": {
         "simulator": true,
         "image": "macos-tahoe-26.5-xcode-26.6"
@@ -20,12 +22,14 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
       }
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
       }

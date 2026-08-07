@@ -5,6 +5,12 @@ node_modules
 .pnp
 .pnp.js
 
+# pnpm content-addressable store — this repo was set up with a local store
+# (./.pnpm-store/v10) instead of the global one (~/Library/pnpm/store). It's
+# 2GB+ and required for node_modules symlinks to resolve, so leave it in place;
+# just keep it out of git.
+.pnpm-store
+
 # testing
 coverage
 

@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 import { enrichItem, enrichedItemValidator, intentValidator } from "./items";
 
@@ -200,6 +201,21 @@ export const createSpace = mutation({
     if (name === "") {
       throw new Error("Space name is empty");
     }
+
+    // Onboarding replay may retry after a process death. Treat the user's
+    // trimmed name as the idempotency key so a successful mutation is never
+    // duplicated merely because the client did not persist its acknowledgement.
+    const existing = await ctx.db
+      .query("spaces")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("userId", userId).eq("name", name),
+      )
+      .take(1);
+    if (existing.length > 0) {
+      return existing[0]._id;
+    }
+
+    await requireProEntitlement(ctx, userId);
     const spaceId = await ctx.db.insert("spaces", {
       userId,
       name,
@@ -228,6 +244,15 @@ export const updateSpace = mutation({
     if (space === null || space.userId !== userId) {
       throw new Error("Space not found");
     }
+    const wasDynamic = space.dynamic === true;
+    // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
+    // saves into the space). A lapsed user editing a space's name or turning
+    // dynamic off is allowed, but enabling it requires an active trial/pro.
+    // Check BEFORE patching so a lapsed user can't flip the flag and trigger
+    // the recommendation pass before being rejected.
+    if (args.dynamic === true && !wasDynamic) {
+      await requireProEntitlement(ctx, userId);
+    }
     const patch: { name?: string; dynamic?: boolean } = {};
     if (args.name !== undefined) {
       const name = args.name.trim();
@@ -241,7 +266,6 @@ export const updateSpace = mutation({
     }
     await ctx.db.patch(space._id, patch);
     // Turning dynamic on (re-)opens the door: run a fresh recommendation pass.
-    const wasDynamic = space.dynamic === true;
     if (args.dynamic === true && !wasDynamic) {
       await ctx.scheduler.runAfter(0, internal.ai.recommendForSpace, {
         spaceId: space._id,

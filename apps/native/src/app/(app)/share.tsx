@@ -16,8 +16,10 @@ import {
   type ShareSession,
 } from '@/lib/share/storage';
 import { useSaveImages } from '@/lib/use-save-image';
+import { openPaywall, useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
-import { useUser } from '@clerk/expo';
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -76,7 +78,8 @@ export default function ShareScreen() {
   const router = useRouter();
   const posthog = usePostHog();
   const { theme } = useUnistyles();
-  const { user } = useUser();
+  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
+  const { entitled, loading: entitlementLoading } = useEntitlement();
   const {
     sharedPayloads,
     resolvedSharedPayloads,
@@ -108,7 +111,8 @@ export default function ShareScreen() {
   const saveDeps = useMemo<ShareSaveDeps>(
     () => ({
       saveLink: ({ url, operationId }) => createLinkItem({ url, operationId }),
-      saveNote: ({ text, operationId }) => createNoteItem({ text, operationId }),
+      saveNote: ({ text, operationId }) =>
+        createNoteItem({ text, operationId }),
       saveImage: ({ image, operationId }) =>
         saveImages([{ image, operationId }]).then((results) => results[0]),
     }),
@@ -138,7 +142,10 @@ export default function ShareScreen() {
         //    delete, no navigation) and surfaces clearFailed for a manual retry.
         clearSharedPayloads();
       } catch (err) {
-        console.error('clearSharedPayloads threw during completion; surfacing retry', err);
+        console.error(
+          'clearSharedPayloads threw during completion; surfacing retry',
+          err,
+        );
         completingSessionId.current = null;
         setPhase({ kind: 'clearFailed', session });
         return;
@@ -172,6 +179,13 @@ export default function ShareScreen() {
     ) => {
       // A run is already in flight for this session — don't start a second.
       if (runningSessionId.current === session.sessionId) return;
+      if (entitlementLoading) return;
+      // Saving is Pro — a lapsed user sharing into Shelvr is routed to the
+      // paywall instead of failing every entry against the server gate.
+      if (!entitled) {
+        void openPaywall(router);
+        return;
+      }
       runningSessionId.current = session.sessionId;
       // Starting (or retrying) a run clears the partial-settled marker for this
       // session so the effect won't block a future legitimate restart.
@@ -197,16 +211,21 @@ export default function ShareScreen() {
 
         setPhase({ kind: 'saving', session: working });
 
-        const result = await processSession(working, resolved, deps, (entry) => {
-          persistEntry(entry, sid);
-          // Reflect incremental progress: update the saving phase's session so
-          // "Saved N of M" advances as each entry settles, not just at the end.
-          setPhase((prev) =>
-            prev.kind === 'saving' && prev.session.sessionId === sid
-              ? { kind: 'saving', session: withEntry(prev.session, entry) }
-              : prev,
-          );
-        });
+        const result = await processSession(
+          working,
+          resolved,
+          deps,
+          (entry) => {
+            persistEntry(entry, sid);
+            // Reflect incremental progress: update the saving phase's session so
+            // "Saved N of M" advances as each entry settles, not just at the end.
+            setPhase((prev) =>
+              prev.kind === 'saving' && prev.session.sessionId === sid
+                ? { kind: 'saving', session: withEntry(prev.session, entry) }
+                : prev,
+            );
+          },
+        );
 
         const allSaved = result.entries.every((e) => e.status === 'saved');
         if (allSaved) {
@@ -237,7 +256,7 @@ export default function ShareScreen() {
         }
       }
     },
-    [completeSession],
+    [completeSession, entitled, entitlementLoading, router],
   );
 
   // Reconcile + drive the save. The resolution-driven phases (resolving /
@@ -245,9 +264,9 @@ export default function ShareScreen() {
   // once resolution has settled AND there are payloads to save, so it contains
   // no synchronous setState for the derived states.
   useEffect(() => {
-    // No authenticated user yet (Clerk still loading): nothing to reconcile.
+    // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
-    const userId = user.id;
+    const userId = user._id;
     // Derived guards: while resolving, after a resolution error, or with no
     // payloads, render handles the phase — nothing for the effect to do.
     if (isResolving || error !== null || sharedPayloads.length === 0) {
@@ -270,11 +289,8 @@ export default function ShareScreen() {
       return;
     }
 
-    const reconciled = reconcileSession(
-      shareStore,
-      userId,
-      raw,
-      () => Crypto.randomUUID(),
+    const reconciled = reconcileSession(shareStore, userId, raw, () =>
+      Crypto.randomUUID(),
     );
 
     if (reconciled.kind === 'empty') {
@@ -357,6 +373,13 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
+  // Entitlement is still loading — don't fall through to the idle/complete
+  // render. The effect also blocks on entitlementLoading, so no save starts
+  // until it resolves.
+  if (entitlementLoading && phase.kind === 'idle') {
+    return <Centered label="Checking subscription…" spinner theme={theme} />;
+  }
+
   // Derived resolution states take precedence over the session-driven phases
   // stored in `phase`: they are pure functions of the hook props and avoid the
   // synchronous-in-effect setState that storing them would require.
@@ -388,7 +411,9 @@ export default function ShareScreen() {
   }
   if (phase.kind === 'saving') {
     const { saved, total } = countProgress(phase.session);
-    return <Centered label={`Saved ${saved} of ${total}…`} spinner theme={theme} />;
+    return (
+      <Centered label={`Saved ${saved} of ${total}…`} spinner theme={theme} />
+    );
   }
   if (phase.kind === 'partial') {
     const { saved, failed, total } = countPartial(phase.session);
@@ -414,7 +439,10 @@ export default function ShareScreen() {
         <Text style={styles.subtitle(theme)}>
           {failedWording} You can retry, or keep what saved.
         </Text>
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        >
           {phase.session.entries
             .filter((e) => e.status === 'failed' || e.status === 'unsupported')
             .map((e) => (
@@ -442,7 +470,11 @@ export default function ShareScreen() {
               onPress={() => {
                 const live = loadSession(shareStore);
                 if (live === null) return;
-                void runSave(live, toResolved(resolvedSharedPayloads), saveDeps);
+                void runSave(
+                  live,
+                  toResolved(resolvedSharedPayloads),
+                  saveDeps,
+                );
               }}
             />
           ) : null}
@@ -491,7 +523,9 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
 function withEntry(session: ShareSession, settled: ShareEntry): ShareSession {
   return {
     ...session,
-    entries: session.entries.map((e) => (e.index === settled.index ? settled : e)),
+    entries: session.entries.map((e) =>
+      e.index === settled.index ? settled : e,
+    ),
   };
 }
 
@@ -507,7 +541,10 @@ function toResolved(
   }));
 }
 
-function countProgress(session: ShareSession): { saved: number; total: number } {
+function countProgress(session: ShareSession): {
+  saved: number;
+  total: number;
+} {
   const saved = session.entries.filter((e) => e.status === 'saved').length;
   return { saved, total: session.entries.length };
 }
@@ -568,7 +605,9 @@ function ErrorActions({
     <View style={styles.container}>
       <Text style={styles.title(theme)}>{title}</Text>
       <View style={styles.actions}>
-        {single || cancelLabel === undefined || onCancel === undefined ? null : (
+        {single ||
+        cancelLabel === undefined ||
+        onCancel === undefined ? null : (
           <Button label={cancelLabel} theme={theme} onPress={onCancel} />
         )}
         <Button label={retryLabel} theme={theme} primary onPress={onRetry} />
@@ -593,7 +632,12 @@ function Button({
       style={[styles.button(theme), primary && styles.buttonPrimary(theme)]}
       onPress={onPress}
     >
-      <Text style={[styles.buttonText(theme), primary && styles.buttonTextPrimary(theme)]}>
+      <Text
+        style={[
+          styles.buttonText(theme),
+          primary && styles.buttonTextPrimary(theme),
+        ]}
+      >
         {label}
       </Text>
     </Pressable>

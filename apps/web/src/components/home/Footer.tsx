@@ -34,7 +34,14 @@ const Footer = () => {
             can find them later.
           </p>
           <p className="text-sm text-muted">
-            © {new Date().getFullYear()} Shelvr. All rights reserved.
+            © {new Date().getFullYear()} Shelvr. All rights reserved. ·{" "}
+            <Link href="/terms" className="hover:text-ink transition-colors">
+              Terms
+            </Link>{" "}
+            ·{" "}
+            <Link href="/privacy" className="hover:text-ink transition-colors">
+              Privacy
+            </Link>
           </p>
         </div>
       </div>

@@ -1,18 +1,24 @@
 import { useOnboarding } from '@/lib/onboarding';
-import { useAuth } from '@clerk/expo';
+import { useReplayOnboarding } from '@/lib/replay-onboarding';
+import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
 
 export default function AppLayout() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
 
-  if (!isLoaded) {
+  // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
+  useReplayOnboarding();
+
+  if (isLoading) {
     return null;
   }
 
-  if (!isSignedIn) {
+  // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen
+  // once they've finished onboarding but haven't authenticated yet.
+  if (!isAuthenticated && onboarded) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
@@ -97,6 +103,16 @@ export default function AppLayout() {
           options={{
             presentation: 'fullScreenModal',
             headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.background },
+          }}
+        />
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: 'formSheet',
+            headerShown: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: 'fitToContents',
             contentStyle: { backgroundColor: theme.colors.background },
           }}
         />

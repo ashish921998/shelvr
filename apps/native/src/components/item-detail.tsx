@@ -1,5 +1,6 @@
 import { IntentChip } from '@/components/intent-chip';
 import { TagChip } from '@/components/tag-chip';
+import { usePaywallGuard } from '@/lib/entitlement';
 import { runIntent } from '@/lib/intents';
 import { displayHost } from '@/lib/url';
 import { convexQuery } from '@convex-dev/react-query';
@@ -247,6 +248,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 function ProductsSection({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const findLinks = useMutation(api.items.findLinks);
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
   const products = item.products;
   const searching = item.productsStatus === 'searching';
 
@@ -311,7 +313,8 @@ function ProductsSection({ item }: { item: DetailItem }) {
     <View style={styles.findLinksRow}>
       <Pressable
         style={({ pressed }) => [styles.findLinksChip, pressed && { opacity: 0.7 }]}
-        onPress={() => findLinks({ id: item._id })}
+        onPress={() => guard(() => findLinks({ id: item._id }))}
+        disabled={entitlementLoading}
         hitSlop={6}
       >
         <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />

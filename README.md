@@ -17,7 +17,7 @@ for Shelvr.
 - [Next.js](https://nextjs.org/) (`apps/web`) — marketing landing only
 - [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`) — product app
 - [Convex](https://convex.dev/) (`apps/native/convex/`)
-- [Clerk](https://clerk.com/) auth (native + Convex)
+- [Convex Auth](https://labs.convex.dev/auth/) (Google + Apple OAuth, dev Anonymous)
 - Vercel AI SDK via AI Gateway (`google/gemini-3.1-flash-lite`)
 
 ## What’s inside
@@ -44,21 +44,48 @@ cd apps/native && npx convex dev --until-success
 This logs you into Convex, connects a project, and writes
 `apps/native/.env.local`.
 
-### 3. Clerk ↔ Convex
+### 3. Convex Auth
 
-Follow the [Convex + Clerk guide](https://docs.convex.dev/auth/clerk).
+Follow the [Convex Auth setup guide](https://labs.convex.dev/auth/setup/manual).
 
-In Clerk, enable the Convex JWT template (`applicationID: "convex"`). Set the
-issuer on your Convex deployment:
+Generate the JWT signing keypair and set it on the deployment:
 
 ```sh
-cd apps/native && npx convex env set CLERK_JWT_ISSUER_DOMAIN https://your-frontend-api.clerk.accounts.dev
+cd apps/native && node generateKeys.mjs   # prints JWT_PRIVATE_KEY + JWKS
+# paste both into the Convex dashboard Environment Variables
+```
+
+Configure the OAuth provider env vars (Google + Apple). See the
+[Google](https://labs.convex.dev/auth/config/oauth/google) and
+[Apple](https://labs.convex.dev/auth/config/oauth/apple) guides for the callback
+URL format (`<CONVEX_SITE_URL>/api/auth/callback/<provider>`).
+
+```sh
+cd apps/native && npx convex env set AUTH_GOOGLE_ID <id>
+cd apps/native && npx convex env set AUTH_GOOGLE_SECRET <secret>
+cd apps/native && npx convex env set AUTH_APPLE_ID <service-id>
+cd apps/native && npx convex env set AUTH_APPLE_SECRET <jwt-secret>
+```
+
+For local dev only, enable the passwordless Anonymous sign-in button:
+
+```sh
+cd apps/native && npx convex env set AUTH_ENABLE_ANONYMOUS true
 ```
 
 For AI classification, also set:
 
 ```sh
 cd apps/native && npx convex env set AI_GATEWAY_API_KEY <your-vercel-ai-gateway-key>
+cd apps/native && npx convex env set REVENUECAT_WEBHOOK_SECRET <webhook-secret>
+```
+
+For RevenueCat (Pro entitlements), set the platform SDK keys in the native env:
+
+```sh
+# apps/native/.env.local
+EXPO_PUBLIC_REVENUECAT_IOS_KEY=<ios-sdk-key>
+EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=<android-sdk-key>
 ```
 
 ### 4. Native env
@@ -68,7 +95,8 @@ cp apps/native/.example.env apps/native/.env.local
 ```
 
 - `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `apps/native/.env.local`
-- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` from the Clerk dashboard
+- `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
+- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → RevenueCat SDK keys
 
 The web marketing site needs no env vars.
 
@@ -88,7 +116,8 @@ Runs backend, web (landing), and native via Turbo.
 
 Public APIs live in `items.ts` and `spaces.ts`. The Node action pipeline is in
 `ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
-from Clerk via `model/auth.ts` — never from a client argument.
+from Convex Auth via `model/auth.ts` (the stable users-table id extracted from the
+session-bearing JWT `sub`) — never from a client argument.
 
 ## Deploying web
 
