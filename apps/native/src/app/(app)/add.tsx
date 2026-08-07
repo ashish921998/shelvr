@@ -14,6 +14,7 @@ import { Icon } from '@/components/symbol';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { analytics } from '@/lib/analytics';
 
 type Mode = 'menu' | 'note' | 'article';
 
@@ -95,6 +96,7 @@ export default function AddScreen() {
       } else {
         await createNoteItem({ text: trimmed, spaceId: pinnedSpaceId });
       }
+      analytics.capture(mode === 'article' ? 'article_saved' : 'note_saved');
       success();
     } catch {
       Alert.alert('Could not save', 'Something went wrong. Try again.');
@@ -115,6 +117,7 @@ export default function AddScreen() {
       const results = await saveImages(requests, { spaceId: pinnedSpaceId });
       const failed = results.filter((r) => r.status === 'failed');
       if (failed.length === 0) {
+        analytics.capture('images_saved', { image_count: results.length });
         success();
         return;
       }

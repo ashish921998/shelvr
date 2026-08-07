@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
+import { analytics } from '@/lib/analytics';
 import {
   Camera,
   useCameraDevice,
@@ -153,6 +154,7 @@ export default function CameraScreen() {
     try {
       const [result] = await saveImages([request], pinnedSpace);
       if (result.status === 'saved') {
+        analytics.capture('photo_captured', { capture_mode: mode });
         router.back();
         return;
       }

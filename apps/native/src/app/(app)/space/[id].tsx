@@ -14,6 +14,7 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { analytics } from '@/lib/analytics';
 
 export default function SpaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -62,6 +63,7 @@ export default function SpaceScreen() {
         onPress: async () => {
           router.back();
           await deleteSpace({ id: space._id });
+          analytics.capture('space_deleted');
         },
       },
     ]);
@@ -71,7 +73,15 @@ export default function SpaceScreen() {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    acceptAllSuggestions({ spaceId: space._id });
+    acceptAllSuggestions({ spaceId: space._id })
+      .then((count) => {
+        if (count > 0) {
+          analytics.capture('space_suggestions_accepted', {
+            suggestion_count: count,
+          });
+        }
+      })
+      .catch(() => undefined);
   };
 
   const suggestionCount = space.suggestions.length;

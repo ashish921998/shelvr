@@ -1,15 +1,20 @@
 import { OnboardingProvider } from '@/lib/onboarding';
+import { analytics } from '@/lib/analytics';
 import { useEntitlementSync } from '@/lib/entitlement';
-import { convex, persister, queryClient } from '@/lib/query-client';
+import { currentUserQuery, useCurrentUser } from '@/lib/current-user';
+import { posthog } from '@/lib/posthog';
 import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
+import { convex, persister, queryClient } from '@/lib/query-client';
+import { useConvexAuth } from 'convex/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PostHogProvider } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
@@ -27,6 +32,41 @@ const authStorage: TokenStorage = {
 // stacks at once and paints the screen container before JS content mounts (no
 // white flash on push / zoom transitions). `useColorScheme` is the reliable
 // system-appearance signal; the palette comes from Unistyles.
+function PostHogIdentity() {
+  const { isAuthenticated } = useConvexAuth();
+  const { data: user, isFetching } = useCurrentUser();
+  const identifiedUserId = useRef<string | undefined>(undefined);
+  const clearedUnauthenticatedUserCache = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      analytics.reset();
+      identifiedUserId.current = undefined;
+      // This persisted query depends on auth even though its Convex key does
+      // not. Clear its old value before a later account can observe it, once
+      // per unauthenticated interval so the reactive query cannot loop.
+      if (!clearedUnauthenticatedUserCache.current) {
+        clearedUnauthenticatedUserCache.current = true;
+        void queryClient.resetQueries({ queryKey: currentUserQuery.queryKey });
+      }
+      return;
+    }
+
+    clearedUnauthenticatedUserCache.current = false;
+
+    // Do not identify cached data while the auth-dependent Convex query is
+    // reconnecting after sign-in or an account change.
+    if (isFetching || !user || identifiedUserId.current === user._id) {
+      return;
+    }
+
+    analytics.identify(user._id, user.email);
+    identifiedUserId.current = user._id;
+  }, [isAuthenticated, isFetching, user]);
+
+  return null;
+}
+
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = useColorScheme();
   const { theme } = useUnistyles();
@@ -55,6 +95,16 @@ function NavThemeProvider({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const router = useRouter();
+  const appContent = (
+    <OnboardingProvider>
+      <EntitlementSync />
+      <NavThemeProvider>
+        <Slot />
+        <StatusBar style="auto" />
+      </NavThemeProvider>
+    </OnboardingProvider>
+  );
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConvexAuthProvider
@@ -74,13 +124,8 @@ export default function RootLayout() {
           client={queryClient}
           persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
         >
-          <OnboardingProvider>
-            <EntitlementSync />
-            <NavThemeProvider>
-              <Slot />
-              <StatusBar style="auto" />
-            </NavThemeProvider>
-          </OnboardingProvider>
+          <PostHogIdentity />
+          {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
         </PersistQueryClientProvider>
       </ConvexAuthProvider>
     </GestureHandlerRootView>
