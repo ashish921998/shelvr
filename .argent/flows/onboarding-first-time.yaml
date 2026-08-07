@@ -1,0 +1,64 @@
+steps:
+  - echo: "First-time user onboarding (9-step quiz-funnel). Requires: fresh install (no auth token, no onboarding flag in SecureStore), Metro running, dev build with ExpoStoreReview linked."
+
+  - launch: app.shelvr.save
+
+  # ---- Sign-in ----
+  - await: { visible: { id: dev-login-button }, timeout: 30000 }
+  - echo: Sign-in screen. Tapping 'Continue without account' (dev anonymous login).
+  - tap: { id: dev-login-button }
+
+  # ---- Step 1/9: Promise ----
+  - await: { visible: "Get started" }
+  - echo: "Onboarding 1/9: Promise — value props. Tapping 'Get started'."
+  - tap: { text: "Get started" }
+
+  # ---- Step 2/9: Survey Q1 ----
+  - await: { visible: "Where do your saves pile up today?" }
+  - echo: "Onboarding 2/9: Survey Q1 — 'Where do your saves pile up today?' Selecting 'X bookmarks'."
+  - tap: { text: "X bookmarks" }
+  - echo: Tapping 'Continue' to advance.
+  - tap: { text: Continue }
+
+  # ---- Step 3/9: Survey Q2 ----
+  - await: { visible: "What do you save most?" }
+  - echo: "Onboarding 3/9: Survey Q2 — 'What do you save most?' Selecting 'Articles' (seeds space picker presets)."
+  - tap: { text: Articles }
+  - echo: Tapping 'Continue' to advance.
+  - tap: { text: Continue }
+
+  # ---- Step 4/9: Space picker ----
+  - await: { visible: "Pick your spaces." }
+  - echo: "Onboarding 4/9: Space picker — selecting 'Articles' space (min 1 required to enable CTA)."
+  - tap: { text: Articles }
+  - echo: Tapping 'Create my spaces'.
+  - tap: { text: "Create my spaces" }
+
+  # ---- Step 5/9: Building (auto-advances after ~2-6s) ----
+  - echo: "Onboarding 5/9: Building — spinner while spaces are created. Auto-advances."
+
+  # ---- Step 6/9: Live demo ----
+  - await: { visible: "Watch Shelvr file a save.", timeout: 20000 }
+  - echo: "Onboarding 6/9: Live demo — skipping for flow reliability."
+  # Dev builds may show a LogBox error ('Pro required' from createSpace). Dismiss if present.
+  - when: { visible: "Console Error" }
+    steps:
+      - tap: Dismiss
+  - tap: { text: "Skip for now" }
+
+  # ---- Step 7/9: Permissions ----
+  - await: { visible: "Two quick permissions." }
+  - echo: "Onboarding 7/9: Permissions — skipping (opt-in). Tapping 'Continue'."
+  - tap: { text: Continue }
+
+  # ---- Step 8/9: Rate ----
+  - await: { visible: "Built for people who save like you." }
+  - echo: "Onboarding 8/9: Rate — tapping 'Not now'."
+  - tap: { text: "Not now" }
+
+  # ---- Step 9/9: Ready ----
+  - await: { visible: "Your shelf is ready." }
+  - echo: "Onboarding 9/9: Ready — tapping 'Start saving' (completes onboarding, presents paywall)."
+  - tap: { text: "Start saving" }
+
+  - echo: "Onboarding complete. Paywall presented — 'Shelvr Pro' with Weekly/Monthly/Annual plans and 7-day free trial."
