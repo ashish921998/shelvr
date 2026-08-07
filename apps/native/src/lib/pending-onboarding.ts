@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 // Persisted store for onboarding choices made before the user signs in.
@@ -10,10 +11,37 @@ import * as SecureStore from 'expo-secure-store';
 
 const SPACES_KEY = 'shelvr.pending.spaces';
 const DEMO_URL_KEY = 'shelvr.pending.demoUrl';
-const REPLAYED_KEY = 'shelvr.pending.replayed';
+const OPERATION_ID_KEY = 'shelvr.pending.operationId';
+
+let revision = 0;
+const listeners = new Set<() => void>();
+
+function notifyChanged() {
+  revision += 1;
+  for (const listener of listeners) listener();
+}
+
+export function subscribePendingOnboarding(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getPendingOnboardingRevision(): number {
+  return revision;
+}
+
+function ensureOperationId(): string {
+  const existing = SecureStore.getItem(OPERATION_ID_KEY);
+  if (existing !== null && existing !== '') return existing;
+  const operationId = `onboarding:${Crypto.randomUUID()}`;
+  SecureStore.setItem(OPERATION_ID_KEY, operationId);
+  return operationId;
+}
 
 export function setPendingSpaces(spaces: string[]) {
+  if (spaces.length > 0) ensureOperationId();
   SecureStore.setItem(SPACES_KEY, JSON.stringify(spaces));
+  notifyChanged();
 }
 
 export function getPendingSpaces(): string[] {
@@ -28,7 +56,13 @@ export function getPendingSpaces(): string[] {
 }
 
 export function setPendingDemoUrl(url: string | null) {
+  if (url !== null) ensureOperationId();
   SecureStore.setItem(DEMO_URL_KEY, url ?? '');
+  notifyChanged();
+}
+
+export function getOrCreatePendingOperationId(): string {
+  return ensureOperationId();
 }
 
 export function getPendingDemoUrl(): string | null {
@@ -40,16 +74,9 @@ export function hasPending(): boolean {
   return getPendingSpaces().length > 0 || getPendingDemoUrl() !== null;
 }
 
-export function markReplayed() {
-  SecureStore.setItem(REPLAYED_KEY, 'true');
-}
-
-export function isReplayed(): boolean {
-  return SecureStore.getItem(REPLAYED_KEY) === 'true';
-}
-
 export function clearPending() {
   SecureStore.setItem(SPACES_KEY, '');
   SecureStore.setItem(DEMO_URL_KEY, '');
-  SecureStore.setItem(REPLAYED_KEY, '');
+  SecureStore.setItem(OPERATION_ID_KEY, '');
+  notifyChanged();
 }

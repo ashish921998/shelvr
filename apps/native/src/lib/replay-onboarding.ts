@@ -1,16 +1,18 @@
 import { api } from '@convex/_generated/api';
 import { useConvexAuth, useMutation } from 'convex/react';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   clearPending,
   getPendingSpaces,
   getPendingDemoUrl,
+  getOrCreatePendingOperationId,
+  getPendingOnboardingRevision,
   hasPending,
-  isReplayed,
-  markReplayed,
   setPendingSpaces,
+  subscribePendingOnboarding,
 } from '@/lib/pending-onboarding';
-import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+import { openPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 
 /**
  * After sign-in, replay deferred onboarding data: create the spaces the user
@@ -21,7 +23,8 @@ import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/en
  */
 export function useReplayOnboarding() {
   const { isAuthenticated } = useConvexAuth();
-  const { entitled } = useEntitlement();
+  const router = useRouter();
+  const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const ranRef = useRef(false);
@@ -30,9 +33,18 @@ export function useReplayOnboarding() {
   const rerunRef = useRef(false);
   const awaitingEntitlementRef = useRef(false);
   const [retryNonce, setRetryNonce] = useState(0);
+  // SecureStore is synchronous but not reactive. Subscribe so finishing
+  // authenticated onboarding immediately wakes this hook; otherwise the hook
+  // would only notice pending data after an auth/entitlement change.
+  const pendingRevision = useSyncExternalStore(
+    subscribePendingOnboarding,
+    getPendingOnboardingRevision,
+    getPendingOnboardingRevision,
+  );
 
   useEffect(() => {
     if (!isAuthenticated || ranRef.current) return;
+    if (entitlementLoading) return;
     if (runningRef.current) {
       // If entitlement changes while the paywall or mutations are in flight,
       // schedule one pass after the current run finishes instead of starting
@@ -43,7 +55,6 @@ export function useReplayOnboarding() {
       return;
     }
     if (!hasPending()) return;
-    if (isReplayed()) return;
     if (!entitled && awaitingEntitlementRef.current) return;
 
     const spaces = getPendingSpaces();
@@ -61,7 +72,7 @@ export function useReplayOnboarding() {
         // (e.g., after a future purchase via the paywall route).
         if (!entitled) {
           await waitForSheetTransition();
-          const purchased = await presentPaywall();
+          const purchased = await openPaywall(router);
           if (purchased) {
             // The RevenueCat webhook may not have updated Convex yet. Keep
             // pending data and wait for the entitlement query to become true.
@@ -91,7 +102,10 @@ export function useReplayOnboarding() {
         let demoOk = true;
         if (demoUrl) {
           try {
-            await createLinkItem({ url: demoUrl });
+            await createLinkItem({
+              url: demoUrl,
+              operationId: getOrCreatePendingOperationId(),
+            });
           } catch {
             demoOk = false;
           }
@@ -101,7 +115,6 @@ export function useReplayOnboarding() {
         if (!allSpacesOk || !demoOk) return;
 
         ranRef.current = true;
-        markReplayed();
         clearPending();
       } finally {
         const shouldRerun = rerunRef.current;
@@ -114,5 +127,14 @@ export function useReplayOnboarding() {
     };
 
     void run();
-  }, [isAuthenticated, createSpace, createLinkItem, entitled, retryNonce]);
+  }, [
+    isAuthenticated,
+    createSpace,
+    createLinkItem,
+    entitled,
+    entitlementLoading,
+    pendingRevision,
+    router,
+    retryNonce,
+  ]);
 }

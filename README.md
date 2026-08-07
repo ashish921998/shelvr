@@ -116,8 +116,8 @@ Runs backend, web (landing), and native via Turbo.
 
 Public APIs live in `items.ts` and `spaces.ts`. The Node action pipeline is in
 `ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
-from Convex Auth via `model/auth.ts` (the JWT `sub`, i.e. the `users` document
-id) — never from a client argument.
+from Convex Auth via `model/auth.ts` (the stable users-table id extracted from the
+session-bearing JWT `sub`) — never from a client argument.
 
 ## Deploying web
 

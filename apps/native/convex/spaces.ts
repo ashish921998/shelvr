@@ -202,6 +202,20 @@ export const createSpace = mutation({
     if (name === "") {
       throw new Error("Space name is empty");
     }
+
+    // Onboarding replay may retry after a process death. Treat the user's
+    // trimmed name as the idempotency key so a successful mutation is never
+    // duplicated merely because the client did not persist its acknowledgement.
+    const existing = await ctx.db
+      .query("spaces")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("userId", userId).eq("name", name),
+      )
+      .take(1);
+    if (existing.length > 0) {
+      return existing[0]._id;
+    }
+
     const spaceId = await ctx.db.insert("spaces", {
       userId,
       name,

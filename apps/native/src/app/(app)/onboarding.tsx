@@ -7,11 +7,11 @@ import { ReadyStep } from '@/components/onboarding/ready';
 import { SpacePickerStep, type SaveKind, getSpacePresets } from '@/components/onboarding/space-picker';
 import { SurveyStep } from '@/components/onboarding/survey';
 import type { FeedItem } from '@/components/item-card';
-import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+import { useEntitlement } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
 import { setPendingSpaces } from '@/lib/pending-onboarding';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -85,7 +85,10 @@ export default function OnboardingScreen() {
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
   const spacesInitRef = useRef(false);
 
-  const advance = () => setStep((s) => Math.min(s + 1, STEPS.ready));
+  const advance = useCallback(
+    () => setStep((s) => Math.min(s + 1, STEPS.ready)),
+    [],
+  );
 
   // Pre-select spaces from Q2 presets when the user first reaches the spaces
   // step. The ref guard ensures this runs only once, preserving subsequent
@@ -107,34 +110,17 @@ export default function OnboardingScreen() {
       );
   }
 
-  // The verbatim v1 finish: haptic, flip the flag, then present the trial
-  // paywall after the stack transition settles. Entitled users (reinstall with
-  // a live sub) skip it. Unchanged because the post-onboarding moment is where
-  // subscription apps convert best.
-  const finish = async () => {
+  // Persist the replay payload before flipping the onboarding route flag. The
+  // replay hook owns both the entitled and paywall paths, so there is one
+  // durable completion flow instead of two competing paywall presentations.
+  const finish = () => {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    setPendingSpaces(spaces);
     completeOnboarding();
     if (!isAuthenticated) {
-      // Stash spaces so the replay hook can create them after sign-in.
-      setPendingSpaces(spaces);
       router.replace('/(auth)/sign-in');
-      return;
-    }
-    if (!entitled) {
-      // Building/live-demo deferred creation (Pro-gated). Stash spaces so
-      // the replay hook can create them once entitlement is active. Present
-      // the paywall; if the user doesn't purchase, route to the paywall
-      // screen so a purchase path remains. Pending data is retained either
-      // way — the replay hook fires when `entitled` flips to true (after
-      // the RevenueCat webhook processes the purchase).
-      setPendingSpaces(spaces);
-      await waitForSheetTransition();
-      const purchased = await presentPaywall();
-      if (!purchased) {
-        router.push('/(app)/paywall');
-      }
     }
   };
 
@@ -195,7 +181,7 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === STEPS.building && <BuildingStep spaceNames={spaces} entitled={entitled} onDone={advance} />}
+          {step === STEPS.building && <BuildingStep onDone={advance} />}
 
           {step === STEPS.demo && (
             <LiveDemoStep

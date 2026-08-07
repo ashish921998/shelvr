@@ -28,7 +28,9 @@ const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 // (paying) path. The lapsed/not-entitled path is covered by the gating tests
 // further down.
 async function as(userId: string): Promise<TestCtx> {
-  const t = convexTest(schema, modules).withIdentity({ subject: userId });
+  const t = convexTest(schema, modules).withIdentity({
+    subject: `${userId}|session-1`,
+  });
   await seedPro(t, userId);
   return t;
 }

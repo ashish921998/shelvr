@@ -234,7 +234,11 @@ export function useEntitlementSync(): void {
  * grant access the server denies.
  */
 export function useEntitlement(): Entitlement {
-  const { data } = useQuery(convexQuery(api.subscriptions.getEntitlement, {}));
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const { data } = useQuery({
+    ...convexQuery(api.subscriptions.getEntitlement, {}),
+    enabled: isAuthenticated,
+  });
   // The clock is seeded once and refreshed on an interval so a trial expiring
   // between Convex updates flips `entitled` without a server push. Seeding via
   // a useState initializer (and updating inside the effect) keeps Date.now
@@ -249,6 +253,12 @@ export function useEntitlement(): Entitlement {
     return () => clearInterval(id);
   }, [hasExpiry]);
 
+  // Onboarding is intentionally visible before sign-in. Do not invoke the
+  // authenticated Convex query in that state, and never render persisted data
+  // from a previous account as this user's entitlement.
+  if (!isAuthenticated) {
+    return { status: 'none', entitled: false, loading: authLoading };
+  }
   if (!data || data.status === 'none') {
     return { status: 'none', entitled: false, loading: data === undefined };
   }

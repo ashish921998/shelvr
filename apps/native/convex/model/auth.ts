@@ -1,21 +1,25 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import type { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
- * Returns the authenticated user's stable id (the Convex Auth `users` table
- * document id, surfaced as the JWT `sub`), or throws. Every public function
- * derives its userId from this — never from an argument.
+ * Returns the authenticated user's stable users-table id, or throws. Every
+ * public function derives its userId from this — never from an argument.
  *
- * Convex Auth issues JWTs whose `sub` claim is the `users` document id, so
- * `ctx.auth.getUserIdentity().subject` is the same value every table keys on.
+ * Convex Auth puts both the user id and session id in the JWT `sub` claim
+ * (`userId|sessionId`). `getAuthUserId` removes the session suffix; using the
+ * raw `identity.subject` would make ownership session-scoped and would not
+ * match RevenueCat's user id or `getCurrentUser`.
+ *
  * This stays provider-agnostic: it works identically whether the user signed in
  * via OAuth or Anonymous.
  */
 export async function requireUserId(
   ctx: QueryCtx | MutationCtx | ActionCtx,
-): Promise<string> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) {
+): Promise<Id<"users">> {
+  const userId = await getAuthUserId(ctx);
+  if (userId === null) {
     throw new Error("Not authenticated");
   }
-  return identity.subject;
+  return userId;
 }

@@ -1,7 +1,7 @@
 import { openPaywall } from '@/lib/entitlement';
 import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { StyleSheet } from 'react-native-unistyles';
 
 type Props = {
   title: string;

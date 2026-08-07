@@ -93,7 +93,11 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    // Space names are the stable key used by onboarding replay. Keeping this
+    // lookup index-backed makes retries idempotent without creating duplicates.
+    .index("by_user_and_name", ["userId", "name"]),
 
   spaceItems: defineTable({
     userId: v.string(),

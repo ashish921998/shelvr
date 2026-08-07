@@ -47,8 +47,8 @@ There is no test suite yet.
 Convex is the reactive backend + database + file storage + AI orchestration. Auth is
 [Convex Auth](https://labs.convex.dev/auth/) (`@convex-dev/auth`), configured in `convex/auth.ts`
 and wired in `convex/auth.config.ts`. Convex Auth issues its own JWTs (signed with the
-`JWT_PRIVATE_KEY` / `JWKS` deployment vars); the JWT `sub` is the `users` table document id, which is
-the `userId` every app table keys on.
+`JWT_PRIVATE_KEY` / `JWKS` deployment vars); the JWT `sub` contains the users-table id and session
+id, and `model/auth.ts` extracts the stable users-table id used by every app table.
 
 - **`schema.ts`** — the Convex Auth tables (`authTables`) plus `items`, `spaces`, `spaceItems`,
   `itemOperations`, and `subscriptions`. `items` has a `by_user` index and a `search_text` full-text
@@ -68,8 +68,8 @@ the `userId` every app table keys on.
   for notes it feeds the content to the model. It calls `generateObject` (Vercel AI SDK, Zod
   schema) to produce title/description/tags/spaceNames, maps space names back to ids, then
   `finalizeItem` flips status to `ready`. `reclassifyForNewSpace` runs when a space is created.
-- **`model/auth.ts`** — `requireUserId(ctx)` returns the Convex Auth user id (the JWT `sub`, i.e.
-  the `users` document id). **Every public function derives `userId` from this, never from a client
+- **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
+  session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
 
 **The AI model** is `google/gemini-3.1-flash-lite`, a bare model-id string that routes through the

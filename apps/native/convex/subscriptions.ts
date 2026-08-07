@@ -121,13 +121,20 @@ export const upsertSubscription = internalMutation({
     const stickyLifetime =
       existing?.status === "lifetime" && args.status !== "lifetime";
 
-    const status: SubscriptionStatus = stickyLifetime
+    // An omitted status means "preserve the current status". There is no
+    // current status for a first-seen advisory/unknown event, so acknowledging
+    // it must not manufacture a Pro subscription. This also handles webhook
+    // reordering where CANCELLATION arrives before INITIAL_PURCHASE.
+    const status: SubscriptionStatus | undefined = stickyLifetime
       ? "lifetime"
-      : (args.status ?? existing?.status ?? "pro");
+      : (args.status ?? existing?.status);
+    if (status === undefined) {
+      return null;
+    }
 
     // Nothing to record: an event with no expiry and no prior state (e.g. a
-    // CANCELLATION for a user who never subscribed). A lifetime purchase is
-    // exempt — it reports `expiresAt: 0` (non-renewing) but is a real entitlement.
+    // lapsed non-lifetime event). A lifetime purchase is exempt — it reports
+    // `expiresAt: 0` (non-renewing) but is a real entitlement.
     if (existing === null && args.expiresAt === 0 && status !== "lifetime") {
       return null;
     }
