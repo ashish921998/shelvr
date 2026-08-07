@@ -374,7 +374,9 @@ export const removeItemFromSpace = mutation({
 
 export const acceptSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
-  returns: v.null(),
+  // True only when a live suggestion actually flipped to saved, so the client
+  // fires `suggestion_accepted` on a real transition rather than a no-op re-tap.
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const { item } = await requireItemAndSpace(
@@ -386,33 +388,36 @@ export const acceptSuggestion = mutation({
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     // Tolerate double-taps and races: only a live suggestion flips.
     if (row === null || effectiveStatus(row) !== "suggested") {
-      return null;
+      return false;
     }
     await ctx.db.patch(row._id, { status: "saved" });
     await scheduleSteering(ctx, item, args.spaceId);
-    return null;
+    return true;
   },
 });
 
 export const dismissSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
-  returns: v.null(),
+  // True only when a live suggestion actually flipped to dismissed.
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row === null || effectiveStatus(row) !== "suggested") {
-      return null;
+      return false;
     }
     // Kept (not deleted) so the AI never nags about this item again.
     await ctx.db.patch(row._id, { status: "dismissed" });
-    return null;
+    return true;
   },
 });
 
 export const acceptAllSuggestions = mutation({
   args: { spaceId: v.id("spaces") },
-  returns: v.null(),
+  // The number of suggestions actually accepted, so analytics report the real
+  // count instead of whatever the client had rendered (which can be stale).
+  returns: v.number(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
@@ -427,7 +432,7 @@ export const acceptAllSuggestions = mutation({
         await scheduleSteering(ctx, item, args.spaceId);
       }
     }
-    return null;
+    return suggested.length;
   },
 });
 

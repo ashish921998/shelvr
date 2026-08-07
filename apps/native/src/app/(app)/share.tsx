@@ -16,10 +16,10 @@ import {
   type ShareSession,
 } from '@/lib/share/storage';
 import { useSaveImages } from '@/lib/use-save-image';
+import { analytics } from '@/lib/analytics';
 import { openPaywall, useEntitlement } from '@/lib/entitlement';
+import { useCurrentUser } from '@/lib/current-user';
 import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
@@ -34,7 +34,6 @@ import {
 } from 'react-native';
 import { createMMKV } from 'react-native-mmkv';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { usePostHog } from 'posthog-react-native';
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -76,9 +75,8 @@ type Phase =
 
 export default function ShareScreen() {
   const router = useRouter();
-  const posthog = usePostHog();
   const { theme } = useUnistyles();
-  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
+  const { data: user } = useCurrentUser();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const {
     sharedPayloads,
@@ -157,14 +155,14 @@ export default function ShareScreen() {
       deleteSession(shareStore, sid);
       // 4. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === 'saved')) {
-        posthog.capture('shared_content_saved', {
+        analytics.capture('shared_content_saved', {
           item_count: session.entries.length,
         });
       }
       setPhase({ kind: 'complete' });
       router.replace('/');
     },
-    [clearSharedPayloads, posthog, router],
+    [clearSharedPayloads, router],
   );
 
   /** Runs the processor for `session`, persisting each settled entry (scoped to

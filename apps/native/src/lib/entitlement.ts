@@ -3,6 +3,7 @@ import { isEntitled } from '@convex/model/entitlement';
 import { convexQuery } from '@convex-dev/react-query';
 import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
+import { useCurrentUser } from '@/lib/current-user';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { NativeModules } from 'react-native';
@@ -189,7 +190,7 @@ export async function configureRevenueCat(): Promise<void> {
  */
 export function useEntitlementSync(): void {
   const { isAuthenticated } = useConvexAuth();
-  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
+  const { data: user } = useCurrentUser();
   const sub = isAuthenticated ? (user?._id ?? null) : null;
 
   useEffect(() => {

@@ -6,17 +6,9 @@ const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | undefined;
 const posthogHost = Constants.expoConfig?.extra?.posthogHost as string | undefined;
 
-function requirePostHogConfiguration(variableName: string, value: string | undefined) {
-  if (!value && __DEV__) {
-    throw new Error(
-      `${variableName} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${variableName} is configured`,
-    );
-  }
-}
-
-requirePostHogConfiguration('POSTHOG_PROJECT_TOKEN', posthogProjectToken);
-requirePostHogConfiguration('POSTHOG_HOST', posthogHost);
-
+// Analytics is optional in local development and in builds that do not have
+// PostHog configured. The analytics boundary treats this as a no-op instead of
+// making the app fail during module initialization.
 export const posthog =
   posthogProjectToken && posthogHost
     ? new PostHog(posthogProjectToken, {

@@ -26,7 +26,7 @@ import { Icon } from '@/components/symbol';
 import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { usePostHog } from 'posthog-react-native';
+import { analytics } from '@/lib/analytics';
 
 export default function ItemScreen() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
@@ -36,7 +36,6 @@ export default function ItemScreen() {
     q?: string;
   }>();
   const router = useRouter();
-  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -156,41 +155,44 @@ export default function ItemScreen() {
   // `expo-sharing` needs a local file, so the remote image is cached first.
   const shareActive = useCallback(async () => {
     if (!activeItem) return;
-    if (!activeItem.imageUrl) {
-      if (activeItem.url) {
-        await Share.share({ url: activeItem.url });
-        posthog.capture('item_shared');
-      }
-      return;
-    }
+
+    let shared = false;
     try {
-      if (!(await Sharing.isAvailableAsync())) {
-        if (activeItem.url) await Share.share({ url: activeItem.url });
-        return;
+      if (!activeItem.imageUrl) {
+        if (!activeItem.url) return;
+        const result = await Share.share({ url: activeItem.url });
+        shared = result.action !== Share.dismissedAction;
+      } else if (!(await Sharing.isAvailableAsync())) {
+        if (!activeItem.url) return;
+        const result = await Share.share({ url: activeItem.url });
+        shared = result.action !== Share.dismissedAction;
+      } else {
+        const ext = activeItem.isSticker ? 'png' : 'jpg';
+        const file = new File(Paths.cache, `${activeItem._id}.${ext}`);
+        if (file.exists) file.delete();
+        await File.downloadFileAsync(activeItem.imageUrl, file);
+        await Sharing.shareAsync(file.uri, {
+          mimeType: activeItem.isSticker ? 'image/png' : 'image/jpeg',
+          UTI: activeItem.isSticker ? 'public.png' : 'public.jpeg',
+          dialogTitle: activeItem.title ?? 'Share',
+        });
+        shared = true;
       }
-      const ext = activeItem.isSticker ? 'png' : 'jpg';
-      const file = new File(Paths.cache, `${activeItem._id}.${ext}`);
-      if (file.exists) file.delete();
-      await File.downloadFileAsync(activeItem.imageUrl, file);
-      await Sharing.shareAsync(file.uri, {
-        mimeType: activeItem.isSticker ? 'image/png' : 'image/jpeg',
-        UTI: activeItem.isSticker ? 'public.png' : 'public.jpeg',
-        dialogTitle: activeItem.title ?? 'Share',
-      });
-      posthog.capture('item_shared');
     } catch {
       // User cancelled the sheet, or the download/share failed — nothing to do.
     }
-  }, [activeItem, posthog]);
+
+    if (shared) analytics.capture('item_shared');
+  }, [activeItem]);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
     await Clipboard.setStringAsync(activeItem.url);
-    posthog.capture('item_link_copied');
+    analytics.capture('item_link_copied');
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [activeItem, posthog]);
+  }, [activeItem]);
 
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
@@ -210,9 +212,11 @@ export default function ItemScreen() {
       itemId: activeId as Id<'items'>,
       spaceId: spaceId as Id<'spaces'>,
     })
-      .then(() => posthog.capture('suggestion_accepted'))
+      .then((changed) => {
+        if (changed) analytics.capture('suggestion_accepted');
+      })
       .catch(() => undefined);
-  }, [spaceId, activeId, acceptSuggestion, posthog]);
+  }, [spaceId, activeId, acceptSuggestion]);
 
   const onDismiss = useCallback(async () => {
     if (!spaceId || !activeId || !items) return;
@@ -231,12 +235,12 @@ export default function ItemScreen() {
     } else {
       router.back();
     }
-    await dismissSuggestion({
+    const changed = await dismissSuggestion({
       itemId: dismissedId,
       spaceId: spaceId as Id<'spaces'>,
     });
-    posthog.capture('suggestion_dismissed');
-  }, [spaceId, activeId, items, dismissSuggestion, router, posthog]);
+    if (changed) analytics.capture('suggestion_dismissed');
+  }, [spaceId, activeId, items, dismissSuggestion, router]);
 
   const onDelete = useCallback(async () => {
     if (!activeItem || !items) return;
@@ -255,8 +259,8 @@ export default function ItemScreen() {
       router.back();
     }
     await deleteItem({ id: activeItem._id });
-    posthog.capture('item_deleted');
-  }, [activeItem, items, deleteItem, router, posthog]);
+    analytics.capture('item_deleted');
+  }, [activeItem, items, deleteItem, router]);
 
   if (items === undefined) {
     return (

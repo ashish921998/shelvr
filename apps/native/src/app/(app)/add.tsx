@@ -14,7 +14,7 @@ import { Icon } from '@/components/symbol';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { usePostHog } from 'posthog-react-native';
+import { analytics } from '@/lib/analytics';
 
 type Mode = 'menu' | 'note' | 'article';
 
@@ -46,7 +46,6 @@ function ActionButton({
 
 export default function AddScreen() {
   const router = useRouter();
-  const posthog = usePostHog();
   const { theme } = useUnistyles();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
@@ -97,7 +96,7 @@ export default function AddScreen() {
       } else {
         await createNoteItem({ text: trimmed, spaceId: pinnedSpaceId });
       }
-      posthog.capture(mode === 'article' ? 'article_saved' : 'note_saved');
+      analytics.capture(mode === 'article' ? 'article_saved' : 'note_saved');
       success();
     } catch {
       Alert.alert('Could not save', 'Something went wrong. Try again.');
@@ -118,7 +117,7 @@ export default function AddScreen() {
       const results = await saveImages(requests, { spaceId: pinnedSpaceId });
       const failed = results.filter((r) => r.status === 'failed');
       if (failed.length === 0) {
-        posthog.capture('images_saved', { image_count: results.length });
+        analytics.capture('images_saved', { image_count: results.length });
         success();
         return;
       }

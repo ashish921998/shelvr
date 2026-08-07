@@ -1,20 +1,17 @@
 import { Wordmark } from '@/components/wordmark';
 import { openPaywall, presentCustomerCenter, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+import { useCurrentUser } from '@/lib/current-user';
+import { analytics } from '@/lib/analytics';
 import { useAuthActions } from '@convex-dev/auth/react';
-import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
-import { usePostHog } from 'posthog-react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
   const { signOut } = useAuthActions();
-  const { data: user } = useQuery(convexQuery(api.users.getCurrentUser, {}));
+  const { data: user } = useCurrentUser();
   const router = useRouter();
-  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
 
@@ -100,7 +97,6 @@ export default function ProfileScreen() {
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         onPress={async () => {
-          posthog.reset();
           // Signing out flips `(app)`'s `isAuthenticated` guard, which renders
           // `<Redirect href="/(auth)/sign-in" />` and unmounts this sheet. Calling
           // `router.back()` here races that redirect — the `(app)` navigator is
@@ -108,6 +104,9 @@ export default function ProfileScreen() {
           // throws "GO_BACK was not handled by any navigator". Let the auth
           // redirect own the navigation.
           await signOut();
+          // Only after sign-out succeeds: drop the PostHog identity so the
+          // next user on this device starts a fresh anonymous person.
+          analytics.reset();
         }}
       >
         <Text style={styles.signOutText}>Sign out</Text>

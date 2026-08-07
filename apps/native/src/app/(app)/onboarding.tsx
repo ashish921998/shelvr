@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
-import { usePostHog } from 'posthog-react-native';
+import { analytics } from '@/lib/analytics';
 
 // Onboarding v2 — a 9-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
@@ -74,7 +74,6 @@ const LAST_PROGRESS_STEP = STEPS.rate; // 7
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const posthog = usePostHog();
   const router = useRouter();
   const { completeOnboarding } = useOnboarding();
   const { entitled } = useEntitlement();
@@ -119,7 +118,13 @@ export default function OnboardingScreen() {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    posthog.capture('onboarding_completed');
+    analytics.capture('onboarding_completed', {
+      save_pileup: q1,
+      save_types: q2,
+      space_count: spaces.length,
+      space_names: spaces,
+      $set: { save_pileup: q1, save_types: q2 },
+    });
     setPendingSpaces(spaces);
     completeOnboarding();
     if (!isAuthenticated) {

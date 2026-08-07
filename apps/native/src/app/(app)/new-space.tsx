@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { usePostHog } from 'posthog-react-native';
+import { analytics } from '@/lib/analytics';
 
 // One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
 // is keyed by the loaded space so its `useState` initializers seed once from
@@ -71,7 +71,6 @@ type SpaceFormProps =
 function SpaceForm(props: SpaceFormProps) {
   const editing = props.mode === 'edit';
   const router = useRouter();
-  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
@@ -107,7 +106,7 @@ function SpaceForm(props: SpaceFormProps) {
       } else {
         await createSpace({ name: trimmed, dynamic });
       }
-      posthog.capture(editing ? 'space_updated' : 'space_created', { dynamic });
+      analytics.capture(editing ? 'space_updated' : 'space_created', { dynamic });
       if (process.env.EXPO_OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
