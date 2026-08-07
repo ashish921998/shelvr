@@ -5,8 +5,10 @@ import { v } from "convex/values";
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
   // authRefreshTokens, authVerificationCodes, authVerifiers, authRateLimits).
-  // The `users` table is the source of truth for the signed-in user's identity:
-  // `ctx.auth.getUserIdentity().subject` == the `users` document id.
+  // The `users` table is the source of truth for the signed-in user's identity.
+  // Use `getAuthUserId(ctx)` (or the app's `requireUserId(ctx)` wrapper) when
+  // deriving the stable users-table document ID; the raw auth subject can also
+  // include a session suffix.
   ...authTables,
 
   items: defineTable({

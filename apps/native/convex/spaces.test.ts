@@ -36,6 +36,24 @@ describe("space creation", () => {
     });
 
     expect(second).toBe(first);
+
+    await t.run(async (ctx) => {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .unique();
+      if (subscription === null) throw new Error("Subscription not found");
+      await ctx.db.patch(subscription._id, {
+        status: "lapsed",
+        expiresAt: Date.now() - 1,
+      });
+    });
+
+    const retriedAfterLapse = await t.mutation(api.spaces.createSpace, {
+      name: " Read later ",
+    });
+    expect(retriedAfterLapse).toBe(first);
+
     const spaces = await t.run(async (ctx) =>
       await ctx.db
         .query("spaces")

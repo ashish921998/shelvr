@@ -30,18 +30,42 @@ export function getPendingOnboardingRevision(): number {
   return revision;
 }
 
+function createOperationId(): string {
+  return `onboarding:${Crypto.randomUUID()}`;
+}
+
 function ensureOperationId(): string {
   const existing = SecureStore.getItem(OPERATION_ID_KEY);
   if (existing !== null && existing !== '') return existing;
-  const operationId = `onboarding:${Crypto.randomUUID()}`;
+  const operationId = createOperationId();
   SecureStore.setItem(OPERATION_ID_KEY, operationId);
   return operationId;
 }
 
-export function setPendingSpaces(spaces: string[]) {
-  if (spaces.length > 0) ensureOperationId();
+function clearOperationIdIfNothingPending() {
+  if (getPendingSpaces().length === 0 && getPendingDemoUrl() === null) {
+    SecureStore.setItem(OPERATION_ID_KEY, '');
+  }
+}
+
+function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
+  if (spaces.length > 0 && refreshOperationId) {
+    SecureStore.setItem(OPERATION_ID_KEY, createOperationId());
+  }
   SecureStore.setItem(SPACES_KEY, JSON.stringify(spaces));
+  if (spaces.length === 0) clearOperationIdIfNothingPending();
   notifyChanged();
+}
+
+export function setPendingSpaces(spaces: string[]) {
+  writePendingSpaces(spaces, true);
+}
+
+// Replay retries update the existing operation rather than starting a new one;
+// otherwise a successfully-created demo link could be duplicated after a
+// partial space-creation failure.
+export function updatePendingSpaces(spaces: string[]) {
+  writePendingSpaces(spaces, false);
 }
 
 export function getPendingSpaces(): string[] {
@@ -56,8 +80,11 @@ export function getPendingSpaces(): string[] {
 }
 
 export function setPendingDemoUrl(url: string | null) {
-  if (url !== null) ensureOperationId();
+  if (url !== null && url !== '') {
+    SecureStore.setItem(OPERATION_ID_KEY, createOperationId());
+  }
   SecureStore.setItem(DEMO_URL_KEY, url ?? '');
+  if (url === null || url === '') clearOperationIdIfNothingPending();
   notifyChanged();
 }
 

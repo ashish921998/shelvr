@@ -9,8 +9,8 @@ import {
   getOrCreatePendingOperationId,
   getPendingOnboardingRevision,
   hasPending,
-  setPendingSpaces,
   subscribePendingOnboarding,
+  updatePendingSpaces,
 } from '@/lib/pending-onboarding';
 import { openPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 
@@ -96,7 +96,7 @@ export function useReplayOnboarding() {
         // Persist only the failed work before attempting the demo item. If the
         // demo fails, a later replay retries it without recreating spaces that
         // already succeeded.
-        setPendingSpaces(failedSpaces);
+        updatePendingSpaces(failedSpaces);
         const allSpacesOk = failedSpaces.length === 0;
 
         let demoOk = true;

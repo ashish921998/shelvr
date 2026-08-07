@@ -197,7 +197,6 @@ export const createSpace = mutation({
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
     const name = args.name.trim();
     if (name === "") {
       throw new Error("Space name is empty");
@@ -216,6 +215,7 @@ export const createSpace = mutation({
       return existing[0]._id;
     }
 
+    await requireProEntitlement(ctx, userId);
     const spaceId = await ctx.db.insert("spaces", {
       userId,
       name,
