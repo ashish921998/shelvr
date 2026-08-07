@@ -9,11 +9,13 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+import { usePostHog } from 'posthog-react-native';
 
 // Per-space membership toggles for one item. Every write here is the user's
 // hand — `saved` rows only; flipping a space on also overrides a dismissal.
 export default function ManageSpacesScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const posthog = usePostHog();
   const id = itemId as Id<'items'>;
 
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
@@ -52,15 +54,19 @@ export default function ManageSpacesScreen() {
       return { itemId: id, values };
     });
     const mutation = next ? addItemToSpace : removeItemFromSpace;
-    mutation({ itemId: id, spaceId }).catch(() => {
-      // Revert the optimistic override so the switch reflects server state.
-      setOverride((current) => {
-        if (current?.itemId !== id) return current;
-        const values = new Map(current.values);
-        values.delete(spaceId);
-        return values.size > 0 ? { itemId: id, values } : null;
+    mutation({ itemId: id, spaceId })
+      .then(() => {
+        posthog.capture('item_space_membership_changed', { membership_added: next });
+      })
+      .catch(() => {
+        // Revert the optimistic override so the switch reflects server state.
+        setOverride((current) => {
+          if (current?.itemId !== id) return current;
+          const values = new Map(current.values);
+          values.delete(spaceId);
+          return values.size > 0 ? { itemId: id, values } : null;
+        });
       });
-    });
   };
 
   // The item may be `null` (deleted, or not ours) — distinct from `undefined`

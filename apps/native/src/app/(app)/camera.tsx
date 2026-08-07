@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
+import { usePostHog } from 'posthog-react-native';
 import {
   Camera,
   useCameraDevice,
@@ -34,6 +35,7 @@ const INACTIVE = 'rgba(255,255,255,0.55)';
 
 export default function CameraScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const insets = useSafeAreaInsets();
   // Opened from a space's add flow: captures are pre-pinned to that space.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
@@ -153,6 +155,7 @@ export default function CameraScreen() {
     try {
       const [result] = await saveImages([request], pinnedSpace);
       if (result.status === 'saved') {
+        posthog.capture('photo_captured', { capture_mode: mode });
         router.back();
         return;
       }

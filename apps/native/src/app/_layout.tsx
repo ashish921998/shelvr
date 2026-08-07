@@ -1,15 +1,17 @@
 import { OnboardingProvider } from '@/lib/onboarding';
+import { posthog } from '@/lib/posthog';
 import { convex, persister, queryClient } from '@/lib/query-client';
-import { ClerkProvider, useAuth } from '@clerk/expo';
+import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
@@ -24,6 +26,40 @@ if (!publishableKey) {
 // stacks at once and paints the screen container before JS content mounts (no
 // white flash on push / zoom transitions). `useColorScheme` is the reliable
 // system-appearance signal; the palette comes from Unistyles.
+function PostHogIdentity() {
+  const { isLoaded, user } = useUser();
+  const posthogClient = usePostHog();
+  const identifiedUserId = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    if (!user) {
+      identifiedUserId.current = undefined;
+      return;
+    }
+
+    if (identifiedUserId.current === user.id) {
+      return;
+    }
+
+    const email = user.primaryEmailAddress?.emailAddress;
+    const name = user.fullName ?? user.firstName;
+
+    posthogClient.identify(user.id, {
+      $set: {
+        ...(email ? { email } : {}),
+        ...(name ? { name } : {}),
+      },
+    });
+    identifiedUserId.current = user.id;
+  }, [isLoaded, posthogClient, user]);
+
+  return null;
+}
+
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = useColorScheme();
   const { theme } = useUnistyles();
@@ -59,12 +95,15 @@ export default function RootLayout() {
             client={queryClient}
             persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
           >
-            <OnboardingProvider>
-              <NavThemeProvider>
-                <Slot />
-                <StatusBar style="auto" />
-              </NavThemeProvider>
-            </OnboardingProvider>
+            <PostHogProvider client={posthog}>
+              <PostHogIdentity />
+              <OnboardingProvider>
+                <NavThemeProvider>
+                  <Slot />
+                  <StatusBar style="auto" />
+                </NavThemeProvider>
+              </OnboardingProvider>
+            </PostHogProvider>
           </PersistQueryClientProvider>
         </ConvexProviderWithClerk>
       </ClerkProvider>

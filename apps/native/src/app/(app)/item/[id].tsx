@@ -26,6 +26,7 @@ import { Icon } from '@/components/symbol';
 import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { usePostHog } from 'posthog-react-native';
 
 export default function ItemScreen() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
@@ -35,6 +36,7 @@ export default function ItemScreen() {
     q?: string;
   }>();
   const router = useRouter();
+  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -155,7 +157,10 @@ export default function ItemScreen() {
   const shareActive = useCallback(async () => {
     if (!activeItem) return;
     if (!activeItem.imageUrl) {
-      if (activeItem.url) await Share.share({ url: activeItem.url });
+      if (activeItem.url) {
+        await Share.share({ url: activeItem.url });
+        posthog.capture('item_shared');
+      }
       return;
     }
     try {
@@ -172,18 +177,20 @@ export default function ItemScreen() {
         UTI: activeItem.isSticker ? 'public.png' : 'public.jpeg',
         dialogTitle: activeItem.title ?? 'Share',
       });
+      posthog.capture('item_shared');
     } catch {
       // User cancelled the sheet, or the download/share failed — nothing to do.
     }
-  }, [activeItem]);
+  }, [activeItem, posthog]);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
     await Clipboard.setStringAsync(activeItem.url);
+    posthog.capture('item_link_copied');
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [activeItem]);
+  }, [activeItem, posthog]);
 
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
@@ -202,8 +209,10 @@ export default function ItemScreen() {
     acceptSuggestion({
       itemId: activeId as Id<'items'>,
       spaceId: spaceId as Id<'spaces'>,
-    });
-  }, [spaceId, activeId, acceptSuggestion]);
+    })
+      .then(() => posthog.capture('suggestion_accepted'))
+      .catch(() => undefined);
+  }, [spaceId, activeId, acceptSuggestion, posthog]);
 
   const onDismiss = useCallback(async () => {
     if (!spaceId || !activeId || !items) return;
@@ -226,7 +235,8 @@ export default function ItemScreen() {
       itemId: dismissedId,
       spaceId: spaceId as Id<'spaces'>,
     });
-  }, [spaceId, activeId, items, dismissSuggestion, router]);
+    posthog.capture('suggestion_dismissed');
+  }, [spaceId, activeId, items, dismissSuggestion, router, posthog]);
 
   const onDelete = useCallback(async () => {
     if (!activeItem || !items) return;
@@ -245,7 +255,8 @@ export default function ItemScreen() {
       router.back();
     }
     await deleteItem({ id: activeItem._id });
-  }, [activeItem, items, deleteItem, router]);
+    posthog.capture('item_deleted');
+  }, [activeItem, items, deleteItem, router, posthog]);
 
   if (items === undefined) {
     return (

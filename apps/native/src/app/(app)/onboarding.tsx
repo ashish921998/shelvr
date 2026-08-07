@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useCameraPermission } from 'react-native-vision-camera';
+import { usePostHog } from 'posthog-react-native';
 
 function FeatureRow({
   icon,
@@ -68,6 +69,7 @@ function PermissionButton({
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const posthog = usePostHog();
   const { completeOnboarding } = useOnboarding();
   const { hasPermission: cameraGranted, requestPermission: requestCamera } =
     useCameraPermission();
@@ -77,6 +79,7 @@ export default function OnboardingScreen() {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    posthog.capture('onboarding_completed');
     completeOnboarding();
   };
 

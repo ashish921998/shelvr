@@ -3,12 +3,14 @@ import { useClerk, useUser } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { Pressable, Text, View } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
+  const posthog = usePostHog();
   const { theme } = useUnistyles();
 
   return (
@@ -28,6 +30,7 @@ export default function ProfileScreen() {
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         onPress={async () => {
+          posthog.reset();
           await signOut();
           router.back();
         }}

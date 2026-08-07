@@ -14,10 +14,12 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { usePostHog } from 'posthog-react-native';
 
 export default function SpaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<'spaces'> }),
@@ -62,6 +64,7 @@ export default function SpaceScreen() {
         onPress: async () => {
           router.back();
           await deleteSpace({ id: space._id });
+          posthog.capture('space_deleted');
         },
       },
     ]);
@@ -71,7 +74,13 @@ export default function SpaceScreen() {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    acceptAllSuggestions({ spaceId: space._id });
+    acceptAllSuggestions({ spaceId: space._id })
+      .then(() =>
+        posthog.capture('space_suggestions_accepted', {
+          suggestion_count: space.suggestions.length,
+        }),
+      )
+      .catch(() => undefined);
   };
 
   const suggestionCount = space.suggestions.length;

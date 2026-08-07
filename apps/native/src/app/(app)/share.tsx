@@ -32,6 +32,7 @@ import {
 } from 'react-native';
 import { createMMKV } from 'react-native-mmkv';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { usePostHog } from 'posthog-react-native';
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -73,6 +74,7 @@ type Phase =
 
 export default function ShareScreen() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { theme } = useUnistyles();
   const { user } = useUser();
   const {
@@ -147,10 +149,15 @@ export default function ShareScreen() {
       //    newer session that replaced its record.
       deleteSession(shareStore, sid);
       // 4. Navigate Home exactly once.
+      if (session.entries.every((entry) => entry.status === 'saved')) {
+        posthog.capture('shared_content_saved', {
+          item_count: session.entries.length,
+        });
+      }
       setPhase({ kind: 'complete' });
       router.replace('/');
     },
-    [clearSharedPayloads, router],
+    [clearSharedPayloads, posthog, router],
   );
 
   /** Runs the processor for `session`, persisting each settled entry (scoped to
