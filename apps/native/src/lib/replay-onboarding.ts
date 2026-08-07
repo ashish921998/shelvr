@@ -1,6 +1,6 @@
 import { api } from '@convex/_generated/api';
 import { useConvexAuth, useMutation } from 'convex/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   clearPending,
   getPendingSpaces,
@@ -8,8 +8,9 @@ import {
   hasPending,
   isReplayed,
   markReplayed,
-} from './pending-onboarding';
-import { presentPaywall, useEntitlement, waitForSheetTransition } from './entitlement';
+  setPendingSpaces,
+} from '@/lib/pending-onboarding';
+import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 
 /**
  * After sign-in, replay deferred onboarding data: create the spaces the user
@@ -24,36 +25,94 @@ export function useReplayOnboarding() {
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const ranRef = useRef(false);
+  const runningRef = useRef(false);
+  const startedEntitledRef = useRef(false);
+  const rerunRef = useRef(false);
+  const awaitingEntitlementRef = useRef(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated || ranRef.current) return;
+    if (runningRef.current) {
+      // If entitlement changes while the paywall or mutations are in flight,
+      // schedule one pass after the current run finishes instead of starting
+      // a second paywall/mutation batch concurrently.
+      if (entitled !== startedEntitledRef.current) {
+        rerunRef.current = true;
+      }
+      return;
+    }
     if (!hasPending()) return;
     if (isReplayed()) return;
-
-    ranRef.current = true;
-    markReplayed();
+    if (!entitled && awaitingEntitlementRef.current) return;
 
     const spaces = getPendingSpaces();
     const demoUrl = getPendingDemoUrl();
 
+    runningRef.current = true;
+    startedEntitledRef.current = entitled;
+
     const run = async () => {
-      await Promise.allSettled(
-        spaces.map((name) => createSpace({ name }).catch(() => undefined)),
-      );
-      if (demoUrl) {
-        try {
-          await createLinkItem({ url: demoUrl });
-        } catch {
-          // Swallow — the demo item is best-effort.
+      try {
+        // Show the paywall before Pro-gated mutations. createSpace and
+        // createLinkItem both call requireProEntitlement on the server, so
+        // they will fail for non-entitled users. If the user cancels, keep
+        // the pending data — the effect re-runs when `entitled` changes
+        // (e.g., after a future purchase via the paywall route).
+        if (!entitled) {
+          await waitForSheetTransition();
+          const purchased = await presentPaywall();
+          if (purchased) {
+            // The RevenueCat webhook may not have updated Convex yet. Keep
+            // pending data and wait for the entitlement query to become true.
+            awaitingEntitlementRef.current = true;
+          }
+          return;
         }
-      }
-      clearPending();
-      if (!entitled) {
-        await waitForSheetTransition();
-        void presentPaywall();
+
+        awaitingEntitlementRef.current = false;
+
+        // entitled is true — the server sees the subscription row, so
+        // requireProEntitlement will pass. Create everything now.
+        const spaceResults = await Promise.allSettled(
+          spaces.map((name) => createSpace({ name })),
+        );
+        const failedSpaces = spaceResults
+          .map((result, index) =>
+            result.status === 'rejected' ? spaces[index] : null,
+          )
+          .filter((name): name is string => name !== null);
+        // Persist only the failed work before attempting the demo item. If the
+        // demo fails, a later replay retries it without recreating spaces that
+        // already succeeded.
+        setPendingSpaces(failedSpaces);
+        const allSpacesOk = failedSpaces.length === 0;
+
+        let demoOk = true;
+        if (demoUrl) {
+          try {
+            await createLinkItem({ url: demoUrl });
+          } catch {
+            demoOk = false;
+          }
+        }
+
+        // Only mark as done when all required mutations succeed.
+        if (!allSpacesOk || !demoOk) return;
+
+        ranRef.current = true;
+        markReplayed();
+        clearPending();
+      } finally {
+        const shouldRerun = rerunRef.current;
+        rerunRef.current = false;
+        runningRef.current = false;
+        if (shouldRerun) {
+          setRetryNonce((nonce) => nonce + 1);
+        }
       }
     };
 
     void run();
-  }, [isAuthenticated, createSpace, createLinkItem, entitled]);
+  }, [isAuthenticated, createSpace, createLinkItem, entitled, retryNonce]);
 }

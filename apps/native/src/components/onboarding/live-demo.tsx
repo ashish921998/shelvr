@@ -40,9 +40,11 @@ const SIMULATED_PROCESSING_MS = 2500;
 type DemoPhase = 'input' | 'processing' | 'reveal';
 
 export function LiveDemoStep({
+  entitled,
   onReady,
   onAdvance,
 }: {
+  entitled: boolean;
   onReady: (item: FeedItem) => void;
   onAdvance: () => void;
 }) {
@@ -104,13 +106,14 @@ export function LiveDemoStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId]);
 
-  // Pre-auth: after a brief processing beat, transition to the static reveal.
-  // The real save happens after sign-in via the replay hook.
+  // Pre-auth or not entitled: after a brief processing beat, transition to the
+  // static reveal. The real save happens after sign-in / purchase via the
+  // replay hook or onboarding finish().
   useEffect(() => {
-    if (phase !== 'processing' || isAuthenticated) return;
+    if (phase !== 'processing' || (isAuthenticated && entitled)) return;
     const id = setTimeout(() => setPhase('reveal'), SIMULATED_PROCESSING_MS);
     return () => clearTimeout(id);
-  }, [phase, isAuthenticated]);
+  }, [phase, isAuthenticated, entitled]);
 
   const submit = async (rawUrl: string) => {
     const trimmed = rawUrl.trim();
@@ -120,9 +123,10 @@ export function LiveDemoStep({
     setUrl(trimmed);
     setPhase('processing');
 
-    // Pre-auth onboarding: stash the URL for replay after sign-in, then
-    // show the processing → static reveal animation.
-    if (!isAuthenticated) {
+    // Pre-auth or not entitled: stash the URL for replay after sign-in /
+    // purchase, then show the processing → static reveal animation.
+    // createLinkItem is Pro-gated on the server.
+    if (!isAuthenticated || !entitled) {
       setPendingDemoUrl(trimmed);
       return;
     }

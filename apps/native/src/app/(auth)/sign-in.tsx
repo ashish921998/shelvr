@@ -53,7 +53,7 @@ export default function Page() {
     }
   };
 
-  const anonEnabled = process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+  const anonEnabled = __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
 
   return (
     <View style={styles.container}>
@@ -121,7 +121,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
     padding: theme.gap(2.5),
     paddingTop: rt.insets.top + theme.gap(3),
-    paddingBottom: theme.gap(2),
+    paddingBottom: rt.insets.bottom + theme.gap(2),
     alignItems: 'center',
   },
   center: {

@@ -17,9 +17,11 @@ const ROTATING_LINES = ['Warming the shelves', 'Teaching Shelvr your taste', 'So
 
 export function BuildingStep({
   spaceNames,
+  entitled,
   onDone,
 }: {
   spaceNames: string[];
+  entitled: boolean;
   onDone: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -49,8 +51,12 @@ export function BuildingStep({
     startedRef.current = true;
 
     const start = Date.now();
+    // Only create spaces when authenticated AND entitled — createSpace is
+    // Pro-gated on the server. When not entitled, skip mutations; spaces
+    // are stashed by the onboarding finish() for replay after purchase.
+    const canCreate = isAuthenticated && entitled;
     const create =
-      isAuthenticated
+      canCreate
         ? Promise.allSettled(
             spaceNames.map((name) => createSpace({ name }).catch(() => undefined)),
           )
@@ -73,7 +79,7 @@ export function BuildingStep({
       advance();
     });
     return () => clearTimeout(cap);
-  }, [spaceNames, createSpace, onDone, isAuthenticated]);
+  }, [spaceNames, createSpace, onDone, isAuthenticated, entitled]);
 
   return (
     <View style={styles.wrap}>

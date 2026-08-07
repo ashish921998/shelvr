@@ -104,6 +104,9 @@ importers:
       expo-linking:
         specifier: ~57.0.1
         version: 57.0.5(expo@57.0.10)(react-native@0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+      expo-localization:
+        specifier: ~57.0.1
+        version: 57.0.1(expo@57.0.10)(react@19.2.3)
       expo-maps:
         specifier: ~57.0.0
         version: 57.0.1(expo@57.0.10)(react-native@0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -4067,6 +4070,12 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-localization@57.0.1:
+    resolution: {integrity: sha512-8Ffl4UTbOsQeGT0v5fxMbyPHyPMPnhSPDFQJa8p9rjJrthFoAtNi+fL6Ssmrvf1/7dmPq1mVY52MEt0TMEfgjA==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+
   expo-manifests@57.0.1:
     resolution: {integrity: sha512-qB/mDG2dYdl+EvUeQuqP8KFYCFgFCQjJYdWIHo8SFBgDzMYmdF286DFY2M1M9Okr99wkb5M4tgA3aCcwv3aEQA==}
     peerDependencies:
@@ -5947,6 +5956,9 @@ packages:
     resolution: {integrity: sha512-opwpo1tQBAcpSUJDt94B7hhLNGOKjCdE//XXjeLrnx9b83bjnw45tXdg1b09yEw/VLFBJGZpwRULMmOZo7ol+A==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
+
+  rtl-detect@1.1.2:
+    resolution: {integrity: sha512-PGMBq03+TTG/p/cRB7HCLKJ1MgDIi07+QU1faSjiYRfmY5UsAttV9Hs08jDAHVwcOwmVLcSJkpwyfXszVjWfIQ==}
 
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
@@ -11024,6 +11036,12 @@ snapshots:
       - expo
       - supports-color
 
+  expo-localization@57.0.1(expo@57.0.10)(react@19.2.3):
+    dependencies:
+      expo: 57.0.10(70bef2a84ccb4b40b21e6b37130bc856)
+      react: 19.2.3
+      rtl-detect: 1.1.2
+
   expo-manifests@57.0.1(expo@57.0.10):
     dependencies:
       expo: 57.0.10(70bef2a84ccb4b40b21e6b37130bc856)
@@ -13215,6 +13233,8 @@ snapshots:
       '@rolldown/binding-openharmony-arm64': 1.2.2
       '@rolldown/binding-win32-arm64-msvc': 1.2.2
       '@rolldown/binding-win32-x64-msvc': 1.2.2
+
+  rtl-detect@1.1.2: {}
 
   run-parallel@1.2.0:
     dependencies:

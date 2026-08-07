@@ -4,14 +4,14 @@ import { PermissionsStep } from '@/components/onboarding/permissions';
 import { PromiseStep } from '@/components/onboarding/promise';
 import { RateStep } from '@/components/onboarding/rate';
 import { ReadyStep } from '@/components/onboarding/ready';
-import { SpacePickerStep, type SaveKind } from '@/components/onboarding/space-picker';
+import { SpacePickerStep, type SaveKind, getSpacePresets } from '@/components/onboarding/space-picker';
 import { SurveyStep } from '@/components/onboarding/survey';
 import type { FeedItem } from '@/components/item-card';
 import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
 import { setPendingSpaces } from '@/lib/pending-onboarding';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -83,8 +83,19 @@ export default function OnboardingScreen() {
   const [q2, setQ2] = useState<SaveKind[]>([]);
   const [spaces, setSpaces] = useState<string[]>([]);
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
+  const spacesInitRef = useRef(false);
 
   const advance = () => setStep((s) => Math.min(s + 1, STEPS.ready));
+
+  // Pre-select spaces from Q2 presets when the user first reaches the spaces
+  // step. The ref guard ensures this runs only once, preserving subsequent
+  // user deselections.
+  useEffect(() => {
+    if (step === STEPS.spaces && !spacesInitRef.current) {
+      spacesInitRef.current = true;
+      setSpaces(getSpacePresets(q2));
+    }
+  }, [step, q2]);
 
   // Survey toggle helper — multi-select, order-independent. Shared by both Qs
   // and the space picker. The setter accepts a subtype of string (SaveKind is a
@@ -107,16 +118,23 @@ export default function OnboardingScreen() {
     completeOnboarding();
     if (!isAuthenticated) {
       // Stash spaces so the replay hook can create them after sign-in.
-      // Only when unauthenticated — building.tsx already created them
-      // via createSpace when authenticated, so stashing here would cause
-      // the replay hook to duplicate them.
       setPendingSpaces(spaces);
       router.replace('/(auth)/sign-in');
       return;
     }
     if (!entitled) {
+      // Building/live-demo deferred creation (Pro-gated). Stash spaces so
+      // the replay hook can create them once entitlement is active. Present
+      // the paywall; if the user doesn't purchase, route to the paywall
+      // screen so a purchase path remains. Pending data is retained either
+      // way — the replay hook fires when `entitled` flips to true (after
+      // the RevenueCat webhook processes the purchase).
+      setPendingSpaces(spaces);
       await waitForSheetTransition();
-      void presentPaywall();
+      const purchased = await presentPaywall();
+      if (!purchased) {
+        router.push('/(app)/paywall');
+      }
     }
   };
 
@@ -177,10 +195,11 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === STEPS.building && <BuildingStep spaceNames={spaces} onDone={advance} />}
+          {step === STEPS.building && <BuildingStep spaceNames={spaces} entitled={entitled} onDone={advance} />}
 
           {step === STEPS.demo && (
             <LiveDemoStep
+              entitled={entitled}
               // The demo step reports the classified item up so the recap can
               // show it. If the user skips, demoItem stays null and ready shows
               // the spaces only.

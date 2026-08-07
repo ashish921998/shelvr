@@ -1,5 +1,5 @@
 steps:
-  - echo: "First-time user onboarding (9-step quiz-funnel). Requires: fresh install (no auth token, no onboarding flag in SecureStore), Metro running, dev build with ExpoStoreReview linked."
+  - echo: "First-time user onboarding (9-step quiz-funnel). Requires: fresh install (no auth token, no onboarding flag in SecureStore), Metro running, dev build with ExpoStoreReview linked, EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true in .env.local, AUTH_ENABLE_ANONYMOUS set to true on the Convex dev deployment (convex env set AUTH_ENABLE_ANONYMOUS true)."
 
   - launch: app.shelvr.save
 
@@ -61,4 +61,10 @@ steps:
   - echo: "Onboarding 9/9: Ready — tapping 'Start saving' (completes onboarding, presents paywall)."
   - tap: { text: "Start saving" }
 
-  - echo: "Onboarding complete. Paywall presented — 'Shelvr Pro' with Weekly/Monthly/Annual plans and 7-day free trial."
+  # Paywall appears after a sheet-transition delay (waitForSheetTransition ~600ms)
+  # then presentPaywall().  If the native RevenueCat UI is linked, the RC sheet
+  # shows "Shelvr Pro"; if it isn't (e.g. Expo Go), finish() routes to the
+  # fallback /(app)/paywall screen which also shows "Shelvr Pro".  Either way
+  # the text is the stable assertion target.
+  - await: { visible: "Shelvr Pro", timeout: 15000 }
+  - echo: "Onboarding complete. Paywall visible — 'Shelvr Pro' header located."

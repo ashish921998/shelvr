@@ -34,6 +34,31 @@ const SPACE_PRESETS: Record<SaveKind, string[]> = {
 const GENERIC_PRESETS = ['Read later', 'Inspiration', 'Wishlist'];
 
 /**
+ * Derive the deduped preset space names from Q2 answers, preserving first-seen
+ * order. Exported so the onboarding orchestrator can pre-select these when the
+ * user reaches the spaces step.
+ */
+export function getSpacePresets(answers: SaveKind[]): string[] {
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  for (const kind of answers) {
+    for (const name of SPACE_PRESETS[kind] ?? []) {
+      if (!seen.has(name)) {
+        seen.add(name);
+        candidates.push(name);
+      }
+    }
+  }
+  for (const name of GENERIC_PRESETS) {
+    if (!seen.has(name)) {
+      seen.add(name);
+      candidates.push(name);
+    }
+  }
+  return candidates;
+}
+
+/**
  * Step 4 — pick your spaces. Chips are pre-selected from Q2, then editable
  * (toggle, min 1). The chosen names flow to step 5 which calls `createSpace`
  * per name. This is the only step that produces real persisted state before the
