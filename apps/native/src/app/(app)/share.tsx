@@ -15,6 +15,7 @@ import {
   type ShareEntry,
   type ShareSession,
 } from '@/lib/share/storage';
+import { clearPendingShare } from '@/lib/share/pending-share-store';
 import { useSaveImages } from '@/lib/use-save-image';
 import { analytics } from '@/lib/analytics';
 import { openPaywall, useEntitlement } from '@/lib/entitlement';
@@ -264,6 +265,9 @@ export default function ShareScreen() {
   useEffect(() => {
     // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
+    // This screen owns the share now — drop any deferred-share flag so a later
+    // Home landing (after save) cannot re-open /share via the resume hook.
+    clearPendingShare();
     const userId = user._id;
     // Derived guards: while resolving, after a resolution error, or with no
     // payloads, render handles the phase — nothing for the effect to do.

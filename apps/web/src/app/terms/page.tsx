@@ -18,7 +18,7 @@ export default function TermsPage() {
         <h1 className="mt-10 font-display text-3xl sm:text-4xl text-ink">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: August 6, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: August 7, 2026</p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-7 text-ink/90">
           <section>
@@ -79,9 +79,11 @@ export default function TermsPage() {
           <section>
             <h2 className="font-semibold text-ink text-lg">6. Termination</h2>
             <p className="mt-2">
-              You can stop using Shelvr and request account deletion at any
-              time. We may suspend or terminate accounts that violate these
-              terms.
+              You can stop using Shelvr and delete your account from Profile in
+              the app at any time. Deleting your Shelvr account removes your
+              saves and identity from our servers; it does not cancel an App
+              Store subscription. We may suspend or terminate accounts that
+              violate these terms.
             </p>
           </section>
 

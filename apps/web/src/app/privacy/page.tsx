@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         <h1 className="mt-10 font-display text-3xl sm:text-4xl text-ink">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: August 6, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: August 7, 2026</p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-7 text-ink/90">
           <section>
@@ -38,25 +38,45 @@ export default function PrivacyPage() {
                 <strong>Account information.</strong> When you sign up we
                 collect your email address (and your name, if your sign-in
                 provider shares it). Authentication is handled by our backend
-                provider, Convex.
+                provider, Convex, via Sign in with Apple or Google.
               </li>
               <li>
                 <strong>Content you save.</strong> The links, notes, and images
-                you save are stored on our backend (Convex) so they sync to
-                your devices. Images are only imported when you actively pick
-                them from your camera or photo library.
+                you save — including URLs, note text, extracted page content,
+                titles, descriptions, tags, and classifications — are stored on
+                our backend (Convex) so they sync to your devices. Images are
+                only imported when you actively capture them or pick them from
+                your camera or photo library (including Tidy).
+              </li>
+              <li>
+                <strong>Photo metadata.</strong> When you import a photo that
+                contains EXIF data, Shelvr may read capture time and GPS
+                coordinates embedded in the file so the item can appear on your
+                map and be sorted by when it was taken. Shelvr does not track
+                your live device location.
+              </li>
+              <li>
+                <strong>Product-search queries.</strong> If you use “Find
+                links” on an item, a search query derived from that item may be
+                sent to our product-search provider to return shopping results.
               </li>
               <li>
                 <strong>Purchase information.</strong> If you subscribe to
                 Shelvr Pro, our payments partner RevenueCat processes your
                 purchase together with the App Store. We receive your
-                subscription status, not your payment details.
+                subscription status, not your payment card details.
+              </li>
+              <li>
+                <strong>Product analytics.</strong> We use PostHog to understand
+                feature usage (for example onboarding completion and save
+                events). Analytics are tied to your account id after sign-in and
+                are not used for advertising.
               </li>
             </ul>
             <p className="mt-3">
-              We do not collect your location, contacts, browsing history, or
-              advertising identifiers, and we do not run third-party
-              advertising or tracking SDKs.
+              We do not collect contacts, browsing history outside content you
+              choose to save, or advertising identifiers, and we do not run
+              third-party advertising SDKs.
             </p>
           </section>
 
@@ -65,11 +85,14 @@ export default function PrivacyPage() {
               How your content is processed
             </h2>
             <p className="mt-2">
-              To organize your saves, Shelvr sends the content of an item (for
-              example a page&rsquo;s text or your note) to a large language
-              model to generate a title, description, and tags. This processing
-              is automated, used only to organize your library, and is never
-              used to train models or shared for advertising.
+              To organize your saves, Shelvr may send notes, image content,
+              URLs, and extracted article text to configured AI and
+              product-search providers to generate a title, description, tags,
+              space suggestions, and optional product links. This processing is
+              automated, used only to operate Shelvr for you, and is never used
+              to train our models or shared for advertising. You choose what to
+              save; transient AI failures do not delete content you already
+              captured.
             </p>
           </section>
 
@@ -79,9 +102,9 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-2">
               We never sell your data. We share it only with the service
-              providers named above (Convex, RevenueCat, and our AI
-              processing provider), strictly to operate Shelvr, and where
-              required by law.
+              providers needed to operate Shelvr (including Convex, RevenueCat,
+              our AI provider, product-search provider, and PostHog), strictly
+              to run the product, and where required by law.
             </p>
           </section>
 
@@ -91,9 +114,13 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-2">
               Your content stays in your account until you delete it. Deleting
-              an item removes it from our backend. If you want your entire
-              account and all associated data deleted, contact us and we will
-              complete the deletion within 30 days.
+              an item removes it from our backend. You can delete your entire
+              Shelvr account from Profile in the app; that removes your saves,
+              spaces, memberships, pending uploads, subscription row, and
+              authentication records. Deleting your Shelvr account does not
+              cancel an App Store subscription — manage that in your Apple ID
+              settings. You can also email{' '}
+              <strong>support@shelvr.app</strong> for help.
             </p>
           </section>
 
