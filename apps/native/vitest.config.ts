@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 // Node is the default environment so plain-TS tests (and later Node-only
@@ -8,7 +9,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@convex": new URL("./convex", import.meta.url).pathname,
+      "@convex": fileURLToPath(new URL("./convex", import.meta.url)),
     },
   },
   test: {
