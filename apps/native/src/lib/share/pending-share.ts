@@ -26,16 +26,6 @@ export function hasPendingShare(store: PendingShareStore): boolean {
   return value === '1';
 }
 
-/**
- * Consumes a pending share flag. Returns true exactly once per mark so the
- * resume navigation cannot loop if the share screen later redirects home.
- */
-export function consumePendingShare(store: PendingShareStore): boolean {
-  if (!hasPendingShare(store)) return false;
-  store.setItem(PENDING_SHARE_KEY, '');
-  return true;
-}
-
 /** Drops any pending share flag without resuming (e.g. user cancelled). */
 export function clearPendingShare(store: PendingShareStore): void {
   store.setItem(PENDING_SHARE_KEY, '');

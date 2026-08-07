@@ -1,12 +1,13 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { convexTest, type TestConvexForDataModel } from "convex-test";
 
 import { api } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
@@ -168,6 +169,63 @@ describe("deleteCurrentUserAccount", () => {
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
       ).toBeNull();
     });
+  });
+
+  it("drains accounts larger than one batch via scheduled continuations", async () => {
+    // The continuation mutation validates `userId: v.id("users")`, so this
+    // test needs a real users row (a synthetic string subject won't do).
+    vi.useFakeTimers();
+    try {
+      const backend = convexTest(schema, modules);
+      const { userId, sessionId } = await backend.run(async (ctx) => {
+        const userId = await ctx.db.insert("users", {
+          email: "big@example.com",
+        });
+        const sessionId = await ctx.db.insert("authSessions", {
+          userId,
+          expirationTime: Date.now() + 60_000,
+        });
+        for (let i = 0; i < DELETE_BATCH + 1; i++) {
+          await ctx.db.insert("items", {
+            userId: userId as string,
+            type: "note",
+            status: "ready",
+            tags: [],
+            searchText: `note ${i}`,
+            note: `note ${i}`,
+          });
+        }
+        await ctx.db.insert("subscriptions", {
+          userId: userId as string,
+          status: "pro",
+          expiresAt: Date.now() + 60_000,
+          updatedAt: Date.now(),
+        });
+        return { userId, sessionId };
+      });
+
+      const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+
+      await backend.run(async (ctx) => {
+        expect(
+          await ctx.db
+            .query("items")
+            .withIndex("by_user", (q) => q.eq("userId", userId as string))
+            .collect(),
+        ).toHaveLength(0);
+        expect(
+          await ctx.db
+            .query("subscriptions")
+            .withIndex("by_user", (q) => q.eq("userId", userId as string))
+            .unique(),
+        ).toBeNull();
+        expect(await ctx.db.get(userId)).toBeNull();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not delete another user's data", async () => {

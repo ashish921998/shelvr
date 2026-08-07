@@ -117,9 +117,12 @@ export default function PrivacyPage() {
               an item removes it from our backend. You can delete your entire
               Shelvr account from Profile in the app; that removes your saves,
               spaces, memberships, pending uploads, subscription row, and
-              authentication records. Deleting your Shelvr account does not
-              cancel an App Store subscription — manage that in your Apple ID
-              settings. You can also email{' '}
+              authentication records. Product analytics events already
+              recorded in PostHog are not automatically erased by in-app
+              deletion; email <strong>support@shelvr.app</strong> to request
+              deletion of analytics data linked to your account. Deleting your
+              Shelvr account does not cancel an App Store subscription —
+              manage that in your Apple ID settings. You can also email{' '}
               <strong>support@shelvr.app</strong> for help.
             </p>
           </section>

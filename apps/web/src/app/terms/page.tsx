@@ -81,9 +81,10 @@ export default function TermsPage() {
             <p className="mt-2">
               You can stop using Shelvr and delete your account from Profile in
               the app at any time. Deleting your Shelvr account removes your
-              saves and identity from our servers; it does not cancel an App
-              Store subscription. We may suspend or terminate accounts that
-              violate these terms.
+              saves and sign-in identity from our backend (see the Privacy
+              Policy for how third-party analytics data is handled); it does
+              not cancel an App Store subscription. We may suspend or
+              terminate accounts that violate these terms.
             </p>
           </section>
 

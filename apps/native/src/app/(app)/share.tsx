@@ -66,9 +66,17 @@ const shareStore: SessionStoreAdapter = createMMKV({ id: 'incoming-share' });
  *
  * `clearFailed` is the escape hatch for the throwing-native-clear window: the
  * completed session is retained (so a remount retries the clear) but the user
- * gets a manual "Try again" / "Cancel" rather than an eternal spinner. */
+ * gets a manual "Try again" / "Cancel" rather than an eternal spinner.
+ *
+ * `locked` is the Pro-gate state. Saving is Pro-gated, so an unentitled user
+ * sharing into Shelvr reaches the paywall instead of a save. If they purchase,
+ * the entitlement flips and the save starts; if they cancel, this phase keeps
+ * the screen on an explicit "Unlock Pro / Cancel" gate rather than falling
+ * through to the terminal "Saved to Shelvr" spinner (which would otherwise
+ * claim a save that never happened). */
 type Phase =
   | { kind: 'idle' }
+  | { kind: 'locked' }
   | { kind: 'saving'; session: ShareSession }
   | { kind: 'partial'; session: ShareSession }
   | { kind: 'clearFailed'; session: ShareSession }
@@ -154,6 +162,16 @@ export default function ShareScreen() {
       //    silently dropped. Scoped so a stale in-flight run can't delete the
       //    newer session that replaced its record.
       deleteSession(shareStore, sid);
+      // The share handoff is durable now — drop the deferred-share flag so the
+      // resume hook can't re-open /share after we land Home. Kept this late so
+      // a process death mid-share still resumes on next launch.
+      try {
+        clearPendingShare();
+      } catch (err) {
+        // The share is already complete; a SecureStore failure must not trap
+        // the user on this screen or prevent navigation home.
+        console.error('Could not clear pending share marker', err);
+      }
       // 4. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === 'saved')) {
         analytics.capture('shared_content_saved', {
@@ -180,8 +198,11 @@ export default function ShareScreen() {
       if (runningSessionId.current === session.sessionId) return;
       if (entitlementLoading) return;
       // Saving is Pro — a lapsed user sharing into Shelvr is routed to the
-      // paywall instead of failing every entry against the server gate.
+      // paywall instead of failing every entry against the server gate. Set
+      // the locked phase BEFORE presenting so a cancel lands on the explicit
+      // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
       if (!entitled) {
+        setPhase({ kind: 'locked' });
         void openPaywall(router);
         return;
       }
@@ -265,9 +286,9 @@ export default function ShareScreen() {
   useEffect(() => {
     // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
-    // This screen owns the share now — drop any deferred-share flag so a later
-    // Home landing (after save) cannot re-open /share via the resume hook.
-    clearPendingShare();
+    // NOTE: the deferred-share flag is cleared in completeSession/abandon (the
+    // durable handoff points), NOT here — a process death mid-share must still
+    // resume the share on next launch.
     const userId = user._id;
     // Derived guards: while resolving, after a resolution error, or with no
     // payloads, render handles the phase — nothing for the effect to do.
@@ -365,6 +386,14 @@ export default function ShareScreen() {
    * share resume the canceled work instead of starting fresh. */
   const abandon = useCallback(() => {
     deleteSession(shareStore);
+    // Explicit user discard — the deferred-share flag must not resurrect this.
+    try {
+      clearPendingShare();
+    } catch (err) {
+      // Best-effort: abandoning the share must still clear native payloads and
+      // leave the screen if SecureStore is temporarily unavailable.
+      console.error('Could not clear pending share marker', err);
+    }
     try {
       clearSharedPayloads();
     } catch {
@@ -380,6 +409,36 @@ export default function ShareScreen() {
   // until it resolves.
   if (entitlementLoading && phase.kind === 'idle') {
     return <Centered label="Checking subscription…" spinner theme={theme} />;
+  }
+
+  // Pro gate: an unentitled user sharing into Shelvr reached the paywall and
+  // (on cancel) landed here. Do NOT fall through to the terminal "Saved to
+  // Shelvr" spinner — the save never happened. Offer Unlock Pro or Cancel.
+  if (phase.kind === 'locked') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title(theme)}>Unlock Shelvr Pro</Text>
+        <Text style={styles.subtitle(theme)}>
+          Saving shared content is a Pro feature. Start a free trial to save it
+          to your hub.
+        </Text>
+        <View style={styles.actions}>
+          <Button
+            label="Cancel"
+            theme={theme}
+            onPress={() => abandon()}
+          />
+          <Button
+            label="Unlock Pro"
+            theme={theme}
+            primary
+            onPress={() => {
+              void openPaywall(router);
+            }}
+          />
+        </View>
+      </View>
+    );
   }
 
   // Derived resolution states take precedence over the session-driven phases

@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   clearPendingShare,
-  consumePendingShare,
   decidePostAuthRoute,
   decideShareRoute,
   hasPendingShare,
   markPendingShare,
   PENDING_SHARE_KEY,
   type PendingShareStore,
-} from './pending-share';
+} from '@/lib/share/pending-share';
 
 function memoryStore(initial: Record<string, string> = {}): PendingShareStore {
   const map = new Map(Object.entries(initial));
@@ -22,25 +21,20 @@ function memoryStore(initial: Record<string, string> = {}): PendingShareStore {
 }
 
 describe('pending share flag', () => {
-  it('marks, reports, and consumes a pending share exactly once', () => {
+  it('marks and reports a pending share', () => {
     const store = memoryStore();
     expect(hasPendingShare(store)).toBe(false);
 
     markPendingShare(store);
     expect(hasPendingShare(store)).toBe(true);
     expect(store.getItem(PENDING_SHARE_KEY)).toBe('1');
-
-    expect(consumePendingShare(store)).toBe(true);
-    expect(hasPendingShare(store)).toBe(false);
-    expect(consumePendingShare(store)).toBe(false);
   });
 
-  it('clearPendingShare drops the flag without resuming', () => {
+  it('clearPendingShare drops the flag', () => {
     const store = memoryStore();
     markPendingShare(store);
     clearPendingShare(store);
     expect(hasPendingShare(store)).toBe(false);
-    expect(consumePendingShare(store)).toBe(false);
   });
 });
 

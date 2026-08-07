@@ -10,7 +10,12 @@ import { markPendingShare } from '@/lib/share/pending-share-store';
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
   try {
     if (new URL(path).hostname === 'expo-sharing') {
-      markPendingShare();
+      try {
+        markPendingShare();
+      } catch {
+        // Best-effort: a SecureStore failure loses only the resume flag —
+        // it must not stop this recognized share from routing to /share.
+      }
       return '/share';
     }
   } catch {

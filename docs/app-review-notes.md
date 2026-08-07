@@ -7,7 +7,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
 - Reviewer path: complete onboarding → sign in with Apple → Home.
-- If a dedicated reviewer Apple ID is provided in App Store Connect, use that. Otherwise Sign in with Apple on the review device is sufficient.
+- Provide a dedicated demo Google account in App Store Connect → App Review Information (sign-in required apps must not rely on the reviewer's personal Apple ID / Google account). Enter the credentials in App Store Connect only — never in this repo or the app binary.
 - Anonymous / “Continue without account” is **dev-only** and disabled in production builds.
 
 ## Onboarding

@@ -97,15 +97,28 @@ export default function ProfileScreen() {
               if (deleting) return;
               setDeleting(true);
               try {
-                await deleteAccount({});
-                await signOut();
-                analytics.reset();
-              } catch (err) {
-                console.error('Account deletion failed', err);
-                Alert.alert(
-                  'Couldn’t delete account',
-                  'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
-                );
+                try {
+                  await deleteAccount({});
+                } catch (err) {
+                  console.error('Account deletion failed', err);
+                  Alert.alert(
+                    'Couldn’t delete account',
+                    'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
+                  );
+                  return;
+                }
+                // The account is gone server-side; local cleanup is best-effort
+                // and must never be reported as a deletion failure.
+                try {
+                  await signOut();
+                } catch (err) {
+                  console.error('Sign-out after account deletion failed', err);
+                }
+                try {
+                  analytics.reset();
+                } catch (err) {
+                  console.error('Analytics reset after account deletion failed', err);
+                }
               } finally {
                 setDeleting(false);
               }

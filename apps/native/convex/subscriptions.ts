@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 
@@ -110,6 +111,17 @@ export const upsertSubscription = internalMutation({
       (args.eventTimestampMs === undefined ||
         args.eventTimestampMs <= existing.eventTimestampMs)
     ) {
+      return null;
+    }
+
+    // Account deletion removes the users row but deliberately does NOT cancel
+    // the App Store subscription, so RevenueCat keeps sending renewal/
+    // expiration events for the deleted account. Acknowledge the event (so
+    // RevenueCat stops retrying) but do not insert or patch a row — otherwise
+    // a renewal webhook resurrects an entitlement for a user who no longer
+    // exists. The userId here is the Convex Auth users-table document id.
+    const owner = await ctx.db.get(args.userId as Id<"users">);
+    if (owner === null) {
       return null;
     }
 

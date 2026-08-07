@@ -1139,11 +1139,26 @@ describe("Pro entitlement gate", () => {
     expect(ent.expiresAt).toBeUndefined();
   });
 
+  /** upsertSubscription ignores events for users whose row no longer exists
+   * (post-account-deletion webhooks), so webhook-ordering tests need a real
+   * users row. The identity subject is that row's id, matching what
+   * requireUserId derives for `getEntitlement`. */
+  async function asWebhookUser(): Promise<{ t: TestCtx; userId: string }> {
+    const backend = convexTest(schema, modules);
+    const userId = await backend.run(async (ctx) => {
+      return (await ctx.db.insert("users", {})) as string;
+    });
+    return {
+      t: backend.withIdentity({ subject: `${userId}|session-1` }),
+      userId,
+    };
+  }
+
   it("upsertSubscription is idempotent and won't regress a newer expiry", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 2000,
@@ -1151,7 +1166,7 @@ describe("Pro entitlement gate", () => {
     // A stale EXPIRATION event with an earlier event timestamp must not
     // regress the row, even though its expiry is earlier.
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc",
+      userId,
       status: "lapsed",
       expiresAt: farFuture - 1000,
       eventTimestampMs: 1000,
@@ -1162,18 +1177,16 @@ describe("Pro entitlement gate", () => {
   });
 
   it("ignores an older active event instead of shortening access", async () => {
-    const t = convexTest(schema, modules).withIdentity({
-      subject: "rc-active",
-    });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-active",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 2000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-active",
+      userId,
       status: "pro",
       expiresAt: farFuture - 1000,
       productId: "stale-product",
@@ -1185,18 +1198,16 @@ describe("Pro entitlement gate", () => {
   });
 
   it("ignores a timestamp-less event after ordered state exists", async () => {
-    const t = convexTest(schema, modules).withIdentity({
-      subject: "rc-no-timestamp",
-    });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-no-timestamp",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 2000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-no-timestamp",
+      userId,
       status: "lapsed",
       expiresAt: farFuture - 1000,
     });
@@ -1206,17 +1217,17 @@ describe("Pro entitlement gate", () => {
   });
 
   it("a newer refund event can move expiry backward", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-refund" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-refund",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
     // A newer EXPIRATION event shortens the period (e.g. a refund).
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-refund",
+      userId,
       status: "lapsed",
       expiresAt: farFuture - 1000,
       eventTimestampMs: 2000,
@@ -1227,16 +1238,16 @@ describe("Pro entitlement gate", () => {
   });
 
   it("an equal-timestamp event is dropped (not strictly newer)", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-eq" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-eq",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-eq",
+      userId,
       status: "lapsed",
       expiresAt: farFuture - 1000,
       eventTimestampMs: 1000,
@@ -1247,10 +1258,10 @@ describe("Pro entitlement gate", () => {
   });
 
   it("identical event replay is idempotent", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-replay" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     const event = {
-      userId: "rc-replay",
+      userId,
       status: "pro" as const,
       expiresAt: farFuture,
       eventTimestampMs: 1000,
@@ -1265,10 +1276,10 @@ describe("Pro entitlement gate", () => {
   });
 
   it("omitted status preserves the existing status", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-cancel" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-cancel",
+      userId,
       status: "trialing",
       expiresAt: farFuture,
       eventTimestampMs: 1000,
@@ -1276,7 +1287,7 @@ describe("Pro entitlement gate", () => {
     // A CANCELLATION event (status omitted) preserves `trialing` but
     // refreshes expiresAt from the event.
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-cancel",
+      userId,
       expiresAt: farFuture + 1000,
       eventTimestampMs: 2000,
     });
@@ -1286,17 +1297,17 @@ describe("Pro entitlement gate", () => {
   });
 
   it("an event with no expiry preserves the existing expiresAt", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-noexp" });
+    const { t, userId } = await asWebhookUser();
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-noexp",
+      userId,
       status: "pro",
       expiresAt: farFuture,
       eventTimestampMs: 1000,
     });
     // An event with expiresAt=0 preserves the existing expiresAt.
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "rc-noexp",
+      userId,
       expiresAt: 0,
       eventTimestampMs: 2000,
     });
@@ -1317,16 +1328,16 @@ describe("Pro entitlement gate", () => {
   });
 
   it("lapses an existing subscription while retaining its expiration", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "expired" });
+    const { t, userId } = await asWebhookUser();
     const periodEnd = Date.now() - 1000;
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "expired",
+      userId,
       status: "pro",
       expiresAt: periodEnd,
       eventTimestampMs: 1000,
     });
     await t.mutation(internal.subscriptions.upsertSubscription, {
-      userId: "expired",
+      userId,
       status: "lapsed",
       expiresAt: periodEnd,
       eventTimestampMs: 2000,

@@ -6,11 +6,10 @@
 import * as SecureStore from 'expo-secure-store';
 import {
   clearPendingShare as clearPendingSharePure,
-  consumePendingShare as consumePendingSharePure,
   hasPendingShare as hasPendingSharePure,
   markPendingShare as markPendingSharePure,
   type PendingShareStore,
-} from './pending-share';
+} from '@/lib/share/pending-share';
 
 const secureStore: PendingShareStore = {
   getItem: (key) => {
@@ -28,10 +27,6 @@ export function markPendingShare(): void {
 
 export function hasPendingShare(): boolean {
   return hasPendingSharePure(secureStore);
-}
-
-export function consumePendingShare(): boolean {
-  return consumePendingSharePure(secureStore);
 }
 
 export function clearPendingShare(): void {

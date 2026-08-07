@@ -9,7 +9,7 @@
  * truth for current offerings. Restore Purchases is available via the native
  * paywall and Customer Center once the SDK is reachable again.
  */
-import { openPaywall } from '@/lib/entitlement';
+import { openPaywall, waitForSheetTransition } from '@/lib/entitlement';
 import { LEGAL_URLS } from '@/lib/legal';
 import { useRouter } from 'expo-router';
 import { Linking, Pressable, Text, View } from 'react-native';
@@ -30,6 +30,10 @@ export default function PaywallScreen() {
         onPress={() => {
           void (async () => {
             router.back();
+            // This screen is a formSheet — UIKit refuses to present RC's
+            // paywall while the dismissal is still animating, which would
+            // map to 'unavailable' and bounce right back here.
+            await waitForSheetTransition();
             await openPaywall(router);
           })();
         }}

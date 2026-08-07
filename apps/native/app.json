@@ -19,6 +19,7 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Shelvr uses your camera so you can capture things you want to save for later.",
+        "NSMicrophoneUsageDescription": "Shelvr does not record audio. This permission is declared because the camera library we use includes audio support; Shelvr never activates the microphone.",
         "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
         "NSPhotoLibraryAddUsageDescription": "Shelvr can save images back to your photo library.",
         "ITSAppUsesNonExemptEncryption": false
