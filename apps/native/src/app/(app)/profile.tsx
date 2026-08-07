@@ -98,8 +98,13 @@ export default function ProfileScreen() {
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         onPress={async () => {
+          // Signing out flips `(app)`'s `isAuthenticated` guard, which renders
+          // `<Redirect href="/(auth)/sign-in" />` and unmounts this sheet. Calling
+          // `router.back()` here races that redirect — the `(app)` navigator is
+          // already gone, so the back action has no navigator to handle it and
+          // throws "GO_BACK was not handled by any navigator". Let the auth
+          // redirect own the navigation.
           await signOut();
-          router.back();
         }}
       >
         <Text style={styles.signOutText}>Sign out</Text>

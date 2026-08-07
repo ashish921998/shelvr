@@ -1,5 +1,5 @@
 import { api } from '@convex/_generated/api';
-import { useMutation } from 'convex/react';
+import { useConvexAuth, useMutation } from 'convex/react';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -23,6 +23,7 @@ export function BuildingStep({
   onDone: () => void;
 }) {
   const { theme } = useUnistyles();
+  const { isAuthenticated } = useConvexAuth();
   const createSpace = useMutation(api.spaces.createSpace);
   const startedRef = useRef(false);
   const [line, setLine] = useState(ROTATING_LINES[0]);
@@ -39,17 +40,21 @@ export function BuildingStep({
     return () => clearInterval(id);
   }, []);
 
-  // Fire all createSpace calls once. Failures are swallowed: a flaky network
-  // can't strand the user here. `Promise.allSettled` waits for every attempt,
-  // then the min-duration guard advances the step.
+  // Fire all createSpace calls once. When unauthenticated (pre-sign-in
+  // onboarding), skip mutations entirely — spaces will be replayed after
+  // sign-in by the pending-onboarding hook. Failures are swallowed: a flaky
+  // network can't strand the user here.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
 
     const start = Date.now();
-    const create = Promise.allSettled(
-      spaceNames.map((name) => createSpace({ name }).catch(() => undefined)),
-    );
+    const create =
+      isAuthenticated
+        ? Promise.allSettled(
+            spaceNames.map((name) => createSpace({ name }).catch(() => undefined)),
+          )
+        : Promise.resolve();
 
     let done = false;
     const advance = () => {
@@ -68,7 +73,7 @@ export function BuildingStep({
       advance();
     });
     return () => clearTimeout(cap);
-  }, [spaceNames, createSpace, onDone]);
+  }, [spaceNames, createSpace, onDone, isAuthenticated]);
 
   return (
     <View style={styles.wrap}>

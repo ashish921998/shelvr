@@ -9,18 +9,20 @@ import { SurveyStep } from '@/components/onboarding/survey';
 import type { FeedItem } from '@/components/item-card';
 import { presentPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
+import { setPendingSpaces } from '@/lib/pending-onboarding';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import Animated, { SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 
 // Onboarding v2 — a 9-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
-// a thin progress bar, and Reanimated enter/exit transitions between the step
-// components. Each step owns its own CTA copy and advance condition; the
-// orchestrator hands them `advance`/`finish` and the shared state.
+// a thin progress bar, and step transitions between the step components.
+// Each step owns its own CTA copy and advance condition; the orchestrator
+// hands them `advance`/`finish` and the shared state.
 //
 // Order: promise → survey Q1 → survey Q2 → space picker → building → live demo
 // → permissions → rate → ready → (paywall). Sign-in stays first (the route is
@@ -71,8 +73,10 @@ const LAST_PROGRESS_STEP = STEPS.rate; // 7
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { completeOnboarding } = useOnboarding();
   const { entitled } = useEntitlement();
+  const { isAuthenticated } = useConvexAuth();
 
   const [step, setStep] = useState<number>(STEPS.promise);
   const [q1, setQ1] = useState<string[]>([]);
@@ -101,6 +105,15 @@ export default function OnboardingScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     completeOnboarding();
+    if (!isAuthenticated) {
+      // Stash spaces so the replay hook can create them after sign-in.
+      // Only when unauthenticated — building.tsx already created them
+      // via createSpace when authenticated, so stashing here would cause
+      // the replay hook to duplicate them.
+      setPendingSpaces(spaces);
+      router.replace('/(auth)/sign-in');
+      return;
+    }
     if (!entitled) {
       await waitForSheetTransition();
       void presentPaywall();
@@ -117,20 +130,12 @@ export default function OnboardingScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={[styles.barWrap, !showBar && styles.barHidden]}>
-        <Animated.View
-          // Animate width as the step changes — the bar grows across the quiz.
+        <View
           style={[styles.bar, { width: `${Math.round(progress * 100)}%` }]}
         />
       </View>
 
-      {/* keying on `step` makes Reanimated mount each screen fresh so the
-          SlideInRight / SlideOutLeft enter/exit pair runs on every transition. */}
-      <Animated.View
-        key={step}
-        entering={SlideInRight.duration(280).springify().damping(26).stiffness(260)}
-        exiting={SlideOutLeft.duration(200)}
-        style={styles.screen}
-      >
+      <View style={styles.screen}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
@@ -192,7 +197,7 @@ export default function OnboardingScreen() {
             <ReadyStep spaceNames={spaces} demoItem={demoItem} onFinish={finish} />
           )}
         </ScrollView>
-      </Animated.View>
+      </View>
     </View>
   );
 }

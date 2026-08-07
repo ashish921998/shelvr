@@ -20,6 +20,7 @@ import { StyleSheet } from 'react-native-unistyles';
 export default function Page() {
   const { signIn } = useAuthActions();
   const [pending, setPending] = React.useState<string | null>(null);
+  const [lastError, setLastError] = React.useState<string | null>(null);
 
   const handleOAuth = async (provider: string) => {
     setPending(provider);
@@ -38,7 +39,15 @@ export default function Page() {
       if (!code) return;
       await signIn(provider, { code });
     } catch (err) {
-      console.error(`${provider} sign-in failed`, err);
+      // Surface the full error shape — Convex wraps server errors with
+      // `.message` and sometimes `.data`; logging the whole object helps
+      // diagnose auth failures (expired tickets, provider misconfig, etc.).
+      const detail =
+        err instanceof Error
+          ? `${err.name}: ${err.message}${(err as any).data ? ` | data=${JSON.stringify((err as any).data)}` : ''}`
+          : JSON.stringify(err);
+      console.error(`${provider} sign-in failed`, detail, err);
+      setLastError(detail);
     } finally {
       setPending(null);
     }
@@ -48,47 +57,61 @@ export default function Page() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>shelvr</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
+      <View style={styles.center}>
+        <View style={styles.header}>
+          <Text style={styles.title}>shelvr</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+        </View>
 
-      <View style={styles.buttons}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.appleButton,
-            pending !== null && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={() => handleOAuth('apple')}
-          disabled={pending !== null}
-        >
-          <Text style={styles.appleButtonText}> Continue with Apple</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.googleButton,
-            pending !== null && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={() => handleOAuth('google')}
-          disabled={pending !== null}
-        >
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </Pressable>
-        {anonEnabled && (
+        <View style={styles.buttons}>
           <Pressable
-            testID="dev-login-button"
             style={({ pressed }) => [
               styles.appleButton,
               pending !== null && styles.buttonDisabled,
               pressed && styles.buttonPressed,
             ]}
-            onPress={() => handleOAuth('anonymous')}
+            onPress={() => handleOAuth('apple')}
             disabled={pending !== null}
           >
-            <Text style={styles.appleButtonText}>🔧 Continue without account</Text>
+            <Text style={styles.appleButtonText}>Continue with Apple</Text>
           </Pressable>
-        )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.googleButton,
+              pending !== null && styles.buttonDisabled,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => handleOAuth('google')}
+            disabled={pending !== null}
+          >
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </Pressable>
+          {anonEnabled && (
+            <Pressable
+              testID="dev-login-button"
+              style={({ pressed }) => [
+                styles.devButton,
+                pending !== null && styles.buttonDisabled,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => handleOAuth('anonymous')}
+              disabled={pending !== null}
+            >
+              <Text style={styles.devButtonText}>Continue without account</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      <Text style={styles.terms}>
+        By continuing you agree to our Terms and acknowledge our Privacy Policy.
+      </Text>
+
+      {lastError !== null && (
+        <Text selectable style={styles.error}>
+          {lastError}
+        </Text>
+      )}
     </View>
   );
 }
@@ -97,8 +120,20 @@ const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     padding: theme.gap(2.5),
-    paddingTop: rt.insets.top + theme.gap(8),
+    paddingTop: rt.insets.top + theme.gap(3),
+    paddingBottom: theme.gap(2),
     alignItems: 'center',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: theme.gap(8),
+  },
+  header: {
+    alignItems: 'center',
+    gap: theme.gap(1),
   },
   title: {
     fontFamily: theme.fonts.display,
@@ -108,18 +143,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   subtitle: {
     fontFamily: theme.fonts.regular,
     fontSize: 16,
-    color: theme.colors.foreground,
-    marginTop: theme.gap(1),
+    color: theme.colors.muted,
   },
   buttons: {
     alignSelf: 'stretch',
-    gap: theme.gap(1.5),
-    marginTop: theme.gap(6),
+    gap: theme.gap(2),
   },
   appleButton: {
     backgroundColor: theme.colors.foreground,
-    paddingVertical: theme.gap(1.75),
-    borderRadius: 12,
+    paddingVertical: theme.gap(2),
+    borderRadius: 14,
     alignItems: 'center',
   },
   appleButtonText: {
@@ -131,14 +164,40 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingVertical: theme.gap(1.75),
-    borderRadius: 12,
+    paddingVertical: theme.gap(2),
+    borderRadius: 14,
     alignItems: 'center',
   },
   googleButtonText: {
     color: theme.colors.foreground,
     fontFamily: theme.fonts.medium,
     fontSize: 16,
+  },
+  devButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: theme.gap(1.25),
+    alignItems: 'center',
+    marginTop: theme.gap(0.5),
+  },
+  devButtonText: {
+    color: theme.colors.muted,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+  },
+  terms: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.faint,
+    textAlign: 'center',
+    paddingHorizontal: theme.gap(4),
+    marginBottom: theme.gap(2),
+  },
+  error: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    color: theme.colors.danger,
+    fontSize: 12,
   },
   buttonDisabled: {
     opacity: 0.5,

@@ -4,7 +4,7 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
+import { useConvexAuth, useMutation } from 'convex/react';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -16,11 +16,14 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { setPendingDemoUrl } from '@/lib/pending-onboarding';
 
-// Step 6 — the gotcha. "Paste any link — watch Shelvr file it." This is the real
-// processItem pipeline: createLinkItem inserts a row, getItem subscribes, and
-// the reveal (title/tags/space) appears as status flips processing → ready. The
-// same ItemCard the home feed uses renders the result, so nothing is faked.
+// Step 6 — the gotcha. "Paste any link — watch Shelvr file it." Post-auth, this
+// is the real processItem pipeline: createLinkItem inserts a row, getItem
+// subscribes, and the reveal (title/tags/space) appears as status flips
+// processing → ready. Pre-auth (onboarding before sign-in), the URL is stashed
+// for replay and a static canned "filed" card is shown — no mock FeedItem, no
+// fake id, no ItemCard impersonating a real save.
 
 // Curated sample links — each is a real, classifiable page that exercises the
 // pipeline end to end (fetch → readability → tag → file). Kept generic so they
@@ -32,6 +35,9 @@ const SAMPLE_LINKS: { label: string; url: string }[] = [
 ];
 
 const TIMEOUT_MS = 15_000;
+const SIMULATED_PROCESSING_MS = 2500;
+
+type DemoPhase = 'input' | 'processing' | 'reveal';
 
 export function LiveDemoStep({
   onReady,
@@ -41,11 +47,13 @@ export function LiveDemoStep({
   onAdvance: () => void;
 }) {
   const { theme } = useUnistyles();
+  const { isAuthenticated } = useConvexAuth();
   const createLinkItem = useMutation(api.items.createLinkItem);
   const [url, setUrl] = useState('');
   const [itemId, setItemId] = useState<Id<'items'> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<DemoPhase>('input');
   const advancedRef = useRef(false);
 
   // Subscribe to the item once we have an id — re-renders as the AI pipeline
@@ -62,6 +70,7 @@ export function LiveDemoStep({
   useEffect(() => {
     if (item && item.status === 'ready' && !liftedRef.current) {
       liftedRef.current = true;
+      setPhase('reveal');
       onReady({
         _id: item._id,
         type: item.type,
@@ -83,8 +92,9 @@ export function LiveDemoStep({
     onAdvance();
   };
 
-  // 15s safety net: if the pipeline hasn't gone ready, show a friendly "still
-  // working" message and advance. Never strand the user on a hung classification.
+  // 15s safety net: if the real pipeline hasn't gone ready, show a friendly
+  // "still working" message and advance. Never strand the user on a hung
+  // classification. Only runs for the post-auth path (itemId !== null).
   useEffect(() => {
     if (itemId === null) return;
     const id = setTimeout(() => {
@@ -94,18 +104,36 @@ export function LiveDemoStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId]);
 
+  // Pre-auth: after a brief processing beat, transition to the static reveal.
+  // The real save happens after sign-in via the replay hook.
+  useEffect(() => {
+    if (phase !== 'processing' || isAuthenticated) return;
+    const id = setTimeout(() => setPhase('reveal'), SIMULATED_PROCESSING_MS);
+    return () => clearTimeout(id);
+  }, [phase, isAuthenticated]);
+
   const submit = async (rawUrl: string) => {
     const trimmed = rawUrl.trim();
     if (trimmed === '' || submitting) return;
     setSubmitting(true);
     setError(null);
     setUrl(trimmed);
+    setPhase('processing');
+
+    // Pre-auth onboarding: stash the URL for replay after sign-in, then
+    // show the processing → static reveal animation.
+    if (!isAuthenticated) {
+      setPendingDemoUrl(trimmed);
+      return;
+    }
+
     try {
       const id = await createLinkItem({ url: trimmed });
       setItemId(id);
     } catch {
       setError('Could not save that link. Try another, or skip.');
       setSubmitting(false);
+      setPhase('input');
     }
   };
 
@@ -114,45 +142,28 @@ export function LiveDemoStep({
     if (clipped.trim() !== '') setUrl(clipped.trim());
   };
 
-  // ---- Reveal state: item is ready, show the classified card ----
-  if (item && item.status === 'ready') {
-    const feedItem: FeedItem = {
-      _id: item._id,
-      type: item.type,
-      status: item.status,
-      title: item.title,
-      url: item.url,
-      siteName: item.siteName,
-      heroImageUrl: item.heroImageUrl,
-      imageUrl: item.imageUrl,
-      aspectRatio: item.aspectRatio,
-      tags: item.tags,
-    };
-    return (
-      <View style={styles.wrap}>
-        <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
-          Filed.
-        </Animated.Text>
-        <Animated.Text entering={FadeInDown.delay(60).duration(400)} style={styles.support}>
-          That&apos;s Shelvr. Every save gets a title, tags, and a home.
-        </Animated.Text>
-
-        <Animated.View entering={FadeIn.duration(300)} style={styles.reveal}>
-          <ItemCard item={feedItem} />
-        </Animated.View>
-
-        <View style={styles.footer}>
-          <Pressable style={styles.skipRow} onPress={advance}>
-            <Text style={styles.continueText}>Continue</Text>
-            <Icon name="chevron.right" size={14} tintColor={theme.colors.primary} />
-          </Pressable>
-        </View>
-      </View>
-    );
+  // ---- Reveal state: item is ready (post-auth) or static demo (pre-auth) ----
+  if (phase === 'reveal') {
+    const revealItem: FeedItem | undefined =
+      item && item.status === 'ready'
+        ? {
+            _id: item._id,
+            type: item.type,
+            status: item.status,
+            title: item.title,
+            url: item.url,
+            siteName: item.siteName,
+            heroImageUrl: item.heroImageUrl,
+            imageUrl: item.imageUrl,
+            aspectRatio: item.aspectRatio,
+            tags: item.tags,
+          }
+        : undefined;
+    return <DemoReveal item={revealItem} onAdvance={advance} />;
   }
 
   // ---- Processing state: shimmer while the pipeline runs ----
-  if (itemId !== null) {
+  if (phase === 'processing') {
     return (
       <View style={styles.wrap}>
         <Text style={styles.headline}>Watch Shelvr file a save.</Text>
@@ -225,6 +236,62 @@ export function LiveDemoStep({
         <Pressable onPress={advance}>
           <Text style={styles.skipText}>Skip for now</Text>
         </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reveal — shared by the real (post-auth) and static (pre-auth) paths.
+// Renders an ItemCard when a real FeedItem is available; otherwise a canned
+// DemoCard that shows what a filed save looks like without impersonating one.
+// ---------------------------------------------------------------------------
+
+function DemoReveal({
+  item,
+  onAdvance,
+}: {
+  item?: FeedItem;
+  onAdvance: () => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.wrap}>
+      <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
+        Filed.
+      </Animated.Text>
+      <Animated.Text entering={FadeInDown.delay(60).duration(400)} style={styles.support}>
+        That&apos;s Shelvr. Every save gets a title, tags, and a home.
+      </Animated.Text>
+
+      <Animated.View entering={FadeIn.duration(300)} style={styles.reveal}>
+        {item ? <ItemCard item={item} /> : <DemoCard />}
+      </Animated.View>
+
+      <View style={styles.footer}>
+        <Pressable style={styles.skipRow} onPress={onAdvance}>
+          <Text style={styles.continueText}>Continue</Text>
+          <Icon name="chevron.right" size={14} tintColor={theme.colors.primary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// A static, curated card showing what a "filed" save looks like. Deliberately
+// not a FeedItem — no _id, no ItemCard — so it can never be mistaken for a
+// real database row or navigated to a detail screen.
+function DemoCard() {
+  return (
+    <View style={styles.demoCard}>
+      <Text style={styles.demoTitle}>Your save, filed</Text>
+      <View style={styles.demoTags}>
+        <View style={styles.demoTag}>
+          <Text style={styles.demoTagText}>Inspiration</Text>
+        </View>
+        <View style={styles.demoTag}>
+          <Text style={styles.demoTagText}>Read later</Text>
+        </View>
       </View>
     </View>
   );
@@ -350,5 +417,33 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 15,
     color: theme.colors.muted,
+  },
+  demoCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderCurve: 'continuous',
+    padding: theme.gap(2),
+    gap: theme.gap(1.5),
+  },
+  demoTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 17,
+    color: theme.colors.foreground,
+  },
+  demoTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.gap(1),
+  },
+  demoTag: {
+    backgroundColor: theme.colors.primarySoft,
+    paddingVertical: theme.gap(0.5),
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: 50,
+  },
+  demoTagText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 13,
+    color: theme.colors.primaryText,
   },
 }));

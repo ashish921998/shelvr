@@ -1,4 +1,5 @@
 import { useOnboarding } from '@/lib/onboarding';
+import { useReplayOnboarding } from '@/lib/replay-onboarding';
 import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
@@ -8,11 +9,16 @@ export default function AppLayout() {
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
 
+  // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
+  useReplayOnboarding();
+
   if (isLoading) {
     return null;
   }
 
-  if (!isAuthenticated) {
+  // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen
+  // once they've finished onboarding but haven't authenticated yet.
+  if (!isAuthenticated && onboarded) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

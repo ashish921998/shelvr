@@ -104,7 +104,8 @@
           }
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

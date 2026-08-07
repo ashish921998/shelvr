@@ -270,7 +270,6 @@ const Loading: FC = () => (
 /** Pro gate shown to lapsed users on the Tidy tab. */
 const ProGate: FC = () => (
   <ProGateView
-    icon="sparkles"
     title="Tidy is a Pro feature"
     message="Sweep through your photo library and clear out the clutter. Start a free trial to unlock Tidy and every other Pro feature."
   />
