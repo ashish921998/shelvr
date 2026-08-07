@@ -2,19 +2,18 @@
 /// <reference types="vite/client" />
 import { describe, expect, it, vi } from "vitest";
 
-import { convexTest, type TestConvexForDataModel } from "convex-test";
+import type { TestConvexForDataModel } from "convex-test";
+import { newConvexTest } from "./test.setup";
 
 import { api } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
-import schema from "./schema";
 import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-const modules = import.meta.glob("./**/*.ts");
 
 async function as(userId: string): Promise<TestCtx> {
-  const t = convexTest(schema, modules).withIdentity({
+  const t = newConvexTest().withIdentity({
     subject: `${userId}|session-1`,
   });
   await seedPro(t, userId);
@@ -105,7 +104,7 @@ async function seedOwnedData(t: TestCtx, userId: string) {
 
 describe("deleteCurrentUserAccount", () => {
   it("rejects unauthenticated callers", async () => {
-    const t = convexTest(schema, modules);
+    const t = newConvexTest();
     await expect(
       t.mutation(api.users.deleteCurrentUserAccount, {}),
     ).rejects.toThrow(/Not authenticated/);
@@ -176,7 +175,7 @@ describe("deleteCurrentUserAccount", () => {
     // test needs a real users row (a synthetic string subject won't do).
     vi.useFakeTimers();
     try {
-      const backend = convexTest(schema, modules);
+      const backend = newConvexTest();
       const { userId, sessionId } = await backend.run(async (ctx) => {
         const userId = await ctx.db.insert("users", {
           email: "big@example.com",
@@ -229,7 +228,7 @@ describe("deleteCurrentUserAccount", () => {
   });
 
   it("does not delete another user's data", async () => {
-    const backend = convexTest(schema, modules);
+    const backend = newConvexTest();
     const ta = backend.withIdentity({ subject: "user-a|session-1" });
     const tb = backend.withIdentity({ subject: "user-b|session-1" });
     await seedPro(ta, "user-a");
@@ -270,7 +269,7 @@ describe("deleteCurrentUserAccount", () => {
   });
 
   it("removes auth sessions, accounts, and the users document", async () => {
-    const backend = convexTest(schema, modules);
+    const backend = newConvexTest();
 
     const { userId, sessionId, accountId } = await backend.run(async (ctx) => {
       const userId = await ctx.db.insert("users", {

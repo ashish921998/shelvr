@@ -1,16 +1,15 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { convexTest, type TestConvexForDataModel } from "convex-test";
+import type { TestConvexForDataModel } from "convex-test";
+import { newConvexTest } from "./test.setup";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
-import schema from "./schema";
 
-const modules = import.meta.glob("./**/*.ts");
 type TestCtx = TestConvexForDataModel<DataModel>;
 
 function signedInAs(userId: string): TestCtx {
-  return convexTest(schema, modules).withIdentity({
+  return newConvexTest().withIdentity({
     subject: `${userId}|session-1`,
   });
 }

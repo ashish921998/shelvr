@@ -2,20 +2,18 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { convexTest, type TestConvexForDataModel } from "convex-test";
+import type { TestConvexForDataModel } from "convex-test";
+import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { STALE_IMPORT_CUTOFF_MS } from "./items";
-import schema from "./schema";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
 // Used as the shared param type for helpers that drive either a base or
 // identity-scoped test backend.
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-// The module map lets convex-test discover and load function files.
-const modules = import.meta.glob("./**/*.ts");
 
 // A representative operation id (UUID-shaped, within the 8–200 char bound).
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
@@ -28,7 +26,7 @@ const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 // (paying) path. The lapsed/not-entitled path is covered by the gating tests
 // further down.
 async function as(userId: string): Promise<TestCtx> {
-  const t = convexTest(schema, modules).withIdentity({
+  const t = newConvexTest().withIdentity({
     subject: `${userId}|session-1`,
   });
   await seedPro(t, userId);
@@ -138,7 +136,7 @@ describe("image import lifecycle", () => {
   it("keeps the same operation id independent across users", async () => {
     // Both users must operate against ONE shared backend so the (userId,
     // operationId) pair — not database isolation — is what distinguishes them.
-    const backend = convexTest(schema, modules);
+    const backend = newConvexTest();
     const ta = backend.withIdentity({ subject: "user-a" });
     const tb = backend.withIdentity({ subject: "user-b" });
     await seedPro(ta, "user-a");
@@ -728,7 +726,7 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects unauthenticated callers on every import entry point", async () => {
-    const t = convexTest(schema, modules);
+    const t = newConvexTest();
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
     ).rejects.toThrow();
@@ -837,7 +835,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("isolates the same operation id across users", async () => {
-    const backend = convexTest(schema, modules);
+    const backend = newConvexTest();
     const ta = backend.withIdentity({ subject: "user-a" });
     const tb = backend.withIdentity({ subject: "user-b" });
     await seedPro(ta, "user-a");
@@ -1034,7 +1032,7 @@ describe("Pro entitlement gate", () => {
   // save and Pro mutation must throw `Pro required` so the client can route
   // to the paywall; reads (listItems, getItem, searchItems) stay open.
   it("blocks saves for a user with no subscription", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "no-sub" });
+    const t = newConvexTest().withIdentity({ subject: "no-sub" });
 
     await expect(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
@@ -1051,7 +1049,7 @@ describe("Pro entitlement gate", () => {
     // A user who began an import while Pro, then lapsed, must NOT be able to
     // retry the pending operation: begin would otherwise hand back a fresh
     // upload URL and refresh updatedAt, pinning the row alive past the cron.
-    const t = convexTest(schema, modules).withIdentity({ subject: "pend-lapse" });
+    const t = newConvexTest().withIdentity({ subject: "pend-lapse" });
     await seedPro(t, "pend-lapse");
     // Begin while Pro (creates the pending row), then lapse the subscription.
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
@@ -1074,7 +1072,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("blocks Find links for a lapsed user", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "lapsed" });
+    const t = newConvexTest().withIdentity({ subject: "lapsed" });
     // Seed a subscription whose trial already expired.
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
@@ -1102,7 +1100,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("allows saves for an active trial", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "trier" });
+    const t = newConvexTest().withIdentity({ subject: "trier" });
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
         userId: "trier",
@@ -1118,7 +1116,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("getEntitlement reports the stored status and the client computes entitled", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "pro-user" });
+    const t = newConvexTest().withIdentity({ subject: "pro-user" });
     await t.run(async (ctx) => {
       await ctx.db.insert("subscriptions", {
         userId: "pro-user",
@@ -1133,7 +1131,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("getEntitlement returns 'none' for a user with no subscription", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "anon" });
+    const t = newConvexTest().withIdentity({ subject: "anon" });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent.status).toBe("none");
     expect(ent.expiresAt).toBeUndefined();
@@ -1144,7 +1142,7 @@ describe("Pro entitlement gate", () => {
    * users row. The identity subject is that row's id, matching what
    * requireUserId derives for `getEntitlement`. */
   async function asWebhookUser(): Promise<{ t: TestCtx; userId: string }> {
-    const backend = convexTest(schema, modules);
+    const backend = newConvexTest();
     const userId = await backend.run(async (ctx) => {
       return (await ctx.db.insert("users", {})) as string;
     });
@@ -1317,7 +1315,7 @@ describe("Pro entitlement gate", () => {
   });
 
   it("an event with no expiry and no existing row creates nothing", async () => {
-    const t = convexTest(schema, modules).withIdentity({ subject: "rc-empty" });
+    const t = newConvexTest().withIdentity({ subject: "rc-empty" });
     await t.mutation(internal.subscriptions.upsertSubscription, {
       userId: "rc-empty",
       expiresAt: 0,
@@ -1344,5 +1342,20 @@ describe("Pro entitlement gate", () => {
     });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });
+  });
+});
+
+describe("rate limiting", () => {
+  it("blocks item creation past the per-user burst capacity", async () => {
+    // itemCreate bucket capacity is 30; the 31st create in a tight loop (no
+    // meaningful refill) must be rejected so a leaked/shared Pro account can't
+    // loop and burn LLM spend. Notes avoid any network fetch.
+    const t = await as("rate-user");
+    for (let i = 0; i < 30; i++) {
+      await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
+    }
+    await expect(
+      t.mutation(api.items.createNoteItem, { text: "over the limit" }),
+    ).rejects.toThrow();
   });
 });

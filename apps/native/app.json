@@ -61,14 +61,26 @@
         }
       ],
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ],
       "expo-router",
       "expo-status-bar",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-web-browser",
       [
         "expo-calendar",
         {
-          "calendarPermission": "Shelvr adds events to your calendar from things you've saved."
+          "calendarPermission": "Shelvr adds events to your calendar from things you've saved.",
+          "remindersPermission": false
         }
       ],
       [

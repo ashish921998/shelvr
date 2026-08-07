@@ -10,6 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { requireProEntitlement } from "./subscriptions";
+import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 
@@ -628,8 +629,11 @@ export const finalizeImageImport = mutation({
       return op.itemId;
     }
 
-    // Gate only new work (creating an item from a pending operation).
+    // Gate only new work (creating an item from a pending operation). Rate limit
+    // sits here too — after the idempotent completed-return above, so a retry of
+    // an already-finished import is never charged against the bucket.
     await requireProEntitlement(ctx, userId);
+    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 
     // Validate BEFORE touching the ledger: invalid metadata must not mark the
     // operation complete, so the caller can retry with corrected input.
@@ -893,6 +897,7 @@ export const createLinkItem = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
+    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
     // Centralized syntactic URL policy: rejects non-http(s) schemes, embedded
     // credentials, non-default ports, missing hosts, and oversized URLs before
     // the item is ever inserted or scheduled. Network-destination safety (private
@@ -919,6 +924,7 @@ export const createNoteItem = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
+    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
     return await createItemWithOperation(
       ctx,
       userId,
@@ -946,6 +952,7 @@ export const findLinks = mutation({
     if (item.status !== "ready" || item.productsStatus === "searching") {
       return null;
     }
+    await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
     await ctx.db.patch(item._id, { productsStatus: "searching" });
     await ctx.scheduler.runAfter(0, internal.ai.findProductLinks, {
       itemId: item._id,
