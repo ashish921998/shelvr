@@ -6,6 +6,11 @@ import { defineConfig } from "vitest/config";
 // `// @vitest-environment edge-runtime` pragma, preserving the Convex-runtime
 // fidelity the guidelines call for without breaking Node-runtime tests.
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@convex": new URL("./convex", import.meta.url).pathname,
+    },
+  },
   test: {
     include: ["src/**/*.test.ts", "convex/**/*.test.ts"],
   },

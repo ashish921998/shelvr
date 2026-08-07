@@ -9,9 +9,13 @@ import * as SecureStore from 'expo-secure-store';
 // for the `onboarded` flag. Clears use setItem('') because SecureStore's
 // delete is async-only; getters treat empty as "not set".
 
-const SPACES_KEY = 'shelvr.pending.spaces';
-const DEMO_URL_KEY = 'shelvr.pending.demoUrl';
-const OPERATION_ID_KEY = 'shelvr.pending.operationId';
+const PENDING_KEY = 'shelvr.pending.onboarding';
+
+type PendingRecord = {
+  operationId: string;
+  spaces: string[];
+  demoUrl: string | null;
+};
 
 let revision = 0;
 const listeners = new Set<() => void>();
@@ -34,26 +38,56 @@ function createOperationId(): string {
   return `onboarding:${Crypto.randomUUID()}`;
 }
 
+function readPendingRecord(): PendingRecord | null {
+  const raw = SecureStore.getItem(PENDING_KEY);
+  if (raw === null || raw === '') return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const record = parsed as Partial<PendingRecord>;
+    if (
+      typeof record.operationId !== 'string' ||
+      record.operationId === '' ||
+      !Array.isArray(record.spaces) ||
+      !record.spaces.every((space): space is string => typeof space === 'string') ||
+      (record.demoUrl !== null && typeof record.demoUrl !== 'string')
+    ) {
+      return null;
+    }
+    return {
+      operationId: record.operationId,
+      spaces: record.spaces,
+      demoUrl: record.demoUrl === '' ? null : record.demoUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePendingRecord(record: PendingRecord | null) {
+  SecureStore.setItem(PENDING_KEY, record === null ? '' : JSON.stringify(record));
+}
+
 function ensureOperationId(): string {
-  const existing = SecureStore.getItem(OPERATION_ID_KEY);
-  if (existing !== null && existing !== '') return existing;
+  const existing = readPendingRecord();
+  if (existing !== null) return existing.operationId;
   const operationId = createOperationId();
-  SecureStore.setItem(OPERATION_ID_KEY, operationId);
+  writePendingRecord({ operationId, spaces: [], demoUrl: null });
   return operationId;
 }
 
-function clearOperationIdIfNothingPending() {
-  if (getPendingSpaces().length === 0 && getPendingDemoUrl() === null) {
-    SecureStore.setItem(OPERATION_ID_KEY, '');
-  }
-}
-
 function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
-  if (spaces.length > 0 && refreshOperationId) {
-    SecureStore.setItem(OPERATION_ID_KEY, createOperationId());
-  }
-  SecureStore.setItem(SPACES_KEY, JSON.stringify(spaces));
-  if (spaces.length === 0) clearOperationIdIfNothingPending();
+  const existing = readPendingRecord();
+  const operationId =
+    spaces.length > 0 && refreshOperationId
+      ? createOperationId()
+      : existing?.operationId ?? createOperationId();
+  const demoUrl = existing?.demoUrl ?? null;
+  writePendingRecord(
+    spaces.length === 0 && demoUrl === null
+      ? null
+      : { operationId, spaces, demoUrl },
+  );
   notifyChanged();
 }
 
@@ -69,22 +103,22 @@ export function updatePendingSpaces(spaces: string[]) {
 }
 
 export function getPendingSpaces(): string[] {
-  const raw = SecureStore.getItem(SPACES_KEY);
-  if (raw === null || raw === '') return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return readPendingRecord()?.spaces ?? [];
 }
 
 export function setPendingDemoUrl(url: string | null) {
-  if (url !== null && url !== '') {
-    SecureStore.setItem(OPERATION_ID_KEY, createOperationId());
-  }
-  SecureStore.setItem(DEMO_URL_KEY, url ?? '');
-  if (url === null || url === '') clearOperationIdIfNothingPending();
+  const existing = readPendingRecord();
+  const spaces = existing?.spaces ?? [];
+  const demoUrl = url === null || url === '' ? null : url;
+  const operationId =
+    demoUrl !== null
+      ? createOperationId()
+      : existing?.operationId ?? createOperationId();
+  writePendingRecord(
+    spaces.length === 0 && demoUrl === null
+      ? null
+      : { operationId, spaces, demoUrl },
+  );
   notifyChanged();
 }
 
@@ -93,8 +127,7 @@ export function getOrCreatePendingOperationId(): string {
 }
 
 export function getPendingDemoUrl(): string | null {
-  const value = SecureStore.getItem(DEMO_URL_KEY);
-  return value === null || value === '' ? null : value;
+  return readPendingRecord()?.demoUrl ?? null;
 }
 
 export function hasPending(): boolean {
@@ -102,8 +135,6 @@ export function hasPending(): boolean {
 }
 
 export function clearPending() {
-  SecureStore.setItem(SPACES_KEY, '');
-  SecureStore.setItem(DEMO_URL_KEY, '');
-  SecureStore.setItem(OPERATION_ID_KEY, '');
+  writePendingRecord(null);
   notifyChanged();
 }

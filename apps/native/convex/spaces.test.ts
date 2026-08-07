@@ -2,8 +2,8 @@
 /// <reference types="vite/client" />
 import { convexTest, type TestConvexForDataModel } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
+import { api } from "@convex/_generated/api";
+import type { DataModel } from "@convex/_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -48,6 +48,10 @@ describe("space creation", () => {
         expiresAt: Date.now() - 1,
       });
     });
+
+    await expect(
+      t.mutation(api.spaces.createSpace, { name: "A new space" }),
+    ).rejects.toThrow("Pro required");
 
     const retriedAfterLapse = await t.mutation(api.spaces.createSpace, {
       name: " Read later ",
