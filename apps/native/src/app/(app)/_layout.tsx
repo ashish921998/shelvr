@@ -1,5 +1,6 @@
 import { useOnboarding } from '@/lib/onboarding';
 import { useReplayOnboarding } from '@/lib/replay-onboarding';
+import { useResumePendingShare } from '@/lib/share/use-resume-pending-share';
 import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
 import { useUnistyles } from 'react-native-unistyles';
@@ -11,6 +12,8 @@ export default function AppLayout() {
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
+  // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
+  useResumePendingShare();
 
   if (isLoading) {
     return null;

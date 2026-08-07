@@ -32,10 +32,10 @@ export function RateStep({ onAdvance }: { onAdvance: () => void }) {
       </Animated.View>
 
       <Animated.Text entering={FadeInDown.delay(120).duration(400)} style={styles.headline}>
-        Built for people who save like you.
+        Enjoying Shelvr so far?
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(200).duration(400)} style={styles.support}>
-        A 5-star rating keeps Shelvr independent.
+        If you have a moment, you can leave a review. No pressure — you can always do it later.
       </Animated.Text>
 
       <View style={styles.footer}>
@@ -44,7 +44,7 @@ export function RateStep({ onAdvance }: { onAdvance: () => void }) {
             onPress={rate}
             style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
           >
-            <Text style={styles.ctaText}>Rate Shelvr</Text>
+            <Text style={styles.ctaText}>Leave a review</Text>
           </Pressable>
         </Animated.View>
         <Pressable onPress={onAdvance}>

@@ -4,6 +4,11 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/current-user';
+import {
+  mapPaywallResult,
+  shouldOpenPaywallFallback,
+  type PaywallOutcome,
+} from '@/lib/paywall-result';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { NativeModules } from 'react-native';
@@ -280,46 +285,44 @@ export function useEntitlement(): Entitlement {
 // ---------------------------------------------------------------------------
 
 /**
- * Present the RevenueCat paywall natively (sheet on iOS). Returns `true` only
- * when the paywall was presented AND the user completed a purchase or restore.
- * Returns `false` if the RC UI SDK isn't linked, the paywall wasn't presented,
- * the user cancelled, or an error occurred. Callers should fall back to
- * routing to the paywall route when this returns `false`.
+ * Present the RevenueCat paywall natively (sheet on iOS). Returns a three-way
+ * outcome so callers can distinguish purchase/restore, user cancellation, and
+ * real unavailability (SDK missing, identity sync timeout, ERROR).
  *
  * The paywall is NOT presented until RevenueCat identity sync is ready (the
  * Convex user id has been logged in to RC), so a purchase is always attributed
  * to the correct user.
  */
-export async function presentPaywall(): Promise<boolean> {
+export async function presentPaywall(): Promise<PaywallOutcome> {
   // Block until RC identity sync completes — a purchase before login would be
   // attributed to an anonymous RC user, breaking the webhook's userId mapping.
-  // The awaitRcSyncReady timeout returns false so the caller routes to the
-  // paywall screen without ever opening a purchase flow under an unsafe identity.
-  if (!(await awaitRcSyncReady())) return false;
+  // The awaitRcSyncReady timeout returns unavailable so the caller can show a
+  // retryable fallback without opening a purchase flow under an unsafe identity.
+  if (!(await awaitRcSyncReady())) return 'unavailable';
 
   const rcui = getRCUI();
-  if (!rcui) return false;
+  if (!rcui) return 'unavailable';
   try {
     const result = await rcui.presentPaywall();
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
-    return result === 'PURCHASED' || result === 'RESTORED';
+    return mapPaywallResult(result);
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
 /**
- * Present the RevenueCat paywall, and if it can't be presented (SDK not linked,
- * user dismissed without purchase, or sync timed out), fall back to routing to
- * the paywall screen. Returns `true` only when the paywall was presented and
- * resulted in a purchase/restore. The one call every Pro-gated affordance and
- * the profile row shares — keeps the `'/(app)/paywall'` route string in one
- * place.
+ * Present the RevenueCat paywall. On real unavailability (SDK not linked, sync
+ * timed out, ERROR), fall back to the paywall route. On cancellation, return
+ * to the caller without routing — cancel must not look like an outage. Returns
+ * `true` only on purchase/restore. Shared by every Pro-gated affordance.
  */
 export async function openPaywall(router: ReturnType<typeof useRouter>): Promise<boolean> {
-  const ok = await presentPaywall();
-  if (!ok) router.push('/(app)/paywall');
-  return ok;
+  const outcome = await presentPaywall();
+  if (shouldOpenPaywallFallback(outcome)) {
+    router.push('/(app)/paywall');
+  }
+  return outcome === 'success';
 }
 
 // ---------------------------------------------------------------------------

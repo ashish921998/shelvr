@@ -1,7 +1,8 @@
+import { LEGAL_URLS } from '@/lib/legal';
 import { useAuthActions } from '@convex-dev/auth/react';
 import * as WebBrowser from 'expo-web-browser';
 import * as React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 /**
@@ -104,7 +105,21 @@ export default function Page() {
       </View>
 
       <Text style={styles.terms}>
-        By continuing you agree to our Terms and acknowledge our Privacy Policy.
+        By continuing you agree to our{' '}
+        <Text
+          style={styles.termsLink}
+          onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
+        >
+          Terms
+        </Text>{' '}
+        and acknowledge our{' '}
+        <Text
+          style={styles.termsLink}
+          onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
+        >
+          Privacy Policy
+        </Text>
+        .
       </Text>
 
       {lastError !== null && (
@@ -192,6 +207,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'center',
     paddingHorizontal: theme.gap(4),
     marginBottom: theme.gap(2),
+  },
+  termsLink: {
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.muted,
+    textDecorationLine: 'underline',
   },
   error: {
     marginTop: 16,

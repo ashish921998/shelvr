@@ -2,9 +2,13 @@ import { Wordmark } from '@/components/wordmark';
 import { openPaywall, presentCustomerCenter, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { analytics } from '@/lib/analytics';
+import { LEGAL_URLS } from '@/lib/legal';
+import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
+import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
+import { useState } from 'react';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -14,6 +18,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
+  const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
+  const [deleting, setDeleting] = useState(false);
 
   const proLabel =
     status === 'trialing'
@@ -66,6 +72,63 @@ export default function ProfileScreen() {
     }
   };
 
+  const openExternal = (url: string) => {
+    void Linking.openURL(url);
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      [
+        'This permanently deletes your Shelvr account and all of your saves:',
+        '• Links, notes, and images',
+        '• Spaces and memberships',
+        '• Pending uploads and account identity',
+        '',
+        'Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.',
+      ].join('\n'),
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              if (deleting) return;
+              setDeleting(true);
+              try {
+                try {
+                  await deleteAccount({});
+                } catch (err) {
+                  console.error('Account deletion failed', err);
+                  Alert.alert(
+                    'Couldn’t delete account',
+                    'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
+                  );
+                  return;
+                }
+                // The account is gone server-side; local cleanup is best-effort
+                // and must never be reported as a deletion failure.
+                try {
+                  await signOut();
+                } catch (err) {
+                  console.error('Sign-out after account deletion failed', err);
+                }
+                try {
+                  analytics.reset();
+                } catch (err) {
+                  console.error('Analytics reset after account deletion failed', err);
+                }
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.content}>
       <Wordmark size={30} />
@@ -94,6 +157,30 @@ export default function ProfileScreen() {
         <Icon name="chevron.right" size={16} tintColor={theme.colors.muted} />
       </Pressable>
 
+      <View style={styles.linkGroup}>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          onPress={() => openExternal(LEGAL_URLS.terms)}
+        >
+          <Text style={styles.linkLabel}>Terms of Service</Text>
+          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          onPress={() => openExternal(LEGAL_URLS.privacy)}
+        >
+          <Text style={styles.linkLabel}>Privacy Policy</Text>
+          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          onPress={() => openExternal(LEGAL_URLS.supportMailto)}
+        >
+          <Text style={styles.linkLabel}>Contact support</Text>
+          <Icon name="envelope" size={14} tintColor={theme.colors.muted} />
+        </Pressable>
+      </View>
+
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         onPress={async () => {
@@ -110,6 +197,20 @@ export default function ProfileScreen() {
         }}
       >
         <Text style={styles.signOutText}>Sign out</Text>
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.deleteAccount,
+          pressed && { opacity: 0.7 },
+          deleting && { opacity: 0.4 },
+        ]}
+        disabled={deleting}
+        onPress={confirmDeleteAccount}
+      >
+        <Text style={styles.deleteAccountText}>
+          {deleting ? 'Deleting…' : 'Delete account'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -172,6 +273,27 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     color: theme.colors.foreground,
   },
+  linkGroup: {
+    alignSelf: 'stretch',
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    overflow: 'hidden',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.gap(1.5),
+    paddingHorizontal: theme.gap(1.5),
+  },
+  linkLabel: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
   signOut: {
     alignSelf: 'stretch',
     alignItems: 'center',
@@ -186,5 +308,15 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.danger,
+  },
+  deleteAccount: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: theme.gap(1.25),
+  },
+  deleteAccountText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 14,
+    color: theme.colors.muted,
   },
 }));
