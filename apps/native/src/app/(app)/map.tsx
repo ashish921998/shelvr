@@ -1,4 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
+import { ProGate as ProGateView } from '@/components/pro-gate';
+import { useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
@@ -42,7 +44,11 @@ function fitCamera(items: Located[]) {
 
 export default function MapScreen() {
   const router = useRouter();
-  const { data: items } = useQuery(convexQuery(api.items.listItems, {}));
+  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const { data: items } = useQuery({
+    ...convexQuery(api.items.listItems, {}),
+    enabled: !entitlementLoading && entitled,
+  });
 
   const located = useMemo(
     () =>
@@ -61,6 +67,26 @@ export default function MapScreen() {
     () => (located.length > 0 ? fitCamera(located) : undefined),
     [located],
   );
+
+  if (entitlementLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
+  // paywall instead of seeing the map. ProGate's default CTA already presents
+  // the paywall, so no guard wrapper is needed.
+  if (!entitled) {
+    return (
+      <ProGateView
+        title="Map is a Pro feature"
+        message="See every saved photo by location with a Shelvr Pro subscription."
+      />
+    );
+  }
 
   if (items === undefined) {
     return (

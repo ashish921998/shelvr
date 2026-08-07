@@ -1,4 +1,5 @@
 import { AnimatedSwitch } from '@/components/ui/animated-switch';
+import { usePaywallGuard } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
 import { convexQuery } from '@convex-dev/react-query';
@@ -72,6 +73,10 @@ function SpaceForm(props: SpaceFormProps) {
   const { theme } = useUnistyles();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
+  // Creating a space and enabling dynamic are Pro — route to the paywall if
+  // not entitled. Editing a name or turning dynamic off stays open to lapsed
+  // users (managing existing data).
+  const { guard } = usePaywallGuard();
 
   // Seeded once per (keyed) mount: a fresh create starts dynamic on; an edit
   // starts from the loaded space. A query refresh remounts via key only if the
@@ -87,6 +92,12 @@ function SpaceForm(props: SpaceFormProps) {
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
+    // Creating any space is Pro; editing is Pro only when turning dynamic on.
+    const needsPro = props.mode === 'create' || (props.mode === 'edit' && dynamic && !(props.space.dynamic ?? false));
+    if (needsPro) {
+      const ok = await guard();
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       if (props.mode === 'edit') {

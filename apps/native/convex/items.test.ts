@@ -23,21 +23,54 @@ const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 
 // Each test gets its own authenticated user via withIdentity. subject is the
 // value requireUserId returns, so different subjects model different users.
-function as(userId: string): TestCtx {
-  return convexTest(schema, modules).withIdentity({ subject: userId });
+// Every save and Pro mutation is gated behind an active subscription, so `as`
+// seeds an active Pro row for the user — the existing tests model the entitled
+// (paying) path. The lapsed/not-entitled path is covered by the gating tests
+// further down.
+async function as(userId: string): Promise<TestCtx> {
+  const t = convexTest(schema, modules).withIdentity({
+    subject: `${userId}|session-1`,
+  });
+  await seedPro(t, userId);
+  return t;
+}
+
+/** Insert an active Pro subscription for `userId` so gated mutations succeed.
+ * Idempotent: if a row already exists it is patched, otherwise a new one is
+ * inserted — so calling `seedPro` twice (e.g. in a shared helper) doesn't
+ * violate the `by_user` unique index. */
+async function seedPro(t: TestCtx, userId: string): Promise<void> {
+  await t.run(async (ctx) => {
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    const fields = {
+      status: "pro" as const,
+      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      updatedAt: Date.now(),
+    };
+    if (existing !== null) {
+      await ctx.db.patch(existing._id, fields);
+    } else {
+      await ctx.db.insert("subscriptions", { userId, ...fields });
+    }
+  });
 }
 
 /** Uploads a blob to mock storage and returns its id, the way a real client
  * would after POSTing to the upload URL begin returns. */
 async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   return await t.run(async (ctx) => {
-    return await ctx.storage.store(new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])]));
+    return await ctx.storage.store(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])]),
+    );
   });
 }
 
 describe("image import lifecycle", () => {
   it("finalizes a pending operation into one item and schedules processing", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     const begin = await t.mutation(api.items.beginImageImport, {
       operationId: OP_ID,
     });
@@ -54,7 +87,9 @@ describe("image import lifecycle", () => {
     expect(typeof itemId).toBe("string");
 
     // The scheduled AI job is queued; verify the item landed as processing.
-    const op = await t.query(api.items.getImportOperation, { operationId: OP_ID });
+    const op = await t.query(api.items.getImportOperation, {
+      operationId: OP_ID,
+    });
     expect(op?.status).toBe("complete");
     expect(op?.itemId).toBe(itemId);
     expect(op?.storageId).toBe(storageId);
@@ -66,7 +101,7 @@ describe("image import lifecycle", () => {
   });
 
   it("returns the same item when begin/finalize repeat the same operation", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -106,6 +141,8 @@ describe("image import lifecycle", () => {
     const backend = convexTest(schema, modules);
     const ta = backend.withIdentity({ subject: "user-a" });
     const tb = backend.withIdentity({ subject: "user-b" });
+    await seedPro(ta, "user-a");
+    await seedPro(tb, "user-b");
 
     // user-a finalizes the operation.
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
@@ -141,9 +178,50 @@ describe("image import lifecycle", () => {
     expect(opB?.itemId).toBe(bId);
   });
 
+  it("returns the completed itemId to a lapsed user without checking Pro", async () => {
+    // A user who saved an image while Pro, then lapsed, must still retrieve
+    // the completed itemId — the idempotent read path is not gated on Pro.
+    const t = await as("user-a");
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    const storageId = await storeBlob(t);
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId,
+    });
+    const itemId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+    });
+
+    // Lapse the subscription.
+    await t.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .unique();
+      if (sub) {
+        await ctx.db.patch(sub._id, {
+          status: "lapsed",
+          expiresAt: Date.now() - 1000,
+        });
+      }
+    });
+
+    // begin returns the completed itemId without throwing Pro required.
+    const began = await t.mutation(api.items.beginImageImport, {
+      operationId: OP_ID,
+    });
+    expect(began).toEqual({ kind: "complete", itemId });
+
+    // finalize also returns the same id without throwing.
+    const again = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+    });
+    expect(again).toBe(itemId);
+  });
+
   it("rejects reusing an operation id with a different kind", async () => {
     // Seed a completed image operation directly.
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
         userId: "user-a",
@@ -175,7 +253,7 @@ describe("image import lifecycle", () => {
   });
 
   it("keeps one canonical storage id and discards a redundant attachment", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const first = await storeBlob(t);
     const second = await storeBlob(t);
@@ -213,7 +291,7 @@ describe("image import lifecycle", () => {
   });
 
   it("does not mark the operation complete on invalid metadata", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -247,7 +325,7 @@ describe("image import lifecycle", () => {
   });
 
   it("releases the operation when its item is explicitly deleted", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -275,7 +353,7 @@ describe("image import lifecycle", () => {
   });
 
   it("deletes only eligible unreferenced stale pending uploads", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
 
     // A stale pending operation with an attached upload (process died between
     // upload and finalize). Its storage should be swept.
@@ -330,7 +408,7 @@ describe("image import lifecycle", () => {
 
   it("refuses to adopt or delete a storage id referenced by a completed item", async () => {
     // A completed image for user-a with its own storage object.
-    const ta = as("user-a");
+    const ta = await as("user-a");
     await ta.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const victimStorageId = await storeBlob(ta);
     await ta.mutation(api.items.attachImageUpload, {
@@ -359,7 +437,7 @@ describe("image import lifecycle", () => {
   });
 
   it("returns the existing item when finalizing an already-complete op even with bad resubmitted metadata", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -385,7 +463,7 @@ describe("image import lifecycle", () => {
     // re-upload is in flight. The retry's attach must return the canonical id
     // AND delete its own redundant blob — nothing else references it, so the
     // pending-only cleanup cron would otherwise never reclaim it.
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const canonical = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -415,7 +493,7 @@ describe("image import lifecycle", () => {
     // Double-adopt defense: without the itemOperations check, one blob could
     // back two operations, finalize into two items sharing it, and be deleted
     // out from under the survivor when either item is deleted.
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
     await t.mutation(api.items.attachImageUpload, {
@@ -440,7 +518,7 @@ describe("image import lifecycle", () => {
 
   it("rejects attaching a storage id that does not exist", async () => {
     // A swept blob's id must not become an item with a permanently dead image.
-    const t = as("user-a");
+    const t = await as("user-a");
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.storage.delete(storageId);
@@ -458,7 +536,7 @@ describe("image import lifecycle", () => {
     // Inconsistent-but-possible state: a stale pending row holds a storageId
     // that a live item also references. The sweep must drop only the ledger
     // row and leave the blob alone.
-    const t = as("user-a");
+    const t = await as("user-a");
     const storageId = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("items", {
@@ -494,7 +572,7 @@ describe("image import lifecycle", () => {
   it("sweeps stale image rows even when stale non-image rows exist", async () => {
     // The kind-first index means link/note rows (plans 004/005) can never fill
     // the sweep page and starve image cleanup.
-    const t = as("user-a");
+    const t = await as("user-a");
     const staleAt = Date.now() - STALE_IMPORT_CUTOFF_MS - 60 * 60 * 1000;
     const imageBlob = await storeBlob(t);
     await t.run(async (ctx) => {
@@ -536,7 +614,7 @@ describe("image import lifecycle", () => {
     // Seed the inconsistent state directly (an item deleted NOT via deleteItem,
     // which would have released the row): begin must reset the row to pending,
     // delete the orphaned blob, and hand back a fresh upload URL.
-    const t = as("user-a");
+    const t = await as("user-a");
     const storageId = await storeBlob(t);
     const deadItemId = await t.run(async (ctx) => {
       const id = await ctx.db.insert("items", {
@@ -582,7 +660,7 @@ describe("image import lifecycle", () => {
     // Defensive branch: a complete row with no itemId. Recycling must clear
     // the stale storageId — left in place, attach would treat it as canonical
     // and delete the fresh re-upload as "redundant".
-    const t = as("user-a");
+    const t = await as("user-a");
     const staleBlob = await storeBlob(t);
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
@@ -619,7 +697,7 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects operation ids outside the allowed length bounds", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: "short" }),
     ).rejects.toThrow(/Invalid operationId/i);
@@ -631,7 +709,7 @@ describe("image import lifecycle", () => {
   });
 
   it("rejects finalize when the operation was never begun or never attached", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     // Never begun.
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
@@ -658,7 +736,10 @@ describe("image import lifecycle", () => {
       ctx.storage.store(new Blob([new Uint8Array([1])])),
     );
     await expect(
-      t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId }),
+      t.mutation(api.items.attachImageUpload, {
+        operationId: OP_ID,
+        storageId,
+      }),
     ).rejects.toThrow();
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
@@ -678,7 +759,7 @@ const NOTE_OP = "note:44444444-4444-4444-8444-444444444444";
 
 describe("shared link/note operation idempotency", () => {
   it("creates one link for a repeated shared operation and returns the same id", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/share",
       operationId: LINK_OP,
@@ -700,7 +781,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("creates one note for a repeated shared operation and returns the same id", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     const firstId = await t.mutation(api.items.createNoteItem, {
       text: "shared note",
       operationId: NOTE_OP,
@@ -721,7 +802,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects reusing a link operation id for a note (kind mismatch)", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.mutation(api.items.createLinkItem, {
       url: "example.com/kind",
       operationId: LINK_OP,
@@ -737,7 +818,7 @@ describe("shared link/note operation idempotency", () => {
   it("rejects reusing an image operation id for a link", async () => {
     // Seed a completed image operation directly, then attempt a link create with
     // the same operation id — the kind guard must reject it.
-    const t = as("user-a");
+    const t = await as("user-a");
     await t.run(async (ctx) => {
       await ctx.db.insert("itemOperations", {
         userId: "user-a",
@@ -759,6 +840,8 @@ describe("shared link/note operation idempotency", () => {
     const backend = convexTest(schema, modules);
     const ta = backend.withIdentity({ subject: "user-a" });
     const tb = backend.withIdentity({ subject: "user-b" });
+    await seedPro(ta, "user-a");
+    await seedPro(tb, "user-b");
 
     const aId = await ta.mutation(api.items.createLinkItem, {
       url: "example.com/shared",
@@ -790,7 +873,7 @@ describe("shared link/note operation idempotency", () => {
   it("creates two intentional items for identical content under distinct operations", async () => {
     // Idempotency is per-operation, never per-content: the same URL shared twice
     // (different share sessions) is two deliberate saves, not a deduplicated one.
-    const t = as("user-a");
+    const t = await as("user-a");
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/dup",
       operationId: "link:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -811,7 +894,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("still creates a fresh item when no operation id is given (Add UI path)", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     const firstId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/add",
     });
@@ -833,7 +916,7 @@ describe("shared link/note operation idempotency", () => {
     // running the AI pipeline twice and racing two concurrent classifications.
     // Both the guarded (operationId) and ordinary paths must schedule exactly
     // one processItem job for the created item — no more.
-    const t = as("user-a");
+    const t = await as("user-a");
 
     // Guarded path (share flow).
     const guardedId = await t.mutation(api.items.createLinkItem, {
@@ -873,7 +956,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("releases the link operation when its item is deleted, allowing re-perform", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     const itemId = await t.mutation(api.items.createLinkItem, {
       url: "example.com/delete-me",
       operationId: LINK_OP,
@@ -894,7 +977,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects invalid operation ids on the link/note paths", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await expect(
       t.mutation(api.items.createLinkItem, {
         url: "example.com",
@@ -910,7 +993,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects empty note text on the idempotent path without completing the op", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     await expect(
       t.mutation(api.items.createNoteItem, {
         text: "   ",
@@ -925,7 +1008,7 @@ describe("shared link/note operation idempotency", () => {
   });
 
   it("rejects an invalid url on the idempotent path without completing the op", async () => {
-    const t = as("user-a");
+    const t = await as("user-a");
     // The centralized URL policy rejects empty/whitespace URLs before any
     // operation row is created. The error category is "empty"; the important
     // contract is that the op is not recorded, so a corrected retry is clean.
@@ -939,5 +1022,316 @@ describe("shared link/note operation idempotency", () => {
       operationId: LINK_OP,
     });
     expect(op).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pro entitlement gate
+// ---------------------------------------------------------------------------
+
+describe("Pro entitlement gate", () => {
+  // A user with no subscription row at all — the brand-new-user case. Every
+  // save and Pro mutation must throw `Pro required` so the client can route
+  // to the paywall; reads (listItems, getItem, searchItems) stay open.
+  it("blocks saves for a user with no subscription", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "no-sub" });
+
+    await expect(
+      t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
+    ).rejects.toThrow(/Pro required/);
+    await expect(
+      t.mutation(api.items.createNoteItem, { text: "hi" }),
+    ).rejects.toThrow(/Pro required/);
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow(/Pro required/);
+  });
+
+  it("blocks a lapsed user from retrying a pending image import", async () => {
+    // A user who began an import while Pro, then lapsed, must NOT be able to
+    // retry the pending operation: begin would otherwise hand back a fresh
+    // upload URL and refresh updatedAt, pinning the row alive past the cron.
+    const t = convexTest(schema, modules).withIdentity({ subject: "pend-lapse" });
+    await seedPro(t, "pend-lapse");
+    // Begin while Pro (creates the pending row), then lapse the subscription.
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await t.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", "pend-lapse"))
+        .unique();
+      if (sub) {
+        await ctx.db.patch(sub._id, {
+          status: "lapsed",
+          expiresAt: Date.now() - 1000,
+        });
+      }
+    });
+    // Retrying begin on the existing pending op must now throw Pro required.
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow(/Pro required/);
+  });
+
+  it("blocks Find links for a lapsed user", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "lapsed" });
+    // Seed a subscription whose trial already expired.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "lapsed",
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    // The lapsed user still owns a ready item (created here directly so the
+    // gate isn't exercised on the insert).
+    const itemId = await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId: "lapsed",
+        type: "link",
+        status: "ready",
+        url: "https://example.com",
+        tags: [],
+        searchText: "",
+      });
+    });
+    await expect(
+      t.mutation(api.items.findLinks, { id: itemId }),
+    ).rejects.toThrow(/Pro required/);
+  });
+
+  it("allows saves for an active trial", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "trier" });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "trier",
+        status: "trialing",
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    const itemId = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com",
+    });
+    expect(typeof itemId).toBe("string");
+  });
+
+  it("getEntitlement reports the stored status and the client computes entitled", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "pro-user" });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "pro-user",
+        status: "pro",
+        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it("getEntitlement returns 'none' for a user with no subscription", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "anon" });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("none");
+    expect(ent.expiresAt).toBeUndefined();
+  });
+
+  it("upsertSubscription is idempotent and won't regress a newer expiry", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 2000,
+    });
+    // A stale EXPIRATION event with an earlier event timestamp must not
+    // regress the row, even though its expiry is earlier.
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("ignores an older active event instead of shortening access", async () => {
+    const t = convexTest(schema, modules).withIdentity({
+      subject: "rc-active",
+    });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-active",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 2000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-active",
+      status: "pro",
+      expiresAt: farFuture - 1000,
+      productId: "stale-product",
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("ignores a timestamp-less event after ordered state exists", async () => {
+    const t = convexTest(schema, modules).withIdentity({
+      subject: "rc-no-timestamp",
+    });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-no-timestamp",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 2000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-no-timestamp",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("a newer refund event can move expiry backward", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-refund" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-refund",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // A newer EXPIRATION event shortens the period (e.g. a refund).
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-refund",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("lapsed");
+    expect(ent.expiresAt).toBe(farFuture - 1000);
+  });
+
+  it("an equal-timestamp event is dropped (not strictly newer)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-eq" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-eq",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-eq",
+      status: "lapsed",
+      expiresAt: farFuture - 1000,
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("identical event replay is idempotent", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-replay" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    const event = {
+      userId: "rc-replay",
+      status: "pro" as const,
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+      productId: "prod-1",
+    };
+    await t.mutation(internal.subscriptions.upsertSubscription, event);
+    // Replaying the exact same event (same timestamp) is a no-op.
+    await t.mutation(internal.subscriptions.upsertSubscription, event);
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("omitted status preserves the existing status", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-cancel" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-cancel",
+      status: "trialing",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // A CANCELLATION event (status omitted) preserves `trialing` but
+    // refreshes expiresAt from the event.
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-cancel",
+      expiresAt: farFuture + 1000,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("trialing");
+    expect(ent.expiresAt).toBe(farFuture + 1000);
+  });
+
+  it("an event with no expiry preserves the existing expiresAt", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-noexp" });
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-noexp",
+      status: "pro",
+      expiresAt: farFuture,
+      eventTimestampMs: 1000,
+    });
+    // An event with expiresAt=0 preserves the existing expiresAt.
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-noexp",
+      expiresAt: 0,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("pro");
+    expect(ent.expiresAt).toBe(farFuture);
+  });
+
+  it("an event with no expiry and no existing row creates nothing", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "rc-empty" });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "rc-empty",
+      expiresAt: 0,
+      eventTimestampMs: 1000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent.status).toBe("none");
+  });
+
+  it("lapses an existing subscription while retaining its expiration", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "expired" });
+    const periodEnd = Date.now() - 1000;
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "expired",
+      status: "pro",
+      expiresAt: periodEnd,
+      eventTimestampMs: 1000,
+    });
+    await t.mutation(internal.subscriptions.upsertSubscription, {
+      userId: "expired",
+      status: "lapsed",
+      expiresAt: periodEnd,
+      eventTimestampMs: 2000,
+    });
+    const ent = await t.query(api.subscriptions.getEntitlement, {});
+    expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });
   });
 });

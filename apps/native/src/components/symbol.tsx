@@ -29,6 +29,7 @@ const SF_TO_MATERIAL: Record<string, string> = {
   'photo.stack': 'photo_library',
   'square.grid.2x2': 'grid_view',
   'square.grid.2x2.fill': 'grid_view',
+  'star.fill': 'star',
   'rectangle.stack': 'collections_bookmark',
   'rectangle.stack.fill': 'collections_bookmark',
   'link': 'link',

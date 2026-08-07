@@ -1,6 +1,7 @@
 import { AnimatedText } from '@/components/animated-text';
 import { parseExifDate } from '@/lib/date';
 import { parseExifLocation } from '@/lib/exif';
+import { usePaywallGuard } from '@/lib/entitlement';
 import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -55,6 +56,8 @@ export default function AddScreen() {
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
+  // Saving is Pro — route to the paywall before composing if not entitled.
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -225,32 +228,34 @@ export default function AddScreen() {
           <ActionButton
             icon="square.and.pencil"
             label="Note"
-            onPress={() => openComposer('note')}
-            disabled={saving}
+            onPress={() => guard(() => openComposer('note'))}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="link"
             label="Article"
-            onPress={() => openComposer('article')}
-            disabled={saving}
+            onPress={() => guard(() => openComposer('article'))}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="photo.on.rectangle"
             label="Photos"
-            onPress={pickImages}
-            disabled={saving}
+            onPress={() => guard(pickImages)}
+            disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="camera"
             label="Camera"
-            onPress={() => {
-              router.back();
-              router.push({
-                pathname: '/camera',
-                params: pinnedSpaceId ? { spaceId: pinnedSpaceId } : {},
-              });
-            }}
-            disabled={saving}
+            onPress={() =>
+              guard(() => {
+                router.back();
+                router.push({
+                  pathname: '/camera',
+                  params: pinnedSpaceId ? { spaceId: pinnedSpaceId } : {},
+                });
+              })
+            }
+            disabled={saving || entitlementLoading}
           />
         </View>
       )}

@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 
@@ -447,6 +448,20 @@ export const beginImageImport = mutation({
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
 
+    // Idempotent read path: a complete operation whose item still exists
+    // returns the itemId WITHOUT a Pro check — a lapsed user must still
+    // retrieve an already-completed save. Hoisted before the gate so every
+    // path below is new or recycled work and can be gated uniformly.
+    if (op?.status === "complete" && op.itemId !== undefined) {
+      const item = await ctx.db.get(op.itemId);
+      if (item !== null) {
+        return { kind: "complete", itemId: op.itemId };
+      }
+    }
+
+    // Every remaining path creates, recycles, or refreshes work — gate once.
+    await requireProEntitlement(ctx, userId);
+
     if (op === null) {
       // (userId, operationId) uniqueness is enforced by Convex's serializable
       // transactions: if two begins race on an empty index range, only one
@@ -468,39 +483,13 @@ export const beginImageImport = mutation({
     }
 
     if (op.status === "complete") {
-      // A complete operation whose item was explicitly deleted is recyclable:
-      // reset to pending so the durable operationId performs a fresh save.
-      if (op.itemId !== undefined) {
-        const item = await ctx.db.get(op.itemId);
-        if (item === null) {
-          // Release the now-orphaned storage object before resetting the row,
-          // otherwise the blob leaks (the cleanup cron only sweeps pending
-          // rows, and this row is currently complete). Guarded so a blob some
-          // other item/operation still depends on — or one already deleted —
-          // can't corrupt them or wedge this recycle path.
-          if (
-            op.storageId !== undefined &&
-            (await isStorageUnreferenced(ctx, op.storageId, op._id))
-          ) {
-            await safeDeleteStorage(ctx, op.storageId);
-          }
-          await ctx.db.patch(op._id, {
-            status: "pending",
-            itemId: undefined,
-            storageId: undefined,
-            updatedAt: now,
-          });
-          return {
-            kind: "upload",
-            uploadUrl: await ctx.storage.generateUploadUrl(),
-          };
-        }
-        return { kind: "complete", itemId: op.itemId };
-      }
-      // Defensive: a complete row with no itemId is inconsistent; recycle it
-      // the same way as above — release the blob (guarded) and CLEAR the stale
-      // storageId, otherwise attach would treat it as canonical and delete the
-      // fresh re-upload as "redundant".
+      // Recycle: the item was deleted ( itemId set but gone) or the row is
+      // inconsistent (no itemId). Release the orphaned storage object before
+      // resetting, otherwise the blob leaks (the cleanup cron only sweeps
+      // pending rows, and this row is currently complete). Guarded so a blob
+      // some other item/operation still depends on — or one already deleted —
+      // can't corrupt them or wedge this recycle path. Clearing itemId is
+      // redundant for the no-itemId case but harmless.
       if (
         op.storageId !== undefined &&
         (await isStorageUnreferenced(ctx, op.storageId, op._id))
@@ -509,6 +498,7 @@ export const beginImageImport = mutation({
       }
       await ctx.db.patch(op._id, {
         status: "pending",
+        itemId: undefined,
         storageId: undefined,
         updatedAt: now,
       });
@@ -520,7 +510,9 @@ export const beginImageImport = mutation({
 
     // Pending: refresh updatedAt (a begin is active interest) and hand back a
     // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
-    // the first storageId and discards the redundant blob.
+    // the first storageId and discards the redundant blob. A lapsed user
+    // retrying a pending op must not mint a fresh upload URL or refresh
+    // updatedAt (which would keep the row alive past the cleanup cron).
     await ctx.db.patch(op._id, { updatedAt: now });
     return {
       kind: "upload",
@@ -537,6 +529,7 @@ export const attachImageUpload = mutation({
   returns: v.object({ storageId: v.id("_storage") }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     requireOperationId(args.operationId);
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
@@ -629,9 +622,14 @@ export const finalizeImageImport = mutation({
     // the caller resending identical valid fields; a completed import is final.
     // (A complete row pointing at a deleted item should have been recycled by
     // begin; if we reach here, treat it as complete with the recorded id.)
+    // Entitlement is NOT checked here — a lapsed user must still retrieve an
+    // already-completed itemId.
     if (op !== null && op.status === "complete" && op.itemId !== undefined) {
       return op.itemId;
     }
+
+    // Gate only new work (creating an item from a pending operation).
+    await requireProEntitlement(ctx, userId);
 
     // Validate BEFORE touching the ledger: invalid metadata must not mark the
     // operation complete, so the caller can retry with corrected input.
@@ -894,6 +892,7 @@ export const createLinkItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     // Centralized syntactic URL policy: rejects non-http(s) schemes, embedded
     // credentials, non-default ports, missing hosts, and oversized URLs before
     // the item is ever inserted or scheduled. Network-destination safety (private
@@ -919,6 +918,7 @@ export const createNoteItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
       userId,
@@ -938,6 +938,7 @@ export const findLinks = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");

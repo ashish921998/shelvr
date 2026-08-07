@@ -1,7 +1,16 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // Convex Auth session/account tables (users, authSessions, authAccounts,
+  // authRefreshTokens, authVerificationCodes, authVerifiers, authRateLimits).
+  // The `users` table is the source of truth for the signed-in user's identity.
+  // Use `getAuthUserId(ctx)` (or the app's `requireUserId(ctx)` wrapper) when
+  // deriving the stable users-table document ID; the raw auth subject can also
+  // include a session suffix.
+  ...authTables,
+
   items: defineTable({
     userId: v.string(),
     type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
@@ -86,7 +95,11 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    // Space names are the stable key used by onboarding replay. Keeping this
+    // lookup index-backed makes retries idempotent without creating duplicates.
+    .index("by_user_and_name", ["userId", "name"]),
 
   spaceItems: defineTable({
     userId: v.string(),
@@ -167,4 +180,35 @@ export default defineSchema({
     // pages through image rows only and can't be starved by stale link/note
     // rows once plans 004/005 create them.
     .index("by_kind_status_updated", ["kind", "status", "updatedAt"]),
+
+  // Pro subscription / entitlement state. One row per user, keyed by the Convex
+  // Auth user id (the same userId every other table uses). Written exclusively by
+  // the RevenueCat webhook (http.ts -> upsertSubscription); read by
+  // getEntitlement (client) and requireProEntitlement (gated mutations). The
+  // lifecycle is:
+  //
+  //   trialing (3-day yearly trial) -> pro (paid) -> lapsed (trial/sub ended)
+  //
+  // A lapsed user is read-only: they can view and search existing saves and
+  // spaces, but every save and Pro feature is gated behind an active trial or
+  // subscription. `expiresAt` is the end of the current period/trial (ms epoch);
+  // the server re-checks it against Date.now() inside mutations (queries never
+  // read the wall clock), and the client computes `entitled` from its own clock.
+  subscriptions: defineTable({
+    userId: v.string(),
+    status: v.union(
+      v.literal("trialing"),
+      v.literal("pro"),
+      v.literal("lapsed"),
+      v.literal("lifetime"),
+    ),
+    expiresAt: v.number(),
+    productId: v.optional(v.string()),
+    // RevenueCat `event_timestamp_ms` — a monotonic event timestamp from the
+    // webhook payload. Used to order events so a newer event can move expiry in
+    // either direction (e.g. a refund shortens the period). Optional for
+    // backward compatibility with rows created before this field existed.
+    eventTimestampMs: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 });

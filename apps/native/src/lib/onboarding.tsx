@@ -14,9 +14,9 @@ const OnboardingContext = createContext<OnboardingContextValue>({
 });
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [onboarded, setOnboarded] = useState(
-    () => SecureStore.getItem(ONBOARDING_KEY) === 'true',
-  );
+  const [onboarded, setOnboarded] = useState(() => {
+    return SecureStore.getItem(ONBOARDING_KEY) === 'true';
+  });
 
   const completeOnboarding = useCallback(() => {
     SecureStore.setItem(ONBOARDING_KEY, 'true');
