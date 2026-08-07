@@ -3,13 +3,9 @@ import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { Icon } from './symbol';
-
 type Props = {
   title: string;
   message: string;
-  /** Optional leading icon name (SF Symbol). Omit to hide the icon badge. */
-  icon?: string;
   ctaLabel?: string;
   /** Override the CTA action. Defaults to presenting the paywall / fallback. */
   onPress?: () => void;
@@ -24,20 +20,13 @@ type Props = {
 export function ProGate({
   title,
   message,
-  icon,
-  ctaLabel = 'Start 7-day free trial',
+  ctaLabel = 'Start free trial',
   onPress,
 }: Props) {
   const router = useRouter();
-  const { theme } = useUnistyles();
   const handlePress = onPress ?? (() => openPaywall(router));
   return (
     <View style={styles.container}>
-      {icon !== undefined && (
-        <View style={styles.iconBadge}>
-          <Icon name={icon} size={28} tintColor={theme.colors.primaryText} />
-        </View>
-      )}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
       <Pressable
@@ -59,24 +48,15 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
     backgroundColor: theme.colors.background,
   },
-  iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.gap(0.5),
-  },
   title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
+    fontFamily: theme.fonts.display,
+    fontSize: 22,
     color: theme.colors.foreground,
   },
   message: {
     fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     color: theme.colors.muted,
     textAlign: 'center',
   },

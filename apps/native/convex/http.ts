@@ -101,9 +101,9 @@ function isLifetimeProduct(productId: string): boolean {
  * flips them to lapsed).
  *
  * The trial/pro distinction is advisory only — both are `entitled` for gating.
- * INITIAL_PURCHASE is treated as `trialing` because the only entry point into
- * Shelvr is the 7-day introductory trial; a direct paid purchase (no trial)
- * would still be entitled, just labeled `trialing` until the next event.
+ * INITIAL_PURCHASE is treated as `trialing`: the yearly plan enters via a
+ * 3-day introductory trial, and a direct paid purchase (monthly, no trial) is
+ * still entitled — just labeled `trialing` until the next event flips it.
  *
  * A non-renewing purchase that is NOT a lifetime product maps to `undefined`
  * (preserve status) — it's a consumable/one-time purchase, not a subscription

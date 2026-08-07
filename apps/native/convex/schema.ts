@@ -181,7 +181,7 @@ export default defineSchema({
   // getEntitlement (client) and requireProEntitlement (gated mutations). The
   // lifecycle is:
   //
-  //   trialing (7-day trial) -> pro (paid) -> lapsed (trial/subscription ended)
+  //   trialing (3-day yearly trial) -> pro (paid) -> lapsed (trial/sub ended)
   //
   // A lapsed user is read-only: they can view and search existing saves and
   // spaces, but every save and Pro feature is gated behind an active trial or
