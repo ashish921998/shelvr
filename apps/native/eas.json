@@ -29,6 +29,19 @@
         "image": "macos-tahoe-26.5-xcode-26.6"
       }
     },
+    "preview-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://amicable-antelope-639.convex.cloud",
+        "EXPO_PUBLIC_CONVEX_SITE_URL": "https://amicable-antelope-639.convex.site",
+        "EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS": "true",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_DzhYgoqsrxPykbPmjFpAMFbGBwn"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
