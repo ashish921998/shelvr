@@ -5,6 +5,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { generateObject } from "ai";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
@@ -16,9 +17,9 @@ import {
   type SafeFetchError,
 } from "./model/safeFetch";
 
-// Bare model-id strings route through the Vercel AI Gateway automatically
-// (authenticated via the AI_GATEWAY_API_KEY deployment env var).
-const MODEL = "google/gemini-3.1-flash-lite";
+// Call Google directly (no Vercel AI Gateway). The default `google` provider
+// reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
+const MODEL = google("gemini-3.1-flash-lite");
 
 const SYSTEM_PROMPT =
   "You are the classifier for Shelvr, a save-it-for-later app. Titles must be short and " +

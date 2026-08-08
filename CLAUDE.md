@@ -72,8 +72,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
 
-**The AI model** is `google/gemini-3.1-flash-lite`, a bare model-id string that routes through the
-**Vercel AI Gateway** (auth via the `AI_GATEWAY_API_KEY` Convex deployment env var).
+**The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
+(auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var — an AI Studio API key).
 
 When editing anything in `convex/`, prefer the `convex-expert` skill — object-form syntax,
 `args` + `returns` validators on every function, index-backed reads only.
@@ -114,7 +114,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET` — Sign-in-with-Apple Service ID + signed JWT secret
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in
-- `AI_GATEWAY_API_KEY` — Vercel AI Gateway key for classification
+- `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
+  `@ai-sdk/google`, no gateway)
 - `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts
 - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public SDK
   keys (client-side; entitlement stays `none` until these are set and a subscription row is written)
