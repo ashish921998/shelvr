@@ -27,6 +27,8 @@ export type AnalyticsEventProperties = {
     $set: { save_pileup: string[]; save_types: string[] };
   };
   shared_content_saved: { item_count: number };
+  review_prompted: { ready_count: number };
+  review_link_opened: Record<string, never>;
 };
 
 export type AnalyticsEvent = keyof AnalyticsEventProperties;

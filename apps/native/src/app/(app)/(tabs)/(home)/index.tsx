@@ -1,5 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
 import { MasonryFeed } from '@/components/masonry-feed';
+import { useReviewPrompt } from '@/lib/review-prompt';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 export default function HomeScreen() {
   const { data: items } = useQuery(convexQuery(api.items.listItems, {}));
+  useReviewPrompt(items);
 
   if (items === undefined) {
     return (
