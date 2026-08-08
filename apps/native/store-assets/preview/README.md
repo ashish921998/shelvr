@@ -18,12 +18,14 @@ Like the screenshots, this is **staged** — it is NOT on the live 1.0.0 submiss
 (previews lock while a version is in review). Apply it to the next version:
 
 ```sh
-# from apps/native, with a version in an editable state
-asc app-previews upload \
-  --app 6798143550 \
-  --version <VERSION_STRING> \
+# from apps/native, with a version in an editable state (asc 3.5.1).
+# 1) resolve the en-US version-localization id for the target version
+asc localizations list --version <VERSION_ID> --output json --locale en-US
+# 2) upload the preview to the 6.9" slot
+asc video-previews upload \
+  --version-localization <VERSION_LOCALIZATION_ID> \
   --path store-assets/preview/shelvr-preview-6.9.mp4 \
-  --device-type IPHONE_67
+  --device-type IPHONE_69
 ```
 
 Regenerate from a fresh argent screen recording (showTouches + trimStatic, video-watermark

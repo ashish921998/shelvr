@@ -814,6 +814,11 @@ async function createItemWithOperation(
       await ctx.db.patch(op._id, { status: "pending", itemId: undefined });
     }
 
+    // New work is now certain (the idempotent completed-return above already
+    // exited). Charge the itemCreate bucket HERE, not in the mutation handler,
+    // so a retry of an already-finished operation is never billed a token —
+    // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
+    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
     const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
@@ -839,6 +844,7 @@ async function createItemWithOperation(
   }
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
+  await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
   return await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId);
 }
 
@@ -897,7 +903,9 @@ export const createLinkItem = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
-    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+    // Rate limiting is charged inside createItemWithOperation, after the
+    // idempotent completed-operation return, so a retry of a finished share
+    // isn't billed a token.
     // Centralized syntactic URL policy: rejects non-http(s) schemes, embedded
     // credentials, non-default ports, missing hosts, and oversized URLs before
     // the item is ever inserted or scheduled. Network-destination safety (private
@@ -924,7 +932,8 @@ export const createNoteItem = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
-    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+    // Rate limiting is charged inside createItemWithOperation, after the
+    // idempotent completed-operation return (see createLinkItem).
     return await createItemWithOperation(
       ctx,
       userId,
