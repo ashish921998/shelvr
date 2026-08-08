@@ -17,6 +17,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_memberships from "../model/memberships.js";
+import type * as model_rateLimiter from "../model/rateLimiter.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as spaces from "../spaces.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/memberships": typeof model_memberships;
+  "model/rateLimiter": typeof model_rateLimiter;
   "model/revenuecat": typeof model_revenuecat;
   "model/safeFetch": typeof model_safeFetch;
   spaces: typeof spaces;
@@ -72,4 +74,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};
