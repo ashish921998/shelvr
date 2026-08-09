@@ -38,9 +38,10 @@ module.exports = ({ config }) => ({
   android: {
     ...appConfig.expo.android,
     ...config?.android,
-    icon: isProduction
-      ? appConfig.expo.android?.icon
-      : { ...appConfig.expo.android?.icon, foregroundImage: './assets/icon-dev.png' },
+    icon: isProduction ? appConfig.expo.android?.icon : undefined,
+    adaptiveIcon: isProduction
+      ? appConfig.expo.android?.adaptiveIcon
+      : { ...appConfig.expo.android?.adaptiveIcon, foregroundImage: './assets/icon-dev.png' },
     ...(googleMapsApiKey
       ? { config: { googleMaps: { apiKey: googleMapsApiKey } } }
       : {}),
@@ -61,6 +62,7 @@ module.exports = ({ config }) => ({
     [
       'expo-widgets',
       {
+        groupIdentifier: 'group.app.shelvr.save',
         widgets: [
           {
             name: 'RecentSaves',

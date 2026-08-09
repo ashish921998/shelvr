@@ -49,7 +49,7 @@ function widgetTitle(item: FeedItem): string {
 }
 
 function widgetSubtitle(item: FeedItem): string {
-  if (item.type === 'link') return item.siteName ?? displayHost(item.url) ?? 'Link';
+  if (item.type === 'link') return item.siteName || displayHost(item.url) || 'Link';
   if (item.type === 'note') return 'Note';
   return 'Photo';
 }
@@ -82,8 +82,11 @@ async function syncWidget(items: FeedItem[]) {
     }),
   );
 
+  RecentSavesWidget.updateSnapshot({ items: widgetItems });
+
   // Drop thumbnails for items that left the widget so the shared container
-  // doesn't grow forever.
+  // doesn't grow forever. Run after updateSnapshot so the old snapshot's
+  // referenced files stay valid until the new one is live.
   const keep = new Set(items.map((item) => `${THUMB_PREFIX}${item._id}.jpg`));
   for (const entry of dir.list()) {
     if (entry instanceof File && entry.name.startsWith(THUMB_PREFIX) && !keep.has(entry.name)) {
@@ -94,8 +97,6 @@ async function syncWidget(items: FeedItem[]) {
       }
     }
   }
-
-  RecentSavesWidget.updateSnapshot({ items: widgetItems });
 }
 
 // Serialize syncs so a fast series of Convex pushes can't interleave file work.
