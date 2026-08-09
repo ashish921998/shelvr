@@ -26,7 +26,7 @@ export default function HomeStackLayout() {
   // Add and Map are Pro features — route to the paywall unless entitled.
   // Suppress haptic until entitlement resolves — firing it during loading
   // would imply the action is about to run when the guard will drop it.
-  const guardedTap = (href: '/add' | '/map') => () => {
+  const guardedTap = (href: '/add') => () => {
     if (entitlementLoading) return;
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -55,13 +55,6 @@ export default function HomeStackLayout() {
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
         <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="map"
-            tintColor={labelColor}
-            onPress={guardedTap('/map')}
-          >
-            Map
-          </Stack.Toolbar.Button>
           <Stack.Toolbar.Button
             icon="plus"
             tintColor={labelColor}

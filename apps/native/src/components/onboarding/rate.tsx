@@ -1,24 +1,28 @@
+import { analytics } from '@/lib/analytics';
 import { Icon } from '@/components/symbol';
-import * as StoreReview from 'expo-store-review';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
+const APP_STORE_ID = '6798143550';
+
 // Step 8 — the rate-us beat. Laurels + a line that frames Shelvr as built for
-// this user. The CTA triggers the native Store Review sheet, then advances no
-// matter what — Apple returns no signal from requestReview(), and the call is
-// rate-limited (~3×/year) and a no-op in many dev builds, so blocking on it
-// would be a dead end. The secondary "Not now" always advances too.
+// this user. The CTA opens the App Store review page via deep link (not the
+// native requestReview() sheet) so it does NOT consume Apple's ~3/year review
+// prompt quota. The native sheet is reserved for the post-onboarding hook that
+// fires after the user has experienced real AI-classified saves.
+// The secondary "Not now" always advances too.
 export function RateStep({ onAdvance }: { onAdvance: () => void }) {
   const { theme } = useUnistyles();
 
   const rate = async () => {
     try {
-      if (await StoreReview.hasAction()) {
-        await StoreReview.requestReview();
-      }
+      analytics.capture('review_link_opened');
+      await Linking.openURL(
+        `itms-apps://itunes.apple.com/app/id${APP_STORE_ID}?action=write-review`,
+      );
     } catch {
-      // Swallowed: the store-review surface is best-effort. We advance regardless.
+      // Best-effort — advance regardless.
     }
     onAdvance();
   };
