@@ -47,6 +47,9 @@ yarn-error.*
 # EAS Simulator session (carries a token - do not commit)
 .env.eas-simulator
 
+# App Store Connect CLI (local metadata push reports)
+.asc/
+
 # Agent skill files (installed by Convex/agent tooling, not project code)
 .agents/skills/
 .claude/skills/

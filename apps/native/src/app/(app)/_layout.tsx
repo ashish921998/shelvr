@@ -1,8 +1,10 @@
 import { useOnboarding } from '@/lib/onboarding';
 import { useReplayOnboarding } from '@/lib/replay-onboarding';
 import { useResumePendingShare } from '@/lib/share/use-resume-pending-share';
+import { RecentSavesWidgetSync } from '@/lib/widget-sync';
 import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
+import { Fragment } from 'react';
 import { useUnistyles } from 'react-native-unistyles';
 
 export default function AppLayout() {
@@ -26,13 +28,15 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerTransparent: true,
-        headerShadowVisible: false,
-        headerTintColor: theme.colors.primary,
-      }}
-    >
+    <Fragment>
+      <RecentSavesWidgetSync />
+      <Stack
+        screenOptions={{
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerTintColor: theme.colors.primary,
+        }}
+      >
       <Stack.Protected guard={onboarded}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="share" options={{ headerShown: false }} />
@@ -49,13 +53,6 @@ export default function AppLayout() {
           name="space/[id]"
           options={{
             title: '',
-            headerBackButtonDisplayMode: 'minimal',
-          }}
-        />
-        <Stack.Screen
-          name="map"
-          options={{
-            title: 'Map',
             headerBackButtonDisplayMode: 'minimal',
           }}
         />
@@ -123,6 +120,7 @@ export default function AppLayout() {
       <Stack.Protected guard={!onboarded}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack.Protected>
-    </Stack>
+      </Stack>
+    </Fragment>
   );
 }

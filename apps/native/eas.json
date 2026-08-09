@@ -9,13 +9,22 @@
       "distribution": "internal",
       "channel": "development",
       "environment": "development",
+      "env": {
+        "APP_VARIANT": "development"
+      },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "development-simulator": {
       "extends": "development",
       "channel": "development",
+      "env": {
+        "APP_VARIANT": "development"
+      },
       "ios": {
         "simulator": true,
         "image": "macos-tahoe-26.5-xcode-26.6"
@@ -25,14 +34,23 @@
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
+      "env": {
+        "APP_VARIANT": "preview"
+      },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "environment": "production",
+      "env": {
+        "APP_VARIANT": "production"
+      },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
       }
@@ -43,6 +61,10 @@
       "ios": {
         "ascAppId": "6798143550",
         "appleTeamId": "WJP847UZY2"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account-key.json",
+        "track": "internal"
       }
     }
   }
