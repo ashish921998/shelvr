@@ -149,7 +149,7 @@ export default function ProfileScreen() {
       {process.env.EXPO_OS === 'android' ? (
         <View style={styles.sheetHeader}>
           <Wordmark size={30} />
-          <HeaderIconButton icon="xmark" label="Close account" onPress={closeProfile} />
+          <HeaderIconButton icon="xmark" label="Close profile" onPress={closeProfile} />
         </View>
       ) : (
         <Wordmark size={30} />

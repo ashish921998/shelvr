@@ -168,7 +168,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
           ...(Platform.OS === 'android'
             ? {
                 headerLeft: canUndo
-                  ? () => <HeaderIconButton icon="arrow.2.circlepath" label="Undo" onPress={handleUndo} />
+                  ? () => <HeaderIconButton icon="arrow.uturn.backward" label="Undo" onPress={handleUndo} />
                   : undefined,
                 headerRight: () => (
                   <View style={styles.headerActions}>
