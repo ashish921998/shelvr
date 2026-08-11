@@ -1,4 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
+import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { openPaywall, presentCustomerCenter, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { analytics } from '@/lib/analytics';
@@ -9,7 +10,7 @@ import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
@@ -20,6 +21,16 @@ export default function ProfileScreen() {
   const { status, loading } = useEntitlement();
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const [deleting, setDeleting] = useState(false);
+
+  const closeProfile = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    // A development reload or direct link can restore Profile as the root
+    // route. In that state there is no history entry for Android Back to pop.
+    router.replace('/');
+  };
 
   const proLabel =
     status === 'trialing'
@@ -130,8 +141,19 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.content}>
-      <Wordmark size={30} />
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.content}
+    >
+      {process.env.EXPO_OS === 'android' ? (
+        <View style={styles.sheetHeader}>
+          <Wordmark size={30} />
+          <HeaderIconButton icon="xmark" label="Close profile" onPress={closeProfile} />
+        </View>
+      ) : (
+        <Wordmark size={30} />
+      )}
       <Text style={styles.slogan}>Save it for later.</Text>
 
       <View style={styles.card}>
@@ -212,16 +234,25 @@ export default function ProfileScreen() {
           {deleting ? 'Deleting…' : 'Delete account'}
         </Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   content: {
+    flexGrow: 1,
     padding: theme.gap(3),
     paddingTop: theme.gap(4),
+    paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
     alignItems: 'center',
+  },
+  sheetHeader: {
+    width: '100%',
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   slogan: {
     fontFamily: theme.fonts.regular,

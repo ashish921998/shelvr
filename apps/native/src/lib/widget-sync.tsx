@@ -4,6 +4,7 @@ import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Directory, File, Paths } from 'expo-file-system';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { Images } from 'react-native-nitro-image';
@@ -55,8 +56,11 @@ function widgetSubtitle(item: FeedItem): string {
 }
 
 async function syncWidget(items: FeedItem[]) {
-  // Loaded lazily so a dev client built before expo-widgets was added doesn't
-  // crash at startup on the missing native module.
+  // Metro can evaluate a dynamic import eagerly. Check the native registry
+  // before touching expo-widgets so older development clients degrade safely
+  // instead of crashing in ExpoWidgets.ios.js at startup.
+  if (!requireOptionalNativeModule('ExpoWidgets')) return;
+
   const { widgetsDirectory } = await import('expo-widgets');
   const { default: RecentSavesWidget } = await import('@/widgets/recent-saves-widget');
 

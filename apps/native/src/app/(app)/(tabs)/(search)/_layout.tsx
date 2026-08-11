@@ -8,6 +8,7 @@ export default function SearchStackLayout() {
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
+        headerTitleAlign: 'center',
       }}
     >
       <Stack.Screen name="index">

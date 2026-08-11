@@ -74,7 +74,11 @@ export default function ManageSpacesScreen() {
   const loading = spaces === undefined || item === undefined;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.content}
+    >
       <Text style={styles.heading}>Spaces</Text>
       <Text style={styles.subheading}>Choose where this save lives.</Text>
 
@@ -107,7 +111,9 @@ export default function ManageSpacesScreen() {
 
 const styles = StyleSheet.create((theme) => ({
   content: {
+    flexGrow: 1,
     padding: theme.gap(2.5),
+    paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
   },
   heading: {

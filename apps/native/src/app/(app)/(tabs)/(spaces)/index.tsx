@@ -11,7 +11,8 @@ import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ScreenLoader } from '@/components/ui/screen-loader';
+import { Alert, Pressable, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -148,9 +149,7 @@ export default function SpacesScreen() {
 
   if (spaces === undefined) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Opening your spaces" />
     );
   }
 
@@ -229,11 +228,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   content: {
     padding: theme.gap(1),
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   // Grid cell — no panel of its own (like the home feed); the stacked covers are
   // the visual. The margin creates the gutters between the two columns and rows.

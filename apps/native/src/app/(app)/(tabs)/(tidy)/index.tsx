@@ -3,10 +3,12 @@ import * as Linking from 'expo-linking';
 import { usePermissions, type PermissionResponse } from 'expo-media-library';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState, type FC } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { EmptyState } from '@/components/empty-state';
+import { HeaderActionMenu, HeaderIconButton } from '@/components/ui/header-icon-button';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { ProGate as ProGateView } from '@/components/pro-gate';
 import { TidyDeck } from '@/components/tidy/tidy-deck';
 import { TidyDone } from '@/components/tidy/tidy-done';
@@ -160,11 +162,39 @@ const TidyDeckView: FC<DeckViewProps> = ({
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: currentSource.title }} />
+      <Stack.Screen
+        options={{
+          title: currentSource.title,
+          ...(Platform.OS === 'android'
+            ? {
+                headerLeft: canUndo
+                  ? () => <HeaderIconButton icon="arrow.uturn.backward" label="Undo" onPress={handleUndo} />
+                  : undefined,
+                headerRight: () => (
+                  <View style={styles.headerActions}>
+                    {pendingDeleteCount > 0 ? (
+                      <HeaderIconButton icon="trash" label="Delete reviewed photos" badge={pendingDeleteCount} onPress={commitDeletes} />
+                    ) : null}
+                    <HeaderActionMenu
+                      icon="photo.on.rectangle.angled"
+                      label="Choose photo album"
+                      title="Photo source"
+                      actions={sources.map((source) => ({
+                        id: source.id,
+                        label: source.id === selectedId ? `${source.title} ✓` : source.title,
+                        onPress: () => selectSource(source.id),
+                      }))}
+                    />
+                  </View>
+                ),
+              }
+            : {}),
+        }}
+      />
 
       {/* Native header controls (note 3): undo on the left, delete on the
           right with a live count badge. */}
-      <Stack.Toolbar placement="left">
+      {Platform.OS === 'ios' ? <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon="arrow.uturn.backward"
           hidden={!canUndo}
@@ -172,8 +202,8 @@ const TidyDeckView: FC<DeckViewProps> = ({
         >
           Undo
         </Stack.Toolbar.Button>
-      </Stack.Toolbar>
-      <Stack.Toolbar placement="right">
+      </Stack.Toolbar> : null}
+      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="trash"
           hidden={pendingDeleteCount === 0}
@@ -197,7 +227,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
             </Stack.Toolbar.MenuAction>
           ))}
         </Stack.Toolbar.Menu>
-      </Stack.Toolbar>
+      </Stack.Toolbar> : null}
 
       {/* Centered progress counter (note 2). */}
       <View style={styles.progressRow}>
@@ -263,11 +293,7 @@ const PermissionGate: FC<{
   );
 };
 
-const Loading: FC = () => (
-  <View style={styles.loading}>
-    <ActivityIndicator />
-  </View>
-);
+const Loading: FC = () => <ScreenLoader label="Opening Tidy" />;
 
 /** Pro gate shown to lapsed users on the Tidy tab. */
 const ProGate: FC = () => (
@@ -281,6 +307,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.gap(1),
   },
   progressRow: {
     alignItems: 'center',
@@ -334,11 +364,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 16,
     color: 'white',
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background,
   },
 }));

@@ -49,6 +49,7 @@ const SF_TO_MATERIAL: Record<string, string> = {
   // Navigation
   'chevron.left': 'arrow_back',
   'chevron.right': 'arrow_forward',
+  'arrow.uturn.backward': 'undo',
   // Tabs / system
   'house.fill': 'home',
   'gearshape': 'settings',

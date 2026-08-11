@@ -1,11 +1,12 @@
 import { EmptyState } from '@/components/empty-state';
 import { MasonryFeed } from '@/components/masonry-feed';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { useReviewPrompt } from '@/lib/review-prompt';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { ProgressiveBlurHeader } from 'progressive-blur';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 export default function HomeScreen() {
@@ -14,9 +15,7 @@ export default function HomeScreen() {
 
   if (items === undefined) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Warming your shelf" />
     );
   }
 
@@ -43,11 +42,5 @@ const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
 
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background,
   },
 }));

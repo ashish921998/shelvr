@@ -8,6 +8,7 @@ export default function MapStackLayout() {
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
+        headerTitleAlign: 'center',
       }}
     >
       <Stack.Screen name="index">

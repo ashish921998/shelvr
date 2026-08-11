@@ -1,4 +1,5 @@
 import { AnimatedSwitch } from '@/components/ui/animated-switch';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { usePaywallGuard } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
@@ -35,9 +36,7 @@ export default function NewSpaceScreen() {
   // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Opening space" />
     );
   }
 

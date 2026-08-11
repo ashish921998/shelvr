@@ -1,4 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
+import { HeaderActionMenu, HeaderIconButton } from '@/components/ui/header-icon-button';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import type { FeedItem } from '@/components/item-card';
 import { MasonryFeed } from '@/components/masonry-feed';
 import { api } from '@convex/_generated/api';
@@ -11,7 +13,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { useMemo } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
@@ -40,9 +42,7 @@ export default function SpaceScreen() {
   // `undefined` = loading (nothing cached yet); `null` = not found.
   if (space === undefined) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Opening space" />
     );
   }
 
@@ -88,6 +88,28 @@ export default function SpaceScreen() {
 
   return (
     <>
+      <Stack.Screen
+        options={Platform.OS === 'android' ? {
+          headerRight: () => (
+            <View style={styles.headerActions}>
+              <HeaderIconButton
+                icon="plus"
+                label="Add to space"
+                onPress={() => router.push({ pathname: '/add', params: { spaceId: id } })}
+              />
+              <HeaderActionMenu
+                icon="ellipsis"
+                label="Space actions"
+                title={space.name}
+                actions={[
+                  { label: 'Edit space', onPress: () => router.push({ pathname: '/new-space', params: { id } }) },
+                  { label: 'Delete space', destructive: true, onPress: confirmDelete },
+                ]}
+              />
+            </View>
+          ),
+        } : undefined}
+      />
       <Stack.Title
         style={{
           fontFamily: theme.fonts.display,
@@ -96,7 +118,7 @@ export default function SpaceScreen() {
       >
         {space.name}
       </Stack.Title>
-      <Stack.Toolbar placement="right">
+      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="plus"
           tintColor={theme.colors.foreground}
@@ -119,7 +141,7 @@ export default function SpaceScreen() {
             Delete space
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
-      </Stack.Toolbar>
+      </Stack.Toolbar> : null}
       <View style={styles.container}>
         <MasonryFeed
           items={feedItems}
@@ -164,6 +186,10 @@ export default function SpaceScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.gap(1),
   },
   loading: {
     flex: 1,
