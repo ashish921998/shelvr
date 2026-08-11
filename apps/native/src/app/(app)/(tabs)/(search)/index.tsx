@@ -1,4 +1,5 @@
 import { EmptyState } from '@/components/empty-state';
+import { Icon } from '@/components/symbol';
 import { MasonryFeed } from '@/components/masonry-feed';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
@@ -6,8 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Platform, TextInput, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -19,6 +20,7 @@ function useDebounced<T>(value: T, delay: number): T {
 }
 
 export default function SearchScreen() {
+  const { theme } = useUnistyles();
   const [search, setSearch] = useState('');
   const query = useDebounced(search.trim(), 250);
 
@@ -29,13 +31,29 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.SearchBar
-        placeholder="Search your saves"
-        autoCapitalize="none"
-        hideWhenScrolling={false}
-        onChangeText={(e) => setSearch(e.nativeEvent.text)}
-        onCancelButtonPress={() => setSearch('')}
-      />
+      {Platform.OS === 'ios' ? (
+        <Stack.SearchBar
+          placeholder="Search your saves"
+          autoCapitalize="none"
+          hideWhenScrolling={false}
+          onChangeText={(e) => setSearch(e.nativeEvent.text)}
+          onCancelButtonPress={() => setSearch('')}
+        />
+      ) : (
+        <View style={styles.searchField}>
+          <Icon name="magnifyingglass" size={20} tintColor={theme.colors.muted} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search your saves"
+            placeholderTextColor={theme.colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+        </View>
+      )}
       {query.length === 0 ? (
         <EmptyState
           title="Find anything"
@@ -57,5 +75,27 @@ export default function SearchScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
+  },
+  searchField: {
+    marginTop: 112,
+    marginHorizontal: theme.gap(2),
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    paddingVertical: 0,
+    fontFamily: theme.fonts.regular,
+    fontSize: 16,
+    color: theme.colors.foreground,
   },
 }));

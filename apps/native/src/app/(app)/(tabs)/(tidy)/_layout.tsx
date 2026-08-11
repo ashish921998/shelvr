@@ -7,6 +7,7 @@ export default function TidyStackLayout() {
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
+        headerTitleAlign: 'center',
         headerTitleStyle: styles.title,
       }}
     >

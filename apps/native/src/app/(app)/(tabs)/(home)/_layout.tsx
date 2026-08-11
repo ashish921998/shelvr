@@ -1,4 +1,5 @@
 import { Wordmark } from '@/components/wordmark';
+import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { usePaywallGuard } from '@/lib/entitlement';
 import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
@@ -9,9 +10,6 @@ export default function HomeStackLayout() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { guard, loading: entitlementLoading } = usePaywallGuard();
-
-  // PlatformColor('label') is iOS-only; on Android fall back to the theme's
-  // foreground color.
   const labelColor = Platform.OS === 'ios' ? PlatformColor('label') : theme.colors.foreground;
 
   // Native bar-button items don't run JS on tap the way a Pressable does, so
@@ -39,30 +37,33 @@ export default function HomeStackLayout() {
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
+        headerTitleAlign: 'center',
       }}
     >
-      <Stack.Screen name="index">
+      <Stack.Screen
+        name="index"
+        options={Platform.OS === 'android' ? {
+          headerLeft: () => <HeaderIconButton icon="person.fill" label="Profile" onPress={tap('/profile')} />,
+          headerRight: () => <HeaderIconButton icon="plus" label="Add save" onPress={guardedTap('/add')} />,
+        } : undefined}
+      >
         <Stack.Title asChild>
           <Wordmark />
         </Stack.Title>
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="person"
-            tintColor={labelColor}
-            onPress={tap('/profile')}
-          >
-            Profile
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="plus"
-            tintColor={labelColor}
-            onPress={guardedTap('/add')}
-          >
-            Add
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
+        {Platform.OS === 'ios' ? (
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button icon="person" tintColor={labelColor} onPress={tap('/profile')}>
+              Profile
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        ) : null}
+        {Platform.OS === 'ios' ? (
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button icon="plus" tintColor={labelColor} onPress={guardedTap('/add')}>
+              Add
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        ) : null}
       </Stack.Screen>
     </Stack>
   );

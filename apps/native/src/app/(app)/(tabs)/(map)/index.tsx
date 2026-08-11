@@ -1,4 +1,5 @@
 import { EmptyState } from '@/components/empty-state';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { ProGate as ProGateView } from '@/components/pro-gate';
 import { useEntitlement } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
@@ -10,7 +11,7 @@ import { Image } from 'expo-image';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 // The accent color matches theme.colors.primary (identical in both themes).
@@ -138,9 +139,7 @@ export default function MapScreen() {
 
   if (entitlementLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Opening your map" />
     );
   }
 
@@ -158,9 +157,7 @@ export default function MapScreen() {
 
   if (items === undefined) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Loading saved places" />
     );
   }
 

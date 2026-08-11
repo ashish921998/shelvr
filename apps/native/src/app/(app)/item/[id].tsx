@@ -1,4 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
+import { HeaderActionMenu } from '@/components/ui/header-icon-button';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { ItemDetail, type DetailItem } from '@/components/item-detail';
 import { ItemHeader } from '@/components/item-header';
 import { convexQuery } from '@convex-dev/react-query';
@@ -14,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Platform,
   Pressable,
   Share,
   Text,
@@ -264,9 +266,7 @@ export default function ItemScreen() {
 
   if (items === undefined) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator />
-      </View>
+      <ScreenLoader label="Opening save" />
     );
   }
 
@@ -284,12 +284,28 @@ export default function ItemScreen() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: 'minimal',
+          ...(Platform.OS === 'android'
+            ? {
+                headerRight: () => (
+                  <HeaderActionMenu
+                    icon="ellipsis"
+                    label="Save actions"
+                    title={activeItem?.title ?? activeItem?.note ?? 'Save actions'}
+                    actions={[
+                      { label: 'Share', onPress: shareActive },
+                      ...(activeItem?.url ? [{ label: 'Copy link', onPress: copyLink }] : []),
+                      { label: 'Delete', destructive: true, onPress: onDelete },
+                    ]}
+                  />
+                ),
+              }
+            : {}),
         }}
       />
       <Stack.Title asChild>
         <ItemHeader item={activeItem} />
       </Stack.Title>
-      <Stack.Toolbar placement="right">
+      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis">
           <Stack.Toolbar.MenuAction icon="square.and.arrow.up" onPress={shareActive}>
             Share
@@ -303,7 +319,7 @@ export default function ItemScreen() {
             Delete
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
-      </Stack.Toolbar>
+      </Stack.Toolbar> : null}
 
 
       <FlashList

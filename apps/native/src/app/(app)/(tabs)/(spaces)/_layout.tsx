@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { Stack, useRouter } from 'expo-router';
 import { Platform, PlatformColor, Text } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -23,21 +24,27 @@ export default function SpacesStackLayout() {
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
+        headerTitleAlign: 'center',
       }}
     >
-      <Stack.Screen name="index">
+      <Stack.Screen
+        name="index"
+        options={Platform.OS === 'android' ? {
+          headerRight: () => (
+            <HeaderIconButton icon="plus" label="New space" onPress={newSpace} />
+          ),
+        } : undefined}
+      >
         <Stack.Title asChild>
           <Text style={styles.title}>spaces</Text>
         </Stack.Title>
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="plus"
-            tintColor={labelColor}
-            onPress={newSpace}
-          >
-            New space
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
+        {Platform.OS === 'ios' ? (
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button icon="plus" tintColor={labelColor} onPress={newSpace}>
+              New space
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        ) : null}
       </Stack.Screen>
     </Stack>
   );

@@ -1,4 +1,5 @@
 import { useOnboarding } from '@/lib/onboarding';
+import { ScreenLoader } from '@/components/ui/screen-loader';
 import { useReplayOnboarding } from '@/lib/replay-onboarding';
 import { useResumePendingShare } from '@/lib/share/use-resume-pending-share';
 import { RecentSavesWidgetSync } from '@/lib/widget-sync';
@@ -18,7 +19,7 @@ export default function AppLayout() {
   useResumePendingShare();
 
   if (isLoading) {
-    return null;
+    return <ScreenLoader label="Opening Shelvr" />;
   }
 
   // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen

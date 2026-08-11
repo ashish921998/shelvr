@@ -11,8 +11,9 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
+import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 
@@ -180,6 +181,16 @@ export default function AddScreen() {
           headerShown: true,
           headerTransparent: false,
           headerStyle: { backgroundColor: theme.colors.background },
+          ...(Platform.OS === 'android' && isComposer
+            ? {
+                headerLeft: () => (
+                  <HeaderIconButton icon="chevron.left" label="Back to save options" onPress={() => setMode('menu')} />
+                ),
+                headerRight: () => (
+                  <HeaderIconButton icon="checkmark" label="Save" disabled={!canSave} onPress={save} />
+                ),
+              }
+            : {}),
         }}
       />
       {/* Animated title persists across mode changes so the text cascades
@@ -187,7 +198,7 @@ export default function AddScreen() {
       <Stack.Title asChild>
         <AnimatedText text={title} style={styles.heading} />
       </Stack.Title>
-      {isComposer && (
+      {isComposer && Platform.OS === 'ios' ? (
         <>
           <Stack.Toolbar placement="left">
             <Stack.Toolbar.Button
@@ -208,7 +219,7 @@ export default function AddScreen() {
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         </>
-      )}
+      ) : null}
 
       {isComposer ? (
         <TextInput

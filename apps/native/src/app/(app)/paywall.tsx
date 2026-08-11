@@ -12,13 +12,14 @@
 import { openPaywall, waitForSheetTransition } from '@/lib/entitlement';
 import { LEGAL_URLS } from '@/lib/legal';
 import { useRouter } from 'expo-router';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
 
 export default function PaywallScreen() {
   const router = useRouter();
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <Text style={styles.title}>Shelvr Pro</Text>
       <Text style={styles.message}>
         We couldn’t load subscription options right now. Check your connection
@@ -61,7 +62,7 @@ export default function PaywallScreen() {
           Privacy
         </Text>
       </Text>
-    </View>
+    </SafeAreaView>
   );
 }
 
