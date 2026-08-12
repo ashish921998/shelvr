@@ -77,6 +77,9 @@ importers:
       expo-blur:
         specifier: ~57.0.0
         version: 57.0.2(expo@57.0.10)(react-native@0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+      expo-build-properties:
+        specifier: ~57.0.10
+        version: 57.0.10(expo@57.0.10)
       expo-calendar:
         specifier: ~57.0.0
         version: 57.0.1(expo@57.0.10)(react-native@0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
@@ -4005,6 +4008,11 @@ packages:
       expo: '*'
       react: '*'
       react-native: '*'
+
+  expo-build-properties@57.0.10:
+    resolution: {integrity: sha512-twFB1IyA1WM3hGUdnEGTWqBsmdtQMIx6SBozlmhQRnocX9Kb8fDTMAAQOsjB3fqJeXUprIeuCpO+gO3MldJ7tQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-calendar@57.0.1:
     resolution: {integrity: sha512-f07ZrBRfZ+J1r+b0pHlo8Qbg4o3E97q4nx7Ce/aW6XQNKgBEpV1oJS1zGnxtWVBFnSO49hb92+fZGrieYj1Yzg==}
@@ -11070,6 +11078,13 @@ snapshots:
       expo: 57.0.10(f85dc84f37a02f73feaba341556cee74)
       react: 19.2.3
       react-native: 0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+
+  expo-build-properties@57.0.10(expo@57.0.10):
+    dependencies:
+      '@expo/schema-utils': 57.0.2
+      expo: 57.0.10(f85dc84f37a02f73feaba341556cee74)
+      resolve-from: 5.0.0
+      semver: 7.7.4
 
   expo-calendar@57.0.1(expo@57.0.10)(react-native@0.86.0(@babel/core@7.29.0)(@react-native/metro-config@0.86.0(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)):
     dependencies:

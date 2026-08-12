@@ -34,6 +34,7 @@
     "expo": "~57.0.2",
     "expo-auth-session": "~57.0.1",
     "expo-blur": "~57.0.0",
+    "expo-build-properties": "~57.0.10",
     "expo-calendar": "~57.0.0",
     "expo-clipboard": "~57.0.0",
     "expo-constants": "~57.0.3",

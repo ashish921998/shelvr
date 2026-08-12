@@ -52,6 +52,18 @@ module.exports = ({ config }) => ({
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),
     [
+      'expo-build-properties',
+      {
+        android: {
+          // Store builds only need physical-device ABIs. Skipping emulator
+          // architectures keeps native C++ compilation within EAS limits.
+          buildArchs: isProduction
+            ? ['arm64-v8a', 'armeabi-v7a']
+            : ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'],
+        },
+      },
+    ],
+    [
       'expo-dev-client',
       {
         // The generated scheme lets a development client (app.shelvr.save.dev)
