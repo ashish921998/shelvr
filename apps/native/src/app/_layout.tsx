@@ -1,7 +1,7 @@
 import { OnboardingProvider } from '@/lib/onboarding';
 import { analytics } from '@/lib/analytics';
 import { useEntitlementSync } from '@/lib/entitlement';
-import { currentUserQuery, useCurrentUser } from '@/lib/current-user';
+import { useCurrentUser } from '@/lib/current-user';
 import { posthog } from '@/lib/posthog';
 import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
 import { convex, persister, queryClient } from '@/lib/query-client';
@@ -19,11 +19,11 @@ import { useUnistyles } from 'react-native-unistyles';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
-// behind the synchronous-looking TokenStorage interface the provider expects.
+// behind the awaitable TokenStorage interface the provider expects.
 const authStorage: TokenStorage = {
-  getItem: (key) => SecureStore.getItem(key),
-  setItem: (key, value) => void SecureStore.setItem(key, value),
-  removeItem: (key) => void SecureStore.deleteItemAsync(key),
+  getItem: (key) => SecureStore.getItemAsync(key),
+  setItem: (key, value) => SecureStore.setItemAsync(key, value),
+  removeItem: (key) => SecureStore.deleteItemAsync(key),
 };
 
 // Single source of truth for the native route background. The navigator paints
@@ -42,12 +42,14 @@ function PostHogIdentity() {
     if (!isAuthenticated) {
       analytics.reset();
       identifiedUserId.current = undefined;
-      // This persisted query depends on auth even though its Convex key does
-      // not. Clear its old value before a later account can observe it, once
-      // per unauthenticated interval so the reactive query cannot loop.
+      // Convex query keys don't include the authenticated user. Remove every
+      // Convex entry once per unauthenticated interval so its subscription
+      // stops and a later account can never observe the previous user's data.
       if (!clearedUnauthenticatedUserCache.current) {
         clearedUnauthenticatedUserCache.current = true;
-        void queryClient.resetQueries({ queryKey: currentUserQuery.queryKey });
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] === 'convexQuery',
+        });
       }
       return;
     }
@@ -122,7 +124,17 @@ export default function RootLayout() {
       >
         <PersistQueryClientProvider
           client={queryClient}
-          persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: 'v1' }}
+          persistOptions={{
+            persister,
+            maxAge: 1000 * 60 * 60 * 24,
+            buster: 'v2',
+            // Restoring a user-scoped Convex query before auth initialization
+            // both exposes stale account data and starts an unauthenticated
+            // subscription. Keep persistence for non-Convex TanStack queries.
+            dehydrateOptions: {
+              shouldDehydrateQuery: (query) => query.queryKey[0] !== 'convexQuery',
+            },
+          }}
         >
           <PostHogIdentity />
           {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
