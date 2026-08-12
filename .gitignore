@@ -58,6 +58,7 @@ yarn-error.log*
 .vscode/
 .zed/
 skills-lock.json
+opencode.json
 
 # argent tool cache (screen recordings, etc.)
 .argent/
