@@ -35,7 +35,13 @@ export default function HomeStackLayout() {
   return (
     <Stack
       screenOptions={{
-        headerTransparent: true,
+        // FlashList does not consistently apply transparent-header insets on
+        // Android. Native headers own their space there; iOS keeps the
+        // content-under-header treatment.
+        headerTransparent: Platform.OS === 'ios',
+        headerStyle: Platform.OS === 'android'
+          ? { backgroundColor: theme.colors.background }
+          : undefined,
         headerShadowVisible: false,
         headerTitleAlign: 'center',
       }}

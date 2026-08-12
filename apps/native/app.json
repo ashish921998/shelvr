@@ -3,13 +3,13 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#faf6ee",
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/c6c97aa7-6676-47a1-8ffc-9a1339c2bc19"
@@ -89,6 +89,7 @@
         {
           "photosPermission": "Shelvr lets you tidy your photo library — keep, delete, or save photos into your hub.",
           "savePhotosPermission": "Shelvr can save images back to your photo library.",
+          "isAccessMediaLocationEnabled": true,
           "granularPermissions": ["photo"]
         }
       ],

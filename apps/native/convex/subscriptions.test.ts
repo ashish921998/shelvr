@@ -34,6 +34,22 @@ describe("Convex Auth identity boundaries", () => {
 });
 
 describe("RevenueCat subscription webhook writes", () => {
+  it("acknowledges a non-Convex app user id without creating a row", async () => {
+    const t = signedInAs("user-a");
+
+    await expect(
+      t.mutation(internal.subscriptions.upsertSubscription, {
+        userId: "1d2ff20a-7139-4398-b4e0-c03dc1b0b6dc",
+        status: "trialing",
+        expiresAt: Date.now() + 60_000,
+        eventTimestampMs: 1,
+      }),
+    ).resolves.toBeNull();
+
+    const rows = await t.run(async (ctx) => await ctx.db.query("subscriptions").collect());
+    expect(rows).toEqual([]);
+  });
+
   it("does not create Pro for a first-seen advisory event", async () => {
     const t = signedInAs("user-a");
 

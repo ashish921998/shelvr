@@ -28,12 +28,17 @@ export function useAlbums(enabled: boolean): TidySource[] {
     (async () => {
       try {
         const albums = await Album.getAll();
-        const named = await Promise.all(
+        // Android's MediaStore can return an album that disappears before its
+        // title is read. One stale id must not hide every other valid album.
+        const settled = await Promise.allSettled(
           albums.map(async (album) => ({
             id: album.id,
             title: await album.getTitle(),
             album,
           })),
+        );
+        const named = settled.flatMap((result) =>
+          result.status === 'fulfilled' ? [result.value] : [],
         );
         if (!cancelled) {
           const sorted = named

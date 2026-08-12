@@ -13,6 +13,9 @@ const tabs = [
   { name: '(search)', href: '/(app)/(tabs)/(search)', label: 'Search', icon: 'magnifyingglass' },
 ] as const;
 
+export const TAB_DOCK_HEIGHT = 64;
+export const TAB_DOCK_GAP = 12;
+
 const TabButton = forwardRef<NativeView, TabTriggerSlotProps & { label: string; icon: string }>(
   function TabButton({ isFocused, label, icon, style: _style, ...props }, ref) {
     const { theme } = useUnistyles();
@@ -43,7 +46,7 @@ const TabButton = forwardRef<NativeView, TabTriggerSlotProps & { label: string; 
 export function AppTabs() {
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, 10);
-  const contentBottomInset = dockBottom + 64 + 12;
+  const contentBottomInset = dockBottom + TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
 
   return (
     <Tabs style={styles.root} options={{ backBehavior: 'history' }}>
@@ -71,7 +74,7 @@ const styles = StyleSheet.create((theme) => ({
     position: 'absolute',
     left: 12,
     right: 12,
-    height: 64,
+    height: TAB_DOCK_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 5,

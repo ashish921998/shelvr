@@ -1,6 +1,6 @@
 import { AnimatedText } from '@/components/animated-text';
 import { parseExifDate } from '@/lib/date';
-import { parseExifLocation } from '@/lib/exif';
+import { resolvePickedImageLocation } from '@/lib/picked-image-location';
 import { usePaywallGuard } from '@/lib/entitlement';
 import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
 import { api } from '@convex/_generated/api';
@@ -157,16 +157,18 @@ export default function AddScreen() {
     });
     if (result.canceled || result.assets.length === 0) return;
     await runImageRequests(
-      result.assets.map((asset) => ({
-        image: {
-          uri: asset.uri,
-          width: asset.width,
-          height: asset.height,
-          mimeType: asset.mimeType,
-          capturedAt: parseExifDate(asset.exif),
-          ...parseExifLocation(asset.exif),
-        },
-      })),
+      await Promise.all(
+        result.assets.map(async (asset) => ({
+          image: {
+            uri: asset.uri,
+            width: asset.width,
+            height: asset.height,
+            mimeType: asset.mimeType,
+            capturedAt: parseExifDate(asset.exif),
+            ...(await resolvePickedImageLocation(asset)),
+          },
+        })),
+      ),
     );
   };
 
@@ -178,19 +180,9 @@ export default function AddScreen() {
     <View style={styles.content}>
       <Stack.Screen
         options={{
-          headerShown: true,
+          headerShown: Platform.OS !== 'android',
           headerTransparent: false,
           headerStyle: { backgroundColor: theme.colors.background },
-          ...(Platform.OS === 'android' && isComposer
-            ? {
-                headerLeft: () => (
-                  <HeaderIconButton icon="chevron.left" label="Back to save options" onPress={() => setMode('menu')} />
-                ),
-                headerRight: () => (
-                  <HeaderIconButton icon="checkmark" label="Save" disabled={!canSave} onPress={save} />
-                ),
-              }
-            : {}),
         }}
       />
       {/* Animated title persists across mode changes so the text cascades
@@ -198,6 +190,26 @@ export default function AddScreen() {
       <Stack.Title asChild>
         <AnimatedText text={title} style={styles.heading} />
       </Stack.Title>
+      {Platform.OS === 'android' ? (
+        <View style={styles.androidHeader}>
+          <HeaderIconButton
+            icon={isComposer ? 'chevron.left' : 'xmark'}
+            label={isComposer ? 'Back to save options' : 'Close save options'}
+            onPress={isComposer ? () => setMode('menu') : () => router.back()}
+          />
+          <Text style={styles.androidHeaderTitle}>{title}</Text>
+          {isComposer ? (
+            <HeaderIconButton
+              icon="checkmark"
+              label="Save"
+              disabled={!canSave}
+              onPress={save}
+            />
+          ) : (
+            <View style={styles.androidHeaderSpacer} />
+          )}
+        </View>
+      ) : null}
       {isComposer && Platform.OS === 'ios' ? (
         <>
           <Stack.Toolbar placement="left">
@@ -287,6 +299,24 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.display,
     fontSize: 24,
     color: theme.colors.foreground,
+  },
+  androidHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  androidHeaderTitle: {
+    flex: 1,
+    paddingHorizontal: theme.gap(1.5),
+    fontFamily: theme.fonts.display,
+    fontSize: 22,
+    color: theme.colors.foreground,
+    textAlign: 'center',
+  },
+  androidHeaderSpacer: {
+    width: 40,
+    height: 40,
   },
   actions: {
     flexDirection: 'row',

@@ -12,7 +12,7 @@ import { Link } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { ScreenLoader } from '@/components/ui/screen-loader';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -64,16 +64,19 @@ const BACKS = [
 // A hand-dropped pile of three same-size cards: two tilted blanks behind and the
 // real cover, barely rotated, on top. The pile's box takes the cover's aspect
 // ratio so the masonry feed packs spaces at their true proportions, exactly like
-// the home cards. An empty space shows a dashed placeholder cover.
+// the home cards. An empty space shows a designed starter cover.
 function CoverStack({
   cover,
   seed,
+  name,
 }: {
   cover:
     | { url: string; type: string; aspectRatio?: number; suggested?: boolean }
     | undefined;
   seed: string;
+  name: string;
 }) {
+  const { theme } = useUnistyles();
   const ratio = cover
     ? clampRatio(cover.aspectRatio, cover.type === 'link' ? OG_RATIO : 1)
     : 1;
@@ -87,6 +90,7 @@ function CoverStack({
           style={[
             styles.card,
             styles.cardBlank,
+            !cover && styles.cardEmptyBack,
             position,
             {
               transform: [
@@ -123,10 +127,30 @@ function CoverStack({
             position,
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
-        />
+        >
+          <View style={styles.emptyIconWell}>
+            <Icon
+              name={emptySpaceIcon(name)}
+              size={26}
+              weight="semibold"
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+          <Text style={styles.emptyLabel}>Add first save</Text>
+        </View>
       )}
     </View>
   );
+}
+
+function emptySpaceIcon(name: string) {
+  // Best-effort English heuristic; names outside these hints use the generic stack.
+  const normalized = name.toLowerCase();
+  if (normalized.includes('wish') || normalized.includes('gift')) return 'heart';
+  if (normalized.includes('video') || normalized.includes('watch')) return 'play.rectangle';
+  if (normalized.includes('read') || normalized.includes('article')) return 'doc.text';
+  if (normalized.includes('inspiration') || normalized.includes('idea')) return 'sparkles';
+  return 'rectangle.stack';
 }
 
 export default function SpacesScreen() {
@@ -188,7 +212,7 @@ export default function SpacesScreen() {
                 <Link.Trigger withAppleZoom>
                   {/* The whole card is the pressable that routes to the space. */}
                   <Pressable style={({ pressed }) => pressed && styles.pressed}>
-                    <CoverStack cover={cover} seed={space._id} />
+                    <CoverStack cover={cover} seed={space._id} name={space.name} />
                     <View style={styles.caption}>
                       <Text style={styles.title} numberOfLines={1}>
                         {space.name}
@@ -217,7 +241,7 @@ export default function SpacesScreen() {
           );
         }}
       />
-      <ProgressiveBlurHeader />
+      {Platform.OS === 'ios' ? <ProgressiveBlurHeader /> : null}
     </View>
   );
 }
@@ -277,14 +301,34 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: '#ffffff',
     zIndex: 1,
   },
-  // Cover slot for an empty space: dashed outline, no fill or shadow.
+  cardEmptyBack: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  // A new space gets an intentional cover until its first saved item becomes
+  // the thumbnail. Avoid a blank white card, which reads as a loading failure.
   cardEmpty: {
-    backgroundColor: 'transparent',
-    boxShadow: 'none',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: theme.colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.gap(1),
+    backgroundColor: theme.colors.primarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     zIndex: 3,
+  },
+  emptyIconWell: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 25,
+    backgroundColor: theme.colors.surface,
+  },
+  emptyLabel: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 11,
+    color: theme.colors.primaryText,
   },
   // Name + ellipsis row below the pile, mirroring the home feed's caption.
   caption: {

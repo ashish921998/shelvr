@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 
@@ -120,7 +119,11 @@ export const upsertSubscription = internalMutation({
     // RevenueCat stops retrying) but do not insert or patch a row — otherwise
     // a renewal webhook resurrects an entitlement for a user who no longer
     // exists. The userId here is the Convex Auth users-table document id.
-    const owner = await ctx.db.get(args.userId as Id<"users">);
+    const ownerId = ctx.db.normalizeId("users", args.userId);
+    if (ownerId === null) {
+      return null;
+    }
+    const owner = await ctx.db.get(ownerId);
     if (owner === null) {
       return null;
     }

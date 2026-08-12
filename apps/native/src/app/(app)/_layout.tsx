@@ -6,6 +6,7 @@ import { RecentSavesWidgetSync } from '@/lib/widget-sync';
 import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack } from 'expo-router';
 import { Fragment } from 'react';
+import { Platform } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
 export default function AppLayout() {
@@ -61,11 +62,20 @@ export default function AppLayout() {
           name="add"
           options={{
             presentation: 'formSheet',
-            headerShown: true,
+            // Android form sheets do not reliably render native-stack header
+            // controls. Add owns an in-content toolbar there; iOS keeps the
+            // native title and toolbar.
+            headerShown: Platform.OS !== 'android',
             headerTransparent: false,
             headerStyle: { backgroundColor: theme.colors.background },
             sheetGrabberVisible: true,
-            sheetAllowedDetents: 'fitToContents',
+            // Android does not resize a fit-to-content form sheet when Add
+            // switches from the compact action menu to the note/article
+            // composer. Use a large detent there so the native Back/Save
+            // header and editor remain reachable; iOS can keep its compact,
+            // dynamically sized sheet.
+            sheetAllowedDetents:
+              Platform.OS === 'android' ? [1] : 'fitToContents',
             contentStyle: { backgroundColor: theme.colors.background },
           }}
         />

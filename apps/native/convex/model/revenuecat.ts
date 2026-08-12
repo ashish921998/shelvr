@@ -3,6 +3,7 @@ export type RevenueCatEvent = {
   userId?: string;
   expiresAt?: number;
   productId?: string;
+  periodType?: string;
   eventTimestampMs?: number;
 };
 
@@ -24,9 +25,38 @@ export function parseRevenueCatEvent(
   const userId = readString(event?.app_user_id);
   const expiresAt = readNumber(event?.expiration_at_ms);
   const productId = readString(event?.product_id);
+  const periodType = readString(event?.period_type);
   const eventTimestampMs = readNumber(event?.event_timestamp_ms);
 
-  return { type, userId, expiresAt, productId, eventTimestampMs };
+  return { type, userId, expiresAt, productId, periodType, eventTimestampMs };
+}
+
+/** Map RevenueCat lifecycle events to Shelvr's server-side entitlement state.
+ * Dashboard-granted entitlements arrive as NON_RENEWING_PURCHASE events with
+ * a PROMOTIONAL period. Treat only that combination as Pro; ordinary
+ * non-renewing purchases remain advisory so a consumable can never unlock the
+ * subscription gate.
+ */
+export function mapRevenueCatStatus(
+  type: string,
+  periodType?: string,
+): "trialing" | "pro" | "lapsed" | undefined {
+  switch (type) {
+    case "INITIAL_PURCHASE":
+    case "TRIAL_STARTED":
+      return "trialing";
+    case "TRIAL_CONVERTED":
+    case "RENEWAL":
+    case "PRODUCT_CHANGE":
+    case "UNCANCELLATION":
+      return "pro";
+    case "EXPIRATION":
+      return "lapsed";
+    case "NON_RENEWING_PURCHASE":
+      return periodType === "PROMOTIONAL" ? "pro" : undefined;
+    default:
+      return undefined;
+  }
 }
 
 function readString(value: unknown): string | undefined {

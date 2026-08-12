@@ -1,5 +1,5 @@
 import { parseExifDate } from '@/lib/date';
-import { parseExifLocation } from '@/lib/exif';
+import { resolvePickedImageLocation } from '@/lib/picked-image-location';
 import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
 import type { Id } from '@convex/_generated/dataModel';
 import * as Haptics from 'expo-haptics';
@@ -132,16 +132,18 @@ export default function CameraScreen() {
     });
     if (result.canceled || result.assets.length === 0) return;
     await runImageRequests(
-      result.assets.map((asset) => ({
-        image: {
-          uri: asset.uri,
-          width: asset.width,
-          height: asset.height,
-          mimeType: asset.mimeType,
-          capturedAt: parseExifDate(asset.exif),
-          ...parseExifLocation(asset.exif),
-        },
-      })),
+      await Promise.all(
+        result.assets.map(async (asset) => ({
+          image: {
+            uri: asset.uri,
+            width: asset.width,
+            height: asset.height,
+            mimeType: asset.mimeType,
+            capturedAt: parseExifDate(asset.exif),
+            ...(await resolvePickedImageLocation(asset)),
+          },
+        })),
+      ),
     );
   };
 

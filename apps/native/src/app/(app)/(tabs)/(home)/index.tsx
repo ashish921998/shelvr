@@ -32,7 +32,11 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <MasonryFeed items={items} numColumns={2} source={{ from: 'home' }} />
+      <MasonryFeed
+        items={items}
+        numColumns={2}
+        source={{ from: 'home' }}
+      />
       <ProgressiveBlurHeader />
     </View>
   );

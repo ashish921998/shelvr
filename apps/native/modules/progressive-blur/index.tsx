@@ -1,5 +1,6 @@
 import { requireNativeView } from 'expo';
-import { useHeaderHeight } from 'expo-router/build/react-navigation/elements';
+import { useAppHeaderHeight } from '@/lib/header-layout';
+import type { ComponentType } from 'react';
 import { Platform, StyleSheet, type ViewProps } from 'react-native';
 
 // View modules resolve on iOS only; on Android (or an unlinked build) there's no
@@ -22,14 +23,22 @@ const NativeBlur =
  * it stays pinned while the feed scrolls beneath it.
  */
 export function ProgressiveBlurHeader() {
-  const headerHeight = useHeaderHeight();
-
   if (!NativeBlur) return null;
 
+  return <IOSProgressiveBlurHeader NativeComponent={NativeBlur} />;
+}
+
+function IOSProgressiveBlurHeader({
+  NativeComponent,
+}: {
+  NativeComponent: ComponentType<ViewProps>;
+}) {
+  const headerHeight = useAppHeaderHeight();
+
   return (
-    <NativeBlur
+    <NativeComponent
       pointerEvents="none"
-      // useHeaderHeight() spans the status bar + nav bar — exactly the
+      // The computed height spans the status bar + nav bar — exactly the
       // screen-top -> header-bottom band we want to blur.
       style={[StyleSheet.absoluteFill, { bottom: undefined, height: headerHeight }]}
     />
