@@ -1,7 +1,6 @@
+import { MenuView } from '@expo/ui/community/menu';
 import { Icon } from '@/components/symbol';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export function HeaderIconButton({
@@ -28,12 +27,7 @@ export function HeaderIconButton({
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed, disabled && styles.disabled]}
     >
-      <Icon name={icon} size={21} weight="semibold" tintColor={theme.colors.foreground} />
-      {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-        </View>
-      ) : null}
+      <HeaderIconContent icon={icon} badge={badge} tintColor={theme.colors.foreground} />
     </Pressable>
   );
 }
@@ -56,59 +50,48 @@ export function HeaderActionMenu({
   title: string;
   actions: HeaderMenuAction[];
 }) {
-  const [visible, setVisible] = useState(false);
-  const insets = useSafeAreaInsets();
-
-  const choose = (action: HeaderMenuAction) => {
-    setVisible(false);
-    action.onPress();
-  };
+  const { theme } = useUnistyles();
 
   return (
-    <>
-      <HeaderIconButton icon={icon} label={label} onPress={() => setVisible(true)} />
-      <Modal
-        animationType="fade"
-        transparent
-        visible={visible}
-        onRequestClose={() => setVisible(false)}
+    <MenuView
+      title={title}
+      actions={actions.map((action) => ({
+        id: action.id ?? action.label,
+        title: action.label,
+        attributes: action.destructive ? { destructive: true } : undefined,
+      }))}
+      onPressAction={({ nativeEvent }) => {
+        actions.find((action) => (action.id ?? action.label) === nativeEvent.event)?.onPress();
+      }}
+    >
+      <View
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={styles.button}
       >
-        <View style={styles.backdrop}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close menu"
-            style={StyleSheet.absoluteFillObject}
-            onPress={() => setVisible(false)}
-          />
-          <View
-            accessibilityRole="menu"
-            style={[styles.menu, { paddingBottom: Math.max(insets.bottom, 16) }]}
-          >
-            <Text style={styles.menuTitle}>{title}</Text>
-            <ScrollView style={styles.menuActions} showsVerticalScrollIndicator={false}>
-              {actions.map((action) => (
-                <Pressable
-                  key={action.id ?? action.label}
-                  accessibilityRole="menuitem"
-                  onPress={() => choose(action)}
-                  style={({ pressed }) => [styles.menuAction, pressed && styles.pressed]}
-                >
-                  <Text style={[styles.menuActionText, action.destructive && styles.destructiveText]}>
-                    {action.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setVisible(false)}
-              style={({ pressed }) => [styles.cancelAction, pressed && styles.pressed]}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </Pressable>
-          </View>
+        <HeaderIconContent icon={icon} tintColor={theme.colors.foreground} />
+      </View>
+    </MenuView>
+  );
+}
+
+function HeaderIconContent({
+  icon,
+  badge,
+  tintColor,
+}: {
+  icon: string;
+  badge?: number;
+  tintColor: string;
+}) {
+  return (
+    <>
+      <Icon name={icon} size={21} weight="semibold" tintColor={tintColor} />
+      {badge ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
         </View>
-      </Modal>
+      ) : null}
     </>
   );
 }
@@ -144,56 +127,5 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 9,
     color: '#fff',
-  },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.38)',
-  },
-  menu: {
-    maxHeight: '70%',
-    paddingTop: 18,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: theme.colors.background,
-  },
-  menuTitle: {
-    paddingHorizontal: 8,
-    paddingBottom: 12,
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    color: theme.colors.foreground,
-  },
-  menuActions: {
-    flexGrow: 0,
-  },
-  menuAction: {
-    minHeight: 52,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  menuActionText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 16,
-    color: theme.colors.foreground,
-  },
-  destructiveText: {
-    color: theme.colors.danger,
-  },
-  cancelAction: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    borderRadius: 16,
-    backgroundColor: theme.colors.surface,
-  },
-  cancelText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.foreground,
   },
 }));

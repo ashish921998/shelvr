@@ -30,6 +30,8 @@ const SF_TO_MATERIAL: Record<string, string> = {
   'square.grid.2x2': 'grid_view',
   'square.grid.2x2.fill': 'grid_view',
   'star.fill': 'star',
+  'heart': 'favorite',
+  'play.rectangle': 'smart_display',
   'rectangle.stack': 'collections_bookmark',
   'rectangle.stack.fill': 'collections_bookmark',
   'link': 'link',

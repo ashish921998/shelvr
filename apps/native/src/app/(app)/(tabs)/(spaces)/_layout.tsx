@@ -22,22 +22,33 @@ export default function SpacesStackLayout() {
   return (
     <Stack
       screenOptions={{
-        headerTransparent: true,
+        // FlashList does not consistently apply a transparent native header's
+        // inset on Android. Let the native header own its space there; iOS can
+        // retain the translucent, content-under-header treatment.
+        headerTransparent: Platform.OS === 'ios',
+        headerStyle: Platform.OS === 'android'
+          ? { backgroundColor: theme.colors.background }
+          : undefined,
         headerShadowVisible: false,
         headerTitleAlign: 'center',
+        headerTintColor: theme.colors.primary,
       }}
     >
       <Stack.Screen
         name="index"
         options={Platform.OS === 'android' ? {
+          title: 'spaces',
+          headerTitleStyle: styles.title,
           headerRight: () => (
             <HeaderIconButton icon="plus" label="New space" onPress={newSpace} />
           ),
         } : undefined}
       >
-        <Stack.Title asChild>
-          <Text style={styles.title}>spaces</Text>
-        </Stack.Title>
+        {Platform.OS === 'ios' ? (
+          <Stack.Title asChild>
+            <Text style={styles.title}>spaces</Text>
+          </Stack.Title>
+        ) : null}
         {Platform.OS === 'ios' ? (
           <Stack.Toolbar placement="right">
             <Stack.Toolbar.Button icon="plus" tintColor={labelColor} onPress={newSpace}>

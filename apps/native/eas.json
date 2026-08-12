@@ -10,7 +10,9 @@
       "channel": "development",
       "environment": "development",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "ANDROID_BUILD_ARCHS": "arm64-v8a",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "test_DzhYgoqsrxPykbPmjFpAMFbGBwn"
       },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
@@ -53,6 +55,14 @@
       },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      }
+    },
+    "internal-test": {
+      "extends": "production",
+      "channel": "internal-test",
+      "environment": "production",
+      "env": {
+        "APP_VARIANT": "production"
       }
     }
   },

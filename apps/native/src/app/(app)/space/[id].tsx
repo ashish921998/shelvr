@@ -90,6 +90,14 @@ export default function SpaceScreen() {
     <>
       <Stack.Screen
         options={Platform.OS === 'android' ? {
+          title: space.name,
+          headerTransparent: false,
+          headerStyle: { backgroundColor: theme.colors.background },
+          headerTitleAlign: 'center',
+          headerTitleStyle: {
+            fontFamily: theme.fonts.display,
+            color: theme.colors.foreground,
+          },
           headerRight: () => (
             <View style={styles.headerActions}>
               <HeaderIconButton
@@ -110,14 +118,16 @@ export default function SpaceScreen() {
           ),
         } : undefined}
       />
-      <Stack.Title
-        style={{
-          fontFamily: theme.fonts.display,
-          color: theme.colors.foreground,
-        }}
-      >
-        {space.name}
-      </Stack.Title>
+      {Platform.OS === 'ios' ? (
+        <Stack.Title
+          style={{
+            fontFamily: theme.fonts.display,
+            color: theme.colors.foreground,
+          }}
+        >
+          {space.name}
+        </Stack.Title>
+      ) : null}
       {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon="plus"
@@ -177,7 +187,7 @@ export default function SpaceScreen() {
             />
           }
         />
-        <ProgressiveBlurHeader />
+        {Platform.OS === 'ios' ? <ProgressiveBlurHeader /> : null}
       </View>
     </>
   );

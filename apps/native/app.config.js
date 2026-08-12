@@ -23,6 +23,10 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? '')
+  .split(',')
+  .map((arch) => arch.trim())
+  .filter(Boolean);
 
 module.exports = ({ config }) => ({
   ...appConfig.expo,
@@ -51,6 +55,21 @@ module.exports = ({ config }) => ({
     // Keep the static plugins from app.json — an inline array here would
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),
+    [
+      'expo-build-properties',
+      {
+        android: {
+          // Store builds only need physical-device ABIs. Skipping emulator
+          // architectures keeps native C++ compilation within EAS limits.
+          buildArchs:
+            requestedAndroidBuildArchs.length > 0
+              ? requestedAndroidBuildArchs
+              : isProduction
+                ? ['arm64-v8a', 'armeabi-v7a']
+                : ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'],
+        },
+      },
+    ],
     [
       'expo-dev-client',
       {

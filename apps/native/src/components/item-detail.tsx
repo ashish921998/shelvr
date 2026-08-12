@@ -1,6 +1,7 @@
 import { IntentChip } from '@/components/intent-chip';
 import { TagChip } from '@/components/tag-chip';
 import { usePaywallGuard } from '@/lib/entitlement';
+import { useAppHeaderHeight } from '@/lib/header-layout';
 import { runIntent } from '@/lib/intents';
 import { displayHost } from '@/lib/url';
 import { convexQuery } from '@convex-dev/react-query';
@@ -9,7 +10,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { useHeaderHeight } from 'expo-router/build/react-navigation';
 import { Icon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
@@ -45,7 +45,7 @@ type Props = {
 // every parent re-render (setActiveId on each swipe) re-rendered every mounted
 // page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
 export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props) {
-  const headerHeight = useHeaderHeight();
+  const headerHeight = useAppHeaderHeight();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();

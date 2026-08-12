@@ -31,7 +31,12 @@ export function MasonryFeed({ items, numColumns = 2, source, firstItemZoomTarget
         )
       }
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ paddingHorizontal: 0, paddingVertical: 8 }}
+      contentContainerStyle={{
+        flexGrow: items.length === 0 ? 1 : undefined,
+        paddingHorizontal: 0,
+        paddingTop: 8,
+        paddingBottom: 8,
+      }}
       ListEmptyComponent={ListEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
     />
