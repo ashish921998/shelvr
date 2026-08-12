@@ -47,5 +47,17 @@ yarn-error.log*
 *.tsbuildinfo
 .gstack/
 
+# Local AI-agent skills, configuration, and generated lockfiles
+.agents/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.kiro/
+.opencode/
+.vscode/
+.zed/
+skills-lock.json
+
 # argent tool cache (screen recordings, etc.)
 .argent/
