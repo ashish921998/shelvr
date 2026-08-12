@@ -241,10 +241,9 @@ export function useEntitlementSync(): void {
  */
 export function useEntitlement(): Entitlement {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
-  const { data } = useQuery({
-    ...convexQuery(api.subscriptions.getEntitlement, {}),
-    enabled: isAuthenticated,
-  });
+  const { data } = useQuery(
+    convexQuery(api.subscriptions.getEntitlement, isAuthenticated ? {} : 'skip'),
+  );
   // The clock is seeded once and refreshed on an interval so a trial expiring
   // between Convex updates flips `entitled` without a server push. Seeding via
   // a useState initializer (and updating inside the effect) keeps Date.now

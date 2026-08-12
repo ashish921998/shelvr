@@ -1,9 +1,16 @@
 import { LEGAL_URLS } from '@/lib/legal';
 import { useAuthActions } from '@convex-dev/auth/react';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as React from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+const oauthRedirectTo = makeRedirectUri({
+  native: 'shelvr://auth/callback',
+  scheme: 'shelvr',
+  path: 'auth/callback',
+});
 
 /**
  * Convex Auth OAuth sign-in (React Native).
@@ -25,19 +32,28 @@ export default function Page() {
 
   const handleOAuth = async (provider: string) => {
     setPending(provider);
+    setLastError(null);
     try {
-      const { redirect } = await signIn(provider);
+      // Convex Auth must persist the same return URI that the browser session
+      // watches for; otherwise the provider callback can open Shelvr without
+      // resolving this promise and the one-time code is never exchanged.
+      const { redirect } = await signIn(provider, { redirectTo: oauthRedirectTo });
       // `redirect` is undefined for providers that sign in immediately
       // (Anonymous) — nothing more to do, the session is established.
       if (!redirect) return;
       const result = await WebBrowser.openAuthSessionAsync(
         redirect.toString(),
-        'shelvr://',
+        oauthRedirectTo,
       );
-      if (result.type !== 'success') return;
+      if (result.type === 'cancel' || result.type === 'dismiss') return;
+      if (result.type !== 'success') {
+        throw new Error(`OAuth browser session ended with ${result.type}`);
+      }
       // Hand the callback URL's code back to the provider to finish the sign-in.
       const code = new URL(result.url).searchParams.get('code');
-      if (!code) return;
+      if (!code) {
+        throw new Error('OAuth callback did not include a verification code');
+      }
       await signIn(provider, { code });
     } catch (err) {
       // Surface the full error shape — Convex wraps server errors with
