@@ -1,0 +1,29 @@
+.gitignore
+  s_8412c3d0c42583::t_af2698c72c6727 50-61
+opencode.json
+  s_f410ce70e10649::t_9073febc91b37b 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c62a98abcc019add5871ee828f9d42a90d27e249",
+  "prompts": {},
+  "sessions": {
+    "s_8412c3d0c42583": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff4f3-da94-7970-88f7-2d84ff0538c9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_f410ce70e10649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff4f2-60b6-7561-a728-5312545b8ee9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
