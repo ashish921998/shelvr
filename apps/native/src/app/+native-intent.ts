@@ -9,7 +9,21 @@ import { markPendingShare } from '@/lib/share/pending-share-store';
 // us resume the share after onboarding + auth instead of dropping it.
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
   try {
-    if (new URL(path).hostname === 'expo-sharing') {
+    const url = new URL(path);
+
+    // The OAuth browser session receives this URL to finish the token
+    // exchange. Expo Router receives the same native intent and would also
+    // try to render `/auth/callback`, which is not an app screen. Keep the
+    // user on sign-in until Convex Auth flips the authenticated route guard.
+    const isOAuthCallback =
+      url.protocol === 'shelvr:' &&
+      ((url.hostname === 'auth' && url.pathname === '/callback') ||
+        (url.hostname === '' && url.pathname === '/auth/callback'));
+    if (isOAuthCallback) {
+      return '/sign-in';
+    }
+
+    if (url.hostname === 'expo-sharing') {
       try {
         markPendingShare();
       } catch {
