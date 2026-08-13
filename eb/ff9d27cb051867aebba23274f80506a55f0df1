@@ -1,0 +1,20 @@
+apps/native/app.json
+  s_f943590ac03a53::t_89165e22924202 24-26
+  s_f943590ac03a53::t_2baa4897c237b6 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ebff9d27cb051867aebba23274f80506a55f0df1",
+  "prompts": {},
+  "sessions": {
+    "s_f943590ac03a53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff773-9e5b-7753-a90d-6f4cb2f1ccbd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": null
+    }
+  }
+}
