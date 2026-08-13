@@ -1,0 +1,19 @@
+apps/native/app.json
+  s_f943590ac03a53::t_1d89e74899883b 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a5ff8a39f3b24751f6081e98cf17964312a1c430",
+  "prompts": {},
+  "sessions": {
+    "s_f943590ac03a53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff773-9e5b-7753-a90d-6f4cb2f1ccbd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
