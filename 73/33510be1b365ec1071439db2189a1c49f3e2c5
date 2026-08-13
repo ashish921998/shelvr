@@ -1,0 +1,34 @@
+apps/native/app.json
+  s_f943590ac03a53::t_2baa4897c237b6 22
+  s_f943590ac03a53::t_89165e22924202 24-26
+apps/native/src/app/_layout.tsx
+  s_f943590ac03a53::t_6bfeba84fde69e 22-30,32-34
+apps/native/convex/appleProfile.ts
+  s_f943590ac03a53::t_cc6383848ad22f 1-18
+apps/native/convex/appleProfile.test.ts
+  s_f943590ac03a53::t_cc6383848ad22f 1-35
+apps/native/convex/auth.ts
+  s_f943590ac03a53::t_cc6383848ad22f 5,15
+apps/native/convex/_generated/api.d.ts
+  s_f943590ac03a53::t_455457c6820940 12,36
+apps/native/package.json
+  s_f943590ac03a53::t_70f320334b6af4 20
+pnpm-lock.yaml
+  s_f943590ac03a53::t_17212e6c7486a6 30-31,792-793,796,6883,6886-6887,9853-9854
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7333510be1b365ec1071439db2189a1c49f3e2c5",
+  "prompts": {},
+  "sessions": {
+    "s_f943590ac03a53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff773-9e5b-7753-a90d-6f4cb2f1ccbd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
