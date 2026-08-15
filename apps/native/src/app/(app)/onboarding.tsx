@@ -2,7 +2,6 @@ import { BuildingStep } from '@/components/onboarding/building';
 import { LiveDemoStep } from '@/components/onboarding/live-demo';
 import { PermissionsStep } from '@/components/onboarding/permissions';
 import { PromiseStep } from '@/components/onboarding/promise';
-import { RateStep } from '@/components/onboarding/rate';
 import { ReadyStep } from '@/components/onboarding/ready';
 import { SpacePickerStep, type SaveKind, getSpacePresets } from '@/components/onboarding/space-picker';
 import { SurveyStep } from '@/components/onboarding/survey';
@@ -19,15 +18,17 @@ import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 
-// Onboarding v2 — a 9-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
+// Onboarding v2 — an 8-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
 // a thin progress bar, and step transitions between the step components.
 // Each step owns its own CTA copy and advance condition; the orchestrator
 // hands them `advance`/`finish` and the shared state.
 //
 // Order: promise → survey Q1 → survey Q2 → space picker → building → live demo
-// → permissions → rate → ready → (paywall). Sign-in stays first (the route is
+// → permissions → ready → (paywall). Sign-in stays first (the route is
 // auth-gated); the paywall is the existing finish() verbatim.
+// App Store rating is NOT requested during onboarding — it is deferred to the
+// post-engagement useReviewPrompt hook that fires after 3+ ready items.
 
 // Step indices — named so the render switch reads as the funnel, not as numbers.
 const STEPS = {
@@ -38,8 +39,7 @@ const STEPS = {
   building: 4,
   demo: 5,
   permissions: 6,
-  rate: 7,
-  ready: 8,
+  ready: 7,
 } as const;
 
 // Q1 — "Where do your saves pile up today?" Analytics-only; no persistence, and
@@ -67,10 +67,11 @@ const Q2_OPTIONS: readonly SaveKind[] = [
   'Videos',
 ];
 
-// The progress bar covers steps 2–8 (survey Q1 through rate). Promise (step 1)
-// has no bar — it's the value screen, not the quiz — and ready shows a full bar.
+// The progress bar covers steps 2–7 (survey Q1 through permissions). Promise
+// (step 1) has no bar — it's the value screen, not the quiz — and ready shows
+// no bar since it's the recap.
 const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
-const LAST_PROGRESS_STEP = STEPS.rate; // 7
+const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -203,8 +204,6 @@ export default function OnboardingScreen() {
           )}
 
           {step === STEPS.permissions && <PermissionsStep onAdvance={advance} />}
-
-          {step === STEPS.rate && <RateStep onAdvance={advance} />}
 
           {step === STEPS.ready && (
             <ReadyStep spaceNames={spaces} demoItem={demoItem} onFinish={finish} />
