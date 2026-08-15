@@ -1,4 +1,4 @@
-import { showActionSheet } from '@/lib/action-sheet';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { EmptyState } from '@/components/empty-state';
 import { SuggestedBadge } from '@/components/suggested-badge';
 import { api } from '@convex/_generated/api';
@@ -165,12 +165,6 @@ export default function SpacesScreen() {
     ]);
   };
 
-  const openMenu = (id: Id<'spaces'>) =>
-    showActionSheet(
-      [{ label: 'Delete', destructive: true, onPress: () => confirmDelete(id) }],
-      { title: 'Space actions' },
-    );
-
   if (spaces === undefined) {
     return (
       <ScreenLoader label="Opening your spaces" />
@@ -217,13 +211,20 @@ export default function SpacesScreen() {
                       <Text style={styles.title} numberOfLines={1}>
                         {space.name}
                       </Text>
-                      <Pressable
-                        hitSlop={10}
-                        onPress={() => openMenu(space._id)}
+                      <ActionMenu
+                        label="Space actions"
+                        title="Space actions"
+                        actions={[
+                          {
+                            label: 'Delete',
+                            destructive: true,
+                            onPress: () => confirmDelete(space._id),
+                          },
+                        ]}
                         style={styles.menuButton}
                       >
                         <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
-                      </Pressable>
+                      </ActionMenu>
                     </View>
                   </Pressable>
                 </Link.Trigger>
@@ -346,7 +347,10 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   menuButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 20,
   },
 }));

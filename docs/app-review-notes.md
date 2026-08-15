@@ -42,7 +42,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 ## Legal and support
 
 - Sign-in: tappable **Terms** and **Privacy Policy** (https://shelvr.app/terms, https://shelvr.app/privacy).
-- Profile: Terms, Privacy, Contact support (`support@shelvr.app`).
+- Profile: Terms and Privacy.
 - Paywall fallback (only on SDK/network failure): Terms and Privacy links plus retry.
 
 ## Permissions

@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import type { TestConvexForDataModel } from "convex-test";
 import { newConvexTest } from "./test.setup";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 
@@ -13,6 +13,10 @@ function signedInAs(userId: string): TestCtx {
     subject: `${userId}|session-1`,
   });
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("Convex Auth identity boundaries", () => {
   it("uses the stable users-table id instead of the session-bearing subject", async () => {
@@ -30,6 +34,50 @@ describe("Convex Auth identity boundaries", () => {
       status: "pro",
       expiresAt: expect.any(Number),
     });
+  });
+
+  it("treats an anonymous account as Pro only when dev auth is enabled", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const backend = newConvexTest();
+    const userId = await backend.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {});
+      await ctx.db.insert("authAccounts", {
+        userId: id,
+        provider: "anonymous",
+        providerAccountId: `anonymous:${id}`,
+      });
+      return id;
+    });
+    const t = backend.withIdentity({ subject: `${userId}|session-1` });
+
+    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+      status: "lifetime",
+    });
+    await expect(
+      t.mutation(api.items.createNoteItem, { text: "dev save" }),
+    ).resolves.toBeDefined();
+  });
+
+  it("does not bypass Pro for anonymous accounts when dev auth is disabled", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
+    const backend = newConvexTest();
+    const userId = await backend.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {});
+      await ctx.db.insert("authAccounts", {
+        userId: id,
+        provider: "anonymous",
+        providerAccountId: `anonymous:${id}`,
+      });
+      return id;
+    });
+    const t = backend.withIdentity({ subject: `${userId}|session-1` });
+
+    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+      status: "none",
+    });
+    await expect(
+      t.mutation(api.items.createNoteItem, { text: "blocked save" }),
+    ).rejects.toThrow(/Pro required/);
   });
 });
 

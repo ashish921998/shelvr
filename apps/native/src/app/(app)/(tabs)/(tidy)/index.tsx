@@ -177,13 +177,26 @@ const TidyDeckView: FC<DeckViewProps> = ({
                     ) : null}
                     <HeaderActionMenu
                       icon="photo.on.rectangle.angled"
-                      label="Choose photo album"
+                      label={
+                        limitedAccess
+                          ? 'Choose photo album. Limited photo access.'
+                          : 'Choose photo album'
+                      }
                       title="Photo source"
-                      actions={sources.map((source) => ({
-                        id: source.id,
-                        label: source.id === selectedId ? `${source.title} ✓` : source.title,
-                        onPress: () => selectSource(source.id),
-                      }))}
+                      actions={[
+                        ...sources.map((source) => ({
+                          id: source.id,
+                          label: source.id === selectedId ? `${source.title} ✓` : source.title,
+                          onPress: () => selectSource(source.id),
+                        })),
+                        ...(limitedAccess
+                          ? [{
+                              id: 'manage-photo-access',
+                              label: 'Manage photo access…',
+                              onPress: () => Linking.openSettings(),
+                            }]
+                          : []),
+                      ]}
                     />
                   </View>
                 ),
@@ -226,6 +239,14 @@ const TidyDeckView: FC<DeckViewProps> = ({
               {s.title}
             </Stack.Toolbar.MenuAction>
           ))}
+          {limitedAccess ? (
+            <Stack.Toolbar.MenuAction
+              icon="gearshape"
+              onPress={() => Linking.openSettings()}
+            >
+              Manage Photo Access
+            </Stack.Toolbar.MenuAction>
+          ) : null}
         </Stack.Toolbar.Menu>
       </Stack.Toolbar> : null}
 
@@ -249,17 +270,6 @@ const TidyDeckView: FC<DeckViewProps> = ({
           />
         )}
       </View>
-
-      {limitedAccess && (
-        <Pressable
-          style={styles.limitedBanner}
-          onPress={() => Linking.openSettings()}
-        >
-          <Text style={styles.limitedText}>
-            Shelvr can only see some photos — tap to manage access.
-          </Text>
-        </Pressable>
-      )}
     </View>
   );
 };
@@ -328,23 +338,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     marginHorizontal: theme.gap(2),
     // Clear the floating native tab bar with a comfortable gap (note 5).
     marginBottom: rt.insets.bottom + theme.gap(11),
-  },
-  limitedBanner: {
-    position: 'absolute',
-    bottom: rt.insets.bottom + theme.gap(11),
-    left: theme.gap(2),
-    right: theme.gap(2),
-    paddingHorizontal: theme.gap(2),
-    paddingVertical: theme.gap(1),
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  limitedText: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.muted,
-    textAlign: 'center',
   },
   gate: {
     flex: 1,
