@@ -1,0 +1,95 @@
+apps/native/src/components/ui/action-menu.tsx
+  s_028063de5b5ec4::t_f489fb28a438ab 1-51
+apps/native/src/components/item-card.tsx
+  s_028063de5b5ec4::t_f489fb28a438ab 2-5,14,83-110,113-124,187-192,194,247
+  s_028063de5b5ec4::t_5a1137123175db 342-343,346
+apps/native/convex/subscriptions.test.ts
+  s_996e483ee2b491::t_48067a762a3680 5,17-20,38-81
+docs/app-review-notes.md
+  s_786ded66d4e4bc::t_4e3640eec0f303 45
+apps/native/src/app/(app)/(tabs)/(spaces)/index.tsx
+  s_028063de5b5ec4::t_f489fb28a438ab 1,214-223,227
+  s_028063de5b5ec4::t_5a1137123175db 350-351,354
+apps/native/src/components/ui/header-icon-button.tsx
+  s_028063de5b5ec4::t_f489fb28a438ab 2-5,38,54-55,57-58,60-61
+apps/native/src/app/(app)/add.tsx
+  s_996e483ee2b491::t_1363a044b90707 2-3
+  s_996e483ee2b491::t_570c0a5f6dd5ec 343
+  s_996e483ee2b491::t_d72f132b6f4290 375
+  s_996e483ee2b491::t_f3cf895ab3db45 4-6,20,106-111,145,201,330,341-342,344,346-351,353-356,363-374,376-403
+  s_996e483ee2b491::t_695c7be2b378c7 359-360,362
+  s_786ded66d4e4bc::t_705fdb04230d7d 426-428
+  s_786ded66d4e4bc::t_c948923cc30e75 21-29,34,62-105,250,252-256,258-264,345,352,357-358,361
+  s_f943590ac03a53::t_4112e0b8484d33 404
+apps/native/src/components/item-detail.tsx
+  s_bc4f803d324096::t_bfa1577e4b7be8 1
+  s_bc4f803d324096::t_f557b2e544f26b 44-47,62-97,110-112
+  s_bc4f803d324096::t_14d772a8677024 359
+apps/native/src/app/(app)/(tabs)/(tidy)/index.tsx
+  s_d876e54055bbda::t_e6b3d696539a53 180-184,186-199,242-249
+apps/native/src/app/(app)/_layout.tsx
+  s_996e483ee2b491::t_f3cf895ab3db45 63-72,77,86
+apps/native/convex/subscriptions.ts
+  s_996e483ee2b491::t_f10ed1a66c4bf2 4,18,78
+  s_996e483ee2b491::t_48067a762a3680 3,15-17,19-29,48-50,80
+apps/native/src/components/article-reader-view.tsx
+  s_bc4f803d324096::t_9ad177999a87d3 1-368
+apps/native/src/lib/legal.ts
+  s_bc4f803d324096::t_d5ec63a43e8043 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "982d8909c2a6db036f57c016b49ac8fce595a8ec",
+  "prompts": {},
+  "sessions": {
+    "s_028063de5b5ec4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ffb86-a0f9-76f2-9f45-78bb0fe782bb",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_786ded66d4e4bc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff76a-df3e-7931-9459-244d529df9b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_996e483ee2b491": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff757-0aa0-7e41-88bc-a814d56be641",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_bc4f803d324096": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "5fb028cd-b30c-4fc8-83f3-aba33ae2dbd2",
+        "model": "auto"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_d876e54055bbda": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ffb5a-3f2c-7a82-b8b9-0f3a2fb2867a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    },
+    "s_f943590ac03a53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff773-9e5b-7753-a90d-6f4cb2f1ccbd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
