@@ -1,3 +1,4 @@
+import { ArticleReaderView } from '@/components/article-reader-view';
 import { IntentChip } from '@/components/intent-chip';
 import { TagChip } from '@/components/tag-chip';
 import { usePaywallGuard } from '@/lib/entitlement';
@@ -40,23 +41,10 @@ type Props = {
   isZoomTarget: boolean;
 };
 
-// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
-// is stable across swipes (Convex query data, staleTime Infinity). Without this,
-// every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
-export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props) {
-  const headerHeight = useAppHeaderHeight();
-  const { theme } = useUnistyles();
-  const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  // Cap the hero so a tall portrait image can't fill the whole screen and hide
-  // the title, description, and actions below it.
-  const maxHeroHeight = height * 0.55;
-
-  // The list row already has everything but the item's spaces; fetch those
-  // separately (cached and cheap) so the space chips can appear. Everything
-  // else renders instantly from `item`, so swiping never shows a spinner.
+// Shared data for both render paths: space memberships (fetched separately
+// since list rows don't carry them), similar items, the hero URI, and parsed
+// article paragraphs.
+function useItemDetailData(item: DetailItem) {
   const { data: withSpaces } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
@@ -71,6 +59,42 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
 
+  const paragraphs =
+    item.content
+      ?.split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0) ?? [];
+
+  return { spaces, similar, heroUri, paragraphs };
+}
+
+// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
+// is stable across swipes (Convex query data, staleTime Infinity). Without this,
+// every parent re-render (setActiveId on each swipe) re-rendered every mounted
+// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
+export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props) {
+  const headerHeight = useAppHeaderHeight();
+  const { theme } = useUnistyles();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
+
+  // Link saves with extracted content get the compact reader layout.
+  if (item.type === 'link' && paragraphs.length > 0) {
+    return (
+      <ArticleReaderView
+        item={item}
+        isZoomTarget={isZoomTarget}
+        headerHeight={headerHeight}
+        spaces={spaces}
+        similar={similar}
+        heroUri={heroUri}
+        paragraphs={paragraphs}
+      />
+    );
+  }
+
   // The item's own actions, plus any purpose-steered ones from the space this
   // page was opened through (deduped — steering may echo a general intent).
   const intents = (() => {
@@ -83,11 +107,9 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
     ];
   })();
 
-  const paragraphs =
-    item.content
-      ?.split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0) ?? [];
+  // Cap the hero so a tall portrait image can't fill the whole screen and hide
+  // the title, description, and actions below it.
+  const maxHeroHeight = height * 0.55;
 
   // Source shape; OG images default to 1200×630 (≈1.91).
   const heroAspect = item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1.4);
@@ -334,7 +356,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
 // scrolls (this lives inside the detail ScrollView), so a virtualized list
 // can't be nested here; ten cards render fine as plain views. Columns are
 // balanced by estimated card height from each item's aspect ratio.
-function SimilarGrid({ items }: { items: DetailItem[] }) {
+export function SimilarGrid({ items }: { items: DetailItem[] }) {
   const columns: [DetailItem[], DetailItem[]] = [[], []];
   const heights = [0, 0];
   for (const item of items) {

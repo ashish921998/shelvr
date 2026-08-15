@@ -194,13 +194,6 @@ export default function ProfileScreen() {
           <Text style={styles.linkLabel}>Privacy Policy</Text>
           <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(LEGAL_URLS.supportMailto)}
-        >
-          <Text style={styles.linkLabel}>Contact support</Text>
-          <Icon name="envelope" size={14} tintColor={theme.colors.muted} />
-        </Pressable>
       </View>
 
       <Pressable

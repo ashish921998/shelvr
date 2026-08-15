@@ -1,5 +1,8 @@
-import { MenuView } from '@expo/ui/community/menu';
 import { Icon } from '@/components/symbol';
+import {
+  ActionMenu,
+  type ActionMenuItem,
+} from '@/components/ui/action-menu';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -32,12 +35,7 @@ export function HeaderIconButton({
   );
 }
 
-export type HeaderMenuAction = {
-  id?: string;
-  label: string;
-  destructive?: boolean;
-  onPress: () => void;
-};
+export type HeaderMenuAction = ActionMenuItem;
 
 export function HeaderActionMenu({
   icon,
@@ -53,25 +51,14 @@ export function HeaderActionMenu({
   const { theme } = useUnistyles();
 
   return (
-    <MenuView
+    <ActionMenu
+      label={label}
       title={title}
-      actions={actions.map((action) => ({
-        id: action.id ?? action.label,
-        title: action.label,
-        attributes: action.destructive ? { destructive: true } : undefined,
-      }))}
-      onPressAction={({ nativeEvent }) => {
-        actions.find((action) => (action.id ?? action.label) === nativeEvent.event)?.onPress();
-      }}
+      actions={actions}
+      style={styles.button}
     >
-      <View
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        style={styles.button}
-      >
-        <HeaderIconContent icon={icon} tintColor={theme.colors.foreground} />
-      </View>
-    </MenuView>
+      <HeaderIconContent icon={icon} tintColor={theme.colors.foreground} />
+    </ActionMenu>
   );
 }
 

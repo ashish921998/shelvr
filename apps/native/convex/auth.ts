@@ -2,6 +2,7 @@ import Apple from "@auth/core/providers/apple";
 import Google from "@auth/core/providers/google";
 import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { convexAuth, type AuthProviderConfig } from "@convex-dev/auth/server";
+import { normalizeAppleProfile } from "./appleProfile";
 
 // Google and Apple are configured via @auth/core providers. Their client
 // id/secret come from the AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and
@@ -11,7 +12,7 @@ import { convexAuth, type AuthProviderConfig } from "@convex-dev/auth/server";
 // development. It is gated behind AUTH_ENABLE_ANONYMOUS so a production
 // deployment never exposes a passwordless back door — set it to "true" on
 // the dev deployment only.
-const providers: AuthProviderConfig[] = [Google, Apple];
+const providers: AuthProviderConfig[] = [Google, Apple({ profile: normalizeAppleProfile })];
 if (process.env.AUTH_ENABLE_ANONYMOUS === "true") {
   providers.push(Anonymous);
 }

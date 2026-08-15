@@ -1,4 +1,9 @@
 import { AnimatedText } from '@/components/animated-text';
+import {
+  BottomSheet,
+  BottomSheetView,
+  type BottomSheetMethods,
+} from '@expo/ui/community/bottom-sheet';
 import { parseExifDate } from '@/lib/date';
 import { resolvePickedImageLocation } from '@/lib/picked-image-location';
 import { usePaywallGuard } from '@/lib/entitlement';
@@ -12,12 +17,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { HeaderIconButton } from '@/components/ui/header-icon-button';
-import { useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 
 type Mode = 'menu' | 'note' | 'article';
+type AndroidDismissAction = { type: 'camera'; spaceId?: Id<'spaces'> } | null;
 
 function ActionButton({
   icon,
@@ -45,8 +59,56 @@ function ActionButton({
   );
 }
 
-export default function AddScreen() {
-  const router = useRouter();
+function AndroidAddHeader({
+  title,
+  isComposer,
+  canSave,
+  back,
+  save,
+}: {
+  title: string;
+  isComposer: boolean;
+  canSave: boolean;
+  back: () => void;
+  save: () => void;
+}) {
+  const [titleWidth, setTitleWidth] = useState(0);
+  const measureTitle = useCallback((event: LayoutChangeEvent) => {
+    setTitleWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  return (
+    <View style={styles.androidHeader}>
+      {isComposer ? (
+        <HeaderIconButton icon="chevron.left" label="Back to save options" onPress={back} />
+      ) : (
+        <View style={styles.androidHeaderSpacer} />
+      )}
+      <View style={styles.androidHeaderTitleContainer} onLayout={measureTitle}>
+        {titleWidth > 0 ? (
+          <AnimatedText
+            text={title}
+            width={titleWidth}
+            height={44}
+            style={styles.androidHeaderTitle}
+          />
+        ) : null}
+      </View>
+      {isComposer ? (
+        <HeaderIconButton icon="checkmark" label="Save" disabled={!canSave} onPress={save} />
+      ) : (
+        <View style={styles.androidHeaderSpacer} />
+      )}
+    </View>
+  );
+}
+
+type AddContentProps = {
+  close: () => void;
+  openCamera: (spaceId?: Id<'spaces'>) => void;
+};
+
+function AddContent({ close, openCamera }: AddContentProps) {
   const { theme } = useUnistyles();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
@@ -80,7 +142,7 @@ export default function AddScreen() {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    router.back();
+    close();
   };
 
   const openComposer = (next: Mode) => {
@@ -136,7 +198,7 @@ export default function AddScreen() {
               );
             },
           },
-          { text: 'Done', onPress: () => router.back() },
+          { text: 'Done', onPress: close },
         ],
       );
       setSaving(false);
@@ -185,30 +247,21 @@ export default function AddScreen() {
           headerStyle: { backgroundColor: theme.colors.background },
         }}
       />
-      {/* Animated title persists across mode changes so the text cascades
+      {/* Each platform mounts exactly one persistent title so changes cascade
           between "Save something" / "New note" / "Save an article". */}
-      <Stack.Title asChild>
-        <AnimatedText text={title} style={styles.heading} />
-      </Stack.Title>
+      {Platform.OS === 'ios' ? (
+        <Stack.Title asChild>
+          <AnimatedText text={title} style={styles.heading} />
+        </Stack.Title>
+      ) : null}
       {Platform.OS === 'android' ? (
-        <View style={styles.androidHeader}>
-          <HeaderIconButton
-            icon={isComposer ? 'chevron.left' : 'xmark'}
-            label={isComposer ? 'Back to save options' : 'Close save options'}
-            onPress={isComposer ? () => setMode('menu') : () => router.back()}
-          />
-          <Text style={styles.androidHeaderTitle}>{title}</Text>
-          {isComposer ? (
-            <HeaderIconButton
-              icon="checkmark"
-              label="Save"
-              disabled={!canSave}
-              onPress={save}
-            />
-          ) : (
-            <View style={styles.androidHeaderSpacer} />
-          )}
-        </View>
+        <AndroidAddHeader
+          title={title}
+          isComposer={isComposer}
+          canSave={canSave}
+          back={() => setMode('menu')}
+          save={save}
+        />
       ) : null}
       {isComposer && Platform.OS === 'ios' ? (
         <>
@@ -274,11 +327,7 @@ export default function AddScreen() {
             label="Camera"
             onPress={() =>
               guard(() => {
-                router.back();
-                router.push({
-                  pathname: '/camera',
-                  params: pinnedSpaceId ? { spaceId: pinnedSpaceId } : {},
-                });
+                openCamera(pinnedSpaceId);
               })
             }
             disabled={saving || entitlementLoading}
@@ -286,6 +335,70 @@ export default function AddScreen() {
         </View>
       )}
     </View>
+  );
+}
+
+function AndroidAddSheet() {
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  const sheetRef = useRef<BottomSheetMethods>(null);
+  const dismissActionRef = useRef<AndroidDismissAction>(null);
+
+  const close = useCallback(() => {
+    sheetRef.current?.close();
+  }, []);
+
+  const openCamera = useCallback((spaceId?: Id<'spaces'>) => {
+    dismissActionRef.current = { type: 'camera', spaceId };
+    sheetRef.current?.close();
+  }, []);
+
+  const finishDismiss = useCallback(() => {
+    const action = dismissActionRef.current;
+    if (action?.type === 'camera') {
+      router.replace({
+        pathname: '/camera',
+        params: action.spaceId ? { spaceId: action.spaceId } : {},
+      });
+      return;
+    }
+    router.back();
+  }, [router]);
+
+  return (
+    <BottomSheet
+      ref={sheetRef}
+      index={0}
+      enableDynamicSizing
+      enablePanDownToClose
+      onClose={finishDismiss}
+      backgroundStyle={{ backgroundColor: theme.colors.background }}
+    >
+      <BottomSheetView>
+        <AddContent close={close} openCamera={openCamera} />
+      </BottomSheetView>
+    </BottomSheet>
+  );
+}
+
+export default function AddScreen() {
+  const router = useRouter();
+
+  if (Platform.OS === 'android') {
+    return <AndroidAddSheet />;
+  }
+
+  return (
+    <AddContent
+      close={() => router.back()}
+      openCamera={(spaceId) => {
+        router.back();
+        router.push({
+          pathname: '/camera',
+          params: spaceId ? { spaceId } : {},
+        });
+      }}
+    />
   );
 }
 
@@ -307,12 +420,12 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'space-between',
   },
   androidHeaderTitle: {
-    flex: 1,
-    paddingHorizontal: theme.gap(1.5),
     fontFamily: theme.fonts.display,
     fontSize: 22,
     color: theme.colors.foreground,
-    textAlign: 'center',
+  },
+  androidHeaderTitleContainer: {
+    flex: 1,
   },
   androidHeaderSpacer: {
     width: 40,

@@ -12,11 +12,18 @@
       "policy": "appVersion"
     },
     "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/c6c97aa7-6676-47a1-8ffc-9a1339c2bc19"
     },
     "ios": {
       "appleTeamId": "WJP847UZY2",
+      "usesAppleSignIn": true,
       "supportsTablet": false,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Shelvr uses your camera so you can capture things you want to save for later.",
         "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",

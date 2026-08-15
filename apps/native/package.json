@@ -17,7 +17,7 @@
     "@ai-sdk/google": "^4.0.39",
     "@ai-sdk/react": "^4.0.15",
     "@auth/core": "0.41.1",
-    "@convex-dev/auth": "^0.0.82",
+    "@convex-dev/auth": "^0.0.95",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/react-query": "^0.1.0",
     "@expo/dom-webview": "~57.0.1",

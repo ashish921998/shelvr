@@ -1,5 +1,8 @@
 import { SuggestedBadge } from '@/components/suggested-badge';
-import { showActionSheet } from '@/lib/action-sheet';
+import {
+  ActionMenu,
+  type ActionMenuItem,
+} from '@/components/ui/action-menu';
 import { displayHost } from '@/lib/url';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -8,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { Icon } from '@/components/symbol';
-import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
+import { Alert, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
 import Animated, { FadeIn, ZoomOut } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -77,29 +80,48 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
     dismissSuggestion({ itemId: item._id, spaceId });
   };
 
-  const openMenu = () => {
-    const actions: { label: string; destructive?: boolean; run: () => void }[] = [];
-    if (isSuggested) {
-      actions.push({ label: 'Add to space', run: accept });
-      actions.push({ label: 'Dismiss suggestion', destructive: true, run: dismiss });
-    } else {
-      if (item.url) {
-        actions.push({ label: 'Share', run: () => Share.share({ url: item.url! }) });
-      }
-      if (spaceId !== undefined) {
-        actions.push({
-          label: 'Remove from space',
-          run: () => removeItemFromSpace({ itemId: item._id, spaceId }),
-        });
-      }
-      actions.push({
-        label: 'Delete',
-        destructive: true,
-        run: () => deleteItem({ id: item._id }),
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete this save?',
+      'This removes it from Shelvr and every space. This can\u2019t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteItem({ id: item._id }),
+        },
+      ],
+    );
+  };
+
+  const menuActions: ActionMenuItem[] = [];
+  if (isSuggested) {
+    menuActions.push({ label: 'Add to space', onPress: accept });
+    menuActions.push({
+      label: 'Dismiss suggestion',
+      destructive: true,
+      onPress: dismiss,
+    });
+  } else {
+    if (item.url) {
+      menuActions.push({
+        label: 'Share',
+        onPress: () => Share.share({ url: item.url! }),
       });
     }
-    showActionSheet(actions.map(({ label, destructive, run }) => ({ label, destructive, onPress: run })));
-  };
+    if (spaceId !== undefined) {
+      menuActions.push({
+        label: 'Remove from space',
+        onPress: () => removeItemFromSpace({ itemId: item._id, spaceId }),
+      });
+    }
+    menuActions.push({
+      label: 'Delete',
+      destructive: true,
+      onPress: confirmDelete,
+    });
+  }
 
   return (
     <Animated.View entering={FadeIn.duration(300)} style={styles.cell}>
@@ -162,9 +184,14 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
                   </View>
                 ) : null}
               </View>
-              <Pressable hitSlop={10} onPress={openMenu} style={styles.menuButton}>
+              <ActionMenu
+                label="Save actions"
+                title="Save actions"
+                actions={menuActions}
+                style={styles.menuButton}
+              >
                 <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
-              </Pressable>
+              </ActionMenu>
             </View>
 
             {isSuggested && (
@@ -217,7 +244,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
                 title="Delete"
                 icon="trash"
                 destructive
-                onPress={() => deleteItem({ id: item._id })}
+                onPress={confirmDelete}
               />
             </>
           )}
@@ -312,8 +339,11 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.muted,
   },
   menuButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 20,
   },
   suggestedBadge: {
     position: 'absolute',
