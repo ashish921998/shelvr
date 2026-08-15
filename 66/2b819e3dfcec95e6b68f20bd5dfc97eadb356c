@@ -1,0 +1,19 @@
+apps/native/src/app/(app)/onboarding.tsx
+  s_bc4f803d324096::t_c8aed1265421fe 21,28,30-31,42,70-72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "662b819e3dfcec95e6b68f20bd5dfc97eadb356c",
+  "prompts": {},
+  "sessions": {
+    "s_bc4f803d324096": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "5fb028cd-b30c-4fc8-83f3-aba33ae2dbd2",
+        "model": "unknown"
+      },
+      "human_author": "Ashish Huddar <ashish.hudar@gmail.com>"
+    }
+  }
+}
