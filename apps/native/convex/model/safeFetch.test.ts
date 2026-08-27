@@ -348,6 +348,34 @@ describe("safeFetch HTTP policy", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("http_error");
+      expect(result.status).toBe(500);
+    }
+  });
+
+  it("carries the status on an http error so callers can tell gone from blocked", async () => {
+    const agent = mockDispatcher();
+    agent.get("http://a.test").intercept({ method: "GET", path: "/" }).reply(404, "");
+    const result = await safeFetch("http://a.test/", {
+      timeoutMs: 2000,
+      maxBytes: 1024,
+      dispatcher: agent,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("http_error");
+      expect(result.status).toBe(404);
+    }
+  });
+
+  it("leaves status unset for a non-http failure", async () => {
+    const result = await safeFetch("http://127.0.0.1/", {
+      timeoutMs: 2000,
+      maxBytes: 1024,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("blocked_destination");
+      expect(result.status).toBeUndefined();
     }
   });
 

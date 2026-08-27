@@ -7,6 +7,7 @@ import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
+import { pageGone } from "./ai";
 import { STALE_IMPORT_CUTOFF_MS } from "./items";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -1342,6 +1343,128 @@ describe("Pro entitlement gate", () => {
     });
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });
+  });
+});
+
+describe("pageGone", () => {
+  it.each([404, 410])("treats HTTP %i as permanently gone", (status) => {
+    expect(pageGone(status)).toBe(true);
+  });
+  it.each([403, 429, 500, 503, undefined])(
+    "treats %s as retryable, not gone",
+    (status) => {
+      expect(pageGone(status)).toBe(false);
+    },
+  );
+});
+
+describe("failed saves and retry", () => {
+  /** Insert a link item for `userId` in the given end state, the way the
+   * pipeline would leave it. */
+  async function seedLink(
+    t: TestCtx,
+    userId: string,
+    fields: {
+      status: "processing" | "ready" | "failed";
+      failureReason?: "not_found" | "error";
+      enrichment?: "partial";
+    },
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: "https://example.com/gone",
+        tags: [],
+        searchText: "",
+        ...fields,
+      });
+    });
+  }
+
+  it("records why an item failed so the client can explain it", async () => {
+    const t = await as("fail-reason");
+    const itemId = await seedLink(t, "fail-reason", { status: "processing" });
+    await t.mutation(internal.items.failItem, { itemId, reason: "not_found" });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("failed");
+    expect(item?.failureReason).toBe("not_found");
+  });
+
+  it("retries a failed item, clearing the reason and re-queueing processing", async () => {
+    const t = await as("retry-fail");
+    const itemId = await seedLink(t, "retry-fail", {
+      status: "failed",
+      failureReason: "error",
+    });
+    await t.mutation(api.items.reprocessItem, { id: itemId });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("processing");
+    expect(item?.failureReason).toBeUndefined();
+  });
+
+  it("retries a partially enriched item", async () => {
+    const t = await as("retry-partial");
+    const itemId = await seedLink(t, "retry-partial", {
+      status: "ready",
+      enrichment: "partial",
+    });
+    await t.mutation(api.items.reprocessItem, { id: itemId });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("processing");
+  });
+
+  it("does not retry a page that is gone (a 404 will not change)", async () => {
+    const t = await as("retry-gone");
+    const itemId = await seedLink(t, "retry-gone", {
+      status: "failed",
+      failureReason: "not_found",
+    });
+    await t.mutation(api.items.reprocessItem, { id: itemId });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("failed");
+    expect(item?.failureReason).toBe("not_found");
+  });
+
+  it("does not retry a fully enriched item", async () => {
+    const t = await as("retry-ready");
+    const itemId = await seedLink(t, "retry-ready", { status: "ready" });
+    await t.mutation(api.items.reprocessItem, { id: itemId });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("ready");
+  });
+
+  it("refuses to retry another user's item", async () => {
+    const owner = await as("retry-owner");
+    const itemId = await seedLink(owner, "retry-owner", {
+      status: "failed",
+      failureReason: "error",
+    });
+    const attacker = await as("retry-attacker");
+    await expect(
+      attacker.mutation(api.items.reprocessItem, { id: itemId }),
+    ).rejects.toThrow(/Item not found/);
+    const item = await owner.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("failed");
+  });
+
+  it("blocks retry for a lapsed user", async () => {
+    const t = newConvexTest().withIdentity({ subject: "retry-lapsed" });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "retry-lapsed",
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    const itemId = await seedLink(t, "retry-lapsed", {
+      status: "failed",
+      failureReason: "error",
+    });
+    await expect(
+      t.mutation(api.items.reprocessItem, { id: itemId }),
+    ).rejects.toThrow(/Pro required/);
   });
 });
 

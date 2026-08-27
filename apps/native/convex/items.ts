@@ -13,6 +13,10 @@ import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import {
+  enrichmentValidator,
+  failureReasonValidator,
+} from "./model/itemFields";
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
@@ -88,6 +92,8 @@ const itemFields = {
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
   productsStatus: v.optional(productsStatusValidator),
+  failureReason: v.optional(failureReasonValidator),
+  enrichment: v.optional(enrichmentValidator),
   searchText: v.string(),
 };
 
@@ -970,6 +976,43 @@ export const findLinks = mutation({
   },
 });
 
+/**
+ * User-triggered retry for a save whose page fetch or classification did not
+ * fully succeed: a `failed` item or a `ready` one flagged `enrichment: "partial"`
+ * (classified from its URL because the page body was unreadable). Re-runs the
+ * same pipeline, so it is rate-limited like a create.
+ *
+ * A `not_found` failure is NOT retryable — the page is gone (404/410) and a
+ * retry would burn a classification to reach the same conclusion.
+ */
+export const reprocessItem = mutation({
+  args: { id: v.id("items") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    const item = await ctx.db.get(args.id);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    const retryable =
+      (item.status === "failed" && item.failureReason !== "not_found") ||
+      (item.status === "ready" && item.enrichment === "partial");
+    if (!retryable) {
+      return null;
+    }
+    await rateLimiter.limit(ctx, "reprocessItem", { key: userId, throws: true });
+    await ctx.db.patch(args.id, {
+      status: "processing",
+      failureReason: undefined,
+    });
+    await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+      itemId: args.id,
+    });
+    return null;
+  },
+});
+
 export const deleteItem = mutation({
   args: { id: v.id("items") },
   returns: v.null(),
@@ -1046,6 +1089,7 @@ export const finalizeItem = internalMutation({
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
     status: itemStatusValidator,
+    enrichment: v.optional(enrichmentValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1071,6 +1115,10 @@ export const finalizeItem = internalMutation({
       aspectRatio: args.aspectRatio,
       intents: args.intents,
       status: args.status,
+      // Always written so a successful retry clears a previous "partial" flag
+      // and a previous failureReason (patching undefined removes the field).
+      enrichment: args.enrichment,
+      failureReason: undefined,
       searchText,
     });
     return null;
@@ -1132,14 +1180,17 @@ export const setProductsInternal = internalMutation({
 });
 
 export const failItem = internalMutation({
-  args: { itemId: v.id("items") },
+  args: { itemId: v.id("items"), reason: failureReasonValidator },
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) {
       return null;
     }
-    await ctx.db.patch(args.itemId, { status: "failed" });
+    await ctx.db.patch(args.itemId, {
+      status: "failed",
+      failureReason: args.reason,
+    });
     return null;
   },
 });
