@@ -1,6 +1,7 @@
 import {
   classifyEntries,
   processSession,
+  resolvedFromRawPayloads,
   type ResolvedPayload,
   type ShareSaveDeps,
 } from '@/lib/share/process-share';
@@ -58,7 +59,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 const shareStore: SessionStoreAdapter = createMMKV({ id: 'incoming-share' });
 
 /** The session-driven UI states. The resolution-driven states (resolving,
- * resolution-error, empty) are pure functions of the `useIncomingShare` hook
+ * empty) are pure functions of the `useIncomingShare` hook
  * props, so they are DERIVED during render rather than stored — storing them
  * would require synchronous setState in the effect (a cascading-render smell).
  * A terminal outcome with any failed/unsupported entry is reported as `partial`
@@ -93,7 +94,6 @@ export default function ShareScreen() {
     isResolving,
     error,
     clearSharedPayloads,
-    refreshSharePayloads,
   } = useIncomingShare();
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -125,6 +125,29 @@ export default function ShareScreen() {
     }),
     [createLinkItem, createNoteItem, saveImages],
   );
+
+  /** The payload list the processor runs against. Normal path: the natively
+   * resolved payloads. When resolution failed or its results no longer align
+   * with the raw payloads — the resolver probes shared URLs with a live
+   * request, so bot-hostile hosts (TikTok) can fail the whole resolution —
+   * fall back to the raw payloads: for url/text shares the raw value is
+   * everything the save needs, and entries the fallback cannot resolve
+   * (images) are reported as failed entries instead of killing the share. */
+  const processorPayloads = useMemo<ResolvedPayload[]>(() => {
+    if (
+      error === null &&
+      resolvedSharedPayloads.length === sharedPayloads.length
+    ) {
+      return toResolved(resolvedSharedPayloads);
+    }
+    return resolvedFromRawPayloads(
+      sharedPayloads.map((p) => ({
+        value: p.value,
+        shareType: p.shareType,
+        mimeType: p.mimeType,
+      })),
+    );
+  }, [error, resolvedSharedPayloads, sharedPayloads]);
 
   /** The single idempotent completion path used by all-success, continue, AND
    * cancel. Cancel reuses it deliberately so the same persist-complete → native
@@ -280,9 +303,10 @@ export default function ShareScreen() {
   );
 
   // Reconcile + drive the save. The resolution-driven phases (resolving /
-  // resolutionError / empty) are derived in render below; this effect only runs
-  // once resolution has settled AND there are payloads to save, so it contains
-  // no synchronous setState for the derived states.
+  // empty) are derived in render below; this effect only runs once resolution
+  // has settled AND there are payloads to save, so it contains no synchronous
+  // setState for the derived states. A resolution failure no longer blocks the
+  // save: processorPayloads falls back to the raw payloads.
   useEffect(() => {
     // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
@@ -290,9 +314,9 @@ export default function ShareScreen() {
     // durable handoff points), NOT here — a process death mid-share must still
     // resume the share on next launch.
     const userId = user._id;
-    // Derived guards: while resolving, after a resolution error, or with no
-    // payloads, render handles the phase — nothing for the effect to do.
-    if (isResolving || error !== null || sharedPayloads.length === 0) {
+    // Derived guards: while resolving, or with no payloads, render handles the
+    // phase — nothing for the effect to do.
+    if (isResolving || sharedPayloads.length === 0) {
       return;
     }
 
@@ -301,16 +325,6 @@ export default function ShareScreen() {
       shareType: p.shareType,
       mimeType: p.mimeType,
     }));
-
-    // Raw/resolved count diverged: alignment is ambiguous. Report it as a
-    // resolution error (render covers it) WITHOUT recording any session id — so
-    // a later successful refreshSharePayloads (counts now aligned) is free to
-    // start the save. This MUST run before we touch the session guard, otherwise
-    // the resumed-session check below would block the retry and trap the screen
-    // on an idle spinner forever.
-    if (resolvedSharedPayloads.length !== raw.length) {
-      return;
-    }
 
     const reconciled = reconcileSession(shareStore, userId, raw, () =>
       Crypto.randomUUID(),
@@ -349,14 +363,13 @@ export default function ShareScreen() {
     // terminal phase. Deferred out of the synchronous effect body so runSave's
     // initial setPhase('saving') does not trip the cascading-render lint rule.
     void Promise.resolve().then(() =>
-      runSave(session, toResolved(resolvedSharedPayloads), saveDeps),
+      runSave(session, processorPayloads, saveDeps),
     );
   }, [
     user,
     sharedPayloads,
-    resolvedSharedPayloads,
+    processorPayloads,
     isResolving,
-    error,
     saveDeps,
     runSave,
     completeSession,
@@ -364,23 +377,16 @@ export default function ShareScreen() {
 
   // --- Derived resolution state (pure functions of hook props) --------------
 
-  // A divergent raw/resolved count is an ambiguous-alignment error, reported as
-  // the resolution-error phase rather than guessing which raw index maps where.
-  const resolutionError =
-    error !== null ||
-    (!isResolving &&
-      sharedPayloads.length > 0 &&
-      resolvedSharedPayloads.length !== sharedPayloads.length);
+  // Resolution failures no longer kill the share: the processor falls back to
+  // the raw payloads (see processorPayloads) and entries the fallback cannot
+  // resolve surface as failed entries on the partial screen.
   const nothingResolved =
-    !isResolving &&
-    error === null &&
-    sharedPayloads.length === 0 &&
-    phase.kind === 'idle';
+    !isResolving && sharedPayloads.length === 0 && phase.kind === 'idle';
 
   // --- Phase render ---------------------------------------------------------
 
   /** Clears native payloads (best-effort), drops any persisted session, and
-   * returns Home. Used by the resolution-error and empty states. Deleting the
+   * returns Home. Used by the terminal error/empty states. Deleting the
    * session is essential: a session may already exist (e.g. counts diverged
    * after the record was created), and leaving it would let a later identical
    * share resume the canceled work instead of starting fresh. */
@@ -446,18 +452,6 @@ export default function ShareScreen() {
   // synchronous-in-effect setState that storing them would require.
   if (isResolving && phase.kind === 'idle') {
     return <Centered label="Reading shared content…" spinner theme={theme} />;
-  }
-  if (resolutionError) {
-    return (
-      <ErrorActions
-        title="Couldn’t read the shared content"
-        theme={theme}
-        cancelLabel="Cancel"
-        onCancel={abandon}
-        retryLabel="Try again"
-        onRetry={() => refreshSharePayloads()}
-      />
-    );
   }
   if (nothingResolved) {
     return (
@@ -531,11 +525,7 @@ export default function ShareScreen() {
               onPress={() => {
                 const live = loadSession(shareStore);
                 if (live === null) return;
-                void runSave(
-                  live,
-                  toResolved(resolvedSharedPayloads),
-                  saveDeps,
-                );
+                void runSave(live, processorPayloads, saveDeps);
               }}
             />
           ) : null}

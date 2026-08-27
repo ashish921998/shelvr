@@ -16,6 +16,7 @@ import { extractFirstUrl, isProbablyUrl } from '@/lib/url';
 import type { Id } from '@convex/_generated/dataModel';
 import type { ImageSaveResult, LocalImage } from '@/lib/use-save-image';
 import type {
+  RawSharePayload,
   ShareEntry,
   ShareEntryKind,
   ShareSession,
@@ -112,6 +113,63 @@ export function classifyPayload(
     return { kind: 'link', url };
   }
   return { kind: 'note' };
+}
+
+/**
+ * Builds processor payloads from RAW share payloads, for use when native
+ * resolution failed or its results no longer align with the raw payloads. The
+ * SDK's resolver probes shared URLs with a live request, so bot-hostile hosts
+ * (TikTok, some shorteners) can fail the whole resolution — but for `url` and
+ * `text` shares the raw value is everything the save needs: the backend does
+ * its own fetch with its own user agent and degrades gracefully when the host
+ * blocks it. Resolution-dependent kinds keep their content type but carry no
+ * `contentUri`, so classifyPayload reports them as failed/unsupported entries
+ * instead of the entire share dying on a resolution-error screen.
+ */
+export function resolvedFromRawPayloads(
+  raw: RawSharePayload[],
+): ResolvedPayload[] {
+  return raw.map((payload) => {
+    const contentMimeType = payload.mimeType ?? null;
+    switch (payload.shareType) {
+      case 'url':
+        return {
+          contentType: 'website' as const,
+          value: payload.value,
+          contentUri: null,
+          contentMimeType,
+        };
+      case 'image':
+        // Without the natively resolved contentUri the image is unreachable;
+        // classification turns this into an explicit failed entry.
+        return {
+          contentType: 'image' as const,
+          value: payload.value,
+          contentUri: null,
+          contentMimeType,
+        };
+      case 'audio':
+      case 'video':
+      case 'file':
+        return {
+          contentType: payload.shareType,
+          value: payload.value,
+          contentUri: null,
+          contentMimeType,
+        };
+      case 'text':
+      default:
+        // Unknown share types are treated as text, mirroring the SDK's own
+        // 'text' default: classification extracts an embedded URL if there is
+        // one and otherwise saves the body as a note.
+        return {
+          contentType: 'text' as const,
+          value: payload.value,
+          contentUri: null,
+          contentMimeType,
+        };
+    }
+  });
 }
 
 /**
