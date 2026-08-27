@@ -22,8 +22,14 @@ import { operationIdFor, type ShareEntry, type ShareSession } from "./storage";
 // is re-exported from its real relative source so classification behavior is
 // exercised against the actual helper, not a hand-rolled stub.
 vi.mock("@/lib/url", async () => {
-  const actual = await vi.importActual<{ isProbablyUrl: (t: string) => boolean }>("../url");
-  return { isProbablyUrl: actual.isProbablyUrl };
+  const actual = await vi.importActual<{
+    isProbablyUrl: (t: string) => boolean;
+    extractFirstUrl: (t: string) => string | null;
+  }>("../url");
+  return {
+    isProbablyUrl: actual.isProbablyUrl,
+    extractFirstUrl: actual.extractFirstUrl,
+  };
 });
 vi.mock("@convex/_generated/dataModel", () => ({}));
 
@@ -91,7 +97,29 @@ describe("classifyPayload", () => {
     expect(classifyPayload(urlPayload("https://example.com"))).toEqual({ kind: "link" });
   });
   it("classifies text that looks like a URL as a link", () => {
-    expect(classifyPayload(textPayload("example.com/path"))).toEqual({ kind: "link" });
+    expect(classifyPayload(textPayload("example.com/path"))).toEqual({
+      kind: "link",
+      url: "example.com/path",
+    });
+  });
+  it("extracts a URL wrapped in TikTok-style caption text as a link", () => {
+    expect(
+      classifyPayload(textPayload("Check out this video! https://www.tiktok.com/@creator/video/7301234567890123456")),
+    ).toEqual({
+      kind: "link",
+      url: "https://www.tiktok.com/@creator/video/7301234567890123456",
+    });
+  });
+  it("strips trailing sentence punctuation from an extracted URL", () => {
+    expect(classifyPayload(textPayload("Loved this. https://x.com/user/status/1."))).toEqual({
+      kind: "link",
+      url: "https://x.com/user/status/1",
+    });
+  });
+  it("classifies caption text without any URL as a note", () => {
+    expect(classifyPayload(textPayload("Check out this account, it's great"))).toEqual({
+      kind: "note",
+    });
   });
   it("classifies plain text as a note", () => {
     expect(classifyPayload(textPayload("a reminder"))).toEqual({ kind: "note" });
@@ -249,6 +277,28 @@ describe("processSession", () => {
     expect(result.entries[0].status).toBe("unsupported");
     expect(result.entries[1].status).toBe("saved");
     expect(saveLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the extracted URL (not the caption text) for caption-wrapped shares", async () => {
+    // TikTok-style shares arrive as text/plain with template text around the
+    // URL. The save must be a LINK keyed to the embedded URL, never a note
+    // holding the raw caption.
+    const session = makeSession(1);
+    const resolved = [
+      textPayload("Check out this video! https://www.tiktok.com/@creator/video/7301234567890123456"),
+    ];
+    const saveLink = vi.fn(async ({ url, operationId }) => `items:${operationId}:${url}` as Id<"items">);
+    const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
+    const deps = makeDeps({ saveLink, saveNote });
+
+    const result = await processSession(session, resolved, deps);
+    expect(result.entries[0].kind).toBe("link");
+    expect(result.entries[0].status).toBe("saved");
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(saveLink.mock.calls[0][0].url).toBe(
+      "https://www.tiktok.com/@creator/video/7301234567890123456",
+    );
+    expect(saveNote).not.toHaveBeenCalled();
   });
 
   it("reports an image save failure from the injected save (a result, not a throw)", async () => {

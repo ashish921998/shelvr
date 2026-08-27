@@ -12,7 +12,7 @@
 //     `failed` entries; saved entries are never re-saved.
 //   - onEntrySettled callback emits progress after each entry settles.
 
-import { isProbablyUrl } from '@/lib/url';
+import { extractFirstUrl, isProbablyUrl } from '@/lib/url';
 import type { Id } from '@convex/_generated/dataModel';
 import type { ImageSaveResult, LocalImage } from '@/lib/use-save-image';
 import type {
@@ -62,9 +62,11 @@ const UNSUPPORTED_CONTENT_TYPES = new Set<NonNullable<ResolvedPayload['contentTy
 
 /**
  * Classifies ONE resolved payload into a kind, WITHOUT starting any side effect.
- * Returns the kind plus a reason when the payload is malformed/unsaveable so
- * the caller can record an explicit `failed`/`unsupported` entry rather than
- * guessing or skipping it.
+ * Returns the kind, the URL to save when the payload resolves to a link (which
+ * may differ from the raw value when the URL was embedded in caption text),
+ * plus a reason when the payload is malformed/unsaveable so the caller can
+ * record an explicit `failed`/`unsupported` entry rather than guessing or
+ * skipping it.
  *
  * Classification rules:
  *   - image WITHOUT contentUri → failed (the image is unreachable).
@@ -73,11 +75,13 @@ const UNSUPPORTED_CONTENT_TYPES = new Set<NonNullable<ResolvedPayload['contentTy
  *   - website otherwise → link.
  *   - unsupported types (audio/video/file) → unsupported.
  *   - blank text → failed (nothing to save).
- *   - text that looks like a URL → link; otherwise note.
+ *   - text containing an http(s) URL (bare or wrapped in caption text, the
+ *     shape TikTok/Instagram/X actually share) → link, with the extracted URL.
+ *   - other text → note.
  */
 export function classifyPayload(
   payload: ResolvedPayload,
-): { kind: ShareEntryKind; reason?: string } {
+): { kind: ShareEntryKind; url?: string; reason?: string } {
   if (payload.contentType === 'image') {
     if (!payload.contentUri) {
       return { kind: 'image', reason: 'Image could not be resolved' };
@@ -99,7 +103,15 @@ export function classifyPayload(
   if (!value) {
     return { kind: 'note', reason: 'Shared text was empty' };
   }
-  return { kind: isProbablyUrl(value) ? 'link' : 'note' };
+  // Captioned links: real apps share the URL wrapped in template text ("Check
+  // out this video! https://..."), which fails the whole-string isProbablyUrl
+  // check. Extract the embedded URL and save a link; the backend fetches the
+  // page for real metadata. A bare (possibly scheme-less) URL still wins first.
+  const url = isProbablyUrl(value) ? value : extractFirstUrl(value);
+  if (url) {
+    return { kind: 'link', url };
+  }
+  return { kind: 'note' };
 }
 
 /**
@@ -208,7 +220,7 @@ async function processOne(
   if (payload === undefined) {
     return { kind: entry.kind, status: 'failed', message: 'No resolved payload for this entry' };
   }
-  const { kind, reason } = classifyPayload(payload);
+  const { kind, reason, url } = classifyPayload(payload);
   if (reason !== undefined) {
     // A saveable kind with a malformed payload (blank website/text, image with
     // no contentUri) is terminal; an unsupported type is terminal too.
@@ -218,8 +230,10 @@ async function processOne(
 
   try {
     if (kind === 'link') {
+      // Save the classifier's URL: for caption-wrapped shares this is the
+      // extracted link, not the raw caption text.
       const itemId = await deps.saveLink({
-        url: payload.value.trim(),
+        url: url ?? payload.value.trim(),
         operationId,
       });
       return { kind, status: 'saved', itemId: String(itemId), message: undefined };
