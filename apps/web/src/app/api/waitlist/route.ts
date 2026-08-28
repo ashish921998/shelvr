@@ -3,9 +3,6 @@ import { makeFunctionReference } from "convex/server";
 import { NextResponse } from "next/server";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const consentVersion = "shelvr-waitlist-v1";
-const consentText =
-  "Notify me when Shelvr launches. One launch email; no newsletter.";
 
 type WaitlistSource = "hero" | "preview" | "footer" | "unknown";
 
@@ -14,8 +11,7 @@ const joinWaitlist = makeFunctionReference<
   {
     email: string;
     source: WaitlistSource;
-    consentVersion: string;
-    consentText: string;
+    ip?: string;
   },
   { saved: boolean; emailProviderSynced: boolean }
 >("waitlist:join");
@@ -24,6 +20,21 @@ function normalizeSource(value: unknown): WaitlistSource {
   return value === "hero" || value === "preview" || value === "footer"
     ? value
     : "unknown";
+}
+
+function clientIp(request: Request): string | undefined {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const fromForwarded = forwarded?.split(",")[0]?.trim();
+  const ip = fromForwarded || request.headers.get("x-real-ip")?.trim() || "";
+  return ip.length > 0 && ip.length <= 64 ? ip : undefined;
+}
+
+function isRateLimited(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return false;
+  }
+  const data = (error as { data?: { kind?: unknown } }).data;
+  return typeof data === "object" && data !== null && data.kind === "RateLimited";
 }
 
 export async function POST(request: Request) {
@@ -70,8 +81,7 @@ export async function POST(request: Request) {
     const result = await convex.action(joinWaitlist, {
       email,
       source: normalizeSource(body.source),
-      consentVersion,
-      consentText,
+      ip: clientIp(request),
     });
 
     if (!result.saved) throw new Error("Convex did not confirm the signup.");
@@ -81,6 +91,12 @@ export async function POST(request: Request) {
       emailProviderSynced: result.emailProviderSynced,
     });
   } catch (error) {
+    if (isRateLimited(error)) {
+      return NextResponse.json(
+        { message: "Too many attempts. Please try again later." },
+        { status: 429 },
+      );
+    }
     console.error("Waitlist persistence failed", error);
     return NextResponse.json(
       { message: "Could not join right now. Please try again." },
