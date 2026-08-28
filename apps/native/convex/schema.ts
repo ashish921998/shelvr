@@ -199,7 +199,7 @@ export default defineSchema({
   // getEntitlement (client) and requireProEntitlement (gated mutations). The
   // lifecycle is:
   //
-  //   trialing (3-day yearly trial) -> pro (paid) -> lapsed (trial/sub ended)
+  //   trialing (7-day yearly trial) -> pro (paid) -> lapsed (trial/sub ended)
   //
   // A lapsed user is read-only: they can view and search existing saves and
   // spaces, but every save and Pro feature is gated behind an active trial or
@@ -223,4 +223,36 @@ export default defineSchema({
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // Provider-independent waitlist source of truth. Resend is only a delivery
+  // and preference-management projection of these records, so a provider
+  // outage or migration can never lose the original signup or consent trail.
+  waitlistSignups: defineTable({
+    email: v.string(),
+    product: v.literal("shelvr"),
+    source: v.union(
+      v.literal("hero"),
+      v.literal("preview"),
+      v.literal("footer"),
+      v.literal("unknown"),
+    ),
+    consentVersion: v.string(),
+    consentText: v.string(),
+    consentedAt: v.number(),
+    firstSubmittedAt: v.number(),
+    lastSubmittedAt: v.number(),
+    resendStatus: v.union(
+      v.literal("pending"),
+      v.literal("synced"),
+      v.literal("failed"),
+      v.literal("unconfigured"),
+    ),
+    resendContactId: v.optional(v.string()),
+    resendError: v.optional(v.string()),
+    resendAttempts: v.number(),
+  })
+    .index("by_email_and_product", ["email", "product"])
+    // Bounded Resend retry cron pages failed/pending/unconfigured rows below
+    // the attempt cap without scanning the whole waitlist.
+    .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),
 });

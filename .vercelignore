@@ -1,0 +1,8 @@
+apps/native
+docs
+tmp
+node_modules
+**/node_modules
+**/.next
+**/Pods
+**/DerivedData

@@ -1,6 +1,6 @@
 import { TagChip } from '@/components/tag-chip';
 import { displayHost } from '@/lib/url';
-import { SimilarGrid } from '@/components/item-detail';
+import { SimilarGrid } from '@/components/similar-grid';
 import type { DetailItem } from '@/components/item-detail';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';

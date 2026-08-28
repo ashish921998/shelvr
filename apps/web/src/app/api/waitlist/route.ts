@@ -1,0 +1,106 @@
+import { ConvexHttpClient } from "convex/browser";
+import { makeFunctionReference } from "convex/server";
+import { NextResponse } from "next/server";
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type WaitlistSource = "hero" | "preview" | "footer" | "unknown";
+
+const joinWaitlist = makeFunctionReference<
+  "action",
+  {
+    email: string;
+    source: WaitlistSource;
+    ip?: string;
+  },
+  { saved: boolean; emailProviderSynced: boolean }
+>("waitlist:join");
+
+function normalizeSource(value: unknown): WaitlistSource {
+  return value === "hero" || value === "preview" || value === "footer"
+    ? value
+    : "unknown";
+}
+
+function clientIp(request: Request): string | undefined {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const fromForwarded = forwarded?.split(",")[0]?.trim();
+  const ip = fromForwarded || request.headers.get("x-real-ip")?.trim() || "";
+  return ip.length > 0 && ip.length <= 64 ? ip : undefined;
+}
+
+function isRateLimited(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return false;
+  }
+  const data = (error as { data?: { kind?: unknown } }).data;
+  return typeof data === "object" && data !== null && data.kind === "RateLimited";
+}
+
+export async function POST(request: Request) {
+  let body: {
+    email?: unknown;
+    company?: unknown;
+    source?: unknown;
+  };
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: "Invalid request." }, { status: 400 });
+  }
+
+  // JSON primitives (`null`, strings, arrays) parse fine but have no fields —
+  // reject them here so the field reads below can never throw.
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ message: "Invalid request." }, { status: 400 });
+  }
+
+  if (body.company) return NextResponse.json({ ok: true });
+
+  const email =
+    typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (!emailPattern.test(email) || email.length > 254) {
+    return NextResponse.json(
+      { message: "Enter a valid email address." },
+      { status: 400 },
+    );
+  }
+
+  const convexUrl = process.env.CONVEX_URL;
+  if (!convexUrl) {
+    console.error("Waitlist is missing CONVEX_URL.");
+    return NextResponse.json(
+      { message: "The waitlist is being connected. Please try again shortly." },
+      { status: 503 },
+    );
+  }
+
+  try {
+    const convex = new ConvexHttpClient(convexUrl);
+    const result = await convex.action(joinWaitlist, {
+      email,
+      source: normalizeSource(body.source),
+      ip: clientIp(request),
+    });
+
+    if (!result.saved) throw new Error("Convex did not confirm the signup.");
+
+    return NextResponse.json({
+      ok: true,
+      emailProviderSynced: result.emailProviderSynced,
+    });
+  } catch (error) {
+    if (isRateLimited(error)) {
+      return NextResponse.json(
+        { message: "Too many attempts. Please try again later." },
+        { status: 429 },
+      );
+    }
+    console.error("Waitlist persistence failed", error);
+    return NextResponse.json(
+      { message: "Could not join right now. Please try again." },
+      { status: 502 },
+    );
+  }
+}

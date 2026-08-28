@@ -11,14 +11,12 @@ export default function PrivacyPage() {
   return (
     <main className="bg-paper min-h-screen">
       <div className="container max-w-3xl py-10 sm:py-16">
-        <Link href="/">
-          <Logo />
-        </Link>
+        <Logo />
 
         <h1 className="mt-10 font-display text-3xl sm:text-4xl text-ink">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: August 7, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: August 28, 2026</p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-7 text-ink/90">
           <section>
@@ -39,6 +37,15 @@ export default function PrivacyPage() {
                 collect your email address (and your name, if your sign-in
                 provider shares it). Authentication is handled by our backend
                 provider, Convex, via Sign in with Apple or Google.
+              </li>
+              <li>
+                <strong>Waitlist signup.</strong> If you join the launch
+                waitlist on this site, we collect your email address and record
+                the consent text you agreed to, solely so we can send you a
+                launch notification. The address is stored with our backend
+                (Convex) and synced to our email-delivery provider (Resend) for
+                that purpose. To unsubscribe or have your address deleted, email{" "}
+                <strong>support@shelvr.app</strong>.
               </li>
               <li>
                 <strong>Content you save.</strong> The links, notes, and images
@@ -69,10 +76,14 @@ export default function PrivacyPage() {
               <li>
                 <strong>Product analytics.</strong> We use PostHog to understand
                 feature usage (for example onboarding completion and save
-                events). Analytics are tied to your account id after sign-in and
-                are not used for advertising.
-              </li>
-            </ul>
+                events). In the app, analytics are tied to your account id
+                after sign-in. On this website, we record a random anonymous
+                identifier in your browser’s local storage and send basic usage
+                events (such as waitlist form interactions and the page URL) to
+                PostHog before you have an account. Website identifiers are not
+                linked to your account or to your saved content, and no
+                analytics data is used for advertising.
+              </li>            </ul>
             <p className="mt-3">
               We do not collect contacts, browsing history outside content you
               choose to save, or advertising identifiers, and we do not run
@@ -103,8 +114,8 @@ export default function PrivacyPage() {
             <p className="mt-2">
               We never sell your data. We share it only with the service
               providers needed to operate Shelvr (including Convex, RevenueCat,
-              our AI provider, product-search provider, and PostHog), strictly
-              to run the product, and where required by law.
+              our AI provider, product-search provider, Resend, and PostHog),
+              strictly to run the product, and where required by law.
             </p>
           </section>
 
@@ -117,13 +128,18 @@ export default function PrivacyPage() {
               an item removes it from our backend. You can delete your entire
               Shelvr account from Profile in the app; that removes your saves,
               spaces, memberships, pending uploads, subscription row, and
-              authentication records. Product analytics events already
-              recorded in PostHog are not automatically erased by in-app
-              deletion; email <strong>support@shelvr.app</strong> to request
-              deletion of analytics data linked to your account. Deleting your
-              Shelvr account does not cancel an App Store subscription —
-              manage that in your Apple ID settings. You can also email{' '}
-              <strong>support@shelvr.app</strong> for help.
+              authentication records. Waitlist email addresses are kept until
+              you ask us to remove them (or unsubscribe). Product analytics
+              events already recorded in PostHog are not automatically erased
+              by in-app deletion; email{" "}
+              <strong>support@shelvr.app</strong> to request deletion of
+              analytics data linked to your account. Clearing your browser’s
+              local storage only discards this browser’s anonymous identifier:
+              already-recorded events remain, and the next event starts a new
+              identifier.
+              Deleting your Shelvr account does not cancel an App Store
+              subscription — manage that in your Apple ID settings. You can
+              also email <strong>support@shelvr.app</strong> for help.
             </p>
           </section>
 

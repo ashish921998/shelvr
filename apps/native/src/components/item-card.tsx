@@ -3,6 +3,7 @@ import {
   ActionMenu,
   type ActionMenuItem,
 } from '@/components/ui/action-menu';
+import { memo } from 'react';
 import { displayHost } from '@/lib/url';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -12,8 +13,18 @@ import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import { Alert, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
-import Animated, { FadeIn, ZoomOut } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+  ZoomOut,
+} from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import {
+  EASE_OUT,
+  REDUCED_FADE_IN,
+  REDUCED_FADE_OUT,
+} from '@/lib/motion';
 
 export type FeedItem = {
   _id: Id<'items'>;
@@ -27,6 +38,8 @@ export type FeedItem = {
   heroImageUrl?: string;
   aspectRatio?: number;
   isSticker?: boolean;
+  failureReason?: 'not_found' | 'error';
+  enrichment?: 'partial';
   tags: string[];
   // Suggested this item into the current space; it isn't a member
   // until the user accepts. Only ever set by the space screen.
@@ -44,6 +57,9 @@ export type ItemSource =
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
 
+const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
+const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
+
 function clampRatio(ratio: number | undefined, fallback: number) {
   const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
   // Preserve the true aspect ratio so previews aren't cropped; only bound
@@ -51,8 +67,12 @@ function clampRatio(ratio: number | undefined, fallback: number) {
   return Math.min(Math.max(value, 0.5), 2);
 }
 
-export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource }) {
+// Memoized: feed rows are the highest-churn surface in the app (every live-query
+// tick and parent re-render touches the list), so skip re-renders when a row's
+// `item` ref is unchanged.
+export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource }) {
   const { theme } = useUnistyles();
+  const reducedMotion = useReducedMotion();
   const deleteItem = useMutation(api.items.deleteItem);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
@@ -63,7 +83,16 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
   const isSuggested = item.suggested === true && spaceId !== undefined;
 
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const captionTitle = item.title ?? item.note ?? (item.url ? displayHost(item.url) : undefined);
+  // A failed save has no AI title, so without this the card is blank forever and
+  // indistinguishable from one still processing.
+  const failedLabel =
+    item.status === 'failed'
+      ? item.failureReason === 'not_found'
+        ? 'Page not found'
+        : "Couldn't be saved"
+      : undefined;
+  const captionTitle =
+    item.title ?? item.note ?? failedLabel ?? (item.url ? displayHost(item.url) : undefined);
 
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
   // exit animation is the confirmation — no navigation, no dialog.
@@ -124,7 +153,10 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.cell}>
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(300)}
+      style={styles.cell}
+    >
       <Link
         href={{ pathname: '/item/[id]', params: { id: item._id, ...source } }}
         asChild
@@ -161,7 +193,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
                   />
                 )}
                 <Text style={styles.textFaceTitle} numberOfLines={5}>
-                  {item.title ?? item.note ?? displayHost(item.url)}
+                  {item.title ?? item.note ?? failedLabel ?? displayHost(item.url)}
                 </Text>
               </View>
             )}
@@ -198,17 +230,36 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
               // The badge pops off with a spring when the suggestion resolves
               // (accepted here or anywhere else — the prop flip unmounts it).
               <Animated.View
-                exiting={ZoomOut.springify().damping(14).stiffness(300)}
+                exiting={
+                  reducedMotion
+                    ? REDUCED_FADE_OUT
+                    : ZoomOut.springify().damping(14).stiffness(300)
+                }
                 style={styles.suggestedBadge}
               >
                 <SuggestedBadge onPress={accept} />
               </Animated.View>
             )}
 
-            {item.status === 'processing' && (
-              <View style={styles.processing}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-              </View>
+            {(item.status === 'processing' || item.status === 'failed') && (
+              // One corner slot for the transient states: a spinner while the
+              // pipeline runs, a warning once it has failed.
+              <Animated.View
+                entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
+                exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+                collapsable={false}
+                style={styles.processing}
+              >
+                {item.status === 'processing' ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                ) : (
+                  <Icon
+                    name="exclamationmark.triangle.fill"
+                    size={13}
+                    tintColor={theme.colors.danger}
+                  />
+                )}
+              </Animated.View>
             )}
           </Pressable>
         </Link.Trigger>
@@ -252,7 +303,7 @@ export function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource
       </Link>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create((theme) => ({
   cell: {

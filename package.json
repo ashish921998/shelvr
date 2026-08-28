@@ -18,5 +18,11 @@
   "workspaces": [
     "apps/*"
   ],
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "version": "1.0.0",
+  "dependencies": {
+    "expo": "~57.0.12",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
+  }
 }

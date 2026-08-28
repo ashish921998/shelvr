@@ -13,4 +13,13 @@ crons.interval(
   {},
 );
 
+// Retry Resend projection for waitlist rows that saved but never synced, so a
+// provider outage does not leave signups unrecoverable.
+crons.interval(
+  "retry waitlist resend sync",
+  { hours: 1 },
+  internal.waitlist.retryFailedResendSyncs,
+  {},
+);
+
 export default crons;

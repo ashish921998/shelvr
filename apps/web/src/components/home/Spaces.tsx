@@ -1,80 +1,78 @@
-const spaces = [
+import Image from "next/image";
+
+const photos = [
   {
-    name: "Design systems",
-    count: 48,
-    color: "#E4572E",
-    blurb: "Component APIs, tokens, critique threads.",
+    src: "/images/spaces/gifts.jpg",
+    alt: "Espresso machine saved into Gift ideas",
+    className: "left-[6%] top-[8%] h-[40%] w-[44%] rotate-[-6deg]",
   },
   {
-    name: "Weekend cooking",
-    count: 23,
-    color: "#0F766E",
-    blurb: "Recipes, techniques, market lists.",
+    src: "/images/spaces/office.jpg",
+    alt: "Dashboard screenshot saved into Home office",
+    className: "right-[6%] top-[14%] h-[30%] w-[42%] rotate-[5deg]",
   },
   {
-    name: "Travel rabbit holes",
-    count: 31,
-    color: "#0B1128",
-    blurb: "Neighborhoods, photo spots, packing notes.",
+    src: "/images/spaces/recipes.jpg",
+    alt: "Ramen bowl saved into Recipes",
+    className: "left-[34%] top-[36%] z-10 h-[24%] w-[30%] rotate-[8deg]",
+  },
+  {
+    src: "/images/spaces/reading.jpg",
+    alt: "Bookshelf saved into Reading list",
+    className: "bottom-[8%] left-[8%] h-[34%] w-[38%] rotate-[3deg]",
+  },
+  {
+    src: "/images/spaces/trips.jpg",
+    alt: "Riverside city saved into Trips",
+    className: "bottom-[8%] right-[6%] h-[36%] w-[40%] rotate-[-4deg]",
   },
 ];
 
-const Spaces = () => {
+export default function Spaces() {
   return (
-    <section id="spaces" className="py-20 sm:py-28">
-      <div className="container">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div>
-            <p className="section-kicker">Spaces</p>
-            <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl sm:text-5xl tracking-[-0.03em] text-ink leading-[1.08] font-medium">
-              Themed shelves that fill themselves
-            </h2>
-            <p className="mt-4 text-base sm:text-lg text-muted leading-relaxed">
-              Spaces are living collections. When you create one, Shelvr
-              re-reads your library and pulls in matching saves — past and
-              future.
-            </p>
-            <ul className="mt-8 space-y-3 text-sm sm:text-base text-ink-soft">
-              {[
-                "Create a space in seconds",
-                "Matching history fills in automatically",
-                "Manual add or remove whenever you want control",
-              ].map((line) => (
-                <li key={line} className="flex items-start gap-3">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-shelf shrink-0" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
+    <section id="spaces" className="border-t border-line py-20 sm:py-28">
+      <div className="container grid items-stretch gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+        <div className="relative min-h-[26rem] overflow-hidden rounded-[1.75rem] bg-paper-deep sm:min-h-[32rem] lg:min-h-[38rem]">
+          {photos.map((photo) => (
+            <div
+              key={photo.src}
+              className={`absolute overflow-hidden rounded-[1.4rem] bg-cream shadow-[0_24px_50px_rgba(43,36,24,0.18)] ${photo.className}`}
+            >
+              <Image
+                src={photo.src}
+                alt={photo.alt}
+                fill
+                sizes="(max-width: 1024px) 45vw, 280px"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
 
-          <div className="grid gap-4">
-            {spaces.map((space, i) => (
-              <div
-                key={space.name}
-                className="soft-card rounded-[1.4rem] p-5 sm:p-6 flex items-center gap-4"
-                style={{ transform: i === 1 ? "translateX(12px)" : undefined }}
+        <div className="flex flex-col justify-center text-center lg:text-left">
+          <p className="section-kicker justify-center lg:justify-start">
+            Living collections
+          </p>
+          <h2 className="mt-4 text-5xl font-bold leading-[0.96] tracking-[-0.06em] text-ink sm:text-6xl">
+            Spaces fill themselves.
+          </h2>
+          <p className="mt-5 text-base leading-relaxed text-muted sm:text-lg">
+            Create a space like Recipes, Gift ideas, or Trips. Shelvr reaches
+            back through your library, finds what belongs, and keeps adding
+            matching saves over time.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start">
+            {["Retroactive", "Automatic", "Always editable"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-ember-soft px-3 py-2 text-xs font-bold text-ember-deep"
               >
-                <div
-                  className="h-14 w-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: space.color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-ink">{space.name}</h3>
-                    <span className="text-xs font-medium text-muted whitespace-nowrap">
-                      {space.count} items
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{space.blurb}</p>
-                </div>
-              </div>
+                {item}
+              </span>
             ))}
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default Spaces;
+}

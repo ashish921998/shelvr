@@ -9,6 +9,7 @@ import {
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from '@/lib/paywall-result';
+import { REVENUECAT_API_KEY } from '@/lib/revenuecat-api-key';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { NativeModules } from 'react-native';
@@ -21,9 +22,9 @@ import { NativeModules } from 'react-native';
  * used only to present offerings and drive purchases — never to gate features
  * directly — so a spoofed client can't unlock Pro without a real subscription.
  *
- * Model: the yearly plan carries a 3-day free trial (payment method upfront,
- * auto-charges at day 3 unless cancelled); the monthly plan has no trial and
- * charges immediately. Then $4.99/mo or $39.99/yr. No free tier. A lapsed user
+ * Model: the yearly plan carries a 7-day free trial (payment method upfront,
+ * auto-charges at day 7 unless cancelled); the monthly plan has no trial and
+ * charges immediately. Then $4.99/mo or $19.99/yr. No free tier. A lapsed user
  * (trial or subscription ended) is read-only: they can view and search existing
  * saves and spaces, but every save and Pro feature routes to the paywall.
  *
@@ -162,9 +163,6 @@ export function waitForSheetTransition(): Promise<void> {
 // RevenueCat configuration
 // ---------------------------------------------------------------------------
 
-const IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
-const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
-
 let configured = false;
 
 /**
@@ -177,9 +175,8 @@ export async function configureRevenueCat(): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
   if (!rc) return;
-  const apiKey = process.env.EXPO_OS === 'ios' ? IOS_KEY : ANDROID_KEY;
-  if (!apiKey) return;
-  await rc.configure({ apiKey });
+  if (!REVENUECAT_API_KEY) return;
+  await rc.configure({ apiKey: REVENUECAT_API_KEY });
   configured = true;
 }
 
@@ -360,6 +357,26 @@ export async function presentCustomerCenter(): Promise<boolean> {
   }
 }
 
+export type RestorePurchasesOutcome = 'restored' | 'none' | 'unavailable';
+
+/**
+ * Restore App Store purchases for the signed-in RevenueCat identity. This is a
+ * first-class Profile action so a returning subscriber does not have to infer
+ * that Restore is hidden inside the paywall or Customer Center.
+ */
+export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  if (!(await awaitRcSyncReady())) return 'unavailable';
+
+  const rc = getPurchases();
+  if (!rc) return 'unavailable';
+  try {
+    const customerInfo = await rc.restorePurchases();
+    return Object.keys(customerInfo.entitlements.active).length > 0 ? 'restored' : 'none';
+  } catch {
+    return 'unavailable';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Paywall guard
 // ---------------------------------------------------------------------------
@@ -367,8 +384,9 @@ export async function presentCustomerCenter(): Promise<boolean> {
 /**
  * Returns a guard that runs `action` only when the user is entitled, otherwise
  * presents the RevenueCat paywall (native sheet). If the RC UI SDK isn't linked
- * or the paywall is dismissed without purchase, falls back to routing to the
- * paywall route. Use this at every Pro-gated affordance (Save, dynamic spaces,
+ * or the paywall is unavailable, falls back to routing to the paywall route.
+ * A user cancellation returns to the current screen. Use this at every
+ * Pro-gated affordance (Save, dynamic spaces,
  * Find links, Tidy, Map) so the paywall appears at a moment of felt need rather
  * than blocking the whole app. The server re-checks entitlement on every gated
  * mutation, so this client guard is advisory only.
@@ -391,7 +409,7 @@ export function usePaywallGuard(): {
         return true;
       }
       // Fallback to the paywall screen is handled by openPaywall (reached when
-      // the native SDK isn't linked, or the user dismissed without purchasing).
+      // the native SDK isn't linked, identity sync times out, or RC returns an error).
       await openPaywall(router);
       return false;
     },

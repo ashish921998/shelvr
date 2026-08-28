@@ -16,6 +16,52 @@ const bundleId = BASE_ID + idSuffix;
 const isProduction = variant === 'production';
 const isDevelopment = !isProduction && variant !== 'preview';
 
+// Values are passed explicitly (never read via process.env[name]) so the
+// expo/no-dynamic-env-var lint rule stays satisfied.
+function requireProductionValue(name, value, isValid, expected) {
+  if (isProduction && process.env.EAS_BUILD === 'true' && !isValid(value)) {
+    throw new Error(`Production config requires ${name} (${expected}).`);
+  }
+}
+
+// Fail the build before an invalid public SDK key can reach App Review. Builds
+// 14 and 16 presented RevenueCat Error 23 during Apple's sandbox purchase flow;
+// the rejected build artifact contained a different key from the current
+// RevenueCat App Store app. Keep this as a permanent release guardrail.
+const buildPlatform = process.env.EAS_BUILD_PLATFORM;
+if (buildPlatform !== 'android') {
+  requireProductionValue(
+    'EXPO_PUBLIC_REVENUECAT_IOS_KEY',
+    process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
+    (value) => value?.startsWith('appl_'),
+    'an appl_ App Store public SDK key',
+  );
+}
+if (buildPlatform === 'android') {
+  requireProductionValue(
+    'EXPO_PUBLIC_REVENUECAT_ANDROID_KEY',
+    process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+    (value) => value?.startsWith('goog_'),
+    'a goog_ Google Play public SDK key',
+  );
+}
+// The production Convex URL must parse as https:// with a hostname — a bare
+// prefix check would let `https://` (no host) reach a store build.
+requireProductionValue(
+  'EXPO_PUBLIC_CONVEX_URL',
+  process.env.EXPO_PUBLIC_CONVEX_URL,
+  (value) => {
+    if (!value) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && url.hostname.length > 0;
+    } catch {
+      return false;
+    }
+  },
+  'an https:// production deployment URL',
+);
+
 function displayName(base) {
   if (isProduction) return base;
   if (variant === 'preview') return `${base} (Preview)`;
@@ -37,6 +83,18 @@ module.exports = ({ config }) => ({
     ...appConfig.expo.ios,
     ...config?.ios,
     icon: isProduction ? appConfig.expo.ios?.icon : './assets/icon-dev.png',
+    infoPlist: {
+      ...appConfig.expo.ios?.infoPlist,
+      ...config?.ios?.infoPlist,
+      ...(isProduction
+        ? {
+            NSAppTransportSecurity: {
+              NSAllowsArbitraryLoads: false,
+              NSAllowsLocalNetworking: false,
+            },
+          }
+        : {}),
+    },
     bundleIdentifier: bundleId,
   },
   android: {

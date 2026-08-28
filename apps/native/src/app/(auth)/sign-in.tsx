@@ -1,9 +1,10 @@
 import { LEGAL_URLS } from '@/lib/legal';
 import { useAuthActions } from '@convex-dev/auth/react';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as React from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, Text, useColorScheme, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 const oauthRedirectTo = makeRedirectUri({
@@ -27,6 +28,7 @@ const oauthRedirectTo = makeRedirectUri({
  */
 export default function Page() {
   const { signIn } = useAuthActions();
+  const colorScheme = useColorScheme();
   const [pending, setPending] = React.useState<string | null>(null);
   const [lastError, setLastError] = React.useState<string | null>(null);
 
@@ -81,17 +83,33 @@ export default function Page() {
         </View>
 
         <View style={styles.buttons}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.appleButton,
-              pending !== null && styles.buttonDisabled,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={() => handleOAuth('apple')}
-            disabled={pending !== null}
-          >
-            <Text style={styles.appleButtonText}>Continue with Apple</Text>
-          </Pressable>
+          {Platform.OS === 'ios' ? (
+            <AppleAuthentication.AppleAuthenticationButton
+              testID="apple-sign-in-button"
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={
+                colorScheme === 'dark'
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={14}
+              style={[styles.appleButton, pending !== null && styles.buttonDisabled]}
+              pointerEvents={pending !== null ? 'none' : 'auto'}
+              onPress={() => handleOAuth('apple')}
+            />
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.appleFallbackButton,
+                pending !== null && styles.buttonDisabled,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => handleOAuth('apple')}
+              disabled={pending !== null}
+            >
+              <Text style={styles.appleFallbackButtonText}>Continue with Apple</Text>
+            </Pressable>
+          )}
           <Pressable
             style={({ pressed }) => [
               styles.googleButton,
@@ -181,12 +199,16 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.gap(2),
   },
   appleButton: {
+    alignSelf: 'stretch',
+    height: 52,
+  },
+  appleFallbackButton: {
     backgroundColor: theme.colors.foreground,
     paddingVertical: theme.gap(2),
     borderRadius: 14,
     alignItems: 'center',
   },
-  appleButtonText: {
+  appleFallbackButtonText: {
     color: theme.colors.background,
     fontFamily: theme.fonts.medium,
     fontSize: 16,

@@ -18,8 +18,23 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  Keyframe,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
+import { EASE_OUT } from '@/lib/motion';
+
+const SUBMIT_CONTENT_ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.97 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }], easing: EASE_OUT },
+}).duration(150);
+const SUBMIT_CONTENT_EXIT = FadeOut.duration(100).easing(EASE_OUT);
+const SUBMIT_CONTENT_REDUCED_ENTER = FadeIn.duration(100).easing(EASE_OUT);
+const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(100).easing(EASE_OUT);
 
 // One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
 // is keyed by the loaded space so its `useState` initializers seed once from
@@ -71,6 +86,7 @@ function SpaceForm(props: SpaceFormProps) {
   const editing = props.mode === 'edit';
   const router = useRouter();
   const { theme } = useUnistyles();
+  const reducedMotion = useReducedMotion();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
   // Creating a space and enabling dynamic are Pro — route to the paywall if
@@ -159,13 +175,31 @@ function SpaceForm(props: SpaceFormProps) {
           pressed && { opacity: 0.8 },
         ]}
       >
-        {saving ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.saveButtonText}>
-            {editing ? 'Save changes' : 'Create space'}
-          </Text>
-        )}
+        <View style={styles.saveButtonContent}>
+          <Animated.View
+            key={saving ? 'saving' : 'idle'}
+            entering={
+              reducedMotion
+                ? SUBMIT_CONTENT_REDUCED_ENTER
+                : SUBMIT_CONTENT_ENTER
+            }
+            exiting={
+              reducedMotion
+                ? SUBMIT_CONTENT_REDUCED_EXIT
+                : SUBMIT_CONTENT_EXIT
+            }
+            collapsable={false}
+            style={styles.saveButtonState}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>
+                {editing ? 'Save changes' : 'Create space'}
+              </Text>
+            )}
+          </Animated.View>
+        </View>
       </Pressable>
     </ScrollView>
   );
@@ -235,6 +269,15 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: 'continuous',
     paddingVertical: theme.gap(1.75),
     alignItems: 'center',
+  },
+  saveButtonContent: {
+    width: '100%',
+    height: 20,
+  },
+  saveButtonState: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonText: {
     fontFamily: theme.fonts.bold,

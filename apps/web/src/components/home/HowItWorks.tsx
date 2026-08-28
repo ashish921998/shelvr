@@ -1,58 +1,74 @@
-import { StepPhones } from "./PhoneMockups";
+import AppPhone from "./AppPhone";
 
 const steps = [
   {
-    n: "01",
-    title: "Save anything",
-    body: "Paste a link, jot a note, or stash an image. Shelvr stores it immediately.",
+    number: "01 / CAPTURE",
+    title: "Save from anywhere",
+    body: "The share sheet, a note, your camera roll, or the camera—without leaving your train of thought.",
+    image: "/images/app/save.webp",
+    alt: "Shelvr save sheet with note, article, photo, and camera options",
   },
   {
-    n: "02",
-    title: "AI classifies it",
-    body: "We extract the page, then propose a title, description, tags, and spaces.",
+    number: "02 / UNDERSTAND",
+    title: "AI adds the context",
+    body: "A useful title, a short summary, tags, and the right spaces appear automatically.",
+    image: "/images/app/detail.webp",
+    alt: "Shelvr detail screen with AI-generated summary, tags, and spaces",
   },
   {
-    n: "03",
-    title: "Find it later",
-    body: "Browse your feed, open a space, or search. Everything is already labeled.",
+    number: "03 / RECALL",
+    title: "Find it your way",
+    body: "Browse your visual shelf or search the fragment you remember across every saved item.",
+    image: "/images/app/search.webp",
+    alt: "Shelvr search results for saved travel items",
   },
 ];
 
-const HowItWorks = () => {
+export default function HowItWorks() {
   return (
     <section id="how" className="py-20 sm:py-28">
       <div className="container">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-kicker">How it works</p>
-          <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl sm:text-5xl tracking-[-0.03em] text-ink leading-[1.08] font-medium">
-            From chaotic tab to clean shelf in seconds
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="section-kicker justify-center">The Shelvr loop</p>
+          <h2 className="mt-4 text-4xl font-bold leading-[0.98] tracking-[-0.06em] text-ink sm:text-6xl lg:text-7xl">
+            From “save this” to
+            <br /> “there it is.”
           </h2>
-          <p className="mt-4 text-base sm:text-lg text-muted leading-relaxed">
-            No folders to maintain. No tagging ritual. Save first — organization
-            arrives on its own.
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+            Three small moments, one continuous app experience. Capture what
+            matters, let Shelvr understand it, then find it the way you
+            remember it.
           </p>
         </div>
 
-        <StepPhones />
-
-        <ol className="mt-14 grid md:grid-cols-3 gap-5">
-          {steps.map((step) => (
-            <li key={step.n} className="soft-card rounded-3xl p-6 sm:p-7">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white text-xs font-bold">
-                {step.n}
+        <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          {steps.map((step, index) => (
+            <article
+              key={step.number}
+              className={`flex min-h-[43rem] flex-col overflow-hidden rounded-[1.75rem] border border-line p-6 pb-0 sm:p-7 sm:pb-0 ${
+                index === 1 ? "bg-ember-soft" : "bg-cream"
+              }`}
+            >
+              <span className="text-[0.65rem] font-bold tracking-[0.14em] text-ember-deep">
+                {step.number}
               </span>
-              <h3 className="mt-5 text-xl font-semibold tracking-tight text-ink">
+              <h3 className="mt-3 text-2xl font-bold tracking-tight text-ink">
                 {step.title}
               </h3>
-              <p className="mt-2 text-sm sm:text-base leading-relaxed text-muted">
+              <p className="mt-2 text-sm leading-relaxed text-muted">
                 {step.body}
               </p>
-            </li>
+              <AppPhone
+                src={step.image}
+                alt={step.alt}
+                className={`mx-auto mt-7 h-[32rem] w-[15.25rem] translate-y-4 ${
+                  index === 1 ? "rotate-2 lg:translate-y-9" : ""
+                } ${index === 2 ? "-rotate-2 lg:translate-y-7" : ""}`}
+              />
+            </article>
           ))}
-        </ol>
+        </div>
       </div>
     </section>
   );
-};
-
-export default HowItWorks;
+}
