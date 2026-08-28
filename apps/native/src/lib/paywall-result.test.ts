@@ -26,7 +26,7 @@ describe('mapPaywallResult', () => {
 });
 
 describe('shouldOpenPaywallFallback', () => {
-  const cases: Array<[PaywallOutcome, boolean]> = [
+  const cases: [PaywallOutcome, boolean][] = [
     ['success', false],
     ['cancelled', false],
     ['unavailable', true],

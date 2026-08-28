@@ -16,6 +16,38 @@ const bundleId = BASE_ID + idSuffix;
 const isProduction = variant === 'production';
 const isDevelopment = !isProduction && variant !== 'preview';
 
+function requireProductionValue(name, isValid, expected) {
+  const value = process.env[name];
+  if (isProduction && process.env.EAS_BUILD === 'true' && !isValid(value)) {
+    throw new Error(`Production config requires ${name} (${expected}).`);
+  }
+}
+
+// Fail the build before an invalid public SDK key can reach App Review. Builds
+// 14 and 16 presented RevenueCat Error 23 during Apple's sandbox purchase flow;
+// the rejected build artifact contained a different key from the current
+// RevenueCat App Store app. Keep this as a permanent release guardrail.
+const buildPlatform = process.env.EAS_BUILD_PLATFORM;
+if (buildPlatform !== 'android') {
+  requireProductionValue(
+    'EXPO_PUBLIC_REVENUECAT_IOS_KEY',
+    (value) => value?.startsWith('appl_'),
+    'an appl_ App Store public SDK key',
+  );
+}
+if (buildPlatform === 'android') {
+  requireProductionValue(
+    'EXPO_PUBLIC_REVENUECAT_ANDROID_KEY',
+    (value) => value?.startsWith('goog_'),
+    'a goog_ Google Play public SDK key',
+  );
+}
+requireProductionValue(
+  'EXPO_PUBLIC_CONVEX_URL',
+  (value) => value?.startsWith('https://'),
+  'an https:// production deployment URL',
+);
+
 function displayName(base) {
   if (isProduction) return base;
   if (variant === 'preview') return `${base} (Preview)`;
@@ -37,6 +69,18 @@ module.exports = ({ config }) => ({
     ...appConfig.expo.ios,
     ...config?.ios,
     icon: isProduction ? appConfig.expo.ios?.icon : './assets/icon-dev.png',
+    infoPlist: {
+      ...appConfig.expo.ios?.infoPlist,
+      ...config?.ios?.infoPlist,
+      ...(isProduction
+        ? {
+            NSAppTransportSecurity: {
+              NSAllowsArbitraryLoads: false,
+              NSAllowsLocalNetworking: false,
+            },
+          }
+        : {}),
+    },
     bundleIdentifier: bundleId,
   },
   android: {

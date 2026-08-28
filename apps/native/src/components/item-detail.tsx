@@ -1,5 +1,6 @@
 import { ArticleReaderView } from '@/components/article-reader-view';
 import { IntentChip } from '@/components/intent-chip';
+import { SimilarGrid } from '@/components/similar-grid';
 import { TagChip } from '@/components/tag-chip';
 import { usePaywallGuard } from '@/lib/entitlement';
 import { useAppHeaderHeight } from '@/lib/header-layout';
@@ -14,9 +15,10 @@ import { Link } from 'expo-router';
 import { Icon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -157,12 +159,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           { paddingTop: heroUri ? theme.gap(5) : headerHeight + theme.gap(5) },
         ]}
       >
-        {item.status === 'processing' ? (
-          <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={styles.processingText}>Shelvr is reading this…</Text>
-          </View>
-        ) : null}
+        <SaveStatusNotice item={item} />
 
         {item.url ? (
           <View style={styles.titleContainer}>
@@ -265,21 +262,112 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
   );
 });
 
+/** How the save itself went, derived once from the item's pipeline fields so
+ * the rendering below stays a flat switch. */
+type SaveState = 'gone' | 'failed' | 'partial';
+
+function saveState(item: DetailItem): SaveState | null {
+  if (item.status === 'failed') {
+    // A `not_found` page is gone for good; any other failure is retryable.
+    return item.failureReason === 'not_found' ? 'gone' : 'failed';
+  }
+  return item.status === 'ready' && item.enrichment === 'partial'
+    ? 'partial'
+    : null;
+}
+
+const SAVE_STATE_NOTICE: Record<SaveState, string> = {
+  gone: 'This page is gone — it was deleted, or the link was wrong.',
+  failed: "Shelvr couldn't read this page.",
+  partial:
+    "Saved from the link alone — the page wouldn't load, so these details are a guess.",
+};
+
+/**
+ * How the save itself went: still reading, unreadable, gone, or enriched from
+ * the URL alone. Without this a failed item renders as an untitled page with no
+ * explanation and no way forward, indistinguishable from one still processing.
+ *
+ * A `not_found` page is gone for good, so it gets no retry — only a reason.
+ */
+function SaveStatusNotice({ item }: { item: DetailItem }) {
+  const { theme } = useUnistyles();
+  const reprocess = useMutation(api.items.reprocessItem);
+  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  // Guards the retry gesture: disabled while in flight, and a rejection gets
+  // user-visible feedback instead of an unhandled promise.
+  const [retrying, setRetrying] = useState(false);
+
+  if (item.status === 'processing') {
+    return (
+      <View style={styles.processingRow}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.processingText}>Shelvr is reading this…</Text>
+      </View>
+    );
+  }
+
+  const state = saveState(item);
+  if (state === null) {
+    return null;
+  }
+
+  return (
+    <View style={styles.noticeRow}>
+      <Icon
+        name="exclamationmark.triangle.fill"
+        size={14}
+        tintColor={state === 'gone' ? theme.colors.faint : theme.colors.danger}
+      />
+      <Text style={styles.noticeText}>{SAVE_STATE_NOTICE[state]}</Text>
+      {state === 'gone' ? null : (
+        <Pressable
+          style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
+          onPress={() =>
+            guard(async () => {
+              setRetrying(true);
+              try {
+                await reprocess({ id: item._id });
+              } catch {
+                Alert.alert("Couldn't retry", 'Please try again in a moment.');
+              } finally {
+                setRetrying(false);
+              }
+            })
+          }
+          disabled={retrying || entitlementLoading}
+          hitSlop={6}
+        >
+          {retrying ? (
+            <ActivityIndicator size="small" color={theme.colors.primaryText} />
+          ) : (
+            <Icon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
+          )}
+          <Text style={styles.chipLabel}>Try again</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search. The button
 // only fires on press (bounded cost); results render as product cards.
 function ProductsSection({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const findLinks = useMutation(api.items.findLinks);
   const { guard, loading: entitlementLoading } = usePaywallGuard();
+  // Same in-flight guard as the retry chip: no double-fire, and a rejected
+  // search surfaces an alert instead of a silently dead button.
+  const [finding, setFinding] = useState(false);
   const products = item.products;
   const searching = item.productsStatus === 'searching';
 
   if (searching) {
     return (
       <View style={styles.findLinksRow}>
-        <View style={styles.findLinksChip}>
+        <View style={styles.chip}>
           <ActivityIndicator size="small" color={theme.colors.primaryText} />
-          <Text style={styles.findLinksLabel}>Finding links…</Text>
+          <Text style={styles.chipLabel}>Finding links…</Text>
         </View>
       </View>
     );
@@ -334,13 +422,28 @@ function ProductsSection({ item }: { item: DetailItem }) {
   return (
     <View style={styles.findLinksRow}>
       <Pressable
-        style={({ pressed }) => [styles.findLinksChip, pressed && { opacity: 0.7 }]}
-        onPress={() => guard(() => findLinks({ id: item._id }))}
-        disabled={entitlementLoading}
+        style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
+        onPress={() =>
+          guard(async () => {
+            setFinding(true);
+            try {
+              await findLinks({ id: item._id });
+            } catch {
+              Alert.alert("Couldn't search", 'Please try again in a moment.');
+            } finally {
+              setFinding(false);
+            }
+          })
+        }
+        disabled={finding || entitlementLoading}
         hitSlop={6}
       >
-        <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />
-        <Text style={styles.findLinksLabel}>
+        {finding ? (
+          <ActivityIndicator size="small" color={theme.colors.primaryText} />
+        ) : (
+          <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />
+        )}
+        <Text style={styles.chipLabel}>
           {item.productsStatus === 'failed'
             ? 'Find links — try again'
             : products
@@ -349,90 +452,6 @@ function ProductsSection({ item }: { item: DetailItem }) {
         </Text>
       </Pressable>
     </View>
-  );
-}
-
-// A static two-column masonry for the similar-items strip. The page already
-// scrolls (this lives inside the detail ScrollView), so a virtualized list
-// can't be nested here; ten cards render fine as plain views. Columns are
-// balanced by estimated card height from each item's aspect ratio.
-export function SimilarGrid({ items }: { items: DetailItem[] }) {
-  const columns: [DetailItem[], DetailItem[]] = [[], []];
-  const heights = [0, 0];
-  for (const item of items) {
-    const ratio = Math.min(
-      Math.max(item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1), 0.5),
-      2,
-    );
-    const column = heights[0] <= heights[1] ? 0 : 1;
-    columns[column].push(item);
-    heights[column] += 1 / ratio;
-  }
-  return (
-    <View style={styles.similarGrid}>
-      {columns.map((column, index) => (
-        <View key={index} style={styles.similarColumn}>
-          {column.map((item) => (
-            <View key={item._id} style={styles.similarCell}>
-              <SimilarItemCard item={item} />
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// Related items are a navigation affordance inside an already-open detail
-// page. Rendering the full feed card here would also mount its preview, menu,
-// mutations, and entering animation for every related item. Keep this variant
-// intentionally small so opening a detail page does not eagerly build that
-// interaction stack below the fold.
-function SimilarItemCard({ item }: { item: DetailItem }) {
-  const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const aspectRatio = Math.min(
-    Math.max(item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1), 0.5),
-    2,
-  );
-  const title = item.title ?? item.note ?? (item.url ? displayHost(item.url) : 'Untitled item');
-
-  return (
-    <Link href={{ pathname: '/item/[id]', params: { id: item._id } }} asChild>
-      <Pressable
-        style={({ pressed }) => [
-          styles.similarCard,
-          item.isSticker && styles.similarCardSticker,
-          pressed && styles.similarCardPressed,
-        ]}
-      >
-        {imageUri ? (
-          item.isSticker ? (
-            <Image
-              source={{ uri: imageUri }}
-              contentFit="contain"
-              style={[styles.similarSticker, { aspectRatio }]}
-            />
-          ) : (
-            <View style={styles.similarImageFrame}>
-              <Image
-                source={{ uri: imageUri }}
-                contentFit="cover"
-                style={[styles.similarImage, { aspectRatio }]}
-              />
-            </View>
-          )
-        ) : (
-          <View style={[styles.similarTextFace, item.type === 'note' && styles.similarNoteFace]}>
-            <Text style={styles.similarTextFaceTitle} numberOfLines={4}>
-              {title}
-            </Text>
-          </View>
-        )}
-        <Text style={styles.similarCardTitle} numberOfLines={2}>
-          {title}
-        </Text>
-      </Pressable>
-    </Link>
   );
 }
 
@@ -476,6 +495,19 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.primaryText,
+  },
+  noticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: theme.gap(1),
+  },
+  noticeText: {
+    flexShrink: 1,
+    fontFamily: theme.fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   titleContainer: {
     gap: theme.gap(1),
@@ -549,87 +581,13 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     paddingHorizontal: 4,
   },
-  similarGrid: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginHorizontal: -4,
-  },
-  similarColumn: {
-    flex: 1,
-  },
-  // Same gutter scheme as the home feed: every cell pads 4 on all sides, so
-  // neighbors sit 8 apart and the grid's -4 margins realign the outer edges.
-  similarCell: {
-    padding: 4,
-  },
-  // Mirrors the home feed's ItemCard treatment: matted frame for photos, bare
-  // silhouette for stickers, muted face for text — so the strip reads as a
-  // miniature of the feed rather than a third card style.
-  similarCard: {
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
-  // Let the sticker's silhouette shadow spill past the card bounds instead of
-  // being clipped.
-  similarCardSticker: {
-    overflow: 'visible',
-  },
-  similarCardPressed: {
-    opacity: 0.85,
-  },
-  similarImageFrame: {
-    backgroundColor: 'white',
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    padding: theme.gap(0.5),
-    boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
-  },
-  similarImage: {
-    width: '100%',
-    borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  // No fill / border / rounding: the white die-cut edge is baked into the PNG,
-  // and the iOS layer shadow hugs the opaque pixels.
-  similarSticker: {
-    width: '100%',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  similarTextFace: {
-    minHeight: 96,
-    justifyContent: 'center',
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  similarNoteFace: {
-    backgroundColor: theme.colors.primarySoft,
-  },
-  similarTextFaceTitle: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.foreground,
-  },
-  similarCardTitle: {
-    paddingHorizontal: theme.gap(0.5),
-    paddingTop: theme.gap(0.75),
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
-    color: theme.colors.foreground,
-  },
   findLinksRow: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  findLinksChip: {
+  // Shared pill for the detail screen's small actions (retry a failed save,
+  // find shopping links).
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -638,7 +596,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 12,
     borderRadius: 50,
   },
-  findLinksLabel: {
+  chipLabel: {
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.primaryText,

@@ -1,80 +1,46 @@
-const spaces = [
-  {
-    name: "Design systems",
-    count: 48,
-    color: "#E4572E",
-    blurb: "Component APIs, tokens, critique threads.",
-  },
-  {
-    name: "Weekend cooking",
-    count: 23,
-    color: "#0F766E",
-    blurb: "Recipes, techniques, market lists.",
-  },
-  {
-    name: "Travel rabbit holes",
-    count: 31,
-    color: "#0B1128",
-    blurb: "Neighborhoods, photo spots, packing notes.",
-  },
-];
+import AppPhone from "./AppPhone";
 
-const Spaces = () => {
+export default function Spaces() {
   return (
-    <section id="spaces" className="py-20 sm:py-28">
-      <div className="container">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div>
-            <p className="section-kicker">Spaces</p>
-            <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl sm:text-5xl tracking-[-0.03em] text-ink leading-[1.08] font-medium">
-              Themed shelves that fill themselves
-            </h2>
-            <p className="mt-4 text-base sm:text-lg text-muted leading-relaxed">
-              Spaces are living collections. When you create one, Shelvr
-              re-reads your library and pulls in matching saves — past and
-              future.
-            </p>
-            <ul className="mt-8 space-y-3 text-sm sm:text-base text-ink-soft">
-              {[
-                "Create a space in seconds",
-                "Matching history fills in automatically",
-                "Manual add or remove whenever you want control",
-              ].map((line) => (
-                <li key={line} className="flex items-start gap-3">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-shelf shrink-0" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
+    <section id="spaces" className="border-t border-line py-20 sm:py-28">
+      <div className="container grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+        <div className="relative mx-auto flex h-[37rem] w-full max-w-xl items-center justify-center">
+          <AppPhone
+            src="/images/app/home.webp"
+            alt="Shelvr visual home feed"
+            className="absolute h-[34rem] w-[16.25rem] -translate-x-12 rotate-[-5deg] sm:-translate-x-20"
+          />
+          <AppPhone
+            src="/images/app/spaces.webp"
+            alt="Shelvr spaces screen with visual collections"
+            className="absolute h-[35rem] w-[16.5rem] translate-x-12 rotate-[4deg] sm:translate-x-20"
+          />
+        </div>
 
-          <div className="grid gap-4">
-            {spaces.map((space, i) => (
-              <div
-                key={space.name}
-                className="soft-card rounded-[1.4rem] p-5 sm:p-6 flex items-center gap-4"
-                style={{ transform: i === 1 ? "translateX(12px)" : undefined }}
+        <div className="text-center lg:text-left">
+          <p className="section-kicker justify-center lg:justify-start">
+            Living collections
+          </p>
+          <h2 className="mt-4 text-5xl font-bold leading-[0.96] tracking-[-0.06em] text-ink sm:text-6xl">
+            Spaces fill themselves.
+          </h2>
+          <p className="mt-5 text-base leading-relaxed text-muted sm:text-lg">
+            Create a space like Recipes, Gift ideas, or Trips. Shelvr reaches
+            back through your library, finds what belongs, and keeps adding
+            matching saves over time.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start">
+            {["Retroactive", "Automatic", "Always editable"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-ember-soft px-3 py-2 text-xs font-bold text-ember-deep"
               >
-                <div
-                  className="h-14 w-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: space.color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-ink">{space.name}</h3>
-                    <span className="text-xs font-medium text-muted whitespace-nowrap">
-                      {space.count} items
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{space.blurb}</p>
-                </div>
-              </div>
+                {item}
+              </span>
             ))}
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default Spaces;
+}

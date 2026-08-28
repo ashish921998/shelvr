@@ -26,7 +26,14 @@ import { useMutation } from 'convex/react';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useIncomingShare } from 'expo-sharing';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -35,7 +42,14 @@ import {
   View,
 } from 'react-native';
 import { createMMKV } from 'react-native-mmkv';
+import Animated, { Keyframe, useReducedMotion } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import {
+  EASE_OUT,
+  EASE_OUT_CSS,
+  REDUCED_FADE_IN,
+  REDUCED_FADE_OUT,
+} from '@/lib/motion';
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -57,6 +71,24 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 // interface lives in storage.ts so its reconciliation rules stay pure and
 // unit-testable with a Map; only this native binding is owned here.
 const shareStore: SessionStoreAdapter = createMMKV({ id: 'incoming-share' });
+
+const PHASE_ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 6 }] },
+  100: {
+    opacity: 1,
+    transform: [{ translateY: 0 }],
+    easing: EASE_OUT,
+  },
+}).duration(250);
+
+const PHASE_EXIT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }] },
+  100: {
+    opacity: 0,
+    transform: [{ translateY: -4 }],
+    easing: EASE_OUT,
+  },
+}).duration(200);
 
 /** The session-driven UI states. The resolution-driven states (resolving,
  * empty) are pure functions of the `useIncomingShare` hook
@@ -414,7 +446,14 @@ export default function ShareScreen() {
   // render. The effect also blocks on entitlementLoading, so no save starts
   // until it resolves.
   if (entitlementLoading && phase.kind === 'idle') {
-    return <Centered label="Checking subscription…" spinner theme={theme} />;
+    return (
+      <Centered
+        phaseKey="checking-entitlement"
+        label="Checking subscription…"
+        spinner
+        theme={theme}
+      />
+    );
   }
 
   // Pro gate: an unentitled user sharing into Shelvr reached the paywall and
@@ -422,11 +461,11 @@ export default function ShareScreen() {
   // Shelvr" spinner — the save never happened. Offer Unlock Pro or Cancel.
   if (phase.kind === 'locked') {
     return (
-      <View style={styles.container}>
+      <PhaseSurface phaseKey="locked">
         <Text style={styles.title(theme)}>Unlock Shelvr Pro</Text>
         <Text style={styles.subtitle(theme)}>
-          Saving shared content is a Pro feature. Start a free trial to save it
-          to your hub.
+          Saving shared content is a Pro feature. View Shelvr Pro plans to save
+          it to your hub.
         </Text>
         <View style={styles.actions}>
           <Button
@@ -443,7 +482,7 @@ export default function ShareScreen() {
             }}
           />
         </View>
-      </View>
+      </PhaseSurface>
     );
   }
 
@@ -451,11 +490,19 @@ export default function ShareScreen() {
   // stored in `phase`: they are pure functions of the hook props and avoid the
   // synchronous-in-effect setState that storing them would require.
   if (isResolving && phase.kind === 'idle') {
-    return <Centered label="Reading shared content…" spinner theme={theme} />;
+    return (
+      <Centered
+        phaseKey="resolving"
+        label="Reading shared content…"
+        spinner
+        theme={theme}
+      />
+    );
   }
   if (nothingResolved) {
     return (
       <ErrorActions
+        phaseKey="nothing-resolved"
         title="Nothing to save"
         theme={theme}
         retryLabel="Done"
@@ -467,7 +514,12 @@ export default function ShareScreen() {
   if (phase.kind === 'saving') {
     const { saved, total } = countProgress(phase.session);
     return (
-      <Centered label={`Saved ${saved} of ${total}…`} spinner theme={theme} />
+      <Centered
+        phaseKey="saving"
+        label={`Saved ${saved} of ${total}…`}
+        spinner
+        theme={theme}
+      />
     );
   }
   if (phase.kind === 'partial') {
@@ -487,7 +539,7 @@ export default function ShareScreen() {
           ? 'One item couldn’t be saved.'
           : `${failed} items couldn’t be saved.`;
     return (
-      <View style={styles.container}>
+      <PhaseSurface phaseKey="partial">
         <Text style={styles.title(theme)}>
           Saved {saved} of {total}
         </Text>
@@ -530,7 +582,7 @@ export default function ShareScreen() {
             />
           ) : null}
         </View>
-      </View>
+      </PhaseSurface>
     );
   }
   if (phase.kind === 'clearFailed') {
@@ -539,6 +591,7 @@ export default function ShareScreen() {
     // throwing clear never traps the user on an eternal "Saving…" spinner.
     return (
       <ErrorActions
+        phaseKey="clear-failed"
         title="Saved, but couldn’t finish"
         theme={theme}
         cancelLabel="Cancel"
@@ -549,7 +602,14 @@ export default function ShareScreen() {
     );
   }
   // complete: brief spinner before navigation lands.
-  return <Centered label="Saved to Shelvr" spinner theme={theme} />;
+  return (
+    <Centered
+      phaseKey="complete"
+      label="Saved to Shelvr"
+      spinner
+      theme={theme}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -618,24 +678,49 @@ function countPartial(session: ShareSession): {
 
 type Theme = ReturnType<typeof useUnistyles>['theme'];
 
+function PhaseSurface({
+  phaseKey,
+  children,
+}: {
+  phaseKey: string;
+  children: ReactNode;
+}) {
+  const reducedMotion = useReducedMotion();
+
+  return (
+    <Animated.View
+      key={phaseKey}
+      entering={reducedMotion ? REDUCED_FADE_IN : PHASE_ENTER}
+      exiting={reducedMotion ? REDUCED_FADE_OUT : PHASE_EXIT}
+      collapsable={false}
+      style={styles.container}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 function Centered({
+  phaseKey,
   label,
   spinner,
   theme,
 }: {
+  phaseKey: string;
   label: string;
   spinner?: boolean;
   theme: Theme;
 }) {
   return (
-    <View style={styles.container}>
+    <PhaseSurface phaseKey={phaseKey}>
       {spinner ? <ActivityIndicator color={theme.colors.primary} /> : null}
       <Text style={styles.label(theme)}>{label}</Text>
-    </View>
+    </PhaseSurface>
   );
 }
 
 function ErrorActions({
+  phaseKey,
   title,
   theme,
   cancelLabel,
@@ -644,6 +729,7 @@ function ErrorActions({
   onRetry,
   single,
 }: {
+  phaseKey: string;
   title: string;
   theme: Theme;
   cancelLabel?: string;
@@ -653,7 +739,7 @@ function ErrorActions({
   single?: boolean;
 }) {
   return (
-    <View style={styles.container}>
+    <PhaseSurface phaseKey={phaseKey}>
       <Text style={styles.title(theme)}>{title}</Text>
       <View style={styles.actions}>
         {single ||
@@ -663,7 +749,7 @@ function ErrorActions({
         )}
         <Button label={retryLabel} theme={theme} primary onPress={onRetry} />
       </View>
-    </View>
+    </PhaseSurface>
   );
 }
 
@@ -678,19 +764,38 @@ function Button({
   primary?: boolean;
   onPress: () => void;
 }) {
+  const [pressed, setPressed] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const scale = pressed ? (reducedMotion ? 0.99 : 0.97) : 1;
+
   return (
     <Pressable
-      style={[styles.button(theme), primary && styles.buttonPrimary(theme)]}
       onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      pressRetentionOffset={16}
     >
-      <Text
+      <Animated.View
         style={[
-          styles.buttonText(theme),
-          primary && styles.buttonTextPrimary(theme),
+          styles.button(theme),
+          primary && styles.buttonPrimary(theme),
+          {
+            transform: [{ scale }],
+            transitionProperty: 'transform',
+            transitionDuration: '120ms',
+            transitionTimingFunction: EASE_OUT_CSS,
+          },
         ]}
       >
-        {label}
-      </Text>
+        <Text
+          style={[
+            styles.buttonText(theme),
+            primary && styles.buttonTextPrimary(theme),
+          ]}
+        >
+          {label}
+        </Text>
+      </Animated.View>
     </Pressable>
   );
 }

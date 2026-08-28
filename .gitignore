@@ -62,3 +62,10 @@ opencode.json
 
 # argent tool cache (screen recordings, etc.)
 .argent/
+.vercel
+
+# Local build artifacts and stray root-level prebuild output — do not commit
+tmp/
+*.ipa
+/ios/
+/app.json

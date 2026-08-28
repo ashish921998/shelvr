@@ -6,6 +6,7 @@
     { "category": "USER_ID", "purposes": ["APP_FUNCTIONALITY", "ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "PHOTOS_OR_VIDEOS", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "OTHER_USER_CONTENT", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
+    { "category": "SEARCH_HISTORY", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "PRECISE_LOCATION", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "PURCHASE_HISTORY", "purposes": ["APP_FUNCTIONALITY", "ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "PRODUCT_INTERACTION", "purposes": ["ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] }

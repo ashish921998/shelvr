@@ -98,7 +98,20 @@ cp apps/native/.example.env apps/native/.env.local
 - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
 - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → RevenueCat SDK keys
 
-The web marketing site needs no env vars.
+The web marketing site needs these variables for its launch waitlist and
+conversion experiment (copy `apps/web/.env.example` to
+`apps/web/.env.local`):
+
+```sh
+RESEND_API_KEY=<server-side-api-key>
+RESEND_AUDIENCE_ID=<waitlist-audience-id>
+NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+```
+
+Resend stores successful signups in the configured audience. PostHog is
+optional; without its public variables, waitlist signup still works and web
+analytics become a no-op.
 
 ### 5. Run
 

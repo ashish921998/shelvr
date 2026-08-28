@@ -1,9 +1,15 @@
 import { Wordmark } from '@/components/wordmark';
 import { HeaderIconButton } from '@/components/ui/header-icon-button';
-import { openPaywall, presentCustomerCenter, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+import {
+  openPaywall,
+  presentCustomerCenter,
+  restorePurchases,
+  useEntitlement,
+  waitForSheetTransition,
+} from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { analytics } from '@/lib/analytics';
-import { LEGAL_URLS } from '@/lib/legal';
+import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useMutation } from 'convex/react';
@@ -21,6 +27,7 @@ export default function ProfileScreen() {
   const { status, loading } = useEntitlement();
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const [deleting, setDeleting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const closeProfile = () => {
     if (router.canGoBack()) {
@@ -43,11 +50,11 @@ export default function ProfileScreen() {
             ? 'Pro — Lapsed'
             : loading
               ? '…'
-              : 'Start free trial';
+              : 'View Pro plans';
 
   // Customer Center is only relevant to users who have (or had) a subscription
   // — any non-`none` status. A `none` user has nothing to manage and should see
-  // the "Start free trial" paywall row instead.
+  // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== 'none' && !loading;
 
   // RevenueCat UI (paywall / Customer Center) presents from the root view
@@ -85,6 +92,33 @@ export default function ProfileScreen() {
 
   const openExternal = (url: string) => {
     void Linking.openURL(url);
+  };
+
+  const handleRestorePurchases = async () => {
+    if (restoring) return;
+    const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+    setRestoring(true);
+    try {
+      const outcome = await restorePurchases();
+      if (outcome === 'restored') {
+        Alert.alert(
+          'Purchases restored',
+          `Your ${storeName} purchase was found. Shelvr Pro may take a moment to update.`,
+        );
+      } else if (outcome === 'none') {
+        Alert.alert(
+          'No active purchase found',
+          `No active Shelvr Pro purchase was found for this ${storeName} account.`,
+        );
+      } else {
+        Alert.alert(
+          'Couldn’t restore purchases',
+          `Check your connection and try again. You can also manage your plan in ${storeName}.`,
+        );
+      }
+    } finally {
+      setRestoring(false);
+    }
   };
 
   const confirmDeleteAccount = () => {
@@ -180,6 +214,27 @@ export default function ProfileScreen() {
       </Pressable>
 
       <View style={styles.linkGroup}>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          onPress={() => openExternal(SUPPORT_URL)}
+        >
+          <Text style={styles.linkLabel}>Contact Support</Text>
+          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.linkRow,
+            pressed && { opacity: 0.7 },
+            restoring && { opacity: 0.4 },
+          ]}
+          disabled={restoring}
+          onPress={() => void handleRestorePurchases()}
+        >
+          <Text style={styles.linkLabel}>
+            {restoring ? 'Restoring Purchases…' : 'Restore Purchases'}
+          </Text>
+          <Icon name="arrow.clockwise" size={14} tintColor={theme.colors.muted} />
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.terms)}

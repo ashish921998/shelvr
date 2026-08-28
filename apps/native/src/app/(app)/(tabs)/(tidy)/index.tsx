@@ -309,7 +309,7 @@ const Loading: FC = () => <ScreenLoader label="Opening Tidy" />;
 const ProGate: FC = () => (
   <ProGateView
     title="Tidy is a Pro feature"
-    message="Sweep through your photo library and clear out the clutter. Start a free trial to unlock Tidy and every other Pro feature."
+    message="Sweep through your photo library and clear out the clutter. View Shelvr Pro plans to unlock Tidy and every other Pro feature."
   />
 );
 

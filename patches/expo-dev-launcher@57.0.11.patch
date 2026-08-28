@@ -1,0 +1,54 @@
+diff --git a/plugin/build/withDevLauncher.js b/plugin/build/withDevLauncher.js
+index 55d7b0ad6772e38dbb4032a73a3908440acbd1d4..230ca1b15a786f2c0f2cffc463018d2fc397a02d 100644
+--- a/plugin/build/withDevLauncher.js
++++ b/plugin/build/withDevLauncher.js
+@@ -87,6 +87,19 @@ fi
+  */
+ const withLocalNetworkPermission = (config) => {
+     return (0, config_plugins_1.withInfoPlist)(config, (config) => {
++        if (process.env.APP_VARIANT === 'production') {
++            const services = (config.modResults.NSBonjourServices ?? []).filter((service) => service.toLowerCase().replace(/\.$/, '') !== '_expo._tcp');
++            if (services.length > 0) {
++                config.modResults.NSBonjourServices = services;
++            }
++            else {
++                delete config.modResults.NSBonjourServices;
++            }
++            if (String(config.modResults.NSLocalNetworkUsageDescription ?? '').includes('Expo Dev Launcher')) {
++                delete config.modResults.NSLocalNetworkUsageDescription;
++            }
++            return config;
++        }
+         const bonjourServices = config.modResults.NSBonjourServices ?? [];
+         const hasExpoService = bonjourServices.some((service) => service.toLowerCase().replace(/\.$/, '') === '_expo._tcp');
+         if (!hasExpoService) {
+diff --git a/plugin/src/withDevLauncher.ts b/plugin/src/withDevLauncher.ts
+index 78896fec518e015bc2ce24b707233ed844f5b7df..b2a003f9575730c8a9d18ac8d814646c7d6f1ea7 100644
+--- a/plugin/src/withDevLauncher.ts
++++ b/plugin/src/withDevLauncher.ts
+@@ -108,6 +108,25 @@ fi
+  */
+ const withLocalNetworkPermission: ConfigPlugin = (config) => {
+   return withInfoPlist(config, (config) => {
++    if (process.env.APP_VARIANT === 'production') {
++      const services = ((config.modResults.NSBonjourServices as string[] | undefined) ?? []).filter(
++        (service) => service.toLowerCase().replace(/\.$/, '') !== '_expo._tcp'
++      );
++      if (services.length > 0) {
++        config.modResults.NSBonjourServices = services;
++      } else {
++        delete config.modResults.NSBonjourServices;
++      }
++      if (
++        String(config.modResults.NSLocalNetworkUsageDescription ?? '').includes(
++          'Expo Dev Launcher'
++        )
++      ) {
++        delete config.modResults.NSLocalNetworkUsageDescription;
++      }
++      return config;
++    }
++
+     const bonjourServices = (config.modResults.NSBonjourServices as string[] | undefined) ?? [];
+ 
+     const hasExpoService = bonjourServices.some(

@@ -1,5 +1,4 @@
 import Header from "@/components/Header";
-import FAQ from "@/components/home/FAQ";
 import Features from "@/components/home/Features";
 import Footer from "@/components/home/Footer";
 import FooterHero from "@/components/home/FooterHero";
@@ -15,9 +14,8 @@ export default function Home() {
       <Hero />
       <Stats />
       <HowItWorks />
-      <Features />
       <Spaces />
-      <FAQ />
+      <Features />
       <FooterHero />
       <Footer />
     </main>

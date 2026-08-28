@@ -20,7 +20,7 @@ type Props = {
 export function ProGate({
   title,
   message,
-  ctaLabel = 'Start free trial',
+  ctaLabel = 'View Pro plans',
   onPress,
 }: Props) {
   const router = useRouter();
