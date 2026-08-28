@@ -1,4 +1,4 @@
-import { RateLimiter, HOUR } from "@convex-dev/rate-limiter";
+import { RateLimiter, HOUR, MINUTE } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 
 // Per-user token buckets on the mutations that each schedule real paid work
@@ -13,4 +13,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Retrying a failed/partial save re-runs the fetch + one classification, so
   // it costs the same as a create; capped tighter since it is a manual repair.
   reprocessItem: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
+  // Email-keyed limit still stops one address from looping. IP and global
+  // buckets stop a client from rotating emails (or one IP from flooding).
+  // The global bucket gates every signup site-wide, so it must sit well
+  // above a legitimate launch spike — err high.
+  waitlistJoin: { kind: "token bucket", rate: 5, period: HOUR, capacity: 3 },
+  waitlistJoinIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  waitlistJoinGlobal: {
+    kind: "token bucket",
+    rate: 300,
+    period: MINUTE,
+    capacity: 100,
+  },
 });
