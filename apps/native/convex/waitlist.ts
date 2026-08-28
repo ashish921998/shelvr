@@ -68,7 +68,7 @@ export const upsertSignup = internalMutation({
   returns: v.object({
     id: v.id("waitlistSignups"),
     resendStatus: resendStatusValidator,
-    resendAttempts: v.optional(v.number()),
+    resendAttempts: v.number(),
   }),
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "waitlistJoinGlobal", { throws: true });
@@ -115,8 +115,9 @@ export const upsertSignup = internalMutation({
       firstSubmittedAt: now,
       lastSubmittedAt: now,
       resendStatus: "pending",
+      resendAttempts: 0,
     });
-    return { id, resendStatus: "pending" as const, resendAttempts: undefined };
+    return { id, resendStatus: "pending" as const, resendAttempts: 0 };
   },
 });
 
@@ -127,6 +128,7 @@ export const updateResendStatus = internalMutation({
     contactId: v.optional(v.string()),
     error: v.optional(v.string()),
     attempts: v.optional(v.number()),
+    preserveError: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -138,7 +140,9 @@ export const updateResendStatus = internalMutation({
         ? {}
         : { resendContactId: args.contactId }),
       ...(args.attempts === undefined ? {} : { resendAttempts: args.attempts }),
-      resendError: args.error,
+      // Same for the error text: the unconfigured path has nothing new to
+      // record and must keep the last real failure message visible.
+      ...(args.preserveError ? {} : { resendError: args.error }),
     });
     return null;
   },
@@ -169,7 +173,7 @@ export const listSignupsNeedingResendSync = internalQuery({
     v.object({
       id: v.id("waitlistSignups"),
       email: v.string(),
-      resendAttempts: v.optional(v.number()),
+      resendAttempts: v.number(),
     }),
   ),
   handler: async (ctx) => {
@@ -177,17 +181,18 @@ export const listSignupsNeedingResendSync = internalQuery({
     const out: {
       id: Id<"waitlistSignups">;
       email: string;
-      resendAttempts: number | undefined;
+      resendAttempts: number;
     }[] = [];
     for (const status of statuses) {
-      // Scan past rows that hit the attempt cap so they cannot starve the
-      // retry window for newer, still-retryable rows.
+      // The compound index drops attempt-capped rows outright so they cannot
+      // fill the retry window and starve newer, still-retryable rows.
       const page = await ctx.db
         .query("waitlistSignups")
-        .withIndex("by_resendStatus", (q) => q.eq("resendStatus", status))
+        .withIndex("by_resendStatus_attempts", (q) =>
+          q.eq("resendStatus", status).lt("resendAttempts", RESEND_MAX_ATTEMPTS),
+        )
         .take(RESEND_RETRY_SCAN);
       for (const row of page) {
-        if ((row.resendAttempts ?? 0) >= RESEND_MAX_ATTEMPTS) continue;
         out.push({
           id: row._id,
           email: row.email,
@@ -290,13 +295,16 @@ async function persistResendSync(
   ctx: ActionCtx,
   id: Id<"waitlistSignups">,
   email: string,
-  attempts: number | undefined,
+  attempts: number,
 ): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
+    // A missing key is an operator condition, not a row failure: keep the
+    // last real error and do not spend an attempt.
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "unconfigured",
+      preserveError: true,
     });
     return false;
   }
@@ -317,7 +325,7 @@ async function persistResendSync(
       id,
       status: "failed",
       error: message,
-      attempts: (attempts ?? 0) + 1,
+      attempts: attempts + 1,
     });
     return false;
   }

@@ -162,6 +162,7 @@ describe("waitlist.retryFailedResendSyncs", () => {
         lastSubmittedAt: now,
         resendStatus: "failed",
         resendError: "previous outage",
+        resendAttempts: 0,
       });
     });
 
@@ -175,10 +176,13 @@ describe("waitlist.retryFailedResendSyncs", () => {
         )
         .unique();
       expect(signup?.resendStatus).toBe("unconfigured");
+      // Unconfigured is an operator condition, not a row failure: the last
+      // real error must survive the status patch.
+      expect(signup?.resendError).toBe("previous outage");
     });
   });
 
-  it("stops retrying rows that exhausted the attempt budget", async () => {
+  it("skips attempt-capped rows without starving retryable ones", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     const t = newConvexTest();
     const now = Date.now();
@@ -197,20 +201,39 @@ describe("waitlist.retryFailedResendSyncs", () => {
         resendError: "permanent failure",
         resendAttempts: RESEND_MAX_ATTEMPTS,
       });
+      await ctx.db.insert("waitlistSignups", {
+        email: "retryable@example.com",
+        product: "shelvr",
+        source: "hero",
+        consentVersion: CONSENT_VERSION,
+        consentText: CONSENT_TEXT,
+        consentedAt: now,
+        firstSubmittedAt: now,
+        lastSubmittedAt: now,
+        resendStatus: "failed",
+        resendError: "transient failure",
+        resendAttempts: 0,
+      });
     });
 
     await t.action(internal.waitlist.retryFailedResendSyncs, {});
 
     await t.run(async (ctx) => {
-      const signup = await ctx.db
-        .query("waitlistSignups")
-        .withIndex("by_email_and_product", (q) =>
-          q.eq("email", "capped@example.com").eq("product", "shelvr"),
-        )
-        .unique();
-      expect(signup?.resendStatus).toBe("failed");
-      expect(signup?.resendError).toBe("permanent failure");
-      expect(signup?.resendAttempts).toBe(RESEND_MAX_ATTEMPTS);
+      const byEmail = async (email: string) =>
+        await ctx.db
+          .query("waitlistSignups")
+          .withIndex("by_email_and_product", (q) =>
+            q.eq("email", email).eq("product", "shelvr"),
+          )
+          .unique();
+      const capped = await byEmail("capped@example.com");
+      expect(capped?.resendStatus).toBe("failed");
+      expect(capped?.resendError).toBe("permanent failure");
+      expect(capped?.resendAttempts).toBe(RESEND_MAX_ATTEMPTS);
+
+      // The capped row must not crowd the retryable one out of the window.
+      const retryable = await byEmail("retryable@example.com");
+      expect(retryable?.resendStatus).toBe("unconfigured");
     });
   });
 });

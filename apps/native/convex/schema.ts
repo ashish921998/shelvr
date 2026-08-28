@@ -249,10 +249,10 @@ export default defineSchema({
     ),
     resendContactId: v.optional(v.string()),
     resendError: v.optional(v.string()),
-    resendAttempts: v.optional(v.number()),
+    resendAttempts: v.number(),
   })
     .index("by_email_and_product", ["email", "product"])
-    // Bounded Resend retry cron pages failed/pending/unconfigured rows without
-    // scanning the whole waitlist.
-    .index("by_resendStatus", ["resendStatus"]),
+    // Bounded Resend retry cron pages failed/pending/unconfigured rows below
+    // the attempt cap without scanning the whole waitlist.
+    .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),
 });
