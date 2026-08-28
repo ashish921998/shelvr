@@ -111,9 +111,11 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 `CONVEX_URL` is the Convex deployment the waitlist route submits to; without
 it the route returns 503 and the form shows a "try again shortly" message.
 PostHog is optional; without its public variables, waitlist signup still works
-and web analytics become a no-op. `RESEND_API_KEY` / `RESEND_AUDIENCE_ID` are
-reserved for the waitlist backend (shipped separately on the Convex side),
-which will store confirmed signups in a Resend audience.
+and web analytics become a no-op. Waitlist rows are stored in Convex
+(`waitlistSignups`). Set `RESEND_API_KEY` (and optional `RESEND_SEGMENT_ID` /
+`RESEND_TOPIC_ID`) on the Convex deployment to sync confirmed signups into a
+Resend audience; without them the signup still persists and Resend sync stays
+unconfigured until a later retry.
 
 ### 5. Run
 
@@ -128,6 +130,7 @@ Runs backend, web (landing), and native via Turbo.
 - **`items`** — saved links / images / notes (`processing` → `ready` | `failed`)
 - **`spaces`** — themed collections owned by a user
 - **`spaceItems`** — join table
+- **`waitlistSignups`** — launch waitlist emails collected from the marketing site
 
 Public APIs live in `items.ts` and `spaces.ts`. The Node action pipeline is in
 `ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
@@ -136,7 +139,8 @@ session-bearing JWT `sub`) — never from a client argument.
 
 ## Deploying web
 
-The marketing site is a plain Next.js build — no Convex URL injection required:
+The marketing site is a Next.js build. Waitlist signup needs `CONVEX_URL` at
+runtime (the Convex deployment that hosts `waitlist:join`):
 
 ```sh
 pnpm --filter web-app build
