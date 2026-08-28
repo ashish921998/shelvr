@@ -132,7 +132,8 @@ Runs backend, web (landing), and native via Turbo.
 - **`spaceItems`** — join table
 - **`waitlistSignups`** — launch waitlist emails collected from the marketing site
 
-Public APIs live in `items.ts` and `spaces.ts`. The Node action pipeline is in
+Public APIs live in `items.ts`, `spaces.ts`, and `waitlist.ts` (the
+marketing-site waitlist). The Node action pipeline is in
 `ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
 from Convex Auth via `model/auth.ts` (the stable users-table id extracted from the
 session-bearing JWT `sub`) — never from a client argument.

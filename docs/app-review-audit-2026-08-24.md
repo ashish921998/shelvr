@@ -1,5 +1,9 @@
 # App Review audit — August 24, 2026
 
+> Note (Aug 29): the Annual-trial references below say three-day; current
+> product copy, review notes, and App Store metadata say 7-day. Verify the
+> live RevenueCat offer before resubmission.
+
 ## Submission history
 
 | Submitted | Submission | Result | Apple finding |

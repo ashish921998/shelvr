@@ -133,8 +133,10 @@ export default function PrivacyPage() {
               events already recorded in PostHog are not automatically erased
               by in-app deletion; email{" "}
               <strong>support@shelvr.app</strong> to request deletion of
-              analytics data linked to your account, or clear your browser’s
-              local storage to remove the website’s anonymous identifier.
+              analytics data linked to your account. Clearing your browser’s
+              local storage only discards this browser’s anonymous identifier:
+              already-recorded events remain, and the next event starts a new
+              identifier.
               Deleting your Shelvr account does not cancel an App Store
               subscription — manage that in your Apple ID settings. You can
               also email <strong>support@shelvr.app</strong> for help.
