@@ -377,22 +377,32 @@ type PageData = {
 };
 
 /**
- * Thrown when the page fetch is blocked by the safe-fetch policy. Carries only
- * a stable code (never the URL, addresses, or response body) so callers can log
- * a sanitized category. A blocked primary page fetch is a CORE processing
- * failure, unlike a blocked best-effort hero image.
+ * Thrown when the page could not be read through the safe-fetch policy: the
+ * resource may be blocked by policy, refused, or simply gone. Carries only a
+ * stable code (never the URL, addresses, or response body) so callers can log
+ * a sanitized category. A failed primary page fetch is a CORE processing
+ * problem, unlike a blocked best-effort hero image.
  */
-class PageFetchBlockedError extends Error {
-  constructor(public readonly code: SafeFetchError) {
-    super(`page fetch blocked: ${code}`);
-    this.name = "PageFetchBlockedError";
+class PageFetchError extends Error {
+  constructor(
+    public readonly code: SafeFetchError,
+    /** HTTP status when `code` is `http_error`. Feeds `pageGone`. */
+    public readonly status?: number,
+  ) {
+    super(`page fetch failed: ${code}`);
+    this.name = "PageFetchError";
   }
 }
 
-function isPageFetchBlockedError(
-  e: unknown,
-): e is PageFetchBlockedError {
-  return e instanceof PageFetchBlockedError;
+function isPageFetchError(e: unknown): e is PageFetchError {
+  return e instanceof PageFetchError;
+}
+
+/** True when the page will never be readable: the resource is gone (404/410).
+ * Such an item must NOT be classified from its URL alone — the model would
+ * invent content from the slug. Exported pure for unit testing. */
+export function pageGone(status: number | undefined): boolean {
+  return status === 404 || status === 410;
 }
 
 /**
@@ -402,8 +412,8 @@ function isPageFetchBlockedError(
  * or cause, which may carry a URL, response body, or resolved address.
  */
 function summarizeError(error: unknown): string {
-  if (isPageFetchBlockedError(error)) {
-    return `page_fetch_blocked:${error.code}`;
+  if (isPageFetchError(error)) {
+    return `page_fetch_error:${error.code}`;
   }
   // Defensive: safeFetch returns error codes in its result type and never
   // throws SafeFetchErrorClass itself, but if a future caller uses the
@@ -440,9 +450,9 @@ async function fetchPage(url: string): Promise<PageData> {
     },
   });
   if (!result.ok) {
-    // A blocked/oversized/timed-out page fetch fails this item's processing.
-    // Surface only the policy code; the catch handlers log a sanitized category.
-    throw new PageFetchBlockedError(result.code);
+    // Surface only the policy code (+ status for http_error); readPage decides
+    // whether the item can still be saved.
+    throw new PageFetchError(result.code, result.status);
   }
   const finalUrl = result.finalUrl;
   const html = decodeWithContentType(result.bytes, result.contentType);
@@ -501,6 +511,28 @@ async function fetchPage(url: string): Promise<PageData> {
     siteName,
     content: content !== "" ? content : undefined,
   };
+}
+
+/** The three outcomes that matter when reading a link's page: got it, the page
+ * is gone for good (no classification, no retry), or it could not be read this
+ * time (classify from the URL alone, retry later). Keeps the branching out of
+ * processItem's body; failed outcomes carry the error for sanitized logging. */
+type PageRead =
+  | { status: "ok"; page: PageData }
+  | { status: "gone"; error: PageFetchError }
+  | { status: "unreadable"; error: PageFetchError };
+
+async function readPage(url: string): Promise<PageRead> {
+  try {
+    return { status: "ok", page: await fetchPage(url) };
+  } catch (error) {
+    if (!isPageFetchError(error)) {
+      throw error;
+    }
+    return pageGone(error.status)
+      ? { status: "gone", error }
+      : { status: "unreadable", error };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -629,12 +661,40 @@ export const processItem = internalAction({
 
       let page: PageData | undefined;
       let result: z.infer<typeof itemAnalysisSchema>;
+      // Set when the page body could not be read but the item is still worth
+      // saving: the classifier runs on the URL alone and the row is flagged so
+      // the client can offer a retry instead of showing a fully enriched save.
+      let unreadable = false;
 
       if (item.type === "link") {
         if (!item.url) {
           throw new Error("Link item has no url");
         }
-        page = await fetchPage(item.url);
+        const read = await readPage(item.url);
+        if (read.status === "gone") {
+          // Nothing to read and nothing to retry: a 404/410 is terminal.
+          console.error(
+            `processItem gone for ${args.itemId}:`,
+            summarizeError(read.error),
+          );
+          await ctx.runMutation(internal.items.failItem, {
+            itemId: args.itemId,
+            reason: "not_found",
+          });
+          return null;
+        }
+        if (read.status === "unreadable") {
+          // Refused (403/429), server error, timeout, or oversized: the link is
+          // probably still good, so save a usable item classified from the URL
+          // and let the user retry the fetch later.
+          console.warn(
+            `processItem unreadable for ${args.itemId}:`,
+            summarizeError(read.error),
+          );
+          unreadable = true;
+        } else {
+          page = read.page;
+        }
         const { object } = await generateObject({
           model: MODEL,
           system: SYSTEM_PROMPT,
@@ -643,12 +703,15 @@ export const processItem = internalAction({
             "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
             spacesBlock,
             `URL: ${item.url}`,
-            page.title ? `Page title: ${page.title}` : "",
-            page.siteName ? `Site: ${page.siteName}` : "",
-            page.description ? `Meta description: ${page.description}` : "",
-            page.content
+            page?.title ? `Page title: ${page.title}` : "",
+            page?.siteName ? `Site: ${page.siteName}` : "",
+            page?.description ? `Meta description: ${page.description}` : "",
+            page?.content
               ? `Page content:\n${page.content.slice(0, 6000)}`
               : "No page content could be extracted.",
+            unreadable
+              ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
+              : "",
             INTENTS_PROMPT_BLOCK,
           ]
             .filter((line) => line !== "")
@@ -728,6 +791,7 @@ export const processItem = internalAction({
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
         intents: sanitizeIntents(result.intents),
+        enrichment: unreadable ? "partial" : undefined,
         status: "ready",
       });
       if (spaceIds.length > 0) {
@@ -750,7 +814,7 @@ export const processItem = internalAction({
         });
       }
     } catch (error) {
-      // Sanitized error log. For fetch-policy failures (PageFetchBlockedError,
+      // Sanitized error log. For fetch-policy failures (PageFetchError,
       // SafeFetchError) log only the stable policy code + item id — never the
       // error object, its cause, URLs, headers, response bodies, or resolved
       // addresses. For other errors log a generic category so a thrown Error's
@@ -759,7 +823,10 @@ export const processItem = internalAction({
         `processItem failed for ${args.itemId}:`,
         summarizeError(error),
       );
-      await ctx.runMutation(internal.items.failItem, { itemId: args.itemId });
+      await ctx.runMutation(internal.items.failItem, {
+        itemId: args.itemId,
+        reason: "error",
+      });
     }
     return null;
   },

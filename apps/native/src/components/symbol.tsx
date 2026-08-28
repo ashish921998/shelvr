@@ -17,6 +17,8 @@ const SF_TO_MATERIAL: Record<string, string> = {
   'ellipsis': 'more_vert',
   'arrow.up.right': 'north_east',
   'checkmark.circle.fill': 'check_circle',
+  'exclamationmark.triangle.fill': 'warning',
+  'exclamationmark.circle': 'error',
   // People / communication
   'person.fill': 'person',
   'envelope': 'mail',
@@ -57,6 +59,7 @@ const SF_TO_MATERIAL: Record<string, string> = {
   'gearshape': 'settings',
   'gearshape.fill': 'settings',
   'arrow.2.circlepath': 'refresh',
+  'arrow.clockwise': 'refresh',
   'speedometer': 'speed',
   'viewfinder': 'center_focus_strong',
   'figure.run': 'directions_run',

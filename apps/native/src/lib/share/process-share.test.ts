@@ -10,10 +10,11 @@ import {
   classifyEntries,
   classifyPayload,
   processSession,
+  resolvedFromRawPayloads,
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "./process-share";
-import { operationIdFor, type ShareEntry, type ShareSession } from "./storage";
+import { operationIdFor, type RawSharePayload, type ShareEntry, type ShareSession } from "./storage";
 
 // Stub the modules the processor imports via the `@/` alias so it loads under
 // Node without the Metro path map. The processor consumes `isProbablyUrl` at
@@ -22,8 +23,14 @@ import { operationIdFor, type ShareEntry, type ShareSession } from "./storage";
 // is re-exported from its real relative source so classification behavior is
 // exercised against the actual helper, not a hand-rolled stub.
 vi.mock("@/lib/url", async () => {
-  const actual = await vi.importActual<{ isProbablyUrl: (t: string) => boolean }>("../url");
-  return { isProbablyUrl: actual.isProbablyUrl };
+  const actual = await vi.importActual<{
+    isProbablyUrl: (t: string) => boolean;
+    extractFirstUrl: (t: string) => string | null;
+  }>("../url");
+  return {
+    isProbablyUrl: actual.isProbablyUrl,
+    extractFirstUrl: actual.extractFirstUrl,
+  };
 });
 vi.mock("@convex/_generated/dataModel", () => ({}));
 
@@ -91,7 +98,29 @@ describe("classifyPayload", () => {
     expect(classifyPayload(urlPayload("https://example.com"))).toEqual({ kind: "link" });
   });
   it("classifies text that looks like a URL as a link", () => {
-    expect(classifyPayload(textPayload("example.com/path"))).toEqual({ kind: "link" });
+    expect(classifyPayload(textPayload("example.com/path"))).toEqual({
+      kind: "link",
+      url: "example.com/path",
+    });
+  });
+  it("extracts a URL wrapped in TikTok-style caption text as a link", () => {
+    expect(
+      classifyPayload(textPayload("Check out this video! https://www.tiktok.com/@creator/video/7301234567890123456")),
+    ).toEqual({
+      kind: "link",
+      url: "https://www.tiktok.com/@creator/video/7301234567890123456",
+    });
+  });
+  it("strips trailing sentence punctuation from an extracted URL", () => {
+    expect(classifyPayload(textPayload("Loved this. https://x.com/user/status/1."))).toEqual({
+      kind: "link",
+      url: "https://x.com/user/status/1",
+    });
+  });
+  it("classifies caption text without any URL as a note", () => {
+    expect(classifyPayload(textPayload("Check out this account, it's great"))).toEqual({
+      kind: "note",
+    });
   });
   it("classifies plain text as a note", () => {
     expect(classifyPayload(textPayload("a reminder"))).toEqual({ kind: "note" });
@@ -249,6 +278,28 @@ describe("processSession", () => {
     expect(result.entries[0].status).toBe("unsupported");
     expect(result.entries[1].status).toBe("saved");
     expect(saveLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the extracted URL (not the caption text) for caption-wrapped shares", async () => {
+    // TikTok-style shares arrive as text/plain with template text around the
+    // URL. The save must be a LINK keyed to the embedded URL, never a note
+    // holding the raw caption.
+    const session = makeSession(1);
+    const resolved = [
+      textPayload("Check out this video! https://www.tiktok.com/@creator/video/7301234567890123456"),
+    ];
+    const saveLink = vi.fn(async ({ url, operationId }) => `items:${operationId}:${url}` as Id<"items">);
+    const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
+    const deps = makeDeps({ saveLink, saveNote });
+
+    const result = await processSession(session, resolved, deps);
+    expect(result.entries[0].kind).toBe("link");
+    expect(result.entries[0].status).toBe("saved");
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(saveLink.mock.calls[0][0].url).toBe(
+      "https://www.tiktok.com/@creator/video/7301234567890123456",
+    );
+    expect(saveNote).not.toHaveBeenCalled();
   });
 
   it("reports an image save failure from the injected save (a result, not a throw)", async () => {
@@ -436,5 +487,96 @@ describe("processSession", () => {
     expect(result.entries[0].status).toBe("failed");
     expect(result.entries[0].message).not.toContain("https://");
     expect(result.entries[0].message).not.toContain("kg2e5gqf40sy8kdqxcm3vp7hn96wtxyz");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolvedFromRawPayloads (native-resolution fallback)
+// ---------------------------------------------------------------------------
+
+describe("resolvedFromRawPayloads", () => {
+  const raw = (
+    value: string,
+    shareType: string,
+    mimeType?: string,
+  ): RawSharePayload => ({ value, shareType, mimeType });
+
+  it("maps url payloads to website with the raw value and mime type", () => {
+    expect(resolvedFromRawPayloads([raw("https://x.com/p/1", "url", "text/html")])).toEqual([
+      {
+        contentType: "website",
+        value: "https://x.com/p/1",
+        contentUri: null,
+        contentMimeType: "text/html",
+      },
+    ]);
+  });
+
+  it("maps text payloads to text with a null mime type when absent", () => {
+    expect(resolvedFromRawPayloads([raw("check this out", "text")])).toEqual([
+      {
+        contentType: "text",
+        value: "check this out",
+        contentUri: null,
+        contentMimeType: null,
+      },
+    ]);
+  });
+
+  it("keeps image payloads classified but without a contentUri, so they fail explicitly", async () => {
+    const resolved = resolvedFromRawPayloads([raw("ph://IMG_0001", "image")]);
+    expect(resolved[0].contentType).toBe("image");
+    expect(resolved[0].contentUri).toBeNull();
+
+    // Round-trip through the processor: an unresolvable image is a terminal
+    // failed entry, never a backend call with a missing uri.
+    const session = makeSession(1);
+    const classified = classifyEntries(session, resolved);
+    expect(classified[0].kind).toBe("image");
+    expect(classified[0].status).toBe("failed");
+    const saveImage = vi.fn(async () => ({
+      status: "saved" as const,
+      operationId: "x",
+      image: { uri: "x" },
+      itemId: "unused" as Id<"items">,
+    }));
+    const result = await processSession(
+      { ...session, entries: classified },
+      resolved,
+      makeDeps({ saveImage }),
+    );
+    expect(result.entries[0].status).toBe("failed");
+    expect(saveImage).not.toHaveBeenCalled();
+  });
+
+  it("maps audio/video/file payloads to their unsupported content types", () => {
+    const resolved = resolvedFromRawPayloads([
+      raw("file://a.m4a", "audio"),
+      raw("file://b.mp4", "video"),
+      raw("file://c.pdf", "file"),
+    ]);
+    expect(resolved.map((p) => p.contentType)).toEqual(["audio", "video", "file"]);
+    const classified = classifyEntries(makeSession(3), resolved);
+    expect(classified.map((e) => e.status)).toEqual([
+      "unsupported",
+      "unsupported",
+      "unsupported",
+    ]);
+  });
+
+  it("treats unknown share types as text so classification can still extract a link", () => {
+    const resolved = resolvedFromRawPayloads([
+      raw("watch this https://a.example/v", "bogus-type"),
+    ]);
+    expect(resolved[0].contentType).toBe("text");
+    expect(classifyPayload(resolved[0])).toEqual({
+      kind: "link",
+      url: "https://a.example/v",
+    });
+  });
+
+  it("classifies a fallback url payload as a saveable link", () => {
+    const resolved = resolvedFromRawPayloads([raw("https://www.tiktok.com/@nasa/video/1", "url")]);
+    expect(classifyPayload(resolved[0])).toEqual({ kind: "link" });
   });
 });

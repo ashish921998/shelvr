@@ -1,6 +1,10 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import {
+  enrichmentValidator,
+  failureReasonValidator,
+} from "./model/itemFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -76,6 +80,14 @@ export default defineSchema({
         v.literal("failed"),
       ),
     ),
+    // Why processing failed, so the client can say something true instead of
+    // rendering an item that looks stuck forever. Only set with
+    // `status: "failed"`; absent on pre-existing failed rows.
+    failureReason: v.optional(failureReasonValidator),
+    // "partial" = classified from the URL alone because the page body could not
+    // be read (403/429/5xx/timeout). The item is usable and retryable; absent
+    // means fully enriched.
+    enrichment: v.optional(enrichmentValidator),
     searchText: v.string(),
   })
     .index("by_user", ["userId"])

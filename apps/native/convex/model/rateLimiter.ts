@@ -10,4 +10,7 @@ import { components } from "../_generated/api";
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   itemCreate: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
   findLinks: { kind: "token bucket", rate: 60, period: HOUR, capacity: 15 },
+  // Retrying a failed/partial save re-runs the fetch + one classification, so
+  // it costs the same as a create; capped tighter since it is a manual repair.
+  reprocessItem: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
 });

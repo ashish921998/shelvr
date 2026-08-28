@@ -54,6 +54,10 @@ export class SafeFetchErrorClass extends Error {
   constructor(
     public readonly code: SafeFetchError,
     message: string,
+    /** Response status, set only for `http_error`. Callers need it to tell a
+     * permanently gone resource (404/410) from a transient or bot-blocked one
+     * (403/429/5xx), which warrant different handling. */
+    public readonly status?: number,
   ) {
     super(message);
     this.name = "SafeFetchError";
@@ -288,7 +292,12 @@ export type SafeFetchOk = {
 
 export type SafeFetchResult =
   | SafeFetchOk
-  | { ok: false; code: SafeFetchError };
+  | {
+      ok: false;
+      code: SafeFetchError;
+      /** Response status, present only when `code` is `http_error`. */
+      status?: number;
+    };
 
 // ---------------------------------------------------------------------------
 // Options
@@ -384,7 +393,7 @@ export async function safeFetch(
     (value) => ({ ok: true, ...value }) as SafeFetchOk,
     (e: unknown) => {
       if (isSafeFetchError(e)) {
-        return { ok: false, code: e.code };
+        return { ok: false, code: e.code, status: e.status };
       }
       if (isUrlPolicyError(e)) {
         return { ok: false, code: e.code };
@@ -479,6 +488,7 @@ async function safeFetchThrowing(
         throw new SafeFetchErrorClass(
           "http_error",
           `http status ${response.statusCode}`,
+          response.statusCode,
         );
       }
       const contentType = String(response.headers["content-type"] ?? "");

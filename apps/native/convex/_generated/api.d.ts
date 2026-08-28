@@ -17,6 +17,7 @@ import type * as items from "../items.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
+import type * as model_itemFields from "../model/itemFields.js";
 import type * as model_memberships from "../model/memberships.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
+  "model/itemFields": typeof model_itemFields;
   "model/memberships": typeof model_memberships;
   "model/rateLimiter": typeof model_rateLimiter;
   "model/revenuecat": typeof model_revenuecat;
