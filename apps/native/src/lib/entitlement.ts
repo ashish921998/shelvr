@@ -22,9 +22,9 @@ import { NativeModules } from 'react-native';
  * used only to present offerings and drive purchases — never to gate features
  * directly — so a spoofed client can't unlock Pro without a real subscription.
  *
- * Model: the yearly plan carries a 3-day free trial (payment method upfront,
- * auto-charges at day 3 unless cancelled); the monthly plan has no trial and
- * charges immediately. Then $4.99/mo or $39.99/yr. No free tier. A lapsed user
+ * Model: the yearly plan carries a 7-day free trial (payment method upfront,
+ * auto-charges at day 7 unless cancelled); the monthly plan has no trial and
+ * charges immediately. Then $4.99/mo or $19.99/yr. No free tier. A lapsed user
  * (trial or subscription ended) is read-only: they can view and search existing
  * saves and spaces, but every save and Pro feature routes to the paywall.
  *
