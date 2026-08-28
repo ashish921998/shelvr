@@ -14,9 +14,7 @@ export default function SupportPage() {
   return (
     <main className="bg-paper min-h-screen">
       <div className="container max-w-3xl py-10 sm:py-16">
-        <Link href="/">
-          <Logo />
-        </Link>
+        <Logo />
 
         <h1 className="mt-10 font-display text-3xl text-ink sm:text-4xl">
           Shelvr Support

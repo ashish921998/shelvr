@@ -39,6 +39,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
+  // JSON primitives (`null`, strings, arrays) parse fine but have no fields —
+  // reject them here so the field reads below can never throw.
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ message: "Invalid request." }, { status: 400 });
+  }
+
   if (body.company) return NextResponse.json({ ok: true });
 
   const email =

@@ -30,7 +30,9 @@ export default function Features() {
           </div>
         </div>
 
-        <div className="relative mx-auto flex h-[37rem] w-full max-w-xl items-center justify-center">
+        {/* overflow-hidden keeps the rotated phones' corners from spilling
+            past the viewport edge on narrow screens. */}
+        <div className="relative mx-auto flex h-[37rem] w-full max-w-xl items-center justify-center overflow-hidden">
           <AppPhone
             src="/images/app/detail.webp"
             alt="Shelvr detail screen with summary, tags, and related saves"

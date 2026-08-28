@@ -461,7 +461,7 @@ export default function ShareScreen() {
   // Shelvr" spinner — the save never happened. Offer Unlock Pro or Cancel.
   if (phase.kind === 'locked') {
     return (
-      <PhaseSurface phaseKey="locked">
+      <PhaseSurface key="locked" phaseKey="locked">
         <Text style={styles.title(theme)}>Unlock Shelvr Pro</Text>
         <Text style={styles.subtitle(theme)}>
           Saving shared content is a Pro feature. View Shelvr Pro plans to save
@@ -539,7 +539,7 @@ export default function ShareScreen() {
           ? 'One item couldn’t be saved.'
           : `${failed} items couldn’t be saved.`;
     return (
-      <PhaseSurface phaseKey="partial">
+      <PhaseSurface key="partial" phaseKey="partial">
         <Text style={styles.title(theme)}>
           Saved {saved} of {total}
         </Text>
@@ -678,6 +678,9 @@ function countPartial(session: ShareSession): {
 
 type Theme = ReturnType<typeof useUnistyles>['theme'];
 
+/** Phase chrome with enter/exit transitions. The Reanimated drivers fire on
+ * mount/unmount, so a phase change only animates if React remounts the
+ * surface — callers must pass `key={phaseKey}` at each call site. */
 function PhaseSurface({
   phaseKey,
   children,
@@ -689,7 +692,6 @@ function PhaseSurface({
 
   return (
     <Animated.View
-      key={phaseKey}
       entering={reducedMotion ? REDUCED_FADE_IN : PHASE_ENTER}
       exiting={reducedMotion ? REDUCED_FADE_OUT : PHASE_EXIT}
       collapsable={false}
@@ -712,7 +714,7 @@ function Centered({
   theme: Theme;
 }) {
   return (
-    <PhaseSurface phaseKey={phaseKey}>
+    <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
       {spinner ? <ActivityIndicator color={theme.colors.primary} /> : null}
       <Text style={styles.label(theme)}>{label}</Text>
     </PhaseSurface>
@@ -739,7 +741,7 @@ function ErrorActions({
   single?: boolean;
 }) {
   return (
-    <PhaseSurface phaseKey={phaseKey}>
+    <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
       <Text style={styles.title(theme)}>{title}</Text>
       <View style={styles.actions}>
         {single ||

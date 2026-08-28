@@ -103,15 +103,17 @@ conversion experiment (copy `apps/web/.env.example` to
 `apps/web/.env.local`):
 
 ```sh
-RESEND_API_KEY=<server-side-api-key>
-RESEND_AUDIENCE_ID=<waitlist-audience-id>
+CONVEX_URL=<deployment-url>
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-Resend stores successful signups in the configured audience. PostHog is
-optional; without its public variables, waitlist signup still works and web
-analytics become a no-op.
+`CONVEX_URL` is the Convex deployment the waitlist route submits to; without
+it the route returns 503 and the form shows a "try again shortly" message.
+PostHog is optional; without its public variables, waitlist signup still works
+and web analytics become a no-op. `RESEND_API_KEY` / `RESEND_AUDIENCE_ID` are
+reserved for the waitlist backend (shipped separately on the Convex side),
+which will store confirmed signups in a Resend audience.
 
 ### 5. Run
 
