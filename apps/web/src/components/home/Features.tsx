@@ -1,9 +1,32 @@
-import AppPhone from "./AppPhone";
+import Image from "next/image";
+
+const tiles = [
+  {
+    src: "/images/features/search-grid.jpg",
+    alt: "Search results for travel across saved Lisbon places",
+    label: "Full-text search",
+  },
+  {
+    src: "/images/features/detail-hero.jpg",
+    alt: "Saved article about a Lisbon weekend itinerary",
+    label: "AI summary",
+  },
+  {
+    src: "/images/features/map.jpg",
+    alt: "Saved Lisbon places on a map",
+    label: "Saved places",
+  },
+  {
+    src: "/images/features/tidy.jpg",
+    alt: "Photo tidy reviewing a night-sky photo",
+    label: "Photo tidy",
+  },
+] as const;
 
 export default function Features() {
   return (
     <section id="search" className="border-t border-line py-20 sm:py-28">
-      <div className="container grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+      <div className="container grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
         <div className="text-center lg:text-left">
           <p className="section-kicker justify-center lg:justify-start">
             More than bookmarks
@@ -16,33 +39,25 @@ export default function Features() {
             saves, or see saved places on a map. Shelvr gives every save
             somewhere useful to go.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start">
-            {["Full-text search", "Related saves", "Saved places", "Photo tidy"].map(
-              (item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-ember-soft px-3 py-2 text-xs font-bold text-ember-deep"
-                >
-                  {item}
-                </span>
-              ),
-            )}
-          </div>
         </div>
 
-        {/* overflow-hidden keeps the rotated phones' corners from spilling
-            past the viewport edge on narrow screens. */}
-        <div className="relative mx-auto flex h-[37rem] w-full max-w-xl items-center justify-center overflow-hidden">
-          <AppPhone
-            src="/images/app/detail.webp"
-            alt="Shelvr detail screen with summary, tags, and related saves"
-            className="absolute h-[34rem] w-[16.25rem] -translate-x-12 rotate-[-5deg] sm:-translate-x-20"
-          />
-          <AppPhone
-            src="/images/app/search.webp"
-            alt="Shelvr full-text search screen"
-            className="absolute h-[35rem] w-[16.5rem] translate-x-12 rotate-[4deg] sm:translate-x-20"
-          />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {tiles.map((tile) => (
+            <figure key={tile.label} className="min-w-0">
+              <div className="relative aspect-[5/4] overflow-hidden rounded-[1.4rem] bg-paper-deep">
+                <Image
+                  src={tile.src}
+                  alt={tile.alt}
+                  fill
+                  sizes="(max-width: 1024px) 45vw, 280px"
+                  className="object-cover"
+                />
+              </div>
+              <figcaption className="mt-2 text-sm font-semibold text-ink">
+                {tile.label}
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </div>
     </section>

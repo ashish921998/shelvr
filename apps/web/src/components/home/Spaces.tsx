@@ -1,23 +1,55 @@
-import AppPhone from "./AppPhone";
+import Image from "next/image";
+
+const photos = [
+  {
+    src: "/images/spaces/gifts.jpg",
+    alt: "Espresso machine saved into Gift ideas",
+    className: "left-[6%] top-[8%] h-[40%] w-[44%] rotate-[-6deg]",
+  },
+  {
+    src: "/images/spaces/office.jpg",
+    alt: "Dashboard screenshot saved into Home office",
+    className: "right-[6%] top-[14%] h-[30%] w-[42%] rotate-[5deg]",
+  },
+  {
+    src: "/images/spaces/recipes.jpg",
+    alt: "Ramen bowl saved into Recipes",
+    className: "left-[34%] top-[36%] z-10 h-[24%] w-[30%] rotate-[8deg]",
+  },
+  {
+    src: "/images/spaces/reading.jpg",
+    alt: "Bookshelf saved into Reading list",
+    className: "bottom-[8%] left-[8%] h-[34%] w-[38%] rotate-[3deg]",
+  },
+  {
+    src: "/images/spaces/trips.jpg",
+    alt: "Riverside city saved into Trips",
+    className: "bottom-[8%] right-[6%] h-[36%] w-[40%] rotate-[-4deg]",
+  },
+];
 
 export default function Spaces() {
   return (
     <section id="spaces" className="border-t border-line py-20 sm:py-28">
-      <div className="container grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-        <div className="relative mx-auto flex h-[37rem] w-full max-w-xl items-center justify-center">
-          <AppPhone
-            src="/images/app/home.webp"
-            alt="Shelvr visual home feed"
-            className="absolute h-[34rem] w-[16.25rem] -translate-x-12 rotate-[-5deg] sm:-translate-x-20"
-          />
-          <AppPhone
-            src="/images/app/spaces.webp"
-            alt="Shelvr spaces screen with visual collections"
-            className="absolute h-[35rem] w-[16.5rem] translate-x-12 rotate-[4deg] sm:translate-x-20"
-          />
+      <div className="container grid items-stretch gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+        <div className="relative min-h-[26rem] overflow-hidden rounded-[1.75rem] bg-paper-deep sm:min-h-[32rem] lg:min-h-[38rem]">
+          {photos.map((photo) => (
+            <div
+              key={photo.src}
+              className={`absolute overflow-hidden rounded-[1.4rem] bg-cream shadow-[0_24px_50px_rgba(43,36,24,0.18)] ${photo.className}`}
+            >
+              <Image
+                src={photo.src}
+                alt={photo.alt}
+                fill
+                sizes="(max-width: 1024px) 45vw, 280px"
+                className="object-cover"
+              />
+            </div>
+          ))}
         </div>
 
-        <div className="text-center lg:text-left">
+        <div className="flex flex-col justify-center text-center lg:text-left">
           <p className="section-kicker justify-center lg:justify-start">
             Living collections
           </p>
