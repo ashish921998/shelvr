@@ -1005,6 +1005,9 @@ export const reprocessItem = mutation({
     await ctx.db.patch(args.id, {
       status: "processing",
       failureReason: undefined,
+      // Dropped up front so an in-flight retry — and a retry that fails again —
+      // never carries the previous run's "partial" marker.
+      enrichment: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, {
       itemId: args.id,

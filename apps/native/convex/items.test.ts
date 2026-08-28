@@ -1412,6 +1412,7 @@ describe("failed saves and retry", () => {
     await t.mutation(api.items.reprocessItem, { id: itemId });
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("processing");
+    expect(item?.enrichment).toBeUndefined();
   });
 
   it("does not retry a page that is gone (a 404 will not change)", async () => {
