@@ -3,18 +3,26 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 const OPERATION_ID_MIN = 8;
 const OPERATION_ID_MAX = 200;
+declare const operationIdBrand: unique symbol;
 
+/** Save mechanism recorded by one durable item operation. */
 export type OperationKind = "image" | "link" | "note";
 
-/** Keep malformed operation IDs out of the idempotency index. */
-export function requireOperationId(operationId: string): void {
+/** Validated client-generated operation ID used as an idempotency key. */
+export type OperationId = string & { readonly [operationIdBrand]: true };
+
+/** Parse an operation ID and keep malformed values out of the idempotency index. */
+export function parseOperationId(operationId: string): OperationId {
   if (
     typeof operationId !== "string" ||
     operationId.length < OPERATION_ID_MIN ||
     operationId.length > OPERATION_ID_MAX
   ) {
-    throw new Error("Invalid operationId");
+    throw new Error(
+      "Operation ID validation failed: expected 8-200 characters",
+    );
   }
+  return operationId as OperationId;
 }
 
 /**
@@ -23,8 +31,8 @@ export function requireOperationId(operationId: string): void {
  */
 export async function loadItemOperation(
   ctx: QueryCtx | MutationCtx,
-  userId: string,
-  operationId: string,
+  userId: Id<"users">,
+  operationId: OperationId,
   kind: OperationKind = "image",
 ): Promise<Doc<"itemOperations"> | null> {
   const operation = await ctx.db
@@ -35,7 +43,7 @@ export async function loadItemOperation(
     .unique();
   if (operation === null) return null;
   if (operation.kind !== kind) {
-    throw new Error("Operation kind mismatch");
+    throw new Error("Item operation lookup failed: operation kind mismatch");
   }
   return operation;
 }

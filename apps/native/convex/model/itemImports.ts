@@ -7,7 +7,7 @@ import { saveIntoSpace } from "./memberships";
 import {
   isStorageUnreferenced,
   loadItemOperation,
-  requireOperationId,
+  parseOperationId,
   safeDeleteStorage,
 } from "./itemOperations";
 import { rateLimiter } from "./rateLimiter";
@@ -28,26 +28,32 @@ import { requireProEntitlement } from "../subscriptions";
 const STORAGE_IN_USE = "Storage object is already in use";
 const CLEANUP_PAGE_SIZE = 100;
 
+/** Maximum pending image-import age in milliseconds before cleanup may reclaim it. */
 export const STALE_IMPORT_CUTOFF_MS = 24 * 60 * 60 * 1000;
 
+/** Validates the durable operation ID that begins an image import. */
 export const beginImageImportArgsValidator = v.object({
   operationId: v.string(),
 });
 
+/** Validates whether image import needs an upload or already has an item. */
 export const beginImageImportResultValidator = v.union(
   v.object({ kind: v.literal("upload"), uploadUrl: v.string() }),
   v.object({ kind: v.literal("complete"), itemId: v.id("items") }),
 );
 
+/** Validates one uploaded storage object attachment to an image import. */
 export const attachImageUploadArgsValidator = v.object({
   operationId: v.string(),
   storageId: v.id("_storage"),
 });
 
+/** Validates the canonical storage object selected by image import. */
 export const attachImageUploadResultValidator = v.object({
   storageId: v.id("_storage"),
 });
 
+/** Validates image metadata used when finalizing an attached upload. */
 export const finalizeImageImportArgsValidator = v.object({
   operationId: v.string(),
   aspectRatio: v.optional(v.number()),
@@ -58,10 +64,12 @@ export const finalizeImageImportArgsValidator = v.object({
   spaceId: v.optional(v.id("spaces")),
 });
 
+/** Validates the operation ID used to read image-import state. */
 export const getImportOperationArgsValidator = v.object({
   operationId: v.string(),
 });
 
+/** Validates durable image-import state returned without refreshing the ledger. */
 export const getImportOperationResultValidator = v.union(
   v.object({
     status: v.union(v.literal("pending"), v.literal("complete")),
@@ -71,9 +79,7 @@ export const getImportOperationResultValidator = v.union(
   v.null(),
 );
 
-type FinalizeImageImportArgs = Infer<
-  typeof finalizeImageImportArgsValidator
->;
+type FinalizeImageImportArgs = Infer<typeof finalizeImageImportArgsValidator>;
 
 function validateImageMetadata(args: FinalizeImageImportArgs): void {
   if (
@@ -102,14 +108,11 @@ export async function beginImageImportHandler(
   args: Infer<typeof beginImageImportArgsValidator>,
 ): Promise<Infer<typeof beginImageImportResultValidator>> {
   const userId = await requireUserId(ctx);
-  requireOperationId(args.operationId);
-  const operation = await loadItemOperation(ctx, userId, args.operationId);
+  const operationId = parseOperationId(args.operationId);
+  const operation = await loadItemOperation(ctx, userId, operationId);
   const now = Date.now();
 
-  if (
-    operation?.status === "complete" &&
-    operation.itemId !== undefined
-  ) {
+  if (operation?.status === "complete" && operation.itemId !== undefined) {
     const item = await ctx.db.get(operation.itemId);
     if (item !== null) {
       return { kind: "complete", itemId: operation.itemId };
@@ -121,7 +124,7 @@ export async function beginImageImportHandler(
   if (operation === null) {
     await ctx.db.insert("itemOperations", {
       userId,
-      operationId: args.operationId,
+      operationId,
       kind: "image",
       status: "pending",
       updatedAt: now,
@@ -135,11 +138,7 @@ export async function beginImageImportHandler(
   if (operation.status === "complete") {
     if (
       operation.storageId !== undefined &&
-      (await isStorageUnreferenced(
-        ctx,
-        operation.storageId,
-        operation._id,
-      ))
+      (await isStorageUnreferenced(ctx, operation.storageId, operation._id))
     ) {
       await safeDeleteStorage(ctx, operation.storageId);
     }
@@ -169,22 +168,22 @@ export async function attachImageUploadHandler(
 ): Promise<Infer<typeof attachImageUploadResultValidator>> {
   const userId = await requireUserId(ctx);
   await requireProEntitlement(ctx, userId);
-  requireOperationId(args.operationId);
-  const operation = await loadItemOperation(ctx, userId, args.operationId);
+  const operationId = parseOperationId(args.operationId);
+  const operation = await loadItemOperation(ctx, userId, operationId);
   const now = Date.now();
 
   if (operation === null) {
     // The upload may have raced cleanup or skipped begin. Existence plus the
     // unreferenced guard is required before adopting a client-supplied ID.
     if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
-      throw new Error("Storage object not found");
+      throw new Error("Attach image upload failed: storage object not found");
     }
     if (!(await isStorageUnreferenced(ctx, args.storageId))) {
       throw new Error(STORAGE_IN_USE);
     }
     await ctx.db.insert("itemOperations", {
       userId,
-      operationId: args.operationId,
+      operationId,
       kind: "image",
       status: "pending",
       storageId: args.storageId,
@@ -220,7 +219,7 @@ export async function attachImageUploadHandler(
 
   if (operation.storageId === undefined) {
     if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
-      throw new Error("Storage object not found");
+      throw new Error("Replace image upload failed: storage object not found");
     }
     if (!(await isStorageUnreferenced(ctx, args.storageId))) {
       throw new Error(STORAGE_IN_USE);
@@ -239,8 +238,8 @@ export async function finalizeImageImportHandler(
   args: FinalizeImageImportArgs,
 ): Promise<Id<"items">> {
   const userId = await requireUserId(ctx);
-  requireOperationId(args.operationId);
-  const operation = await loadItemOperation(ctx, userId, args.operationId);
+  const operationId = parseOperationId(args.operationId);
+  const operation = await loadItemOperation(ctx, userId, operationId);
 
   if (
     operation !== null &&
@@ -311,21 +310,14 @@ export async function cleanupStaleImageImportsHandler(
   const stale = await ctx.db
     .query("itemOperations")
     .withIndex("by_kind_status_updated", (query) =>
-      query
-        .eq("kind", "image")
-        .eq("status", "pending")
-        .lt("updatedAt", cutoff),
+      query.eq("kind", "image").eq("status", "pending").lt("updatedAt", cutoff),
     )
     .take(CLEANUP_PAGE_SIZE);
 
   for (const operation of stale) {
     if (
       operation.storageId !== undefined &&
-      (await isStorageUnreferenced(
-        ctx,
-        operation.storageId,
-        operation._id,
-      ))
+      (await isStorageUnreferenced(ctx, operation.storageId, operation._id))
     ) {
       await safeDeleteStorage(ctx, operation.storageId);
     }

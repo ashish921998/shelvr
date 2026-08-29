@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
+/** Effective ownership state of one item-to-space membership. */
 export type MembershipStatus = "suggested" | "saved" | "dismissed";
 
 /**
@@ -31,13 +32,13 @@ export async function getMembership(
  */
 export async function saveIntoSpace(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   itemId: Id<"items">,
   spaceId: Id<"spaces">,
 ): Promise<void> {
   const space = await ctx.db.get(spaceId);
   if (space === null || space.userId !== userId) {
-    throw new Error("Space not found");
+    throw new Error("Save item into space failed: Space not found");
   }
   await ctx.db.insert("spaceItems", {
     userId,

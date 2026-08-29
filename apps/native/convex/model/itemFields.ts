@@ -7,18 +7,21 @@ import { v } from "convex/values";
  * hand-copied validator — these two fields must not become the next instance.
  */
 
+/** Validates the three persisted item content types. */
 export const itemTypeValidator = v.union(
   v.literal("image"),
   v.literal("link"),
   v.literal("note"),
 );
 
+/** Validates the item processing lifecycle state stored on every item. */
 export const itemStatusValidator = v.union(
   v.literal("processing"),
   v.literal("ready"),
   v.literal("failed"),
 );
 
+/** Validates the closed set of item action intent kinds. */
 export const intentKindValidator = v.union(
   v.literal("open_url"),
   v.literal("copy"),
@@ -30,12 +33,14 @@ export const intentKindValidator = v.union(
   v.literal("add_event"),
 );
 
+/** Validates one user-visible item action intent. */
 export const intentValidator = v.object({
   kind: intentKindValidator,
   label: v.string(),
   value: v.string(),
 });
 
+/** Validates one product-search result attached to an item. */
 export const productValidator = v.object({
   title: v.string(),
   url: v.string(),
@@ -44,19 +49,18 @@ export const productValidator = v.object({
   thumbnailUrl: v.optional(v.string()),
 });
 
+/** Validates the product-search lifecycle state for an item. */
 export const productsStatusValidator = v.union(
   v.literal("searching"),
   v.literal("ready"),
   v.literal("failed"),
 );
 
-// Why processing failed. `not_found` is terminal (the page is gone, 404/410);
-// `error` is a pipeline fault worth retrying. Only set with `status: "failed"`.
+/** Validates why processing failed; `not_found` is terminal and `error` is retryable. */
 export const failureReasonValidator = v.union(
   v.literal("not_found"),
   v.literal("error"),
 );
 
-// How much of the item could be enriched. "partial" = classified from the URL
-// alone because the page body was unreadable; absent = fully enriched.
+/** Marks URL-only enrichment after the page body could not be read. */
 export const enrichmentValidator = v.literal("partial");

@@ -35,20 +35,24 @@ import {
   failItemHandler,
   finalizeItemArgsValidator,
   finalizeItemHandler,
+  setAspectRatioInternalArgsValidator,
+  setAspectRatioInternalHandler,
+  setProductsInternalArgsValidator,
+  setProductsInternalHandler,
+} from "./model/itemEnrichment";
+import {
   getItemInternalArgsValidator,
   getItemInternalHandler,
   listImagesNeedingRatioInternalHandler,
   listReadyItemsInternalArgsValidator,
   listReadyItemsInternalHandler,
-  setAspectRatioInternalArgsValidator,
-  setAspectRatioInternalHandler,
-  setProductsInternalArgsValidator,
-  setProductsInternalHandler,
+} from "./model/itemReadModel";
+import {
   setSpacesForItemArgsValidator,
   setSpacesForItemHandler,
   suggestItemsForSpaceArgsValidator,
   suggestItemsForSpaceHandler,
-} from "./model/itemProcessing";
+} from "./model/itemSuggestions";
 import {
   enrichmentValidator,
   failureReasonValidator,
@@ -60,6 +64,7 @@ import {
   productsStatusValidator,
 } from "./model/itemFields";
 
+/** Canonical item-intent and product validators re-exported for space return shapes. */
 export {
   intentKindValidator,
   intentValidator,
@@ -98,8 +103,7 @@ const itemFields = {
   searchText: v.string(),
 };
 
-// Exported so spaces.ts reuses the exact same shape — a second hand-written
-// copy is how `capturedAt`/`intents` drifted out of getSpace's validator.
+/** Canonical item return shape shared with spaces to prevent field drift. */
 export const enrichedItemValidator = v.object({
   ...itemFields,
   imageUrl: v.union(v.string(), v.null()),
@@ -116,6 +120,7 @@ const enrichedItemWithSpacesValidator = v.object({
   ),
 });
 
+/** Resolve an item's current storage URL at read time; persisted fields are unchanged. */
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
@@ -127,6 +132,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
 // Public queries
 // ---------------------------------------------------------------------------
 
+/** List the authenticated user's newest items, capped by the backend read limit. */
 export const listItems = query({
   args: {},
   returns: v.array(enrichedItemValidator),
@@ -141,6 +147,7 @@ export const listItems = query({
   },
 });
 
+/** Read one owned item with saved spaces; suggestions are deliberately excluded. */
 export const getItem = query({
   args: { id: v.id("items") },
   returns: v.union(enrichedItemWithSpacesValidator, v.null()),
@@ -171,6 +178,7 @@ export const getItem = query({
   },
 });
 
+/** Search the authenticated user's item text through the owner-filtered search index. */
 export const searchItems = query({
   args: { query: v.string() },
   returns: v.array(enrichedItemValidator),
@@ -206,6 +214,7 @@ function searchTokens(text: string): Set<string> {
   );
 }
 
+/** Rank owned ready items by lexical tag and search-text overlap. */
 export const similarItems = query({
   args: { id: v.id("items") },
   returns: v.array(enrichedItemValidator),
@@ -264,38 +273,45 @@ export const similarItems = query({
 // api.items.* and internal.items.* route remains stable. Implementations live
 // behind focused modules that own the import and operation state machines.
 
+/** Begin or resume a durable image import while preserving the public Convex route. */
 export const beginImageImport = mutation({
   args: beginImageImportArgsValidator.fields,
   returns: beginImageImportResultValidator,
   handler: beginImageImportHandler,
 });
 
+/** Attach uploaded storage to an image import while preserving the public Convex route. */
 export const attachImageUpload = mutation({
   args: attachImageUploadArgsValidator.fields,
   returns: attachImageUploadResultValidator,
   handler: attachImageUploadHandler,
 });
 
+/** Finalize one attached image upload into an item through the stable public route. */
 export const finalizeImageImport = mutation({
   args: finalizeImageImportArgsValidator.fields,
   returns: v.id("items"),
   handler: finalizeImageImportHandler,
 });
 
+/** Read durable image-import state without creating or refreshing its ledger row. */
 export const getImportOperation = query({
   args: getImportOperationArgsValidator.fields,
   returns: getImportOperationResultValidator,
   handler: getImportOperationHandler,
 });
 
+/** Public alias for the image-import cleanup age in milliseconds. */
 export const STALE_IMPORT_CUTOFF_MS = IMPORT_STALE_CUTOFF_MS;
 
+/** Reclaim one bounded page of abandoned image imports through the stable internal route. */
 export const cleanupStaleImageImports = internalMutation({
   args: {},
   returns: v.null(),
   handler: cleanupStaleImageImportsHandler,
 });
 
+/** Create an owned link item with optional durable operation idempotency. */
 export const createLinkItem = mutation({
   args: {
     url: v.string(),
@@ -325,6 +341,7 @@ export const createLinkItem = mutation({
   },
 });
 
+/** Create an owned note item with optional durable operation idempotency. */
 export const createNoteItem = mutation({
   args: {
     text: v.string(),
@@ -359,7 +376,7 @@ export const findLinks = mutation({
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
-      throw new Error("Item not found");
+      throw new Error("Find product links failed: Item not found");
     }
     if (item.status !== "ready" || item.productsStatus === "searching") {
       return null;
@@ -390,7 +407,7 @@ export const reprocessItem = mutation({
     await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
-      throw new Error("Item not found");
+      throw new Error("Reprocess item failed: Item not found");
     }
     const retryable =
       (item.status === "failed" && item.failureReason !== "not_found") ||
@@ -398,7 +415,10 @@ export const reprocessItem = mutation({
     if (!retryable) {
       return null;
     }
-    await rateLimiter.limit(ctx, "reprocessItem", { key: userId, throws: true });
+    await rateLimiter.limit(ctx, "reprocessItem", {
+      key: userId,
+      throws: true,
+    });
     await ctx.db.patch(args.id, {
       status: "processing",
       failureReason: undefined,
@@ -413,6 +433,7 @@ export const reprocessItem = mutation({
   },
 });
 
+/** Delete one owned item, its memberships, operation ledger rows, and stored image. */
 export const deleteItem = mutation({
   args: { id: v.id("items") },
   returns: v.null(),
@@ -420,7 +441,7 @@ export const deleteItem = mutation({
     const userId = await requireUserId(ctx);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
-      throw new Error("Item not found");
+      throw new Error("Delete item failed: Item not found");
     }
     const joins = await ctx.db
       .query("spaceItems")
@@ -455,54 +476,65 @@ export const deleteItem = mutation({
 // Internal AI collaborators — stable routes, focused implementations
 // ---------------------------------------------------------------------------
 
+/** Stable internal route for reading one item during background processing. */
 export const getItemInternal = internalQuery({
   args: getItemInternalArgsValidator.fields,
   returns: v.union(v.object(itemFields), v.null()),
   handler: getItemInternalHandler,
 });
 
+/** Stable internal route for listing an owner's newest ready items. */
 export const listReadyItemsInternal = internalQuery({
   args: listReadyItemsInternalArgsValidator.fields,
   returns: v.array(v.object(itemFields)),
   handler: listReadyItemsInternalHandler,
 });
 
+/** Stable internal route for persisting completed item classification. */
 export const finalizeItem = internalMutation({
   args: finalizeItemArgsValidator.fields,
   returns: v.null(),
   handler: finalizeItemHandler,
 });
 
+/** Stable internal route for finding stored images missing an aspect ratio. */
 export const listImagesNeedingRatioInternal = internalQuery({
   args: {},
-  returns: v.array(v.object({ _id: v.id("items"), storageId: v.id("_storage") })),
+  returns: v.array(
+    v.object({ _id: v.id("items"), storageId: v.id("_storage") }),
+  ),
   handler: listImagesNeedingRatioInternalHandler,
 });
 
+/** Stable internal route for persisting one computed image aspect ratio. */
 export const setAspectRatioInternal = internalMutation({
   args: setAspectRatioInternalArgsValidator.fields,
   returns: v.null(),
   handler: setAspectRatioInternalHandler,
 });
 
+/** Stable internal route for persisting product-search results and status. */
 export const setProductsInternal = internalMutation({
   args: setProductsInternalArgsValidator.fields,
   returns: v.null(),
   handler: setProductsInternalHandler,
 });
 
+/** Stable internal route for recording a categorized item-processing failure. */
 export const failItem = internalMutation({
   args: failItemArgsValidator.fields,
   returns: v.null(),
   handler: failItemHandler,
 });
 
+/** Stable internal route for applying classifier spaces without overwriting user choices. */
 export const setSpacesForItem = internalMutation({
   args: setSpacesForItemArgsValidator.fields,
   returns: v.null(),
   handler: setSpacesForItemHandler,
 });
 
+/** Stable internal route for adding recommendations without reviving dismissed items. */
 export const suggestItemsForSpace = internalMutation({
   args: suggestItemsForSpaceArgsValidator.fields,
   returns: v.null(),

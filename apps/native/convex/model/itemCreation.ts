@@ -5,7 +5,7 @@ import { rateLimiter } from "./rateLimiter";
 import { saveIntoSpace } from "./memberships";
 import {
   loadItemOperation,
-  requireOperationId,
+  parseOperationId,
   type OperationKind,
 } from "./itemOperations";
 
@@ -33,7 +33,7 @@ function validateLinkOrNotePayload(
 
 async function insertLinkOrNote(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: LinkOrNoteKind,
   payload: LinkOrNotePayload,
   spaceId?: Id<"spaces">,
@@ -61,7 +61,7 @@ async function insertLinkOrNote(
  */
 export async function createItemWithOperation(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: LinkOrNoteKind,
   payload: LinkOrNotePayload,
   options: {
@@ -73,13 +73,8 @@ export async function createItemWithOperation(
   validateLinkOrNotePayload(kind, payload);
 
   if (options.operationId !== undefined) {
-    requireOperationId(options.operationId);
-    const operation = await loadItemOperation(
-      ctx,
-      userId,
-      options.operationId,
-      kind,
-    );
+    const operationId = parseOperationId(options.operationId);
+    const operation = await loadItemOperation(ctx, userId, operationId, kind);
     if (operation !== null) {
       if (operation.status === "complete" && operation.itemId !== undefined) {
         const item = await ctx.db.get(operation.itemId);
@@ -105,7 +100,7 @@ export async function createItemWithOperation(
     if (operation === null) {
       await ctx.db.insert("itemOperations", {
         userId,
-        operationId: options.operationId,
+        operationId,
         kind,
         status: "complete",
         itemId,
