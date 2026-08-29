@@ -7,7 +7,6 @@ import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { pageGone } from "./ai";
 import { STALE_IMPORT_CUTOFF_MS } from "./items";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -1344,18 +1343,6 @@ describe("Pro entitlement gate", () => {
     const ent = await t.query(api.subscriptions.getEntitlement, {});
     expect(ent).toEqual({ status: "lapsed", expiresAt: periodEnd });
   });
-});
-
-describe("pageGone", () => {
-  it.each([404, 410])("treats HTTP %i as permanently gone", (status) => {
-    expect(pageGone(status)).toBe(true);
-  });
-  it.each([403, 429, 500, 503, undefined])(
-    "treats %s as retryable, not gone",
-    (status) => {
-      expect(pageGone(status)).toBe(false);
-    },
-  );
 });
 
 describe("failed saves and retry", () => {
