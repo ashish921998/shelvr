@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
 import { memo, useState } from 'react';
@@ -167,11 +167,11 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               style={styles.sourceRow}
               onPress={() => WebBrowser.openBrowserAsync(item.url!)}
             >
-              <Icon name="safari" size={15} tintColor={theme.colors.muted} />
+              <AppSymbolIcon name="safari" size={15} tintColor={theme.colors.muted} />
               <Text style={styles.sourceText}>
                 {item.siteName ?? displayHost(item.url)}
               </Text>
-              <Icon
+              <AppSymbolIcon
                 name="arrow.up.right"
                 size={11}
                 tintColor={theme.colors.faint}
@@ -222,7 +222,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               asChild
             >
               <Pressable style={styles.manageSpacesChip}>
-                <Icon name="plus" size={11} tintColor={theme.colors.primaryText} />
+                <AppSymbolIcon name="plus" size={11} tintColor={theme.colors.primaryText} />
                 <Text style={styles.manageSpacesLabel}>
                   {spaces.length > 0 ? 'Spaces' : 'Add to space'}
                 </Text>
@@ -314,7 +314,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
 
   return (
     <View style={styles.noticeRow}>
-      <Icon
+      <AppSymbolIcon
         name="exclamationmark.triangle.fill"
         size={14}
         tintColor={state === 'gone' ? theme.colors.faint : theme.colors.danger}
@@ -341,7 +341,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
           {retrying ? (
             <ActivityIndicator size="small" color={theme.colors.primaryText} />
           ) : (
-            <Icon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
+            <AppSymbolIcon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
           )}
           <Text style={styles.chipLabel}>Try again</Text>
         </Pressable>
@@ -396,7 +396,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
                 />
               ) : (
                 <View style={[styles.productImage, styles.productImageEmpty]}>
-                  <Icon name="bag" size={22} tintColor={theme.colors.faint} />
+                  <AppSymbolIcon name="bag" size={22} tintColor={theme.colors.faint} />
                 </View>
               )}
               <Text style={styles.productName} numberOfLines={2}>
@@ -441,7 +441,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
         {finding ? (
           <ActivityIndicator size="small" color={theme.colors.primaryText} />
         ) : (
-          <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="bag" size={14} tintColor={theme.colors.primaryText} />
         )}
         <Text style={styles.chipLabel}>
           {item.productsStatus === 'failed'

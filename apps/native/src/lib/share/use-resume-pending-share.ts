@@ -1,5 +1,5 @@
 import { decidePostAuthRoute } from '@/lib/share/pending-share';
-import { hasPendingShare } from '@/lib/share/pending-share-store';
+import { hasPendingShareOnDevice } from '@/lib/share/pending-share-store';
 import { useOnboarding } from '@/lib/onboarding';
 import { useConvexAuth } from 'convex/react';
 import { usePathname, useRouter } from 'expo-router';
@@ -28,7 +28,9 @@ export function useResumePendingShare(): void {
       navigatedRef.current = false;
       return;
     }
-    const href = decidePostAuthRoute({ hasPendingShare: hasPendingShare() });
+    const href = decidePostAuthRoute({
+      hasPendingShare: hasPendingShareOnDevice(),
+    });
     if (href !== '/share') {
       navigatedRef.current = false;
       return;

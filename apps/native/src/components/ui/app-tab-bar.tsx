@@ -1,4 +1,4 @@
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { Tabs, TabList, TabSlot, TabTrigger, type TabTriggerSlotProps } from 'expo-router/ui';
 import { forwardRef } from 'react';
 import { Pressable, Text, View, type View as NativeView } from 'react-native';
@@ -16,7 +16,10 @@ const tabs = [
 export const TAB_DOCK_HEIGHT = 64;
 export const TAB_DOCK_GAP = 12;
 
-const TabButton = forwardRef<NativeView, TabTriggerSlotProps & { label: string; icon: string }>(
+const TabButton = forwardRef<
+  NativeView,
+  TabTriggerSlotProps & { label: string; icon: AppSymbolName }
+>(
   function TabButton({ isFocused, label, icon, style: _style, ...props }, ref) {
     const { theme } = useUnistyles();
     return (
@@ -30,7 +33,7 @@ const TabButton = forwardRef<NativeView, TabTriggerSlotProps & { label: string; 
         {...props}
       >
         <View style={[styles.iconWell, isFocused && styles.iconWellActive]}>
-          <Icon
+          <AppSymbolIcon
             name={icon}
             size={21}
             weight={isFocused ? 'semibold' : 'medium'}

@@ -1,4 +1,4 @@
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
@@ -14,7 +14,7 @@ export function FeatureRow({
   message,
   delay,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   title: string;
   message: string;
   delay: number;
@@ -22,7 +22,7 @@ export function FeatureRow({
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={styles.feature}>
       <View style={styles.featureIcon}>
-        <Icon name={icon} size={20} tintColor={styles.featureIcon.tintColor} />
+        <AppSymbolIcon name={icon} size={20} tintColor={styles.featureIcon.tintColor} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.featureTitle}>{title}</Text>
@@ -39,7 +39,7 @@ export function PermissionButton({
   granted,
   onPress,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   label: string;
   granted: boolean;
   onPress: () => void;
@@ -53,7 +53,7 @@ export function PermissionButton({
         pressed && !granted && { opacity: 0.8 },
       ]}
     >
-      <Icon
+      <AppSymbolIcon
         name={granted ? 'checkmark.circle.fill' : icon}
         size={18}
         tintColor={granted ? styles.permissionGrantedText.color : styles.permissionText.color}

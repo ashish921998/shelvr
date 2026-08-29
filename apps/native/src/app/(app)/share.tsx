@@ -16,7 +16,7 @@ import {
   type ShareEntry,
   type ShareSession,
 } from '@/lib/share/storage';
-import { clearPendingShare } from '@/lib/share/pending-share-store';
+import { clearPendingShareOnDevice } from '@/lib/share/pending-share-store';
 import { useSaveImages } from '@/lib/use-save-image';
 import { analytics } from '@/lib/analytics';
 import { openPaywall, useEntitlement } from '@/lib/entitlement';
@@ -115,6 +115,7 @@ type Phase =
   | { kind: 'clearFailed'; session: ShareSession }
   | { kind: 'complete' };
 
+/** Receive, persist, and save one native share session with crash-safe retries. */
 export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -221,7 +222,7 @@ export default function ShareScreen() {
       // resume hook can't re-open /share after we land Home. Kept this late so
       // a process death mid-share still resumes on next launch.
       try {
-        clearPendingShare();
+        clearPendingShareOnDevice();
       } catch (err) {
         // The share is already complete; a SecureStore failure must not trap
         // the user on this screen or prevent navigation home.
@@ -426,7 +427,7 @@ export default function ShareScreen() {
     deleteSession(shareStore);
     // Explicit user discard — the deferred-share flag must not resurrect this.
     try {
-      clearPendingShare();
+      clearPendingShareOnDevice();
     } catch (err) {
       // Best-effort: abandoning the share must still clear native payloads and
       // leave the screen if SecureStore is temporarily unavailable.
@@ -468,11 +469,7 @@ export default function ShareScreen() {
           it to your hub.
         </Text>
         <View style={styles.actions}>
-          <Button
-            label="Cancel"
-            theme={theme}
-            onPress={() => abandon()}
-          />
+          <Button label="Cancel" theme={theme} onPress={() => abandon()} />
           <Button
             label="Unlock Pro"
             theme={theme}

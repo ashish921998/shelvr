@@ -7,7 +7,7 @@
 //
 // The contract the UI layer relies on, in plain terms:
 //
-//   1. fingerprint(rawPayloads) — a collision-free encoding of the current raw
+//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the current raw
 //      shared payload batch (order + duplicates included). Two distinct batches
 //      must never share a fingerprint, so a deliberate later re-share of
 //      identical content is its own fresh session rather than matching a stale
@@ -35,7 +35,6 @@ export interface SessionStoreAdapter {
   remove(key: string): void;
   contains(key: string): boolean;
 }
-
 /** One raw shared payload, as `useIncomingShare` exposes it. Only the fields
  * that contribute to identity are tracked, so the store has no compile-time
  * dependency on the (experimental, evolving) expo-sharing types. */
@@ -50,6 +49,7 @@ export type RawSharePayload = {
  * not import — it is reported, never silently coerced into a note. */
 export type ShareEntryKind = 'link' | 'note' | 'image' | 'unsupported';
 
+/** Persisted processing state for one entry in a native share session. */
 export type ShareEntryStatus = 'pending' | 'saved' | 'failed' | 'unsupported';
 
 /** A single resolved share entry plus its stable operation id and outcome. The
@@ -84,6 +84,7 @@ export type ShareSession = {
   entries: ShareEntry[];
 };
 
+/** Current persisted share-session schema version used to reject incompatible records. */
 export const SESSION_SCHEMA_VERSION = 1;
 
 /** The status/kind enums, centralized so loadSession can validate every entry
@@ -96,6 +97,7 @@ const ENTRY_STATUSES = new Set<ShareEntryStatus>([
 ]);
 const ENTRY_KINDS = new Set<ShareEntryKind>(['link', 'note', 'image', 'unsupported']);
 
+/** Device-storage key containing the active incoming share session. */
 export const SESSION_KEY = 'incoming-share-session';
 
 // ---------------------------------------------------------------------------
@@ -107,7 +109,7 @@ export const SESSION_KEY = 'incoming-share-session';
  * can collide across distinct batches (e.g. `"a|b"` vs `"a","b"`). Order and
  * duplicates are preserved so two identical entries in one batch stay distinct
  * and a re-ordering reads as a different batch (a new session). */
-export function fingerprint(rawPayloads: RawSharePayload[]): string {
+export function fingerprintSharePayloads(rawPayloads: RawSharePayload[]): string {
   // Sort object keys for determinism: an undefined mimeType serialized as
   // {mimeType: undefined} vs {mimeType omitted} must not flip the fingerprint.
   const normalized = rawPayloads.map((p) => ({
@@ -197,6 +199,7 @@ export function operationIdFor(sessionId: string, index: number): string {
 // Reconciliation
 // ---------------------------------------------------------------------------
 
+/** Outcome of reconciling native payloads with a persisted share session. */
 export type ReconcileResult =
   | { kind: 'empty' }
   | { kind: 'new'; session: ShareSession }
@@ -231,7 +234,7 @@ export function reconcileSession(
     return { kind: 'empty' };
   }
 
-  const currentFp = fingerprint(rawPayloads);
+  const currentFp = fingerprintSharePayloads(rawPayloads);
   const existing = loadSession(store);
 
   // A session from a different user, or no session at all: start fresh. The

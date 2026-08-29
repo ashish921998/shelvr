@@ -1,5 +1,5 @@
 import { ItemCard, type FeedItem } from '@/components/item-card';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { convexQuery } from '@convex-dev/react-query';
@@ -275,7 +275,7 @@ function DemoReveal({
       <View style={styles.footer}>
         <Pressable style={styles.skipRow} onPress={onAdvance}>
           <Text style={styles.continueText}>Continue</Text>
-          <Icon name="chevron.right" size={14} tintColor={theme.colors.primary} />
+          <AppSymbolIcon name="chevron.right" size={14} tintColor={theme.colors.primary} />
         </Pressable>
       </View>
     </View>

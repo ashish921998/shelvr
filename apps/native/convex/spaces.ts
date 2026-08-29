@@ -61,6 +61,7 @@ async function loadItems(
 // Public queries
 // ---------------------------------------------------------------------------
 
+/** List owned spaces with saved-item previews and separate suggestion counts. */
 export const listSpaces = query({
   args: {},
   returns: v.array(
@@ -72,7 +73,11 @@ export const listSpaces = query({
       previews: v.array(
         v.object({
           url: v.string(),
-          type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
+          type: v.union(
+            v.literal("image"),
+            v.literal("link"),
+            v.literal("note"),
+          ),
           aspectRatio: v.optional(v.number()),
           suggested: v.boolean(),
         }),
@@ -140,6 +145,7 @@ export const listSpaces = query({
   },
 });
 
+/** Read one owned space with saved and suggested items kept separate. */
 export const getSpace = query({
   args: { id: v.id("spaces") },
   returns: v.union(
@@ -188,6 +194,7 @@ export const getSpace = query({
 // Public mutations
 // ---------------------------------------------------------------------------
 
+/** Create one idempotently named owned space and schedule its first recommendation pass. */
 export const createSpace = mutation({
   args: {
     name: v.string(),
@@ -199,7 +206,7 @@ export const createSpace = mutation({
     const userId = await requireUserId(ctx);
     const name = args.name.trim();
     if (name === "") {
-      throw new Error("Space name is empty");
+      throw new Error("Create space validation failed: Space name is empty");
     }
 
     // Onboarding replay may retry after a process death. Treat the user's
@@ -231,6 +238,7 @@ export const createSpace = mutation({
   },
 });
 
+/** Update an owned space and recommend items when dynamic suggestions become enabled. */
 export const updateSpace = mutation({
   args: {
     id: v.id("spaces"),
@@ -242,7 +250,7 @@ export const updateSpace = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
+      throw new Error("Update space failed: Space not found");
     }
     const wasDynamic = space.dynamic === true;
     // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
@@ -257,7 +265,7 @@ export const updateSpace = mutation({
     if (args.name !== undefined) {
       const name = args.name.trim();
       if (name === "") {
-        throw new Error("Space name is empty");
+        throw new Error("Update space validation failed: Space name is empty");
       }
       patch.name = name;
     }
@@ -275,6 +283,7 @@ export const updateSpace = mutation({
   },
 });
 
+/** Delete an owned space and all of its item membership rows. */
 export const deleteSpace = mutation({
   args: { id: v.id("spaces") },
   returns: v.null(),
@@ -282,7 +291,7 @@ export const deleteSpace = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
+      throw new Error("Delete space failed: Space not found");
     }
     const joins = await ctx.db
       .query("spaceItems")
@@ -305,11 +314,11 @@ async function requireItemAndSpace(
 ): Promise<{ item: Doc<"items">; space: Doc<"spaces"> }> {
   const item = await ctx.db.get(itemId);
   if (item === null || item.userId !== userId) {
-    throw new Error("Item not found");
+    throw new Error("Space membership validation failed: Item not found");
   }
   const space = await ctx.db.get(spaceId);
   if (space === null || space.userId !== userId) {
-    throw new Error("Space not found");
+    throw new Error("Space membership validation failed: Space not found");
   }
   return { item, space };
 }
@@ -328,6 +337,7 @@ async function scheduleSteering(
   }
 }
 
+/** Save an owned item into an owned space and schedule purpose steering when ready. */
 export const addItemToSpace = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
@@ -358,6 +368,7 @@ export const addItemToSpace = mutation({
   },
 });
 
+/** Remove one saved item membership without creating a dismissed suggestion row. */
 export const removeItemFromSpace = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
@@ -372,6 +383,7 @@ export const removeItemFromSpace = mutation({
   },
 });
 
+/** Promote one suggested item membership to a user-owned saved membership. */
 export const acceptSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   // True only when a live suggestion actually flipped to saved, so the client
@@ -396,6 +408,7 @@ export const acceptSuggestion = mutation({
   },
 });
 
+/** Preserve one rejected suggestion as dismissed so AI cannot revive it. */
 export const dismissSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   // True only when a live suggestion actually flipped to dismissed.
@@ -413,6 +426,7 @@ export const dismissSuggestion = mutation({
   },
 });
 
+/** Promote every current suggestion in one owned space to saved membership. */
 export const acceptAllSuggestions = mutation({
   args: { spaceId: v.id("spaces") },
   // The number of suggestions actually accepted, so analytics report the real
@@ -422,7 +436,7 @@ export const acceptAllSuggestions = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) {
-      throw new Error("Space not found");
+      throw new Error("Accept all suggestions failed: Space not found");
     }
     const { suggested } = await splitJoins(ctx, space._id);
     for (const row of suggested) {
@@ -440,6 +454,7 @@ export const acceptAllSuggestions = mutation({
 // Internal — used by the AI actions
 // ---------------------------------------------------------------------------
 
+/** List an owner's spaces for internal item classification. */
 export const listSpacesInternal = internalQuery({
   args: { userId: v.string() },
   returns: v.array(v.object(spaceFields)),
@@ -451,6 +466,7 @@ export const listSpacesInternal = internalQuery({
   },
 });
 
+/** Read one space without public owner filtering for internal AI work. */
 export const getSpaceInternal = internalQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(v.object(spaceFields), v.null()),

@@ -1,6 +1,6 @@
 import { CtaButton } from '@/components/onboarding/parts';
 import { ItemCard, type FeedItem } from '@/components/item-card';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -43,7 +43,7 @@ export function ReadyStep({
       )}
 
       <Animated.View entering={FadeInDown.delay(280).duration(400)} style={styles.tip}>
-        <Icon name="square.and.arrow.up" size={16} tintColor={theme.colors.muted} />
+        <AppSymbolIcon name="square.and.arrow.up" size={16} tintColor={theme.colors.muted} />
         <Text style={styles.tipText}>Save from any app with the share sheet.</Text>
       </Animated.View>
 

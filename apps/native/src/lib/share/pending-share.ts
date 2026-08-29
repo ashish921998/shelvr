@@ -10,24 +10,25 @@
 
 export const PENDING_SHARE_KEY = 'shelvr.pending.share';
 
+/** Synchronous key-value capability required by pure pending-share rules. */
 export interface PendingShareStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
 
 /** Marks that a share is waiting to be resumed after onboarding/auth. */
-export function markPendingShare(store: PendingShareStore): void {
+export function markPendingShareInStore(store: PendingShareStore): void {
   store.setItem(PENDING_SHARE_KEY, '1');
 }
 
 /** True when a share was deferred and has not yet been consumed. */
-export function hasPendingShare(store: PendingShareStore): boolean {
+export function hasPendingShareInStore(store: PendingShareStore): boolean {
   const value = store.getItem(PENDING_SHARE_KEY);
   return value === '1';
 }
 
 /** Drops any pending share flag without resuming (e.g. user cancelled). */
-export function clearPendingShare(store: PendingShareStore): void {
+export function clearPendingShareInStore(store: PendingShareStore): void {
   store.setItem(PENDING_SHARE_KEY, '');
 }
 
@@ -45,6 +46,7 @@ export type ShareRouteDecision =
   | { action: 'defer-onboarding'; markPending: true }
   | { action: 'defer-sign-in'; markPending: true; href: '/(auth)/sign-in' };
 
+/** Choose the initial route for an incoming share and whether it must be deferred. */
 export function decideShareRoute(state: {
   onboarded: boolean;
   isAuthenticated: boolean;

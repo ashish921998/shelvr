@@ -1,5 +1,5 @@
 import { EmptyState } from '@/components/empty-state';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { MasonryFeed } from '@/components/masonry-feed';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
@@ -41,7 +41,7 @@ export default function SearchScreen() {
         />
       ) : (
         <View style={styles.searchField}>
-          <Icon name="magnifyingglass" size={20} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="magnifyingglass" size={20} tintColor={theme.colors.muted} />
           <TextInput
             value={search}
             onChangeText={setSearch}

@@ -11,7 +11,7 @@ import { useMutation } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { Alert, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -185,7 +185,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
             ) : (
               <View style={[styles.textFace, item.type === 'note' && styles.noteFace]}>
                 {item.type === 'link' && (
-                  <Icon
+                  <AppSymbolIcon
                     name="link"
                     size={13}
                     tintColor={theme.colors.faint}
@@ -208,7 +208,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                     <Text style={styles.captionHost} numberOfLines={1}>
                       {displayHost(item.url)}
                     </Text>
-                    <Icon
+                    <AppSymbolIcon
                       name="arrow.up.right"
                       size={9}
                       tintColor={theme.colors.faint}
@@ -222,7 +222,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                 actions={menuActions}
                 style={styles.menuButton}
               >
-                <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
+                <AppSymbolIcon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
               </ActionMenu>
             </View>
 
@@ -253,7 +253,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                 {item.status === 'processing' ? (
                   <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Icon
+                  <AppSymbolIcon
                     name="exclamationmark.triangle.fill"
                     size={13}
                     tintColor={theme.colors.danger}

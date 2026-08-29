@@ -1,4 +1,9 @@
-import { SymbolView } from 'expo-symbols';
+import {
+  SymbolView,
+  type AndroidSymbol,
+  type SFSymbol,
+  type SymbolViewProps,
+} from 'expo-symbols';
 import { Platform } from 'react-native';
 
 /**
@@ -9,7 +14,7 @@ import { Platform } from 'react-native';
  * Any SF Symbol not in this map will fall back to 'circle' on Android
  * (a neutral placeholder) rather than rendering nothing.
  */
-const SF_TO_MATERIAL: Record<string, string> = {
+const SF_TO_MATERIAL = {
   // Generic UI
   'xmark': 'close',
   'checkmark': 'check',
@@ -68,7 +73,10 @@ const SF_TO_MATERIAL: Record<string, string> = {
   'arrow.up': 'arrow_upward',
   'doc.text': 'description',
   'arrow.triangle.2.circlepath.camera': 'cameraswitch',
-};
+} as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
+
+/** SF Symbol names with an explicit cross-platform Material fallback. */
+export type AppSymbolName = keyof typeof SF_TO_MATERIAL;
 
 /**
  * Resolves an SF Symbol name to the cross-platform format that
@@ -77,7 +85,7 @@ const SF_TO_MATERIAL: Record<string, string> = {
  * On iOS, the original SF Symbol name is used.
  * On Android, the mapped Material Symbols name (or 'circle' fallback).
  */
-export function resolveSymbolName(sfName: string) {
+export function resolveSymbolName(sfName: AppSymbolName): SymbolViewProps['name'] {
   if (Platform.OS === 'ios') {
     return sfName;
   }
@@ -90,22 +98,22 @@ export function resolveSymbolName(sfName: string) {
  * A drop-in replacement for SymbolView that works on both platforms.
  * Pass any SF Symbol name; on Android it renders the Material equivalent.
  */
-export function Icon({
+export function AppSymbolIcon({
   name,
   size = 24,
   tintColor,
   weight,
   style,
 }: {
-  name: string;
+  name: AppSymbolName;
   size?: number;
   tintColor?: string;
-  weight?: 'thin' | 'light' | 'regular' | 'medium' | 'semibold' | 'bold' | 'heavy' | 'black';
-  style?: React.ComponentProps<typeof SymbolView>['style'];
+  weight?: SymbolViewProps['weight'];
+  style?: SymbolViewProps['style'];
 }) {
   return (
     <SymbolView
-      name={resolveSymbolName(name) as any}
+      name={resolveSymbolName(name)}
       size={size}
       tintColor={tintColor}
       weight={weight}

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { capture } from "@/lib/analytics";
+import { captureWebAnalyticsEvent } from "@/lib/analytics";
 
 type WaitlistFormProps = {
   source: "hero" | "preview" | "footer";
@@ -11,6 +11,7 @@ type WaitlistFormProps = {
   accent?: boolean;
 };
 
+/** Submit a marketing waitlist signup and capture full literal analytics events. */
 export default function WaitlistForm({
   source,
   variant = "waitlist",
@@ -30,7 +31,7 @@ export default function WaitlistForm({
 
     setStatus("loading");
     setMessage("");
-    capture("waitlist_form_submitted", { source, variant });
+    captureWebAnalyticsEvent("waitlist_form_submitted", { source, variant });
 
     try {
       const response = await fetch("/api/waitlist", {
@@ -51,13 +52,13 @@ export default function WaitlistForm({
       setStatus("success");
       setMessage("You’re on the shelf. We’ll email you when iOS is ready.");
       form.reset();
-      capture("waitlist_joined", { source, variant });
+      captureWebAnalyticsEvent("waitlist_joined", { source, variant });
     } catch (error) {
       setStatus("error");
       setMessage(
         error instanceof Error ? error.message : "Could not join right now.",
       );
-      capture("waitlist_signup_failed", { source, variant });
+      captureWebAnalyticsEvent("waitlist_signup_failed", { source, variant });
     }
   }
 

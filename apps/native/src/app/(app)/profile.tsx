@@ -14,7 +14,7 @@ import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -192,7 +192,7 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <Icon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
           {user?.email ?? 'Signed in'}
@@ -208,9 +208,9 @@ export default function ProfileScreen() {
         disabled={loading}
         onPress={manageSubscription}
       >
-        <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
+        <AppSymbolIcon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
         <Text style={styles.proLabel}>{proLabel}</Text>
-        <Icon name="chevron.right" size={16} tintColor={theme.colors.muted} />
+        <AppSymbolIcon name="chevron.right" size={16} tintColor={theme.colors.muted} />
       </Pressable>
 
       <View style={styles.linkGroup}>
@@ -219,7 +219,7 @@ export default function ProfileScreen() {
           onPress={() => openExternal(SUPPORT_URL)}
         >
           <Text style={styles.linkLabel}>Contact Support</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [
@@ -233,21 +233,21 @@ export default function ProfileScreen() {
           <Text style={styles.linkLabel}>
             {restoring ? 'Restoring Purchases…' : 'Restore Purchases'}
           </Text>
-          <Icon name="arrow.clockwise" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.clockwise" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.terms)}
         >
           <Text style={styles.linkLabel}>Terms of Service</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.privacy)}
         >
           <Text style={styles.linkLabel}>Privacy Policy</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
       </View>
 

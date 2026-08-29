@@ -1,5 +1,5 @@
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { type FC } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
@@ -57,7 +57,7 @@ const Tint: FC<{ direction: Direction; color: string }> = ({ direction, color })
 type BadgeProps = {
   direction: Direction;
   label: string;
-  icon: string;
+  icon: AppSymbolName;
   accentColor: string;
 };
 
@@ -112,10 +112,10 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
         </Canvas>
         <View style={styles.badgeIconStack}>
           <Animated.View style={styles.badgeIcon}>
-            <Icon name={icon} size={ICON_SIZE} tintColor="white" />
+            <AppSymbolIcon name={icon} size={ICON_SIZE} tintColor="white" />
           </Animated.View>
           <Animated.View style={[styles.badgeIcon, rAccentIconStyle]}>
-            <Icon name={icon} size={ICON_SIZE} tintColor={accentColor} />
+            <AppSymbolIcon name={icon} size={ICON_SIZE} tintColor={accentColor} />
           </Animated.View>
         </View>
       </Animated.View>
