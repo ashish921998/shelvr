@@ -8,6 +8,7 @@ import { decodeWithContentType, safeFetch } from "./safeFetch";
 
 const MAX_STORED_CONTENT_CHARS = 100000;
 
+/** Parsed page metadata and readable content, excluding fetch outcome state. */
 export type PageData = {
   title?: string;
   description?: string;
@@ -17,6 +18,7 @@ export type PageData = {
   content?: string;
 };
 
+/** Discriminated page-read outcome separating success, terminal absence, and retryable failure. */
 export type PageRead =
   | { status: "ok"; page: PageData }
   | { status: "gone"; error: PageFetchError }
