@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 
+/** Effective ownership state of one item-to-space membership. */
 export type MembershipStatus = "suggested" | "saved" | "dismissed";
 
 /**
@@ -23,4 +24,26 @@ export async function getMembership(
     .withIndex("by_item", (q) => q.eq("itemId", itemId))
     .collect();
   return rows.find((row) => row.spaceId === spaceId) ?? null;
+}
+
+/**
+ * File an item into an explicitly selected space as a user-owned membership.
+ * This is the canonical write path shared by every item creation mechanism.
+ */
+export async function saveIntoSpace(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  itemId: Id<"items">,
+  spaceId: Id<"spaces">,
+): Promise<void> {
+  const space = await ctx.db.get(spaceId);
+  if (space === null || space.userId !== userId) {
+    throw new Error("Save item into space failed: Space not found");
+  }
+  await ctx.db.insert("spaceItems", {
+    userId,
+    spaceId,
+    itemId,
+    status: "saved",
+  });
 }

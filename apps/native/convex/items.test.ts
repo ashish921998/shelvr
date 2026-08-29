@@ -15,7 +15,6 @@ import { STALE_IMPORT_CUTOFF_MS } from "./items";
 // identity-scoped test backend.
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-
 // A representative operation id (UUID-shaped, within the 8–200 char bound).
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
 const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
@@ -699,12 +698,12 @@ describe("image import lifecycle", () => {
     const t = await as("user-a");
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: "short" }),
-    ).rejects.toThrow(/Invalid operationId/i);
+    ).rejects.toThrow(/Operation ID validation failed/i);
     await expect(
       t.mutation(api.items.beginImageImport, {
         operationId: "x".repeat(201),
       }),
-    ).rejects.toThrow(/Invalid operationId/i);
+    ).rejects.toThrow(/Operation ID validation failed/i);
   });
 
   it("rejects finalize when the operation was never begun or never attached", async () => {
@@ -982,13 +981,13 @@ describe("shared link/note operation idempotency", () => {
         url: "example.com",
         operationId: "short",
       }),
-    ).rejects.toThrow(/Invalid operationId/i);
+    ).rejects.toThrow(/Operation ID validation failed/i);
     await expect(
       t.mutation(api.items.createNoteItem, {
         text: "x",
         operationId: "x".repeat(201),
       }),
-    ).rejects.toThrow(/Invalid operationId/i);
+    ).rejects.toThrow(/Operation ID validation failed/i);
   });
 
   it("rejects empty note text on the idempotent path without completing the op", async () => {
