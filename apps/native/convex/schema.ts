@@ -4,6 +4,11 @@ import { v } from "convex/values";
 import {
   enrichmentValidator,
   failureReasonValidator,
+  intentValidator,
+  itemStatusValidator,
+  itemTypeValidator,
+  productValidator,
+  productsStatusValidator,
 } from "./model/itemFields";
 
 export default defineSchema({
@@ -17,12 +22,8 @@ export default defineSchema({
 
   items: defineTable({
     userId: v.string(),
-    type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
-    status: v.union(
-      v.literal("processing"),
-      v.literal("ready"),
-      v.literal("failed"),
-    ),
+    type: itemTypeValidator,
+    status: itemStatusValidator,
     title: v.optional(v.string()),
     description: v.optional(v.string()),
     url: v.optional(v.string()),
@@ -41,45 +42,12 @@ export default defineSchema({
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is a closed union (mirrors items.ts).
-    intents: v.optional(
-      v.array(
-        v.object({
-          kind: v.union(
-            v.literal("open_url"),
-            v.literal("copy"),
-            v.literal("web_search"),
-            v.literal("open_maps"),
-            v.literal("call"),
-            v.literal("email"),
-            v.literal("message"),
-            v.literal("add_event"),
-          ),
-          label: v.string(),
-          value: v.string(),
-        }),
-      ),
-    ),
+    intents: v.optional(v.array(intentValidator)),
     // Real product results from the user-triggered "Find links" pass
     // (SerpAPI Google Shopping). `productsStatus` tracks the in-flight action
     // so the button can show progress; absent = never searched.
-    products: v.optional(
-      v.array(
-        v.object({
-          title: v.string(),
-          url: v.string(),
-          price: v.optional(v.string()),
-          merchant: v.optional(v.string()),
-          thumbnailUrl: v.optional(v.string()),
-        }),
-      ),
-    ),
-    productsStatus: v.optional(
-      v.union(
-        v.literal("searching"),
-        v.literal("ready"),
-        v.literal("failed"),
-      ),
-    ),
+    products: v.optional(v.array(productValidator)),
+    productsStatus: v.optional(productsStatusValidator),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with
     // `status: "failed"`; absent on pre-existing failed rows.
@@ -131,24 +99,7 @@ export default defineSchema({
     // Purpose-steered actions scoped to THIS space's membership: the same
     // couch gets a shopping link in "apartment shopping" and nothing extra in
     // "interior design". Mirrors items.intents; kinds kept in sync with items.ts.
-    intents: v.optional(
-      v.array(
-        v.object({
-          kind: v.union(
-            v.literal("open_url"),
-            v.literal("copy"),
-            v.literal("web_search"),
-            v.literal("open_maps"),
-            v.literal("call"),
-            v.literal("email"),
-            v.literal("message"),
-            v.literal("add_event"),
-          ),
-          label: v.string(),
-          value: v.string(),
-        }),
-      ),
-    ),
+    intents: v.optional(v.array(intentValidator)),
   })
     .index("by_space", ["spaceId"])
     .index("by_item", ["itemId"])
