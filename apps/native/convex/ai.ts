@@ -7,15 +7,10 @@ import type { Id } from "./_generated/dataModel";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { Readability } from "@mozilla/readability";
-import { parseHTML } from "linkedom";
-import {
-  safeFetch,
-  decodeWithContentType,
-  parseJson,
-  isSafeFetchError,
-  type SafeFetchError,
-} from "./model/safeFetch";
+import { safeFetch, parseJson } from "./model/safeFetch";
+import { summarizeExternalError } from "./model/externalErrors";
+import { readImageSize } from "./model/imageDimensions";
+import { readPage, type PageData } from "./model/pageRead";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
@@ -58,482 +53,6 @@ const INTENTS_PROMPT_BLOCK = [
 // How much extracted text to feed the classifier. The model only needs enough
 // to understand the piece — it doesn't read the whole thing.
 const MAX_CONTENT_CHARS = 8000;
-// How much of the article body to store & render. Kept well under Convex's
-// 1MB document limit; long-form essays run tens of thousands of chars.
-const MAX_STORED_CONTENT_CHARS = 100000;
-
-// ---------------------------------------------------------------------------
-// HTML extraction
-// ---------------------------------------------------------------------------
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&#(\d+);/g, (_, code) => {
-      const n = Number(code);
-      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
-        ? String.fromCodePoint(n)
-        : "";
-    })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
-      const n = parseInt(code, 16);
-      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
-        ? String.fromCodePoint(n)
-        : "";
-    })
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    .replace(/&hellip;/g, "…")
-    .replace(/&rsquo;/g, "’")
-    .replace(/&lsquo;/g, "‘")
-    .replace(/&rdquo;/g, "”")
-    .replace(/&ldquo;/g, "“");
-}
-
-/** Find the content of a meta tag by property/name, tolerant of attribute order. */
-function extractMetaContent(html: string, key: string): string | undefined {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(
-      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*["']([^"']*)["'][^>]*>`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]*content\\s*=\\s*["']([^"']*)["'][^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
-      "i",
-    ),
-  ];
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match && match[1].trim() !== "") {
-      return decodeEntities(match[1].trim());
-    }
-  }
-  return undefined;
-}
-
-/**
- * Read the pixel dimensions straight from an image file's header bytes.
- * Covers PNG, GIF, WebP (VP8/VP8L/VP8X) and JPEG — no dependencies. Returns
- * undefined for formats we don't recognize or truncated buffers.
- */
-function readImageSize(
-  buf: Uint8Array,
-): { width: number; height: number } | undefined {
-  // PNG — IHDR width/height are big-endian uint32 at offset 16/20.
-  if (
-    buf.length >= 24 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47
-  ) {
-    const width = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
-    const height = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
-    return { width, height };
-  }
-  // GIF — little-endian uint16 at offset 6/8.
-  if (buf.length >= 10 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
-    return { width: buf[6] | (buf[7] << 8), height: buf[8] | (buf[9] << 8) };
-  }
-  // WebP — RIFF container tagged "WEBP", three sub-formats.
-  if (
-    buf.length >= 30 &&
-    buf[0] === 0x52 &&
-    buf[1] === 0x49 &&
-    buf[2] === 0x46 &&
-    buf[3] === 0x46 &&
-    buf[8] === 0x57 &&
-    buf[9] === 0x45 &&
-    buf[10] === 0x42 &&
-    buf[11] === 0x50
-  ) {
-    const fourCC = String.fromCharCode(buf[12], buf[13], buf[14], buf[15]);
-    if (fourCC === "VP8 ") {
-      const width = (buf[26] | (buf[27] << 8)) & 0x3fff;
-      const height = (buf[28] | (buf[29] << 8)) & 0x3fff;
-      return { width, height };
-    }
-    if (fourCC === "VP8L") {
-      const b0 = buf[21];
-      const b1 = buf[22];
-      const b2 = buf[23];
-      const b3 = buf[24];
-      const width = 1 + (((b1 & 0x3f) << 8) | b0);
-      const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
-      return { width, height };
-    }
-    if (fourCC === "VP8X") {
-      const width = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
-      const height = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
-      return { width, height };
-    }
-  }
-  // JPEG — walk segments to the start-of-frame marker.
-  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8) {
-    let offset = 2;
-    while (offset + 9 < buf.length) {
-      if (buf[offset] !== 0xff) {
-        offset++;
-        continue;
-      }
-      const marker = buf[offset + 1];
-      if (
-        (marker >= 0xc0 && marker <= 0xc3) ||
-        (marker >= 0xc5 && marker <= 0xc7) ||
-        (marker >= 0xc9 && marker <= 0xcb) ||
-        (marker >= 0xcd && marker <= 0xcf)
-      ) {
-        const height = (buf[offset + 5] << 8) | buf[offset + 6];
-        const width = (buf[offset + 7] << 8) | buf[offset + 8];
-        return { width, height };
-      }
-      const segLen = (buf[offset + 2] << 8) | buf[offset + 3];
-      if (segLen <= 0) {
-        break;
-      }
-      offset += 2 + segLen;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Fetch just enough of a metadata image to read its real width/height ratio.
- * Best-effort: any policy/transport failure returns no ratio and the caller
- * falls back to a sensible default. Routes through the safe fetcher so the
- * destination is policy-checked and the body is hard-capped at 128 KiB even if
- * the server ignores Range.
- */
-async function fetchImageAspectRatio(
-  imageUrl: string,
-): Promise<number | undefined> {
-  const result = await safeFetch(imageUrl, {
-    timeoutMs: 10000,
-    // Header bytes live at the front; 128 KiB covers large EXIF blocks. The
-    // safe fetcher enforces this cap on actual streamed bytes regardless of
-    // what the server sends, so a Range-ignoring server still cannot exhaust us.
-    maxBytes: 131072,
-    // Allow only the raster types readImageSize parses (PNG/GIF/WebP/JPEG).
-    // SVG is intentionally excluded: it is XML and can carry scripts/XXE, and
-    // readImageSize returns undefined for it anyway. ct is already lowercased
-    // by the safe fetcher.
-    allowContentType: (ct) =>
-      ct === "image/png" ||
-      ct === "image/gif" ||
-      ct === "image/webp" ||
-      ct === "image/jpeg" ||
-      ct.startsWith("image/png;") ||
-      ct.startsWith("image/gif;") ||
-      ct.startsWith("image/webp;") ||
-      ct.startsWith("image/jpeg;"),
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Range: "bytes=0-131071",
-    },
-  });
-  if (!result.ok) {
-    // A blocked or oversized hero image is best-effort — no aspect ratio.
-    return undefined;
-  }
-  const size = readImageSize(result.bytes);
-  if (size && size.width > 0 && size.height > 0) {
-    return size.width / size.height;
-  }
-  return undefined;
-}
-
-function extractTitle(html: string): string | undefined {
-  const ogTitle = extractMetaContent(html, "og:title");
-  if (ogTitle) {
-    return ogTitle;
-  }
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (match) {
-    const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
-    if (title !== "") {
-      return title;
-    }
-  }
-  return undefined;
-}
-
-/** Strip whole elements (including content) for the given tag names. */
-function stripElements(html: string, tags: string[]): string {
-  let out = html;
-  for (const tag of tags) {
-    out = out.replace(
-      new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi"),
-      " ",
-    );
-  }
-  return out;
-}
-
-function htmlToText(html: string): string {
-  let text = html;
-  // Block-level boundaries become paragraph breaks.
-  text = text.replace(/<\/(p|div|section|h[1-6]|li|blockquote|tr|figcaption|pre)>/gi, "\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<li[^>]*>/gi, "- ");
-  // Drop every remaining tag.
-  text = text.replace(/<[^>]+>/g, " ");
-  text = decodeEntities(text);
-  // Collapse intra-line whitespace, keep paragraph breaks.
-  text = text
-    .split(/\n{2,}/)
-    .map((para) => para.replace(/[ \t]+/g, " ").replace(/\n/g, " ").trim())
-    .filter((para) => para !== "")
-    .join("\n\n");
-  return text.slice(0, MAX_STORED_CONTENT_CHARS);
-}
-
-/**
- * Fallback extractor: crude tag-scoping + tag-stripping. Only used when
- * Readability can't isolate an article (e.g. malformed markup). It leaks page
- * chrome (nav menus, share counts, captions) on many sites, which is exactly
- * why Readability is preferred.
- */
-function extractBodyTextRegex(html: string): string {
-  let scope = html;
-  const article = html.match(/<article[\s\S]*?<\/article>/i);
-  if (article) {
-    scope = article[0];
-  } else {
-    const main = html.match(/<main[\s\S]*?<\/main>/i);
-    if (main) {
-      scope = main[0];
-    } else {
-      const body = html.match(/<body[\s\S]*<\/body>/i);
-      if (body) {
-        scope = body[0];
-      }
-    }
-  }
-  scope = stripElements(scope, [
-    "script",
-    "style",
-    "noscript",
-    "svg",
-    "nav",
-    "header",
-    "footer",
-    "aside",
-    "form",
-    "iframe",
-    "template",
-  ]);
-  scope = scope.replace(/<!--[\s\S]*?-->/g, " ");
-  return htmlToText(scope);
-}
-
-/**
- * Extract the readable article body. Mozilla Readability (the engine behind
- * Firefox Reader View) scores DOM blocks by text density and link ratio to
- * isolate the real article, discarding nav, ads, share widgets, comment
- * counts, captions, and other boilerplate — so it works across arbitrary
- * article pages rather than one site's markup. We feed its cleaned article
- * HTML through htmlToText to get the paragraph-separated plain text the client
- * renders. Falls back to the regex extractor if Readability finds nothing
- * (e.g. non-article pages or JS-rendered shells with no server-side content).
- */
-function extractBodyText(html: string, url: string): string {
-  try {
-    const { document } = parseHTML(html);
-    // Give Readability a base URL so it can resolve/keep links correctly.
-    try {
-      const base = document.createElement("base");
-      base.setAttribute("href", url);
-      document.head?.appendChild(base);
-    } catch {
-      // Non-fatal — Readability still parses without a <base>.
-    }
-    const article = new Readability(document).parse();
-    if (article?.content) {
-      const text = htmlToText(article.content);
-      if (text.trim() !== "") {
-        return text;
-      }
-    }
-  } catch {
-    // Fall through to the regex extractor below.
-  }
-  return extractBodyTextRegex(html);
-}
-
-type PageData = {
-  title?: string;
-  description?: string;
-  heroImageUrl?: string;
-  heroAspectRatio?: number;
-  siteName?: string;
-  content?: string;
-};
-
-/**
- * Thrown when the page could not be read through the safe-fetch policy: the
- * resource may be blocked by policy, refused, or simply gone. Carries only a
- * stable code (never the URL, addresses, or response body) so callers can log
- * a sanitized category. A failed primary page fetch is a CORE processing
- * problem, unlike a blocked best-effort hero image.
- */
-class PageFetchError extends Error {
-  constructor(
-    public readonly code: SafeFetchError,
-    /** HTTP status when `code` is `http_error`. Feeds `pageGone`. */
-    public readonly status?: number,
-  ) {
-    super(`page fetch failed: ${code}`);
-    this.name = "PageFetchError";
-  }
-}
-
-function isPageFetchError(e: unknown): e is PageFetchError {
-  return e instanceof PageFetchError;
-}
-
-/** True when the page will never be readable: the resource is gone (404/410).
- * Such an item must NOT be classified from its URL alone — the model would
- * invent content from the slug. Exported pure for unit testing. */
-export function pageGone(status: number | undefined): boolean {
-  return status === 404 || status === 410;
-}
-
-/**
- * Reduce a caught error to a safe log category. Fetch-policy errors expose only
- * their stable code; anything else retains the error's constructor name (e.g.
- * TypeError) for observability without leaking data — never the error's message
- * or cause, which may carry a URL, response body, or resolved address.
- */
-function summarizeError(error: unknown): string {
-  if (isPageFetchError(error)) {
-    return `page_fetch_error:${error.code}`;
-  }
-  // Defensive: safeFetch returns error codes in its result type and never
-  // throws SafeFetchErrorClass itself, but if a future caller uses the
-  // throwing variant directly this branch ensures the error is summarized.
-  if (isSafeFetchError(error)) {
-    return `safe_fetch:${error.code}`;
-  }
-  // Include the constructor name so genuine bugs are diagnosable in logs; the
-  // name (TypeError, RangeError, ...) carries no user/request data.
-  if (error !== null && typeof error === "object" && "name" in error) {
-    return `unexpected_error:${String(error.name)}`;
-  }
-  return "unexpected_error";
-}
-
-async function fetchPage(url: string): Promise<PageData> {
-  const result = await safeFetch(url, {
-    timeoutMs: 15000,
-    // Hard cap on the streamed page body. Generous for real articles; bounded
-    // to deny a malicious/buggy server from exhausting memory. Truncate instead
-    // of failing — a large page's first 1 MiB is still enough for extraction.
-    maxBytes: 1024 * 1024,
-    onOverflow: "truncate",
-    allowContentType: (ct) =>
-      ct.startsWith("text/html") ||
-      ct.startsWith("application/xhtml+xml") ||
-      ct.startsWith("application/xml"),
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
-  if (!result.ok) {
-    // Surface only the policy code (+ status for http_error); readPage decides
-    // whether the item can still be saved.
-    throw new PageFetchError(result.code, result.status);
-  }
-  const finalUrl = result.finalUrl;
-  const html = decodeWithContentType(result.bytes, result.contentType);
-
-  const title = extractTitle(html);
-  const description =
-    extractMetaContent(html, "og:description") ??
-    extractMetaContent(html, "description");
-
-  let heroImageUrl =
-    extractMetaContent(html, "og:image") ??
-    extractMetaContent(html, "og:image:url") ??
-    extractMetaContent(html, "twitter:image");
-  if (heroImageUrl) {
-    try {
-      heroImageUrl = new URL(heroImageUrl, finalUrl).toString();
-    } catch {
-      heroImageUrl = undefined;
-    }
-  }
-
-  // Match the preview to the OG image's real shape. Prefer the dimensions the
-  // page declares; if absent, read them from the image file itself.
-  let heroAspectRatio: number | undefined;
-  if (heroImageUrl) {
-    const ogWidth = Number(extractMetaContent(html, "og:image:width"));
-    const ogHeight = Number(extractMetaContent(html, "og:image:height"));
-    if (
-      Number.isFinite(ogWidth) &&
-      Number.isFinite(ogHeight) &&
-      ogWidth > 0 &&
-      ogHeight > 0
-    ) {
-      heroAspectRatio = ogWidth / ogHeight;
-    } else {
-      heroAspectRatio = await fetchImageAspectRatio(heroImageUrl);
-    }
-  }
-
-  let siteName = extractMetaContent(html, "og:site_name");
-  if (!siteName) {
-    try {
-      siteName = new URL(finalUrl).hostname.replace(/^www\./, "");
-    } catch {
-      siteName = undefined;
-    }
-  }
-
-  const content = extractBodyText(html, finalUrl);
-
-  return {
-    title,
-    description,
-    heroImageUrl,
-    heroAspectRatio,
-    siteName,
-    content: content !== "" ? content : undefined,
-  };
-}
-
-/** The three outcomes that matter when reading a link's page: got it, the page
- * is gone for good (no classification, no retry), or it could not be read this
- * time (classify from the URL alone, retry later). Keeps the branching out of
- * processItem's body; failed outcomes carry the error for sanitized logging. */
-type PageRead =
-  | { status: "ok"; page: PageData }
-  | { status: "gone"; error: PageFetchError }
-  | { status: "unreadable"; error: PageFetchError };
-
-async function readPage(url: string): Promise<PageRead> {
-  try {
-    return { status: "ok", page: await fetchPage(url) };
-  } catch (error) {
-    if (!isPageFetchError(error)) {
-      throw error;
-    }
-    return pageGone(error.status)
-      ? { status: "gone", error }
-      : { status: "unreadable", error };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // AI classification
@@ -675,7 +194,7 @@ export const processItem = internalAction({
           // Nothing to read and nothing to retry: a 404/410 is terminal.
           console.error(
             `processItem gone for ${args.itemId}:`,
-            summarizeError(read.error),
+            summarizeExternalError(read.error),
           );
           await ctx.runMutation(internal.items.failItem, {
             itemId: args.itemId,
@@ -689,7 +208,7 @@ export const processItem = internalAction({
           // and let the user retry the fetch later.
           console.warn(
             `processItem unreadable for ${args.itemId}:`,
-            summarizeError(read.error),
+            summarizeExternalError(read.error),
           );
           unreadable = true;
         } else {
@@ -821,7 +340,7 @@ export const processItem = internalAction({
       // message (which may include a URL) is not leaked either.
       console.error(
         `processItem failed for ${args.itemId}:`,
-        summarizeError(error),
+        summarizeExternalError(error),
       );
       await ctx.runMutation(internal.items.failItem, {
         itemId: args.itemId,
@@ -949,7 +468,7 @@ export const recommendForSpace = internalAction({
       // Sanitized: log a category, not the raw error object.
       console.error(
         `recommendForSpace failed for ${args.spaceId}:`,
-        summarizeError(error),
+        summarizeExternalError(error),
       );
     }
     return null;
@@ -1135,11 +654,11 @@ export const findProductLinks = internalAction({
       });
     } catch (error) {
       // Sanitized error log: never the raw error object (which may carry the
-      // request URL with the API key, or a response body). summarizeError
+      // request URL with the API key, or a response body). summarizeExternalError
       // reduces fetch-policy errors to a code and everything else to a category.
       console.error(
         `findProductLinks failed for ${args.itemId}:`,
-        summarizeError(error),
+        summarizeExternalError(error),
       );
       await fail();
     }
@@ -1210,7 +729,7 @@ export const steerItemForSpace = internalAction({
       // Sanitized: log a category, not the raw error object.
       console.error(
         `steerItemForSpace failed for ${args.itemId} in ${args.spaceId}:`,
-        summarizeError(error),
+        summarizeExternalError(error),
       );
     }
     return null;
