@@ -121,7 +121,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  const { guard, loading: entitlementLoading } = usePaywallGuard('add');
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;

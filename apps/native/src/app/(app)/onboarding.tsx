@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
+import { activationPal } from '@/lib/activation-pal';
 
 // Onboarding v2 — an 8-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
@@ -41,6 +42,17 @@ const STEPS = {
   permissions: 6,
   ready: 7,
 } as const;
+
+const STEP_IDS = [
+  'promise',
+  'save_pileup',
+  'save_types',
+  'spaces',
+  'building',
+  'live_demo',
+  'permissions',
+  'ready',
+] as const;
 
 // Q1 — "Where do your saves pile up today?" Analytics-only; no persistence, and
 // it doesn't seed anything downstream. Kept here (not in the component) because
@@ -86,11 +98,27 @@ export default function OnboardingScreen() {
   const [spaces, setSpaces] = useState<string[]>([]);
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
   const spacesInitRef = useRef(false);
+  const trackedStepsRef = useRef(new Set<number>());
 
-  const advance = useCallback(
-    () => setStep((s) => Math.min(s + 1, STEPS.ready)),
-    [],
-  );
+  const recordCurrentStep = useCallback(() => {
+    if (trackedStepsRef.current.has(step)) return;
+
+    const answer =
+      step === STEPS.surveyQ1
+        ? q1.join(',')
+        : step === STEPS.surveyQ2
+          ? q2.join(',')
+          : step === STEPS.spaces
+            ? spaces.join(',')
+            : undefined;
+    activationPal.onboardingStep(step, STEP_IDS[step], answer || undefined);
+    trackedStepsRef.current.add(step);
+  }, [q1, q2, spaces, step]);
+
+  const advance = useCallback(() => {
+    recordCurrentStep();
+    setStep((current) => Math.min(current + 1, STEPS.ready));
+  }, [recordCurrentStep]);
 
   // Pre-select spaces from Q2 presets when the user first reaches the spaces
   // step. The ref guard ensures this runs only once, preserving subsequent
@@ -126,6 +154,8 @@ export default function OnboardingScreen() {
       space_names: spaces,
       $set: { save_pileup: q1, save_types: q2 },
     });
+    recordCurrentStep();
+    activationPal.onboardingCompleted();
     setPendingSpaces(spaces);
     completeOnboarding();
     if (!isAuthenticated) {

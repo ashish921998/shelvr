@@ -129,3 +129,16 @@ export function normalizeExternalUrl(raw: string): string {
 }
 
 
+
+/** True for a TikTok video link (any subdomain, including the `vm`/`vt` short
+ * hosts). Shared by the pipeline (oEmbed instead of a page fetch — TikTok
+ * refuses bot page loads) and the client (video card/detail treatment). */
+export function isTikTokUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "tiktok.com" || host.endsWith(".tiktok.com");
+  } catch {
+    return false;
+  }
+}

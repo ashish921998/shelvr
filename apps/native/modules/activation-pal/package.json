@@ -1,0 +1,7 @@
+{
+  "name": "activation-pal",
+  "version": "1.0.0",
+  "description": "Local Expo bridge for the ActivationPal iOS SDK.",
+  "main": "index.ts",
+  "private": true
+}

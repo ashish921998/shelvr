@@ -45,6 +45,14 @@ if (buildPlatform === 'android') {
     'a goog_ Google Play public SDK key',
   );
 }
+if (buildPlatform !== 'android') {
+  requireProductionValue(
+    'ACTIVATION_PAL_IOS_KEY',
+    process.env.ACTIVATION_PAL_IOS_KEY,
+    (value) => value?.startsWith('ap_pk_'),
+    'an ap_pk_ public app key',
+  );
+}
 // The production Convex URL must parse as https:// with a hostname — a bare
 // prefix check would let `https://` (no host) reach a store build.
 requireProductionValue(
@@ -94,6 +102,12 @@ module.exports = ({ config }) => ({
             },
           }
         : {}),
+      ...(process.env.ACTIVATION_PAL_IOS_KEY
+        ? {
+            ActivationPalApp: 'shelvr',
+            ActivationPalKey: process.env.ACTIVATION_PAL_IOS_KEY,
+          }
+        : {}),
     },
     bundleIdentifier: bundleId,
   },
@@ -103,7 +117,10 @@ module.exports = ({ config }) => ({
     icon: isProduction ? appConfig.expo.android?.icon : undefined,
     adaptiveIcon: isProduction
       ? appConfig.expo.android?.adaptiveIcon
-      : { ...appConfig.expo.android?.adaptiveIcon, foregroundImage: './assets/icon-dev.png' },
+      : {
+          ...appConfig.expo.android?.adaptiveIcon,
+          foregroundImage: './assets/icon-dev.png',
+        },
     ...(googleMapsApiKey
       ? { config: { googleMaps: { apiKey: googleMapsApiKey } } }
       : {}),
@@ -168,10 +185,14 @@ module.exports = ({ config }) => ({
             // The share extension's bundle id must track the active variant so
             // each install owns its own extension target.
             appExtensions: (
-              appConfig.expo.extra?.eas?.build?.experimental?.ios?.appExtensions ?? []
+              appConfig.expo.extra?.eas?.build?.experimental?.ios
+                ?.appExtensions ?? []
             ).map((ext) =>
               ext.targetName === 'expo-sharing-extension'
-                ? { ...ext, bundleIdentifier: `${bundleId}.expo-sharing-extension` }
+                ? {
+                    ...ext,
+                    bundleIdentifier: `${bundleId}.expo-sharing-extension`,
+                  }
                 : ext,
             ),
           },

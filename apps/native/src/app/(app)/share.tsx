@@ -259,7 +259,7 @@ export default function ShareScreen() {
       // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
       if (!entitled) {
         setPhase({ kind: 'locked' });
-        void openPaywall(router);
+        void openPaywall(router, 'share');
         return;
       }
       runningSessionId.current = session.sessionId;
@@ -475,7 +475,7 @@ export default function ShareScreen() {
             theme={theme}
             primary
             onPress={() => {
-              void openPaywall(router);
+              void openPaywall(router, 'share');
             }}
           />
         </View>

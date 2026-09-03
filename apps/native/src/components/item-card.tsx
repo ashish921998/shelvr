@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/action-menu';
 import { memo } from 'react';
 import { displayHost } from '@/lib/url';
+import { isTikTokUrl } from '@convex/model/externalUrl';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
@@ -28,11 +29,13 @@ import {
 
 export type FeedItem = {
   _id: Id<'items'>;
+  fixtureKey?: string;
   type: 'image' | 'link' | 'note';
   status: 'processing' | 'ready' | 'failed';
   title?: string;
   url?: string;
   siteName?: string;
+  author?: string;
   note?: string;
   imageUrl?: string | null;
   heroImageUrl?: string;
@@ -83,6 +86,8 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
   const isSuggested = item.suggested === true && spaceId !== undefined;
 
   const imageUri = item.imageUrl ?? item.heroImageUrl;
+  // Video saves get a 9:16 poster with a play badge and the creator handle.
+  const isVideo = item.type === 'link' && isTikTokUrl(item.url);
   // A failed save has no AI title, so without this the card is blank forever and
   // indistinguishable from one still processing.
   const failedLabel =
@@ -163,6 +168,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
       >
         <Link.Trigger withAppleZoom>
           <Pressable
+            testID={item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined}
             style={({ pressed }) => [
               styles.card,
               item.isSticker && styles.cardSticker,
@@ -178,9 +184,19 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                   contentFit={item.isSticker ? 'contain' : 'cover'}
                   style={[
                     item.isSticker ? styles.sticker : styles.image,
-                    { aspectRatio: clampRatio(item.aspectRatio, item.type === 'link' ? OG_RATIO : 1) },
+                    { aspectRatio: clampRatio(item.aspectRatio, isVideo ? 9 / 16 : item.type === 'link' ? OG_RATIO : 1) },
                   ]}
                 />
+                {isVideo && (
+                  <View style={styles.videoBadge}>
+                    <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
+                    {item.author ? (
+                      <Text style={styles.videoBadgeText} numberOfLines={1}>
+                        {item.author}
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
               </View>
             ) : (
               <View style={[styles.textFace, item.type === 'note' && styles.noteFace]}>
@@ -206,7 +222,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                 {item.type === 'link' && item.url ? (
                   <View style={styles.captionHostRow}>
                     <Text style={styles.captionHost} numberOfLines={1}>
-                      {displayHost(item.url)}
+                      {item.siteName === 'TikTok' ? 'TikTok' : displayHost(item.url)}
                     </Text>
                     <AppSymbolIcon
                       name="arrow.up.right"
@@ -332,6 +348,26 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(0.5),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
 
+  },
+  videoBadge: {
+    position: 'absolute',
+    left: theme.gap(1.25),
+    bottom: theme.gap(1.25),
+    maxWidth: '80%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  videoBadgeText: {
+    flexShrink: 1,
+    fontFamily: theme.fonts.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    color: 'white',
   },
   // No fill / border / rounding: the white die-cut edge is baked into the PNG.
   // The iOS layer shadow is cast from the image's opaque pixels, so it hugs the

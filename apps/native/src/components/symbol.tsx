@@ -39,6 +39,7 @@ const SF_TO_MATERIAL = {
   'star.fill': 'star',
   'heart': 'favorite',
   'play.rectangle': 'smart_display',
+  'play.fill': 'play_arrow',
   'rectangle.stack': 'collections_bookmark',
   'rectangle.stack.fill': 'collections_bookmark',
   'link': 'link',
@@ -96,7 +97,7 @@ export function resolveSymbolName(sfName: AppSymbolName): SymbolViewProps['name'
 
 /**
  * A drop-in replacement for SymbolView that works on both platforms.
- * Pass any SF Symbol name; on Android it renders the Material equivalent.
+ * Pass any supported SF Symbol name; on Android it renders the Material equivalent.
  */
 export function AppSymbolIcon({
   name,
