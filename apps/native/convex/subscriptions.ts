@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, internalMutation } from "./_generated/server";
+import { env, query, internalMutation } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
@@ -17,7 +17,7 @@ async function isDevelopmentAnonymousUser(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
 ): Promise<boolean> {
-  if (process.env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
+  if (env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
   const account = await ctx.db
     .query("authAccounts")
     .withIndex("userIdAndProvider", (q) =>

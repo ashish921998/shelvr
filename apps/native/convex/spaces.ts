@@ -17,6 +17,7 @@ const spaceFields = {
   _id: v.id("spaces"),
   _creationTime: v.number(),
   userId: v.string(),
+  fixtureKey: v.optional(v.string()),
   name: v.string(),
   description: v.optional(v.string()),
   dynamic: v.optional(v.boolean()),
@@ -206,7 +207,7 @@ export const createSpace = mutation({
     const userId = await requireUserId(ctx);
     const name = args.name.trim();
     if (name === "") {
-      throw new Error("Create space validation failed: Space name is empty");
+      throw new Error("Space name is empty");
     }
 
     // Onboarding replay may retry after a process death. Treat the user's
@@ -250,7 +251,7 @@ export const updateSpace = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
-      throw new Error("Update space failed: Space not found");
+      throw new Error("Space not found");
     }
     const wasDynamic = space.dynamic === true;
     // Enabling dynamic spaces is a Pro feature (the AI keeps suggesting new
@@ -265,7 +266,7 @@ export const updateSpace = mutation({
     if (args.name !== undefined) {
       const name = args.name.trim();
       if (name === "") {
-        throw new Error("Update space validation failed: Space name is empty");
+        throw new Error("Space name is empty");
       }
       patch.name = name;
     }
@@ -291,7 +292,7 @@ export const deleteSpace = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.id);
     if (space === null || space.userId !== userId) {
-      throw new Error("Delete space failed: Space not found");
+      throw new Error("Space not found");
     }
     const joins = await ctx.db
       .query("spaceItems")
@@ -314,11 +315,11 @@ async function requireItemAndSpace(
 ): Promise<{ item: Doc<"items">; space: Doc<"spaces"> }> {
   const item = await ctx.db.get(itemId);
   if (item === null || item.userId !== userId) {
-    throw new Error("Space membership validation failed: Item not found");
+    throw new Error("Item not found");
   }
   const space = await ctx.db.get(spaceId);
   if (space === null || space.userId !== userId) {
-    throw new Error("Space membership validation failed: Space not found");
+    throw new Error("Space not found");
   }
   return { item, space };
 }
@@ -436,7 +437,7 @@ export const acceptAllSuggestions = mutation({
     const userId = await requireUserId(ctx);
     const space = await ctx.db.get(args.spaceId);
     if (space === null || space.userId !== userId) {
-      throw new Error("Accept all suggestions failed: Space not found");
+      throw new Error("Space not found");
     }
     const { suggested } = await splitJoins(ctx, space._id);
     for (const row of suggested) {
