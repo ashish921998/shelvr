@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import Foundation
 
 public class ActivationPalExpoModule: Module {
   public func definition() -> ModuleDefinition {
@@ -35,8 +36,11 @@ public class ActivationPalExpoModule: Module {
       ActivationPal.onboardingCompleted()
     }
 
-    Function("paywallShown") { (placement: String) -> Void in
-      ActivationPal.paywallShown(placement)
+    Function("paywallShown") { (placement: String, presentedAt: Double) -> Void in
+      ActivationPal.paywallShown(
+        placement,
+        at: Date(timeIntervalSince1970: presentedAt / 1_000)
+      )
     }
 
     Function("paywallPlanSelected") { (plan: String) -> Void in

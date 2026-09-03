@@ -12,6 +12,8 @@ import { analytics } from '@/lib/analytics';
 import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
@@ -29,6 +31,14 @@ export default function ProfileScreen() {
   const [deleting, setDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
+  const fixtureResetEnabled =
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+  const { data: canResetFlowFixtures } = useQuery(
+    convexQuery(
+      api.devFixtures.canResetCurrentUser,
+      fixtureResetEnabled && user ? {} : 'skip',
+    ),
+  );
   const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
   const closeProfile = () => {
@@ -236,9 +246,7 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      {__DEV__ &&
-      process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true' &&
-      user?.isDevelopmentAnonymous ? (
+      {fixtureResetEnabled && canResetFlowFixtures ? (
         <Pressable
           testID="reset-flow-fixtures"
           accessibilityRole="button"

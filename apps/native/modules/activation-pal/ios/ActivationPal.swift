@@ -56,8 +56,8 @@ public enum ActivationPal {
         track("onboarding_completed")
     }
 
-    public static func paywallShown(_ placement: String) {
-        track("paywall_shown", ["placement": placement])
+    public static func paywallShown(_ placement: String, at date: Date = Date()) {
+        Client.shared.track("paywall_shown", props: ["placement": placement], timestamp: date)
     }
 
     public static func paywallPlanSelected(_ plan: String) {
@@ -204,12 +204,12 @@ private final class Client: @unchecked Sendable {
 
     // MARK: Track
 
-    func track(_ name: String, props: [String: Any]?, origin: String? = nil) {
+    func track(_ name: String, props: [String: Any]?, origin: String? = nil, timestamp: Date? = nil) {
         var sanitized = Self.sanitize(props)
         // Stamped into props rather than a top-level column: it is rare, and
         // the ingest schema stays untouched.
         if let origin = origin { sanitized["origin"] = origin }
-        let ts = isoFormatter.string(from: Date())
+        let ts = isoFormatter.string(from: timestamp ?? Date())
         queue.async {
             guard self.configured else { return }
             self.append(name: name, ts: ts, props: sanitized)

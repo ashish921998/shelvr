@@ -1,6 +1,7 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { env, mutation, type MutationCtx } from "./_generated/server";
+import { env, mutation, query, type MutationCtx } from "./_generated/server";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -10,6 +11,17 @@ const resetResultValidator = v.object({
   items: v.number(),
   spaces: v.number(),
   memberships: v.number(),
+});
+
+export const canResetCurrentUser = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    if (env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return false;
+    return await isDevelopmentAnonymousUser(ctx, userId);
+  },
 });
 
 async function requireDevelopmentAnonymousUser(

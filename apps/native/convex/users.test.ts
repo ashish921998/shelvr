@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
 import { newConvexTest } from "./test.setup";
@@ -10,10 +10,6 @@ import type { DataModel, Id } from "./_generated/dataModel";
 import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 async function as(userId: string): Promise<TestCtx> {
   const t = newConvexTest().withIdentity({
@@ -49,44 +45,6 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
     );
   });
 }
-
-describe("getCurrentUser", () => {
-  it("reports fixture eligibility only for anonymous development accounts", async () => {
-    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
-    const backend = newConvexTest();
-    const anonymousId = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {});
-      await ctx.db.insert("authAccounts", {
-        userId,
-        provider: "anonymous",
-        providerAccountId: `anonymous:${userId}`,
-      });
-      return userId;
-    });
-    const oauthId = await backend.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "oauth@example.com",
-      });
-      await ctx.db.insert("authAccounts", {
-        userId,
-        provider: "google",
-        providerAccountId: "google-1",
-      });
-      return userId;
-    });
-
-    await expect(
-      backend
-        .withIdentity({ subject: `${anonymousId}|session-1` })
-        .query(api.users.getCurrentUser, {}),
-    ).resolves.toMatchObject({ isDevelopmentAnonymous: true });
-    await expect(
-      backend
-        .withIdentity({ subject: `${oauthId}|session-1` })
-        .query(api.users.getCurrentUser, {}),
-    ).resolves.toMatchObject({ isDevelopmentAnonymous: false });
-  });
-});
 
 /** Seeds note + image, space + membership, pending op with storage. */
 async function seedOwnedData(t: TestCtx, userId: string) {

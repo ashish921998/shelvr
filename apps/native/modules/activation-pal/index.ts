@@ -8,7 +8,7 @@ type ActivationPalNativeModule = {
   track: (name: string, properties?: ActivationPalProperties) => void;
   onboardingStep: (index: number, id: string, answer?: string) => void;
   onboardingCompleted: () => void;
-  paywallShown: (placement: string) => void;
+  paywallShown: (placement: string, presentedAt: number) => void;
   paywallPlanSelected: (plan: string) => void;
   paywallPurchased: (plan: string) => void;
   paywallDismissed: () => void;
@@ -42,8 +42,8 @@ export const activationPal = {
   onboardingCompleted() {
     safely((module) => module.onboardingCompleted());
   },
-  paywallShown(placement: string) {
-    safely((module) => module.paywallShown(placement));
+  paywallShown(placement: string, presentedAt: number) {
+    safely((module) => module.paywallShown(placement, presentedAt));
   },
   paywallPlanSelected(plan: string) {
     safely((module) => module.paywallPlanSelected(plan));

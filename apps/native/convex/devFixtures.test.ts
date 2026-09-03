@@ -28,6 +28,37 @@ async function anonymousFixtureUser() {
 }
 
 describe("resetCurrentUser", () => {
+  it("reports reset eligibility only for anonymous development accounts", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { client } = await anonymousFixtureUser();
+    const backend = newConvexTest();
+    const oauthId = await backend.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "oauth@example.com",
+      });
+      await ctx.db.insert("authAccounts", {
+        userId,
+        provider: "google",
+        providerAccountId: "google-1",
+      });
+      return userId;
+    });
+
+    await expect(
+      client.query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(true);
+    await expect(
+      backend
+        .withIdentity({ subject: `${oauthId}|session-1` })
+        .query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(false);
+
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
+    await expect(
+      client.query(api.devFixtures.canResetCurrentUser, {}),
+    ).resolves.toBe(false);
+  });
+
   it("is unavailable unless anonymous development auth is enabled", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "false");
     const { client } = await anonymousFixtureUser();

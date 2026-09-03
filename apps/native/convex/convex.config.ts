@@ -5,7 +5,7 @@ import rateLimiter from "@convex-dev/rate-limiter/convex.config";
 const app = defineApp({
   env: {
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
-    GOOGLE_GENERATIVE_AI_API_KEY: v.optional(v.string()),
+    GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),
     OBSERVABILITY_ENV: v.optional(v.string()),

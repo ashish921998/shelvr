@@ -67,7 +67,8 @@ opencode.json
 /apps/native/.argent/*
 !/apps/native/.argent/flows/
 /apps/native/.argent/flows/*
-!/apps/native/.argent/flows/*.yaml
+!/apps/native/.argent/flows/store-*.yaml
+!/apps/native/.argent/flows/*-dev.yaml
 .vercel
 
 # Local build artifacts and stray root-level prebuild output — do not commit

@@ -26,7 +26,7 @@ import type { DataModel } from "./dataModel.js";
  */
 type Env = {
   readonly AUTH_ENABLE_ANONYMOUS: string | undefined;
-  readonly GOOGLE_GENERATIVE_AI_API_KEY: string | undefined;
+  readonly GOOGLE_GENERATIVE_AI_API_KEY: string;
   readonly OBSERVABILITY_ENV: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
