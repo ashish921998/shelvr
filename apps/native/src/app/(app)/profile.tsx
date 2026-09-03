@@ -28,6 +28,8 @@ export default function ProfileScreen() {
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const [deleting, setDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [resettingFixtures, setResettingFixtures] = useState(false);
+  const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
   const closeProfile = () => {
     if (router.canGoBack()) {
@@ -86,7 +88,7 @@ export default function ProfileScreen() {
         ]);
       }
     } else {
-      void openPaywall(router);
+      void openPaywall(router, 'profile');
     }
   };
 
@@ -174,6 +176,41 @@ export default function ProfileScreen() {
     );
   };
 
+  const confirmResetFlowFixtures = () => {
+    Alert.alert(
+      'Reset flow fixtures?',
+      'This replaces this anonymous development account’s saves and spaces with deterministic flow data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              if (resettingFixtures) return;
+              setResettingFixtures(true);
+              try {
+                const result = await resetFlowFixtures({});
+                Alert.alert(
+                  'Flow fixtures ready',
+                  `${result.items} saves and ${result.spaces} spaces were created.`,
+                );
+              } catch (error) {
+                console.error('Flow fixture reset failed', error);
+                Alert.alert(
+                  'Couldn’t reset fixtures',
+                  'Use an anonymous account on a development deployment and try again.',
+                );
+              } finally {
+                setResettingFixtures(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -198,6 +235,25 @@ export default function ProfileScreen() {
           {user?.email ?? 'Signed in'}
         </Text>
       </View>
+
+      {__DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true' ? (
+        <Pressable
+          testID="reset-flow-fixtures"
+          accessibilityRole="button"
+          accessibilityLabel="Reset flow fixtures"
+          style={({ pressed }) => [
+            styles.fixtureReset,
+            pressed && { opacity: 0.7 },
+            resettingFixtures && { opacity: 0.4 },
+          ]}
+          disabled={resettingFixtures}
+          onPress={confirmResetFlowFixtures}
+        >
+          <Text style={styles.fixtureResetText}>
+            {resettingFixtures ? 'Resetting flow fixtures…' : 'Reset flow fixtures'}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [
@@ -351,6 +407,21 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.foreground,
+  },
+  fixtureReset: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  fixtureResetText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.primary,
   },
   linkGroup: {
     alignSelf: 'stretch',

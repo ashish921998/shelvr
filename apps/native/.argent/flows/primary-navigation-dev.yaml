@@ -1,0 +1,21 @@
+steps:
+  - echo: Restart the Shelvr development build and expect Home.
+  - launch: app.shelvr.save.dev
+  - await: { visible: { text: Home } }
+  - await: { idle: true }
+  - echo: From Home, open Spaces and expect the new-space action.
+  - tap: { id: rectangle.stack }
+  - await: { visible: { text: New space } }
+  - await: { idle: true }
+  - echo: From Spaces, open Tidy and expect the photo-permission gate.
+  - tap: { id: photo.stack }
+  - await: { visible: { text: Tidy your camera roll } }
+  - await: { idle: true }
+  - echo: From Tidy, open Map and expect the saved-places screen.
+  - tap: { id: map }
+  - await: { visible: { text: Nothing on the map yet } }
+  - await: { idle: true }
+  - echo: From Map, open Search and expect the empty search screen.
+  - tap: { id: magnifyingglass }
+  - await: { visible: { text: Find anything } }
+  - await: { idle: true }

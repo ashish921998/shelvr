@@ -71,6 +71,7 @@ export function ArticleReaderView({
 
   return (
     <ScrollView
+      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
       contentInsetAdjustmentBehavior="never"
       style={[styles.container, { paddingTop: headerHeight + theme.gap(1.5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}

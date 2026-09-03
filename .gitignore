@@ -60,8 +60,15 @@ yarn-error.log*
 skills-lock.json
 opencode.json
 
-# argent tool cache (screen recordings, etc.)
+# Argent tool cache (screen recordings, etc.). Keep Goldie's deterministic
+# store flows versioned so the marketing captures remain reproducible.
 .argent/
+!/apps/native/.argent/
+/apps/native/.argent/*
+!/apps/native/.argent/flows/
+/apps/native/.argent/flows/*
+!/apps/native/.argent/flows/store-*.yaml
+!/apps/native/.argent/flows/*-dev.yaml
 .vercel
 
 # Local build artifacts and stray root-level prebuild output — do not commit

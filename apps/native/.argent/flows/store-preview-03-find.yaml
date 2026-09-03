@@ -1,0 +1,16 @@
+executionPrerequisite: The Spaces tab is open and its grid is visible.
+steps:
+  - tap:
+      text: Search
+  - await:
+      visible:
+        text: Search your saves
+  - tap:
+      text: Search your saves
+  - tool: keyboard
+    args:
+      text: travel
+  - await:
+      visible:
+        text: Belém Tower
+  - wait: 1800

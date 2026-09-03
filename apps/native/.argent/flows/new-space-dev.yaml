@@ -1,0 +1,15 @@
+steps:
+  - echo: Restart Shelvr and expect Home.
+  - launch: app.shelvr.save.dev
+  - await: { visible: { text: Home } }
+  - await: { idle: true }
+  - echo: From Home, open Spaces and expect the new-space action.
+  - tap:
+      id: rectangle.stack
+  - await: { visible: { text: New space } }
+  - await: { idle: true }
+  - echo: From Spaces, open New space and expect the space form.
+  - tap:
+      id: plus
+  - await: { visible: { text: Apartment shopping list } }
+  - await: { idle: true }

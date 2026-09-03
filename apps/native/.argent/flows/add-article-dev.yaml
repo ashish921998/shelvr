@@ -1,0 +1,14 @@
+steps:
+  - echo: Restart Shelvr and expect Home.
+  - launch: app.shelvr.save.dev
+  - await: { visible: { text: Home } }
+  - await: { idle: true }
+  - echo: From Home, open Add and expect save options.
+  - tap:
+      id: plus
+  - await: { visible: { text: Article } }
+  - await: { idle: true }
+  - echo: From save options, choose Article and expect the link composer.
+  - tap: { text: Article }
+  - await: { visible: { text: Paste or type a link } }
+  - await: { idle: true }

@@ -152,7 +152,10 @@ export default function SpaceScreen() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar> : null}
-      <View style={styles.container}>
+      <View
+        testID={space.fixtureKey ? `fixture-space-detail-${space.fixtureKey}` : undefined}
+        style={styles.container}
+      >
         <MasonryFeed
           items={feedItems}
           source={{ from: 'space', spaceId: id }}
