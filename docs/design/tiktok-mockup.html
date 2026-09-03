@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Shelvr — TikTok saves (design mockup)</title>
+<style>
+  :root{
+    --bg:#faf6ee;--surface:#fffdf8;--surfaceMuted:#f3ecdd;--fg:#2b2418;--muted:#8d8271;--faint:#b5aa97;
+    --primary:#e6a23c;--primarySoft:#f7e8cd;--primaryText:#9a6416;--border:#ece3d1;--danger:#c05a3a;
+    --r-sm:8px;--r-md:11px;--r-lg:16px;--r-xl:24px;
+  }
+  .dark{
+    --bg:#191510;--surface:#231e16;--surfaceMuted:#2c261c;--fg:#f4eddd;--muted:#a2977f;--faint:#6f6650;
+    --primarySoft:#3a2f1c;--primaryText:#f0c078;--border:#332c20;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9e2d4;font-family:-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;color:#2b2418}
+  h1{font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 80px}
+  .lede{color:#6f6650;max-width:64ch;line-height:1.5;margin:0 0 32px}
+  .row{display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;margin-bottom:56px}
+  .col{flex:1 1 320px}
+  .label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#8d8271;margin:0 0 12px;font-weight:600}
+
+  /* phone */
+  .phone{width:320px;height:692px;background:var(--bg);border-radius:44px;padding:52px 14px 24px;position:relative;
+    box-shadow:0 0 0 10px #1a1612,0 0 0 12px #3a332a,0 30px 60px -20px rgba(0,0,0,.5);overflow:hidden;color:var(--fg)}
+  .phone::before{content:"";position:absolute;top:16px;left:50%;transform:translateX(-50%);width:96px;height:28px;background:#1a1612;border-radius:20px}
+  .status{position:absolute;top:18px;left:34px;right:34px;display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+  .home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:110px;height:5px;background:var(--fg);opacity:.4;border-radius:3px}
+
+  /* feed */
+  .feedhead{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 12px}
+  .wordmark{font-family:Georgia,serif;font-style:italic;font-size:26px}
+  .masonry{display:flex;gap:10px}
+  .masonry>div{flex:1;display:flex;flex-direction:column;gap:12px}
+  .card{display:flex;flex-direction:column;gap:6px}
+  .thumb{border-radius:var(--r-md);background:var(--surfaceMuted);overflow:hidden;position:relative;box-shadow:0 0 4px rgba(0,0,0,.07)}
+  .thumb.h1{aspect-ratio:1.91}.thumb.h2{aspect-ratio:1.2}.thumb.h3{aspect-ratio:.8}
+  .thumb.tt{aspect-ratio:9/16;background:linear-gradient(160deg,#1d1a2b 0%,#3b2f4f 45%,#c9557f 100%)}
+  .thumb.tt::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.65) 0%,rgba(0,0,0,0) 45%)}
+  .ttmeta{position:absolute;left:8px;right:8px;bottom:8px;display:flex;align-items:center;gap:6px;color:#fff;font-size:11.5px;font-weight:600;z-index:1;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+  .ttglyph{width:16px;height:16px;border-radius:5px;background:#000;display:inline-grid;place-items:center;flex:none}
+  .ttglyph svg{width:10px;height:10px}
+  .play{position:absolute;top:8px;right:8px;z-index:1;background:rgba(255,255,255,.22);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:3px 8px 3px 6px;font-size:10.5px;color:#fff;font-weight:700;display:flex;gap:4px;align-items:center}
+  .ttitle{font-weight:700;font-size:13px;line-height:1.3;padding:0 2px}
+  .tags{display:flex;gap:4px;flex-wrap:wrap;padding:0 2px}
+  .tag{font-size:10.5px;font-weight:500;background:var(--surfaceMuted);border-radius:var(--r-sm);padding:3px 7px;color:var(--fg)}
+  .tag.ai{background:var(--primarySoft);color:var(--primaryText)}
+  .tabbar{position:absolute;left:14px;right:14px;bottom:26px;height:58px;background:var(--surface);border:1px solid var(--border);border-radius:30px;display:flex;justify-content:space-around;align-items:center;font-size:11px;color:var(--muted)}
+  .tabbar b{color:var(--fg)}
+  .fab{position:absolute;right:26px;bottom:98px;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:28px;box-shadow:0 8px 20px -6px rgba(230,162,60,.8)}
+
+  /* detail */
+  .nav{display:flex;justify-content:space-between;align-items:center;padding:0 4px 10px;font-size:15px}
+  .hero{border-radius:var(--r-lg);aspect-ratio:9/16;max-height:360px;width:100%;position:relative;overflow:hidden;
+    background:linear-gradient(160deg,#1d1a2b 0%,#3b2f4f 45%,#c9557f 100%)}
+  .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0%,rgba(0,0,0,0) 40%)}
+  .bigplay{position:absolute;inset:0;margin:auto;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.45);display:grid;place-items:center;z-index:2}
+  .bigplay::after{content:"";border-left:22px solid #fff;border-top:13px solid transparent;border-bottom:13px solid transparent;margin-left:5px}
+  .creator{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;display:flex;align-items:center;gap:8px;color:#fff}
+  .avatar{width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ffd39a,#c9557f);border:2px solid #fff;flex:none}
+  .creator .who{flex:1;line-height:1.15}
+  .creator .who b{display:block;font-size:13px}
+  .creator .who span{font-size:11px;opacity:.85}
+  .openbtn{background:#fff;color:#000;font-size:11.5px;font-weight:700;border-radius:999px;padding:7px 11px;display:flex;gap:5px;align-items:center}
+  .h2{font-size:19px;font-weight:700;line-height:1.25;margin:14px 2px 6px;letter-spacing:-.01em}
+  .caption{color:var(--muted);font-size:13px;line-height:1.45;margin:0 2px 12px}
+  .caption em{color:var(--primaryText);font-style:normal;font-weight:600}
+  .section{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-weight:700;margin:14px 2px 8px}
+  .intents{display:flex;gap:6px;flex-wrap:wrap}
+  .intent{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:600;display:flex;gap:6px;align-items:center}
+  .intent.primary{background:var(--primarySoft);border-color:transparent;color:var(--primaryText)}
+  .meta{font-size:11.5px;color:var(--faint);margin:16px 2px 0}
+
+  /* states */
+  .states{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px}
+  .state .thumb{width:150px}
+  .state p{font-size:12.5px;color:#6f6650;line-height:1.45;margin:8px 0 0}
+  .shimmer{background:linear-gradient(90deg,var(--surfaceMuted) 25%,#fff8e8 50%,var(--surfaceMuted) 75%);background-size:200% 100%;animation:sh 1.6s infinite}
+  @keyframes sh{to{background-position:-200% 0}}
+  .center{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:11px;color:var(--muted);padding:12px;z-index:1}
+
+  /* spec */
+  table{border-collapse:collapse;width:100%;font-size:14px;background:#fffdf8;border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid #ece3d1;vertical-align:top}
+  th{background:#f3ecdd;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#8d8271}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:#f3ecdd;padding:1px 5px;border-radius:5px}
+  ol{line-height:1.6;color:#3d3528}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TikTok saves in Shelvr</h1>
+  <p class="lede">A TikTok link is a video, not an article. The design treats it as a vertical poster with a creator, a caption, and one action: open the video. Everything else stays the same as the current card and detail view.</p>
+
+  <div class="row">
+    <div>
+      <p class="label">1 · Home feed — the TikTok card</p>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="feedhead"><span class="wordmark">Shelvr</span><span style="font-size:13px;color:var(--muted)">Search</span></div>
+        <div class="masonry">
+          <div>
+            <div class="card">
+              <div class="thumb tt">
+                <div class="play">▶ 0:42</div>
+                <div class="ttmeta"><span class="ttglyph"><svg viewBox="0 0 24 24" fill="#fff"><path d="M16 2h-3v13.5a3.5 3.5 0 1 1-3.5-3.5v-3A6.5 6.5 0 1 0 16 15.5V9a8 8 0 0 0 5 1.8V7.7A5 5 0 0 1 16 2.7z"/></svg></span>@bonappetit</div>
+              </div>
+              <div class="ttitle">One-pan lemon orzo with crispy chickpeas</div>
+              <div class="tags"><span class="tag ai">Recipe</span><span class="tag">Weeknight</span></div>
+            </div>
+            <div class="card"><div class="thumb h1"></div><div class="ttitle">Why cast iron is having a moment</div><div class="tags"><span class="tag">Kitchen</span></div></div>
+          </div>
+          <div>
+            <div class="card"><div class="thumb h2"></div><div class="ttitle">Copenhagen coffee spots</div><div class="tags"><span class="tag ai">Travel</span></div></div>
+            <div class="card">
+              <div class="thumb tt" style="background:linear-gradient(160deg,#0f2a2b,#1e5b5e 55%,#e7c46b)">
+                <div class="play">▶ 1:15</div>
+                <div class="ttmeta"><span class="ttglyph"><svg viewBox="0 0 24 24" fill="#fff"><path d="M16 2h-3v13.5a3.5 3.5 0 1 1-3.5-3.5v-3A6.5 6.5 0 1 0 16 15.5V9a8 8 0 0 0 5 1.8V7.7A5 5 0 0 1 16 2.7z"/></svg></span>@studiomcgee</div>
+              </div>
+              <div class="ttitle">Small bedroom, three layout ideas</div>
+              <div class="tags"><span class="tag ai">Interior</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fab">+</div>
+        <div class="tabbar"><b>Home</b><span>Spaces</span><span>Profile</span></div>
+        <div class="home"></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="label">2 · Item detail — the video page</p>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="nav"><span>‹ Back</span><span>···</span></div>
+        <div class="hero">
+          <div class="bigplay"></div>
+          <div class="creator">
+            <div class="avatar"></div>
+            <div class="who"><b>Bon Appétit</b><span>@bonappetit · TikTok</span></div>
+            <div class="openbtn">Open ↗</div>
+          </div>
+        </div>
+        <div class="h2">One-pan lemon orzo with crispy chickpeas</div>
+        <p class="caption">the 20 minute dinner you will make every week 🍋 <em>#orzo #weeknightdinner #easyrecipe</em></p>
+        <div class="section">Do next</div>
+        <div class="intents">
+          <span class="intent primary">🛒 Add ingredients to list</span>
+          <span class="intent">🔍 Find full recipe</span>
+          <span class="intent">📋 Copy link</span>
+        </div>
+        <div class="section">Tags</div>
+        <div class="tags"><span class="tag ai">Recipe</span><span class="tag">Weeknight</span><span class="tag">Vegetarian</span></div>
+        <div class="meta">Saved from TikTok · 3 days ago · in <b style="color:var(--muted)">Dinner ideas</b></div>
+        <div class="home"></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="label">3 · Dark mode</p>
+      <div class="phone dark">
+        <div class="status"><span>9:41</span><span>●●● ▲ ▮</span></div>
+        <div class="nav"><span>‹ Back</span><span>···</span></div>
+        <div class="hero">
+          <div class="bigplay"></div>
+          <div class="creator">
+            <div class="avatar"></div>
+            <div class="who"><b>Bon Appétit</b><span>@bonappetit · TikTok</span></div>
+            <div class="openbtn">Open ↗</div>
+          </div>
+        </div>
+        <div class="h2">One-pan lemon orzo with crispy chickpeas</div>
+        <p class="caption">the 20 minute dinner you will make every week 🍋 <em>#orzo #weeknightdinner #easyrecipe</em></p>
+        <div class="section">Do next</div>
+        <div class="intents">
+          <span class="intent primary">🛒 Add ingredients to list</span>
+          <span class="intent">🔍 Find full recipe</span>
+        </div>
+        <div class="section">Tags</div>
+        <div class="tags"><span class="tag ai">Recipe</span><span class="tag">Weeknight</span></div>
+        <div class="meta">Saved from TikTok · 3 days ago</div>
+        <div class="home"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="label">4 · Card states</p>
+  <div class="states" style="margin-bottom:56px">
+    <div class="state"><div class="thumb tt shimmer" style="background:var(--surfaceMuted)"><div class="center">Fetching video…</div></div><p><b>Processing.</b> 9:16 placeholder with shimmer. The card keeps its final height, so the feed does not jump.</p></div>
+    <div class="state"><div class="thumb tt"><div class="play">▶</div><div class="ttmeta"><span class="ttglyph"></span>@bonappetit</div></div><p><b>Ready.</b> Poster, duration, creator handle, AI title, tags.</p></div>
+    <div class="state"><div class="thumb tt" style="background:#111"><div class="center" style="color:#ccc">TikTok video<br/><small>@bonappetit</small></div><div class="ttmeta"><span class="ttglyph"></span>@bonappetit</div></div><p><b>No poster.</b> Thumbnail URL expired or blocked. Dark 9:16 tile with the handle. Tap still opens the video.</p></div>
+    <div class="state"><div class="thumb tt" style="background:var(--surfaceMuted)"><div class="center">Video unavailable<br/><small>Removed or private</small></div></div><p><b>Removed.</b> oEmbed returns 400/404. Card says why. Delete stays in the menu.</p></div>
+  </div>
+
+  <p class="label">5 · How the data flows</p>
+  <table>
+    <tr><th>Step</th><th>What happens</th><th>Where</th></tr>
+    <tr><td>Detect</td><td>Host is <code>tiktok.com</code>, <code>vm.tiktok.com</code>, or <code>vt.tiktok.com</code>.</td><td><code>convex/ai.ts</code></td></tr>
+    <tr><td>Fetch</td><td>Call <code>https://www.tiktok.com/oembed?url=…</code>. Public. No key. Not bot-hostile. Returns caption, creator name, handle, thumbnail URL and size.</td><td><code>convex/ai.ts</code></td></tr>
+    <tr><td>Store</td><td><code>siteName = "TikTok"</code>, <code>heroImageUrl = thumbnail_url</code>, <code>aspectRatio = w/h</code>, <code>content = caption</code>, new <code>author = "@handle"</code>.</td><td><code>convex/schema.ts</code> (one optional field)</td></tr>
+    <tr><td>Classify</td><td>Existing <code>generateObject</code> call. Input is the caption and hashtags. Output is title, tags, spaces, intents. No new prompt.</td><td><code>convex/ai.ts</code></td></tr>
+    <tr><td>Render card</td><td>If <code>siteName === "TikTok"</code>: show creator handle + glyph overlay and play pill. Ratio 9:16 is inside the current clamp (0.5).</td><td><code>item-card.tsx</code></td></tr>
+    <tr><td>Render detail</td><td>If <code>siteName === "TikTok"</code>: show poster with play button and creator row. Hide the article reader. "Open" uses <code>WebBrowser.openBrowserAsync</code>. iOS hands off to the TikTok app if installed.</td><td><code>item-detail.tsx</code></td></tr>
+  </table>
+
+  <p class="label" style="margin-top:40px">6 · What this design does not do</p>
+  <ol>
+    <li>No in-app video playback. The TikTok embed needs a WebView and autoplay is blocked. "Open" is one tap and always works.</li>
+    <li>No transcript. oEmbed does not return it. The AI classifies from the caption. Good enough for most saves.</li>
+    <li>No Instagram Reels or YouTube Shorts yet. Same pattern. Add a host check when needed.</li>
+  </ol>
+</div>
+</body>
+</html>
