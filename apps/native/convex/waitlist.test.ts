@@ -3,7 +3,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
-import { CONSENT_TEXT, CONSENT_VERSION, RESEND_MAX_ATTEMPTS } from "./waitlist";
+import {
+  ANDROID_CONSENT_TEXT,
+  ANDROID_CONSENT_VERSION,
+  CONSENT_TEXT,
+  CONSENT_VERSION,
+  RESEND_MAX_ATTEMPTS,
+} from "./waitlist";
 import { newConvexTest } from "./test.setup";
 
 afterEach(() => {
@@ -64,6 +70,44 @@ describe("waitlist.join", () => {
       expect(rows[0]?.lastSubmittedAt).toBeGreaterThanOrEqual(
         rows[0]?.firstSubmittedAt ?? 0,
       );
+    });
+  });
+
+  it("stores Android interest separately with Android-specific consent", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const t = newConvexTest();
+
+    await t.action(api.waitlist.join, {
+      email: "android@example.com",
+      source: "hero",
+    });
+    await t.action(api.waitlist.join, {
+      email: "android@example.com",
+      product: "shelvr-android",
+      source: "footer",
+    });
+
+    await t.run(async (ctx) => {
+      const generic = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", "android@example.com").eq("product", "shelvr"),
+        )
+        .unique();
+      const android = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", "android@example.com").eq("product", "shelvr-android"),
+        )
+        .unique();
+
+      expect(generic).not.toBeNull();
+      expect(android).toMatchObject({
+        product: "shelvr-android",
+        source: "footer",
+        consentVersion: ANDROID_CONSENT_VERSION,
+        consentText: ANDROID_CONSENT_TEXT,
+      });
     });
   });
 
@@ -179,6 +223,43 @@ describe("waitlist.retryFailedResendSyncs", () => {
       // Unconfigured is an operator condition, not a row failure: the last
       // real error must survive the status patch.
       expect(signup?.resendError).toBe("previous outage");
+    });
+  });
+
+  it("leaves Android rows unconfigured until their Resend segment exists", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_ANDROID_SEGMENT_ID", "");
+    const t = newConvexTest();
+    const now = Date.now();
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("waitlistSignups", {
+        email: "android-retry@example.com",
+        product: "shelvr-android",
+        source: "hero",
+        consentVersion: ANDROID_CONSENT_VERSION,
+        consentText: ANDROID_CONSENT_TEXT,
+        consentedAt: now,
+        firstSubmittedAt: now,
+        lastSubmittedAt: now,
+        resendStatus: "pending",
+        resendAttempts: 0,
+      });
+    });
+
+    await t.action(internal.waitlist.retryFailedResendSyncs, {});
+
+    await t.run(async (ctx) => {
+      const signup = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q
+            .eq("email", "android-retry@example.com")
+            .eq("product", "shelvr-android"),
+        )
+        .unique();
+      expect(signup?.resendStatus).toBe("unconfigured");
+      expect(signup?.resendAttempts).toBe(0);
     });
   });
 

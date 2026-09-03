@@ -6,8 +6,8 @@ export function captureWebAnalyticsEvent(
   properties: AnalyticsProperties = {},
 ) {
   // Analytics must never break the UI: localStorage and crypto access can
-  // throw in restrictive privacy modes, and callers fire capture outside
-  // their own error handling (e.g. WaitlistForm before its try block).
+  // throw in restrictive privacy modes, and CTA handlers should remain usable
+  // even when telemetry is unavailable.
   try {
     const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;

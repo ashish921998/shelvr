@@ -1,75 +1,121 @@
-import Link from "next/link";
-import AppPhone from "./AppPhone";
-import WaitlistForm from "./WaitlistForm";
+import Image from "next/image";
+import type { CSSProperties } from "react";
+import AppStoreButton from "../AppStoreButton";
+import AndroidWaitlist from "./AndroidWaitlist";
+import styles from "./Hero.module.css";
+
+const floatingSaves = [
+  {
+    position: "recipes",
+    image: "/images/spaces/recipes.jpg",
+    label: "Weeknight ramen",
+    meta: "Recipes",
+  },
+  {
+    position: "prague",
+    image: "/images/spaces/prague.jpg",
+    label: "Prague someday",
+    meta: "Trips",
+  },
+  {
+    position: "reading",
+    image: "/images/spaces/reading.jpg",
+    label: "Reading list",
+    meta: "Ideas",
+  },
+  {
+    position: "gifts",
+    image: "/images/spaces/gifts.jpg",
+    label: "Coffee setup",
+    meta: "Wish list",
+  },
+] as const;
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="container grid min-h-[52rem] items-center gap-12 py-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16 lg:py-16">
-        <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#ead4ad] bg-[#fff8eb] px-3 py-2 text-xs font-semibold text-ember-deep">
-            <span className="h-1.5 w-1.5 rounded-full bg-ember" />
-            Private beta opening soon
-          </span>
+    <section className={styles.hero} aria-labelledby="hero-title">
+      <div className={styles.glow} aria-hidden="true" />
 
-          <h1 className="mt-7 text-[3.25rem] font-bold leading-[0.92] tracking-[-0.07em] text-ink sm:text-7xl lg:text-[6.1rem]">
-            Your saved internet,
-            <em className="display block text-ember-deep">finally useful.</em>
-          </h1>
+      <div aria-hidden="true">
+        {floatingSaves.map((save, index) => (
+          <figure
+            key={save.label}
+            className={`${styles.save} ${styles[save.position]}`}
+            style={{ "--save-index": index } as CSSProperties}
+          >
+            <span className={styles.saveImage}>
+              <Image
+                src={save.image}
+                alt=""
+                fill
+                priority={index < 2}
+                sizes="(max-width: 640px) 124px, (max-width: 1100px) 150px, 220px"
+              />
+            </span>
+            <figcaption>
+              <strong>{save.label}</strong>
+              <span>{save.meta}</span>
+            </figcaption>
+          </figure>
+        ))}
 
-          <p className="mt-7 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
-            Shelvr is a calm, searchable home for everything you want to
-            remember. Save in one tap. Let AI handle the filing.
-          </p>
+        <aside className={styles.note}>
+          <span>NOTE</span>
+          <p>Build a home full of things worth remembering.</p>
+        </aside>
 
-          <div className="mt-8 w-full max-w-xl">
-            <WaitlistForm source="hero" compact accent />
-            <Link
-              href="#how"
-              className="mt-2 inline-flex min-h-10 items-center justify-center text-sm font-bold text-ink underline decoration-line-strong underline-offset-4 transition hover:text-ember-deep lg:justify-start"
-            >
-              See how it works&nbsp; ↓
-            </Link>
+        <aside className={styles.linkCard}>
+          <span className={styles.linkIcon}>↗</span>
+          <div>
+            <strong>The quiet joy of keeping things</strong>
+            <span>every.to</span>
           </div>
+        </aside>
+      </div>
 
-          <div className="mt-9 grid gap-2 text-xs text-muted sm:flex sm:gap-5">
-            {["Built for iPhone", "Private by design", "No folder upkeep"].map(
-              (item) => (
-                <span key={item}>
-                  <span className="mr-2 text-ember-deep">✓</span>
-                  {item}
-                </span>
-              ),
-            )}
-          </div>
-        </div>
-
-        <div className="relative mx-auto grid h-[40rem] w-full max-w-[38rem] place-items-center sm:h-[45rem]">
-          <div className="absolute h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(230,162,60,0.18),transparent_68%)] sm:h-[38rem] sm:w-[38rem]" />
-          <span className="display absolute right-2 top-8 hidden rotate-3 text-lg text-muted lg:block">
-            the app, for real →
-          </span>
-
-          <AppPhone
-            src="/images/app/home.webp"
-            alt="Shelvr home screen showing a visual feed of saved links and images"
+      <div className={styles.center}>
+        <div className={styles.mark}>
+          <Image
+            src="/shelvr-mark.svg"
+            alt=""
+            width={52}
+            height={52}
             priority
-            className="z-10 h-[38rem] w-[18.25rem] sm:h-[43rem] sm:w-[20.6rem]"
+            aria-hidden
           />
-
-          <div className="absolute left-0 top-36 z-20 rounded-2xl border border-line bg-cream/95 px-4 py-3 text-xs font-bold shadow-card backdrop-blur sm:left-3">
-            <span className="text-ember-deep">One tap saved</span>
-            <small className="mt-1 block font-normal text-muted">
-              link, note, photo, or camera
-            </small>
-          </div>
-          <div className="absolute bottom-20 right-0 z-20 rounded-2xl border border-line bg-cream/95 px-4 py-3 text-xs font-bold shadow-card backdrop-blur">
-            <span className="text-ember-deep">Already organized</span>
-            <small className="mt-1 block font-normal text-muted">
-              titles, tags, and spaces
-            </small>
-          </div>
         </div>
+
+        <p className={styles.kicker}>Save it. Shelvr handles the rest.</p>
+        <h1 id="hero-title">
+          Your saved internet,
+          <br />
+          <em>finally useful.</em>
+        </h1>
+        <p className={styles.copy}>
+          Save anything in one tap. Shelvr understands it, files it into the
+          right Space, and keeps it ready for later.
+        </p>
+
+        <div
+          className={styles.route}
+          aria-label="Links, photos, and notes are automatically filed"
+        >
+          <span>Link</span>
+          <span>Photo</span>
+          <span>Note</span>
+          <b aria-hidden>→</b>
+          <strong>Auto-filed</strong>
+        </div>
+
+        <div className={styles.cta}>
+          <AppStoreButton source="hero" />
+          <AndroidWaitlist source="hero" />
+        </div>
+
+        <p className={styles.proof}>
+          Available on iPhone <span>·</span> Private by design <span>·</span> No
+          folder upkeep
+        </p>
       </div>
     </section>
   );

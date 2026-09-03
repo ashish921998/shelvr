@@ -1,0 +1,478 @@
+.hero {
+  position: relative;
+  min-height: calc(100svh - 4rem);
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(154, 100, 22, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(154, 100, 22, 0.025) 1px, transparent 1px),
+    var(--color-paper);
+  background-size: 48px 48px;
+  color: var(--color-ink);
+  isolation: isolate;
+}
+
+.glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  width: min(70vw, 900px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(230, 162, 60, 0.2),
+    rgba(230, 162, 60, 0.06) 40%,
+    transparent 70%
+  );
+  filter: blur(8px);
+}
+
+.center {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: min(740px, calc(100% - 40px));
+  min-height: calc(100svh - 4rem);
+  margin: 0 auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 72px 0 64px;
+  text-align: center;
+}
+
+.mark {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid rgba(154, 100, 22, 0.18);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: 0 22px 65px -28px rgba(43, 36, 24, 0.5);
+  animation: markIn 240ms 40ms ease-out both;
+}
+
+.kicker {
+  margin-top: 16px;
+  color: var(--color-ember-deep);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  animation: riseIn 220ms 260ms ease-out both;
+}
+
+.center h1 {
+  width: 100%;
+  margin-top: 16px;
+  font-size: clamp(50px, 5.3vw, 76px);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.07em;
+  animation: riseIn 240ms 330ms ease-out both;
+}
+
+.center h1 em {
+  color: var(--color-ember-deep);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.copy {
+  width: 100%;
+  max-width: 520px;
+  margin-top: 24px;
+  color: var(--color-muted);
+  font-size: 17px;
+  line-height: 1.65;
+  animation: riseIn 240ms 400ms ease-out both;
+}
+
+.route {
+  display: flex;
+  margin-top: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(154, 100, 22, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.72);
+  padding: 6px;
+  box-shadow: 0 12px 32px -26px rgba(43, 36, 24, 0.5);
+  backdrop-filter: blur(10px);
+  animation: riseIn 240ms 440ms ease-out both;
+}
+
+.route span,
+.route strong {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.route span {
+  color: var(--color-muted);
+}
+
+.route b {
+  color: var(--color-muted-soft);
+  font-size: 13px;
+}
+
+.route strong {
+  background: var(--color-ember-soft);
+  color: var(--color-ember-deep);
+}
+
+.cta {
+  display: flex;
+  width: min(100%, 520px);
+  margin-top: 16px;
+  align-items: center;
+  flex-direction: column;
+  animation: riseIn 240ms 500ms ease-out both;
+}
+
+.proof {
+  display: flex;
+  margin-top: 16px;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-muted);
+  font-size: 12px;
+  animation: riseIn 220ms 560ms ease-out both;
+}
+
+.proof span {
+  color: var(--color-ember-deep);
+}
+
+.save,
+.note,
+.linkCard {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  animation: cardIn 240ms calc(90ms + var(--save-index, 0) * 55ms) ease-out
+    forwards;
+}
+
+.save {
+  width: clamp(145px, 15vw, 220px);
+  overflow: hidden;
+  border: 1px solid rgba(154, 100, 22, 0.16);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.88);
+  box-shadow: 0 24px 70px -34px rgba(43, 36, 24, 0.52);
+  backdrop-filter: blur(10px);
+}
+
+.saveImage {
+  position: relative;
+  display: block;
+  aspect-ratio: 1.36;
+}
+
+.saveImage img {
+  object-fit: cover;
+}
+
+.save figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 12px 16px;
+  text-align: left;
+}
+
+.save figcaption strong {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save figcaption span {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+
+.recipes {
+  top: 8%;
+  left: 3.5%;
+  transform: rotate(-5deg);
+}
+
+.prague {
+  top: 8%;
+  right: 3.5%;
+  transform: rotate(4deg);
+}
+
+.reading {
+  bottom: 6%;
+  left: 5%;
+  transform: rotate(3deg);
+}
+
+.gifts {
+  right: 5%;
+  bottom: 6%;
+  transform: rotate(-4deg);
+}
+
+.note {
+  top: 43%;
+  left: 2.2%;
+  width: clamp(150px, 14vw, 205px);
+  transform: rotate(2deg);
+  border: 1px solid #efd8ae;
+  border-radius: 18px;
+  background: #fff5dc;
+  padding: 16px;
+  box-shadow: 0 20px 50px -30px rgba(43, 36, 24, 0.48);
+  text-align: left;
+  --save-index: 4;
+}
+
+.note > span {
+  color: var(--color-ember-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.note p {
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.linkCard {
+  top: 45%;
+  right: 1.8%;
+  display: flex;
+  width: clamp(180px, 18vw, 255px);
+  transform: rotate(-2deg);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(154, 100, 22, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 12px;
+  box-shadow: 0 22px 58px -32px rgba(43, 36, 24, 0.5);
+  text-align: left;
+  --save-index: 5;
+}
+
+.linkIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--color-ember-soft);
+  color: var(--color-ember-deep);
+}
+
+.linkCard div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.linkCard strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkCard div span {
+  color: var(--color-muted);
+  font-size: 9px;
+}
+
+@keyframes markIn {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+    scale: 0.94;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@media (max-width: 1100px) {
+  .save {
+    width: 150px;
+  }
+
+  .recipes {
+    top: 8%;
+    left: -36px;
+  }
+
+  .prague {
+    top: 8%;
+    right: -36px;
+  }
+
+  .reading {
+    bottom: 5%;
+    left: -36px;
+  }
+
+  .gifts {
+    right: -36px;
+    bottom: 5%;
+  }
+
+  .note,
+  .linkCard {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .center {
+    min-height: calc(100svh - 4rem);
+    justify-content: flex-start;
+    padding-top: 96px;
+  }
+
+  .center h1 {
+    font-size: clamp(46px, 14vw, 68px);
+  }
+
+  .copy {
+    font-size: 15px;
+  }
+
+  .route {
+    gap: 2px;
+    margin-top: 16px;
+  }
+
+  .route span,
+  .route strong {
+    min-height: 24px;
+    padding-inline: 8px;
+    font-size: 8px;
+  }
+
+  .save {
+    width: 124px;
+  }
+
+  .recipes {
+    top: 2%;
+    left: -48px;
+  }
+
+  .prague {
+    top: 3%;
+    right: -48px;
+  }
+
+  .reading {
+    bottom: -20px;
+    left: -36px;
+  }
+
+  .gifts {
+    right: -40px;
+    bottom: -18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .center {
+    width: calc(100% - 34px);
+    padding-top: 88px;
+    padding-bottom: 96px;
+  }
+
+  .mark {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+  }
+
+  .mark img {
+    width: 46px;
+    height: 46px;
+  }
+
+  .kicker {
+    font-size: 9px;
+  }
+
+  .route span:nth-child(3) {
+    display: none;
+  }
+
+  .proof {
+    gap: 6px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark,
+  .kicker,
+  .center h1,
+  .copy,
+  .route,
+  .cta,
+  .proof,
+  .save,
+  .note,
+  .linkCard {
+    animation: none;
+    opacity: 1;
+  }
+}

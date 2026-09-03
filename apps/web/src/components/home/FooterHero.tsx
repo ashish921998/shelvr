@@ -1,4 +1,5 @@
-import WaitlistForm from "./WaitlistForm";
+import AppStoreButton from "../AppStoreButton";
+import AndroidWaitlist from "./AndroidWaitlist";
 
 export default function FooterHero() {
   return (
@@ -17,10 +18,11 @@ export default function FooterHero() {
             <em className="display text-ember-deep">everything interesting.</em>
           </h2>
           <p className="mt-5 text-base text-muted sm:text-lg">
-            Launching first on iOS. One email when access opens.
+            Shelvr is available now on the App Store.
           </p>
-          <div className="mx-auto mt-8 max-w-xl">
-            <WaitlistForm source="footer" />
+          <div className="mt-8 flex flex-col items-center">
+            <AppStoreButton source="footer" />
+            <AndroidWaitlist source="footer" />
           </div>
         </div>
       </div>

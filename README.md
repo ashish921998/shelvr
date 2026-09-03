@@ -18,13 +18,13 @@ for Shelvr.
 - [Expo](https://docs.expo.dev/) + Expo Router (`apps/native`) — product app
 - [Convex](https://convex.dev/) (`apps/native/convex/`)
 - [Convex Auth](https://labs.convex.dev/auth/) (Google + Apple OAuth, dev Anonymous)
-- Vercel AI SDK via AI Gateway (`google/gemini-3.1-flash-lite`)
+- Vercel AI SDK with the direct Google provider (`gemini-3.1-flash-lite`)
 
 ## What’s inside
 
-| Path | Purpose |
-| --- | --- |
-| `apps/web` | Next.js marketing / landing site |
+| Path          | Purpose                                            |
+| ------------- | -------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site                   |
 | `apps/native` | Expo native client (full product) + Convex backend |
 
 ## Quick start
@@ -73,10 +73,32 @@ For local dev only, enable the passwordless Anonymous sign-in button:
 cd apps/native && npx convex env set AUTH_ENABLE_ANONYMOUS true
 ```
 
-For AI classification, also set:
+For AI classification, set a Google AI Studio API key on each Convex deployment.
+Convex environment variables are deployment-specific, so production needs the
+explicit `--prod` command even when development is already configured:
 
 ```sh
-cd apps/native && npx convex env set AI_GATEWAY_API_KEY <your-vercel-ai-gateway-key>
+cd apps/native && npx convex env set GOOGLE_GENERATIVE_AI_API_KEY <your-google-ai-studio-key>
+cd apps/native && npx convex env set --prod GOOGLE_GENERATIVE_AI_API_KEY <your-google-ai-studio-key>
+```
+
+AI categorization observability is sent server-side to PostHog. Configure the
+same variables on development and production (`--prod`):
+
+```sh
+cd apps/native && npx convex env set POSTHOG_PROJECT_TOKEN <posthog-project-token>
+cd apps/native && npx convex env set POSTHOG_HOST https://us.i.posthog.com
+cd apps/native && npx convex env set OBSERVABILITY_ENV development
+```
+
+The pipeline emits `ai_categorization_succeeded`, `_partial`, `_not_found`, and
+`_failed` with provider, model, item type, duration, environment, and a sanitized
+error category when relevant. It never sends item content, URLs, item ids, or
+user identifiers.
+
+For the RevenueCat webhook, also set:
+
+```sh
 cd apps/native && npx convex env set REVENUECAT_WEBHOOK_SECRET <webhook-secret>
 ```
 
@@ -97,9 +119,10 @@ cp apps/native/.example.env apps/native/.env.local
 - `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `apps/native/.env.local`
 - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
 - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → RevenueCat SDK keys
+- `ACTIVATION_PAL_IOS_KEY` → ActivationPal public app key embedded in iOS builds
 
-The web marketing site needs these variables for its launch waitlist and
-conversion experiment (copy `apps/web/.env.example` to
+The web marketing site uses the Convex deployment for its Android waitlist;
+analytics are optional (copy `apps/web/.env.example` to
 `apps/web/.env.local`):
 
 ```sh
@@ -108,14 +131,11 @@ NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-`CONVEX_URL` is the Convex deployment the waitlist route submits to; without
-it the route returns 503 and the form shows a "try again shortly" message.
-PostHog is optional; without its public variables, waitlist signup still works
-and web analytics become a no-op. Waitlist rows are stored in Convex
-(`waitlistSignups`). Set `RESEND_API_KEY` (and optional `RESEND_SEGMENT_ID` /
-`RESEND_TOPIC_ID`) on the Convex deployment to sync confirmed signups into a
-Resend audience; without them the signup still persists and Resend sync stays
-unconfigured until a later retry.
+Without `CONVEX_URL`, the Android waitlist route returns 503. Without the
+PostHog public variables, signup and App Store downloads still work and web
+analytics become a no-op. Waitlist rows are stored in Convex and optionally
+synced to Resend. Set `RESEND_API_KEY` and `RESEND_ANDROID_SEGMENT_ID` on the
+Convex deployment to add Android signups to a dedicated Resend segment.
 
 ### 5. Run
 
@@ -130,18 +150,17 @@ Runs backend, web (landing), and native via Turbo.
 - **`items`** — saved links / images / notes (`processing` → `ready` | `failed`)
 - **`spaces`** — themed collections owned by a user
 - **`spaceItems`** — join table
-- **`waitlistSignups`** — launch waitlist emails collected from the marketing site
+- **`waitlistSignups`** — platform availability waitlists and prior launch records
 
-Public APIs live in `items.ts`, `spaces.ts`, and `waitlist.ts` (the
-marketing-site waitlist). The Node action pipeline is in
-`ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
+Public product APIs live in `items.ts` and `spaces.ts`. The Node action pipeline
+is in `ai.ts` (`processItem`, `reclassifyForNewSpace`). Auth always derives `userId`
 from Convex Auth via `model/auth.ts` (the stable users-table id extracted from the
 session-bearing JWT `sub`) — never from a client argument.
 
 ## Deploying web
 
-The marketing site is a Next.js build. Waitlist signup needs `CONVEX_URL` at
-runtime (the Convex deployment that hosts `waitlist:join`):
+The marketing site is a Next.js build. Android waitlist signup needs
+`CONVEX_URL` at runtime:
 
 ```sh
 pnpm --filter web-app build

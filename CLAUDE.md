@@ -18,10 +18,10 @@ in matching existing items.
 
 ## Monorepo layout
 
-| Path | Role |
-| --- | --- |
-| `apps/web` | Next.js marketing / landing site only |
-| `apps/native` | Expo Router native app (includes `convex/` backend) |
+| Path          | Role                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists |
+| `apps/native` | Expo Router native app (includes `convex/` backend)                           |
 
 Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
@@ -80,7 +80,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 ### Web (`apps/web`)
 
-- Next.js App Router marketing site only (no auth, no Convex)
+- Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
+  for marketing forms such as platform waitlists
 - Landing page at `/` — product experience lives in the native app
 
 ### Native (`apps/native`)
@@ -102,7 +103,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 **Client**
 
-- Web: no backend/auth env vars (static marketing site)
+- Web: `CONVEX_URL` is optional unless a server-backed marketing form is enabled; no auth env vars
 - Native (`.env.local`): `EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` (optional,
   mirrors the backend `AUTH_ENABLE_ANONYMOUS` to show the dev-only passwordless button)
 
