@@ -236,7 +236,9 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      {__DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true' ? (
+      {__DEV__ &&
+      process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true' &&
+      user?.isDevelopmentAnonymous ? (
         <Pressable
           testID="reset-flow-fixtures"
           accessibilityRole="button"

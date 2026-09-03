@@ -104,6 +104,7 @@ private final class Client: @unchecked Sendable {
     private var context: [String: String] = [:]
     private var buffer: [[String: Any]] = []
     private var isFlushing = false
+    private var inFlightCount = 0
     private var backgroundedAt: Date?
     private var timer: DispatchSourceTimer?
     private var observers: [NSObjectProtocol] = []
@@ -229,7 +230,12 @@ private final class Client: @unchecked Sendable {
 
         buffer.append(event)
         if buffer.count > maxPersistedEvents {
-            buffer.removeFirst(buffer.count - maxPersistedEvents)
+            let overflow = buffer.count - maxPersistedEvents
+            if isFlushing {
+                buffer.removeSubrange(inFlightCount..<(inFlightCount + overflow))
+            } else {
+                buffer.removeFirst(overflow)
+            }
         }
         persistQueue()
         if buffer.count >= flushThreshold { flush() }
@@ -307,6 +313,7 @@ private final class Client: @unchecked Sendable {
         }
 
         isFlushing = true
+        inFlightCount = batch.count
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -316,9 +323,11 @@ private final class Client: @unchecked Sendable {
         URLSession.shared.dataTask(with: request) { [weak self] _, response, _ in
             guard let self = self else { return }
             self.queue.async {
+                let sentCount = self.inFlightCount
                 self.isFlushing = false
+                self.inFlightCount = 0
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                    self.buffer.removeFirst(min(batch.count, self.buffer.count))
+                    self.buffer.removeFirst(min(sentCount, self.buffer.count))
                     self.persistQueue()
                     #if DEBUG
                     print("[ActivationPal] flushed \(batch.count) event(s)")

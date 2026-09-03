@@ -58,9 +58,9 @@ export default function AppleConceptPage() {
         </div>
         <div className={styles.showcase}>
           <div className={styles.copyPanel}>
-            <div className={styles.segmented} role="tablist" aria-label="Shelvr features">
+            <div className={styles.segmented} role="group" aria-label="Shelvr features">
               {previews.map((item, index) => (
-                <button key={item.label} role="tab" aria-selected={active === index} onClick={() => setActive(index)}>{item.label}</button>
+                <button key={item.label} type="button" aria-pressed={active === index} onClick={() => setActive(index)}>{item.label}</button>
               ))}
             </div>
             <div className={styles.previewCopy} key={preview.label}>

@@ -480,7 +480,7 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
  * expire within hours, so the card would go blank without this. Best-effort:
  * a blocked or oversized image leaves the (short-lived) URL as the fallback.
  */
-async function storePoster(
+export async function storePoster(
   ctx: { storage: { store: (blob: Blob) => Promise<Id<"_storage">> } },
   imageUrl: string,
 ): Promise<Id<"_storage"> | undefined> {
@@ -496,11 +496,15 @@ async function storePoster(
   if (!result.ok) {
     return undefined;
   }
-  return await ctx.storage.store(
-    new Blob([new Uint8Array(result.bytes)], {
-      type: result.contentType.split(";")[0],
-    }),
-  );
+  try {
+    return await ctx.storage.store(
+      new Blob([new Uint8Array(result.bytes)], {
+        type: result.contentType.split(";")[0],
+      }),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**

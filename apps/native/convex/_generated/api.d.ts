@@ -23,6 +23,7 @@ import type * as model_memberships from "../model/memberships.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
+import type * as model_storage from "../model/storage.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "model/rateLimiter": typeof model_rateLimiter;
   "model/revenuecat": typeof model_revenuecat;
   "model/safeFetch": typeof model_safeFetch;
+  "model/storage": typeof model_storage;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;
   users: typeof users;

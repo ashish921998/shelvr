@@ -1387,6 +1387,74 @@ describe("poster storage compensation", () => {
       expect(await ctx.db.system.get("_storage", attached)).not.toBeNull();
     });
   });
+
+  it("deletes the previous poster when finalization replaces it", async () => {
+    const t = newConvexTest();
+    const previous = await storeBlob(t);
+    const replacement = await storeBlob(t);
+    const itemId = await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId: "poster-owner",
+        type: "link",
+        status: "processing",
+        storageId: previous,
+        tags: [],
+        searchText: "",
+      });
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "TikTok",
+      description: "A saved video",
+      tags: [],
+      storageId: replacement,
+      status: "ready",
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.system.get("_storage", previous)).toBeNull();
+      expect(await ctx.db.system.get("_storage", replacement)).not.toBeNull();
+      expect((await ctx.db.get(itemId))?.storageId).toBe(replacement);
+    });
+  });
+
+  it("keeps a replaced poster that another item still references", async () => {
+    const t = newConvexTest();
+    const shared = await storeBlob(t);
+    const replacement = await storeBlob(t);
+    const itemId = await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "other-owner",
+        type: "link",
+        status: "ready",
+        storageId: shared,
+        tags: [],
+        searchText: "",
+      });
+      return await ctx.db.insert("items", {
+        userId: "poster-owner",
+        type: "link",
+        status: "processing",
+        storageId: shared,
+        tags: [],
+        searchText: "",
+      });
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "TikTok",
+      description: "A saved video",
+      tags: [],
+      storageId: replacement,
+      status: "ready",
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.system.get("_storage", shared)).not.toBeNull();
+    });
+  });
 });
 
 describe("failed saves and retry", () => {

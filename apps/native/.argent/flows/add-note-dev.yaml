@@ -10,6 +10,6 @@ steps:
   - await: { idle: true }
   - echo: From save options, choose Note and expect the note composer.
   - tap:
-      id: square.and.pencil
+      text: Note
   - await: { visible: { text: Jot a note } }
   - await: { idle: true }

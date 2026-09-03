@@ -62,9 +62,9 @@ Bio:
 > Save once. Shelvr files it for you. ↓
 
 Use the tracked App Store link on Instagram. Until TikTok allows a clickable
-link, put `shelvr.app` (or the canonical Shelvr domain) and the exact app name in
-the bio. Use the Shelvr mark as the avatar so the profile is recognizable when
-the app appears in a video.
+link, put `shelvr-web.vercel.app` (or a verified canonical Shelvr domain) and the
+exact app name in the bio. Use the Shelvr mark as the avatar so the profile is
+recognizable when the app appears in a video.
 
 ## Research and warmup — days 2–8
 
@@ -128,14 +128,14 @@ to an ad and does not establish trust.
 | --- | --- | --- | --- | --- |
 | v001 | Social graveyard / confession | “I save things on Instagram like I’m ever going to find them again.” | Share one post to Shelvr, then retrieve it by search | “How many posts are in your Saved folder?” |
 | v002 | Screenshot chaos / confession | “My screenshots were a graveyard of good intentions.” | Save three screenshots into Spaces | “What’s your screenshot count?” |
-| v003 | Scattered / confession | “The recipe was in Instagram. The hotel was in Notes. I found neither.” | Recipe, place, and note in one Space | “Where do your saves disappear?” |
+| v003 | Fragmented plans / confession | “The recipe was in Instagram. The hotel was in Notes. I found neither.” | Recipe, place, and note in one Space | “Where do your saves disappear?” |
 | v004 | Social graveyard / before-after | “Before: 2,000 saved posts. After: things I can actually find.” | Instagram Saved → Shelvr Space → search | “Do you ever revisit your saved posts?” |
-| v005 | Screenshot / POV | “POV: you can actually find that screenshot from March.” | Search a remembered phrase | “What screenshot do you keep hunting for?” |
-| v006 | Scattered / list | “Three places your future plans go to die.” | Instagram, Photos, Notes → one Space | “Which one gets you?” |
+| v005 | Screenshot chaos / POV | “POV: you can actually find that screenshot from March.” | Search a remembered phrase | “What screenshot do you keep hunting for?” |
+| v006 | Fragmented plans / list | “Three places your future plans go to die.” | Instagram, Photos, Notes → one Space | “Which one gets you?” |
 | v007 | Social graveyard / demo | “Don’t leave this buried in your Saved folder.” | Share sheet capture and full-text search | “Instagram Saved or screenshots?” |
-| v008 | Screenshot / list | “Before deleting screenshots, rescue the useful ones.” | Tidy flow → save → delete | “Would this fix your camera roll?” |
-| v009 | Scattered / POV | “POV: your saved internet has a home.” | Mixed-format Space scroll | “What would your first Space be?” |
-| v010 | Objection reply | “But I already have Instagram Saved and Photos.” | Show cross-app search, Spaces, and map | “Where do you save things you actually need later?” |
+| v008 | Screenshot chaos / list | “Before deleting screenshots, rescue the useful ones.” | Tidy flow → save → delete | “Would this fix your camera roll?” |
+| v009 | Fragmented plans / POV | “POV: your saved internet has a home.” | Mixed-format Space scroll | “What would your first Space be?” |
+| v010 | Fragmented plans / reaction | “But I already have Instagram Saved and Photos.” | Show cross-app search, Spaces, and map | “Where do you save things you actually need later?” |
 
 After v010, use the strongest angle twice more with new hooks, then test the next
 format. Reserve one or two posts per week for a trend only when it can express a

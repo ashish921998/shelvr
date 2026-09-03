@@ -1,9 +1,7 @@
-"use client";
-
 import Link from "next/link";
 import { APP_STORE_URL } from "@/lib/app-store";
-import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import Logo from "../common/Logo";
+import FooterAppStoreLink from "./FooterAppStoreLink";
 
 const links = [
   { title: "How it works", url: "#how" },
@@ -27,27 +25,19 @@ const Footer = () => {
           </div>
           <nav className="grid grid-cols-2 gap-x-10 gap-y-3 sm:text-right">
             {links.map((item) => (
-              <Link
-                key={item.title}
-                href={item.url}
-                target={item.url.startsWith("https://") ? "_blank" : undefined}
-                rel={
-                  item.url.startsWith("https://")
-                    ? "noopener noreferrer"
-                    : undefined
-                }
-                onClick={
-                  item.url === APP_STORE_URL
-                    ? () =>
-                        captureWebAnalyticsEvent("app_store_clicked", {
-                          source: "footer-nav",
-                        })
-                    : undefined
-                }
-                className="text-sm font-medium text-muted transition-colors hover:text-ink"
-              >
-                {item.title}
-              </Link>
+              item.url === APP_STORE_URL ? (
+                <FooterAppStoreLink key={item.title}>
+                  {item.title}
+                </FooterAppStoreLink>
+              ) : (
+                <Link
+                  key={item.title}
+                  href={item.url}
+                  className="text-sm font-medium text-muted transition-colors hover:text-ink"
+                >
+                  {item.title}
+                </Link>
+              )
             ))}
           </nav>
         </div>

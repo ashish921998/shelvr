@@ -4,18 +4,19 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { requireUserId } from "./model/auth";
+import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 
 /**
- * Returns the currently signed-in user's id and email, or `null` when
+ * Returns the currently signed-in user's id, email, and development-fixture
+ * eligibility, or `null` when
  * unauthenticated. The client uses this for:
  *  - the profile screen (email display)
  *  - RevenueCat identity sync (`_id` is passed to `Purchases.logIn` so the
  *    webhook's `app_user_id` matches the `userId` every table keys on)
  *
  * `_id` is the same value `requireUserId` returns server-side, so passing it to
- * RevenueCat keeps the webhook mapping consistent. Only the two fields the
+ * RevenueCat keeps the webhook mapping consistent. Only the fields the
  * client needs are projected out — not the full auth document — so the contract
  * doesn't drift with Convex Auth's `users` schema (phone, verification state,
  * …).
@@ -27,6 +28,7 @@ export const getCurrentUser = query({
     v.object({
       _id: v.id("users"),
       email: v.optional(v.string()),
+      isDevelopmentAnonymous: v.boolean(),
     }),
   ),
   handler: async (ctx) => {
@@ -34,7 +36,11 @@ export const getCurrentUser = query({
     if (userId === null) return null;
     const user = await ctx.db.get(userId);
     if (user === null) return null;
-    return { _id: user._id, email: user.email };
+    return {
+      _id: user._id,
+      email: user.email,
+      isDevelopmentAnonymous: await isDevelopmentAnonymousUser(ctx, user._id),
+    };
   },
 });
 

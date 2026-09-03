@@ -1,7 +1,7 @@
 {
-  "background": "linear-gradient(160deg, #F1DFC0 0%, #FFFDF8 100%)",
+  "background": "linear-gradient(160deg, #F1DFC0 0%, #F8F0E3 52%, #FFFDF8 100%)",
   "frame": "17-pro-silver",
-  "fontFamily": "\"Montserrat\", system-ui, sans-serif",
+  "fontFamily": "\"DM Sans\", -apple-system, system-ui, sans-serif",
   "template": "editorial",
   "layout": "classic",
   "screenOnly": false

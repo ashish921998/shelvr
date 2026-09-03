@@ -230,6 +230,12 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Text style={styles.description}>{item.description}</Text>
         ) : null}
 
+        {isVideo && paragraphs.length > 0 ? (
+          <Text selectable style={styles.paragraph}>
+            {paragraphs.join('\n\n')}
+          </Text>
+        ) : null}
+
         {item.tags.length > 0 ? (
           <View style={styles.chipsRow}>
             {item.tags.map((tag) => (

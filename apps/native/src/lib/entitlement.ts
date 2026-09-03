@@ -312,8 +312,10 @@ export async function presentPaywall(placement = 'pro_gate'): Promise<PaywallOut
   const rcui = getRCUI();
   if (!rcui) return 'unavailable';
   try {
-    activationPal.paywallShown(placement);
     const result = await rcui.presentPaywall();
+    if (result === 'CANCELLED' || result === 'PURCHASED' || result === 'RESTORED') {
+      activationPal.paywallShown(placement);
+    }
     if (result === 'CANCELLED') {
       activationPal.paywallDismissed();
     } else if (result === 'PURCHASED') {

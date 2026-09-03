@@ -13,7 +13,9 @@ export default function MapStackLayout() {
     >
       <Stack.Screen name="index">
         <Stack.Title asChild>
-          <Text style={styles.title}>map</Text>
+          <Text testID="map-screen-title" style={styles.title}>
+            map
+          </Text>
         </Stack.Title>
       </Stack.Screen>
     </Stack>

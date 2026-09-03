@@ -1089,6 +1089,14 @@ export const finalizeItem = internalMutation({
       failureReason: undefined,
       searchText,
     });
+    if (
+      args.storageId !== undefined &&
+      item.storageId !== undefined &&
+      item.storageId !== args.storageId &&
+      (await isStorageUnreferenced(ctx, item.storageId))
+    ) {
+      await safeDeleteStorage(ctx, item.storageId);
+    }
     return true;
   },
 });

@@ -42,17 +42,22 @@ const STEPS = {
   permissions: 6,
   ready: 7,
 } as const;
+type StepIndex = (typeof STEPS)[keyof typeof STEPS];
 
-const STEP_IDS = [
-  'promise',
-  'save_pileup',
-  'save_types',
-  'spaces',
-  'building',
-  'live_demo',
-  'permissions',
-  'ready',
-] as const;
+const STEP_IDS = {
+  [STEPS.promise]: 'promise',
+  [STEPS.surveyQ1]: 'save_pileup',
+  [STEPS.surveyQ2]: 'save_types',
+  [STEPS.spaces]: 'spaces',
+  [STEPS.building]: 'building',
+  [STEPS.demo]: 'live_demo',
+  [STEPS.permissions]: 'permissions',
+  [STEPS.ready]: 'ready',
+} as const satisfies Record<(typeof STEPS)[keyof typeof STEPS], string>;
+
+function isStepIndex(value: number): value is StepIndex {
+  return value in STEP_IDS;
+}
 
 // Q1 — "Where do your saves pile up today?" Analytics-only; no persistence, and
 // it doesn't seed anything downstream. Kept here (not in the component) because
@@ -92,7 +97,7 @@ export default function OnboardingScreen() {
   const { entitled } = useEntitlement();
   const { isAuthenticated } = useConvexAuth();
 
-  const [step, setStep] = useState<number>(STEPS.promise);
+  const [step, setStep] = useState<StepIndex>(STEPS.promise);
   const [q1, setQ1] = useState<string[]>([]);
   const [q2, setQ2] = useState<SaveKind[]>([]);
   const [spaces, setSpaces] = useState<string[]>([]);
@@ -117,7 +122,10 @@ export default function OnboardingScreen() {
 
   const advance = useCallback(() => {
     recordCurrentStep();
-    setStep((current) => Math.min(current + 1, STEPS.ready));
+    setStep((current) => {
+      const next = current + 1;
+      return isStepIndex(next) ? next : STEPS.ready;
+    });
   }, [recordCurrentStep]);
 
   // Pre-select spaces from Q2 presets when the user first reaches the spaces

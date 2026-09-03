@@ -1,6 +1,6 @@
 # Shelvr UGC videos
 
-Generated with MiniMax H3 Max as 5-second, 9:16 creator-style clips.
+Generated with MiniMax H3 Max as 5-second, 4:7 creator-style clips.
 
 | File | Creative hook |
 | --- | --- |
