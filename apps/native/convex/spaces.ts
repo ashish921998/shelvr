@@ -62,7 +62,8 @@ async function loadItems(
 // Public queries
 // ---------------------------------------------------------------------------
 
-/** List owned spaces with saved-item previews and separate suggestion counts. */
+/** List owned spaces with separate saved/suggestion counts. Previews are saved-first,
+ * and suggested previews are marked with `suggested: true`. */
 export const listSpaces = query({
   args: {},
   returns: v.array(
