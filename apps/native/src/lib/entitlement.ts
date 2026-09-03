@@ -4,7 +4,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/current-user';
-import { activationPal } from '@/lib/activation-pal';
+import { activationPal } from 'activation-pal';
 import {
   mapPaywallResult,
   shouldOpenPaywallFallback,
@@ -296,11 +296,7 @@ async function purchasedPlan(): Promise<string> {
 
   try {
     const customerInfo = await rc.getCustomerInfo();
-    const activeSubscription = customerInfo.activeSubscriptions[0];
-    if (activeSubscription) return activeSubscription;
-
-    const activeEntitlement = Object.values(customerInfo.entitlements.active)[0];
-    return activeEntitlement?.productIdentifier ?? 'unknown';
+    return Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ?? 'unknown';
   } catch {
     return 'unknown';
   }

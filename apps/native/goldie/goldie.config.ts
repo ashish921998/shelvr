@@ -1,7 +1,11 @@
-const APP_ROOT = '/Users/ashishhuddar/Developer/shelvr/apps/native';
-const APP_PATH =
-  process.env.GOLDIE_APP_PATH ??
-  '/tmp/shelvr-goldie-derived/Build/Products/Release-iphonesimulator/Shelvr.app';
+import { fileURLToPath } from 'node:url';
+
+const APP_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const APP_PATH = process.env.GOLDIE_APP_PATH;
+
+if (!APP_PATH) {
+  throw new Error('Set GOLDIE_APP_PATH to a Release simulator .app bundle.');
+}
 
 const config = {
   appRoot: APP_ROOT,

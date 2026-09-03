@@ -118,7 +118,8 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
   const maxHeroHeight = height * 0.55;
 
   // Source shape; OG images default to 1200×630 (≈1.91).
-  const heroAspect = item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1.4);
+  const heroAspect =
+    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === 'link' ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap — and when the cap bites, pull
@@ -271,7 +272,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           </Text>
         ) : null}
 
-        {paragraphs.length > 0 ? (
+        {!isVideo && paragraphs.length > 0 ? (
           <View style={styles.article}>
             {paragraphs.map((paragraph, index) => (
               <Text selectable key={index} style={styles.paragraph}>

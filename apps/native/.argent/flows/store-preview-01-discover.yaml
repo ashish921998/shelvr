@@ -3,7 +3,9 @@ steps:
   - await:
       visible:
         text: Home
-  - wait: 1200
+  - await:
+      visible:
+        text: Weeknight Miso Ramen
   - tap:
       text: Weeknight Miso Ramen
   - await:

@@ -21,17 +21,14 @@ const secureStore: PendingShareStore = {
   },
 };
 
-/** Persist the pending-share flag in device SecureStore. */
 export function markPendingShareOnDevice(): void {
   markPendingShareInStore(secureStore);
 }
 
-/** Read the pending-share flag from device SecureStore. */
 export function hasPendingShareOnDevice(): boolean {
   return hasPendingShareInStore(secureStore);
 }
 
-/** Clear the pending-share flag in device SecureStore without deleting its key. */
 export function clearPendingShareOnDevice(): void {
   clearPendingShareInStore(secureStore);
 }

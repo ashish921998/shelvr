@@ -89,6 +89,9 @@ same variables on development and production (`--prod`):
 cd apps/native && npx convex env set POSTHOG_PROJECT_TOKEN <posthog-project-token>
 cd apps/native && npx convex env set POSTHOG_HOST https://us.i.posthog.com
 cd apps/native && npx convex env set OBSERVABILITY_ENV development
+cd apps/native && npx convex env set --prod POSTHOG_PROJECT_TOKEN <posthog-project-token>
+cd apps/native && npx convex env set --prod POSTHOG_HOST https://us.i.posthog.com
+cd apps/native && npx convex env set --prod OBSERVABILITY_ENV production
 ```
 
 The pipeline emits `ai_categorization_succeeded`, `_partial`, `_not_found`, and

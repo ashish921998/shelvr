@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { env, query, internalMutation } from "./_generated/server";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { query, internalMutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireUserId } from "./model/auth";
+import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
 
 export const subscriptionStatusValidator = v.union(
@@ -11,21 +11,6 @@ export const subscriptionStatusValidator = v.union(
   v.literal("lapsed"),
   v.literal("lifetime"),
 );
-
-/** Development-only Pro access for the anonymous dev-login account. */
-async function isDevelopmentAnonymousUser(
-  ctx: QueryCtx | MutationCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
-  if (env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
-  const account = await ctx.db
-    .query("authAccounts")
-    .withIndex("userIdAndProvider", (q) =>
-      q.eq("userId", userId).eq("provider", "anonymous"),
-    )
-    .unique();
-  return account !== null;
-}
 
 /**
  * The entitlement a client renders. `status` is the stored subscription state

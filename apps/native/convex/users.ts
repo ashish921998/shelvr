@@ -5,6 +5,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
+import { safeDeleteStorage } from "./model/storage";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -202,16 +203,5 @@ async function deleteAuthIdentity(
   const user = await ctx.db.get(userId);
   if (user !== null) {
     await ctx.db.delete(userId);
-  }
-}
-
-/** Missing blobs must not wedge account deletion. */
-async function safeDeleteStorage(
-  ctx: MutationCtx,
-  storageId: Id<"_storage">,
-): Promise<void> {
-  const exists = await ctx.db.system.get("_storage", storageId);
-  if (exists !== null) {
-    await ctx.storage.delete(storageId);
   }
 }

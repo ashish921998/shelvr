@@ -1,5 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import type { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
+import {
+  env,
+  type ActionCtx,
+  type MutationCtx,
+  type QueryCtx,
+} from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
 /**
@@ -22,4 +27,18 @@ export async function requireUserId(
     throw new Error("Not authenticated");
   }
   return userId;
+}
+
+export async function isDevelopmentAnonymousUser(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (env.AUTH_ENABLE_ANONYMOUS !== "true") return false;
+  const account = await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) =>
+      q.eq("userId", userId).eq("provider", "anonymous"),
+    )
+    .unique();
+  return account !== null;
 }

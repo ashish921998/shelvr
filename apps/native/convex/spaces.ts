@@ -62,8 +62,6 @@ async function loadItems(
 // Public queries
 // ---------------------------------------------------------------------------
 
-/** List owned spaces with separate saved/suggestion counts. Previews are saved-first,
- * and suggested previews are marked with `suggested: true`. */
 export const listSpaces = query({
   args: {},
   returns: v.array(
@@ -147,7 +145,6 @@ export const listSpaces = query({
   },
 });
 
-/** Read one owned space with saved and suggested items kept separate. */
 export const getSpace = query({
   args: { id: v.id("spaces") },
   returns: v.union(
@@ -196,7 +193,6 @@ export const getSpace = query({
 // Public mutations
 // ---------------------------------------------------------------------------
 
-/** Create one idempotently named owned space and schedule its first recommendation pass. */
 export const createSpace = mutation({
   args: {
     name: v.string(),
@@ -240,7 +236,6 @@ export const createSpace = mutation({
   },
 });
 
-/** Update an owned space and recommend items when dynamic suggestions become enabled. */
 export const updateSpace = mutation({
   args: {
     id: v.id("spaces"),
@@ -285,7 +280,6 @@ export const updateSpace = mutation({
   },
 });
 
-/** Delete an owned space and all of its item membership rows. */
 export const deleteSpace = mutation({
   args: { id: v.id("spaces") },
   returns: v.null(),
@@ -339,7 +333,6 @@ async function scheduleSteering(
   }
 }
 
-/** Save an owned item into an owned space and schedule purpose steering when ready. */
 export const addItemToSpace = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
@@ -370,7 +363,6 @@ export const addItemToSpace = mutation({
   },
 });
 
-/** Remove one saved item membership without creating a dismissed suggestion row. */
 export const removeItemFromSpace = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   returns: v.null(),
@@ -385,7 +377,6 @@ export const removeItemFromSpace = mutation({
   },
 });
 
-/** Promote one suggested item membership to a user-owned saved membership. */
 export const acceptSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   // True only when a live suggestion actually flipped to saved, so the client
@@ -410,7 +401,6 @@ export const acceptSuggestion = mutation({
   },
 });
 
-/** Preserve one rejected suggestion as dismissed so AI cannot revive it. */
 export const dismissSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
   // True only when a live suggestion actually flipped to dismissed.
@@ -428,7 +418,6 @@ export const dismissSuggestion = mutation({
   },
 });
 
-/** Promote every current suggestion in one owned space to saved membership. */
 export const acceptAllSuggestions = mutation({
   args: { spaceId: v.id("spaces") },
   // The number of suggestions actually accepted, so analytics report the real
@@ -456,7 +445,6 @@ export const acceptAllSuggestions = mutation({
 // Internal — used by the AI actions
 // ---------------------------------------------------------------------------
 
-/** List an owner's spaces for internal item classification. */
 export const listSpacesInternal = internalQuery({
   args: { userId: v.string() },
   returns: v.array(v.object(spaceFields)),
@@ -468,7 +456,6 @@ export const listSpacesInternal = internalQuery({
   },
 });
 
-/** Read one space without public owner filtering for internal AI work. */
 export const getSpaceInternal = internalQuery({
   args: { spaceId: v.id("spaces") },
   returns: v.union(v.object(spaceFields), v.null()),

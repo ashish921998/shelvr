@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { env, mutation, type MutationCtx } from "./_generated/server";
-import { requireUserId } from "./model/auth";
+import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
+import { safeDeleteStorage } from "./model/storage";
 
 const RESET_LIMIT = 200;
 
@@ -18,32 +19,8 @@ async function requireDevelopmentAnonymousUser(
   if (env.AUTH_ENABLE_ANONYMOUS !== "true") {
     throw new Error("Development fixtures are disabled");
   }
-  const account = await ctx.db
-    .query("authAccounts")
-    .withIndex("userIdAndProvider", (q) =>
-      q.eq("userId", userId).eq("provider", "anonymous"),
-    )
-    .unique();
-  if (account === null) {
+  if (!(await isDevelopmentAnonymousUser(ctx, userId))) {
     throw new Error("Development fixtures require an anonymous account");
-  }
-}
-
-function ensureWithinResetLimit(name: string, count: number): void {
-  if (count > RESET_LIMIT) {
-    throw new Error(
-      `Development fixture reset refused: ${name} exceeds ${RESET_LIMIT} rows`,
-    );
-  }
-}
-
-async function safeDeleteStorage(
-  ctx: MutationCtx,
-  storageId: Id<"_storage">,
-): Promise<void> {
-  const exists = await ctx.db.system.get("_storage", storageId);
-  if (exists !== null) {
-    await ctx.storage.delete(storageId);
   }
 }
 
@@ -84,10 +61,18 @@ export const resetCurrentUser = mutation({
           .take(2),
       ]);
 
-    ensureWithinResetLimit("memberships", memberships.length);
-    ensureWithinResetLimit("operations", operations.length);
-    ensureWithinResetLimit("items", items.length);
-    ensureWithinResetLimit("spaces", spaces.length);
+    for (const [name, count] of [
+      ["memberships", memberships.length],
+      ["operations", operations.length],
+      ["items", items.length],
+      ["spaces", spaces.length],
+    ] as const) {
+      if (count > RESET_LIMIT) {
+        throw new Error(
+          `Development fixture reset refused: ${name} exceeds ${RESET_LIMIT} rows`,
+        );
+      }
+    }
     if (subscriptions.length > 1) {
       throw new Error(
         "Development fixture reset refused: duplicate subscription rows",

@@ -76,7 +76,6 @@ const SF_TO_MATERIAL = {
   'arrow.triangle.2.circlepath.camera': 'cameraswitch',
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
-/** SF Symbol names with an explicit cross-platform Material fallback. */
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;
 
 /**

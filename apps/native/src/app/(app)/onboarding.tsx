@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
-import { activationPal } from '@/lib/activation-pal';
+import { activationPal } from 'activation-pal';
 
 // Onboarding v2 — an 8-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,

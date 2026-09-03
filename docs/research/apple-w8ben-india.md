@@ -10,7 +10,7 @@ The best-supported treatment is:
 
 1. Complete **Form W-8BEN** to certify foreign individual status.
 2. Enter the developer's **PAN** as the foreign TIN.
-3. For ordinary App Store proceeds, **do not claim treaty benefits unless Apple specifically requires a claim**. In Apple's flow, that means answer **No** to a treaty-benefits question or leave the treaty-claim section blank.
+3. Follow the current question-driven App Store Connect flow for treaty benefits. Do not treat **No** or a blank Part II as a universal filing instruction; confirm the response with Apple Finance and a qualified tax professional before submission.
 4. Do **not** enter Article 12 / 15% merely because the app or subscription is described as a license.
 
 If the current App Store Connect form unexpectedly forces an article, rate, and explanation, stop before submission and ask Apple Finance to confirm why. If a treaty claim truly is required and the facts above are accurate, **Article 7(1), business profits, 0%** is materially more supportable than Article 12 royalties, but it is a fallback position rather than the normal way to certify foreign status for standard App Store proceeds.
@@ -26,7 +26,7 @@ If the current App Store Connect form unexpectedly forces an article, rate, and 
 | U.S. SSN / ITIN | Blank if the developer genuinely has neither | A foreign TIN may be used for a treaty claim instead of a U.S. TIN. Never invent an ITIN. [IRS W-8BEN instructions, lines 5 and 6a](https://www.irs.gov/instructions/iw8ben) |
 | Foreign TIN | PAN, without substituting GSTIN or Aadhaar | India's Income Tax Department describes PAN as its unique taxpayer identifier; the OECD's India TIN profile expressly identifies PAN as India's TIN. [India Income Tax Department](https://www.incometaxindia.gov.in/w/pan-and-aadhaar), [OECD India TIN profile](https://www.oecd.org/tax/automatic-exchange/crs-implementation-and-assistance/tax-identification-numbers/india-tin.pdf) |
 | Date of birth | Actual DOB in the format Apple requests | [IRS W-8BEN instructions, line 8](https://www.irs.gov/instructions/iw8ben) |
-| Claim tax treaty benefits? | **No / leave Part II blank** for ordinary App Store proceeds | A W-8BEN must be supplied when requested even without a treaty claim. [IRS W-8BEN instructions](https://www.irs.gov/instructions/iw8ben) |
+| Claim tax treaty benefits? | Confirm the response required by the current Apple India individual flow with Apple Finance and a qualified tax professional before submitting; do not assume **No / leave Part II blank** applies universally | Apple uses a question-driven flow to select the appropriate form and certification, and submitted information may require Apple support to correct. [Apple: provide tax information](https://developer.apple.com/help/app-store-connect/manage-tax-information/provide-tax-information/), [IRS W-8BEN instructions](https://www.irs.gov/instructions/iw8ben) |
 | Treaty country | Blank when no treaty claim is made | Not applicable without a treaty claim. |
 | Treaty article / paragraph | Blank when no treaty claim is made | Not applicable without a treaty claim. |
 | Type of income | If Apple separately requires an income-type selection, choose its ordinary **Income from the sale of applications** option; this does not by itself mean a treaty claim is being made | Apple's contract and U.S. regulations treat the platform relationship as sales/agency, not a royalty paid by Apple. See analysis below. |

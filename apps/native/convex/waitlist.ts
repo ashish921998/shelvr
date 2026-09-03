@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { internal } from "./_generated/api";
 import {
   action,
@@ -22,7 +22,7 @@ const productValidator = v.union(
   v.literal("shelvr"),
   v.literal("shelvr-android"),
 );
-type WaitlistProduct = "shelvr" | "shelvr-android";
+type WaitlistProduct = Infer<typeof productValidator>;
 
 const sourceValidator = v.union(
   v.literal("hero"),

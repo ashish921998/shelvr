@@ -7,11 +7,11 @@
 //
 // The contract the UI layer relies on, in plain terms:
 //
-//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the current raw
-//      shared payload batch (order + duplicates included). Two distinct batches
-//      must never share a fingerprint, so a deliberate later re-share of
-//      identical content is its own fresh session rather than matching a stale
-//      completed one.
+//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
+//      current raw shared payload batch (order + duplicates included). Two
+//      distinct batches must never share a fingerprint, so a deliberate later
+//      re-share of identical content is its own fresh session rather than
+//      matching a stale completed one.
 //   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
@@ -49,7 +49,6 @@ export type RawSharePayload = {
  * not import — it is reported, never silently coerced into a note. */
 export type ShareEntryKind = 'link' | 'note' | 'image' | 'unsupported';
 
-/** Persisted processing state for one entry in a native share session. */
 export type ShareEntryStatus = 'pending' | 'saved' | 'failed' | 'unsupported';
 
 /** A single resolved share entry plus its stable operation id and outcome. The
@@ -84,7 +83,6 @@ export type ShareSession = {
   entries: ShareEntry[];
 };
 
-/** Current persisted share-session schema version used to reject incompatible records. */
 export const SESSION_SCHEMA_VERSION = 1;
 
 /** The status/kind enums, centralized so loadSession can validate every entry
@@ -97,7 +95,6 @@ const ENTRY_STATUSES = new Set<ShareEntryStatus>([
 ]);
 const ENTRY_KINDS = new Set<ShareEntryKind>(['link', 'note', 'image', 'unsupported']);
 
-/** Device-storage key containing the active incoming share session. */
 export const SESSION_KEY = 'incoming-share-session';
 
 // ---------------------------------------------------------------------------
@@ -199,7 +196,6 @@ export function operationIdFor(sessionId: string, index: number): string {
 // Reconciliation
 // ---------------------------------------------------------------------------
 
-/** Outcome of reconciling native payloads with a persisted share session. */
 export type ReconcileResult =
   | { kind: 'empty' }
   | { kind: 'new'; session: ShareSession }

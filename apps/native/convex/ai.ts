@@ -25,12 +25,7 @@ const MODEL = google(MODEL_NAME);
 
 type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "failed";
 
-/**
- * Emit low-cardinality operational telemetry for the categorization pipeline.
- * No item ids, URLs, content, or user identifiers leave Convex. Observability
- * must also never change the product result, so ingestion is best-effort and
- * bounded independently from the model call.
- */
+/** No item ids, URLs, content, or user identifiers leave Convex. */
 async function captureCategorizationTelemetry(args: {
   outcome: CategorizationOutcome;
   itemType: "image" | "link" | "note";
@@ -437,7 +432,6 @@ type PageData = {
   heroImageUrl?: string;
   heroAspectRatio?: number;
   siteName?: string;
-  /** Creator handle, video saves only. */
   author?: string;
   content?: string;
 };
@@ -463,10 +457,10 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
     throw new PageFetchError(result.code, result.status);
   }
   const data = parseJson(result.bytes) as Record<string, unknown>;
-  const str = (key: string) =>
-    typeof data[key] === "string" && data[key] !== ""
-      ? (data[key] as string)
-      : undefined;
+  const str = (key: string) => {
+    const value = data[key];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
   const width = Number(data.thumbnail_width);
   const height = Number(data.thumbnail_height);
   const handle = str("author_unique_id");
@@ -927,7 +921,7 @@ export const processItem = internalAction({
           ? await storePoster(ctx, page.heroImageUrl)
           : undefined;
 
-      const finalized: boolean = await ctx.runMutation(
+      const finalized = await ctx.runMutation(
         internal.items.finalizeItem,
         {
           itemId: args.itemId,
@@ -1007,9 +1001,7 @@ export const processItem = internalAction({
           errorCategory,
         });
       }
-      // Convex's native PostHog/Sentry exception integrations only receive
-      // uncaught function failures. The item state has already been persisted,
-      // so rethrow a sanitized, low-cardinality category for error tracking.
+      // Rethrow so Convex error tracking sees the failure.
       throw new Error(`ai_categorization_failed:${errorCategory}`);
     }
     return null;

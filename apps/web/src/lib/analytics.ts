@@ -1,6 +1,5 @@
 type AnalyticsProperties = Record<string, boolean | number | string>;
 
-/** Capture one web analytics event without allowing telemetry failures to break the UI. */
 export function captureWebAnalyticsEvent(
   event: string,
   properties: AnalyticsProperties = {},

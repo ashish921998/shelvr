@@ -184,13 +184,13 @@ private final class Client: @unchecked Sendable {
             }
 
             self.loadPersistedQueue()
+            self.startSession()
 
             if !defaults.bool(forKey: self.firstOpenKey) {
                 defaults.set(true, forKey: self.firstOpenKey)
                 self.append(name: "first_open", props: [:])
                 self.captureAttributionToken()
             }
-            self.startSession()
             self.installObservers()
             self.startTimer()
             self.flush()

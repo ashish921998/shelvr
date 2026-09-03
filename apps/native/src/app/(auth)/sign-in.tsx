@@ -1,5 +1,4 @@
 import { LEGAL_URLS } from '@/lib/legal';
-import { formatErrorDetail } from '@/lib/error-detail';
 import { useAuthActions } from '@convex-dev/auth/react';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -59,10 +58,8 @@ export default function Page() {
       }
       await signIn(provider, { code });
     } catch (err) {
-      // Surface the full error shape — Convex wraps server errors with
-      // `.message` and sometimes `.data`; logging the whole object helps
-      // diagnose auth failures (expired tickets, provider misconfig, etc.).
-      const detail = formatErrorDetail(err);
+      const detail =
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       console.error('OAuth provider sign-in failed', provider, detail, err);
       setLastError(detail);
     } finally {

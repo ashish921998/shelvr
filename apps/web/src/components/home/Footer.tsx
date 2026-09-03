@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { APP_STORE_URL } from "@/lib/app-store";
+import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import Logo from "../common/Logo";
 
 const links = [
@@ -28,7 +31,19 @@ const Footer = () => {
                 key={item.title}
                 href={item.url}
                 target={item.url.startsWith("https://") ? "_blank" : undefined}
-                rel={item.url.startsWith("https://") ? "noopener noreferrer" : undefined}
+                rel={
+                  item.url.startsWith("https://")
+                    ? "noopener noreferrer"
+                    : undefined
+                }
+                onClick={
+                  item.url === APP_STORE_URL
+                    ? () =>
+                        captureWebAnalyticsEvent("app_store_clicked", {
+                          source: "footer-nav",
+                        })
+                    : undefined
+                }
                 className="text-sm font-medium text-muted transition-colors hover:text-ink"
               >
                 {item.title}

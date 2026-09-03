@@ -1,5 +1,5 @@
 import { posthog } from '@/lib/posthog';
-import { activationPal } from '@/lib/activation-pal';
+import { activationPal } from 'activation-pal';
 
 export type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
@@ -33,30 +33,21 @@ export type AnalyticsEventProperties = {
 
 export type AnalyticsEvent = keyof AnalyticsEventProperties;
 
-const activationPalDomainEvents = new Set<AnalyticsEvent>([
-  'article_saved',
-  'note_saved',
-  'images_saved',
-  'space_created',
-]);
-
-function captureActivationPalDomainEvent<Event extends AnalyticsEvent>(
-  event: Event,
-  properties?: AnalyticsEventProperties[Event],
-): void {
-  if (!activationPalDomainEvents.has(event)) return;
-
-  // The four selected domain events only contain scalar properties accepted by
-  // ActivationPal. Keep this boundary explicit so PostHog-only arrays/$set
-  // metadata cannot leak into the native SDK by accident.
-  activationPal.track(event, properties as Record<string, string | boolean | number> | undefined);
-}
-
 function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
-  captureActivationPalDomainEvent(event, properties);
+  if (
+    event === 'article_saved' ||
+    event === 'note_saved' ||
+    event === 'images_saved' ||
+    event === 'space_created'
+  ) {
+    activationPal.track(
+      event,
+      properties as Record<string, string | boolean | number> | undefined,
+    );
+  }
 
   if (!posthog) return;
 

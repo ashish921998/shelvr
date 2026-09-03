@@ -9,6 +9,7 @@ import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { enrichmentValidator, failureReasonValidator } from "./model/itemFields";
+import { safeDeleteStorage } from "./model/storage";
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
@@ -376,18 +377,6 @@ async function isStorageUnreferenced(
     .withIndex("by_storage", (q) => q.eq("storageId", storageId))
     .take(2);
   return ops.every((op) => op._id === excludeOperation);
-}
-
-/** Deletes a storage object iff it still exists. `ctx.storage.delete` throws on
- * a missing file, and several callers here run inside transactional sweeps or
- * recycle paths where one dangling reference must not wedge the whole mutation
- * (the cron re-reads the same oldest page every run, so a single poisoned row
- * would halt cleanup permanently). */
-async function safeDeleteStorage(ctx: MutationCtx, storageId: Id<"_storage">): Promise<void> {
-  const exists = await ctx.db.system.get("_storage", storageId);
-  if (exists !== null) {
-    await ctx.storage.delete(storageId);
-  }
 }
 
 /** Discriminated return for beginImageImport. A named type (rather than inline

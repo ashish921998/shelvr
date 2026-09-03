@@ -115,7 +115,6 @@ type Phase =
   | { kind: 'clearFailed'; session: ShareSession }
   | { kind: 'complete' };
 
-/** Receive, persist, and save one native share session with crash-safe retries. */
 export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();

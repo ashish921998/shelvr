@@ -10,7 +10,6 @@
 
 export const PENDING_SHARE_KEY = 'shelvr.pending.share';
 
-/** Synchronous key-value capability required by pure pending-share rules. */
 export interface PendingShareStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -46,7 +45,6 @@ export type ShareRouteDecision =
   | { action: 'defer-onboarding'; markPending: true }
   | { action: 'defer-sign-in'; markPending: true; href: '/(auth)/sign-in' };
 
-/** Choose the initial route for an incoming share and whether it must be deferred. */
 export function decideShareRoute(state: {
   onboarded: boolean;
   isAuthenticated: boolean;
