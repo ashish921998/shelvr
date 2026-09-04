@@ -1350,12 +1350,111 @@ describe("pageGone", () => {
   it.each([404, 410])("treats HTTP %i as permanently gone", (status) => {
     expect(pageGone(status)).toBe(true);
   });
-  it.each([403, 429, 500, 503, undefined])(
+  it.each([400, 403, 429, 500, 503, undefined])(
     "treats %s as retryable, not gone",
     (status) => {
       expect(pageGone(status)).toBe(false);
     },
   );
+});
+
+describe("poster storage compensation", () => {
+  it("deletes only storage that was never attached to an item", async () => {
+    const t = newConvexTest();
+    const orphaned = await storeBlob(t);
+    const attached = await storeBlob(t);
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "poster-owner",
+        type: "link",
+        status: "ready",
+        storageId: attached,
+        tags: [],
+        searchText: "",
+      });
+    });
+
+    await t.mutation(internal.items.deleteStorageIfUnreferenced, {
+      storageId: orphaned,
+    });
+    await t.mutation(internal.items.deleteStorageIfUnreferenced, {
+      storageId: attached,
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.system.get("_storage", orphaned)).toBeNull();
+      expect(await ctx.db.system.get("_storage", attached)).not.toBeNull();
+    });
+  });
+
+  it("deletes the previous poster when finalization replaces it", async () => {
+    const t = newConvexTest();
+    const previous = await storeBlob(t);
+    const replacement = await storeBlob(t);
+    const itemId = await t.run(async (ctx) => {
+      return await ctx.db.insert("items", {
+        userId: "poster-owner",
+        type: "link",
+        status: "processing",
+        storageId: previous,
+        tags: [],
+        searchText: "",
+      });
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "TikTok",
+      description: "A saved video",
+      tags: [],
+      storageId: replacement,
+      status: "ready",
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.system.get("_storage", previous)).toBeNull();
+      expect(await ctx.db.system.get("_storage", replacement)).not.toBeNull();
+      expect((await ctx.db.get(itemId))?.storageId).toBe(replacement);
+    });
+  });
+
+  it("keeps a replaced poster that another item still references", async () => {
+    const t = newConvexTest();
+    const shared = await storeBlob(t);
+    const replacement = await storeBlob(t);
+    const itemId = await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "other-owner",
+        type: "link",
+        status: "ready",
+        storageId: shared,
+        tags: [],
+        searchText: "",
+      });
+      return await ctx.db.insert("items", {
+        userId: "poster-owner",
+        type: "link",
+        status: "processing",
+        storageId: shared,
+        tags: [],
+        searchText: "",
+      });
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "TikTok",
+      description: "A saved video",
+      tags: [],
+      storageId: replacement,
+      status: "ready",
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.system.get("_storage", shared)).not.toBeNull();
+    });
+  });
 });
 
 describe("failed saves and retry", () => {

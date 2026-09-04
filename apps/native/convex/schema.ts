@@ -17,6 +17,9 @@ export default defineSchema({
 
   items: defineTable({
     userId: v.string(),
+    // Stable automation identity for development fixtures. Product writes do
+    // not accept this field; only the guarded fixture reset can populate it.
+    fixtureKey: v.optional(v.string()),
     type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
     status: v.union(
       v.literal("processing"),
@@ -37,6 +40,8 @@ export default defineSchema({
     tags: v.array(v.string()),
     content: v.optional(v.string()),
     siteName: v.optional(v.string()),
+    // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
+    author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
@@ -74,11 +79,7 @@ export default defineSchema({
       ),
     ),
     productsStatus: v.optional(
-      v.union(
-        v.literal("searching"),
-        v.literal("ready"),
-        v.literal("failed"),
-      ),
+      v.union(v.literal("searching"), v.literal("ready"), v.literal("failed")),
     ),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with
@@ -102,6 +103,7 @@ export default defineSchema({
 
   spaces: defineTable({
     userId: v.string(),
+    fixtureKey: v.optional(v.string()),
     name: v.string(),
     description: v.optional(v.string()),
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
@@ -229,7 +231,7 @@ export default defineSchema({
   // outage or migration can never lose the original signup or consent trail.
   waitlistSignups: defineTable({
     email: v.string(),
-    product: v.literal("shelvr"),
+    product: v.union(v.literal("shelvr"), v.literal("shelvr-android")),
     source: v.union(
       v.literal("hero"),
       v.literal("preview"),

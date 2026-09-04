@@ -1,0 +1,14 @@
+steps:
+  - launch: app.shelvr.save
+  - await:
+      visible:
+        text: Home
+  - await:
+      visible:
+        text: Weeknight Miso Ramen
+  - tap:
+      text: Weeknight Miso Ramen
+  - await:
+      visible:
+        text: Recipes
+  - wait: 1400

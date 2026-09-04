@@ -6,13 +6,14 @@ import { usePaywallGuard } from '@/lib/entitlement';
 import { useAppHeaderHeight } from '@/lib/header-layout';
 import { runIntent } from '@/lib/intents';
 import { displayHost } from '@/lib/url';
+import { isTikTokUrl } from '@convex/model/externalUrl';
 import { convexQuery } from '@convex-dev/react-query';
 import { api } from '@convex/_generated/api';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
 import { memo, useState } from 'react';
@@ -82,8 +83,11 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
   const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
 
+  // A video's "content" is its caption, not an article: keep the poster layout.
+  const isVideo = item.type === 'link' && isTikTokUrl(item.url);
+
   // Link saves with extracted content get the compact reader layout.
-  if (item.type === 'link' && paragraphs.length > 0) {
+  if (item.type === 'link' && !isVideo && paragraphs.length > 0) {
     return (
       <ArticleReaderView
         item={item}
@@ -114,7 +118,8 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
   const maxHeroHeight = height * 0.55;
 
   // Source shape; OG images default to 1200×630 (≈1.91).
-  const heroAspect = item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1.4);
+  const heroAspect =
+    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === 'link' ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap — and when the cap bites, pull
@@ -126,7 +131,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
   const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
   const heroWidth = heroHeight * heroAspect;
 
-  const hero = heroUri ? (
+  const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
       contentFit="contain"
@@ -138,8 +143,28 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
     />
   ) : null;
 
+  // The poster is the video's one real action: tap anywhere on it to open.
+  const hero =
+    heroImage && isVideo && item.url ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Play on TikTok"
+        onPress={() => WebBrowser.openBrowserAsync(item.url!)}
+      >
+        {heroImage}
+        <View style={styles.playOverlay} pointerEvents="none">
+          <View style={styles.playButton}>
+            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
+          </View>
+        </View>
+      </Pressable>
+    ) : (
+      heroImage
+    );
+
   return (
     <ScrollView
+      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
       contentInsetAdjustmentBehavior="never"
       style={[styles.container, { paddingTop: headerHeight + theme.gap(5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
@@ -167,11 +192,17 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               style={styles.sourceRow}
               onPress={() => WebBrowser.openBrowserAsync(item.url!)}
             >
-              <Icon name="safari" size={15} tintColor={theme.colors.muted} />
+              <AppSymbolIcon
+                name={isVideo ? 'play.rectangle' : 'safari'}
+                size={15}
+                tintColor={theme.colors.muted}
+              />
               <Text style={styles.sourceText}>
-                {item.siteName ?? displayHost(item.url)}
+                {isVideo && item.author
+                  ? `${item.author} · TikTok`
+                  : (item.siteName ?? displayHost(item.url))}
               </Text>
-              <Icon
+              <AppSymbolIcon
                 name="arrow.up.right"
                 size={11}
                 tintColor={theme.colors.faint}
@@ -199,6 +230,12 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Text style={styles.description}>{item.description}</Text>
         ) : null}
 
+        {isVideo && paragraphs.length > 0 ? (
+          <Text selectable style={styles.paragraph}>
+            {paragraphs.join('\n\n')}
+          </Text>
+        ) : null}
+
         {item.tags.length > 0 ? (
           <View style={styles.chipsRow}>
             {item.tags.map((tag) => (
@@ -222,7 +259,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
               asChild
             >
               <Pressable style={styles.manageSpacesChip}>
-                <Icon name="plus" size={11} tintColor={theme.colors.primaryText} />
+                <AppSymbolIcon name="plus" size={11} tintColor={theme.colors.primaryText} />
                 <Text style={styles.manageSpacesLabel}>
                   {spaces.length > 0 ? 'Spaces' : 'Add to space'}
                 </Text>
@@ -241,7 +278,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           </Text>
         ) : null}
 
-        {paragraphs.length > 0 ? (
+        {!isVideo && paragraphs.length > 0 ? (
           <View style={styles.article}>
             {paragraphs.map((paragraph, index) => (
               <Text selectable key={index} style={styles.paragraph}>
@@ -293,7 +330,7 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
 function SaveStatusNotice({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
-  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  const { guard, loading: entitlementLoading } = usePaywallGuard('item_detail');
   // Guards the retry gesture: disabled while in flight, and a rejection gets
   // user-visible feedback instead of an unhandled promise.
   const [retrying, setRetrying] = useState(false);
@@ -314,7 +351,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
 
   return (
     <View style={styles.noticeRow}>
-      <Icon
+      <AppSymbolIcon
         name="exclamationmark.triangle.fill"
         size={14}
         tintColor={state === 'gone' ? theme.colors.faint : theme.colors.danger}
@@ -341,7 +378,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
           {retrying ? (
             <ActivityIndicator size="small" color={theme.colors.primaryText} />
           ) : (
-            <Icon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
+            <AppSymbolIcon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
           )}
           <Text style={styles.chipLabel}>Try again</Text>
         </Pressable>
@@ -355,7 +392,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
 function ProductsSection({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const findLinks = useMutation(api.items.findLinks);
-  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  const { guard, loading: entitlementLoading } = usePaywallGuard('item_detail');
   // Same in-flight guard as the retry chip: no double-fire, and a rejected
   // search surfaces an alert instead of a silently dead button.
   const [finding, setFinding] = useState(false);
@@ -396,7 +433,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
                 />
               ) : (
                 <View style={[styles.productImage, styles.productImageEmpty]}>
-                  <Icon name="bag" size={22} tintColor={theme.colors.faint} />
+                  <AppSymbolIcon name="bag" size={22} tintColor={theme.colors.faint} />
                 </View>
               )}
               <Text style={styles.productName} numberOfLines={2}>
@@ -441,7 +478,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
         {finding ? (
           <ActivityIndicator size="small" color={theme.colors.primaryText} />
         ) : (
-          <Icon name="bag" size={14} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="bag" size={14} tintColor={theme.colors.primaryText} />
         )}
         <Text style={styles.chipLabel}>
           {item.productsStatus === 'failed'
@@ -481,6 +518,24 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.md,
     borderCurve: 'continuous',
     backgroundColor: theme.colors.surfaceMuted,
+  },
+  playOverlay: {
+    position: 'absolute',
+    inset: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Nudge the glyph to the optical center of the circle.
+    paddingLeft: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   body: {
     gap: theme.gap(5),

@@ -1,0 +1,12 @@
+steps:
+  - launch: app.shelvr.save
+  - await:
+      visible:
+        text: Spaces
+  - tap:
+      text: Spaces
+  - await:
+      visible:
+        text: Trips
+  - await:
+      idle: true

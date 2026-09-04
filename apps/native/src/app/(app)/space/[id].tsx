@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { useMemo } from 'react';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
@@ -152,7 +152,10 @@ export default function SpaceScreen() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar> : null}
-      <View style={styles.container}>
+      <View
+        testID={space.fixtureKey ? `fixture-space-detail-${space.fixtureKey}` : undefined}
+        style={styles.container}
+      >
         <MasonryFeed
           items={feedItems}
           source={{ from: 'space', spaceId: id }}
@@ -164,7 +167,7 @@ export default function SpaceScreen() {
                 exiting={FadeOut.duration(200)}
                 style={styles.suggestionsPill}
               >
-                <Icon name="sparkles" size={14} tintColor={theme.colors.primaryText} />
+                <AppSymbolIcon name="sparkles" size={14} tintColor={theme.colors.primaryText} />
                 <Text style={styles.suggestionsText}>
                   {suggestionCount === 1
                     ? '1 suggestion'

@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction } from "./_generated/server";
+import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { generateObject } from "ai";
@@ -16,10 +16,59 @@ import {
   isSafeFetchError,
   type SafeFetchError,
 } from "./model/safeFetch";
+import { isTikTokUrl } from "./model/externalUrl";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
-const MODEL = google("gemini-3.1-flash-lite");
+const MODEL_NAME = "gemini-3.1-flash-lite";
+const MODEL = google(MODEL_NAME);
+
+type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "failed";
+
+/** No item ids, URLs, content, or user identifiers leave Convex. */
+async function captureCategorizationTelemetry(args: {
+  outcome: CategorizationOutcome;
+  itemType: "image" | "link" | "note";
+  durationMs: number;
+  errorCategory?: string;
+}): Promise<void> {
+  try {
+    const projectToken = env.POSTHOG_PROJECT_TOKEN;
+    if (!projectToken) return;
+    const host = (env.POSTHOG_HOST ?? "https://us.i.posthog.com").replace(
+      /\/$/,
+      "",
+    );
+    const response = await fetch(`${host}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(3000),
+      body: JSON.stringify({
+        api_key: projectToken,
+        event: `ai_categorization_${args.outcome}`,
+        properties: {
+          distinct_id: "shelvr-convex-ai",
+          $process_person_profile: false,
+          service: "convex-ai",
+          environment: env.OBSERVABILITY_ENV ?? "development",
+          provider: "google",
+          model: MODEL_NAME,
+          item_type: args.itemType,
+          outcome: args.outcome,
+          duration_ms: args.durationMs,
+          ...(args.errorCategory !== undefined
+            ? { error_category: args.errorCategory }
+            : {}),
+        },
+      }),
+    });
+    if (!response.ok) {
+      console.warn("ai_observability_delivery_failed", response.status);
+    }
+  } catch {
+    console.warn("ai_observability_delivery_failed");
+  }
+}
 
 const SYSTEM_PROMPT =
   "You are the classifier for Shelvr, a save-it-for-later app. Titles must be short and " +
@@ -138,7 +187,12 @@ function readImageSize(
     return { width, height };
   }
   // GIF — little-endian uint16 at offset 6/8.
-  if (buf.length >= 10 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
+  if (
+    buf.length >= 10 &&
+    buf[0] === 0x47 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46
+  ) {
     return { width: buf[6] | (buf[7] << 8), height: buf[8] | (buf[9] << 8) };
   }
   // WebP — RIFF container tagged "WEBP", three sub-formats.
@@ -268,10 +322,7 @@ function extractTitle(html: string): string | undefined {
 function stripElements(html: string, tags: string[]): string {
   let out = html;
   for (const tag of tags) {
-    out = out.replace(
-      new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi"),
-      " ",
-    );
+    out = out.replace(new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi"), " ");
   }
   return out;
 }
@@ -279,7 +330,10 @@ function stripElements(html: string, tags: string[]): string {
 function htmlToText(html: string): string {
   let text = html;
   // Block-level boundaries become paragraph breaks.
-  text = text.replace(/<\/(p|div|section|h[1-6]|li|blockquote|tr|figcaption|pre)>/gi, "\n\n");
+  text = text.replace(
+    /<\/(p|div|section|h[1-6]|li|blockquote|tr|figcaption|pre)>/gi,
+    "\n\n",
+  );
   text = text.replace(/<br\s*\/?>/gi, "\n");
   text = text.replace(/<li[^>]*>/gi, "- ");
   // Drop every remaining tag.
@@ -288,7 +342,12 @@ function htmlToText(html: string): string {
   // Collapse intra-line whitespace, keep paragraph breaks.
   text = text
     .split(/\n{2,}/)
-    .map((para) => para.replace(/[ \t]+/g, " ").replace(/\n/g, " ").trim())
+    .map((para) =>
+      para
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n/g, " ")
+        .trim(),
+    )
     .filter((para) => para !== "")
     .join("\n\n");
   return text.slice(0, MAX_STORED_CONTENT_CHARS);
@@ -373,8 +432,80 @@ type PageData = {
   heroImageUrl?: string;
   heroAspectRatio?: number;
   siteName?: string;
+  author?: string;
   content?: string;
 };
+
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+/**
+ * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
+ * the caption, creator, and a 9:16 poster — everything the card needs. TikTok
+ * also returns 400 for unsupported URL shapes, so only true 404/410 responses
+ * are treated as permanently gone by the shared page reader.
+ */
+async function fetchTikTokOEmbed(url: string): Promise<PageData> {
+  const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+  const result = await safeFetch(endpoint, {
+    timeoutMs: 15000,
+    maxBytes: 64 * 1024,
+    allowContentType: (ct) => ct.startsWith("application/json"),
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+  });
+  if (!result.ok) {
+    throw new PageFetchError(result.code, result.status);
+  }
+  const data = parseJson(result.bytes) as Record<string, unknown>;
+  const str = (key: string) => {
+    const value = data[key];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const width = Number(data.thumbnail_width);
+  const height = Number(data.thumbnail_height);
+  const handle = str("author_unique_id");
+  const caption = str("title");
+  return {
+    title: caption,
+    siteName: "TikTok",
+    author: handle ? `@${handle}` : str("author_name"),
+    heroImageUrl: str("thumbnail_url"),
+    heroAspectRatio: width > 0 && height > 0 ? width / height : 9 / 16,
+    content: caption,
+  };
+}
+
+/**
+ * Copy a poster into Convex storage. TikTok thumbnail URLs are signed and
+ * expire within hours, so the card would go blank without this. Best-effort:
+ * a blocked or oversized image leaves the (short-lived) URL as the fallback.
+ */
+export async function storePoster(
+  ctx: { storage: { store: (blob: Blob) => Promise<Id<"_storage">> } },
+  imageUrl: string,
+): Promise<Id<"_storage"> | undefined> {
+  const result = await safeFetch(imageUrl, {
+    timeoutMs: 10000,
+    maxBytes: 3 * 1024 * 1024,
+    allowContentType: (ct) =>
+      ct.startsWith("image/jpeg") ||
+      ct.startsWith("image/png") ||
+      ct.startsWith("image/webp"),
+    headers: { "User-Agent": BROWSER_USER_AGENT },
+  });
+  if (!result.ok) {
+    return undefined;
+  }
+  try {
+    return await ctx.storage.store(
+      new Blob([new Uint8Array(result.bytes)], {
+        type: result.contentType.split(";")[0],
+      }),
+    );
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Thrown when the page could not be read through the safe-fetch policy: the
@@ -444,8 +575,7 @@ async function fetchPage(url: string): Promise<PageData> {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
     },
   });
@@ -524,7 +654,10 @@ type PageRead =
 
 async function readPage(url: string): Promise<PageRead> {
   try {
-    return { status: "ok", page: await fetchPage(url) };
+    const page = isTikTokUrl(url)
+      ? await fetchTikTokOEmbed(url)
+      : await fetchPage(url);
+    return { status: "ok", page };
   } catch (error) {
     if (!isPageFetchError(error)) {
       throw error;
@@ -632,18 +765,18 @@ function spacesPromptBlock(
     return "The user has no spaces yet, so spaceNames must be an empty array.";
   }
   const lines = spaces
-    .map(
-      (s) => `- "${s.name}"${s.description ? `: ${s.description}` : ""}`,
-    )
+    .map((s) => `- "${s.name}"${s.description ? `: ${s.description}` : ""}`)
     .join("\n");
   return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
 }
-
 
 export const processItem = internalAction({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const startedAt = Date.now();
+    let itemType: "image" | "link" | "note" | undefined;
+    let posterStorageId: Id<"_storage"> | undefined;
     try {
       const item = await ctx.runQuery(internal.items.getItemInternal, {
         itemId: args.itemId,
@@ -651,6 +784,7 @@ export const processItem = internalAction({
       if (item === null) {
         return null;
       }
+      itemType = item.type;
       // Only dynamic spaces are visible to the classifier: matches become
       // pending suggestions. Non-dynamic spaces never hear from the pipeline.
       const allSpaces = await ctx.runQuery(internal.spaces.listSpacesInternal, {
@@ -681,6 +815,11 @@ export const processItem = internalAction({
             itemId: args.itemId,
             reason: "not_found",
           });
+          await captureCategorizationTelemetry({
+            outcome: "not_found",
+            itemType: item.type,
+            durationMs: Date.now() - startedAt,
+          });
           return null;
         }
         if (read.status === "unreadable") {
@@ -705,9 +844,12 @@ export const processItem = internalAction({
             `URL: ${item.url}`,
             page?.title ? `Page title: ${page.title}` : "",
             page?.siteName ? `Site: ${page.siteName}` : "",
+            page?.author ? `Creator: ${page.author}` : "",
             page?.description ? `Meta description: ${page.description}` : "",
             page?.content
-              ? `Page content:\n${page.content.slice(0, 6000)}`
+              ? page.siteName === "TikTok"
+                ? `This is a short video. Only its caption is available:\n${page.content.slice(0, 6000)}`
+                : `Page content:\n${page.content.slice(0, 6000)}`
               : "No page content could be extracted.",
             unreadable
               ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
@@ -778,22 +920,40 @@ export const processItem = internalAction({
         }
       }
 
-      await ctx.runMutation(internal.items.finalizeItem, {
-        itemId: args.itemId,
-        title: result.title,
-        description: result.description,
-        tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-        content: item.type === "link" ? page?.content : undefined,
-        siteName: item.type === "link" ? page?.siteName : undefined,
-        heroImageUrl: item.type === "link" ? page?.heroImageUrl : undefined,
-        // Links: the OG image's shape. Images/notes: preserve the ratio the
-        // client captured on upload (patching undefined would drop the field).
-        aspectRatio:
-          item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-        intents: sanitizeIntents(result.intents),
-        enrichment: unreadable ? "partial" : undefined,
-        status: "ready",
-      });
+      posterStorageId =
+        page?.siteName === "TikTok" && page.heroImageUrl
+          ? await storePoster(ctx, page.heroImageUrl)
+          : undefined;
+
+      const finalized = await ctx.runMutation(
+        internal.items.finalizeItem,
+        {
+          itemId: args.itemId,
+          title: result.title,
+          description: result.description,
+          tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
+          content: item.type === "link" ? page?.content : undefined,
+          siteName: item.type === "link" ? page?.siteName : undefined,
+          author: item.type === "link" ? page?.author : undefined,
+          heroImageUrl: item.type === "link" ? page?.heroImageUrl : undefined,
+          storageId: posterStorageId,
+          // Links: the OG image's shape. Images/notes: preserve the ratio the
+          // client captured on upload (patching undefined would drop the field).
+          aspectRatio:
+            item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
+          intents: sanitizeIntents(result.intents),
+          enrichment: unreadable ? "partial" : undefined,
+          status: "ready",
+        },
+      );
+      if (!finalized) {
+        if (posterStorageId !== undefined) {
+          await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
+            storageId: posterStorageId,
+          });
+        }
+        return null;
+      }
       if (spaceIds.length > 0) {
         await ctx.runMutation(internal.items.setSpacesForItem, {
           itemId: args.itemId,
@@ -805,7 +965,9 @@ export const processItem = internalAction({
       // processing, run the purpose-steering pass now that it's classified.
       const savedSpaceIds = await ctx.runQuery(
         internal.spaces.listSavedSpaceIdsForItemInternal,
-        { itemId: args.itemId },
+        {
+          itemId: args.itemId,
+        },
       );
       for (const spaceId of savedSpaceIds) {
         await ctx.scheduler.runAfter(0, internal.ai.steerItemForSpace, {
@@ -813,20 +975,38 @@ export const processItem = internalAction({
           spaceId,
         });
       }
+      await captureCategorizationTelemetry({
+        outcome: unreadable ? "partial" : "succeeded",
+        itemType: item.type,
+        durationMs: Date.now() - startedAt,
+      });
     } catch (error) {
       // Sanitized error log. For fetch-policy failures (PageFetchError,
       // SafeFetchError) log only the stable policy code + item id — never the
       // error object, its cause, URLs, headers, response bodies, or resolved
       // addresses. For other errors log a generic category so a thrown Error's
       // message (which may include a URL) is not leaked either.
-      console.error(
-        `processItem failed for ${args.itemId}:`,
-        summarizeError(error),
-      );
+      const errorCategory = summarizeError(error);
+      console.error(`processItem failed for ${args.itemId}:`, errorCategory);
+      if (posterStorageId !== undefined) {
+        await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
+          storageId: posterStorageId,
+        });
+      }
       await ctx.runMutation(internal.items.failItem, {
         itemId: args.itemId,
         reason: "error",
       });
+      if (itemType !== undefined) {
+        await captureCategorizationTelemetry({
+          outcome: "failed",
+          itemType,
+          durationMs: Date.now() - startedAt,
+          errorCategory,
+        });
+      }
+      // Rethrow so Convex error tracking sees the failure.
+      throw new Error(`ai_categorization_failed:${errorCategory}`);
     }
     return null;
   },
@@ -1043,7 +1223,7 @@ export const findProductLinks = internalAction({
       if (item === null) {
         return null;
       }
-      const apiKey = process.env.SERPAPI_KEY;
+      const apiKey = env.SERPAPI_KEY;
       if (!apiKey) {
         console.error("findProductLinks: SERPAPI_KEY is not set");
         await fail();

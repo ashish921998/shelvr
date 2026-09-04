@@ -9,7 +9,7 @@ import { useUnistyles } from 'react-native-unistyles';
 export default function HomeStackLayout() {
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  const { guard, loading: entitlementLoading } = usePaywallGuard('home');
   const labelColor = Platform.OS === 'ios' ? PlatformColor('label') : theme.colors.foreground;
 
   // Native bar-button items don't run JS on tap the way a Pressable does, so

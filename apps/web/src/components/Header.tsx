@@ -7,6 +7,7 @@ import {
 } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import AppStoreButton from "./AppStoreButton";
 import Logo from "./common/Logo";
 
 const navigation = [
@@ -40,13 +41,7 @@ export default function Header() {
             </ul>
 
             <div className="hidden shrink-0 items-center sm:flex">
-              <Link
-                href="#get-app"
-                className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-xl bg-ember px-5 text-sm font-semibold text-ink shadow-[0_10px_24px_rgba(154,100,22,0.18)] transition hover:-translate-y-0.5"
-              >
-                Join the waitlist
-                <span aria-hidden>→</span>
-              </Link>
+              <AppStoreButton source="header" compact />
             </div>
 
             <div className="md:hidden">
@@ -73,12 +68,9 @@ export default function Header() {
                   {item.name}
                 </DisclosureButton>
               ))}
-              <Link
-                href="#get-app"
-                className="mt-2 rounded-xl bg-ember px-4 py-3 text-center text-sm font-semibold text-ink"
-              >
-                Join the waitlist
-              </Link>
+              <div className="mt-2 flex justify-center">
+                <AppStoreButton source="header" compact />
+              </div>
             </div>
           </DisclosurePanel>
         </>

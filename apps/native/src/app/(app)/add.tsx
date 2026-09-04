@@ -15,7 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -39,7 +39,7 @@ function ActionButton({
   onPress,
   disabled,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -52,7 +52,7 @@ function ActionButton({
       style={[styles.action, disabled && { opacity: 0.4 }]}
     >
       <View style={styles.actionIcon}>
-        <Icon name={icon} size={40} tintColor={theme.colors.foreground} />
+        <AppSymbolIcon name={icon} size={40} tintColor={theme.colors.foreground} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
@@ -121,7 +121,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } = usePaywallGuard();
+  const { guard, loading: entitlementLoading } = usePaywallGuard('add');
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;

@@ -11,7 +11,6 @@ import { DELETE_BATCH } from "./users";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
-
 async function as(userId: string): Promise<TestCtx> {
   const t = newConvexTest().withIdentity({
     subject: `${userId}|session-1`,

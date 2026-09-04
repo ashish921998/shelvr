@@ -72,7 +72,7 @@ export function useReplayOnboarding() {
         // (e.g., after a future purchase via the paywall route).
         if (!entitled) {
           await waitForSheetTransition();
-          const purchased = await openPaywall(router);
+          const purchased = await openPaywall(router, 'onboarding');
           if (purchased) {
             // The RevenueCat webhook may not have updated Convex yet. Keep
             // pending data and wait for the entitlement query to become true.

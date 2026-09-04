@@ -1,10 +1,5 @@
 import { v } from "convex/values";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -13,19 +8,13 @@ import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
-import {
-  enrichmentValidator,
-  failureReasonValidator,
-} from "./model/itemFields";
+import { enrichmentValidator, failureReasonValidator } from "./model/itemFields";
+import { safeDeleteStorage } from "./model/storage";
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
 
-const itemTypeValidator = v.union(
-  v.literal("image"),
-  v.literal("link"),
-  v.literal("note"),
-);
+const itemTypeValidator = v.union(v.literal("image"), v.literal("link"), v.literal("note"));
 
 const itemStatusValidator = v.union(
   v.literal("processing"),
@@ -73,6 +62,7 @@ const itemFields = {
   _id: v.id("items"),
   _creationTime: v.number(),
   userId: v.string(),
+  fixtureKey: v.optional(v.string()),
   type: itemTypeValidator,
   status: itemStatusValidator,
   title: v.optional(v.string()),
@@ -87,6 +77,7 @@ const itemFields = {
   tags: v.array(v.string()),
   content: v.optional(v.string()),
   siteName: v.optional(v.string()),
+  author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
@@ -116,9 +107,7 @@ const enrichedItemWithSpacesValidator = v.object({
 });
 
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
-  const imageUrl = item.storageId
-    ? await ctx.storage.getUrl(item.storageId)
-    : null;
+  const imageUrl = item.storageId ? await ctx.storage.getUrl(item.storageId) : null;
   return { ...item, imageUrl };
 }
 
@@ -260,9 +249,7 @@ export const similarItems = query({
     }
     scored.sort((a, b) => b.score - a.score);
     return await Promise.all(
-      scored
-        .slice(0, SIMILAR_LIMIT)
-        .map(({ item: match }) => enrichItem(ctx, match)),
+      scored.slice(0, SIMILAR_LIMIT).map(({ item: match }) => enrichItem(ctx, match)),
     );
   },
 });
@@ -344,9 +331,7 @@ async function loadItemOperation(
 ): Promise<Doc<"itemOperations"> | null> {
   const op = await ctx.db
     .query("itemOperations")
-    .withIndex("by_user_operation", (q) =>
-      q.eq("userId", userId).eq("operationId", operationId),
-    )
+    .withIndex("by_user_operation", (q) => q.eq("userId", userId).eq("operationId", operationId))
     .unique();
   if (op === null) {
     return null;
@@ -394,21 +379,6 @@ async function isStorageUnreferenced(
   return ops.every((op) => op._id === excludeOperation);
 }
 
-/** Deletes a storage object iff it still exists. `ctx.storage.delete` throws on
- * a missing file, and several callers here run inside transactional sweeps or
- * recycle paths where one dangling reference must not wedge the whole mutation
- * (the cron re-reads the same oldest page every run, so a single poisoned row
- * would halt cleanup permanently). */
-async function safeDeleteStorage(
-  ctx: MutationCtx,
-  storageId: Id<"_storage">,
-): Promise<void> {
-  const exists = await ctx.db.system.get("_storage", storageId);
-  if (exists !== null) {
-    await ctx.storage.delete(storageId);
-  }
-}
-
 /** Discriminated return for beginImageImport. A named type (rather than inline
  * object literals) keeps `kind` a literal so the `returns` validator matches. */
 type BeginImageImportResult =
@@ -429,8 +399,7 @@ function validateImageMetadata(args: {
     throw new Error("Invalid aspectRatio");
   }
   // Location is all-or-nothing: a lone latitude can't be plotted.
-  const hasLocation =
-    args.latitude !== undefined && args.longitude !== undefined;
+  const hasLocation = args.latitude !== undefined && args.longitude !== undefined;
   if (
     (args.latitude !== undefined || args.longitude !== undefined) &&
     (!hasLocation ||
@@ -497,10 +466,7 @@ export const beginImageImport = mutation({
       // some other item/operation still depends on — or one already deleted —
       // can't corrupt them or wedge this recycle path. Clearing itemId is
       // redundant for the no-itemId case but harmless.
-      if (
-        op.storageId !== undefined &&
-        (await isStorageUnreferenced(ctx, op.storageId, op._id))
-      ) {
+      if (op.storageId !== undefined && (await isStorageUnreferenced(ctx, op.storageId, op._id))) {
         await safeDeleteStorage(ctx, op.storageId);
       }
       await ctx.db.patch(op._id, {
@@ -571,13 +537,10 @@ export const attachImageUpload = mutation({
       // otherwise it is referenced by nothing (no item, no ledger row) and the
       // pending-only cleanup cron would never reclaim it. The unreferenced
       // guard keeps a blob some other item/operation owns safe.
-      if (
-        args.storageId !== op.storageId &&
-        (await isStorageUnreferenced(ctx, args.storageId))
-      ) {
+      if (args.storageId !== op.storageId && (await isStorageUnreferenced(ctx, args.storageId))) {
         await safeDeleteStorage(ctx, args.storageId);
       }
-      return { storageId: (op.storageId ?? args.storageId) };
+      return { storageId: op.storageId ?? args.storageId };
     }
 
     // First attachment wins. A racing retry that supplies a different storageId
@@ -749,10 +712,7 @@ export const cleanupStaleImageImports = internalMutation({
       // destroy a live image — drop only the ledger row in that case. And a
       // blob already gone must not throw and wedge the sweep (this mutation is
       // transactional and re-reads the same oldest page every run).
-      if (
-        op.storageId !== undefined &&
-        (await isStorageUnreferenced(ctx, op.storageId, op._id))
-      ) {
+      if (op.storageId !== undefined && (await isStorageUnreferenced(ctx, op.storageId, op._id))) {
         await safeDeleteStorage(ctx, op.storageId);
       }
       await ctx.db.delete(op._id);
@@ -760,11 +720,7 @@ export const cleanupStaleImageImports = internalMutation({
     // A full page means more stale rows likely remain; sweep again immediately
     // rather than waiting for the next cron tick.
     if (stale.length === CLEANUP_PAGE_SIZE) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.items.cleanupStaleImageImports,
-        {},
-      );
+      await ctx.scheduler.runAfter(0, internal.items.cleanupStaleImageImports, {});
     }
     return null;
   },
@@ -1001,7 +957,10 @@ export const reprocessItem = mutation({
     if (!retryable) {
       return null;
     }
-    await rateLimiter.limit(ctx, "reprocessItem", { key: userId, throws: true });
+    await rateLimiter.limit(ctx, "reprocessItem", {
+      key: userId,
+      throws: true,
+    });
     await ctx.db.patch(args.id, {
       status: "processing",
       failureReason: undefined,
@@ -1088,17 +1047,21 @@ export const finalizeItem = internalMutation({
     tags: v.array(v.string()),
     content: v.optional(v.string()),
     siteName: v.optional(v.string()),
+    author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    // A poster copied into our storage (TikTok thumbnails expire). Only ever
+    // set for links; image items keep the storageId they were uploaded with.
+    storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) {
-      return null;
+      return false;
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
@@ -1114,7 +1077,9 @@ export const finalizeItem = internalMutation({
       tags: args.tags,
       content: args.content,
       siteName: args.siteName,
+      author: args.author,
       heroImageUrl: args.heroImageUrl,
+      ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents: args.intents,
       status: args.status,
@@ -1124,6 +1089,32 @@ export const finalizeItem = internalMutation({
       failureReason: undefined,
       searchText,
     });
+    if (
+      args.storageId !== undefined &&
+      item.storageId !== undefined &&
+      item.storageId !== args.storageId &&
+      (await isStorageUnreferenced(ctx, item.storageId))
+    ) {
+      await safeDeleteStorage(ctx, item.storageId);
+    }
+    return true;
+  },
+});
+
+/** Best-effort compensation for a poster stored by an action before the item
+ * could be finalized. Rechecking the reference index makes this safe when a
+ * mutation committed but the action observed an ambiguous transport failure. */
+export const deleteStorageIfUnreferenced = internalMutation({
+  args: { storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const referenced = await ctx.db
+      .query("items")
+      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (referenced === null) {
+      await safeDeleteStorage(ctx, args.storageId);
+    }
     return null;
   },
 });
@@ -1135,11 +1126,7 @@ export const listImagesNeedingRatioInternal = internalQuery({
     const items = await ctx.db.query("items").take(LIST_CAP);
     const out: { _id: Id<"items">; storageId: Id<"_storage"> }[] = [];
     for (const item of items) {
-      if (
-        item.type === "image" &&
-        item.storageId !== undefined &&
-        item.aspectRatio === undefined
-      ) {
+      if (item.type === "image" && item.storageId !== undefined && item.aspectRatio === undefined) {
         out.push({ _id: item._id, storageId: item.storageId });
       }
     }
@@ -1236,11 +1223,7 @@ export const setSpacesForItem = internalMutation({
       }
       const space = await ctx.db.get(spaceId);
       // Only suggest into dynamic spaces that exist and belong to the owner.
-      if (
-        space !== null &&
-        space.userId === item.userId &&
-        space.dynamic === true
-      ) {
+      if (space !== null && space.userId === item.userId && space.dynamic === true) {
         await ctx.db.insert("spaceItems", {
           userId: item.userId,
           spaceId,
@@ -1293,4 +1276,3 @@ export const suggestItemsForSpace = internalMutation({
     return null;
   },
 });
-

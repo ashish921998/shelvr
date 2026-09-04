@@ -1,0 +1,15 @@
+steps:
+  - echo: Restart Shelvr and expect Home.
+  - launch: app.shelvr.save.dev
+  - await: { visible: { text: Home } }
+  - await: { idle: true }
+  - echo: From Home, open Add and expect save options.
+  - tap:
+      id: plus
+  - await: { visible: { text: Note } }
+  - await: { idle: true }
+  - echo: From save options, choose Note and expect the note composer.
+  - tap:
+      text: Note
+  - await: { visible: { text: Jot a note } }
+  - await: { idle: true }

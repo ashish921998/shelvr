@@ -1,4 +1,5 @@
 import { posthog } from '@/lib/posthog';
+import { activationPal } from 'activation-pal';
 
 export type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
@@ -36,6 +37,18 @@ function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
+  if (
+    event === 'article_saved' ||
+    event === 'note_saved' ||
+    event === 'images_saved' ||
+    event === 'space_created'
+  ) {
+    activationPal.track(
+      event,
+      properties as Record<string, string | boolean | number> | undefined,
+    );
+  }
+
   if (!posthog) return;
 
   try {
@@ -50,6 +63,7 @@ function capture<Event extends AnalyticsEvent>(
 }
 
 function identify(userId: string, email?: string): void {
+  activationPal.setUserId(userId);
   if (!posthog) return;
 
   try {
@@ -60,6 +74,7 @@ function identify(userId: string, email?: string): void {
 }
 
 function reset(): void {
+  activationPal.setUserId();
   if (!posthog) return;
 
   try {

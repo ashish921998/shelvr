@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isTikTokUrl,
   isUrlPolicyError,
   MAX_URL_LENGTH,
   normalizeExternalUrl,
@@ -144,5 +145,21 @@ describe("normalizeExternalUrl - empty / invalid", () => {
     expectCode("https://exa mple.com", "invalid_host");
     // Genuinely unparseable schemeless garbage is invalid_url.
     expectCode("exa mple", "invalid_url");
+  });
+});
+
+describe("isTikTokUrl", () => {
+  it("matches tiktok.com and its subdomains, including short hosts", () => {
+    expect(isTikTokUrl("https://www.tiktok.com/@nasa/video/7301234567890123456")).toBe(true);
+    expect(isTikTokUrl("https://vm.tiktok.com/ZMabc123/")).toBe(true);
+    expect(isTikTokUrl("https://tiktok.com/t/ZTabc/")).toBe(true);
+  });
+
+  it("rejects look-alike hosts, other sites, and bad input", () => {
+    expect(isTikTokUrl("https://nottiktok.com/x")).toBe(false);
+    expect(isTikTokUrl("https://tiktok.com.evil.example/x")).toBe(false);
+    expect(isTikTokUrl("https://example.com")).toBe(false);
+    expect(isTikTokUrl("not a url")).toBe(false);
+    expect(isTikTokUrl(undefined)).toBe(false);
   });
 });

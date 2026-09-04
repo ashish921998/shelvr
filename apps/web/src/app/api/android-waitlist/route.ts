@@ -4,12 +4,13 @@ import { NextResponse } from "next/server";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type WaitlistSource = "hero" | "preview" | "footer" | "unknown";
+type WaitlistSource = "hero" | "footer" | "unknown";
 
 const joinWaitlist = makeFunctionReference<
   "action",
   {
     email: string;
+    product: "shelvr-android";
     source: WaitlistSource;
     ip?: string;
   },
@@ -17,9 +18,7 @@ const joinWaitlist = makeFunctionReference<
 >("waitlist:join");
 
 function normalizeSource(value: unknown): WaitlistSource {
-  return value === "hero" || value === "preview" || value === "footer"
-    ? value
-    : "unknown";
+  return value === "hero" || value === "footer" ? value : "unknown";
 }
 
 function clientIp(request: Request): string | undefined {
@@ -34,15 +33,13 @@ function isRateLimited(error: unknown): boolean {
     return false;
   }
   const data = (error as { data?: { kind?: unknown } }).data;
-  return typeof data === "object" && data !== null && data.kind === "RateLimited";
+  return (
+    typeof data === "object" && data !== null && data.kind === "RateLimited"
+  );
 }
 
 export async function POST(request: Request) {
-  let body: {
-    email?: unknown;
-    company?: unknown;
-    source?: unknown;
-  };
+  let body: { email?: unknown; company?: unknown; source?: unknown };
 
   try {
     body = await request.json();
@@ -50,12 +47,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
-  // JSON primitives (`null`, strings, arrays) parse fine but have no fields —
-  // reject them here so the field reads below can never throw.
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
+  // A hidden honeypot lets ordinary bots succeed without persisting anything.
   if (body.company) return NextResponse.json({ ok: true });
 
   const email =
@@ -69,7 +65,7 @@ export async function POST(request: Request) {
 
   const convexUrl = process.env.CONVEX_URL;
   if (!convexUrl) {
-    console.error("Waitlist is missing CONVEX_URL.");
+    console.error("Android waitlist is missing CONVEX_URL.");
     return NextResponse.json(
       { message: "The waitlist is being connected. Please try again shortly." },
       { status: 503 },
@@ -80,6 +76,7 @@ export async function POST(request: Request) {
     const convex = new ConvexHttpClient(convexUrl);
     const result = await convex.action(joinWaitlist, {
       email,
+      product: "shelvr-android",
       source: normalizeSource(body.source),
       ip: clientIp(request),
     });
@@ -97,7 +94,7 @@ export async function POST(request: Request) {
         { status: 429 },
       );
     }
-    console.error("Waitlist persistence failed", error);
+    console.error("Android waitlist persistence failed", error);
     return NextResponse.json(
       { message: "Could not join right now. Please try again." },
       { status: 502 },

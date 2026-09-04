@@ -1,5 +1,5 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { env, httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { mapRevenueCatStatus, parseRevenueCatEvent } from "./model/revenuecat";
@@ -25,7 +25,7 @@ http.route({
   path: "/webhooks/revenuecat",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
-    const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    const secret = env.REVENUECAT_WEBHOOK_SECRET;
     if (!secret) {
       return new Response("Webhook secret not configured", { status: 500 });
     }
@@ -58,7 +58,8 @@ http.route({
       return new Response(null, { status: 200 });
     }
 
-    const { type, userId, expiresAt, productId, periodType, eventTimestampMs } = event;
+    const { type, userId, expiresAt, productId, periodType, eventTimestampMs } =
+      event;
 
     // Lifetime-ness is decided once, here at the edge, from the product id —
     // not re-derived in the handler. A lifetime purchase carries

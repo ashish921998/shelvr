@@ -1,6 +1,6 @@
 # Observations — Shelvr
 
-> ⚠️ IN PROGRESS — the walk is not complete. Categories done: none (category 10 seeded by O1); currently on: 1. Undeniable comparative strength. If you are resuming, continue there.
+> ⚠️ IN PROGRESS — the walk is not complete. Categories done: none (category 10 seeded by O1); currently on: 1. Undeniable comparative strength. O2 verifies the capture-to-enrichment loop for one X article. If you are resuming, drain category 1 by asking for another verified comparative capability or let the user say “next.”
 
 Shelvr is a pre-launch, solo-built, mobile-first save-for-later app for links, images, screenshots, and notes. AI generates titles, descriptions, tags, and themed spaces; the native app is awaiting a successful App Store release and has no paying customers or public customer-review corpus yet. These are raw observations, deliberately not classified as strengths or weaknesses.
 
@@ -8,7 +8,7 @@ Public research on Shelvr itself was skipped because the product is pre-launch. 
 
 ## 1. Undeniable comparative strength
 
-_Currently gathering._
+**O2.** In a live iOS simulator test on August 29, 2026, Ashish only added an X article about HeyReach; he made no metadata edits, and the app provides no ability to edit the generated title or summary. Shelvr extracted the article text and automatically produced the title “HeyReach Growth Playbook,” the summary “A breakdown of the bootstrap strategy and milestones used to scale HeyReach to over $17M ARR in three years,” and seven relevant tags: `saas`, `bootstrapping`, `growth strategy`, `entrepreneurship`, `case study`, `business growth`, and `scaling`. No space was assigned; the detail screen showed “Add to space.”
 
 ## 2. Consistent complaints
 

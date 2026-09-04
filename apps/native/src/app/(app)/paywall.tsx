@@ -35,7 +35,7 @@ export default function PaywallScreen() {
             // paywall while the dismissal is still animating, which would
             // map to 'unavailable' and bounce right back here.
             await waitForSheetTransition();
-            await openPaywall(router);
+            await openPaywall(router, 'retry');
           })();
         }}
       >

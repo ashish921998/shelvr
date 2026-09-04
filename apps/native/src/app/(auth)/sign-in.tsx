@@ -58,14 +58,9 @@ export default function Page() {
       }
       await signIn(provider, { code });
     } catch (err) {
-      // Surface the full error shape — Convex wraps server errors with
-      // `.message` and sometimes `.data`; logging the whole object helps
-      // diagnose auth failures (expired tickets, provider misconfig, etc.).
       const detail =
-        err instanceof Error
-          ? `${err.name}: ${err.message}${(err as any).data ? ` | data=${JSON.stringify((err as any).data)}` : ''}`
-          : JSON.stringify(err);
-      console.error(`${provider} sign-in failed`, detail, err);
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      console.error('OAuth provider sign-in failed', provider, detail, err);
       setLastError(detail);
     } finally {
       setPending(null);
@@ -164,7 +159,6 @@ export default function Page() {
     </View>
   );
 }
-
 const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,

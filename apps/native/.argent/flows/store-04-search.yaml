@@ -1,0 +1,20 @@
+steps:
+  - launch: app.shelvr.save
+  - await:
+      visible:
+        text: Search
+  - tap:
+      text: Search
+  - await:
+      visible:
+        text: Search your saves
+  - tap:
+      text: Search your saves
+  - tool: keyboard
+    args:
+      text: travel
+  - await:
+      visible:
+        text: Belém Tower
+  - await:
+      idle: true

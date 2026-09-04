@@ -17,6 +17,7 @@ const spaceFields = {
   _id: v.id("spaces"),
   _creationTime: v.number(),
   userId: v.string(),
+  fixtureKey: v.optional(v.string()),
   name: v.string(),
   description: v.optional(v.string()),
   dynamic: v.optional(v.boolean()),
@@ -72,7 +73,11 @@ export const listSpaces = query({
       previews: v.array(
         v.object({
           url: v.string(),
-          type: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
+          type: v.union(
+            v.literal("image"),
+            v.literal("link"),
+            v.literal("note"),
+          ),
           aspectRatio: v.optional(v.number()),
           suggested: v.boolean(),
         }),

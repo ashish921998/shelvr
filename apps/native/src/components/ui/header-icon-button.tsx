@@ -1,4 +1,4 @@
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import {
   ActionMenu,
   type ActionMenuItem,
@@ -13,7 +13,7 @@ export function HeaderIconButton({
   disabled,
   onPress,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   label: string;
   badge?: number;
   disabled?: boolean;
@@ -43,7 +43,7 @@ export function HeaderActionMenu({
   title,
   actions,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   label: string;
   title: string;
   actions: HeaderMenuAction[];
@@ -67,13 +67,13 @@ function HeaderIconContent({
   badge,
   tintColor,
 }: {
-  icon: string;
+  icon: AppSymbolName;
   badge?: number;
   tintColor: string;
 }) {
   return (
     <>
-      <Icon name={icon} size={21} weight="semibold" tintColor={tintColor} />
+      <AppSymbolIcon name={icon} size={21} weight="semibold" tintColor={tintColor} />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>

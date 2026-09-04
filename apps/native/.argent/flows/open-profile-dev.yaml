@@ -1,0 +1,10 @@
+steps:
+  - echo: Restart Shelvr and expect Home.
+  - launch: app.shelvr.save.dev
+  - await: { visible: { text: Home } }
+  - await: { idle: true }
+  - echo: From Home, open Profile and expect account controls.
+  - tap:
+      id: person
+  - await: { visible: { text: Contact Support } }
+  - await: { idle: true }

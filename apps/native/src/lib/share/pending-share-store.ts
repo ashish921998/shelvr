@@ -5,9 +5,9 @@
  */
 import * as SecureStore from 'expo-secure-store';
 import {
-  clearPendingShare as clearPendingSharePure,
-  hasPendingShare as hasPendingSharePure,
-  markPendingShare as markPendingSharePure,
+  clearPendingShareInStore,
+  hasPendingShareInStore,
+  markPendingShareInStore,
   type PendingShareStore,
 } from '@/lib/share/pending-share';
 
@@ -21,14 +21,14 @@ const secureStore: PendingShareStore = {
   },
 };
 
-export function markPendingShare(): void {
-  markPendingSharePure(secureStore);
+export function markPendingShareOnDevice(): void {
+  markPendingShareInStore(secureStore);
 }
 
-export function hasPendingShare(): boolean {
-  return hasPendingSharePure(secureStore);
+export function hasPendingShareOnDevice(): boolean {
+  return hasPendingShareInStore(secureStore);
 }
 
-export function clearPendingShare(): void {
-  clearPendingSharePure(secureStore);
+export function clearPendingShareOnDevice(): void {
+  clearPendingShareInStore(secureStore);
 }

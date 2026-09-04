@@ -24,7 +24,7 @@ export function ProGate({
   onPress,
 }: Props) {
   const router = useRouter();
-  const handlePress = onPress ?? (() => openPaywall(router));
+  const handlePress = onPress ?? (() => openPaywall(router, 'pro_gate'));
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>

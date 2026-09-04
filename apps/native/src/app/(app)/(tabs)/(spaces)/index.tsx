@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { ScreenLoader } from '@/components/ui/screen-loader';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
@@ -129,7 +129,7 @@ function CoverStack({
           ]}
         >
           <View style={styles.emptyIconWell}>
-            <Icon
+            <AppSymbolIcon
               name={emptySpaceIcon(name)}
               size={26}
               weight="semibold"
@@ -205,7 +205,10 @@ export default function SpacesScreen() {
               <Link href={`/space/${space._id}`} asChild>
                 <Link.Trigger withAppleZoom>
                   {/* The whole card is the pressable that routes to the space. */}
-                  <Pressable style={({ pressed }) => pressed && styles.pressed}>
+                  <Pressable
+                    testID={space.fixtureKey ? `fixture-space-${space.fixtureKey}` : undefined}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
                     <CoverStack cover={cover} seed={space._id} name={space.name} />
                     <View style={styles.caption}>
                       <Text style={styles.title} numberOfLines={1}>
@@ -223,7 +226,7 @@ export default function SpacesScreen() {
                         ]}
                         style={styles.menuButton}
                       >
-                        <Icon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
+                        <AppSymbolIcon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
                       </ActionMenu>
                     </View>
                   </Pressable>

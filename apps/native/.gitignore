@@ -44,6 +44,9 @@ yarn-error.*
 # Local builds
 *.ipa
 *.apk
+
+# Goldie renders (config and replay flows stay versioned)
+goldie/out/
 # EAS Simulator session (carries a token - do not commit)
 .env.eas-simulator
 

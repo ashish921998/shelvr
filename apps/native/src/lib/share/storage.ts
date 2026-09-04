@@ -7,11 +7,11 @@
 //
 // The contract the UI layer relies on, in plain terms:
 //
-//   1. fingerprint(rawPayloads) — a collision-free encoding of the current raw
-//      shared payload batch (order + duplicates included). Two distinct batches
-//      must never share a fingerprint, so a deliberate later re-share of
-//      identical content is its own fresh session rather than matching a stale
-//      completed one.
+//   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
+//      current raw shared payload batch (order + duplicates included). Two
+//      distinct batches must never share a fingerprint, so a deliberate later
+//      re-share of identical content is its own fresh session rather than
+//      matching a stale completed one.
 //   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
@@ -35,7 +35,6 @@ export interface SessionStoreAdapter {
   remove(key: string): void;
   contains(key: string): boolean;
 }
-
 /** One raw shared payload, as `useIncomingShare` exposes it. Only the fields
  * that contribute to identity are tracked, so the store has no compile-time
  * dependency on the (experimental, evolving) expo-sharing types. */
@@ -107,7 +106,7 @@ export const SESSION_KEY = 'incoming-share-session';
  * can collide across distinct batches (e.g. `"a|b"` vs `"a","b"`). Order and
  * duplicates are preserved so two identical entries in one batch stay distinct
  * and a re-ordering reads as a different batch (a new session). */
-export function fingerprint(rawPayloads: RawSharePayload[]): string {
+export function fingerprintSharePayloads(rawPayloads: RawSharePayload[]): string {
   // Sort object keys for determinism: an undefined mimeType serialized as
   // {mimeType: undefined} vs {mimeType omitted} must not flip the fingerprint.
   const normalized = rawPayloads.map((p) => ({
@@ -231,7 +230,7 @@ export function reconcileSession(
     return { kind: 'empty' };
   }
 
-  const currentFp = fingerprint(rawPayloads);
+  const currentFp = fingerprintSharePayloads(rawPayloads);
   const existing = loadSession(store);
 
   // A session from a different user, or no session at all: start fresh. The

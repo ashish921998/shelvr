@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -363,7 +363,7 @@ export default function ItemScreen() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.primary }}
             >
-              <Icon name="sparkles" size={15} tintColor="#fff" />
+              <AppSymbolIcon name="sparkles" size={15} tintColor="#fff" />
               <Text style={styles.acceptText}>Add to space</Text>
             </GlassView>
           </Pressable>

@@ -1,10 +1,11 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { internal } from "./_generated/api";
 import {
   action,
   internalAction,
   internalMutation,
   internalQuery,
+  env,
   type ActionCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -13,6 +14,15 @@ import { rateLimiter } from "./model/rateLimiter";
 export const CONSENT_VERSION = "shelvr-waitlist-v1";
 export const CONSENT_TEXT =
   "Notify me when Shelvr launches. One launch email; no newsletter.";
+export const ANDROID_CONSENT_VERSION = "shelvr-android-waitlist-v1";
+export const ANDROID_CONSENT_TEXT =
+  "Notify me when Shelvr launches on Android. One launch email; no newsletter.";
+
+const productValidator = v.union(
+  v.literal("shelvr"),
+  v.literal("shelvr-android"),
+);
+type WaitlistProduct = Infer<typeof productValidator>;
 
 const sourceValidator = v.union(
   v.literal("hero"),
@@ -62,6 +72,7 @@ function normalizeIp(value: string | undefined): string | undefined {
 export const upsertSignup = internalMutation({
   args: {
     email: v.string(),
+    product: productValidator,
     source: sourceValidator,
     ip: v.optional(v.string()),
   },
@@ -87,7 +98,7 @@ export const upsertSignup = internalMutation({
     const existing = await ctx.db
       .query("waitlistSignups")
       .withIndex("by_email_and_product", (q) =>
-        q.eq("email", args.email).eq("product", "shelvr"),
+        q.eq("email", args.email).eq("product", args.product),
       )
       .unique();
 
@@ -107,10 +118,14 @@ export const upsertSignup = internalMutation({
 
     const id = await ctx.db.insert("waitlistSignups", {
       email: args.email,
-      product: "shelvr",
+      product: args.product,
       source: args.source,
-      consentVersion: CONSENT_VERSION,
-      consentText: CONSENT_TEXT,
+      consentVersion:
+        args.product === "shelvr-android"
+          ? ANDROID_CONSENT_VERSION
+          : CONSENT_VERSION,
+      consentText:
+        args.product === "shelvr-android" ? ANDROID_CONSENT_TEXT : CONSENT_TEXT,
       consentedAt: now,
       firstSubmittedAt: now,
       lastSubmittedAt: now,
@@ -155,15 +170,20 @@ export const deleteSignupByEmail = internalMutation({
   returns: v.boolean(),
   handler: async (ctx, args) => {
     const email = normalizeEmail(args.email);
-    const signup = await ctx.db
-      .query("waitlistSignups")
-      .withIndex("by_email_and_product", (q) =>
-        q.eq("email", email).eq("product", "shelvr"),
-      )
-      .unique();
-    if (!signup) return false;
-    await ctx.db.delete(signup._id);
-    return true;
+    let deleted = false;
+    for (const product of ["shelvr", "shelvr-android"] as const) {
+      const signup = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_email_and_product", (q) =>
+          q.eq("email", email).eq("product", product),
+        )
+        .unique();
+      if (signup) {
+        await ctx.db.delete(signup._id);
+        deleted = true;
+      }
+    }
+    return deleted;
   },
 });
 
@@ -173,6 +193,7 @@ export const listSignupsNeedingResendSync = internalQuery({
     v.object({
       id: v.id("waitlistSignups"),
       email: v.string(),
+      product: productValidator,
       resendAttempts: v.number(),
     }),
   ),
@@ -181,6 +202,7 @@ export const listSignupsNeedingResendSync = internalQuery({
     const out: {
       id: Id<"waitlistSignups">;
       email: string;
+      product: WaitlistProduct;
       resendAttempts: number;
     }[] = [];
     for (const status of statuses) {
@@ -189,13 +211,16 @@ export const listSignupsNeedingResendSync = internalQuery({
       const page = await ctx.db
         .query("waitlistSignups")
         .withIndex("by_resendStatus_attempts", (q) =>
-          q.eq("resendStatus", status).lt("resendAttempts", RESEND_MAX_ATTEMPTS),
+          q
+            .eq("resendStatus", status)
+            .lt("resendAttempts", RESEND_MAX_ATTEMPTS),
         )
         .take(RESEND_RETRY_SCAN);
       for (const row of page) {
         out.push({
           id: row._id,
           email: row.email,
+          product: row.product,
           resendAttempts: row.resendAttempts,
         });
       }
@@ -204,11 +229,7 @@ export const listSignupsNeedingResendSync = internalQuery({
   },
 });
 
-async function resendRequest(
-  apiKey: string,
-  path: string,
-  init: RequestInit,
-) {
+async function resendRequest(apiKey: string, path: string, init: RequestInit) {
   return await fetch(`https://api.resend.com${path}`, {
     ...init,
     headers: {
@@ -225,18 +246,20 @@ async function resendRequest(
 async function syncResendContact(
   apiKey: string,
   email: string,
+  product: WaitlistProduct,
 ): Promise<string | undefined> {
-  const segmentId = process.env.RESEND_SEGMENT_ID;
-  const topicId = process.env.RESEND_TOPIC_ID;
+  const segmentId =
+    product === "shelvr-android"
+      ? env.RESEND_ANDROID_SEGMENT_ID
+      : env.RESEND_SEGMENT_ID;
+  const topicId = env.RESEND_TOPIC_ID;
   const createResponse = await resendRequest(apiKey, "/contacts", {
     method: "POST",
     body: JSON.stringify({
       email,
       unsubscribed: false,
       ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
-      ...(topicId
-        ? { topics: [{ id: topicId, subscription: "opt_in" }] }
-        : {}),
+      ...(topicId ? { topics: [{ id: topicId, subscription: "opt_in" }] } : {}),
     }),
   });
 
@@ -280,9 +303,7 @@ async function syncResendContact(
         },
       );
       if (!topicResponse.ok) {
-        throw new Error(
-          `Resend topic sync failed (${topicResponse.status}).`,
-        );
+        throw new Error(`Resend topic sync failed (${topicResponse.status}).`);
       }
     }
   } else {
@@ -295,12 +316,16 @@ async function persistResendSync(
   ctx: ActionCtx,
   id: Id<"waitlistSignups">,
   email: string,
+  product: WaitlistProduct,
   attempts: number,
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    // A missing key is an operator condition, not a row failure: keep the
-    // last real error and do not spend an attempt.
+  const apiKey = env.RESEND_API_KEY;
+  const missingAndroidSegment =
+    product === "shelvr-android" && !env.RESEND_ANDROID_SEGMENT_ID;
+  if (!apiKey || missingAndroidSegment) {
+    // Missing provider configuration is an operator condition, not a row
+    // failure: keep the last real error and do not spend an attempt. Android
+    // rows must not be marked synced until they are in their launch segment.
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "unconfigured",
@@ -310,7 +335,7 @@ async function persistResendSync(
   }
 
   try {
-    const contactId = await syncResendContact(apiKey, email);
+    const contactId = await syncResendContact(apiKey, email, product);
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "synced",
@@ -334,6 +359,7 @@ async function persistResendSync(
 export const join = action({
   args: {
     email: v.string(),
+    product: v.optional(productValidator),
     source: sourceValidator,
     ip: v.optional(v.string()),
   },
@@ -347,9 +373,11 @@ export const join = action({
       throw new Error("Enter a valid email address.");
     }
     const ip = normalizeIp(args.ip);
+    const product = args.product ?? "shelvr";
 
     const signup = await ctx.runMutation(internal.waitlist.upsertSignup, {
       email,
+      product,
       source: args.source,
       ip,
     });
@@ -362,6 +390,7 @@ export const join = action({
       ctx,
       signup.id,
       email,
+      product,
       signup.resendAttempts,
     );
     return { saved: true, emailProviderSynced };
@@ -377,7 +406,13 @@ export const retryFailedResendSyncs = internalAction({
       {},
     );
     for (const row of rows) {
-      await persistResendSync(ctx, row.id, row.email, row.resendAttempts);
+      await persistResendSync(
+        ctx,
+        row.id,
+        row.email,
+        row.product,
+        row.resendAttempts,
+      );
     }
     return null;
   },

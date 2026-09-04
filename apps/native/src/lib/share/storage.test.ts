@@ -7,7 +7,7 @@ import {
   allEntriesSettled,
   deleteSession,
   entriesToProcess,
-  fingerprint,
+  fingerprintSharePayloads,
   loadSession,
   markComplete,
   operationIdFor,
@@ -44,44 +44,43 @@ const payload = (value: string, shareType = "text"): RawSharePayload => ({
   value,
   shareType,
 });
-
 const BATCH_A = [payload("https://a.example", "url")];
 const BATCH_A_DUP = [payload("https://a.example", "url")]; // identical content
 const BATCH_B = [payload("https://b.example", "url")]; // different content
 
-describe("fingerprint", () => {
+describe("fingerprintSharePayloads", () => {
   it("encodes order and duplicates so identical-content distinct batches stay distinct", () => {
     // Two identical entries in one batch must NOT collapse with one entry.
-    expect(fingerprint([payload("x"), payload("x")])).not.toBe(fingerprint([payload("x")]));
+    expect(fingerprintSharePayloads([payload("x"), payload("x")])).not.toBe(fingerprintSharePayloads([payload("x")]));
     // Order matters: a re-ordering is a different batch.
-    expect(fingerprint([payload("a"), payload("b")])).not.toBe(
-      fingerprint([payload("b"), payload("a")]),
+    expect(fingerprintSharePayloads([payload("a"), payload("b")])).not.toBe(
+      fingerprintSharePayloads([payload("b"), payload("a")]),
     );
     // Same batch, same fingerprint (deterministic).
-    expect(fingerprint([payload("a"), payload("b")])).toBe(
-      fingerprint([payload("a"), payload("b")]),
+    expect(fingerprintSharePayloads([payload("a"), payload("b")])).toBe(
+      fingerprintSharePayloads([payload("a"), payload("b")]),
     );
   });
 
   it("includes mimeType and shareType so they distinguish otherwise-equal values", () => {
-    expect(fingerprint([payload("x", "text")])).not.toBe(
-      fingerprint([{ value: "x", shareType: "url" }]),
+    expect(fingerprintSharePayloads([payload("x", "text")])).not.toBe(
+      fingerprintSharePayloads([{ value: "x", shareType: "url" }]),
     );
-    expect(fingerprint([payload("x")])).not.toBe(
-      fingerprint([{ value: "x", shareType: "text", mimeType: "text/plain" }]),
+    expect(fingerprintSharePayloads([payload("x")])).not.toBe(
+      fingerprintSharePayloads([{ value: "x", shareType: "text", mimeType: "text/plain" }]),
     );
   });
 
   it("treats undefined and omitted mimeType identically (no flapping)", () => {
-    expect(fingerprint([{ value: "x", shareType: "text" }])).toBe(
-      fingerprint([{ value: "x", shareType: "text", mimeType: undefined }]),
+    expect(fingerprintSharePayloads([{ value: "x", shareType: "text" }])).toBe(
+      fingerprintSharePayloads([{ value: "x", shareType: "text", mimeType: undefined }]),
     );
   });
 
   it("never collides via delimiter concatenation", () => {
     // The classic delimiter pitfall: ["a|b"] vs ["a","b"].
-    expect(fingerprint([payload("a|b")])).not.toBe(
-      fingerprint([payload("a"), payload("b")]),
+    expect(fingerprintSharePayloads([payload("a|b")])).not.toBe(
+      fingerprintSharePayloads([payload("a"), payload("b")]),
     );
   });
 });
@@ -105,7 +104,7 @@ describe("reconcileSession", () => {
     expect(result.session.entries[0].operationId).toBe("share:sess-1:0");
     expect(result.session.entries[0].status).toBe("pending");
     // Persisted.
-    expect(loadSession(store)?.fingerprint).toBe(fingerprint(BATCH_A));
+    expect(loadSession(store)?.fingerprint).toBe(fingerprintSharePayloads(BATCH_A));
   });
 
   it("resumes an active session with the same fingerprint (does not reset entries)", () => {

@@ -12,9 +12,11 @@ import { analytics } from '@/lib/analytics';
 import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -28,6 +30,16 @@ export default function ProfileScreen() {
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const [deleting, setDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [resettingFixtures, setResettingFixtures] = useState(false);
+  const fixtureResetEnabled =
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+  const { data: canResetFlowFixtures } = useQuery(
+    convexQuery(
+      api.devFixtures.canResetCurrentUser,
+      fixtureResetEnabled && user ? {} : 'skip',
+    ),
+  );
+  const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
   const closeProfile = () => {
     if (router.canGoBack()) {
@@ -86,7 +98,7 @@ export default function ProfileScreen() {
         ]);
       }
     } else {
-      void openPaywall(router);
+      void openPaywall(router, 'profile');
     }
   };
 
@@ -174,6 +186,41 @@ export default function ProfileScreen() {
     );
   };
 
+  const confirmResetFlowFixtures = () => {
+    Alert.alert(
+      'Reset flow fixtures?',
+      'This replaces this anonymous development account’s saves and spaces with deterministic flow data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              if (resettingFixtures) return;
+              setResettingFixtures(true);
+              try {
+                const result = await resetFlowFixtures({});
+                Alert.alert(
+                  'Flow fixtures ready',
+                  `${result.items} saves and ${result.spaces} spaces were created.`,
+                );
+              } catch (error) {
+                console.error('Flow fixture reset failed', error);
+                Alert.alert(
+                  'Couldn’t reset fixtures',
+                  'Use an anonymous account on a development deployment and try again.',
+                );
+              } finally {
+                setResettingFixtures(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -192,12 +239,31 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <Icon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="person.fill" size={20} tintColor={theme.colors.primaryText} />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
           {user?.email ?? 'Signed in'}
         </Text>
       </View>
+
+      {fixtureResetEnabled && canResetFlowFixtures ? (
+        <Pressable
+          testID="reset-flow-fixtures"
+          accessibilityRole="button"
+          accessibilityLabel="Reset flow fixtures"
+          style={({ pressed }) => [
+            styles.fixtureReset,
+            pressed && { opacity: 0.7 },
+            resettingFixtures && { opacity: 0.4 },
+          ]}
+          disabled={resettingFixtures}
+          onPress={confirmResetFlowFixtures}
+        >
+          <Text style={styles.fixtureResetText}>
+            {resettingFixtures ? 'Resetting flow fixtures…' : 'Reset flow fixtures'}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [
@@ -208,9 +274,9 @@ export default function ProfileScreen() {
         disabled={loading}
         onPress={manageSubscription}
       >
-        <Icon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
+        <AppSymbolIcon name="sparkles" size={18} tintColor={theme.colors.primaryText} />
         <Text style={styles.proLabel}>{proLabel}</Text>
-        <Icon name="chevron.right" size={16} tintColor={theme.colors.muted} />
+        <AppSymbolIcon name="chevron.right" size={16} tintColor={theme.colors.muted} />
       </Pressable>
 
       <View style={styles.linkGroup}>
@@ -219,7 +285,7 @@ export default function ProfileScreen() {
           onPress={() => openExternal(SUPPORT_URL)}
         >
           <Text style={styles.linkLabel}>Contact Support</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [
@@ -233,21 +299,21 @@ export default function ProfileScreen() {
           <Text style={styles.linkLabel}>
             {restoring ? 'Restoring Purchases…' : 'Restore Purchases'}
           </Text>
-          <Icon name="arrow.clockwise" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.clockwise" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.terms)}
         >
           <Text style={styles.linkLabel}>Terms of Service</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.privacy)}
         >
           <Text style={styles.linkLabel}>Privacy Policy</Text>
-          <Icon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
+          <AppSymbolIcon name="arrow.up.right" size={14} tintColor={theme.colors.muted} />
         </Pressable>
       </View>
 
@@ -351,6 +417,21 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.foreground,
+  },
+  fixtureReset: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  fixtureResetText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.primary,
   },
   linkGroup: {
     alignSelf: 'stretch',

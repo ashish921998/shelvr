@@ -4,6 +4,7 @@
     { "category": "EMAIL_ADDRESS", "purposes": ["APP_FUNCTIONALITY", "ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "NAME", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "USER_ID", "purposes": ["APP_FUNCTIONALITY", "ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
+    { "category": "DEVICE_ID", "purposes": ["ANALYTICS"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "PHOTOS_OR_VIDEOS", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "OTHER_USER_CONTENT", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },
     { "category": "SEARCH_HISTORY", "purposes": ["APP_FUNCTIONALITY"], "dataProtections": ["DATA_LINKED_TO_YOU"] },

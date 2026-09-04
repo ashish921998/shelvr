@@ -1,5 +1,5 @@
 import { CtaButton } from '@/components/onboarding/parts';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import { Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -21,14 +21,14 @@ export function PermissionsStep({ onAdvance }: { onAdvance: () => void }) {
           Shelvr only asks for permissions when you use the matching feature.
         </Text>
         <View style={styles.row}>
-          <Icon name="camera" size={18} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="camera" size={18} tintColor={theme.colors.primaryText} />
           <View style={styles.copy}>
             <Text style={styles.label}>Camera</Text>
             <Text style={styles.detail}>When you capture something to save.</Text>
           </View>
         </View>
         <View style={styles.row}>
-          <Icon name="photo.on.rectangle" size={18} tintColor={theme.colors.primaryText} />
+          <AppSymbolIcon name="photo.on.rectangle" size={18} tintColor={theme.colors.primaryText} />
           <View style={styles.copy}>
             <Text style={styles.label}>Photo Library</Text>
             <Text style={styles.detail}>When you import a photo or run Tidy.</Text>

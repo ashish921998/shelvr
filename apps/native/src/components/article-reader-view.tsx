@@ -4,7 +4,7 @@ import { SimilarGrid } from '@/components/similar-grid';
 import type { DetailItem } from '@/components/item-detail';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { Id } from '@convex/_generated/dataModel';
 import { useState } from 'react';
@@ -65,12 +65,13 @@ export function ArticleReaderView({
     />
   ) : (
     <View style={styles.thumbnailFallback}>
-      <Icon name="link" size={22} tintColor={theme.colors.primaryText} />
+      <AppSymbolIcon name="link" size={22} tintColor={theme.colors.primaryText} />
     </View>
   );
 
   return (
     <ScrollView
+      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
       contentInsetAdjustmentBehavior="never"
       style={[styles.container, { paddingTop: headerHeight + theme.gap(1.5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
@@ -106,11 +107,11 @@ export function ArticleReaderView({
                   ]}
                   onPress={() => WebBrowser.openBrowserAsync(item.url!)}
                 >
-                  <Icon name="safari" size={13} tintColor={theme.colors.muted} />
+                  <AppSymbolIcon name="safari" size={13} tintColor={theme.colors.muted} />
                   <Text numberOfLines={1} style={styles.sourceText}>
                     {item.siteName ?? displayHost(item.url)}
                   </Text>
-                  <Icon
+                  <AppSymbolIcon
                     name="arrow.up.right"
                     size={10}
                     tintColor={theme.colors.faint}
@@ -136,7 +137,7 @@ export function ArticleReaderView({
                     })
                   }
                 >
-                  <Icon
+                  <AppSymbolIcon
                     name="plus"
                     size={10}
                     tintColor={theme.colors.primaryText}

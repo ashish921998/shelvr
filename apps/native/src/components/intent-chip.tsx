@@ -1,12 +1,12 @@
 import type { IntentKind } from '@/lib/intents';
-import { Icon } from '@/components/symbol';
+import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { Pressable, Text } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 // The app owns the kind → icon mapping so the model can never emit an invalid
 // SF Symbol. `sparkles` is a forward-compat fallback for a kind a newer backend
 // might add before this build knows about it.
-const ICONS: Record<IntentKind, string> = {
+const ICONS: Record<IntentKind, AppSymbolName> = {
   open_url: 'arrow.up.right.square',
   copy: 'doc.on.doc',
   web_search: 'magnifyingglass',
@@ -34,7 +34,7 @@ export function IntentChip({
       onPress={onPress}
       hitSlop={6}
     >
-      <Icon name={icon} size={14} tintColor={theme.colors.primaryText} />
+      <AppSymbolIcon name={icon} size={14} tintColor={theme.colors.primaryText} />
       <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>

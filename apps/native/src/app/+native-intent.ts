@@ -1,4 +1,4 @@
-import { markPendingShare } from '@/lib/share/pending-share-store';
+import { markPendingShareOnDevice } from '@/lib/share/pending-share-store';
 
 // expo-sharing launches the app with a `<scheme>://expo-sharing` deep link when
 // something is shared into Shelvr from another app. Route those to the receiver
@@ -7,11 +7,16 @@ import { markPendingShare } from '@/lib/share/pending-share-store';
 // Always mark a pending-share flag too. If the user is mid-onboarding or signed
 // out, the app layout guards will redirect away from `/share` — the flag lets
 // us resume the share after onboarding + auth instead of dropping it.
-export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
+export function redirectSystemPath({
+  path,
+}: {
+  path: string;
+  initial: boolean;
+}) {
   try {
     if (new URL(path).hostname === 'expo-sharing') {
       try {
-        markPendingShare();
+        markPendingShareOnDevice();
       } catch {
         // Best-effort: a SecureStore failure loses only the resume flag —
         // it must not stop this recognized share from routing to /share.

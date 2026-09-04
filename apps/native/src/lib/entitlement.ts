@@ -4,6 +4,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/current-user';
+import { activationPal } from 'activation-pal';
 import {
   mapPaywallResult,
   shouldOpenPaywallFallback,
@@ -289,7 +290,19 @@ export function useEntitlement(): Entitlement {
  * Convex user id has been logged in to RC), so a purchase is always attributed
  * to the correct user.
  */
-export async function presentPaywall(): Promise<PaywallOutcome> {
+async function purchasedPlan(): Promise<string> {
+  const rc = getPurchases();
+  if (!rc) return 'unknown';
+
+  try {
+    const customerInfo = await rc.getCustomerInfo();
+    return Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+export async function presentPaywall(placement = 'pro_gate'): Promise<PaywallOutcome> {
   // Block until RC identity sync completes — a purchase before login would be
   // attributed to an anonymous RC user, breaking the webhook's userId mapping.
   // The awaitRcSyncReady timeout returns unavailable so the caller can show a
@@ -299,7 +312,23 @@ export async function presentPaywall(): Promise<PaywallOutcome> {
   const rcui = getRCUI();
   if (!rcui) return 'unavailable';
   try {
+    const presentedAt = Date.now();
     const result = await rcui.presentPaywall();
+    if (result === 'CANCELLED' || result === 'PURCHASED' || result === 'RESTORED') {
+      activationPal.paywallShown(placement, presentedAt);
+    }
+    if (result === 'CANCELLED') {
+      activationPal.paywallDismissed();
+    } else if (result === 'PURCHASED') {
+      // RevenueCat's imperative sheet API reports the selected package only
+      // after checkout. Read the newly active product so plan selection and
+      // purchase use the exact App Store product identifier. This lookup is
+      // analytics-only and must not delay a completed purchase.
+      void purchasedPlan().then((plan) => {
+        activationPal.paywallPlanSelected(plan);
+        activationPal.paywallPurchased(plan);
+      });
+    }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     return mapPaywallResult(result);
   } catch {
@@ -313,8 +342,11 @@ export async function presentPaywall(): Promise<PaywallOutcome> {
  * to the caller without routing — cancel must not look like an outage. Returns
  * `true` only on purchase/restore. Shared by every Pro-gated affordance.
  */
-export async function openPaywall(router: ReturnType<typeof useRouter>): Promise<boolean> {
-  const outcome = await presentPaywall();
+export async function openPaywall(
+  router: ReturnType<typeof useRouter>,
+  placement = 'pro_gate',
+): Promise<boolean> {
+  const outcome = await presentPaywall(placement);
   if (shouldOpenPaywallFallback(outcome)) {
     router.push('/(app)/paywall');
   }
@@ -395,7 +427,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
  * callers should disable the affordance or show a loading state. The hook also
  * returns `loading` so callers can read it without a second `useEntitlement`.
  */
-export function usePaywallGuard(): {
+export function usePaywallGuard(placement = 'pro_gate'): {
   guard: (action?: () => void) => Promise<boolean>;
   loading: boolean;
 } {
@@ -410,10 +442,10 @@ export function usePaywallGuard(): {
       }
       // Fallback to the paywall screen is handled by openPaywall (reached when
       // the native SDK isn't linked, identity sync times out, or RC returns an error).
-      await openPaywall(router);
+      await openPaywall(router, placement);
       return false;
     },
-    [entitled, loading, router],
+    [entitled, loading, placement, router],
   );
   return { guard, loading };
 }

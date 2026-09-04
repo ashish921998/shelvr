@@ -92,7 +92,7 @@ function SpaceForm(props: SpaceFormProps) {
   // Creating a space and enabling dynamic are Pro — route to the paywall if
   // not entitled. Editing a name or turning dynamic off stays open to lapsed
   // users (managing existing data).
-  const { guard } = usePaywallGuard();
+  const { guard } = usePaywallGuard('new_space');
 
   // Seeded once per (keyed) mount: a fresh create starts dynamic on; an edit
   // starts from the loaded space. A query refresh remounts via key only if the
