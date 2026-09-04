@@ -376,7 +376,7 @@ private final class Client: @unchecked Sendable {
             case let string as String: out[key] = string
             case let bool as Bool: out[key] = bool
             case let int as Int: out[key] = int
-            case let double as Double: out[key] = double
+            case let double as Double where double.isFinite: out[key] = double
             default: break
             }
         }
