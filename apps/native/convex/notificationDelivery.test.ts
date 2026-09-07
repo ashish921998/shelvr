@@ -1,0 +1,250 @@
+// @vitest-environment edge-runtime
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { internal } from "./_generated/api";
+import { newConvexTest } from "./test.setup";
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+async function seed(tokens = ["token-a"]) {
+  const t = newConvexTest();
+  const digestId = await t.run(async (ctx) => {
+    await ctx.db.insert("notificationPreferences", {
+      userId: "user-a",
+      weeklyShelfEnabled: true,
+      nextDigestAt: Date.now() + 7 * 86400000,
+      updatedAt: Date.now(),
+    });
+    for (const token of tokens)
+      await ctx.db.insert("notificationDevices", {
+        userId: "user-a",
+        token,
+        enabled: true,
+        platform: "ios",
+        lastSeenAt: Date.now(),
+      });
+    const itemId = await ctx.db.insert("items", {
+      userId: "user-a",
+      type: "note",
+      status: "ready",
+      title: "A note",
+      tags: [],
+      searchText: "note",
+    });
+    return ctx.db.insert("weeklyDigests", {
+      userId: "user-a",
+      weekStart: Date.now(),
+      createdAt: Date.now(),
+      itemIds: [itemId],
+      deliveryStatus: "pending",
+      deliveryNextAttemptAt: Date.now(),
+    });
+  });
+  const digest = () => t.run((ctx) => ctx.db.get(digestId));
+  const advance = async () => {
+    const row = await digest();
+    if (row?.deliveryNextAttemptAt) vi.setSystemTime(row.deliveryNextAttemptAt);
+  };
+  return { t, digestId, digest, advance };
+}
+
+const json = (data: unknown) =>
+  new Response(JSON.stringify({ data }), { status: 200 });
+
+describe("durable digest delivery", () => {
+  it("retries a failed send on the same digest through the recovery cron", async () => {
+    const { t, digestId, digest, advance } = await seed();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "pending",
+      deliveryAttempts: 1,
+    });
+    expect((await digest())?.deliveredAt).toBeUndefined();
+    await advance();
+    await t.mutation(internal.notificationDelivery.recover, {});
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(await digest()).toMatchObject({
+      deliveryAttempts: 2,
+      deliveryRecipients: [{ state: "receipt", ticketId: "ticket-a" }],
+    });
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(
+      await t.run((ctx) => ctx.db.query("weeklyDigests").collect()),
+    ).toHaveLength(1);
+  });
+
+  it("tracks partial results, checks receipts, and disables invalid tokens", async () => {
+    const { t, digestId, digest, advance } = await seed([
+      "token-a",
+      "token-b",
+      "token-c",
+    ]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json([
+          { status: "ok", id: "ticket-a" },
+          { status: "error", details: { error: "DeviceNotRegistered" } },
+          { status: "error", details: { error: "MessageRateExceeded" } },
+        ]),
+      )
+      .mockResolvedValueOnce(json({ "ticket-a": { status: "ok" } }))
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-c" }]))
+      .mockResolvedValueOnce(
+        json({
+          "ticket-c": {
+            status: "error",
+            details: { error: "DeviceNotRegistered" },
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect((await digest())?.deliveredAt).toBeUndefined();
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(
+      JSON.parse(fetchMock.mock.calls[2][1].body).map(
+        (message: { to: string }) => message.to,
+      ),
+    ).toEqual(["token-c"]);
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "complete",
+      deliveredAt: expect.any(Number),
+    });
+    const devices = await t.run((ctx) =>
+      ctx.db.query("notificationDevices").collect(),
+    );
+    expect(
+      devices.filter((device) => device.enabled).map((device) => device.token),
+    ).toEqual(["token-a"]);
+  });
+
+  it("recovers an interrupted attempt after its lease and rejects stale completion", async () => {
+    const { t, digestId, advance, digest } = await seed();
+    const first = await t.mutation(internal.notificationDelivery.claim, {
+      digestId,
+    });
+    expect(
+      await t.mutation(internal.notificationDelivery.claim, { digestId }),
+    ).toBeNull();
+    await advance();
+    const second = await t.mutation(internal.notificationDelivery.claim, {
+      digestId,
+    });
+    expect(second?.attempt).toBe(2);
+    await t.mutation(internal.notificationDelivery.finish, {
+      digestId,
+      attempt: first!.attempt,
+      recipients: [{ token: "token-a", state: "delivered" }],
+    });
+    expect((await digest())?.deliveredAt).toBeUndefined();
+  });
+
+  it("bounds retries and preserves the final failure", async () => {
+    const { t, digestId, advance, digest } = await seed();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(new Response("unavailable", { status: 503 })),
+        ),
+    );
+    for (let i = 0; i < 8; i++) {
+      await t.action(internal.notificationDelivery.send, { digestId });
+      await advance();
+    }
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "retry_limit_reached",
+      deliveryAttempts: 8,
+    });
+    expect(
+      await t.mutation(internal.notificationDelivery.claim, { digestId }),
+    ).toBeNull();
+  });
+
+  it("does not resend when a receipt is temporarily missing", async () => {
+    const { t, digestId, advance, digest } = await seed();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
+      .mockResolvedValueOnce(json({}));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain("getReceipts");
+    expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
+  });
+
+  it("honors opt-out before delivery", async () => {
+    const { t, digestId, digest } = await seed();
+    await t.run(async (ctx) => {
+      const prefs = await ctx.db.query("notificationPreferences").unique();
+      await ctx.db.patch(prefs!._id, { weeklyShelfEnabled: false });
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "notifications_disabled",
+    });
+  });
+
+  it("recovers legacy unsent digests without resending completed ones", async () => {
+    const { t, digestId, digest } = await seed();
+    const completedId = await t.run(async (ctx) => {
+      const original = await ctx.db.get(digestId);
+      await ctx.db.patch(digestId, {
+        deliveryStatus: undefined,
+        deliveryNextAttemptAt: undefined,
+      });
+      return ctx.db.insert("weeklyDigests", {
+        userId: "user-a",
+        weekStart: Date.now() - 7 * 86400000,
+        createdAt: Date.now() - 7 * 86400000,
+        itemIds: original!.itemIds,
+        deliveredAt: Date.now() - 7 * 86400000,
+      });
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.mutation(internal.notificationDelivery.recover, {});
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
+    expect(
+      (await t.run((ctx) => ctx.db.get(completedId)))?.deliveryStatus,
+    ).toBe("complete");
+  });
+
+  it("does not treat a malformed successful HTTP response as delivery", async () => {
+    const { t, digestId, digest } = await seed();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json([])));
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "pending",
+      deliveryRecipients: [
+        { state: "pending", error: "Error: expo_ticket_count_mismatch" },
+      ],
+    });
+    expect((await digest())?.deliveredAt).toBeUndefined();
+  });
+});

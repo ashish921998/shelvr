@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import {
   internalAction,
   internalMutation,
-  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
@@ -10,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
 import { requireUserId } from "./model/auth";
+import { nextWeeklyDigestAt } from "./model/notificationSchedule";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -26,30 +26,9 @@ const preferencesValidator = v.object({
   timezone: v.union(v.string(), v.null()),
 });
 
-const DEFAULT_DIGEST_HOUR_UTC = 9;
-const DISABLED_DIGEST_AT = Number.MAX_SAFE_INTEGER;
 const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_DIGEST_ITEMS = 3;
 const MAX_USER_ITEMS = 1000;
-
-function nextFallbackDigestAt(now: number): number {
-  const candidate = new Date(now);
-  candidate.setUTCHours(DEFAULT_DIGEST_HOUR_UTC, 0, 0, 0);
-  const daysUntilSunday = (7 - candidate.getUTCDay()) % 7;
-  candidate.setUTCDate(candidate.getUTCDate() + daysUntilSunday);
-  if (candidate.getTime() <= now) {
-    candidate.setUTCDate(candidate.getUTCDate() + 7);
-  }
-  return candidate.getTime();
-}
-
-function advanceDigestAt(current: number | undefined, now: number): number {
-  let next = current ?? nextFallbackDigestAt(now);
-  while (next <= now) {
-    next += DIGEST_WINDOW_MS;
-  }
-  return next;
-}
 
 function weekStart(now: number): number {
   const date = new Date(now);
@@ -125,12 +104,22 @@ export const setPreferences = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     const now = Date.now();
+    const timezone = args.timezone ?? existing?.timezone ?? "UTC";
+    const fallback = nextWeeklyDigestAt(now, timezone);
+    const previous = existing?.nextDigestAt;
+    const schedule =
+      previous !== undefined &&
+      previous > now &&
+      previous <= now + DIGEST_WINDOW_MS
+        ? previous
+        : fallback;
     const fields = {
       weeklyShelfEnabled: args.weeklyShelfEnabled,
       nextDigestAt: args.weeklyShelfEnabled
-        ? (args.nextDigestAt ?? existing?.nextDigestAt ?? nextFallbackDigestAt(now))
-        : DISABLED_DIGEST_AT,
-      timezone: args.timezone ?? existing?.timezone,
+        ? (args.nextDigestAt ??
+          (timezone === existing?.timezone ? schedule : fallback))
+        : schedule,
+      timezone,
       updatedAt: now,
     };
     if (existing === null) {
@@ -146,6 +135,7 @@ export const registerDevice = mutation({
   args: {
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
+    // Accepted for compatibility with installed clients; scheduling belongs to setPreferences.
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
   },
@@ -187,7 +177,7 @@ export const registerDevice = mutation({
       await ctx.db.insert("notificationPreferences", {
         userId,
         weeklyShelfEnabled: false,
-        nextDigestAt: args.nextDigestAt ?? DISABLED_DIGEST_AT,
+        nextDigestAt: nextWeeklyDigestAt(now, args.timezone),
         timezone: args.timezone,
         updatedAt: now,
       });
@@ -234,13 +224,13 @@ export const getDigest = query({
     const digest =
       args.id !== undefined
         ? await ctx.db.get(args.id)
-        : (
+        : ((
             await ctx.db
               .query("weeklyDigests")
               .withIndex("by_user", (q) => q.eq("userId", userId))
               .order("desc")
               .take(1)
-          )[0] ?? null;
+          )[0] ?? null);
     if (digest === null || digest.userId !== userId) {
       return null;
     }
@@ -269,7 +259,11 @@ export const markDigestOpened = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const digest = await ctx.db.get(args.id);
-    if (digest !== null && digest.userId === userId && digest.openedAt === undefined) {
+    if (
+      digest !== null &&
+      digest.userId === userId &&
+      digest.openedAt === undefined
+    ) {
       await ctx.db.patch(digest._id, { openedAt: Date.now() });
     }
     return null;
@@ -283,13 +277,19 @@ export const prepareDueWeeklyDigests = internalMutation({
     const now = Date.now();
     const due = await ctx.db
       .query("notificationPreferences")
-      .withIndex("by_next_digest_at", (q) => q.lte("nextDigestAt", now))
+      .withIndex("by_enabled_and_next_digest_at", (q) =>
+        q.eq("weeklyShelfEnabled", true).lte("nextDigestAt", now),
+      )
       .take(50);
     for (const preferences of due) {
-      await ctx.scheduler.runAfter(0, internal.notifications.prepareWeeklyDigest, {
-        userId: preferences.userId,
-        now,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.prepareWeeklyDigest,
+        {
+          userId: preferences.userId,
+          now,
+        },
+      );
     }
     return null;
   },
@@ -316,11 +316,25 @@ export const prepareWeeklyDigest = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(MAX_USER_ITEMS);
-    const reads = await ctx.db
-      .query("itemReads")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .take(MAX_USER_ITEMS);
-    const openedItemIds = new Set(reads.map((read) => read.itemId));
+    const reads = await Promise.all(
+      items
+        .filter(
+          (item) =>
+            item.status === "ready" &&
+            item._creationTime >= args.now - DIGEST_WINDOW_MS,
+        )
+        .map((item) =>
+          ctx.db
+            .query("itemReads")
+            .withIndex("by_user_and_item", (q) =>
+              q.eq("userId", args.userId).eq("itemId", item._id),
+            )
+            .unique(),
+        ),
+    );
+    const openedItemIds = new Set(
+      reads.flatMap((read) => (read === null ? [] : [read.itemId])),
+    );
     const recentDigests = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -336,7 +350,7 @@ export const prepareWeeklyDigest = internalMutation({
       args.now,
     );
 
-    const nextDigestAt = advanceDigestAt(preferences.nextDigestAt, args.now);
+    const nextDigestAt = nextWeeklyDigestAt(args.now, preferences.timezone);
     await ctx.db.patch(preferences._id, {
       nextDigestAt,
       updatedAt: args.now,
@@ -361,89 +375,22 @@ export const prepareWeeklyDigest = internalMutation({
       weekStart: currentWeekStart,
       itemIds: selected.map((item) => item._id),
       createdAt: args.now,
+      deliveryStatus: "pending",
+      deliveryNextAttemptAt: args.now,
     });
-    await ctx.scheduler.runAfter(0, internal.notifications.sendDigestNotification, {
+    await ctx.scheduler.runAfter(0, internal.notificationDelivery.send, {
       digestId,
     });
     return null;
   },
 });
 
-export const getDigestDeliveryData = internalQuery({
-  args: { digestId: v.id("weeklyDigests") },
-  returns: v.union(
-    v.object({
-      tokens: v.array(v.string()),
-      itemCount: v.number(),
-    }),
-    v.null(),
-  ),
-  handler: async (ctx, args) => {
-    const digest = await ctx.db.get(args.digestId);
-    if (digest === null || digest.deliveredAt !== undefined) {
-      return null;
-    }
-    const devices = await ctx.db
-      .query("notificationDevices")
-      .withIndex("by_user", (q) => q.eq("userId", digest.userId))
-      .take(20);
-    return {
-      tokens: devices.filter((device) => device.enabled).map((device) => device.token),
-      itemCount: digest.itemIds.length,
-    };
-  },
-});
-
-export const markDigestDelivered = internalMutation({
-  args: { digestId: v.id("weeklyDigests") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const digest = await ctx.db.get(args.digestId);
-    if (digest !== null && digest.deliveredAt === undefined) {
-      await ctx.db.patch(digest._id, { deliveredAt: Date.now() });
-    }
-    return null;
-  },
-});
-
+// Keep the scheduled entry point used by previously deployed code.
 export const sendDigestNotification = internalAction({
   args: { digestId: v.id("weeklyDigests") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const delivery = await ctx.runQuery(
-      internal.notifications.getDigestDeliveryData,
-      { digestId: args.digestId },
-    );
-    if (delivery === null) {
-      return null;
-    }
-    if (delivery.tokens.length === 0) {
-      await ctx.runMutation(internal.notifications.markDigestDelivered, {
-        digestId: args.digestId,
-      });
-      return null;
-    }
-
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        delivery.tokens.map((to) => ({
-          to,
-          title: "Your weekly shelf is ready",
-          body: `You saved ${delivery.itemCount} things this week. Take a look at the ones waiting for you.`,
-          data: { url: `/digest/${args.digestId}` },
-          sound: "default",
-          channelId: "weekly-shelf",
-        })),
-      ),
-    });
-    if (!response.ok) {
-      throw new Error(`weekly_digest_delivery_failed:${response.status}`);
-    }
-    await ctx.runMutation(internal.notifications.markDigestDelivered, {
-      digestId: args.digestId,
-    });
+    await ctx.runAction(internal.notificationDelivery.send, args);
     return null;
   },
 });

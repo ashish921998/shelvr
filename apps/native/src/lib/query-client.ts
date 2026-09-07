@@ -31,6 +31,17 @@ export const queryClient = new QueryClient({
 
 convexQueryClient.connect(queryClient);
 
+export function restartConvexSubscription(queryHash: string): void {
+  const subscription = convexQueryClient.subscriptions[queryHash];
+  if (!subscription) return;
+  // The adapter's queryFn reads the existing Convex result, including cached errors.
+  // Re-subscribe its watch so the server evaluates the query under the current identity.
+  subscription.unsubscribe();
+  subscription.unsubscribe = subscription.watch.onUpdate(() => {
+    convexQueryClient.onUpdateQueryKeyHash(queryHash);
+  });
+}
+
 // MMKV is synchronous, so use the sync storage persister with a small shim.
 // MMKV v4 (Nitro) creates instances via createMMKV() and deletes with remove().
 const mmkv = createMMKV({ id: 'tanstack-query-cache' });

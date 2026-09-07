@@ -1,6 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { recipientValidator } from "./model/notificationDelivery";
 import {
   enrichmentValidator,
   failureReasonValidator,
@@ -248,7 +249,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_next_digest_at", ["nextDigestAt"]),
+    .index("by_enabled_and_next_digest_at", ["weeklyShelfEnabled", "nextDigestAt"]),
 
   // Read state is separate from items so opening a save does not rewrite the
   // item row that is rendered throughout the feed.
@@ -271,9 +272,15 @@ export default defineSchema({
     createdAt: v.number(),
     deliveredAt: v.optional(v.number()),
     openedAt: v.optional(v.number()),
+    deliveryStatus: v.optional(v.union(v.literal("pending"), v.literal("complete"), v.literal("failed"))),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_week", ["userId", "weekStart"]),
+    .index("by_user_and_week", ["userId", "weekStart"])
+    .index("by_delivery_status_and_attempt", ["deliveryStatus", "deliveryNextAttemptAt"]),
 
   // Provider-independent waitlist source of truth. Resend is only a delivery
   // and preference-management projection of these records, so a provider

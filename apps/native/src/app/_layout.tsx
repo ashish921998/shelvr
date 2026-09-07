@@ -4,7 +4,8 @@ import { useEntitlementSync } from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { posthog } from '@/lib/posthog';
 import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
-import { convex, persister, queryClient } from '@/lib/query-client';
+import { convex, persister, queryClient, restartConvexSubscription } from '@/lib/query-client';
+import { observeAuthQueryErrors } from '@/lib/query-auth-recovery';
 import { useConvexAuth } from 'convex/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
@@ -168,24 +169,11 @@ function EntitlementSync() {
   return null;
 }
 
-/** A route restored before Convex Auth finishes refreshing an expired token
- * (state restoration, a push deep link) subscribes once, errors with "Not
- * authenticated", and Convex never re-runs it — the screen keeps showing stale
- * data and its controls stay dead until remounted. Periodically re-fetch any
- * still-errored, still-observed Convex query so screens recover in place once
- * auth settles. Healthy subscriptions are untouched. */
 function ConvexErroredQueryHealer() {
+  const { isAuthenticated } = useConvexAuth();
   useEffect(() => {
-    const heal = () => {
-      void queryClient.refetchQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'convexQuery' &&
-          query.state.status === 'error' &&
-          query.getObserversCount() > 0,
-      });
-    };
-    const interval = setInterval(heal, 15_000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!isAuthenticated) return;
+    return observeAuthQueryErrors(queryClient, restartConvexSubscription);
+  }, [isAuthenticated]);
   return null;
 }

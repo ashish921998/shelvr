@@ -20,16 +20,6 @@ export function getNotificationTimezone(): string | undefined {
   return Localization.getCalendars()[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export function getNextWeeklyDigestAt(now = Date.now()): number {
-  const next = new Date(now);
-  next.setHours(9, 0, 0, 0);
-  next.setDate(next.getDate() + ((7 - next.getDay()) % 7));
-  if (next.getTime() <= now) {
-    next.setDate(next.getDate() + 7);
-  }
-  return next.getTime();
-}
-
 async function prepareNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('weekly-shelf', {
@@ -91,7 +81,6 @@ export function PushNotificationSetup() {
         await registerDevice({
           token,
           platform: Platform.OS === 'ios' ? 'ios' : 'android',
-          nextDigestAt: getNextWeeklyDigestAt(),
           timezone: getNotificationTimezone(),
         });
         lastRegisteredToken.current = token;

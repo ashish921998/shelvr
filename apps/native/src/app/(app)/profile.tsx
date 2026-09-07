@@ -12,7 +12,6 @@ import { analytics } from '@/lib/analytics';
 import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
 import {
   getExpoPushToken,
-  getNextWeeklyDigestAt,
   getNotificationTimezone,
 } from '@/lib/notifications';
 import { api } from '@convex/_generated/api';
@@ -133,13 +132,11 @@ export default function ProfileScreen() {
         await registerDevice({
           token,
           platform: Platform.OS === 'ios' ? 'ios' : 'android',
-          nextDigestAt: getNextWeeklyDigestAt(),
           timezone: getNotificationTimezone(),
         });
       }
       await setNotificationPreferences({
         weeklyShelfEnabled: enabled,
-        nextDigestAt: enabled ? getNextWeeklyDigestAt() : undefined,
         timezone: getNotificationTimezone(),
       });
     } catch (error) {
