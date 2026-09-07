@@ -230,9 +230,9 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Text style={styles.description}>{item.description}</Text>
         ) : null}
 
-        {item.url ? (
-          // The address itself is the content when there's no article to
-          // read — show it as a real, tappable row instead of a sparse gap.
+        {item.url && !item.content ? (
+          // No article body came back, so the address itself is the content —
+          // show it as a real, tappable row instead of a sparse gap.
           <Pressable
             style={styles.urlRow}
             onPress={() => WebBrowser.openBrowserAsync(item.url!)}
@@ -491,7 +491,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
   // Idle (never searched): nothing inline — the trigger lives in the action
   // menu. Only a failed search (retry affordance) or a completed empty search
   // ("No matches") needs a chip here.
-  if (products === undefined && item.productsStatus !== 'failed') {
+  if (item.productsStatus === undefined) {
     return null;
   }
 

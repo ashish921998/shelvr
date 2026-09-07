@@ -537,21 +537,25 @@ export function pageGone(status: number | undefined): boolean {
 }
 
 /**
- * Pure decision for the enrichment flag a finalized link earns from one
- * pipeline run: "partial" when the page could not be read at all (retryable —
- * the classifier worked from the URL alone), "no_article" when the page read
- * fine but yielded no extractable article body (the URL itself is the save; a
- * retry cannot change the outcome), undefined when fully enriched. Exported
- * pure for unit testing.
+ * Pure decision for the enrichment flag a finalized item earns from one
+ * pipeline run, taken straight from the page-read outcome: "partial" when the
+ * page could not be read at all (retryable — the classifier worked from the
+ * URL alone), "no_article" when the page read fine but yielded no extractable
+ * article body (the URL itself is the save; a retry cannot change the
+ * outcome), undefined when fully enriched. A missing read (images/notes never
+ * fetch a page) is fully enriched; "gone" never reaches finalize — a gone
+ * page fails the item instead. Exported pure for unit testing.
  */
 export function linkEnrichment(
-  unreadable: boolean,
-  page: PageData | undefined,
+  read: LinkRead | undefined,
 ): "partial" | "no_article" | undefined {
-  if (unreadable) {
+  if (read === undefined) {
+    return undefined;
+  }
+  if (read.status === "unreadable") {
     return "partial";
   }
-  return page && !page.content ? "no_article" : undefined;
+  return read.page.content ? undefined : "no_article";
 }
 
 /**
@@ -669,6 +673,11 @@ type PageRead =
   | { status: "ok"; page: PageData }
   | { status: "gone"; error: PageFetchError }
   | { status: "unreadable"; error: PageFetchError };
+
+/** The read outcomes that reach finalizeItem: "gone" fails the item before
+ * classification, and the fetch error is dropped — nothing downstream of the
+ * sanitized log rereads it. */
+type LinkRead = { status: "ok"; page: PageData } | { status: "unreadable" };
 
 async function readPage(url: string): Promise<PageRead> {
   try {
@@ -813,10 +822,11 @@ export const processItem = internalAction({
 
       let page: PageData | undefined;
       let result: z.infer<typeof itemAnalysisSchema>;
-      // Set when the page body could not be read but the item is still worth
-      // saving: the classifier runs on the URL alone and the row is flagged so
-      // the client can offer a retry instead of showing a fully enriched save.
-      let unreadable = false;
+      // The link's page-read outcome, if any: it decides the enrichment flag
+      // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
+      // Only links fetch a page, so images/notes leave this unset and stay
+      // fully enriched.
+      let linkRead: LinkRead | undefined;
 
       if (item.type === "link") {
         if (!item.url) {
@@ -840,6 +850,7 @@ export const processItem = internalAction({
           });
           return null;
         }
+        linkRead = read;
         if (read.status === "unreadable") {
           // Refused (403/429), server error, timeout, or oversized: the link is
           // probably still good, so save a usable item classified from the URL
@@ -848,7 +859,6 @@ export const processItem = internalAction({
             `processItem unreadable for ${args.itemId}:`,
             summarizeError(read.error),
           );
-          unreadable = true;
         } else {
           page = read.page;
         }
@@ -869,7 +879,7 @@ export const processItem = internalAction({
                 ? `This is a short video. Only its caption is available:\n${page.content.slice(0, 6000)}`
                 : `Page content:\n${page.content.slice(0, 6000)}`
               : "No page content could be extracted.",
-            unreadable
+            linkRead?.status === "unreadable"
               ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
               : "",
             INTENTS_PROMPT_BLOCK,
@@ -960,10 +970,7 @@ export const processItem = internalAction({
           aspectRatio:
             item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
           intents: sanitizeIntents(result.intents),
-          // Only links carry enrichment; images/notes are always fully
-          // enriched (see linkEnrichment).
-          enrichment:
-            item.type === "link" ? linkEnrichment(unreadable, page) : undefined,
+          enrichment: linkEnrichment(linkRead),
           status: "ready",
         },
       );
@@ -997,7 +1004,7 @@ export const processItem = internalAction({
         });
       }
       await captureCategorizationTelemetry({
-        outcome: unreadable ? "partial" : "succeeded",
+        outcome: linkRead?.status === "unreadable" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
       });

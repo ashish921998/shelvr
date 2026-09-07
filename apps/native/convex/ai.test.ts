@@ -42,21 +42,25 @@ describe("storePoster", () => {
 });
 
 describe("linkEnrichment", () => {
-  // Mirrors the three states readPage can hand finalizeItem for a link:
-  // the fetch failed (retryable, classified from the URL alone), the page read
-  // but had no article body (terminal — e.g. an oEmbed-only TikTok read), and
-  // a fully read article.
+  // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
+  // failed (retryable, classified from the URL alone), the page read but had
+  // no article body (terminal — e.g. an oEmbed-only TikTok read), a fully
+  // read article, and no page at all (images/notes never fetch).
   it("flags an unreadable page as partial so the client offers a retry", () => {
-    expect(linkEnrichment(true, undefined)).toBe("partial");
+    expect(linkEnrichment({ status: "unreadable" })).toBe("partial");
   });
 
   it("flags a readable page without an article body as no_article", () => {
-    expect(linkEnrichment(false, {})).toBe("no_article");
+    expect(linkEnrichment({ status: "ok", page: {} })).toBe("no_article");
   });
 
   it("flags a fully read page as enriched (undefined)", () => {
     expect(
-      linkEnrichment(false, { content: "Extracted article body" }),
+      linkEnrichment({ status: "ok", page: { content: "Extracted body" } }),
     ).toBeUndefined();
+  });
+
+  it("treats a page-less item (image/note) as fully enriched", () => {
+    expect(linkEnrichment(undefined)).toBeUndefined();
   });
 });

@@ -6,6 +6,8 @@ import {
 import { memo } from 'react';
 import { displayHost } from '@/lib/url';
 import { isTikTokUrl } from '@convex/model/externalUrl';
+import { enrichmentValidator } from '@convex/model/itemFields';
+import type { Infer } from 'convex/values';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
@@ -42,7 +44,7 @@ export type FeedItem = {
   aspectRatio?: number;
   isSticker?: boolean;
   failureReason?: 'not_found' | 'error';
-  enrichment?: 'partial' | 'no_article';
+  enrichment?: Infer<typeof enrichmentValidator>;
   tags: string[];
   // Suggested this item into the current space; it isn't a member
   // until the user accepts. Only ever set by the space screen.
