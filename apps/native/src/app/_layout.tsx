@@ -4,7 +4,8 @@ import { useEntitlementSync } from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { posthog } from '@/lib/posthog';
 import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
-import { convex, persister, queryClient } from '@/lib/query-client';
+import { convex, persister, queryClient, restartConvexSubscription } from '@/lib/query-client';
+import { observeAuthQueryErrors } from '@/lib/query-auth-recovery';
 import { useConvexAuth } from 'convex/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
@@ -16,6 +17,7 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PostHogProvider } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
+import { PushNotificationSetup, useNotificationObserver } from '@/lib/notifications';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
@@ -75,6 +77,11 @@ function PostHogIdentity() {
   }, [isAuthenticated, isFetching, user]);
 
   return null;
+}
+
+function NotificationSetup() {
+  useNotificationObserver();
+  return <PushNotificationSetup />;
 }
 
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
@@ -145,6 +152,8 @@ export default function RootLayout() {
           }}
         >
           <PostHogIdentity />
+          <NotificationSetup />
+          <ConvexErroredQueryHealer />
           {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
         </PersistQueryClientProvider>
       </ConvexAuthProvider>
@@ -157,5 +166,14 @@ export default function RootLayout() {
  * providers. */
 function EntitlementSync() {
   useEntitlementSync();
+  return null;
+}
+
+function ConvexErroredQueryHealer() {
+  const { isAuthenticated } = useConvexAuth();
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    return observeAuthQueryErrors(queryClient, restartConvexSubscription);
+  }, [isAuthenticated]);
   return null;
 }

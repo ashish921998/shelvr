@@ -1003,6 +1003,13 @@ export const deleteItem = mutation({
     for (const op of operations) {
       await ctx.db.delete(op._id);
     }
+    const reads = await ctx.db
+      .query("itemReads")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .collect();
+    for (const read of reads) {
+      await ctx.db.delete(read._id);
+    }
     if (item.storageId) {
       // Existence-checked: if the blob is somehow already gone, the delete must
       // still remove the item rather than throw and leave it undeletable.

@@ -10,6 +10,11 @@ import {
 import { useCurrentUser } from '@/lib/current-user';
 import { analytics } from '@/lib/analytics';
 import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
+import {
+  getExpoPushToken,
+  getNotificationTimezone,
+  notificationDeviceSession,
+} from '@/lib/notifications';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { convexQuery } from '@convex-dev/react-query';
@@ -18,7 +23,7 @@ import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
@@ -28,9 +33,17 @@ export default function ProfileScreen() {
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
+  const registerDevice = useMutation(api.notifications.registerDevice);
+  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
+  const setNotificationPreferences = useMutation(api.notifications.setPreferences);
+  const { data: notificationPreferences } = useQuery(
+    convexQuery(api.notifications.getPreferences, {}),
+  );
   const [deleting, setDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
+  const [updatingNotifications, setUpdatingNotifications] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const fixtureResetEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
   const { data: canResetFlowFixtures } = useQuery(
@@ -106,6 +119,39 @@ export default function ProfileScreen() {
     void Linking.openURL(url);
   };
 
+  const toggleWeeklyShelf = async (enabled: boolean) => {
+    if (updatingNotifications || signingOut || deleting) return;
+    setUpdatingNotifications(true);
+    try {
+      if (enabled) {
+        const registered = await notificationDeviceSession.register(
+          () => getExpoPushToken(true),
+          (token) => registerDevice({
+            token,
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+            timezone: getNotificationTimezone(),
+          }),
+        );
+        if (!registered) {
+          Alert.alert(
+            'Notifications are off',
+            'Allow notifications for Shelvr in your device settings to turn on the weekly shelf.',
+          );
+          return;
+        }
+      }
+      await setNotificationPreferences({
+        weeklyShelfEnabled: enabled,
+        timezone: getNotificationTimezone(),
+      });
+    } catch (error) {
+      console.error('Weekly shelf preference failed', error);
+      Alert.alert('Couldn’t update notifications', 'Try again in a moment.');
+    } finally {
+      setUpdatingNotifications(false);
+    }
+  };
+
   const handleRestorePurchases = async () => {
     if (restoring) return;
     const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
@@ -133,6 +179,35 @@ export default function ProfileScreen() {
     }
   };
 
+  const restoreDeviceRegistration = () => {
+    void notificationDeviceSession.register(
+      () => getExpoPushToken(false),
+      (token) => registerDevice({
+        token,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        timezone: getNotificationTimezone(),
+      }),
+    ).catch((error) => console.error('Notification registration failed', error));
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut || deleting || updatingNotifications) return;
+    setSigningOut(true);
+    try {
+      await notificationDeviceSession.signOut(
+        (token) => unregisterDevice({ token }),
+        signOut,
+      );
+      analytics.reset();
+    } catch (error) {
+      console.error('Sign-out failed', error);
+      restoreDeviceRegistration();
+      Alert.alert('Couldn’t sign out', 'Check your connection and try again.');
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
@@ -151,13 +226,17 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              if (deleting) return;
+              if (deleting || signingOut || updatingNotifications) return;
               setDeleting(true);
               try {
                 try {
-                  await deleteAccount({});
+                  await notificationDeviceSession.signOut(
+                    (token) => unregisterDevice({ token }),
+                    () => deleteAccount({}),
+                  );
                 } catch (err) {
                   console.error('Account deletion failed', err);
+                  restoreDeviceRegistration();
                   Alert.alert(
                     'Couldn’t delete account',
                     'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
@@ -279,6 +358,23 @@ export default function ProfileScreen() {
         <AppSymbolIcon name="chevron.right" size={16} tintColor={theme.colors.muted} />
       </Pressable>
 
+      <View style={styles.preferenceRow}>
+        <View style={styles.preferenceCopy}>
+          <Text style={styles.preferenceLabel}>Weekly shelf</Text>
+          <Text style={styles.preferenceDescription}>
+            A few unopened saves every Sunday
+          </Text>
+        </View>
+        <Switch
+          accessibilityLabel="Weekly shelf notifications"
+          value={notificationPreferences?.weeklyShelfEnabled ?? false}
+          disabled={notificationPreferences === undefined || updatingNotifications || signingOut || deleting}
+          onValueChange={(value) => void toggleWeeklyShelf(value)}
+          trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+          thumbColor="#fff"
+        />
+      </View>
+
       <View style={styles.linkGroup}>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
@@ -319,20 +415,10 @@ export default function ProfileScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
-        onPress={async () => {
-          // Signing out flips `(app)`'s `isAuthenticated` guard, which renders
-          // `<Redirect href="/(auth)/sign-in" />` and unmounts this sheet. Calling
-          // `router.back()` here races that redirect — the `(app)` navigator is
-          // already gone, so the back action has no navigator to handle it and
-          // throws "GO_BACK was not handled by any navigator". Let the auth
-          // redirect own the navigation.
-          await signOut();
-          // Only after sign-out succeeds: drop the PostHog identity so the
-          // next user on this device starts a fresh anonymous person.
-          analytics.reset();
-        }}
+        disabled={signingOut || deleting || updatingNotifications}
+        onPress={() => void handleSignOut()}
       >
-        <Text style={styles.signOutText}>Sign out</Text>
+        <Text style={styles.signOutText}>{signingOut ? 'Signing out…' : 'Sign out'}</Text>
       </Pressable>
 
       <Pressable
@@ -341,7 +427,7 @@ export default function ProfileScreen() {
           pressed && { opacity: 0.7 },
           deleting && { opacity: 0.4 },
         ]}
-        disabled={deleting}
+        disabled={deleting || signingOut || updatingNotifications}
         onPress={confirmDeleteAccount}
       >
         <Text style={styles.deleteAccountText}>
@@ -411,6 +497,33 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.gap(1.5),
+    alignSelf: 'stretch',
+    padding: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  preferenceCopy: {
+    flex: 1,
+    gap: theme.gap(0.25),
+  },
+  preferenceLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  preferenceDescription: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   proLabel: {
     flex: 1,

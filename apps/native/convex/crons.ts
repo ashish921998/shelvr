@@ -22,4 +22,20 @@ crons.interval(
   {},
 );
 
+// Prepare and deliver eligible weekly shelves. The worker is bounded and
+// schedules one small transaction per due user.
+crons.interval(
+  "prepare weekly shelves",
+  { hours: 1 },
+  internal.notifications.prepareDueWeeklyDigests,
+  {},
+);
+
+crons.interval(
+  "recover weekly shelf deliveries",
+  { minutes: 5 },
+  internal.notificationDelivery.recover,
+  {},
+);
+
 export default crons;

@@ -154,6 +154,42 @@ async function deleteUserOwnedDataBatch(
   }
   if (operations.length === DELETE_BATCH) return false;
 
+  const reads = await ctx.db
+    .query("itemReads")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const read of reads) {
+    await ctx.db.delete(read._id);
+  }
+  if (reads.length === DELETE_BATCH) return false;
+
+  const devices = await ctx.db
+    .query("notificationDevices")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const device of devices) {
+    await ctx.db.delete(device._id);
+  }
+  if (devices.length === DELETE_BATCH) return false;
+
+  const preferences = await ctx.db
+    .query("notificationPreferences")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const preference of preferences) {
+    await ctx.db.delete(preference._id);
+  }
+  if (preferences.length === DELETE_BATCH) return false;
+
+  const digests = await ctx.db
+    .query("weeklyDigests")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const digest of digests) {
+    await ctx.db.delete(digest._id);
+  }
+  if (digests.length === DELETE_BATCH) return false;
+
   // Does not cancel the App Store subscription — only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")

@@ -52,6 +52,13 @@ export default function AppLayout() {
           }}
         />
         <Stack.Screen
+          name="digest/[id]"
+          options={{
+            title: 'Weekly shelf',
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        />
+        <Stack.Screen
           name="space/[id]"
           options={{
             title: '',
