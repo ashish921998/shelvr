@@ -55,19 +55,20 @@ export default function AppLayout() {
         />
         <Stack.Screen
           name="digest/[id]"
-          options={({ navigation }) => ({
+          options={{
             title: 'Weekly shelf',
             headerBackButtonDisplayMode: 'minimal',
-            headerLeft: navigation.canGoBack()
-              ? undefined
-              : () => (
+            headerBackVisible: true,
+            headerLeft: ({ canGoBack }) => canGoBack
+              ? null
+              : (
                 <HeaderIconButton
                   icon="house.fill"
                   label="Back to library"
                   onPress={() => router.replace('/')}
                 />
               ),
-          })}
+          }}
         />
         <Stack.Screen
           name="space/[id]"
