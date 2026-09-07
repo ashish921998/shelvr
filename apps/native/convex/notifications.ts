@@ -104,6 +104,16 @@ export const setPreferences = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     const now = Date.now();
+    if (
+      args.nextDigestAt !== undefined &&
+      (!Number.isSafeInteger(args.nextDigestAt) ||
+        args.nextDigestAt < now - DIGEST_WINDOW_MS ||
+        args.nextDigestAt > now + DIGEST_WINDOW_MS)
+    ) {
+      throw new Error(
+        "nextDigestAt must be a valid timestamp within one week of now",
+      );
+    }
     const timezone = args.timezone ?? existing?.timezone ?? "UTC";
     const fallback = nextWeeklyDigestAt(now, timezone);
     const previous = existing?.nextDigestAt;
@@ -182,6 +192,21 @@ export const registerDevice = mutation({
         updatedAt: now,
       });
     }
+    return null;
+  },
+});
+
+export const unregisterDevice = mutation({
+  args: { token: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const device = await ctx.db
+      .query("notificationDevices")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .unique();
+    if (device?.userId === userId)
+      await ctx.db.patch(device._id, { enabled: false });
     return null;
   },
 });

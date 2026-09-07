@@ -3,9 +3,24 @@ import { useConvexAuth, useMutation } from 'convex/react';
 import Constants from 'expo-constants';
 import * as Localization from 'expo-localization';
 import * as Notifications from 'expo-notifications';
-import { router, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useRouter } from 'expo-router';
 import { Platform } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { NotificationDeviceSession } from './notification-device-session';
+
+const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? 'default').replace(/[^A-Za-z0-9._-]/g, '_')}`;
+export const notificationDeviceSession = new NotificationDeviceSession({
+  read: async () => {
+    const stored = await SecureStore.getItemAsync(tokenStorageKey);
+    const tokens: unknown = stored ? JSON.parse(stored) : [];
+    if (!Array.isArray(tokens) || !tokens.every((token): token is string => typeof token === 'string')) {
+      throw new Error('Invalid saved notification tokens');
+    }
+    return tokens;
+  },
+  write: (tokens) => SecureStore.setItemAsync(tokenStorageKey, JSON.stringify(tokens)),
+});
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -60,32 +75,25 @@ export async function getExpoPushToken(
 export function PushNotificationSetup() {
   const { isAuthenticated } = useConvexAuth();
   const registerDevice = useMutation(api.notifications.registerDevice);
-  // Auth resolution can flip several times during boot, re-running this effect
-  // each flip. A per-run guard would reset every time and re-register the same
-  // token dozens of times in the first seconds, so keep the last registered
-  // token in a ref (survives effect re-runs). Sign-out clears it so a
-  // different account re-registers the same device token.
-  const lastRegisteredToken = useRef<string | null>(null);
-
   useEffect(() => {
     if (!isAuthenticated) {
-      lastRegisteredToken.current = null;
+      notificationDeviceSession.stop();
       return;
     }
-    let cancelled = false;
+    notificationDeviceSession.start();
 
     const register = async (devicePushToken?: Notifications.DevicePushToken) => {
-      const token = await getExpoPushToken(false, devicePushToken);
-      if (!token || cancelled || token === lastRegisteredToken.current) return;
       try {
-        await registerDevice({
-          token,
-          platform: Platform.OS === 'ios' ? 'ios' : 'android',
-          timezone: getNotificationTimezone(),
-        });
-        lastRegisteredToken.current = token;
-      } catch {
-        // Leave `lastRegisteredToken` unset so a later token event retries.
+        await notificationDeviceSession.register(
+          () => getExpoPushToken(false, devicePushToken),
+          (token) => registerDevice({
+            token,
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+            timezone: getNotificationTimezone(),
+          }),
+        );
+      } catch (error) {
+        console.error('Notification registration failed', error);
       }
     };
 
@@ -94,7 +102,7 @@ export function PushNotificationSetup() {
       void register(devicePushToken);
     });
     return () => {
-      cancelled = true;
+      notificationDeviceSession.stop();
       tokenListener.remove();
     };
   }, [isAuthenticated, registerDevice]);
@@ -130,8 +138,4 @@ export function useNotificationObserver(): void {
     });
     return () => subscription.remove();
   }, [nav]);
-}
-
-export function openNotificationUrl(url: string): void {
-  router.push(url as never);
 }

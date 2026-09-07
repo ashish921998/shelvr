@@ -14,7 +14,7 @@ import { StyleSheet } from 'react-native-unistyles';
 export default function DigestScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { data: digest } = useQuery(
+  const { data: digest, isError } = useQuery(
     convexQuery(api.notifications.getDigest, {
       id: id as Id<'weeklyDigests'>,
     }),
@@ -23,9 +23,29 @@ export default function DigestScreen() {
 
   useEffect(() => {
     if (digest && digest.openedAt === undefined) {
-      void markOpened({ id: digest._id });
+      void markOpened({ id: digest._id }).catch((error) => {
+        console.error('Could not mark weekly shelf opened', error);
+      });
     }
   }, [digest, markOpened]);
+
+  if (isError) {
+    return (
+      <View style={styles.empty}>
+        <EmptyState
+          title="Couldn’t load your weekly shelf"
+          message="Check your connection and try opening it again."
+        />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.replace('/')}
+          style={[styles.button, styles.errorButton]}
+        >
+          <Text style={styles.buttonText}>Back to library</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (digest === undefined) {
     return <ScreenLoader label="Opening your weekly shelf" />;
@@ -125,5 +145,9 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 14,
     color: '#fff',
+  },
+  errorButton: {
+    alignSelf: 'center',
+    marginBottom: theme.gap(6),
   },
 }));

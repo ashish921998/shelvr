@@ -26,6 +26,57 @@ async function seedItem(
 }
 
 describe("weekly shelf notifications", () => {
+  it.each([NaN, Infinity, -Infinity, -1e100, Number.MAX_SAFE_INTEGER, 1.5])(
+    "rejects invalid nextDigestAt %s without changing preferences",
+    async (nextDigestAt) => {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      await expect(
+        t.mutation(api.notifications.setPreferences, {
+          weeklyShelfEnabled: true,
+          nextDigestAt,
+        }),
+      ).rejects.toThrow("nextDigestAt must be a valid timestamp");
+      expect(
+        (await t.query(api.notifications.getPreferences, {}))
+          .weeklyShelfEnabled,
+      ).toBe(false);
+    },
+  );
+
+  it("revokes only a device owned by the caller and allows later registration", async () => {
+    const t = newConvexTest();
+    const owner = t.withIdentity({ subject: "user-a|session-1" });
+    const other = t.withIdentity({ subject: "user-b|session-2" });
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+    });
+    await other.mutation(api.notifications.unregisterDevice, {
+      token: "token-a",
+    });
+    expect(
+      (await t.run((ctx) => ctx.db.query("notificationDevices").unique()))
+        ?.enabled,
+    ).toBe(true);
+    await owner.mutation(api.notifications.unregisterDevice, {
+      token: "token-a",
+    });
+    expect(
+      (await t.run((ctx) => ctx.db.query("notificationDevices").unique()))
+        ?.enabled,
+    ).toBe(false);
+    await other.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+    });
+    await owner.mutation(api.notifications.unregisterDevice, {
+      token: "token-a",
+    });
+    expect(
+      await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
+    ).toMatchObject({ userId: "user-b", enabled: true });
+  });
+
   it("keeps a newly registered device disabled and out of the due queue", async () => {
     const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
     await t.mutation(api.notifications.registerDevice, {

@@ -13,6 +13,7 @@ import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
 import {
   getExpoPushToken,
   getNotificationTimezone,
+  notificationDeviceSession,
 } from '@/lib/notifications';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
@@ -33,6 +34,7 @@ export default function ProfileScreen() {
   const { status, loading } = useEntitlement();
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const registerDevice = useMutation(api.notifications.registerDevice);
+  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const setNotificationPreferences = useMutation(api.notifications.setPreferences);
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
@@ -41,6 +43,7 @@ export default function ProfileScreen() {
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const [updatingNotifications, setUpdatingNotifications] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const fixtureResetEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
   const { data: canResetFlowFixtures } = useQuery(
@@ -117,23 +120,25 @@ export default function ProfileScreen() {
   };
 
   const toggleWeeklyShelf = async (enabled: boolean) => {
-    if (updatingNotifications) return;
+    if (updatingNotifications || signingOut || deleting) return;
     setUpdatingNotifications(true);
     try {
       if (enabled) {
-        const token = await getExpoPushToken(true);
-        if (!token) {
+        const registered = await notificationDeviceSession.register(
+          () => getExpoPushToken(true),
+          (token) => registerDevice({
+            token,
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+            timezone: getNotificationTimezone(),
+          }),
+        );
+        if (!registered) {
           Alert.alert(
             'Notifications are off',
             'Allow notifications for Shelvr in your device settings to turn on the weekly shelf.',
           );
           return;
         }
-        await registerDevice({
-          token,
-          platform: Platform.OS === 'ios' ? 'ios' : 'android',
-          timezone: getNotificationTimezone(),
-        });
       }
       await setNotificationPreferences({
         weeklyShelfEnabled: enabled,
@@ -174,6 +179,35 @@ export default function ProfileScreen() {
     }
   };
 
+  const restoreDeviceRegistration = () => {
+    void notificationDeviceSession.register(
+      () => getExpoPushToken(false),
+      (token) => registerDevice({
+        token,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        timezone: getNotificationTimezone(),
+      }),
+    ).catch((error) => console.error('Notification registration failed', error));
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut || deleting || updatingNotifications) return;
+    setSigningOut(true);
+    try {
+      await notificationDeviceSession.signOut(
+        (token) => unregisterDevice({ token }),
+        signOut,
+      );
+      analytics.reset();
+    } catch (error) {
+      console.error('Sign-out failed', error);
+      restoreDeviceRegistration();
+      Alert.alert('Couldn’t sign out', 'Check your connection and try again.');
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   const confirmDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
@@ -192,13 +226,17 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              if (deleting) return;
+              if (deleting || signingOut || updatingNotifications) return;
               setDeleting(true);
               try {
                 try {
-                  await deleteAccount({});
+                  await notificationDeviceSession.signOut(
+                    (token) => unregisterDevice({ token }),
+                    () => deleteAccount({}),
+                  );
                 } catch (err) {
                   console.error('Account deletion failed', err);
+                  restoreDeviceRegistration();
                   Alert.alert(
                     'Couldn’t delete account',
                     'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
@@ -328,8 +366,9 @@ export default function ProfileScreen() {
           </Text>
         </View>
         <Switch
+          accessibilityLabel="Weekly shelf notifications"
           value={notificationPreferences?.weeklyShelfEnabled ?? false}
-          disabled={notificationPreferences === undefined || updatingNotifications}
+          disabled={notificationPreferences === undefined || updatingNotifications || signingOut || deleting}
           onValueChange={(value) => void toggleWeeklyShelf(value)}
           trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
           thumbColor="#fff"
@@ -376,20 +415,10 @@ export default function ProfileScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
-        onPress={async () => {
-          // Signing out flips `(app)`'s `isAuthenticated` guard, which renders
-          // `<Redirect href="/(auth)/sign-in" />` and unmounts this sheet. Calling
-          // `router.back()` here races that redirect — the `(app)` navigator is
-          // already gone, so the back action has no navigator to handle it and
-          // throws "GO_BACK was not handled by any navigator". Let the auth
-          // redirect own the navigation.
-          await signOut();
-          // Only after sign-out succeeds: drop the PostHog identity so the
-          // next user on this device starts a fresh anonymous person.
-          analytics.reset();
-        }}
+        disabled={signingOut || deleting || updatingNotifications}
+        onPress={() => void handleSignOut()}
       >
-        <Text style={styles.signOutText}>Sign out</Text>
+        <Text style={styles.signOutText}>{signingOut ? 'Signing out…' : 'Sign out'}</Text>
       </Pressable>
 
       <Pressable
@@ -398,7 +427,7 @@ export default function ProfileScreen() {
           pressed && { opacity: 0.7 },
           deleting && { opacity: 0.4 },
         ]}
-        disabled={deleting}
+        disabled={deleting || signingOut || updatingNotifications}
         onPress={confirmDeleteAccount}
       >
         <Text style={styles.deleteAccountText}>
