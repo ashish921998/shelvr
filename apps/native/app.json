@@ -182,6 +182,7 @@
         }
       ],
       "expo-web-browser",
+      "expo-notifications",
       [
         "expo-calendar",
         {

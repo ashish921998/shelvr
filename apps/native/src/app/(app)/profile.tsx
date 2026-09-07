@@ -10,6 +10,11 @@ import {
 import { useCurrentUser } from '@/lib/current-user';
 import { analytics } from '@/lib/analytics';
 import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
+import {
+  getExpoPushToken,
+  getNextWeeklyDigestAt,
+  getNotificationTimezone,
+} from '@/lib/notifications';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { convexQuery } from '@convex-dev/react-query';
@@ -18,7 +23,7 @@ import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 export default function ProfileScreen() {
@@ -28,9 +33,15 @@ export default function ProfileScreen() {
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
+  const registerDevice = useMutation(api.notifications.registerDevice);
+  const setNotificationPreferences = useMutation(api.notifications.setPreferences);
+  const { data: notificationPreferences } = useQuery(
+    convexQuery(api.notifications.getPreferences, {}),
+  );
   const [deleting, setDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
+  const [updatingNotifications, setUpdatingNotifications] = useState(false);
   const fixtureResetEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
   const { data: canResetFlowFixtures } = useQuery(
@@ -104,6 +115,39 @@ export default function ProfileScreen() {
 
   const openExternal = (url: string) => {
     void Linking.openURL(url);
+  };
+
+  const toggleWeeklyShelf = async (enabled: boolean) => {
+    if (updatingNotifications) return;
+    setUpdatingNotifications(true);
+    try {
+      if (enabled) {
+        const token = await getExpoPushToken(true);
+        if (!token) {
+          Alert.alert(
+            'Notifications are off',
+            'Allow notifications for Shelvr in your device settings to turn on the weekly shelf.',
+          );
+          return;
+        }
+        await registerDevice({
+          token,
+          platform: Platform.OS === 'ios' ? 'ios' : 'android',
+          nextDigestAt: getNextWeeklyDigestAt(),
+          timezone: getNotificationTimezone(),
+        });
+      }
+      await setNotificationPreferences({
+        weeklyShelfEnabled: enabled,
+        nextDigestAt: enabled ? getNextWeeklyDigestAt() : undefined,
+        timezone: getNotificationTimezone(),
+      });
+    } catch (error) {
+      console.error('Weekly shelf preference failed', error);
+      Alert.alert('Couldn’t update notifications', 'Try again in a moment.');
+    } finally {
+      setUpdatingNotifications(false);
+    }
   };
 
   const handleRestorePurchases = async () => {
@@ -279,6 +323,22 @@ export default function ProfileScreen() {
         <AppSymbolIcon name="chevron.right" size={16} tintColor={theme.colors.muted} />
       </Pressable>
 
+      <View style={styles.preferenceRow}>
+        <View style={styles.preferenceCopy}>
+          <Text style={styles.preferenceLabel}>Weekly shelf</Text>
+          <Text style={styles.preferenceDescription}>
+            A few unopened saves every Sunday
+          </Text>
+        </View>
+        <Switch
+          value={notificationPreferences?.weeklyShelfEnabled ?? false}
+          disabled={notificationPreferences === undefined || updatingNotifications}
+          onValueChange={(value) => void toggleWeeklyShelf(value)}
+          trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+          thumbColor="#fff"
+        />
+      </View>
+
       <View style={styles.linkGroup}>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
@@ -411,6 +471,33 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.gap(1.5),
+    alignSelf: 'stretch',
+    padding: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  preferenceCopy: {
+    flex: 1,
+    gap: theme.gap(0.25),
+  },
+  preferenceLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  preferenceDescription: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   proLabel: {
     flex: 1,

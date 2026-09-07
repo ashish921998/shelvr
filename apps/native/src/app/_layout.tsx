@@ -16,6 +16,7 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PostHogProvider } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
+import { PushNotificationSetup, useNotificationObserver } from '@/lib/notifications';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
@@ -75,6 +76,11 @@ function PostHogIdentity() {
   }, [isAuthenticated, isFetching, user]);
 
   return null;
+}
+
+function NotificationSetup() {
+  useNotificationObserver();
+  return <PushNotificationSetup />;
 }
 
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
@@ -145,6 +151,8 @@ export default function RootLayout() {
           }}
         >
           <PostHogIdentity />
+          <NotificationSetup />
+          <ConvexErroredQueryHealer />
           {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
         </PersistQueryClientProvider>
       </ConvexAuthProvider>
@@ -157,5 +165,27 @@ export default function RootLayout() {
  * providers. */
 function EntitlementSync() {
   useEntitlementSync();
+  return null;
+}
+
+/** A route restored before Convex Auth finishes refreshing an expired token
+ * (state restoration, a push deep link) subscribes once, errors with "Not
+ * authenticated", and Convex never re-runs it — the screen keeps showing stale
+ * data and its controls stay dead until remounted. Periodically re-fetch any
+ * still-errored, still-observed Convex query so screens recover in place once
+ * auth settles. Healthy subscriptions are untouched. */
+function ConvexErroredQueryHealer() {
+  useEffect(() => {
+    const heal = () => {
+      void queryClient.refetchQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'convexQuery' &&
+          query.state.status === 'error' &&
+          query.getObserversCount() > 0,
+      });
+    };
+    const interval = setInterval(heal, 15_000);
+    return () => clearInterval(interval);
+  }, []);
   return null;
 }

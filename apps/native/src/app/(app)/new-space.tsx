@@ -43,10 +43,11 @@ export default function NewSpaceScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = id !== undefined;
 
-  const { data: space, isLoading, isError } = useQuery({
-    ...convexQuery(api.spaces.getSpace, { id: (id ?? '') as Id<'spaces'> }),
-    enabled: editing,
-  });
+  // 'skip' (not `enabled`) keeps create mode from subscribing with an empty
+  // id — see item/[id].tsx for why `enabled` is not enough here.
+  const { data: space, isLoading, isError } = useQuery(
+    convexQuery(api.spaces.getSpace, editing ? { id: id as Id<'spaces'> } : 'skip'),
+  );
 
   // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {

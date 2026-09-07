@@ -226,6 +226,55 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // One Expo push token per device. Tokens are user-scoped so a device can be
+  // moved safely when a different account signs in on it.
+  notificationDevices: defineTable({
+    userId: v.string(),
+    token: v.string(),
+    platform: v.union(v.literal("ios"), v.literal("android")),
+    enabled: v.boolean(),
+    lastSeenAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
+
+  // Delivery preferences and the next UTC instant at which the weekly shelf
+  // should be prepared. The client calculates this in the user's timezone.
+  notificationPreferences: defineTable({
+    userId: v.string(),
+    weeklyShelfEnabled: v.boolean(),
+    nextDigestAt: v.number(),
+    timezone: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_next_digest_at", ["nextDigestAt"]),
+
+  // Read state is separate from items so opening a save does not rewrite the
+  // item row that is rendered throughout the feed.
+  itemReads: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    firstOpenedAt: v.number(),
+    lastOpenedAt: v.number(),
+  })
+    .index("by_user_and_item", ["userId", "itemId"])
+    .index("by_user", ["userId"])
+    .index("by_item", ["itemId"]),
+
+  // A persisted weekly shelf keeps the notification payload and in-app view
+  // stable even if the underlying saves are later deleted or reclassified.
+  weeklyDigests: defineTable({
+    userId: v.string(),
+    weekStart: v.number(),
+    itemIds: v.array(v.id("items")),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    openedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_week", ["userId", "weekStart"]),
+
   // Provider-independent waitlist source of truth. Resend is only a delivery
   // and preference-management projection of these records, so a provider
   // outage or migration can never lose the original signup or consent trail.

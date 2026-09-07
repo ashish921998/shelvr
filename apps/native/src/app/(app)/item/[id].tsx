@@ -42,6 +42,7 @@ export default function ItemScreen() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const deleteItem = useMutation(api.items.deleteItem);
+  const markItemOpened = useMutation(api.notifications.markItemOpened);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
   const listRef = useRef<FlashListRef<DetailItem>>(null);
@@ -49,18 +50,25 @@ export default function ItemScreen() {
   // Rebuild the ordered sibling list from whichever list the user opened from.
   // Each of these queries is already warm in the cache from the source screen,
   // so this is a cache read, not a network round-trip.
-  const listQ = useQuery({
-    ...convexQuery(api.items.listItems, {}),
-    enabled: from !== 'space' && from !== 'search',
-  });
-  const spaceQ = useQuery({
-    ...convexQuery(api.spaces.getSpace, { id: (spaceId ?? '') as Id<'spaces'> }),
-    enabled: from === 'space' && !!spaceId,
-  });
-  const searchQ = useQuery({
-    ...convexQuery(api.items.searchItems, { query: q ?? '' }),
-    enabled: from === 'search' && !!q,
-  });
+  // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
+  // React Query still subscribes through the Convex adapter, and an invalid
+  // arg (e.g. an empty-string id) throws ArgumentValidationError on every
+  // socket reconnect, which the server answers by closing the WebSocket.
+  const listQ = useQuery(
+    convexQuery(
+      api.items.listItems,
+      from !== 'space' && from !== 'search' ? {} : 'skip',
+    ),
+  );
+  const spaceQ = useQuery(
+    convexQuery(
+      api.spaces.getSpace,
+      from === 'space' && spaceId ? { id: spaceId as Id<'spaces'> } : 'skip',
+    ),
+  );
+  const searchQ = useQuery(
+    convexQuery(api.items.searchItems, from === 'search' && q ? { query: q } : 'skip'),
+  );
 
   // A single-item fallback for deep links (no source) or a stale list that no
   // longer contains this id.
@@ -152,6 +160,12 @@ export default function ItemScreen() {
   );
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
+
+  useEffect(() => {
+    if (activeItem?.status === 'ready') {
+      void markItemOpened({ itemId: activeItem._id });
+    }
+  }, [activeItem?._id, activeItem?.status, markItemOpened]);
 
   // A link shares its URL; a saved image/sticker shares the picture itself.
   // `expo-sharing` needs a local file, so the remote image is cached first.
