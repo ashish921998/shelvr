@@ -537,6 +537,24 @@ export function pageGone(status: number | undefined): boolean {
 }
 
 /**
+ * Pure decision for the enrichment flag a finalized link earns from one
+ * pipeline run: "partial" when the page could not be read at all (retryable —
+ * the classifier worked from the URL alone), "no_article" when the page read
+ * fine but yielded no extractable article body (the URL itself is the save; a
+ * retry cannot change the outcome), undefined when fully enriched. Exported
+ * pure for unit testing.
+ */
+export function linkEnrichment(
+  unreadable: boolean,
+  page: PageData | undefined,
+): "partial" | "no_article" | undefined {
+  if (unreadable) {
+    return "partial";
+  }
+  return page && !page.content ? "no_article" : undefined;
+}
+
+/**
  * Reduce a caught error to a safe log category. Fetch-policy errors expose only
  * their stable code; anything else retains the error's constructor name (e.g.
  * TypeError) for observability without leaking data — never the error's message
@@ -942,7 +960,10 @@ export const processItem = internalAction({
           aspectRatio:
             item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
           intents: sanitizeIntents(result.intents),
-          enrichment: unreadable ? "partial" : undefined,
+          // Only links carry enrichment; images/notes are always fully
+          // enriched (see linkEnrichment).
+          enrichment:
+            item.type === "link" ? linkEnrichment(unreadable, page) : undefined,
           status: "ready",
         },
       );

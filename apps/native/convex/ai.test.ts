@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { storePoster } from "./ai";
+import { linkEnrichment, storePoster } from "./ai";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 
@@ -38,5 +38,25 @@ describe("storePoster", () => {
     );
 
     expect(stored).toBeUndefined();
+  });
+});
+
+describe("linkEnrichment", () => {
+  // Mirrors the three states readPage can hand finalizeItem for a link:
+  // the fetch failed (retryable, classified from the URL alone), the page read
+  // but had no article body (terminal — e.g. an oEmbed-only TikTok read), and
+  // a fully read article.
+  it("flags an unreadable page as partial so the client offers a retry", () => {
+    expect(linkEnrichment(true, undefined)).toBe("partial");
+  });
+
+  it("flags a readable page without an article body as no_article", () => {
+    expect(linkEnrichment(false, {})).toBe("no_article");
+  });
+
+  it("flags a fully read page as enriched (undefined)", () => {
+    expect(
+      linkEnrichment(false, { content: "Extracted article body" }),
+    ).toBeUndefined();
   });
 });

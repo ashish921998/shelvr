@@ -230,6 +230,21 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Text style={styles.description}>{item.description}</Text>
         ) : null}
 
+        {item.url ? (
+          // The address itself is the content when there's no article to
+          // read — show it as a real, tappable row instead of a sparse gap.
+          <Pressable
+            style={styles.urlRow}
+            onPress={() => WebBrowser.openBrowserAsync(item.url!)}
+            hitSlop={4}
+          >
+            <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
+            <Text style={styles.urlText} numberOfLines={2}>
+              {item.url}
+            </Text>
+          </Pressable>
+        ) : null}
+
         {isVideo && paragraphs.length > 0 ? (
           <Text selectable style={styles.paragraph}>
             {paragraphs.join('\n\n')}
@@ -301,16 +316,22 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState = 'gone' | 'failed' | 'partial';
+type SaveState = 'gone' | 'failed' | 'partial' | 'no_article';
 
 function saveState(item: DetailItem): SaveState | null {
   if (item.status === 'failed') {
     // A `not_found` page is gone for good; any other failure is retryable.
     return item.failureReason === 'not_found' ? 'gone' : 'failed';
   }
-  return item.status === 'ready' && item.enrichment === 'partial'
-    ? 'partial'
-    : null;
+  if (item.status !== 'ready') {
+    return null;
+  }
+  if (item.enrichment === 'partial') {
+    return 'partial';
+  }
+  // The page loaded but had no extractable article: the URL itself is the
+  // save. Explained, but not retryable — a re-run would reach the same result.
+  return item.enrichment === 'no_article' ? 'no_article' : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
@@ -318,6 +339,8 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   failed: "Shelvr couldn't read this page.",
   partial:
     "Saved from the link alone — the page wouldn't load, so these details are a guess.",
+  no_article:
+    'This page has no readable article — saved as a plain link.',
 };
 
 /**
@@ -352,12 +375,18 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   return (
     <View style={styles.noticeRow}>
       <AppSymbolIcon
-        name="exclamationmark.triangle.fill"
+        name={state === 'no_article' ? 'info.circle' : 'exclamationmark.triangle.fill'}
         size={14}
-        tintColor={state === 'gone' ? theme.colors.faint : theme.colors.danger}
+        tintColor={
+          state === 'gone'
+            ? theme.colors.faint
+            : state === 'no_article'
+              ? theme.colors.muted
+              : theme.colors.danger
+        }
       />
       <Text style={styles.noticeText}>{SAVE_STATE_NOTICE[state]}</Text>
-      {state === 'gone' ? null : (
+      {state === 'gone' || state === 'no_article' ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
@@ -387,8 +416,11 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   );
 }
 
-// Phase-3 "Find links": a user-triggered SerpAPI shopping search. The button
-// only fires on press (bounded cost); results render as product cards.
+// Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
+// from the toolbar's action menu (an idle item renders no inline chip — it
+// made every sparse detail page noisier). Post-search states still render
+// inline: results as product cards, a spinner while searching, and a retry
+// chip when the search failed.
 function ProductsSection({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const findLinks = useMutation(api.items.findLinks);
@@ -456,6 +488,13 @@ function ProductsSection({ item }: { item: DetailItem }) {
     );
   }
 
+  // Idle (never searched): nothing inline — the trigger lives in the action
+  // menu. Only a failed search (retry affordance) or a completed empty search
+  // ("No matches") needs a chip here.
+  if (products === undefined && item.productsStatus !== 'failed') {
+    return null;
+  }
+
   return (
     <View style={styles.findLinksRow}>
       <Pressable
@@ -483,9 +522,7 @@ function ProductsSection({ item }: { item: DetailItem }) {
         <Text style={styles.chipLabel}>
           {item.productsStatus === 'failed'
             ? 'Find links — try again'
-            : products
-              ? 'No matches — search again'
-              : 'Find links'}
+            : 'No matches — search again'}
         </Text>
       </Pressable>
     </View>
@@ -581,10 +618,25 @@ const styles = StyleSheet.create((theme) => ({
   },
   description: {
     fontFamily: theme.fonts.medium,
-    fontSize: 16,
-    lineHeight: 23,
+    fontSize: 17,
+    lineHeight: 25,
     textAlign: 'center',
     color: theme.colors.muted,
+  },
+  urlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    alignSelf: 'center',
+    paddingHorizontal: theme.gap(1),
+  },
+  urlText: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: theme.colors.faint,
   },
   chipsRow: {
     flexDirection: 'row',

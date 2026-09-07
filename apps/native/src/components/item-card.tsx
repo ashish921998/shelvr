@@ -42,7 +42,7 @@ export type FeedItem = {
   aspectRatio?: number;
   isSticker?: boolean;
   failureReason?: 'not_found' | 'error';
-  enrichment?: 'partial';
+  enrichment?: 'partial' | 'no_article';
   tags: string[];
   // Suggested this item into the current space; it isn't a member
   // until the user accepts. Only ever set by the space screen.

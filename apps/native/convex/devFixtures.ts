@@ -117,6 +117,9 @@ export const resetCurrentUser = mutation({
       url: "https://example.com/recipes/weeknight-miso-ramen",
       siteName: "Example Kitchen",
       tags: ["recipes", "dinner"],
+      // The page loaded but had no extractable article — demonstrates the
+      // "no_article" enrichment state on the detail screen.
+      enrichment: "no_article",
       intents: [
         {
           kind: "open_url",
@@ -161,6 +164,16 @@ export const resetCurrentUser = mutation({
       url: "https://example.com/design/value-of-craft",
       siteName: "Example Journal",
       tags: ["design", "reading"],
+      // A readable article body + hero so this fixture exercises the
+      // ArticleReaderView path (paragraphs split on blank lines).
+      heroImageUrl: "https://picsum.photos/seed/value-of-craft/1200/630",
+      aspectRatio: 1.91,
+      content: [
+        "The objects that stay with us are rarely the ones built to impress at first glance. They are the ones that were assembled with an opinion — a decision about what they should be, made by someone who cared enough to defend it.",
+        "Durability is the quiet half of craft. A well-made thing absorbs use without showing it as damage; the patina becomes a record of a life rather than a tally of failures. Mass production struggles here because its economics reward the cheapest acceptable outcome, not the most durable one.",
+        "Thoughtful design also knows when to stop. Every feature added to fill a spec sheet is a claim on the user's attention, and attention is the scarcest material any product touches. The discipline is not in what a thing can do, but in what it declines to do.",
+        "None of this is nostalgia. New tools, new materials, and new methods all have a place — but the intent behind them is the part that compounds. A workshop that asks \"what should this be?\" before \"how fast can we ship it?\" will make objects worth keeping, whatever century it works in.",
+      ].join("\n\n"),
       searchText:
         "the value of craft durable objects thoughtful design reading example journal",
     });

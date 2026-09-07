@@ -1466,7 +1466,7 @@ describe("failed saves and retry", () => {
     fields: {
       status: "processing" | "ready" | "failed";
       failureReason?: "not_found" | "error";
-      enrichment?: "partial";
+      enrichment?: "partial" | "no_article";
     },
   ): Promise<Id<"items">> {
     return await t.run(async (ctx) => {
@@ -1512,6 +1512,20 @@ describe("failed saves and retry", () => {
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("processing");
     expect(item?.enrichment).toBeUndefined();
+  });
+
+  it("does not retry a no-article link (the URL itself is the save)", async () => {
+    // A no-article page read fine — a retry cannot change the outcome, so the
+    // backend must refuse the retry the way it refuses a 404.
+    const t = await as("retry-no-article");
+    const itemId = await seedLink(t, "retry-no-article", {
+      status: "ready",
+      enrichment: "no_article",
+    });
+    await t.mutation(api.items.reprocessItem, { id: itemId });
+    const item = await t.run(async (ctx) => await ctx.db.get(itemId));
+    expect(item?.status).toBe("ready");
+    expect(item?.enrichment).toBe("no_article");
   });
 
   it("does not retry a page that is gone (a 404 will not change)", async () => {

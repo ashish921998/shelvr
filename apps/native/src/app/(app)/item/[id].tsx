@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   Share,
@@ -29,6 +30,7 @@ import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
+import { usePaywallGuard } from '@/lib/entitlement';
 
 export default function ItemScreen() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
@@ -210,6 +212,22 @@ export default function ItemScreen() {
     }
   }, [activeItem]);
 
+  // "Find links" moved off the detail body (it made every sparse page
+  // noisier) into this menu. The server no-ops while a search is in flight,
+  // and the inline results/spinner/retry render on the detail page.
+  const findLinks = useMutation(api.items.findLinks);
+  const { guard: findLinksGuard } = usePaywallGuard('item_detail');
+  const onFindLinks = useCallback(() => {
+    if (!activeItem || activeItem.status !== 'ready') return;
+    void findLinksGuard(async () => {
+      try {
+        await findLinks({ id: activeItem._id });
+      } catch {
+        Alert.alert("Couldn't search", 'Please try again in a moment.');
+      }
+    });
+  }, [activeItem, findLinks, findLinksGuard]);
+
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
   // drops away as the suggestion becomes a real membership.
@@ -308,6 +326,9 @@ export default function ItemScreen() {
                     actions={[
                       { label: 'Share', onPress: shareActive },
                       ...(activeItem?.url ? [{ label: 'Copy link', onPress: copyLink }] : []),
+                      ...(activeItem?.status === 'ready'
+                        ? [{ label: 'Find links', onPress: onFindLinks }]
+                        : []),
                       { label: 'Delete', destructive: true, onPress: onDelete },
                     ]}
                   />
@@ -327,6 +348,11 @@ export default function ItemScreen() {
           {activeItem?.url ? (
             <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
               Copy link
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {activeItem?.status === 'ready' ? (
+            <Stack.Toolbar.MenuAction icon="bag" onPress={onFindLinks}>
+              Find links
             </Stack.Toolbar.MenuAction>
           ) : null}
           <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>

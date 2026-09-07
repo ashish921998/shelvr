@@ -24,6 +24,7 @@ const SF_TO_MATERIAL = {
   'checkmark.circle.fill': 'check_circle',
   'exclamationmark.triangle.fill': 'warning',
   'exclamationmark.circle': 'error',
+  'info.circle': 'info',
   // People / communication
   'person.fill': 'person',
   'envelope': 'mail',
