@@ -1,11 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
 
-/** Install for one authenticated session, including auth errors that arrive after sign-in. */
+/** Recover live queries once per error category during each authenticated session. */
 export function observeAuthQueryErrors(
   client: QueryClient,
   restart: (queryHash: string) => void,
 ) {
-  const attempted = new Set<string>();
+  const attemptedAuth = new Set<string>();
+  const attemptedOther = new Set<string>();
   let stopped = false;
   const recover = () => {
     if (stopped) return;
@@ -13,11 +14,13 @@ export function observeAuthQueryErrors(
       if (
         query.queryKey[0] !== 'convexQuery' ||
         query.state.status !== 'error' ||
-        query.getObserversCount() === 0 ||
-        attempted.has(query.queryHash) ||
-        !String(query.state.error).includes('Not authenticated')
+        query.getObserversCount() === 0
       )
         continue;
+      const attempted = String(query.state.error).includes('Not authenticated')
+        ? attemptedAuth
+        : attemptedOther;
+      if (attempted.has(query.queryHash)) continue;
       attempted.add(query.queryHash);
       restart(query.queryHash);
     }
