@@ -1,15 +1,17 @@
 import { useOnboarding } from '@/lib/onboarding';
 import { ScreenLoader } from '@/components/ui/screen-loader';
+import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { useReplayOnboarding } from '@/lib/replay-onboarding';
 import { useResumePendingShare } from '@/lib/share/use-resume-pending-share';
 import { RecentSavesWidgetSync } from '@/lib/widget-sync';
 import { useConvexAuth } from 'convex/react';
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 import { Fragment } from 'react';
 import { Platform } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
 export default function AppLayout() {
+  const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
@@ -56,6 +58,16 @@ export default function AppLayout() {
           options={{
             title: 'Weekly shelf',
             headerBackButtonDisplayMode: 'minimal',
+            headerBackVisible: true,
+            headerLeft: ({ canGoBack }) => canGoBack
+              ? null
+              : (
+                <HeaderIconButton
+                  icon="house.fill"
+                  label="Back to library"
+                  onPress={() => router.replace('/')}
+                />
+              ),
           }}
         />
         <Stack.Screen
