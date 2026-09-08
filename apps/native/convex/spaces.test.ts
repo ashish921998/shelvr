@@ -77,12 +77,17 @@ describe("filing corrections", () => {
       return { itemId, spaceId };
     });
     await t.mutation(api.spaces.acceptSuggestion, ids);
-    await t.mutation(api.spaces.undoAcceptSuggestion, ids);
-    await t.mutation(api.spaces.undoAcceptSuggestion, ids);
+    await t.mutation(internal.spaces.setMembershipIntentsInternal, {
+      ...ids, intents: [{ kind: "web_search", label: "Find recipes", value: "pasta recipes" }],
+    });
+    expect(await t.mutation(api.spaces.undoAcceptSuggestion, ids)).toBe(true);
+    expect(await t.mutation(api.spaces.undoAcceptSuggestion, ids)).toBe(false);
     const space = await t.query(api.spaces.getSpace, { id: ids.spaceId });
     expect(space?.items).toHaveLength(0);
     expect(space?.suggestions.map((item) => item._id)).toEqual([ids.itemId]);
     expect(await t.mutation(api.spaces.acceptSuggestion, ids)).toBe(true);
+    const restored = await t.query(api.spaces.getSpace, { id: ids.spaceId });
+    expect(restored?.items[0].spaceIntents).toBeUndefined();
   });
 
   it("keeps a removal through both AI passes and lets an explicit undo restore membership", async () => {

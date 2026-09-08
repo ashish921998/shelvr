@@ -404,15 +404,16 @@ export const acceptSuggestion = mutation({
 
 export const undoAcceptSuggestion = mutation({
   args: { itemId: v.id("items"), spaceId: v.id("spaces") },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
-      await ctx.db.patch(row._id, { status: "suggested" });
+      await ctx.db.patch(row._id, { status: "suggested", intents: undefined });
+      return true;
     }
-    return null;
+    return false;
   },
 });
 

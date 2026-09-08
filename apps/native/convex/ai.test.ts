@@ -42,6 +42,12 @@ describe("storePoster", () => {
 });
 
 describe("linkEnrichment", () => {
+  it.each(["article", "main", "div"])("preserves short readable text inside %s", (tag) => {
+    const content = extractBodyText(`<html><head><title>Field notes</title></head><body><${tag}><h1>Field notes</h1><p>We walked along the river at dawn. The water was still and the reeds were full of birds.</p><p>By noon the wind had picked up. We returned along the ridge and watched the clouds gather.</p></${tag}></body></html>`, "https://example.com/notes");
+    expect(content).toContain("We walked along the river");
+    expect(content).toContain("By noon the wind");
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
+  });
   it("does not turn page chrome into an article body", () => {
     const content = extractBodyText('<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>', "https://example.com");
     expect(content).toBeUndefined();

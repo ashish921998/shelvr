@@ -7,7 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { Readability, isProbablyReaderable } from "@mozilla/readability";
+import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import {
   safeFetch,
@@ -356,8 +356,13 @@ function htmlToText(html: string): string {
 export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
-    // parse() can return sparse page chrome even without an article candidate.
-    if (!isProbablyReaderable(document)) return undefined;
+    // Remove explicit page chrome before parsing: the readerability preflight
+    // rejects short articles, while parse() can retain chrome on sparse pages.
+    for (const element of document.querySelectorAll(
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .menu, .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+    )) {
+      element.remove();
+    }
     // Give Readability a base URL so it can resolve/keep links correctly.
     try {
       const base = document.createElement("base");

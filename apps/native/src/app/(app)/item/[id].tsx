@@ -264,10 +264,12 @@ export default function ItemScreen() {
     decisionPending.current = true;
     setDecisionBusy(true);
     try {
-      await undoAcceptSuggestion(accepted);
-      analytics.capture('item_space_membership_changed', {
-        item_id: accepted.itemId, space_id: accepted.spaceId, membership_added: false, undone: true,
-      });
+      const changed = await undoAcceptSuggestion(accepted);
+      if (changed) {
+        analytics.capture('item_space_membership_changed', {
+          item_id: accepted.itemId, space_id: accepted.spaceId, membership_added: false, undone: true,
+        });
+      }
       setAccepted(null);
     } catch {
       Alert.alert("Couldn't undo", 'The save is still in this Space. Please try again.');
