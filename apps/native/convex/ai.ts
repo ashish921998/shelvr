@@ -7,7 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { Readability } from "@mozilla/readability";
+import { Readability, isProbablyReaderable } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import {
   safeFetch,
@@ -318,15 +318,6 @@ function extractTitle(html: string): string | undefined {
   return undefined;
 }
 
-/** Strip whole elements (including content) for the given tag names. */
-function stripElements(html: string, tags: string[]): string {
-  let out = html;
-  for (const tag of tags) {
-    out = out.replace(new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi"), " ");
-  }
-  return out;
-}
-
 function htmlToText(html: string): string {
   let text = html;
   // Block-level boundaries become paragraph breaks.
@@ -354,57 +345,19 @@ function htmlToText(html: string): string {
 }
 
 /**
- * Fallback extractor: crude tag-scoping + tag-stripping. Only used when
- * Readability can't isolate an article (e.g. malformed markup). It leaks page
- * chrome (nav menus, share counts, captions) on many sites, which is exactly
- * why Readability is preferred.
- */
-function extractBodyTextRegex(html: string): string {
-  let scope = html;
-  const article = html.match(/<article[\s\S]*?<\/article>/i);
-  if (article) {
-    scope = article[0];
-  } else {
-    const main = html.match(/<main[\s\S]*?<\/main>/i);
-    if (main) {
-      scope = main[0];
-    } else {
-      const body = html.match(/<body[\s\S]*<\/body>/i);
-      if (body) {
-        scope = body[0];
-      }
-    }
-  }
-  scope = stripElements(scope, [
-    "script",
-    "style",
-    "noscript",
-    "svg",
-    "nav",
-    "header",
-    "footer",
-    "aside",
-    "form",
-    "iframe",
-    "template",
-  ]);
-  scope = scope.replace(/<!--[\s\S]*?-->/g, " ");
-  return htmlToText(scope);
-}
-
-/**
  * Extract the readable article body. Mozilla Readability (the engine behind
  * Firefox Reader View) scores DOM blocks by text density and link ratio to
  * isolate the real article, discarding nav, ads, share widgets, comment
  * counts, captions, and other boilerplate — so it works across arbitrary
  * article pages rather than one site's markup. We feed its cleaned article
  * HTML through htmlToText to get the paragraph-separated plain text the client
- * renders. Falls back to the regex extractor if Readability finds nothing
- * (e.g. non-article pages or JS-rendered shells with no server-side content).
+ * renders. Pages without a readable article do not store a body.
  */
-function extractBodyText(html: string, url: string): string {
+export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
+    // parse() can return sparse page chrome even without an article candidate.
+    if (!isProbablyReaderable(document)) return undefined;
     // Give Readability a base URL so it can resolve/keep links correctly.
     try {
       const base = document.createElement("base");
@@ -421,9 +374,9 @@ function extractBodyText(html: string, url: string): string {
       }
     }
   } catch {
-    // Fall through to the regex extractor below.
+    // Malformed pages without a readable body remain bare links.
   }
-  return extractBodyTextRegex(html);
+  return undefined;
 }
 
 type PageData = {
@@ -661,7 +614,7 @@ async function fetchPage(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     siteName,
-    content: content !== "" ? content : undefined,
+    content,
   };
 }
 

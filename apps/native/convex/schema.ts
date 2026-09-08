@@ -87,8 +87,9 @@ export default defineSchema({
     // `status: "failed"`; absent on pre-existing failed rows.
     failureReason: v.optional(failureReasonValidator),
     // "partial" = classified from the URL alone because the page body could not
-    // be read (403/429/5xx/timeout). The item is usable and retryable; absent
-    // means fully enriched.
+    // be read (403/429/5xx/timeout). The item is usable and retryable.
+    // "no_article" = page fetched successfully but has no readable article body.
+    // Absent means fully enriched.
     enrichment: v.optional(enrichmentValidator),
     searchText: v.string(),
   })

@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { linkEnrichment, storePoster } from "./ai";
+import { extractBodyText, linkEnrichment, storePoster } from "./ai";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 
@@ -42,6 +42,19 @@ describe("storePoster", () => {
 });
 
 describe("linkEnrichment", () => {
+  it("does not turn page chrome into an article body", () => {
+    const content = extractBodyText('<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>', "https://example.com");
+    expect(content).toBeUndefined();
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBe("no_article");
+  });
+
+  it("preserves readable article text", () => {
+    const paragraph = "A reader follows the winding path through the forest, observing the changing leaves and the quiet stream. Each season brings a different landscape, with new plants and animals to discover. ";
+    const content = extractBodyText(`<html><head><title>A forest walk</title></head><body><nav>Home</nav><article><h1>A forest walk</h1>${Array.from({ length: 6 }, () => `<p>${paragraph.repeat(3)}</p>`).join("")}</article><footer>Copyright</footer></body></html>`, "https://example.com/article");
+    expect(content).toContain("A reader follows");
+    expect(content).not.toContain("Copyright");
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
+  });
   // Mirrors the read outcomes that reach finalizeItem for a link: the fetch
   // failed (retryable, classified from the URL alone), the page read but had
   // no article body (terminal — e.g. an oEmbed-only TikTok read), a fully

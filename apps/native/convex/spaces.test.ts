@@ -68,6 +68,23 @@ describe("space creation", () => {
 });
 
 describe("filing corrections", () => {
+  it("undoes acceptance back to a suggestion without dismissing it", async () => {
+    const t = await entitledUser("user-a");
+    const ids = await t.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", { userId: "user-a", name: "Recipes" });
+      const itemId = await ctx.db.insert("items", { userId: "user-a", type: "note", status: "ready", tags: [], searchText: "Pasta" });
+      await ctx.db.insert("spaceItems", { itemId, spaceId, userId: "user-a", status: "suggested" });
+      return { itemId, spaceId };
+    });
+    await t.mutation(api.spaces.acceptSuggestion, ids);
+    await t.mutation(api.spaces.undoAcceptSuggestion, ids);
+    await t.mutation(api.spaces.undoAcceptSuggestion, ids);
+    const space = await t.query(api.spaces.getSpace, { id: ids.spaceId });
+    expect(space?.items).toHaveLength(0);
+    expect(space?.suggestions.map((item) => item._id)).toEqual([ids.itemId]);
+    expect(await t.mutation(api.spaces.acceptSuggestion, ids)).toBe(true);
+  });
+
   it("keeps a removal through both AI passes and lets an explicit undo restore membership", async () => {
     const t = await entitledUser("user-a");
     const ids = await t.run(async (ctx) => {
@@ -102,5 +119,6 @@ describe("filing corrections", () => {
     }));
     await expect(t.mutation(api.spaces.removeItemFromSpace, ids)).rejects.toThrow("Item not found");
     await expect(t.mutation(api.spaces.addItemToSpace, ids)).rejects.toThrow("Item not found");
+    await expect(t.mutation(api.spaces.undoAcceptSuggestion, ids)).rejects.toThrow("Item not found");
   });
 });

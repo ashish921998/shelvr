@@ -17,8 +17,10 @@ export function useItemOpen(
   useFocusEffect(
     useCallback(() => {
       if (!id || savedAt === undefined || !type || !ready) return;
+      let recorded = false;
       const record = () => {
-        if (AppState.currentState !== "active") return;
+        if (recorded || AppState.currentState !== "active") return;
+        recorded = true;
         // Only the focused pager's active item calls this, never preloaded pages.
         analytics.itemOpened(
           { _id: id, _creationTime: savedAt, type, fixtureKey },

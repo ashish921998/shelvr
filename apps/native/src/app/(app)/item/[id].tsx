@@ -48,7 +48,7 @@ export default function ItemScreen() {
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
-  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  const undoAcceptSuggestion = useMutation(api.spaces.undoAcceptSuggestion);
   const [accepted, setAccepted] = useState<{ itemId: Id<'items'>; spaceId: Id<'spaces'> } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
@@ -264,7 +264,7 @@ export default function ItemScreen() {
     decisionPending.current = true;
     setDecisionBusy(true);
     try {
-      await removeItemFromSpace(accepted);
+      await undoAcceptSuggestion(accepted);
       analytics.capture('item_space_membership_changed', {
         item_id: accepted.itemId, space_id: accepted.spaceId, membership_added: false, undone: true,
       });
@@ -302,17 +302,23 @@ export default function ItemScreen() {
   }, [spaceId, activeId, items, dismissSuggestion, router]);
 
   const onDelete = useCallback(async () => {
-    if (!activeItem) return;
+    if (!activeItem || !items) return;
     if (paramTimer.current) clearTimeout(paramTimer.current);
+    const idx = items.findIndex((item) => item._id === activeItem._id);
+    const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
       analytics.capture('item_deleted');
-      if (router.canGoBack()) router.back();
+      if (neighbor) {
+        setActiveId(neighbor._id);
+        router.setParams({ id: neighbor._id });
+        listRef.current?.scrollToIndex({ index: Math.min(idx, items.length - 2), animated: true });
+      } else if (router.canGoBack()) router.back();
       else router.replace('/');
     } catch {
       Alert.alert("Couldn't delete save", 'Please try again in a moment.');
     }
-  }, [activeItem, deleteItem, router]);
+  }, [activeItem, items, deleteItem, router]);
 
   if (items === undefined) {
     return (
@@ -345,7 +351,7 @@ export default function ItemScreen() {
                       { label: 'Share', onPress: shareActive },
                       ...(activeItem?.url ? [{ label: 'Copy link', onPress: copyLink }] : []),
                       ...(activeItem?.status === 'ready'
-                        ? [{ label: 'Find links', onPress: onFindLinks }]
+                        ? [{ label: 'Find links', onPress: onFindLinks, disabled: searchDisabled }]
                         : []),
                       { label: 'Delete', destructive: true, onPress: onDelete },
                     ]}

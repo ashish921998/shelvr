@@ -6,6 +6,7 @@ export type ActionMenuItem = {
   id?: string;
   label: string;
   destructive?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 };
 
@@ -35,11 +36,11 @@ export function ActionMenu({
       actions={actions.map((action) => ({
         id: action.id ?? action.label,
         title: action.label,
-        attributes: action.destructive ? { destructive: true } : undefined,
+        attributes: { destructive: action.destructive, disabled: action.disabled },
       }))}
       onPressAction={({ nativeEvent }) => {
         actions.find(
-          (action) => (action.id ?? action.label) === nativeEvent.event,
+          (action) => !action.disabled && (action.id ?? action.label) === nativeEvent.event,
         )?.onPress();
       }}
     >

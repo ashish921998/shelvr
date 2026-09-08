@@ -246,6 +246,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           // show it as a real, tappable row instead of a sparse gap.
           <Pressable
             style={styles.urlRow}
+            accessibilityRole="link"
             onPress={() => {
               void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
             }}
@@ -504,6 +505,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.muted,
   },
   urlRow: {
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -512,6 +514,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(1),
   },
   urlText: {
+    flexShrink: 1,
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
