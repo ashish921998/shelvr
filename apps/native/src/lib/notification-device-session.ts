@@ -3,14 +3,61 @@ type TokenStore = {
   write: (tokens: string[]) => Promise<void>;
 };
 
+type SessionDependencies = {
+  getToken: (requestPermission: boolean) => Promise<string | null>;
+  saveToken: (token: string) => Promise<unknown>;
+  revokeToken: (token: string) => Promise<unknown>;
+  setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
+  signOut: () => Promise<unknown>;
+  deleteAccount: () => Promise<unknown>;
+  resetAnalytics: () => void;
+  reportError: (error: unknown) => void;
+};
+
+export type NotificationOperation =
+  | 'idle'
+  | 'preferences'
+  | 'sign_out'
+  | 'delete_account';
+
 export class NotificationDeviceSession {
   private generation = 0;
   private paused = true;
-  private signingOut = false;
+  private operation: NotificationOperation = 'idle';
+  private listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
   private registeredToken: string | null = null;
 
-  constructor(private readonly store: TokenStore) {}
+  constructor(
+    private readonly store: TokenStore,
+    private readonly deps: SessionDependencies,
+  ) {}
+
+  getSnapshot = () => this.operation;
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  private setOperation(operation: NotificationOperation) {
+    this.operation = operation;
+    for (const listener of this.listeners) listener();
+  }
+
+  private async runOperation<T>(
+    operation: Exclude<NotificationOperation, 'idle'>,
+    action: () => Promise<T>,
+  ) {
+    if (this.operation !== 'idle') return;
+    this.setOperation(operation);
+    try {
+      return await action();
+    } finally {
+      this.setOperation('idle');
+    }
+  }
 
   start() {
     this.generation++;
@@ -24,13 +71,13 @@ export class NotificationDeviceSession {
     this.registeredToken = null;
   }
 
-  register(
-    getToken: () => Promise<string | null>,
-    save: (token: string) => Promise<unknown>,
-  ): Promise<boolean> {
+  register(getToken = () => this.deps.getToken(false)): Promise<boolean> {
     const generation = this.generation;
     const current = () =>
-      !this.paused && !this.signingOut && generation === this.generation;
+      !this.paused &&
+      this.operation !== 'sign_out' &&
+      this.operation !== 'delete_account' &&
+      generation === this.generation;
     const operation = this.queue.then(async () => {
       if (!current()) return false;
       const token = await getToken();
@@ -40,7 +87,7 @@ export class NotificationDeviceSession {
       const tokens = await this.store.read();
       if (!tokens.includes(token)) await this.store.write([...tokens, token]);
       if (!current()) return false;
-      await save(token);
+      await this.deps.saveToken(token);
       if (!current()) return false;
       this.registeredToken = token;
       return true;
@@ -52,22 +99,55 @@ export class NotificationDeviceSession {
     return operation;
   }
 
-  async signOut(
-    revoke: (token: string) => Promise<unknown>,
-    endSession: () => Promise<unknown>,
-  ) {
-    this.signingOut = true;
-    this.stop();
-    await this.queue;
+  setWeeklyShelf(enabled: boolean) {
+    return this.runOperation('preferences', async () => {
+      if (enabled && !(await this.register(() => this.deps.getToken(true))))
+        return false;
+      await this.deps.setWeeklyShelf(enabled);
+      return true;
+    });
+  }
+
+  signOut() {
+    return this.endSession('sign_out');
+  }
+
+  deleteAccount() {
+    return this.endSession('delete_account');
+  }
+
+  private async endSession(operation: 'sign_out' | 'delete_account') {
     try {
-      for (const token of await this.store.read()) await revoke(token);
-      await endSession();
-      this.stop();
+      await this.runOperation(operation, async () => {
+        this.stop();
+        await this.queue;
+        try {
+          for (const token of await this.store.read())
+            await this.deps.revokeToken(token);
+          await (operation === 'delete_account'
+            ? this.deps.deleteAccount()
+            : this.deps.signOut());
+        } catch (error) {
+          this.start();
+          throw error;
+        }
+        this.stop();
+        // Once the account is deleted, local cleanup cannot turn it into a failed deletion.
+        const cleanup =
+          operation === 'delete_account'
+            ? [this.deps.signOut, this.deps.resetAnalytics]
+            : [this.deps.resetAnalytics];
+        for (const action of cleanup) {
+          try {
+            await action();
+          } catch (error) {
+            this.deps.reportError(error);
+          }
+        }
+      });
     } catch (error) {
-      this.start();
+      void this.register().catch(this.deps.reportError);
       throw error;
-    } finally {
-      this.signingOut = false;
     }
   }
 }

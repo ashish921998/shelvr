@@ -371,7 +371,8 @@ export const removeItemFromSpace = mutation({
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
-      await ctx.db.delete(row._id);
+      // Remember the user's correction so later classification cannot re-add it.
+      await ctx.db.patch(row._id, { status: "dismissed", intents: undefined });
     }
     return null;
   },

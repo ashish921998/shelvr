@@ -9,7 +9,7 @@ import { observeAuthQueryErrors } from '@/lib/query-auth-recovery';
 import { useConvexAuth } from 'convex/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
-import { DarkTheme, DefaultTheme, Slot, ThemeProvider, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Slot, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useRef } from 'react';
@@ -17,7 +17,7 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PostHogProvider } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
-import { PushNotificationSetup, useNotificationObserver } from '@/lib/notifications';
+import { NotificationSessionProvider, useNotificationObserver } from '@/lib/notifications';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
@@ -81,7 +81,7 @@ function PostHogIdentity() {
 
 function NotificationSetup() {
   useNotificationObserver();
-  return <PushNotificationSetup />;
+  return null;
 }
 
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
@@ -112,12 +112,13 @@ function NavThemeProvider({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
         <Slot />
-        <StatusBar style="auto" />
+        <StatusBar style={pathname === '/camera' ? 'light' : 'auto'} />
       </NavThemeProvider>
     </OnboardingProvider>
   );
@@ -154,7 +155,9 @@ export default function RootLayout() {
           <PostHogIdentity />
           <NotificationSetup />
           <ConvexErroredQueryHealer />
-          {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
+          <NotificationSessionProvider>
+            {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
+          </NotificationSessionProvider>
         </PersistQueryClientProvider>
       </ConvexAuthProvider>
     </GestureHandlerRootView>

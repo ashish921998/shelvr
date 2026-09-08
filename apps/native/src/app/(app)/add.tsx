@@ -155,9 +155,9 @@ function AddContent({ close, openCamera }: AddContentProps) {
     setSaving(true);
     try {
       if (mode === 'article') {
-        await createLinkItem({ url: trimmed, spaceId: pinnedSpaceId });
+        await createLinkItem({ url: trimmed, spaceId: pinnedSpaceId, analyticsSessionId: analytics.sessionId() });
       } else {
-        await createNoteItem({ text: trimmed, spaceId: pinnedSpaceId });
+        await createNoteItem({ text: trimmed, spaceId: pinnedSpaceId, analyticsSessionId: analytics.sessionId() });
       }
       analytics.capture(mode === 'article' ? 'article_saved' : 'note_saved');
       success();

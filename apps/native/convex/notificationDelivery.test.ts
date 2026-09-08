@@ -55,6 +55,20 @@ const json = (data: unknown) =>
   new Response(JSON.stringify({ data }), { status: 200 });
 
 describe("durable digest delivery", () => {
+  it("rejects receipt recipients without a provider ticket at the mutation boundary", async () => {
+    const { t, digestId } = await seed();
+    await expect(
+      t.mutation(internal.notificationDelivery.finish, {
+        digestId,
+        attempt: 1,
+        recipients: [
+          // @ts-expect-error Exercise runtime validation of an invalid caller payload.
+          { token: "token-a", state: "receipt" },
+        ],
+      }),
+    ).rejects.toThrow();
+  });
+
   it("retries a failed send on the same digest through the recovery cron", async () => {
     const { t, digestId, digest, advance } = await seed();
     const fetchMock = vi

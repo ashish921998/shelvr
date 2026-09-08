@@ -20,6 +20,45 @@ type TestCtx = TestConvexForDataModel<DataModel>;
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
 const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 
+describe("canonical save telemetry", () => {
+  it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
+    const t = await as("telemetry-user");
+    const itemId = await t.mutation(api.items.createNoteItem, {
+      text: "Private note", operationId: "note:telemetry-1", analyticsSessionId: "save-session",
+    });
+    const retry = await t.mutation(api.items.createNoteItem, {
+      text: "Private note", operationId: "note:telemetry-1", analyticsSessionId: "later-session",
+    });
+    expect(retry).toBe(itemId);
+    const { item, jobs } = await t.run(async (ctx) => ({
+      item: await ctx.db.get(itemId),
+      jobs: await ctx.db.system.query("_scheduled_functions").collect(),
+    }));
+    const telemetry = jobs.filter((job) => job.name === "analytics:captureSave");
+    expect(telemetry).toHaveLength(1);
+    expect(telemetry[0].args).toEqual([{
+      itemId, userId: "telemetry-user", itemType: "note", savedAt: item?._creationTime, sessionId: "save-session",
+    }]);
+  });
+
+  it("tracks link and image saves while remaining compatible with old clients", async () => {
+    const t = await as("telemetry-user");
+    const linkId = await t.mutation(api.items.createLinkItem, { url: "https://example.com" });
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    const storageId = await storeBlob(t);
+    await t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId });
+    const imageId = await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID, analyticsSessionId: "image-session" });
+    await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID, analyticsSessionId: "retry-session" });
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    const telemetry = jobs.filter((job) => job.name === "analytics:captureSave");
+    expect(telemetry).toHaveLength(2);
+    expect(telemetry.map((job) => job.args[0])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: linkId, itemType: "link" }),
+      expect.objectContaining({ itemId: imageId, itemType: "image", sessionId: "image-session" }),
+    ]));
+  });
+});
+
 // Each test gets its own authenticated user via withIdentity. subject is the
 // value requireUserId returns, so different subjects model different users.
 // Every save and Pro mutation is gated behind an active subscription, so `as`

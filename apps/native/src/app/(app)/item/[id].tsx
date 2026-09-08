@@ -30,7 +30,8 @@ import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
-import { usePaywallGuard } from '@/lib/entitlement';
+import { useFindLinks } from '@/lib/use-find-links';
+import { useItemOpen } from '@/lib/use-item-open';
 
 export default function ItemScreen() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
@@ -47,6 +48,10 @@ export default function ItemScreen() {
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
+  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  const [accepted, setAccepted] = useState<{ itemId: Id<'items'>; spaceId: Id<'spaces'> } | null>(null);
+  const decisionPending = useRef(false);
+  const [decisionBusy, setDecisionBusy] = useState(false);
   const listRef = useRef<FlashListRef<DetailItem>>(null);
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
@@ -163,11 +168,9 @@ export default function ItemScreen() {
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
-  useEffect(() => {
-    if (activeItem?.status === 'ready') {
-      void markItemOpened({ itemId: activeItem._id });
-    }
-  }, [activeItem?._id, activeItem?.status, markItemOpened]);
+  const markOpened = useCallback(({ itemId }: { itemId: string }) =>
+    markItemOpened({ itemId: itemId as Id<'items'> }), [markItemOpened]);
+  useItemOpen(activeItem, from ?? 'direct', markOpened);
 
   // A link shares its URL; a saved image/sticker shares the picture itself.
   // `expo-sharing` needs a local file, so the remote image is cached first.
@@ -175,8 +178,14 @@ export default function ItemScreen() {
     if (!activeItem) return;
 
     let shared = false;
+    let shareSheetOnly = false;
     try {
-      if (!activeItem.imageUrl) {
+      if (activeItem.type === 'note') {
+        const message = activeItem.note ?? activeItem.content ?? activeItem.description ?? activeItem.title;
+        if (!message) return;
+        const result = await Share.share({ message });
+        shared = result.action !== Share.dismissedAction;
+      } else if (!activeItem.imageUrl) {
         if (!activeItem.url) return;
         const result = await Share.share({ url: activeItem.url });
         shared = result.action !== Share.dismissedAction;
@@ -195,38 +204,29 @@ export default function ItemScreen() {
           dialogTitle: activeItem.title ?? 'Share',
         });
         shared = true;
+        shareSheetOnly = true;
       }
     } catch {
       // User cancelled the sheet, or the download/share failed — nothing to do.
     }
 
-    if (shared) analytics.capture('item_shared');
+    if (shared) {
+      analytics.capture('item_shared');
+      analytics.itemAction(activeItem, shareSheetOnly ? 'share_sheet_opened' : 'share');
+    }
   }, [activeItem]);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
     await Clipboard.setStringAsync(activeItem.url);
     analytics.capture('item_link_copied');
+    analytics.itemAction(activeItem, 'copy');
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [activeItem]);
 
-  // "Find links" moved off the detail body (it made every sparse page
-  // noisier) into this menu. The server no-ops while a search is in flight,
-  // and the inline results/spinner/retry render on the detail page.
-  const findLinks = useMutation(api.items.findLinks);
-  const { guard: findLinksGuard } = usePaywallGuard('item_detail');
-  const onFindLinks = useCallback(() => {
-    if (!activeItem || activeItem.status !== 'ready') return;
-    void findLinksGuard(async () => {
-      try {
-        await findLinks({ id: activeItem._id });
-      } catch {
-        Alert.alert("Couldn't search", 'Please try again in a moment.');
-      }
-    });
-  }, [activeItem, findLinks, findLinksGuard]);
+  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(activeItem);
 
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
@@ -237,20 +237,45 @@ export default function ItemScreen() {
     !!activeId &&
     suggestedIds.has(activeId as Id<'items'>);
 
-  const onAccept = useCallback(() => {
-    if (!spaceId || !activeId) return;
+  const onAccept = useCallback(async () => {
+    if (!spaceId || !activeId || decisionPending.current) return;
+    decisionPending.current = true;
+    setDecisionBusy(true);
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    acceptSuggestion({
-      itemId: activeId as Id<'items'>,
-      spaceId: spaceId as Id<'spaces'>,
-    })
-      .then((changed) => {
-        if (changed) analytics.capture('suggestion_accepted');
-      })
-      .catch(() => undefined);
+    const membership = { itemId: activeId as Id<'items'>, spaceId: spaceId as Id<'spaces'> };
+    try {
+      const changed = await acceptSuggestion(membership);
+      if (changed) {
+        analytics.capture('suggestion_accepted');
+        setAccepted(membership);
+      }
+    } catch {
+      Alert.alert("Couldn't add to space", 'Please try again.');
+    } finally {
+      decisionPending.current = false;
+      setDecisionBusy(false);
+    }
   }, [spaceId, activeId, acceptSuggestion]);
+
+  const undoAccept = async () => {
+    if (!accepted || decisionPending.current) return;
+    decisionPending.current = true;
+    setDecisionBusy(true);
+    try {
+      await removeItemFromSpace(accepted);
+      analytics.capture('item_space_membership_changed', {
+        item_id: accepted.itemId, space_id: accepted.spaceId, membership_added: false, undone: true,
+      });
+      setAccepted(null);
+    } catch {
+      Alert.alert("Couldn't undo", 'The save is still in this Space. Please try again.');
+    } finally {
+      decisionPending.current = false;
+      setDecisionBusy(false);
+    }
+  };
 
   const onDismiss = useCallback(async () => {
     if (!spaceId || !activeId || !items) return;
@@ -277,24 +302,17 @@ export default function ItemScreen() {
   }, [spaceId, activeId, items, dismissSuggestion, router]);
 
   const onDelete = useCallback(async () => {
-    if (!activeItem || !items) return;
-    // Cancel any pending debounced setParams so it doesn't revert the
-    // immediate param write below to the just-deleted item.
+    if (!activeItem) return;
     if (paramTimer.current) clearTimeout(paramTimer.current);
-    const idx = items.findIndex((i) => i._id === activeItem._id);
-    const neighbor = items[idx + 1] ?? items[idx - 1];
-    if (neighbor) {
-      // Slide to the neighbour first, then remove the current save; Convex's
-      // reactive query drops it from the list behind us.
-      listRef.current?.scrollToIndex({ index: items.indexOf(neighbor), animated: true });
-      setActiveId(neighbor._id);
-      router.setParams({ id: neighbor._id });
-    } else {
-      router.back();
+    try {
+      await deleteItem({ id: activeItem._id });
+      analytics.capture('item_deleted');
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+    } catch {
+      Alert.alert("Couldn't delete save", 'Please try again in a moment.');
     }
-    await deleteItem({ id: activeItem._id });
-    analytics.capture('item_deleted');
-  }, [activeItem, items, deleteItem, router]);
+  }, [activeItem, deleteItem, router]);
 
   if (items === undefined) {
     return (
@@ -351,7 +369,7 @@ export default function ItemScreen() {
             </Stack.Toolbar.MenuAction>
           ) : null}
           {activeItem?.status === 'ready' ? (
-            <Stack.Toolbar.MenuAction icon="bag" onPress={onFindLinks}>
+            <Stack.Toolbar.MenuAction icon="bag" onPress={onFindLinks} disabled={searchDisabled}>
               Find links
             </Stack.Toolbar.MenuAction>
           ) : null}
@@ -385,7 +403,7 @@ export default function ItemScreen() {
           exiting={FadeOutDown.duration(200)}
           style={[styles.decisionBar, { bottom: insets.bottom + theme.gap(1.5) }]}
         >
-          <Pressable onPress={onDismiss} style={styles.dismissWrap}>
+          <Pressable onPress={onDismiss} disabled={decisionBusy} style={styles.dismissWrap}>
             <GlassView
               glassEffectStyle="regular"
               isInteractive
@@ -395,7 +413,7 @@ export default function ItemScreen() {
               <Text style={styles.dismissText}>Dismiss</Text>
             </GlassView>
           </Pressable>
-          <Pressable onPress={onAccept} style={styles.acceptWrap}>
+          <Pressable onPress={onAccept} disabled={decisionBusy} style={styles.acceptWrap}>
             <GlassView
               glassEffectStyle="regular"
               isInteractive
@@ -409,11 +427,28 @@ export default function ItemScreen() {
           </Pressable>
         </Animated.View>
       ) : null}
+      {!activeIsSuggested && accepted?.itemId === activeItem?._id && spaceQ.data?.items.some((item) => item._id === accepted?.itemId) ? (
+        <View style={[styles.acceptedNotice, { bottom: insets.bottom + theme.gap(1.5) }]} accessibilityLiveRegion="polite">
+          <Text style={styles.acceptedLabel} numberOfLines={2}>Added to {spaceQ.data?.name ?? 'space'}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Undo add to space" disabled={decisionBusy} onPress={undoAccept} style={styles.undoButton}>
+            <Text style={styles.undoText}>Undo</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  acceptedNotice: {
+    position: 'absolute', left: theme.gap(2), right: theme.gap(2),
+    flexDirection: 'row', alignItems: 'center', gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5), backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
+  },
+  acceptedLabel: { flex: 1, fontFamily: theme.fonts.medium, fontSize: 14, color: theme.colors.foreground },
+  undoButton: { minHeight: 44, minWidth: 60, alignItems: 'center', justifyContent: 'center' },
+  undoText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.primaryText },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

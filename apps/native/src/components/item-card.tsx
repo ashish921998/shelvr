@@ -1,4 +1,5 @@
 import { SuggestedBadge } from '@/components/suggested-badge';
+import { analytics } from '@/lib/analytics';
 import {
   ActionMenu,
   type ActionMenuItem,
@@ -13,7 +14,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import { Alert, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
 import Animated, {
@@ -31,6 +32,7 @@ import {
 
 export type FeedItem = {
   _id: Id<'items'>;
+  _creationTime?: number;
   fixtureKey?: string;
   type: 'image' | 'link' | 'note';
   status: 'processing' | 'ready' | 'failed';
@@ -78,14 +80,26 @@ function clampRatio(ratio: number | undefined, fallback: number) {
 export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource }) {
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
+  const router = useRouter();
   const deleteItem = useMutation(api.items.deleteItem);
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
-  const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
 
   const spaceId =
     source?.from === 'space' ? (source.spaceId as Id<'spaces'>) : undefined;
   const isSuggested = item.suggested === true && spaceId !== undefined;
+  const changeSpaces = () => router.push({ pathname: '/manage-spaces', params: { itemId: item._id } });
+  const share = async () => {
+    if (!item.url) return;
+    try {
+      const result = await Share.share({ url: item.url });
+      if (result.action === Share.sharedAction && item._creationTime !== undefined) {
+        analytics.itemAction({ ...item, _creationTime: item._creationTime }, 'share');
+      }
+    } catch {
+      // A dismissed or failed share is not a completed action.
+    }
+  };
 
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   // Video saves get a 9:16 poster with a play badge and the creator handle.
@@ -96,7 +110,9 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
     item.status === 'failed'
       ? item.failureReason === 'not_found'
         ? 'Page not found'
-        : "Couldn't be saved"
+        : item.type === 'image'
+          ? "Couldn't read photo"
+          : "Couldn't be saved"
       : undefined;
   const captionTitle =
     item.title ?? item.note ?? failedLabel ?? (item.url ? displayHost(item.url) : undefined);
@@ -143,13 +159,13 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
     if (item.url) {
       menuActions.push({
         label: 'Share',
-        onPress: () => Share.share({ url: item.url! }),
+        onPress: share,
       });
     }
-    if (spaceId !== undefined) {
+    if (item.status === 'ready') {
       menuActions.push({
-        label: 'Remove from space',
-        onPress: () => removeItemFromSpace({ itemId: item._id, spaceId }),
+        label: 'Change spaces',
+        onPress: changeSpaces,
       });
     }
     menuActions.push({
@@ -299,14 +315,14 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
                 <Link.MenuAction
                   title="Share"
                   icon="square.and.arrow.up"
-                  onPress={() => Share.share({ url: item.url! })}
+                  onPress={share}
                 />
               ) : null}
-              {spaceId !== undefined ? (
+              {item.status === 'ready' ? (
                 <Link.MenuAction
-                  title="Remove from space"
+                  title="Change spaces"
                   icon="tray.and.arrow.up"
-                  onPress={() => removeItemFromSpace({ itemId: item._id, spaceId })}
+                  onPress={changeSpaces}
                 />
               ) : null}
               <Link.MenuAction

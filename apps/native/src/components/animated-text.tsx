@@ -102,16 +102,6 @@ const CharGlyph = memo(function CharGlyph({
   const op = useSharedValue(0);
   const bl = useSharedValue(blurMax);
 
-  // Enter: on mount, cascade from below/blurred/faded/small into place.
-  useEffect(() => {
-    const delay = ENTER_DELAY_MS + cell.index * staggerMs;
-    ty.set(withDelay(delay, withSpring(0)));
-    sc.set(withDelay(delay, withSpring(1)));
-    op.set(withDelay(delay, withTiming(1, { duration: MOVE_DURATION })));
-    bl.set(withDelay(delay, withTiming(0, { duration: MOVE_DURATION })));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Glide: persistent characters slide (after a short wait) to their new x.
   const firstX = useRef(true);
   useEffect(() => {
@@ -125,7 +115,15 @@ const CharGlyph = memo(function CharGlyph({
 
   // Exit: continue up + right, shrink, blur and fade, then drop the cell.
   useEffect(() => {
-    if (cell.phase !== 'exit') return;
+    if (cell.phase === 'present') {
+      const delay = ENTER_DELAY_MS + cell.index * staggerMs;
+      tx.set(withTiming(0, { duration: MOVE_DURATION }));
+      ty.set(withDelay(delay, withSpring(0)));
+      sc.set(withDelay(delay, withSpring(1)));
+      op.set(withDelay(delay, withTiming(1, { duration: MOVE_DURATION })));
+      bl.set(withDelay(delay, withTiming(0, { duration: MOVE_DURATION })));
+      return;
+    }
     const delay = cell.index * staggerMs;
     ty.set(withDelay(delay, withTiming(-EXIT_UP, { duration: EXIT_DURATION })));
     tx.set(withDelay(delay, withTiming(EXIT_RIGHT, { duration: EXIT_DURATION })));
@@ -162,6 +160,7 @@ export type AnimatedTextProps = {
   height?: number;
   staggerMs?: number;
   blurMax?: number;
+  truncate?: boolean;
 };
 
 export function AnimatedText({
@@ -172,6 +171,7 @@ export function AnimatedText({
   height = CANVAS_HEIGHT,
   staggerMs = STAGGER_MS,
   blurMax = BLUR_MAX,
+  truncate = false,
 }: AnimatedTextProps) {
   const { theme } = useUnistyles();
   const flat = (RNStyleSheet.flatten(style) ?? {}) as TextStyle;
@@ -187,10 +187,24 @@ export function AnimatedText({
   useEffect(() => {
     if (!font) return;
 
-    const keyed = toKeyedChars(text);
+    let displayText = text;
+    if (truncate) {
+      const chars = [...text];
+      const widths = font.getGlyphWidths(font.getGlyphIDs(text));
+      let totalWidth = widths.reduce((sum, value) => sum + value, 0);
+      if (totalWidth > width) {
+        const ellipsisWidth = font.getGlyphWidths(font.getGlyphIDs('…'))[0] ?? 0;
+        while (chars.length > 0 && totalWidth + ellipsisWidth > width) {
+          chars.pop();
+          totalWidth -= widths.pop() ?? 0;
+        }
+        displayText = `${chars.join('')}…`;
+      }
+    }
+    const keyed = toKeyedChars(displayText);
     // Use true glyph advance widths (not tight bounds) so spacing/positioning
     // is accurate — tight bounds drop trailing spaces and side bearings.
-    const advances = font.getGlyphWidths(font.getGlyphIDs(text));
+    const advances = font.getGlyphWidths(font.getGlyphIDs(displayText));
     const total = advances.reduce((sum, w) => sum + w, 0);
     // Center the string within the fixed-width canvas.
     const originX = (width - total) / 2;
@@ -218,10 +232,10 @@ export function AnimatedText({
     // not a pure render derivation — so state is set from the effect by design.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCells([...present, ...exiting]);
-  }, [text, font, width]);
+  }, [text, font, width, truncate]);
 
   const removeCell = useCallback(
-    (key: string) => setCells((prev) => prev.filter((c) => c.key !== key)),
+    (key: string) => setCells((prev) => prev.filter((c) => c.key !== key || c.phase !== 'exit')),
     [],
   );
 
@@ -229,13 +243,13 @@ export function AnimatedText({
   if (!font) {
     return (
       <View style={[styles.container, containerStyle]}>
-        <RNText style={style}>{text}</RNText>
+        <RNText style={style} numberOfLines={truncate ? 1 : undefined}>{text}</RNText>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle]} accessible accessibilityLabel={text}>
       <Canvas style={{ width, height }}>
         {cells.map((cell) => (
           <CharGlyph

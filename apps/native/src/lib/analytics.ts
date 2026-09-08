@@ -1,12 +1,46 @@
-import { posthog } from '@/lib/posthog';
-import { activationPal } from 'activation-pal';
+import { posthog } from "@/lib/posthog";
+import { activationPal } from "activation-pal";
+import Constants from "expo-constants";
+
+export type AnalyticsItem = {
+  _id: string;
+  _creationTime: number;
+  type: "image" | "link" | "note";
+  fixtureKey?: string;
+};
+
+type ItemProperties = {
+  item_id: string;
+  item_type: AnalyticsItem["type"];
+  saved_at: number;
+  item_age_ms: number;
+};
+
+export type ItemAction =
+  | "copy"
+  | "share"
+  | "share_sheet_opened"
+  | "open_source"
+  | "open_maps"
+  | "web_search"
+  | "call"
+  | "email"
+  | "message"
+  | "calendar_sheet_opened";
 
 export type AnalyticsEventProperties = {
+  item_opened: ItemProperties & { source: string };
+  item_action: ItemProperties & { action: ItemAction };
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
-  photo_captured: { capture_mode: 'photo' | 'sticker' };
-  item_space_membership_changed: { membership_added: boolean };
+  photo_captured: { capture_mode: "photo" | "sticker" };
+  item_space_membership_changed: {
+    membership_added: boolean;
+    item_id: string;
+    space_id: string;
+    undone: boolean;
+  };
   item_shared: Record<string, never>;
   item_link_copied: Record<string, never>;
   item_deleted: Record<string, never>;
@@ -38,10 +72,10 @@ function capture<Event extends AnalyticsEvent>(
   properties?: AnalyticsEventProperties[Event],
 ): void {
   if (
-    event === 'article_saved' ||
-    event === 'note_saved' ||
-    event === 'images_saved' ||
-    event === 'space_created'
+    event === "article_saved" ||
+    event === "note_saved" ||
+    event === "images_saved" ||
+    event === "space_created"
   ) {
     activationPal.track(
       event,
@@ -52,14 +86,44 @@ function capture<Event extends AnalyticsEvent>(
   if (!posthog) return;
 
   try {
-    if (properties === undefined) {
-      posthog.capture(event);
-    } else {
-      posthog.capture(event, properties);
-    }
+    posthog.capture(event, {
+      ...properties,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
   } catch {
     // Analytics must never change the outcome of a product action.
   }
+}
+
+function sessionId(): string | undefined {
+  try {
+    return posthog?.getSessionId() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function itemProperties(item: AnalyticsItem): ItemProperties {
+  return {
+    item_id: item._id,
+    item_type: item.type,
+    saved_at: item._creationTime,
+    item_age_ms: Math.max(0, Date.now() - item._creationTime),
+  };
+}
+
+function itemOpened(item: AnalyticsItem, source: string): void {
+  if (!item.fixtureKey)
+    capture("item_opened", {
+      ...itemProperties(item),
+      source: ["home", "space", "search"].includes(source) ? source : "direct",
+    });
+}
+
+function itemAction(item: AnalyticsItem, action: ItemAction): void {
+  if (!item.fixtureKey)
+    capture("item_action", { ...itemProperties(item), action });
 }
 
 function identify(userId: string, email?: string): void {
@@ -88,8 +152,7 @@ export const analytics = {
   capture,
   identify,
   reset,
-} satisfies {
-  capture: typeof capture;
-  identify: typeof identify;
-  reset: typeof reset;
+  sessionId,
+  itemOpened,
+  itemAction,
 };

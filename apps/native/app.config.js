@@ -199,7 +199,10 @@ module.exports = ({ config }) => ({
         },
       },
     },
-    posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
-    posthogHost: process.env.POSTHOG_HOST,
+    // Public ingestion key for Shelvr; development stays opt-in via env.
+    posthogProjectToken:
+      process.env.POSTHOG_PROJECT_TOKEN ??
+      (isProduction ? 'phc_C8xznYZsCFESYcnhi2VtyaJVP2AfivECFpo8ARXAp3V2' : undefined),
+    posthogHost: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
   },
 });

@@ -1,4 +1,5 @@
 import { ItemCard, type FeedItem } from '@/components/item-card';
+import { analytics } from '@/lib/analytics';
 import { AppSymbolIcon } from '@/components/symbol';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -132,7 +133,7 @@ export function LiveDemoStep({
     }
 
     try {
-      const id = await createLinkItem({ url: trimmed });
+      const id = await createLinkItem({ url: trimmed, analyticsSessionId: analytics.sessionId() });
       setItemId(id);
     } catch {
       setError('Could not save that link. Try another, or skip.');

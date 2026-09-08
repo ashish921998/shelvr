@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as analytics from "../analytics.js";
 import type * as appleProfile from "../appleProfile.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
@@ -41,6 +42,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  analytics: typeof analytics;
   appleProfile: typeof appleProfile;
   auth: typeof auth;
   crons: typeof crons;
