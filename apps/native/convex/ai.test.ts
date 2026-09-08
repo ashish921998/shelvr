@@ -42,6 +42,12 @@ describe("storePoster", () => {
 });
 
 describe("linkEnrichment", () => {
+  it("preserves readable content with a menu class", () => {
+    const content = extractBodyText('<html><head><title>Seasonal menu</title></head><body><main class="menu"><h1>Seasonal menu</h1><p>Our spring tasting menu begins with fresh asparagus, garden peas, and herbs from the kitchen garden.</p><p>The main course pairs roasted vegetables with handmade pasta, followed by a dessert of local strawberries and cream.</p></main></body></html>', "https://example.com/menu");
+    expect(content).toContain("Our spring tasting menu");
+    expect(content).toContain("The main course pairs");
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
+  });
   it.each(["article", "main", "div"])("preserves short readable text inside %s", (tag) => {
     const content = extractBodyText(`<html><head><title>Field notes</title></head><body><${tag}><h1>Field notes</h1><p>We walked along the river at dawn. The water was still and the reeds were full of birds.</p><p>By noon the wind had picked up. We returned along the ridge and watched the clouds gather.</p></${tag}></body></html>`, "https://example.com/notes");
     expect(content).toContain("We walked along the river");

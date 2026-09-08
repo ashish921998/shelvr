@@ -359,9 +359,17 @@ export function extractBodyText(html: string, url: string): string | undefined {
     // Remove explicit page chrome before parsing: the readerability preflight
     // rejects short articles, while parse() can retain chrome on sparse pages.
     for (const element of document.querySelectorAll(
-      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .menu, .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
     )) {
       element.remove();
+    }
+    for (const menu of document.querySelectorAll(".menu")) {
+      const links = Array.from(menu.querySelectorAll("a"));
+      const linkText = links.map((link) => link.textContent ?? "").join("").replace(/\s/g, "");
+      const menuText = (menu.textContent ?? "").replace(/\s/g, "");
+      if (links.length > 0 && menuText === linkText) {
+        menu.remove();
+      }
     }
     // Give Readability a base URL so it can resolve/keep links correctly.
     try {
