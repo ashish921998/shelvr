@@ -10,6 +10,8 @@ const app = defineApp({
     POSTHOG_HOST: v.optional(v.string()),
     OBSERVABILITY_ENV: v.optional(v.string()),
     REVENUECAT_WEBHOOK_SECRET: v.optional(v.string()),
+    REVENUECAT_API_KEY: v.optional(v.string()),
+    REVENUECAT_ENTITLEMENT_ID: v.optional(v.string()),
     RESEND_API_KEY: v.optional(v.string()),
     RESEND_SEGMENT_ID: v.optional(v.string()),
     RESEND_ANDROID_SEGMENT_ID: v.optional(v.string()),

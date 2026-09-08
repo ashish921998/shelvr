@@ -16,6 +16,8 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
+  paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index('by_event', ['eventId']),
+
   items: defineTable({
     userId: v.string(),
     // Stable automation identity for development fixtures. Product writes do
@@ -308,7 +310,7 @@ export default defineSchema({
     ),
     resendContactId: v.optional(v.string()),
     resendError: v.optional(v.string()),
-    resendAttempts: v.number(),
+    resendAttempts: v.optional(v.number()),
   })
     .index("by_email_and_product", ["email", "product"])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below

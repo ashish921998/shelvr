@@ -3,6 +3,8 @@ import { env, httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { mapRevenueCatStatus, parseRevenueCatEvent } from "./model/revenuecat";
+import { reconcileRevenueCatTransfer } from "./model/revenuecatTransfer";
+import { parsePaymentTelemetry } from './model/paymentTelemetry';
 
 const http = httpRouter();
 
@@ -47,6 +49,30 @@ http.route({
       return new Response("Bad payload", { status: 400 });
     }
 
+    if (event.type === "TRANSFER") {
+      if (
+        event.eventTimestampMs === undefined ||
+        !event.transferredFrom ||
+        !event.transferredTo
+      ) {
+        return new Response("Invalid transfer event", { status: 400 });
+      }
+      try {
+        await reconcileRevenueCatTransfer(
+          ctx,
+          event.transferredFrom,
+          event.transferredTo,
+          event.eventTimestampMs,
+        );
+      } catch {
+        // Do not acknowledge a failed lookup: RevenueCat retries non-2xx deliveries.
+        return new Response("Transfer reconciliation unavailable", {
+          status: 503,
+        });
+      }
+      return new Response(null, { status: 200 });
+    }
+
     // A readable event missing required identity or ordering fields is
     // malformed but acknowledged — return 200 so RevenueCat stops retrying a
     // non-actionable event rather than hammering the endpoint.
@@ -79,6 +105,8 @@ http.route({
       productId,
       eventTimestampMs,
     });
+    const payment = parsePaymentTelemetry(body);
+    if (payment) await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
     return new Response(null, { status: 200 });
   }),
 });

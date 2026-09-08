@@ -3,7 +3,11 @@ import { LiveDemoStep } from '@/components/onboarding/live-demo';
 import { PermissionsStep } from '@/components/onboarding/permissions';
 import { PromiseStep } from '@/components/onboarding/promise';
 import { ReadyStep } from '@/components/onboarding/ready';
-import { SpacePickerStep, type SaveKind, getSpacePresets } from '@/components/onboarding/space-picker';
+import {
+  SpacePickerStep,
+  type SaveKind,
+  getSpacePresets,
+} from '@/components/onboarding/space-picker';
 import { SurveyStep } from '@/components/onboarding/survey';
 import type { FeedItem } from '@/components/item-card';
 import { useEntitlement } from '@/lib/entitlement';
@@ -104,6 +108,18 @@ export default function OnboardingScreen() {
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
   const spacesInitRef = useRef(false);
   const trackedStepsRef = useRef(new Set<number>());
+  const stepEnteredAt = useRef(0);
+  const viewedStep = useRef<StepIndex | null>(null);
+
+  useEffect(() => {
+    if (viewedStep.current === step) return;
+    viewedStep.current = step;
+    stepEnteredAt.current = Date.now();
+    analytics.capture('onboarding_step_viewed', {
+      step_id: STEP_IDS[step],
+      step_index: step,
+    });
+  }, [step]);
 
   const recordCurrentStep = useCallback(() => {
     if (trackedStepsRef.current.has(step)) return;
@@ -117,6 +133,11 @@ export default function OnboardingScreen() {
             ? spaces.join(',')
             : undefined;
     activationPal.onboardingStep(step, STEP_IDS[step], answer || undefined);
+    analytics.capture('onboarding_step_completed', {
+      step_id: STEP_IDS[step],
+      step_index: step,
+      duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
+    });
     trackedStepsRef.current.add(step);
   }, [q1, q2, spaces, step]);
 
@@ -141,10 +162,14 @@ export default function OnboardingScreen() {
   // Survey toggle helper — multi-select, order-independent. Shared by both Qs
   // and the space picker. The setter accepts a subtype of string (SaveKind is a
   // string union), so the generic keeps the element type narrow per state.
-  function toggle<T extends string>(setter: React.Dispatch<React.SetStateAction<T[]>>) {
+  function toggle<T extends string>(
+    setter: React.Dispatch<React.SetStateAction<T[]>>,
+  ) {
     return (option: T) =>
       setter((prev) =>
-        prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option],
+        prev.includes(option)
+          ? prev.filter((o) => o !== option)
+          : [...prev, option],
       );
   }
 
@@ -173,8 +198,7 @@ export default function OnboardingScreen() {
 
   // Progress bar value for the current step. Steps outside the quiz window
   // (promise, ready) hide the bar entirely.
-  const showBar =
-    step >= FIRST_PROGRESS_STEP && step <= LAST_PROGRESS_STEP;
+  const showBar = step >= FIRST_PROGRESS_STEP && step <= LAST_PROGRESS_STEP;
   const progress =
     (step - FIRST_PROGRESS_STEP) / (LAST_PROGRESS_STEP - FIRST_PROGRESS_STEP);
 
@@ -189,7 +213,10 @@ export default function OnboardingScreen() {
       <View style={styles.screen}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 24 },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -241,10 +268,16 @@ export default function OnboardingScreen() {
             />
           )}
 
-          {step === STEPS.permissions && <PermissionsStep onAdvance={advance} />}
+          {step === STEPS.permissions && (
+            <PermissionsStep onAdvance={advance} />
+          )}
 
           {step === STEPS.ready && (
-            <ReadyStep spaceNames={spaces} demoItem={demoItem} onFinish={finish} />
+            <ReadyStep
+              spaceNames={spaces}
+              demoItem={demoItem}
+              onFinish={finish}
+            />
           )}
         </ScrollView>
       </View>

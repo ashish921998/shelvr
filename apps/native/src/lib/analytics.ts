@@ -29,6 +29,47 @@ export type ItemAction =
   | "calendar_sheet_opened";
 
 export type AnalyticsEventProperties = {
+  onboarding_step_viewed: { step_id: string; step_index: number };
+  onboarding_step_completed: {
+    step_id: string;
+    step_index: number;
+    duration_ms: number;
+  };
+  auth_started: { provider: string };
+  auth_cancelled: { provider: string };
+  auth_failed: { provider: string };
+  auth_completed: Record<string, never>;
+  paywall_requested: { placement: string; paywall_attempt_id: string };
+  paywall_presentation_started: {
+    placement: string;
+    paywall_attempt_id: string;
+  };
+  paywall_shown: {
+    placement: string;
+    paywall_attempt_id: string;
+    duration_ms: number;
+  };
+  paywall_cancelled: {
+    placement: string;
+    paywall_attempt_id: string;
+    duration_ms: number;
+  };
+  paywall_purchase_completed: {
+    placement: string;
+    paywall_attempt_id: string;
+    duration_ms: number;
+  };
+  paywall_restored: {
+    placement: string;
+    paywall_attempt_id: string;
+    duration_ms: number;
+  };
+  paywall_failed: {
+    placement: string;
+    paywall_attempt_id: string;
+    reason: string;
+    duration_ms: number;
+  };
   item_opened: ItemProperties & { source: string };
   item_action: ItemProperties & { action: ItemAction };
   article_saved: Record<string, never>;
@@ -143,8 +184,23 @@ function reset(): void {
 
   try {
     posthog.reset();
+    posthog.register({
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
   } catch {
     // Analytics must never block sign-out.
+  }
+}
+
+function screen(route: string): void {
+  try {
+    posthog?.screen(route, {
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Screen tracking must never interrupt navigation.
   }
 }
 
@@ -153,6 +209,7 @@ export const analytics = {
   identify,
   reset,
   sessionId,
+  screen,
   itemOpened,
   itemAction,
 };

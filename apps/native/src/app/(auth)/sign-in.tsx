@@ -1,10 +1,18 @@
 import { LEGAL_URLS } from '@/lib/legal';
+import { analytics } from '@/lib/analytics';
 import { useAuthActions } from '@convex-dev/auth/react';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as React from 'react';
-import { Linking, Platform, Pressable, Text, useColorScheme, View } from 'react-native';
+import {
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 const oauthRedirectTo = makeRedirectUri({
@@ -33,13 +41,16 @@ export default function Page() {
   const [lastError, setLastError] = React.useState<string | null>(null);
 
   const handleOAuth = async (provider: string) => {
+    analytics.capture('auth_started', { provider });
     setPending(provider);
     setLastError(null);
     try {
       // Convex Auth must persist the same return URI that the browser session
       // watches for; otherwise the provider callback can open Shelvr without
       // resolving this promise and the one-time code is never exchanged.
-      const { redirect } = await signIn(provider, { redirectTo: oauthRedirectTo });
+      const { redirect } = await signIn(provider, {
+        redirectTo: oauthRedirectTo,
+      });
       // `redirect` is undefined for providers that sign in immediately
       // (Anonymous) — nothing more to do, the session is established.
       if (!redirect) return;
@@ -47,7 +58,10 @@ export default function Page() {
         redirect.toString(),
         oauthRedirectTo,
       );
-      if (result.type === 'cancel' || result.type === 'dismiss') return;
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        analytics.capture('auth_cancelled', { provider });
+        return;
+      }
       if (result.type !== 'success') {
         throw new Error(`OAuth browser session ended with ${result.type}`);
       }
@@ -58,6 +72,7 @@ export default function Page() {
       }
       await signIn(provider, { code });
     } catch (err) {
+      analytics.capture('auth_failed', { provider });
       const detail =
         err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       console.error('OAuth provider sign-in failed', provider, detail, err);
@@ -67,7 +82,8 @@ export default function Page() {
     }
   };
 
-  const anonEnabled = __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+  const anonEnabled =
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
 
   return (
     <View style={styles.container}>
@@ -81,14 +97,19 @@ export default function Page() {
           {Platform.OS === 'ios' ? (
             <AppleAuthentication.AppleAuthenticationButton
               testID="apple-sign-in-button"
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonType={
+                AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+              }
               buttonStyle={
                 colorScheme === 'dark'
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
               cornerRadius={14}
-              style={[styles.appleButton, pending !== null && styles.buttonDisabled]}
+              style={[
+                styles.appleButton,
+                pending !== null && styles.buttonDisabled,
+              ]}
               pointerEvents={pending !== null ? 'none' : 'auto'}
               onPress={() => handleOAuth('apple')}
             />
@@ -102,7 +123,9 @@ export default function Page() {
               onPress={() => handleOAuth('apple')}
               disabled={pending !== null}
             >
-              <Text style={styles.appleFallbackButtonText}>Continue with Apple</Text>
+              <Text style={styles.appleFallbackButtonText}>
+                Continue with Apple
+              </Text>
             </Pressable>
           )}
           <Pressable

@@ -4,12 +4,25 @@ import { useEntitlementSync } from '@/lib/entitlement';
 import { useCurrentUser } from '@/lib/current-user';
 import { posthog } from '@/lib/posthog';
 import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
-import { convex, persister, queryClient, restartConvexSubscription } from '@/lib/query-client';
+import {
+  convex,
+  persister,
+  queryClient,
+  restartConvexSubscription,
+} from '@/lib/query-client';
 import { observeAuthQueryErrors } from '@/lib/query-auth-recovery';
 import { useConvexAuth } from 'convex/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
-import { DarkTheme, DefaultTheme, Slot, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import {
+  DarkTheme,
+  DefaultTheme,
+  Slot,
+  ThemeProvider,
+  usePathname,
+  useRouter,
+  useSegments,
+} from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useRef } from 'react';
@@ -17,17 +30,19 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PostHogProvider } from 'posthog-react-native';
 import { useUnistyles } from 'react-native-unistyles';
-import { NotificationSessionProvider, useNotificationObserver } from '@/lib/notifications';
+import {
+  NotificationSessionProvider,
+  useNotificationObserver,
+} from '@/lib/notifications';
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
 // behind the awaitable TokenStorage interface the provider expects. Scope the
 // keys to the Convex deployment so a development refresh token can never be
 // presented to production (or leave auth initialization stuck while testing).
-const authStorageNamespace = (process.env.EXPO_PUBLIC_CONVEX_URL ?? 'default').replace(
-  /[^A-Za-z0-9._-]/g,
-  '_',
-);
+const authStorageNamespace = (
+  process.env.EXPO_PUBLIC_CONVEX_URL ?? 'default'
+).replace(/[^A-Za-z0-9._-]/g, '_');
 const authStorageKey = (key: string) => `${authStorageNamespace}_${key}`;
 
 const authStorage: TokenStorage = {
@@ -73,9 +88,20 @@ function PostHogIdentity() {
     }
 
     analytics.identify(user._id, user.email);
+    analytics.capture('auth_completed');
     identifiedUserId.current = user._id;
   }, [isAuthenticated, isFetching, user]);
 
+  return null;
+}
+
+function PostHogScreenTracking() {
+  // Route segments retain placeholders such as [id], excluding saved item IDs,
+  // URLs and OAuth query parameters from the analytics screen name.
+  const route = useSegments().join('/');
+  useEffect(() => {
+    analytics.screen(route || 'index');
+  }, [route]);
   return null;
 }
 
@@ -148,15 +174,23 @@ export default function RootLayout() {
             // both exposes stale account data and starts an unauthenticated
             // subscription. Keep persistence for non-Convex TanStack queries.
             dehydrateOptions: {
-              shouldDehydrateQuery: (query) => query.queryKey[0] !== 'convexQuery',
+              shouldDehydrateQuery: (query) =>
+                query.queryKey[0] !== 'convexQuery',
             },
           }}
         >
           <PostHogIdentity />
+          <PostHogScreenTracking />
           <NotificationSetup />
           <ConvexErroredQueryHealer />
           <NotificationSessionProvider>
-            {posthog ? <PostHogProvider client={posthog}>{appContent}</PostHogProvider> : appContent}
+            {posthog ? (
+              <PostHogProvider client={posthog} autocapture={false}>
+                {appContent}
+              </PostHogProvider>
+            ) : (
+              appContent
+            )}
           </NotificationSessionProvider>
         </PersistQueryClientProvider>
       </ConvexAuthProvider>
