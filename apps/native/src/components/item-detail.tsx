@@ -1,4 +1,7 @@
+import { ProductsSection } from '@/components/products-section';
 import { ArticleReaderView } from '@/components/article-reader-view';
+import { ItemSpaces } from '@/components/item-spaces';
+import { analytics } from '@/lib/analytics';
 import { IntentChip } from '@/components/intent-chip';
 import { SimilarGrid } from '@/components/similar-grid';
 import { TagChip } from '@/components/tag-chip';
@@ -149,7 +152,9 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Play on TikTok"
-        onPress={() => WebBrowser.openBrowserAsync(item.url!)}
+        onPress={() => {
+          void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
+        }}
       >
         {heroImage}
         <View style={styles.playOverlay} pointerEvents="none">
@@ -186,11 +191,15 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       >
         <SaveStatusNotice item={item} />
 
+        {item.status === 'ready' ? <ItemSpaces itemId={item._id} spaces={spaces} /> : null}
+
         {item.url ? (
           <View style={styles.titleContainer}>
             <Pressable
               style={styles.sourceRow}
-              onPress={() => WebBrowser.openBrowserAsync(item.url!)}
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
+              }}
             >
               <AppSymbolIcon
                 name={isVideo ? 'play.rectangle' : 'safari'}
@@ -219,7 +228,9 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
                 kind={intent.kind}
                 label={intent.label}
                 onPress={() => {
-                  void runIntent(intent.kind, intent.value).catch(() => {});
+                  void runIntent(intent.kind, intent.value).then(() => {
+                    analytics.itemAction(item, intent.kind === 'open_url' ? 'open_source' : intent.kind === 'add_event' ? 'calendar_sheet_opened' : intent.kind);
+                  }).catch(() => {});
                 }}
               />
             ))}
@@ -228,6 +239,24 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
         {item.description ? (
           <Text style={styles.description}>{item.description}</Text>
+        ) : null}
+
+        {item.url && !item.content ? (
+          // No article body came back, so the address itself is the content —
+          // show it as a real, tappable row instead of a sparse gap.
+          <Pressable
+            style={styles.urlRow}
+            accessibilityRole="link"
+            onPress={() => {
+              void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
+            }}
+            hitSlop={4}
+          >
+            <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
+            <Text style={styles.urlText} numberOfLines={2}>
+              {item.url}
+            </Text>
+          </Pressable>
         ) : null}
 
         {isVideo && paragraphs.length > 0 ? (
@@ -241,30 +270,6 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
             {item.tags.map((tag) => (
               <TagChip key={tag} label={tag} />
             ))}
-          </View>
-        ) : null}
-
-        {item.status === 'ready' ? (
-          <View style={styles.chipsRow}>
-            {spaces.map((space) => (
-              <Link key={space._id} href={`/space/${space._id}`} asChild>
-                <Pressable>
-                  <TagChip emphasized label={space.name} />
-                </Pressable>
-              </Link>
-            ))}
-            {/* Entry to the per-space membership toggles. */}
-            <Link
-              href={{ pathname: '/manage-spaces', params: { itemId: item._id } }}
-              asChild
-            >
-              <Pressable style={styles.manageSpacesChip}>
-                <AppSymbolIcon name="plus" size={11} tintColor={theme.colors.primaryText} />
-                <Text style={styles.manageSpacesLabel}>
-                  {spaces.length > 0 ? 'Spaces' : 'Add to space'}
-                </Text>
-              </Pressable>
-            </Link>
           </View>
         ) : null}
 
@@ -301,16 +306,22 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState = 'gone' | 'failed' | 'partial';
+type SaveState = 'gone' | 'failed' | 'partial' | 'no_article';
 
 function saveState(item: DetailItem): SaveState | null {
   if (item.status === 'failed') {
     // A `not_found` page is gone for good; any other failure is retryable.
     return item.failureReason === 'not_found' ? 'gone' : 'failed';
   }
-  return item.status === 'ready' && item.enrichment === 'partial'
-    ? 'partial'
-    : null;
+  if (item.status !== 'ready') {
+    return null;
+  }
+  if (item.enrichment === 'partial') {
+    return 'partial';
+  }
+  // The page loaded but had no extractable article: the URL itself is the
+  // save. Explained, but not retryable — a re-run would reach the same result.
+  return item.enrichment === 'no_article' ? 'no_article' : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
@@ -318,6 +329,8 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   failed: "Shelvr couldn't read this page.",
   partial:
     "Saved from the link alone — the page wouldn't load, so these details are a guess.",
+  no_article:
+    'This page has no readable article — saved as a plain link.',
 };
 
 /**
@@ -352,12 +365,22 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   return (
     <View style={styles.noticeRow}>
       <AppSymbolIcon
-        name="exclamationmark.triangle.fill"
+        name={state === 'no_article' ? 'info.circle' : 'exclamationmark.triangle.fill'}
         size={14}
-        tintColor={state === 'gone' ? theme.colors.faint : theme.colors.danger}
+        tintColor={
+          state === 'gone'
+            ? theme.colors.faint
+            : state === 'no_article'
+              ? theme.colors.muted
+              : theme.colors.danger
+        }
       />
-      <Text style={styles.noticeText}>{SAVE_STATE_NOTICE[state]}</Text>
-      {state === 'gone' ? null : (
+      <Text style={styles.noticeText}>
+        {state === 'failed' && item.type !== 'link'
+          ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
+          : SAVE_STATE_NOTICE[state]}
+      </Text>
+      {state === 'gone' || state === 'no_article' ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
@@ -383,111 +406,6 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
           <Text style={styles.chipLabel}>Try again</Text>
         </Pressable>
       )}
-    </View>
-  );
-}
-
-// Phase-3 "Find links": a user-triggered SerpAPI shopping search. The button
-// only fires on press (bounded cost); results render as product cards.
-function ProductsSection({ item }: { item: DetailItem }) {
-  const { theme } = useUnistyles();
-  const findLinks = useMutation(api.items.findLinks);
-  const { guard, loading: entitlementLoading } = usePaywallGuard('item_detail');
-  // Same in-flight guard as the retry chip: no double-fire, and a rejected
-  // search surfaces an alert instead of a silently dead button.
-  const [finding, setFinding] = useState(false);
-  const products = item.products;
-  const searching = item.productsStatus === 'searching';
-
-  if (searching) {
-    return (
-      <View style={styles.findLinksRow}>
-        <View style={styles.chip}>
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
-          <Text style={styles.chipLabel}>Finding links…</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (products && products.length > 0) {
-    return (
-      <View style={styles.productsSection}>
-        <Text style={styles.productsTitle}>Shop</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsRow}
-        >
-          {products.map((product, index) => (
-            <Pressable
-              key={`${product.url}-${index}`}
-              style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85 }]}
-              onPress={() => WebBrowser.openBrowserAsync(product.url)}
-            >
-              {product.thumbnailUrl ? (
-                <Image
-                  source={{ uri: product.thumbnailUrl }}
-                  contentFit="cover"
-                  style={styles.productImage}
-                />
-              ) : (
-                <View style={[styles.productImage, styles.productImageEmpty]}>
-                  <AppSymbolIcon name="bag" size={22} tintColor={theme.colors.faint} />
-                </View>
-              )}
-              <Text style={styles.productName} numberOfLines={2}>
-                {product.title}
-              </Text>
-              <View style={styles.productMetaRow}>
-                {product.price ? (
-                  <Text style={styles.productPrice}>{product.price}</Text>
-                ) : null}
-                {product.merchant ? (
-                  <Text style={styles.productMerchant} numberOfLines={1}>
-                    {product.merchant}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.findLinksRow}>
-      <Pressable
-        style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
-        onPress={() =>
-          guard(async () => {
-            setFinding(true);
-            try {
-              await findLinks({ id: item._id });
-            } catch {
-              Alert.alert("Couldn't search", 'Please try again in a moment.');
-            } finally {
-              setFinding(false);
-            }
-          })
-        }
-        disabled={finding || entitlementLoading}
-        hitSlop={6}
-      >
-        {finding ? (
-          <ActivityIndicator size="small" color={theme.colors.primaryText} />
-        ) : (
-          <AppSymbolIcon name="bag" size={14} tintColor={theme.colors.primaryText} />
-        )}
-        <Text style={styles.chipLabel}>
-          {item.productsStatus === 'failed'
-            ? 'Find links — try again'
-            : products
-              ? 'No matches — search again'
-              : 'Find links'}
-        </Text>
-      </Pressable>
     </View>
   );
 }
@@ -581,10 +499,27 @@ const styles = StyleSheet.create((theme) => ({
   },
   description: {
     fontFamily: theme.fonts.medium,
-    fontSize: 16,
-    lineHeight: 23,
+    fontSize: 17,
+    lineHeight: 25,
     textAlign: 'center',
     color: theme.colors.muted,
+  },
+  urlRow: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    alignSelf: 'center',
+    paddingHorizontal: theme.gap(1),
+  },
+  urlText: {
+    flexShrink: 1,
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: theme.colors.faint,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -610,20 +545,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 25,
     color: theme.colors.foreground,
   },
-  manageSpacesChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: theme.colors.primarySoft,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 50,
-  },
-  manageSpacesLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    color: theme.colors.primaryText,
-  },
   similarSection: {
     gap: theme.gap(1),
     borderTopWidth: 1,
@@ -635,10 +556,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 18,
     color: theme.colors.foreground,
     paddingHorizontal: 4,
-  },
-  findLinksRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
   // Shared pill for the detail screen's small actions (retry a failed save,
   // find shopping links).
@@ -655,53 +572,5 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 13,
     color: theme.colors.primaryText,
-  },
-  productsSection: {
-    gap: theme.gap(1),
-  },
-  productsTitle: {
-    fontFamily: theme.fonts.display,
-    fontSize: 18,
-    color: theme.colors.foreground,
-  },
-  productsRow: {
-    gap: theme.gap(1.25),
-  },
-  productCard: {
-    width: 150,
-    gap: theme.gap(0.75),
-  },
-  productImage: {
-    width: 150,
-    height: 130,
-    borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  productImageEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  productName: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 12,
-    lineHeight: 16,
-    color: theme.colors.foreground,
-  },
-  productMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.gap(0.75),
-  },
-  productPrice: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 12,
-    color: theme.colors.foreground,
-  },
-  productMerchant: {
-    flexShrink: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 11,
-    color: theme.colors.muted,
   },
 }));

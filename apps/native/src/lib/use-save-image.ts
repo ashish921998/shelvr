@@ -5,6 +5,7 @@ import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useCallback } from 'react';
+import { analytics } from '@/lib/analytics';
 
 export type LocalImage = {
   uri: string;
@@ -201,7 +202,7 @@ export function useSaveImages() {
         },
         attach: (operationId, storageId) =>
           attachImageUpload({ operationId, storageId }),
-        finalize: (input) => finalizeImageImport(input),
+        finalize: (input) => finalizeImageImport({ ...input, analyticsSessionId: analytics.sessionId() }),
       };
       return await saveImageOperations(requests, deps, options);
     },

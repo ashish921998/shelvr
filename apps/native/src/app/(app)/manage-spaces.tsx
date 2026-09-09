@@ -1,35 +1,50 @@
-import { AnimatedSwitch } from '@/components/ui/animated-switch';
-import { EmptyState } from '@/components/empty-state';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import { useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
+import { EmptyState } from "@/components/empty-state";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { useLocalSearchParams } from "expo-router";
+import { useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
 
 // Per-space membership toggles for one item. Every write here is the user's
 // hand — `saved` rows only; flipping a space on also overrides a dismissal.
 export default function ManageSpacesScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
-  const id = itemId as Id<'items'>;
+  const id = itemId as Id<"items">;
 
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
   const { data: item } = useQuery(convexQuery(api.items.getItem, { id }));
 
   const addItemToSpace = useMutation(api.spaces.addItemToSpace);
   const removeItemFromSpace = useMutation(api.spaces.removeItemFromSpace);
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [lastChange, setLastChange] = useState<{
+    itemId: Id<"items">;
+    spaceId: Id<"spaces">;
+    name: string;
+    added: boolean;
+  } | null>(null);
 
   // Optimistic overrides are keyed by item so a route-param change cannot
   // apply the previous item's toggles to the next item. Server-side changes
   // from another flow (e.g. a background suggestion accept) are not reconciled
   // for the active item.
   const [override, setOverride] = useState<{
-    itemId: Id<'items'>;
-    values: Map<Id<'spaces'>, boolean>;
+    itemId: Id<"items">;
+    values: Map<Id<"spaces">, boolean>;
   } | null>(null);
   const activeOverride = override?.itemId === id ? override.values : null;
   const serverMembers = useMemo(
@@ -46,26 +61,56 @@ export default function ManageSpacesScreen() {
     return set;
   }, [activeOverride, serverMembers]);
 
-  const toggle = (spaceId: Id<'spaces'>, next: boolean) => {
+  const toggle = async (
+    spaceId: Id<"spaces">,
+    next: boolean,
+    undone = false,
+  ) => {
+    if (busyRef.current || !item || members.has(spaceId) === next) return;
+    busyRef.current = true;
+    setBusy(true);
+    const previous = members.has(spaceId);
     setOverride((current) => {
       const values = new Map(current?.itemId === id ? current.values : []);
       values.set(spaceId, next);
       return { itemId: id, values };
     });
     const mutation = next ? addItemToSpace : removeItemFromSpace;
-    mutation({ itemId: id, spaceId })
-      .then(() => {
-        analytics.capture('item_space_membership_changed', { membership_added: next });
-      })
-      .catch(() => {
-        // Revert the optimistic override so the switch reflects server state.
-        setOverride((current) => {
-          if (current?.itemId !== id) return current;
-          const values = new Map(current.values);
-          values.delete(spaceId);
-          return values.size > 0 ? { itemId: id, values } : null;
-        });
+    try {
+      await mutation({ itemId: id, spaceId });
+      analytics.capture("item_space_membership_changed", {
+        membership_added: next,
+        item_id: id,
+        space_id: spaceId,
+        undone,
       });
+      setLastChange(
+        undone
+          ? null
+          : {
+              itemId: id,
+              spaceId,
+              name:
+                spaces?.find((space) => space._id === spaceId)?.name ?? "space",
+              added: next,
+            },
+      );
+    } catch {
+      // Revert the optimistic override so the switch reflects server state.
+      setOverride((current) => {
+        if (current?.itemId !== id) return current;
+        const values = new Map(current.values);
+        values.set(spaceId, previous);
+        return { itemId: id, values };
+      });
+      Alert.alert(
+        "Couldn't change space",
+        "Your previous choice is still saved. Please try again.",
+      );
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
   };
 
   // The item may be `null` (deleted, or not ours) — distinct from `undefined`
@@ -81,6 +126,29 @@ export default function ManageSpacesScreen() {
     >
       <Text style={styles.heading}>Spaces</Text>
       <Text style={styles.subheading}>Choose where this save lives.</Text>
+      <Text style={styles.subheading}>
+        Removed saves stay out of that Space unless you add them again.
+      </Text>
+
+      {lastChange?.itemId === id ? (
+        <View style={styles.undoRow} accessibilityLiveRegion="polite">
+          <Text style={styles.rowLabel}>
+            {lastChange.added ? "Added to" : "Removed from"} {lastChange.name}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Undo space change"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
+            style={styles.undoButton}
+            onPress={() =>
+              void toggle(lastChange.spaceId, !lastChange.added, true)
+            }
+          >
+            <Text style={styles.undoText}>Undo</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {loading ? (
         <ActivityIndicator style={styles.spinner} />
@@ -97,7 +165,9 @@ export default function ManageSpacesScreen() {
               <Text style={styles.rowLabel} numberOfLines={1}>
                 {space.name}
               </Text>
-              <AnimatedSwitch
+              <Switch
+                accessibilityLabel={space.name}
+                disabled={busy}
                 value={members.has(space._id)}
                 onValueChange={(next) => toggle(space._id, next)}
               />
@@ -139,14 +209,14 @@ const styles = StyleSheet.create((theme) => ({
   list: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: theme.gap(1.5),
     paddingVertical: theme.gap(1.5),
     paddingHorizontal: theme.gap(1.5),
@@ -158,5 +228,24 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 15,
     color: theme.colors.foreground,
+  },
+  undoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  undoButton: {
+    minHeight: 44,
+    minWidth: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  undoText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 14,
+    color: theme.colors.primaryText,
   },
 }));

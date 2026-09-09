@@ -371,7 +371,8 @@ export const removeItemFromSpace = mutation({
     await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row !== null && effectiveStatus(row) === "saved") {
-      await ctx.db.delete(row._id);
+      // Remember the user's correction so later classification cannot re-add it.
+      await ctx.db.patch(row._id, { status: "dismissed", intents: undefined });
     }
     return null;
   },
@@ -398,6 +399,21 @@ export const acceptSuggestion = mutation({
     await ctx.db.patch(row._id, { status: "saved" });
     await scheduleSteering(ctx, item, args.spaceId);
     return true;
+  },
+});
+
+export const undoAcceptSuggestion = mutation({
+  args: { itemId: v.id("items"), spaceId: v.id("spaces") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireItemAndSpace(ctx, userId, args.itemId, args.spaceId);
+    const row = await getMembership(ctx, args.itemId, args.spaceId);
+    if (row !== null && effectiveStatus(row) === "saved") {
+      await ctx.db.patch(row._id, { status: "suggested", intents: undefined });
+      return true;
+    }
+    return false;
   },
 });
 

@@ -1,10 +1,13 @@
-import { v, type Infer } from "convex/values";
+import { v } from "convex/values";
 import { z } from "zod";
 import { internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { recipientValidator } from "./model/notificationDelivery";
+import {
+  recipientValidator,
+  recipientError,
+  type Recipient,
+} from "./model/notificationDelivery";
 
-type Recipient = Infer<typeof recipientValidator>;
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
@@ -100,21 +103,25 @@ export const claim = internalMutation({
       .filter((q) => q.eq(q.field("enabled"), true))
       .take(20);
     const tokens = new Set(devices.map((device) => device.token));
-    const recipients: Recipient[] =
+    const recipients: Recipient[] = (
       digest.deliveryRecipients ??
       devices.map((device) => ({
         token: device.token,
-        state: "pending",
-      }));
-    for (const recipient of recipients) {
+        state: "pending" as const,
+      }))
+    ).map((recipient): Recipient => {
       if (
         (recipient.state === "pending" || recipient.state === "receipt") &&
         !tokens.has(recipient.token)
       ) {
-        recipient.state = "failed";
-        recipient.error = "device_unavailable";
+        return {
+          token: recipient.token,
+          state: "failed",
+          error: "device_unavailable",
+        };
       }
-    }
+      return recipient;
+    });
     const items = await Promise.all(digest.itemIds.map((id) => ctx.db.get(id)));
     const itemCount = items.filter(
       (item) => item?.userId === digest.userId && item.status === "ready",
@@ -195,21 +202,12 @@ export const finish = internalMutation({
   },
 });
 
-function applyError(
+function failedResult(
   recipient: Recipient,
   result: z.infer<typeof resultSchema>,
-) {
+): Recipient {
   const error = result.details?.error ?? result.message ?? "unknown_push_error";
-  recipient.error = error;
-  recipient.state = [
-    "DeviceNotRegistered",
-    "MessageTooBig",
-    "InvalidCredentials",
-    "MismatchSenderId",
-  ].includes(error)
-    ? "failed"
-    : "pending";
-  recipient.ticketId = undefined;
+  return recipientError(recipient, error);
 }
 
 async function post(path: string, body: unknown): Promise<unknown> {
@@ -232,7 +230,7 @@ export const send = internalAction({
       { digestId },
     );
     if (!delivery) return null;
-    const recipients: Recipient[] = delivery.recipients;
+    let recipients: Recipient[] = delivery.recipients;
     // Check old tickets before sending pending tokens; newly accepted tickets wait for the next run.
     const awaiting = recipients.filter(
       (recipient) => recipient.state === "receipt",
@@ -246,21 +244,27 @@ export const send = internalAction({
               ids: awaiting.map((recipient) => recipient.ticketId),
             }),
           );
-        for (const recipient of awaiting) {
-          const result = recipient.ticketId
-            ? response.data[recipient.ticketId]
-            : undefined;
+        recipients = recipients.map((recipient): Recipient => {
+          if (recipient.state !== "receipt") return recipient;
+          const result = response.data[recipient.ticketId];
           if (!result) {
-            recipient.error = "receipt_pending";
-            continue;
+            return { ...recipient, error: "receipt_pending" };
           }
           if (result.status === "ok") {
-            recipient.state = "delivered";
-            recipient.error = undefined;
-          } else applyError(recipient, result);
-        }
+            return {
+              token: recipient.token,
+              state: "delivered",
+              ticketId: recipient.ticketId,
+            };
+          }
+          return failedResult(recipient, result);
+        });
       } catch (error) {
-        for (const recipient of awaiting) recipient.error = String(error);
+        recipients = recipients.map((recipient) =>
+          recipient.state === "receipt"
+            ? { ...recipient, error: String(error) }
+            : recipient,
+        );
       }
     }
     const pending = recipients.filter(
@@ -283,17 +287,27 @@ export const send = internalAction({
         );
         if (response.data.length !== pending.length)
           throw new Error("expo_ticket_count_mismatch");
-        for (const [index, recipient] of pending.entries()) {
-          const result = response.data[index];
+        let index = 0;
+        recipients = recipients.map((recipient): Recipient => {
+          if (recipient.state !== "pending") return recipient;
+          const result = response.data[index++];
           if (result.status === "ok" && result.id) {
-            recipient.state = "receipt";
-            recipient.ticketId = result.id;
-            recipient.error = undefined;
-          } else if (result.status === "error") applyError(recipient, result);
-          else recipient.error = "expo_missing_ticket_id";
-        }
+            return {
+              token: recipient.token,
+              state: "receipt",
+              ticketId: result.id,
+            };
+          }
+          return result.status === "error"
+            ? failedResult(recipient, result)
+            : { ...recipient, error: "expo_missing_ticket_id" };
+        });
       } catch (error) {
-        for (const recipient of pending) recipient.error = String(error);
+        recipients = recipients.map((recipient) =>
+          recipient.state === "pending"
+            ? { ...recipient, error: String(error) }
+            : recipient,
+        );
       }
     }
     await ctx.runMutation(internal.notificationDelivery.finish, {

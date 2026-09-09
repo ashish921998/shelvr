@@ -112,7 +112,7 @@ export const upsertSignup = internalMutation({
       return {
         id: existing._id,
         resendStatus: existing.resendStatus,
-        resendAttempts: existing.resendAttempts,
+        resendAttempts: existing.resendAttempts ?? 0,
       };
     }
 
@@ -221,7 +221,7 @@ export const listSignupsNeedingResendSync = internalQuery({
           id: row._id,
           email: row.email,
           product: row.product,
-          resendAttempts: row.resendAttempts,
+          resendAttempts: row.resendAttempts ?? 0,
         });
       }
     }

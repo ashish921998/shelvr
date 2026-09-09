@@ -4,6 +4,7 @@ import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { convexAuth, type AuthProviderConfig } from "@convex-dev/auth/server";
 import { env } from "./_generated/server";
 import { normalizeAppleProfile } from "./appleProfile";
+import { recordAccountCreated } from "./model/accountCreated";
 
 // Google and Apple are configured via @auth/core providers. Their client
 // id/secret come from the AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and
@@ -23,4 +24,5 @@ if (env.AUTH_ENABLE_ANONYMOUS === "true") {
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers,
+  callbacks: { afterUserCreatedOrUpdated: recordAccountCreated },
 });

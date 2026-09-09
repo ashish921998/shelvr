@@ -1,4 +1,5 @@
 import { api } from '@convex/_generated/api';
+import { analytics } from '@/lib/analytics';
 import { useConvexAuth, useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -105,6 +106,7 @@ export function useReplayOnboarding() {
             await createLinkItem({
               url: demoUrl,
               operationId: getOrCreatePendingOperationId(),
+              analyticsSessionId: analytics.sessionId(),
             });
           } catch {
             demoOk = false;

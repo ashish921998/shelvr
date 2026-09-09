@@ -5,6 +5,8 @@ export type RevenueCatEvent = {
   productId?: string;
   periodType?: string;
   eventTimestampMs?: number;
+  transferredFrom?: string[];
+  transferredTo?: string[];
 };
 
 /** Parse the subset of a RevenueCat webhook used by the entitlement sync.
@@ -28,7 +30,20 @@ export function parseRevenueCatEvent(
   const periodType = readString(event?.period_type);
   const eventTimestampMs = readNumber(event?.event_timestamp_ms);
 
-  return { type, userId, expiresAt, productId, periodType, eventTimestampMs };
+  return {
+    type,
+    userId,
+    expiresAt,
+    productId,
+    periodType,
+    eventTimestampMs,
+    ...(type === "TRANSFER"
+      ? {
+          transferredFrom: readStringArray(event.transferred_from),
+          transferredTo: readStringArray(event.transferred_to),
+        }
+      : {}),
+  };
 }
 
 /** Map RevenueCat lifecycle events to Shelvr's server-side entitlement state.
@@ -43,13 +58,9 @@ export function mapRevenueCatStatus(
 ): "trialing" | "pro" | "lapsed" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
-    case "TRIAL_STARTED":
-      return "trialing";
-    case "TRIAL_CONVERTED":
     case "RENEWAL":
-    case "PRODUCT_CHANGE":
     case "UNCANCELLATION":
-      return "pro";
+      return periodType === "TRIAL" ? "trialing" : "pro";
     case "EXPIRATION":
       return "lapsed";
     case "NON_RENEWING_PURCHASE":
@@ -57,6 +68,67 @@ export function mapRevenueCatStatus(
     default:
       return undefined;
   }
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length > 100) return undefined;
+  if (
+    !value.every(
+      (entry): entry is string => typeof entry === "string" && entry.length > 0,
+    )
+  )
+    return undefined;
+  return [...new Set(value)];
+}
+
+export type RevenueCatSnapshot = {
+  status: "trialing" | "pro" | "lapsed" | "lifetime";
+  expiresAt: number;
+  productId?: string;
+};
+
+/** Read only the project's Pro entitlement; malformed responses must not revoke access. */
+export function parseRevenueCatSnapshot(
+  body: unknown,
+  entitlementIdentifier = "Shelvr Pro",
+): RevenueCatSnapshot {
+  const response = readRecord(body);
+  const subscriber = readRecord(response?.subscriber);
+  const entitlements = readRecord(subscriber?.entitlements);
+  const subscriptions = readRecord(subscriber?.subscriptions);
+  const now = readNumber(response?.request_date_ms);
+  if (!entitlements || !subscriptions || now === undefined) {
+    throw new Error("Invalid RevenueCat customer response");
+  }
+  if (!(entitlementIdentifier in entitlements))
+    return { status: "lapsed", expiresAt: 0 };
+  const entitlement = readRecord(entitlements[entitlementIdentifier]);
+  const productId = readString(entitlement?.product_identifier);
+  if (!entitlement || !productId)
+    throw new Error("Invalid RevenueCat entitlement");
+  if (entitlement.expires_date === null)
+    return { status: "lifetime", expiresAt: 0, productId };
+  const expiresAt = parseDate(entitlement.expires_date);
+  const grace = entitlement.grace_period_expires_date;
+  const effectiveExpiry =
+    grace == null ? expiresAt : Math.max(expiresAt, parseDate(grace));
+  const subscription = readRecord(subscriptions[productId]);
+  return {
+    status:
+      effectiveExpiry <= now
+        ? "lapsed"
+        : subscription?.period_type === "trial"
+          ? "trialing"
+          : "pro",
+    expiresAt: effectiveExpiry,
+    productId,
+  };
+}
+
+function parseDate(value: unknown): number {
+  const date = typeof value === "string" ? Date.parse(value) : NaN;
+  if (!Number.isFinite(date)) throw new Error("Invalid RevenueCat expiry");
+  return date;
 }
 
 function readString(value: unknown): string | undefined {

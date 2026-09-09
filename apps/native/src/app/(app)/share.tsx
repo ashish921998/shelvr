@@ -149,9 +149,9 @@ export default function ShareScreen() {
    * "Retry failed" press share this so the deps object is never rebuilt. */
   const saveDeps = useMemo<ShareSaveDeps>(
     () => ({
-      saveLink: ({ url, operationId }) => createLinkItem({ url, operationId }),
+      saveLink: ({ url, operationId }) => createLinkItem({ url, operationId, analyticsSessionId: analytics.sessionId() }),
       saveNote: ({ text, operationId }) =>
-        createNoteItem({ text, operationId }),
+        createNoteItem({ text, operationId, analyticsSessionId: analytics.sessionId() }),
       saveImage: ({ image, operationId }) =>
         saveImages([{ image, operationId }]).then((results) => results[0]),
     }),

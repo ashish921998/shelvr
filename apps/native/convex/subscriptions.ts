@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, internalMutation } from "./_generated/server";
+import { query, internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
@@ -98,6 +99,7 @@ export const upsertSubscription = internalMutation({
     expiresAt: v.number(),
     productId: v.optional(v.string()),
     eventTimestampMs: v.optional(v.number()),
+    authoritative: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -139,7 +141,9 @@ export const upsertSubscription = internalMutation({
     // edge already decided lifetime-ness, so a fresh lifetime purchase arrives
     // as `status: "lifetime"`.
     const stickyLifetime =
-      existing?.status === "lifetime" && args.status !== "lifetime";
+      !args.authoritative &&
+      existing?.status === "lifetime" &&
+      args.status !== "lifetime";
 
     // An omitted status means "preserve the current status". There is no
     // current status for a first-seen advisory/unknown event, so acknowledging
@@ -165,7 +169,7 @@ export const upsertSubscription = internalMutation({
     // stored `expiresAt` value is irrelevant.
     const expiresAt = stickyLifetime
       ? (existing?.expiresAt ?? 0)
-      : args.expiresAt === 0 && existing !== null
+      : !args.authoritative && args.expiresAt === 0 && existing !== null
         ? existing.expiresAt
         : args.expiresAt;
 
@@ -187,6 +191,45 @@ export const upsertSubscription = internalMutation({
     }
 
     await ctx.db.insert("subscriptions", { userId: args.userId, ...doc });
+    return null;
+  },
+});
+
+export const transferOwners = internalQuery({
+  args: { userIds: v.array(v.string()) },
+  returns: v.array(v.id("users")),
+  handler: async (ctx, { userIds }) => {
+    const owners: Id<"users">[] = [];
+    for (const userId of new Set(userIds)) {
+      const id = ctx.db.normalizeId("users", userId);
+      if (id !== null && (await ctx.db.get(id)) !== null) owners.push(id);
+    }
+    return owners;
+  },
+});
+
+export const reconcileTransfer = internalMutation({
+  args: {
+    eventTimestampMs: v.number(),
+    snapshots: v.array(
+      v.object({
+        userId: v.id("users"),
+        status: subscriptionStatusValidator,
+        expiresAt: v.number(),
+        productId: v.optional(v.string()),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, { snapshots, eventTimestampMs }) => {
+    // Nested writes share this transaction: a failed update rolls back both sides.
+    for (const snapshot of snapshots) {
+      await ctx.runMutation(internal.subscriptions.upsertSubscription, {
+        ...snapshot,
+        eventTimestampMs,
+        authoritative: true,
+      });
+    }
     return null;
   },
 });

@@ -10,7 +10,8 @@ import { StyleSheet } from 'react-native-unistyles';
 // camera-roll capture time for imported photos, otherwise when it was saved.
 export function ItemHeader({ item }: { item: DetailItem | undefined }) {
   const title =
-    item?.title ?? item?.note ?? displayHost(item?.url) ?? 'Untitled';
+    item?.title || item?.note || displayHost(item?.url) ||
+    (item?.type === 'image' ? 'Saved photo' : 'Untitled');
 
   const when =
     item?.type === 'image' && item?.capturedAt
@@ -22,8 +23,8 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
       {/* Narrower than the default so the morph canvas clears the back button
           on the left and the Share item on the right. */}
       <AnimatedText
-        text={title || 'Untitled'}
-
+        text={title}
+        truncate
         height={24}
         style={styles.title}
       />

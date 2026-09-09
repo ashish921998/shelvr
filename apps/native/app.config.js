@@ -29,6 +29,23 @@ function requireProductionValue(name, value, isValid, expected) {
 // the rejected build artifact contained a different key from the current
 // RevenueCat App Store app. Keep this as a permanent release guardrail.
 const buildPlatform = process.env.EAS_BUILD_PLATFORM;
+const productionConvexUrl = 'https://amiable-setter-120.convex.cloud';
+const developmentTestKey = 'test_VOYicTvOGPXCBFMVdHzyxRndiRi';
+if (!isProduction) {
+  let convexOrigin;
+  try {
+    convexOrigin = new URL(process.env.EXPO_PUBLIC_CONVEX_URL).origin;
+  } catch {
+    // Missing or malformed URLs are handled by the client configuration.
+  }
+  if (convexOrigin === productionConvexUrl) {
+    throw new Error('Development and preview builds must not use production Convex.');
+  }
+  const testKey = process.env.EXPO_PUBLIC_REVENUECAT_TEST_KEY;
+  if ((testKey || process.env.EAS_BUILD === 'true') && testKey !== developmentTestKey) {
+    throw new Error('Development and preview builds require the Shelvr Development Test Store key.');
+  }
+}
 if (buildPlatform !== 'android') {
   requireProductionValue(
     'EXPO_PUBLIC_REVENUECAT_IOS_KEY',
@@ -62,12 +79,12 @@ requireProductionValue(
     if (!value) return false;
     try {
       const url = new URL(value);
-      return url.protocol === 'https:' && url.hostname.length > 0;
+      return url.origin === productionConvexUrl && url.pathname === '/';
     } catch {
       return false;
     }
   },
-  'an https:// production deployment URL',
+  'the Shelvr production deployment URL',
 );
 
 function displayName(base) {
@@ -199,7 +216,10 @@ module.exports = ({ config }) => ({
         },
       },
     },
-    posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
-    posthogHost: process.env.POSTHOG_HOST,
+    // Public ingestion key for Shelvr; development stays opt-in via env.
+    posthogProjectToken:
+      process.env.POSTHOG_PROJECT_TOKEN ??
+      (isProduction ? 'phc_C8xznYZsCFESYcnhi2VtyaJVP2AfivECFpo8ARXAp3V2' : undefined),
+    posthogHost: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
   },
 });

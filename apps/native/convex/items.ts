@@ -573,6 +573,7 @@ export const attachImageUpload = mutation({
 export const finalizeImageImport = mutation({
   args: {
     operationId: v.string(),
+    analyticsSessionId: v.optional(v.string()),
     aspectRatio: v.optional(v.number()),
     isSticker: v.optional(v.boolean()),
     capturedAt: v.optional(v.number()),
@@ -641,6 +642,7 @@ export const finalizeImageImport = mutation({
       updatedAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
+    await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId);
     return itemId;
   },
 });
@@ -744,6 +746,7 @@ async function createItemWithOperation(
   options: {
     operationId?: string;
     spaceId?: Id<"spaces">;
+    analyticsSessionId?: string;
   },
 ): Promise<Id<"items">> {
   const now = Date.now();
@@ -781,7 +784,7 @@ async function createItemWithOperation(
     // so a retry of an already-finished operation is never billed a token —
     // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId);
+    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId, options.analyticsSessionId);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
         userId,
@@ -807,7 +810,7 @@ async function createItemWithOperation(
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-  return await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId);
+  return await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId, options.analyticsSessionId);
 }
 
 /** Throws if a link/note payload is empty/invalid. Validation is shared by the
@@ -838,6 +841,7 @@ async function insertLinkOrNote(
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   spaceId?: Id<"spaces">,
+  analyticsSessionId?: string,
 ): Promise<Id<"items">> {
   const itemId = await ctx.db.insert("items", {
     userId,
@@ -852,7 +856,24 @@ async function insertLinkOrNote(
     await saveIntoSpace(ctx, userId, itemId, spaceId);
   }
   await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
+  await scheduleSaveTelemetry(ctx, itemId, analyticsSessionId);
   return itemId;
+}
+
+async function scheduleSaveTelemetry(
+  ctx: MutationCtx,
+  itemId: Id<"items">,
+  sessionId?: string,
+): Promise<void> {
+  const item = await ctx.db.get(itemId);
+  if (!item) return;
+  await ctx.scheduler.runAfter(0, internal.analytics.captureSave, {
+    itemId,
+    userId: item.userId,
+    itemType: item.type,
+    savedAt: item._creationTime,
+    sessionId: sessionId?.slice(0, 128),
+  });
 }
 
 export const createLinkItem = mutation({
@@ -860,6 +881,7 @@ export const createLinkItem = mutation({
     url: v.string(),
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
+    analyticsSessionId: v.optional(v.string()),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -879,7 +901,7 @@ export const createLinkItem = mutation({
       userId,
       "link",
       { url },
-      { operationId: args.operationId, spaceId: args.spaceId },
+      { operationId: args.operationId, spaceId: args.spaceId, analyticsSessionId: args.analyticsSessionId },
     );
   },
 });
@@ -889,6 +911,7 @@ export const createNoteItem = mutation({
     text: v.string(),
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
+    analyticsSessionId: v.optional(v.string()),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -901,7 +924,7 @@ export const createNoteItem = mutation({
       userId,
       "note",
       { note: args.text },
-      { operationId: args.operationId, spaceId: args.spaceId },
+      { operationId: args.operationId, spaceId: args.spaceId, analyticsSessionId: args.analyticsSessionId },
     );
   },
 });

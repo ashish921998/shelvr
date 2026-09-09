@@ -17,6 +17,21 @@ afterEach(() => {
 });
 
 describe("waitlist.join", () => {
+  it("accepts production records created before retry counts were added", async () => {
+    const t = newConvexTest();
+    const id = await t.run(async (ctx) => ctx.db.insert("waitlistSignups", {
+      email: "legacy@example.com", product: "shelvr", source: "hero",
+      consentVersion: CONSENT_VERSION, consentText: CONSENT_TEXT,
+      consentedAt: 1, firstSubmittedAt: 1, lastSubmittedAt: 1,
+      resendStatus: "unconfigured",
+    }));
+    expect(await t.query(internal.waitlist.listSignupsNeedingResendSync, {})).toContainEqual({
+      id, email: "legacy@example.com", product: "shelvr", resendAttempts: 0,
+    });
+    expect(await t.mutation(internal.waitlist.upsertSignup, {
+      email: "legacy@example.com", product: "shelvr", source: "hero",
+    })).toMatchObject({ id, resendAttempts: 0 });
+  });
   it("persists a signup when Resend is not configured", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     const t = newConvexTest();

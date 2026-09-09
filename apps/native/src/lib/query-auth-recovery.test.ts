@@ -3,6 +3,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { observeAuthQueryErrors } from './query-auth-recovery';
 
 describe('auth query recovery', () => {
+  it('scans once on startup and never rescans for healthy cache traffic', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { gcTime: Infinity } },
+    });
+    for (let i = 0; i < 1000; i++) client.setQueryData(['convexQuery', i], i);
+    const allQueries = vi.spyOn(client.getQueryCache(), 'getAll');
+    const restart = vi.fn();
+    const stop = observeAuthQueryErrors(client, restart);
+    for (let i = 0; i < 100; i++)
+      client.setQueryData(['convexQuery', i], i + 1);
+    await Promise.resolve();
+    expect(allQueries).toHaveBeenCalledTimes(1);
+    expect(restart).not.toHaveBeenCalled();
+    stop();
+    client.clear();
+  });
+
   it('recovers existing and late errors with separate bounded auth and non-auth attempts', async () => {
     const client = new QueryClient();
     const subscriptions: (() => void)[] = [];

@@ -15,5 +15,10 @@ export const failureReasonValidator = v.union(
 );
 
 // How much of the item could be enriched. "partial" = classified from the URL
-// alone because the page body was unreadable; absent = fully enriched.
-export const enrichmentValidator = v.literal("partial");
+// alone because the page body was unreadable (retryable); "no_article" = the
+// page loaded but no article body could be extracted (a landing page or docs
+// URL, say — nothing a retry would change); absent = fully enriched.
+export const enrichmentValidator = v.union(
+  v.literal("partial"),
+  v.literal("no_article"),
+);

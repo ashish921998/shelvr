@@ -5,6 +5,9 @@ import { useConvexAuth } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/current-user';
 import { activationPal } from 'activation-pal';
+import { analytics } from '@/lib/analytics';
+import { observePaywallPresentation } from '@/lib/paywall-telemetry';
+import { randomUUID } from 'expo-crypto';
 import {
   mapPaywallResult,
   shouldOpenPaywallFallback,
@@ -54,7 +57,9 @@ function makeLazyModule<T>(
   let cached: T | null | undefined;
   return () => {
     if (cached !== undefined) return cached;
-    const linked = nativeNames.some((n) => NativeModules[n as keyof typeof NativeModules]);
+    const linked = nativeNames.some(
+      (n) => NativeModules[n as keyof typeof NativeModules],
+    );
     if (!linked) {
       cached = null;
       return cached;
@@ -68,13 +73,17 @@ function makeLazyModule<T>(
   };
 }
 
-const getPurchases = makeLazyModule<typeof import('react-native-purchases').default>(
+const getPurchases = makeLazyModule<
+  typeof import('react-native-purchases').default
+>(
   ['RNPurchases', 'RNPurchasesModule'],
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   () => require('react-native-purchases'),
 );
 
-const getRCUI = makeLazyModule<typeof import('react-native-purchases-ui').default>(
+const getRCUI = makeLazyModule<
+  typeof import('react-native-purchases-ui').default
+>(
   // react-native-purchases-ui registers its native module as `RNPaywalls`
   // (plural). The older `RNPaywall` (singular) name is retained as a fallback
   // for any older linking variant.
@@ -87,7 +96,12 @@ const getRCUI = makeLazyModule<typeof import('react-native-purchases-ui').defaul
 // Types
 // ---------------------------------------------------------------------------
 
-export type EntitlementStatus = 'trialing' | 'pro' | 'lapsed' | 'lifetime' | 'none';
+export type EntitlementStatus =
+  | 'trialing'
+  | 'pro'
+  | 'lapsed'
+  | 'lifetime'
+  | 'none';
 
 export type Entitlement = {
   status: EntitlementStatus;
@@ -144,7 +158,9 @@ async function awaitRcSyncReady(): Promise<boolean> {
   if (isRcSyncReady()) return true;
   return Promise.race([
     _rcIdentitySync.then(() => isRcSyncReady()),
-    new Promise<boolean>((r) => setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS)),
+    new Promise<boolean>((r) =>
+      setTimeout(() => r(false), SYNC_READY_TIMEOUT_MS),
+    ),
   ]);
 }
 
@@ -172,12 +188,12 @@ let configured = false;
  * isn't set (e.g. dev without RC configured) — entitlement then stays `none`
  * until a subscription row is written by the webhook.
  */
-export async function configureRevenueCat(): Promise<void> {
+export async function configureRevenueCat(appUserID: string): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
   if (!rc) return;
   if (!REVENUECAT_API_KEY) return;
-  await rc.configure({ apiKey: REVENUECAT_API_KEY });
+  await rc.configure({ apiKey: REVENUECAT_API_KEY, appUserID });
   configured = true;
 }
 
@@ -207,7 +223,7 @@ export function useEntitlementSync(): void {
       .catch(() => {})
       .then(async () => {
         if (cancelled || _rcTargetUserId !== sub) return;
-        await configureRevenueCat();
+        await configureRevenueCat(sub);
         if (cancelled || _rcTargetUserId !== sub) return;
         const rc = getPurchases();
         if (!rc) return;
@@ -240,7 +256,10 @@ export function useEntitlementSync(): void {
 export function useEntitlement(): Entitlement {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { data } = useQuery(
-    convexQuery(api.subscriptions.getEntitlement, isAuthenticated ? {} : 'skip'),
+    convexQuery(
+      api.subscriptions.getEntitlement,
+      isAuthenticated ? {} : 'skip',
+    ),
   );
   // The clock is seeded once and refreshed on an interval so a trial expiring
   // between Convex updates flips `entitled` without a server push. Seeding via
@@ -296,25 +315,51 @@ async function purchasedPlan(): Promise<string> {
 
   try {
     const customerInfo = await rc.getCustomerInfo();
-    return Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ?? 'unknown';
+    return (
+      Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ??
+      'unknown'
+    );
   } catch {
     return 'unknown';
   }
 }
 
-export async function presentPaywall(placement = 'pro_gate'): Promise<PaywallOutcome> {
+export async function presentPaywall(
+  placement = 'pro_gate',
+): Promise<PaywallOutcome> {
+  const properties = { placement, paywall_attempt_id: randomUUID() };
+  const requestedAt = Date.now();
+  analytics.capture('paywall_requested', properties);
+  const failed = (reason: string) =>
+    analytics.capture('paywall_failed', {
+      ...properties,
+      reason,
+      duration_ms: Math.max(0, Date.now() - requestedAt),
+    });
   // Block until RC identity sync completes — a purchase before login would be
   // attributed to an anonymous RC user, breaking the webhook's userId mapping.
   // The awaitRcSyncReady timeout returns unavailable so the caller can show a
   // retryable fallback without opening a purchase flow under an unsafe identity.
-  if (!(await awaitRcSyncReady())) return 'unavailable';
+  if (!(await awaitRcSyncReady())) {
+    failed('identity_not_ready');
+    return 'unavailable';
+  }
 
   const rcui = getRCUI();
-  if (!rcui) return 'unavailable';
+  if (!rcui) {
+    failed('sdk_unavailable');
+    return 'unavailable';
+  }
   try {
     const presentedAt = Date.now();
-    const result = await rcui.presentPaywall();
-    if (result === 'CANCELLED' || result === 'PURCHASED' || result === 'RESTORED') {
+    const result = await observePaywallPresentation(properties, () =>
+      rcui.presentPaywall(),
+    );
+    if (
+      result === 'CANCELLED' ||
+      result === 'PURCHASED' ||
+      result === 'RESTORED'
+    ) {
       activationPal.paywallShown(placement, presentedAt);
     }
     if (result === 'CANCELLED') {
@@ -403,7 +448,9 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   if (!rc) return 'unavailable';
   try {
     const customerInfo = await rc.restorePurchases();
-    return Object.keys(customerInfo.entitlements.active).length > 0 ? 'restored' : 'none';
+    return Object.keys(customerInfo.entitlements.active).length > 0
+      ? 'restored'
+      : 'none';
   } catch {
     return 'unavailable';
   }

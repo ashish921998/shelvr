@@ -69,12 +69,16 @@ function CoverStack({
   cover,
   seed,
   name,
+  itemCount,
+  suggestionCount,
 }: {
   cover:
     | { url: string; type: string; aspectRatio?: number; suggested?: boolean }
     | undefined;
   seed: string;
   name: string;
+  itemCount: number;
+  suggestionCount: number;
 }) {
   const { theme } = useUnistyles();
   const ratio = cover
@@ -136,7 +140,13 @@ function CoverStack({
               tintColor={theme.colors.primaryText}
             />
           </View>
-          <Text style={styles.emptyLabel}>Add first save</Text>
+          <Text style={styles.emptyLabel}>
+            {itemCount > 0
+              ? `${itemCount} ${itemCount === 1 ? 'save' : 'saves'}`
+              : suggestionCount > 0
+                ? `${suggestionCount} ${suggestionCount === 1 ? 'suggestion' : 'suggestions'}`
+                : 'Add first save'}
+          </Text>
         </View>
       )}
     </View>
@@ -209,7 +219,13 @@ export default function SpacesScreen() {
                     testID={space.fixtureKey ? `fixture-space-${space.fixtureKey}` : undefined}
                     style={({ pressed }) => pressed && styles.pressed}
                   >
-                    <CoverStack cover={cover} seed={space._id} name={space.name} />
+                    <CoverStack
+                      cover={cover}
+                      seed={space._id}
+                      name={space.name}
+                      itemCount={space.itemCount}
+                      suggestionCount={space.suggestionCount}
+                    />
                     <View style={styles.caption}>
                       <Text style={styles.title} numberOfLines={1}>
                         {space.name}

@@ -318,15 +318,6 @@ function extractTitle(html: string): string | undefined {
   return undefined;
 }
 
-/** Strip whole elements (including content) for the given tag names. */
-function stripElements(html: string, tags: string[]): string {
-  let out = html;
-  for (const tag of tags) {
-    out = out.replace(new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, "gi"), " ");
-  }
-  return out;
-}
-
 function htmlToText(html: string): string {
   let text = html;
   // Block-level boundaries become paragraph breaks.
@@ -354,57 +345,32 @@ function htmlToText(html: string): string {
 }
 
 /**
- * Fallback extractor: crude tag-scoping + tag-stripping. Only used when
- * Readability can't isolate an article (e.g. malformed markup). It leaks page
- * chrome (nav menus, share counts, captions) on many sites, which is exactly
- * why Readability is preferred.
- */
-function extractBodyTextRegex(html: string): string {
-  let scope = html;
-  const article = html.match(/<article[\s\S]*?<\/article>/i);
-  if (article) {
-    scope = article[0];
-  } else {
-    const main = html.match(/<main[\s\S]*?<\/main>/i);
-    if (main) {
-      scope = main[0];
-    } else {
-      const body = html.match(/<body[\s\S]*<\/body>/i);
-      if (body) {
-        scope = body[0];
-      }
-    }
-  }
-  scope = stripElements(scope, [
-    "script",
-    "style",
-    "noscript",
-    "svg",
-    "nav",
-    "header",
-    "footer",
-    "aside",
-    "form",
-    "iframe",
-    "template",
-  ]);
-  scope = scope.replace(/<!--[\s\S]*?-->/g, " ");
-  return htmlToText(scope);
-}
-
-/**
  * Extract the readable article body. Mozilla Readability (the engine behind
  * Firefox Reader View) scores DOM blocks by text density and link ratio to
  * isolate the real article, discarding nav, ads, share widgets, comment
  * counts, captions, and other boilerplate — so it works across arbitrary
  * article pages rather than one site's markup. We feed its cleaned article
  * HTML through htmlToText to get the paragraph-separated plain text the client
- * renders. Falls back to the regex extractor if Readability finds nothing
- * (e.g. non-article pages or JS-rendered shells with no server-side content).
+ * renders. Pages without a readable article do not store a body.
  */
-function extractBodyText(html: string, url: string): string {
+export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
+    // Remove explicit page chrome before parsing: the readerability preflight
+    // rejects short articles, while parse() can retain chrome on sparse pages.
+    for (const element of document.querySelectorAll(
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+    )) {
+      element.remove();
+    }
+    for (const menu of document.querySelectorAll(".menu")) {
+      const links = Array.from(menu.querySelectorAll("a"));
+      const linkText = links.map((link) => link.textContent ?? "").join("").replace(/\s/g, "");
+      const menuText = (menu.textContent ?? "").replace(/\s/g, "");
+      if (links.length > 0 && menuText === linkText) {
+        menu.remove();
+      }
+    }
     // Give Readability a base URL so it can resolve/keep links correctly.
     try {
       const base = document.createElement("base");
@@ -421,9 +387,9 @@ function extractBodyText(html: string, url: string): string {
       }
     }
   } catch {
-    // Fall through to the regex extractor below.
+    // Malformed pages without a readable body remain bare links.
   }
-  return extractBodyTextRegex(html);
+  return undefined;
 }
 
 type PageData = {
@@ -537,6 +503,28 @@ export function pageGone(status: number | undefined): boolean {
 }
 
 /**
+ * Pure decision for the enrichment flag a finalized item earns from one
+ * pipeline run, taken straight from the page-read outcome: "partial" when the
+ * page could not be read at all (retryable — the classifier worked from the
+ * URL alone), "no_article" when the page read fine but yielded no extractable
+ * article body (the URL itself is the save; a retry cannot change the
+ * outcome), undefined when fully enriched. A missing read (images/notes never
+ * fetch a page) is fully enriched; "gone" never reaches finalize — a gone
+ * page fails the item instead. Exported pure for unit testing.
+ */
+export function linkEnrichment(
+  read: LinkRead | undefined,
+): "partial" | "no_article" | undefined {
+  if (read === undefined) {
+    return undefined;
+  }
+  if (read.status === "unreadable") {
+    return "partial";
+  }
+  return read.page.content ? undefined : "no_article";
+}
+
+/**
  * Reduce a caught error to a safe log category. Fetch-policy errors expose only
  * their stable code; anything else retains the error's constructor name (e.g.
  * TypeError) for observability without leaking data — never the error's message
@@ -639,7 +627,7 @@ async function fetchPage(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     siteName,
-    content: content !== "" ? content : undefined,
+    content,
   };
 }
 
@@ -651,6 +639,11 @@ type PageRead =
   | { status: "ok"; page: PageData }
   | { status: "gone"; error: PageFetchError }
   | { status: "unreadable"; error: PageFetchError };
+
+/** The read outcomes that reach finalizeItem: "gone" fails the item before
+ * classification, and the fetch error is dropped — nothing downstream of the
+ * sanitized log rereads it. */
+type LinkRead = { status: "ok"; page: PageData } | { status: "unreadable" };
 
 async function readPage(url: string): Promise<PageRead> {
   try {
@@ -795,10 +788,11 @@ export const processItem = internalAction({
 
       let page: PageData | undefined;
       let result: z.infer<typeof itemAnalysisSchema>;
-      // Set when the page body could not be read but the item is still worth
-      // saving: the classifier runs on the URL alone and the row is flagged so
-      // the client can offer a retry instead of showing a fully enriched save.
-      let unreadable = false;
+      // The link's page-read outcome, if any: it decides the enrichment flag
+      // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
+      // Only links fetch a page, so images/notes leave this unset and stay
+      // fully enriched.
+      let linkRead: LinkRead | undefined;
 
       if (item.type === "link") {
         if (!item.url) {
@@ -822,6 +816,7 @@ export const processItem = internalAction({
           });
           return null;
         }
+        linkRead = read;
         if (read.status === "unreadable") {
           // Refused (403/429), server error, timeout, or oversized: the link is
           // probably still good, so save a usable item classified from the URL
@@ -830,7 +825,6 @@ export const processItem = internalAction({
             `processItem unreadable for ${args.itemId}:`,
             summarizeError(read.error),
           );
-          unreadable = true;
         } else {
           page = read.page;
         }
@@ -851,7 +845,7 @@ export const processItem = internalAction({
                 ? `This is a short video. Only its caption is available:\n${page.content.slice(0, 6000)}`
                 : `Page content:\n${page.content.slice(0, 6000)}`
               : "No page content could be extracted.",
-            unreadable
+            linkRead?.status === "unreadable"
               ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
               : "",
             INTENTS_PROMPT_BLOCK,
@@ -942,7 +936,7 @@ export const processItem = internalAction({
           aspectRatio:
             item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
           intents: sanitizeIntents(result.intents),
-          enrichment: unreadable ? "partial" : undefined,
+          enrichment: linkEnrichment(linkRead),
           status: "ready",
         },
       );
@@ -976,7 +970,7 @@ export const processItem = internalAction({
         });
       }
       await captureCategorizationTelemetry({
-        outcome: unreadable ? "partial" : "succeeded",
+        outcome: linkRead?.status === "unreadable" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
       });

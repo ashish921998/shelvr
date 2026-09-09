@@ -1,9 +1,12 @@
 import { TagChip } from '@/components/tag-chip';
+import { ProductsSection } from '@/components/products-section';
+import { ItemSpaces } from '@/components/item-spaces';
+import { analytics } from '@/lib/analytics';
 import { displayHost } from '@/lib/url';
 import { SimilarGrid } from '@/components/similar-grid';
 import type { DetailItem } from '@/components/item-detail';
 import { Image } from 'expo-image';
-import { Link, useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { Id } from '@convex/_generated/dataModel';
@@ -43,7 +46,6 @@ export function ArticleReaderView({
   heroUri,
   paragraphs,
 }: Props) {
-  const router = useRouter();
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -105,7 +107,9 @@ export function ArticleReaderView({
                     styles.source,
                     pressed && styles.pressed,
                   ]}
-                  onPress={() => WebBrowser.openBrowserAsync(item.url!)}
+                  onPress={() => {
+                    void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
+                  }}
                 >
                   <AppSymbolIcon name="safari" size={13} tintColor={theme.colors.muted} />
                   <Text numberOfLines={1} style={styles.sourceText}>
@@ -119,34 +123,6 @@ export function ArticleReaderView({
                 </Pressable>
               ) : null}
 
-              {item.status === 'ready' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    spaces.length > 0 ? 'Manage spaces' : 'Add to space'
-                  }
-                  hitSlop={6}
-                  style={({ pressed }) => [
-                    styles.spaceChip,
-                    pressed && styles.pressed,
-                  ]}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/manage-spaces',
-                      params: { itemId: item._id },
-                    })
-                  }
-                >
-                  <AppSymbolIcon
-                    name="plus"
-                    size={10}
-                    tintColor={theme.colors.primaryText}
-                  />
-                  <Text numberOfLines={1} style={styles.spaceLabel}>
-                    {spaces.length > 0 ? 'Spaces' : 'Add to space'}
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
 
             {item.description ? (
@@ -186,6 +162,8 @@ export function ArticleReaderView({
           </View>
         ) : null}
 
+        {item.status === 'ready' ? <ItemSpaces itemId={item._id} spaces={spaces} /> : null}
+
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text
@@ -197,6 +175,8 @@ export function ArticleReaderView({
             </Text>
           ))}
         </View>
+
+        {item.status === 'ready' ? <ProductsSection item={item} /> : null}
 
         {similar && similar.length > 0 ? (
           <View style={styles.similarSection}>
@@ -275,23 +255,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 11,
     color: theme.colors.muted,
-  },
-  spaceChip: {
-    minWidth: 88,
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 50,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  spaceLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 10,
-    color: theme.colors.primaryText,
   },
   description: {
     fontFamily: theme.fonts.regular,

@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 // time. Only the orchestration (which receives its deps as arguments) is
 // exercised.
 vi.mock("expo-file-system", () => ({ File: class {} }));
+vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => undefined } }));
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
   // A counter (not a constant) so tests can assert each image in a batch mints
