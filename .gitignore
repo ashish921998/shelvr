@@ -48,7 +48,9 @@ yarn-error.log*
 .gstack/
 
 # Local AI-agent skills, configuration, and generated lockfiles
-.agents/
+.agents/*
+!.agents/setup
+!.agents/resume
 .claude/
 .codex/
 .cursor/
@@ -70,6 +72,9 @@ opencode.json
 !/apps/native/.argent/flows/store-*.yaml
 !/apps/native/.argent/flows/*-dev.yaml
 .vercel
+
+# Amp orb portal metadata
+.amp/portals/
 
 # Local build artifacts and stray root-level prebuild output — do not commit
 tmp/
