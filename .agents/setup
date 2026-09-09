@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+run_step() {
+  local label="$1"
+  shift
+  echo "==> $label"
+  time "$@"
+}
+
+run_step "Checking Node.js version" node -e '
+  const [major, minor] = process.versions.node.split(".").map(Number);
+  if (major < 20 || (major === 20 && minor < 20)) {
+    console.error(`Node.js >=20.20.0 is required; found ${process.version}`);
+    process.exit(1);
+  }
+  console.log(`Using Node.js ${process.version}`);
+'
+
+if ! command -v corepack >/dev/null 2>&1; then
+  # Node.js 25+ no longer bundles Corepack; this version also supports Node 20.20.
+  run_step "Installing Corepack" npm install --global corepack@0.34.5
+fi
+
+run_step "Enabling Corepack pnpm shim" corepack enable pnpm
+run_step "Activating pnpm 10.33.0" corepack install --global pnpm@10.33.0
+run_step "Installing workspace dependencies" pnpm install --frozen-lockfile
+
+if [[ ! -f apps/native/.env.local ]]; then
+  cp -- apps/native/.example.env apps/native/.env.local
+  echo "Created apps/native/.env.local from its template"
+fi
+
+if [[ ! -f apps/web/.env.local ]]; then
+  cp -- apps/web/.env.example apps/web/.env.local
+  echo "Created apps/web/.env.local from its template"
+fi
+
+echo "Orb setup complete"
