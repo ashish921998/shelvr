@@ -6,6 +6,8 @@ import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
 
+class PermanentPaymentDeliveryError extends Error {}
+
 export const capturePayment = internalAction({
   args: {
     payment: paymentTelemetryValidator,
@@ -14,11 +16,11 @@ export const capturePayment = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (!env.POSTHOG_PROJECT_TOKEN)
-      throw new Error("Payment analytics is not configured");
     const deliveryId = args.deliveryId ?? randomUUID();
     const { payment } = args;
     try {
+      if (!env.POSTHOG_PROJECT_TOKEN)
+        throw new Error("Payment analytics is not configured");
       const host = (env.POSTHOG_HOST ?? "https://us.i.posthog.com").replace(
         /\/$/,
         "",
@@ -50,8 +52,12 @@ export const capturePayment = internalAction({
         }),
       });
       if (response.ok) return null;
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        throw new PermanentPaymentDeliveryError(`Payment analytics HTTP ${response.status}`);
+      }
       throw new Error(`Payment analytics HTTP ${response.status}`);
     } catch (error) {
+      if (error instanceof PermanentPaymentDeliveryError) throw error;
       const attempt = args.attempt ?? 0;
       if (attempt >= 5) throw error;
       await ctx.scheduler.runAfter(

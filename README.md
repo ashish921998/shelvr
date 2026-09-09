@@ -109,6 +109,8 @@ For RevenueCat (Pro entitlements), set the platform SDK keys in the native env:
 
 ```sh
 # apps/native/.env.local
+EXPO_PUBLIC_REVENUECAT_TEST_KEY=test_VOYicTvOGPXCBFMVdHzyxRndiRi
+# Production builds only:
 EXPO_PUBLIC_REVENUECAT_IOS_KEY=<ios-sdk-key>
 EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=<android-sdk-key>
 ```
@@ -121,7 +123,8 @@ cp apps/native/.example.env apps/native/.env.local
 
 - `EXPO_PUBLIC_CONVEX_URL` → `CONVEX_URL` from `apps/native/.env.local`
 - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
-- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → RevenueCat SDK keys
+- `EXPO_PUBLIC_REVENUECAT_TEST_KEY` → isolated Shelvr Development Test Store key from `.example.env`, used by local development and preview on both platforms. Use the development Convex deployment (`amicable-antelope-639`), never production.
+- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → production-only RevenueCat SDK keys
 - `ACTIVATION_PAL_IOS_KEY` → ActivationPal public app key embedded in iOS builds
 
 The web marketing site uses the Convex deployment for its Android waitlist;

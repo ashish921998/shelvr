@@ -32,7 +32,13 @@ const buildPlatform = process.env.EAS_BUILD_PLATFORM;
 const productionConvexUrl = 'https://amiable-setter-120.convex.cloud';
 const developmentTestKey = 'test_VOYicTvOGPXCBFMVdHzyxRndiRi';
 if (!isProduction) {
-  if (process.env.EXPO_PUBLIC_CONVEX_URL === productionConvexUrl) {
+  let convexOrigin;
+  try {
+    convexOrigin = new URL(process.env.EXPO_PUBLIC_CONVEX_URL).origin;
+  } catch {
+    // Missing or malformed URLs are handled by the client configuration.
+  }
+  if (convexOrigin === productionConvexUrl) {
     throw new Error('Development and preview builds must not use production Convex.');
   }
   const testKey = process.env.EXPO_PUBLIC_REVENUECAT_TEST_KEY;

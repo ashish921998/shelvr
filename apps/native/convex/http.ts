@@ -52,8 +52,8 @@ http.route({
     if (event.type === "TRANSFER") {
       if (
         event.eventTimestampMs === undefined ||
-        !event.transferredFrom ||
-        !event.transferredTo
+        !event.transferredFrom?.length ||
+        !event.transferredTo?.length
       ) {
         return new Response("Invalid transfer event", { status: 400 });
       }

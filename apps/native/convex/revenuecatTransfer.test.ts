@@ -123,4 +123,21 @@ describe("transfer webhook reconciliation", () => {
     ).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it.each(["transferred_from", "transferred_to"])("rejects empty %s without looking up customers", async (field) => {
+    const f = await fixture();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await f.t.fetch("/webhooks/revenuecat", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+      body: JSON.stringify({ event: {
+        type: "TRANSFER", event_timestamp_ms: 2,
+        transferred_from: [f.ids.from], transferred_to: [f.ids.to],
+        [field]: [],
+      } }),
+    });
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await f.rows()).toMatchObject([{ userId: f.ids.from, status: "lifetime" }]);
+  });
 });

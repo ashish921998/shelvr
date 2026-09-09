@@ -14,6 +14,9 @@ function validate(env: Record<string, string>) {
 }
 
 describe("billing environment isolation", () => {
+  it.each(["/", "?test=true", "/?test=true", "/#test"])("rejects production origin with suffix %s", (suffix) => {
+    expect(() => validate({ APP_VARIANT: "preview", EXPO_PUBLIC_CONVEX_URL: productionUrl + suffix })).toThrow(/must not use production Convex/);
+  });
   it.each(["development", "preview"])("rejects production Convex in %s", (variant) => {
     expect(() => validate({ APP_VARIANT: variant, EXPO_PUBLIC_CONVEX_URL: productionUrl })).toThrow(/must not use production Convex/);
   });

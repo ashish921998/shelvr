@@ -25,6 +25,50 @@ afterEach(() => {
 });
 
 describe("server-confirmed payments", () => {
+  it.each([400, 401, 403, 422])("surfaces permanent HTTP %s failures without scheduling retries", async (status) => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
+    const t = newConvexTest();
+    const payment = parsePaymentTelemetry({ event });
+    if (!payment) throw new Error("Invalid test payment");
+    await expect(t.action(internal.analytics.capturePayment, { payment })).rejects.toThrow(`HTTP ${status}`);
+    expect(await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+  });
+
+  it.each([429, 503])("retries HTTP %s through six delivery attempts then surfaces failure", async (status) => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const t = newConvexTest();
+    const payment = parsePaymentTelemetry({ event });
+    if (!payment) throw new Error("Invalid test payment");
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await t.action(internal.analytics.capturePayment, { payment, attempt, deliveryId: "same-delivery" });
+    }
+    await expect(t.action(internal.analytics.capturePayment, { payment, attempt: 5, deliveryId: "same-delivery" })).rejects.toThrow(`HTTP ${status}`);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(5);
+    expect(jobs.every((job) => job.args[0].deliveryId === "same-delivery")).toBe(true);
+  });
+
+  it("retains a retry when configuration is missing and delivers after it is restored", async () => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const t = newConvexTest();
+    const payment = parsePaymentTelemetry({ event });
+    if (!payment) throw new Error("Invalid test payment");
+    await t.action(internal.analytics.capturePayment, { payment });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(1);
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
+    await t.action(internal.analytics.capturePayment, {
+      payment, attempt: 1, deliveryId: jobs[0].args[0].deliveryId,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).uuid).toBe(jobs[0].args[0].deliveryId);
+  });
   it("authenticates the webhook and schedules exactly one payment alongside entitlement sync", async () => {
     vi.stubEnv("REVENUECAT_WEBHOOK_SECRET", "test-secret");
     const t = newConvexTest();
@@ -155,7 +199,7 @@ describe("server-confirmed payments", () => {
     ).toHaveLength(0);
   });
 
-  it("keeps the purchase timestamp and UUID on delivery retry, excluding sandbox revenue", async () => {
+  it("keeps the purchase timestamp and UUID on retry and labels sandbox charges separately", async () => {
     vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
     vi.stubEnv("POSTHOG_HOST", "https://analytics.example");
     vi.stubEnv("OBSERVABILITY_ENV", "production");

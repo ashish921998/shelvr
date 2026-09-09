@@ -43,6 +43,15 @@ September 8 implementation verification: production Convex telemetry deployed to
 4. Verify text/image masking in a real replay from the rebuilt app before broad release. SDK configuration alone is not proof of rendered masking.
 5. Check event arrival after release before interpreting empty charts as zero conversion. No historical payment or onboarding events have been fabricated or backfilled.
 
-Payment deliveries retry five times after the initial attempt. Exhausted deliveries surface as failed Convex actions; retry the failed scheduled action with its recorded arguments to retain its delivery UUID. If analytics configuration is missing, the action fails visibly rather than silently acknowledging delivery. The receipt contains only the opaque RevenueCat event ID.
+Payment deliveries retry five times after the initial attempt (six HTTP attempts total) for network failures, HTTP 429, and server errors. Other HTTP 4xx responses fail visibly without automatic retry. Missing analytics configuration also uses the bounded retry schedule, allowing configuration to be restored without another webhook. Exhausted deliveries surface as failed Convex actions; retry the failed scheduled action with its recorded arguments to retain its delivery UUID. The receipt deduplicates webhook ingestion, not successful PostHog delivery; it contains only the opaque RevenueCat event ID. Replaying the webhook is not a delivery-recovery mechanism.
+
+Sandbox charges retain their amount for development diagnostics, but carry `environment=sandbox` on the production backend (or `development` on a development backend). Production reports must filter `environment=production`; an unfiltered sum of `revenue_usd` is not production revenue.
+
+## Review verification — 9 September 2026
+
+- The native dependency is `@posthog/react-native-plugin` 2.5.2. [PostHog's installation guide](https://posthog.com/docs/session-replay/installation/react-native) identifies it as the renamed session-replay module. It is autolinked; it is not an Expo config plugin and must not be added to the Expo `plugins` array. The prior native build/runtime checks confirmed it loaded.
+- The installed iOS PostHog implementation explicitly checks both `RCTTextView` and Fabric `RCTParagraphComponentView` under `maskAllTextInputs`, so the claim that this setting only covers editable controls is incorrect for this build. Visual masking verification remains a release requirement; this source check does not replace it.
+- Transfer reconciliation runs inside a mutation, so its nested mutation calls share the parent transaction. The [Convex transaction documentation](https://docs.convex.dev/understanding/best-practices#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations) distinguishes this from calls made by an action. An uncaught failure rolls back the parent transaction.
+- The legacy waitlist regression test inserts a row without `resendAttempts` and reads it through the actual indexed retry query. The `< maximum` range includes that missing value; the returned count is normalized to zero. No backfill is needed for this query.
 
 References: [RevenueCat webhook fields](https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields), [PostHog native replay](https://posthog.com/docs/session-replay/installation/react-native).
