@@ -17,13 +17,15 @@ import {
   type SafeFetchError,
 } from "./model/safeFetch";
 import { isTikTokUrl } from "./model/externalUrl";
+import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
+import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
 const MODEL_NAME = "gemini-3.1-flash-lite";
 const MODEL = google(MODEL_NAME);
 
-type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "failed";
+type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "rejected" | "failed";
 
 /** No item ids, URLs, content, or user identifiers leave Convex. */
 async function captureCategorizationTelemetry(args: {
@@ -531,6 +533,7 @@ export function linkEnrichment(
  * or cause, which may carry a URL, response body, or resolved address.
  */
 function summarizeError(error: unknown): string {
+  if (error instanceof StoredImageError) return `stored_image:${error.code}`;
   if (isPageFetchError(error)) {
     return `page_fetch_error:${error.code}`;
   }
@@ -757,9 +760,18 @@ function spacesPromptBlock(
   if (spaces.length === 0) {
     return "The user has no spaces yet, so spaceNames must be an empty array.";
   }
-  const lines = spaces
-    .map((s) => `- "${s.name}"${s.description ? `: ${s.description}` : ""}`)
-    .join("\n");
+  // Count JSON-escaped UTF-8 bytes, not characters; preserve exact space names.
+  let remaining = MAX_SPACE_PROMPT_BYTES;
+  const candidates: string[] = [];
+  for (const space of spaces) {
+    const description = Array.from(space.description ?? "").slice(0, 512).join("");
+    const line = `- "${space.name}"${description ? `: ${description}` : ""}`;
+    const size = Buffer.byteLength(JSON.stringify(line + "\n"), "utf8");
+    if (size > remaining) continue;
+    remaining -= size;
+    candidates.push(line);
+  }
+  const lines = candidates.join("\n");
   return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
 }
 
@@ -856,12 +868,9 @@ export const processItem = internalAction({
         result = object;
       } else if (item.type === "image") {
         if (!item.storageId) {
-          throw new Error("Image item has no storageId");
+          throw new StoredImageError("not_found");
         }
-        const imageUrl = await ctx.storage.getUrl(item.storageId);
-        if (imageUrl === null) {
-          throw new Error("Image file not found in storage");
-        }
+        const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
           system: SYSTEM_PROMPT,
@@ -878,7 +887,7 @@ export const processItem = internalAction({
                     INTENTS_PROMPT_BLOCK,
                   ].join("\n\n"),
                 },
-                { type: "image", image: new URL(imageUrl) },
+                { type: "file", data: image.bytes, mediaType: image.mediaType ?? "image" },
               ],
             },
           ],
@@ -981,6 +990,22 @@ export const processItem = internalAction({
       // addresses. For other errors log a generic category so a thrown Error's
       // message (which may include a URL) is not leaked either.
       const errorCategory = summarizeError(error);
+      if (error instanceof StoredImageError) {
+        const tooLarge = error.code === "too_large";
+        await ctx.runMutation(internal.items.failItem, {
+          itemId: args.itemId,
+          reason: tooLarge ? "image_too_large" : "not_found",
+        });
+        if (itemType !== undefined) {
+          await captureCategorizationTelemetry({
+            outcome: tooLarge ? "rejected" : "not_found",
+            itemType,
+            durationMs: Date.now() - startedAt,
+            errorCategory,
+          });
+        }
+        return null;
+      }
       console.error(`processItem failed for ${args.itemId}:`, errorCategory);
       if (posterStorageId !== undefined) {
         await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
@@ -1227,12 +1252,11 @@ export const findProductLinks = internalAction({
       // Build the product query. Images go through the vision model; links
       // and notes already have classified text that describes the thing.
       let query: string;
-      if (item.type === "image" && item.storageId) {
-        const imageUrl = await ctx.storage.getUrl(item.storageId);
-        if (imageUrl === null) {
-          await fail();
-          return null;
+      if (item.type === "image") {
+        if (!item.storageId) {
+          throw new StoredImageError("not_found");
         }
+        const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
           schema: productQuerySchema,
@@ -1244,7 +1268,7 @@ export const findProductLinks = internalAction({
                   type: "text",
                   text: "Identify the primary product shown in this image and produce a shopping search query for it. If nothing in the image is a purchasable product, return an empty query.",
                 },
-                { type: "image", image: new URL(imageUrl) },
+                { type: "file", data: image.bytes, mediaType: image.mediaType ?? "image" },
               ],
             },
           ],
@@ -1308,6 +1332,13 @@ export const findProductLinks = internalAction({
         productsStatus: "ready",
       });
     } catch (error) {
+      if (error instanceof StoredImageError) {
+        await ctx.runMutation(internal.items.setProductsInternal, {
+          itemId: args.itemId,
+          productsStatus: "unavailable",
+        });
+        return null;
+      }
       // Sanitized error log: never the raw error object (which may carry the
       // request URL with the API key, or a response body). summarizeError
       // reduces fetch-policy errors to a code and everything else to a category.

@@ -8,7 +8,8 @@ import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
-import { enrichmentValidator, failureReasonValidator } from "./model/itemFields";
+import { enrichmentValidator, failureReasonValidator, isTerminalFailure } from "./model/itemFields";
+import { imageSizeError } from "./model/imagePolicy";
 import { safeDeleteStorage } from "./model/storage";
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
@@ -56,6 +57,7 @@ export const productsStatusValidator = v.union(
   v.literal("searching"),
   v.literal("ready"),
   v.literal("failed"),
+  v.literal("unavailable"),
 );
 
 const itemFields = {
@@ -499,13 +501,35 @@ export const attachImageUpload = mutation({
     operationId: v.string(),
     storageId: v.id("_storage"),
   },
-  returns: v.object({ storageId: v.id("_storage") }),
+  returns: v.object({ storageId: v.id("_storage"), error: v.optional(v.string()) }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
     requireOperationId(args.operationId);
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
+
+    // Skip the size check for completed ops and for a different already-attached
+    // file; those paths return idempotently below.
+    const validatesNewUpload =
+      op?.status !== "complete" && (!op?.storageId || op.storageId === args.storageId);
+    const metadata = validatesNewUpload
+      ? await ctx.db.system.get("_storage", args.storageId)
+      : null;
+    if (validatesNewUpload) {
+      const error = metadata ? imageSizeError(metadata.size) : undefined;
+      if (error) {
+        if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
+          throw new Error(STORAGE_IN_USE);
+        }
+        await safeDeleteStorage(ctx, args.storageId);
+        if (op) {
+          await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
+        }
+        // Return, don't throw: throwing would roll back storage cleanup.
+        return { storageId: args.storageId, error };
+      }
+    }
 
     if (op === null) {
       // No begin happened (or the row was swept). Adopt the caller's storage id
@@ -514,7 +538,7 @@ export const attachImageUpload = mutation({
       // another operation. NOTE: existence + unreferenced is NOT proof the
       // caller owns this blob during the un-attached window — see the residual
       // documented on isStorageUnreferenced.
-      if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
+      if (metadata === null) {
         throw new Error("Storage object not found");
       }
       if (!(await isStorageUnreferenced(ctx, args.storageId))) {
@@ -558,7 +582,7 @@ export const attachImageUpload = mutation({
     // No canonical id yet, or the caller re-sent the same id: adopt it, with
     // the same existence and unreferenced defenses as the no-begin path.
     if (op.storageId === undefined) {
-      if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
+      if (metadata === null) {
         throw new Error("Storage object not found");
       }
       if (!(await isStorageUnreferenced(ctx, args.storageId))) {
@@ -603,6 +627,12 @@ export const finalizeImageImport = mutation({
     // sits here too — after the idempotent completed-return above, so a retry of
     // an already-finished import is never charged against the bucket.
     await requireProEntitlement(ctx, userId);
+    if (op?.storageId) {
+      const metadata = await ctx.db.system.get("_storage", op.storageId);
+      if (!metadata) throw new Error("Storage object not found");
+      const error = imageSizeError(metadata.size);
+      if (error) throw new Error(error);
+    }
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 
     // Validate BEFORE touching the ledger: invalid metadata must not mark the
@@ -943,8 +973,15 @@ export const findLinks = mutation({
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
     }
-    if (item.status !== "ready" || item.productsStatus === "searching") {
+    if (item.status !== "ready" || item.productsStatus === "searching" || item.productsStatus === "unavailable") {
       return null;
+    }
+    if (item.type === "image") {
+      const metadata = item.storageId ? await ctx.db.system.get("_storage", item.storageId) : null;
+      if (!metadata || imageSizeError(metadata.size)) {
+        await ctx.db.patch(item._id, { productsStatus: "unavailable" });
+        return null;
+      }
     }
     await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
     await ctx.db.patch(item._id, { productsStatus: "searching" });
@@ -961,8 +998,8 @@ export const findLinks = mutation({
  * (classified from its URL because the page body was unreadable). Re-runs the
  * same pipeline, so it is rate-limited like a create.
  *
- * A `not_found` failure is NOT retryable — the page is gone (404/410) and a
- * retry would burn a classification to reach the same conclusion.
+ * Unavailable sources and oversized photos are terminal; retrying would
+ * spend classification capacity without changing the result.
  */
 export const reprocessItem = mutation({
   args: { id: v.id("items") },
@@ -975,7 +1012,7 @@ export const reprocessItem = mutation({
       throw new Error("Item not found");
     }
     const retryable =
-      (item.status === "failed" && item.failureReason !== "not_found") ||
+      (item.status === "failed" && !isTerminalFailure(item.failureReason)) ||
       (item.status === "ready" && item.enrichment === "partial");
     if (!retryable) {
       return null;

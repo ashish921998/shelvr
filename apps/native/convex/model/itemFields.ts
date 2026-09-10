@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 
 /**
  * Item-field validators shared by `schema.ts` (the document shape) and
@@ -7,11 +7,13 @@ import { v } from "convex/values";
  * hand-copied validator — these two fields must not become the next instance.
  */
 
-// Why processing failed. `not_found` is terminal (the page is gone, 404/410);
-// `error` is a pipeline fault worth retrying. Only set with `status: "failed"`.
+// Why processing failed. `not_found` (missing page or missing/empty photo) and `image_too_large`
+// are terminal; `error` is a pipeline fault worth retrying. Only set with
+// `status: "failed"`.
 export const failureReasonValidator = v.union(
   v.literal("not_found"),
   v.literal("error"),
+  v.literal("image_too_large"),
 );
 
 // How much of the item could be enriched. "partial" = classified from the URL
@@ -22,3 +24,9 @@ export const enrichmentValidator = v.union(
   v.literal("partial"),
   v.literal("no_article"),
 );
+
+export function isTerminalFailure(
+  reason: Infer<typeof failureReasonValidator> | undefined,
+): boolean {
+  return reason === "not_found" || reason === "image_too_large";
+}

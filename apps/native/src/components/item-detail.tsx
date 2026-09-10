@@ -1,3 +1,5 @@
+import { isTerminalFailure } from '@convex/model/itemFields';
+import { IMAGE_TOO_LARGE_MESSAGE } from '@convex/model/imagePolicy';
 import { ProductsSection } from '@/components/products-section';
 import { ArticleReaderView } from '@/components/article-reader-view';
 import { ItemSpaces } from '@/components/item-spaces';
@@ -306,11 +308,12 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState = 'gone' | 'failed' | 'partial' | 'no_article';
+type SaveState = 'image_too_large' | 'gone' | 'failed' | 'partial' | 'no_article';
 
 function saveState(item: DetailItem): SaveState | null {
   if (item.status === 'failed') {
-    // A `not_found` page is gone for good; any other failure is retryable.
+    if (item.failureReason === 'image_too_large') return 'image_too_large';
+    // Missing sources cannot be recovered by retrying.
     return item.failureReason === 'not_found' ? 'gone' : 'failed';
   }
   if (item.status !== 'ready') {
@@ -325,6 +328,7 @@ function saveState(item: DetailItem): SaveState | null {
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
+  image_too_large: IMAGE_TOO_LARGE_MESSAGE,
   gone: 'This page is gone — it was deleted, or the link was wrong.',
   failed: "Shelvr couldn't read this page.",
   partial:
@@ -332,6 +336,16 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   no_article:
     'This page has no readable article — saved as a plain link.',
 };
+
+function noticeFor(state: SaveState, type: DetailItem['type']): string {
+  if (state === 'gone' && type === 'image') {
+    return 'This photo is unavailable or empty. Please save it again.';
+  }
+  if (state === 'failed' && type !== 'link') {
+    return `Shelvr couldn't read this ${type === 'image' ? 'photo' : 'note'}.`;
+  }
+  return SAVE_STATE_NOTICE[state];
+}
 
 /**
  * How the save itself went: still reading, unreadable, gone, or enriched from
@@ -376,11 +390,9 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
         }
       />
       <Text style={styles.noticeText}>
-        {state === 'failed' && item.type !== 'link'
-          ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
-          : SAVE_STATE_NOTICE[state]}
+        {noticeFor(state, item.type)}
       </Text>
-      {state === 'gone' || state === 'no_article' ? null : (
+      {isTerminalFailure(item.failureReason) || state === 'no_article' ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>

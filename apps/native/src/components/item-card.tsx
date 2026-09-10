@@ -7,7 +7,7 @@ import {
 import { memo } from 'react';
 import { displayHost } from '@/lib/url';
 import { isTikTokUrl } from '@convex/model/externalUrl';
-import { enrichmentValidator } from '@convex/model/itemFields';
+import { enrichmentValidator, failureReasonValidator } from '@convex/model/itemFields';
 import type { Infer } from 'convex/values';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -45,13 +45,27 @@ export type FeedItem = {
   heroImageUrl?: string;
   aspectRatio?: number;
   isSticker?: boolean;
-  failureReason?: 'not_found' | 'error';
+  failureReason?: Infer<typeof failureReasonValidator>;
   enrichment?: Infer<typeof enrichmentValidator>;
   tags: string[];
   // Suggested this item into the current space; it isn't a member
   // until the user accepts. Only ever set by the space screen.
   suggested?: boolean;
 };
+
+const FAILURE_LABELS: Record<
+  NonNullable<FeedItem['failureReason']>,
+  Record<FeedItem['type'], string>
+> = {
+  image_too_large: { image: 'Photo too large', link: 'Photo too large', note: 'Photo too large' },
+  not_found: { image: 'Photo unavailable', link: 'Page not found', note: 'Page not found' },
+  error: { image: "Couldn't read photo", link: "Couldn't be saved", note: "Couldn't be saved" },
+};
+
+function failureLabel(item: FeedItem): string | undefined {
+  if (item.status !== 'failed') return;
+  return FAILURE_LABELS[item.failureReason ?? 'error'][item.type];
+}
 
 // Describes which list a card belongs to, so the detail screen can rebuild the
 // same ordered sibling set for horizontal swipe-paging.
@@ -106,14 +120,7 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
   const isVideo = item.type === 'link' && isTikTokUrl(item.url);
   // A failed save has no AI title, so without this the card is blank forever and
   // indistinguishable from one still processing.
-  const failedLabel =
-    item.status === 'failed'
-      ? item.failureReason === 'not_found'
-        ? 'Page not found'
-        : item.type === 'image'
-          ? "Couldn't read photo"
-          : "Couldn't be saved"
-      : undefined;
+  const failedLabel = failureLabel(item);
   const captionTitle =
     item.title ?? item.note ?? failedLabel ?? (item.url ? displayHost(item.url) : undefined);
 
