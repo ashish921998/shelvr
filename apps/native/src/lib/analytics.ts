@@ -172,12 +172,15 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
     capture("item_action", { ...itemProperties(item), action });
 }
 
-function identify(userId: string, email?: string): void {
+// The Convex user id is the whole identity PostHog needs. The email stays in
+// Convex: sending it as a person property would copy PII into a third party
+// (and into replay-linked person profiles) for no analytics gain.
+function identify(userId: string): void {
   activationPal.setUserId(userId);
   if (!posthog) return;
 
   try {
-    posthog.identify(userId, email ? { $set: { email } } : undefined);
+    posthog.identify(userId);
   } catch {
     // Analytics must never block authentication or app rendering.
   }

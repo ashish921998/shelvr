@@ -87,7 +87,7 @@ function PostHogIdentity() {
       return;
     }
 
-    analytics.identify(user._id, user.email);
+    analytics.identify(user._id);
     analytics.capture('auth_completed');
     identifiedUserId.current = user._id;
   }, [isAuthenticated, isFetching, user]);

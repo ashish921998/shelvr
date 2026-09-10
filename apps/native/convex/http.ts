@@ -1,10 +1,18 @@
 import { httpRouter } from "convex/server";
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { mapRevenueCatStatus, parseRevenueCatEvent } from "./model/revenuecat";
 import { reconcileRevenueCatTransfer } from "./model/revenuecatTransfer";
 import { parsePaymentTelemetry } from './model/paymentTelemetry';
+import { secureCompare } from "./model/secureCompare";
+import {
+  WaitlistInputError,
+  isWaitlistProduct,
+  isWaitlistSource,
+  joinWaitlist,
+} from "./waitlist";
 
 const http = httpRouter();
 
@@ -31,8 +39,10 @@ http.route({
     if (!secret) {
       return new Response("Webhook secret not configured", { status: 500 });
     }
+    // Constant-time compare: a plain `!==` returns as soon as one byte
+    // differs, which lets a caller time their way to the secret byte by byte.
     const authHeader = req.headers.get("authorization") ?? "";
-    if (authHeader !== `Bearer ${secret}`) {
+    if (!(await secureCompare(`Bearer ${secret}`, authHeader))) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -108,6 +118,88 @@ http.route({
     const payment = parsePaymentTelemetry(body);
     if (payment) await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
     return new Response(null, { status: 200 });
+  }),
+});
+
+function json(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/**
+ * Header the web server uses to pass the visitor's IP along. A dedicated name
+ * (rather than `x-forwarded-for`) means the value cannot be confused with
+ * hops Convex's own edge adds, and it is only honoured after the shared
+ * secret check below has proven the caller is our server.
+ */
+export const WAITLIST_CLIENT_IP_HEADER = "x-shelvr-client-ip";
+export const WAITLIST_SECRET_HEADER = "x-waitlist-secret";
+
+/**
+ * Waitlist signup receiver for the marketing site. The Next.js route is the
+ * only intended caller: it proves itself with `WAITLIST_SHARED_SECRET` and
+ * forwards the real visitor IP, so the per-IP limiter inside `upsertSignup`
+ * cannot be skipped by omitting or forging the address. The old public
+ * `waitlist:join` action let any Convex client do exactly that.
+ */
+http.route({
+  path: "/waitlist/join",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Waitlist secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return json({ message: "Invalid request." }, 400);
+    }
+    const { email, product, source } = body as Record<string, unknown>;
+    if (typeof email !== "string") {
+      return json({ message: "Enter a valid email address." }, 400);
+    }
+    if (product !== undefined && !isWaitlistProduct(product)) {
+      return json({ message: "Invalid request." }, 400);
+    }
+    if (source !== undefined && !isWaitlistSource(source)) {
+      return json({ message: "Invalid request." }, 400);
+    }
+
+    try {
+      const result = await joinWaitlist(ctx, {
+        email,
+        product,
+        source: source ?? "unknown",
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+      });
+      return json(result, 200);
+    } catch (error) {
+      if (error instanceof WaitlistInputError) {
+        return json({ message: error.message }, 400);
+      }
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      // Convex argument errors print the failing args, which include the
+      // address. Log the error class only.
+      console.error(
+        "Waitlist join failed",
+        error instanceof Error ? error.name : typeof error,
+      );
+      return json({ message: "Could not join right now." }, 500);
+    }
   }),
 });
 

@@ -17,6 +17,8 @@ const app = defineApp({
     RESEND_ANDROID_SEGMENT_ID: v.optional(v.string()),
     RESEND_TOPIC_ID: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
+    // Shared with the marketing site's server; authenticates POST /waitlist/join.
+    WAITLIST_SHARED_SECRET: v.optional(v.string()),
   },
 });
 app.use(rateLimiter);
