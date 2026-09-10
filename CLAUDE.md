@@ -2,19 +2,18 @@
 
 This file provides guidance when working with code in this repository.
 
-@AGENTS.md (when present)
-
 > Expo docs change quickly. Before writing native app code, read the versioned docs
-> for the SDK pinned in `apps/native/package.json` (currently Expo SDK 55):
-> https://docs.expo.dev/versions/v55.0.0/
+> for the SDK pinned in `apps/native/package.json` (currently Expo SDK 57):
+> https://docs.expo.dev/versions/v57.0.0/
 
 ## What this is
 
 **Shelvr** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
 backend action fetches/extracts content and an LLM classifies each item (title, description,
 tags, and which "spaces" it belongs to). Clients render a feed of saves. Items can be
-organized into **spaces** (themed collections), and creating a new space retroactively pulls
-in matching existing items.
+organized into **spaces** (themed collections). Creating a new space runs one recommendation
+pass over existing items. That pass writes `suggested` memberships only. The user accepts or
+dismisses each suggestion.
 
 ## Monorepo layout
 
@@ -30,15 +29,23 @@ Convex types/API are imported as `@convex/_generated/*` (path alias resolves to 
 **Use `pnpm`** (workspace package manager). Root scripts go through Turbo.
 
 - `pnpm install` — install deps
-- `pnpm dev` — run web + native via Turbo
+- `pnpm dev` — run web (`next dev`) + native (`expo start`) via Turbo. It does not start the
+  Convex backend; run `convex dev` in a second terminal
 - `pnpm typecheck` — typecheck all packages
 - `pnpm --filter native-app start` — Expo Metro
 - `pnpm --filter native-app exec convex dev` —
   Convex backend against the dev deployment; keeps `convex/_generated/*` in sync
 - `pnpm --filter web-app dev` — Next.js dev server
 - `pnpm --filter web-app lint` — ESLint
+- `pnpm --filter native-app test` — Vitest suite (`vitest run`)
+- `pnpm --filter native-app check` — lint, then typecheck, then test
 
-There is no test suite yet.
+Tests live next to the code as `*.test.ts` under `apps/native/convex/` and `apps/native/src/`.
+`apps/native/vitest.config.ts` includes both trees and runs Node as the default environment.
+Convex function tests use [`convex-test`](https://docs.convex.dev/testing/convex-test) and opt
+into the edge runtime per file with a `// @vitest-environment edge-runtime` pragma. Build the
+test harness through `newConvexTest()` in `apps/native/convex/test.setup.ts`; it registers the
+rate-limiter component, without which any mutation that calls `rateLimiter.limit` fails.
 
 ## Architecture
 
@@ -50,24 +57,69 @@ and wired in `convex/auth.config.ts`. Convex Auth issues its own JWTs (signed wi
 `JWT_PRIVATE_KEY` / `JWKS` deployment vars); the JWT `sub` contains the users-table id and session
 id, and `model/auth.ts` extracts the stable users-table id used by every app table.
 
-- **`schema.ts`** — the Convex Auth tables (`authTables`) plus `items`, `spaces`, `spaceItems`,
-  `itemOperations`, and `subscriptions`. `items` has a `by_user` index and a `search_text` full-text
-  search index (filtered by `userId`).
-- **`items.ts`** — public queries/mutations (`listItems`, `getItem`, `searchItems`,
-  `createItem`/`deleteItem`, `generateUploadUrl`) plus internal helpers the AI action calls.
-  Image URLs are resolved from `storageId` at read time via `enrichItem` (`resolvedImageUrl`).
-- **`spaces.ts`** — space CRUD + space/item join management.
+- **`schema.ts`** — the Convex Auth tables (`authTables`) plus these app tables:
+  - `items` — saved links, images, and notes (`processing` → `ready` | `failed`)
+  - `spaces` — themed collections owned by a user
+  - `spaceItems` — item/space membership join, with a `suggested` / `saved` / `dismissed` status
+  - `itemOperations` — per-import idempotency ledger for image, link, and note saves
+  - `subscriptions` — one Pro entitlement row per user, written by the RevenueCat webhook
+  - `paymentAnalyticsReceipts` — seen payment event ids, so telemetry is not double counted
+  - `notificationDevices` — one Expo push token per device, scoped to a user
+  - `notificationPreferences` — weekly shelf opt-in, timezone, and the next digest instant
+  - `itemReads` — per-user read state, kept out of the item row
+  - `weeklyDigests` — the persisted weekly shelf and its delivery state
+  - `waitlistSignups` — waitlist source of truth, projected to Resend
+
+  `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
+  full-text search index (filtered by `userId`).
+
+- **`items.ts`** — public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
+  `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
+  `beginImageImport` → `attachImageUpload` → `finalizeImageImport`, all keyed on a
+  client-generated `operationId` in `itemOperations`. Other public mutations are
+  `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
+  `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
+  file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
+  `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
+  `storageId` to an `imageUrl` at read time.
+- **`spaces.ts`** — public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
+  `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
+  suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
+  `acceptAllSuggestions`), plus internal join helpers.
+- **`subscriptions.ts`** — `getEntitlement` query for the client and the
+  `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
+  `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
+  RevenueCat webhook.
+- **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
+  `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
+  plus internal digest preparation and send. `notificationDelivery.ts` holds the
+  claim/finish/recover delivery machine.
+- **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
+  Resend projection and its bounded retry.
+- **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`) and the RevenueCat webhook at
+  `/webhooks/revenuecat`, authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret.
+- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
+  and weekly shelf delivery recovery.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
-  identity sync.
+  identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
+- **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
+  `AUTH_ENABLE_ANONYMOUS` is `"true"` and the caller is a development anonymous user.
+- **`analytics.ts`**, **`accountTelemetry.ts`**, **`paymentTelemetry.ts`** — server-side PostHog
+  capture. Every one is a no-op when `POSTHOG_PROJECT_TOKEN` is unset.
 - **`ai.ts`** (`"use node"` action) — the processing pipeline. On create, a mutation inserts the
   item as `status: "processing"` and schedules `internal.ai.processItem`. That action: for links,
   fetches the page and extracts the article body (Mozilla **Readability** via `linkedom`, with a
   regex fallback) + OpenGraph metadata + hero image aspect ratio (read from raw header bytes);
-  for notes it feeds the content to the model. It calls `generateObject` (Vercel AI SDK, Zod
-  schema) to produce title/description/tags/spaceNames, maps space names back to ids, then
-  `finalizeItem` flips status to `ready`. `reclassifyForNewSpace` runs when a space is created.
+  for notes it feeds the content to the model; for images it sends the stored bytes as a file
+  part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
+  title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
+  flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
+  matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
+  existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
+  when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
+  `SERPAPI_KEY`), and the one-off `backfillImageAspectRatios`.
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
@@ -90,8 +142,14 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- Screens: home feed, save item, item detail, spaces list/detail
-- Scheme / bundle id: `shelvr` / `app.shelvr.save`
+- Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
+  `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
+- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
+  `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
+- `(auth)` holds a single `sign-in` route
+- Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
+  or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides
+  with the App Store install
 
 ## Path aliases
 
@@ -103,23 +161,58 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 **Client**
 
-- Web: `CONVEX_URL` is optional unless a server-backed marketing form is enabled; no auth env vars
-- Native (`.env.local`): `EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` (optional,
-  mirrors the backend `AUTH_ENABLE_ANONYMOUS` to show the dev-only passwordless button)
+- Web (`apps/web/.env.example`): `CONVEX_URL` is optional unless a server-backed marketing form
+  is enabled; the Android waitlist route returns 503 without it. No auth env vars
+- Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
+  Analytics is a no-op when either is unset
+- Native (`apps/native/.example.env` → `.env.local`):
+  - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
+    rejects the production URL on dev and preview builds
+  - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
+  - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
+    to show the dev-only passwordless button
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
+    non-production variant. `app.config.js` pins it to one exact value
+  - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
+    SDK keys used only by production builds. The entitlement stays `none` until a key is set and
+    a subscription row is written
+  - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
+    iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
+  - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
+    `expo-maps` on the map screen
+  - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
+    `expoConfig.extra`. The client analytics module is undefined unless both resolve
 
-**Convex deployment** (via `convex env set` or dashboard):
+**Convex deployment** (via `convex env set` or dashboard). The names are declared in
+`apps/native/convex/convex.config.ts`, so a required one that is missing fails the deploy:
 
 - `JWT_PRIVATE_KEY` / `JWKS` — RS256 keypair Convex Auth uses to sign its JWTs (generate via
   `node generateKeys.mjs`, see [Manual Setup](https://labs.convex.dev/auth/setup/manual))
+- `CONVEX_SITE_URL` — set by Convex; `auth.config.ts` uses it as the JWT issuer domain
 - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials
 - `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET` — Sign-in-with-Apple Service ID + signed JWT secret
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
-  dev sign-in
+  dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
-  `@ai-sdk/google`, no gateway)
-- `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts
-- `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public SDK
-  keys (client-side; entitlement stays `none` until these are set and a subscription row is written)
+  `@ai-sdk/google`, no gateway). The only required entry
+- `POSTHOG_PROJECT_TOKEN` — server-side PostHog ingestion key. All backend capture is skipped
+  when it is unset
+- `POSTHOG_HOST` — PostHog ingestion host. Defaults to `https://us.i.posthog.com`
+- `OBSERVABILITY_ENV` — tags captured events with an `environment` property. Set it to
+  `production` on the production deployment
+- `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts.
+  The route answers 500 when it is unset
+- `REVENUECAT_API_KEY` — RevenueCat REST key used to re-read subscribers when reconciling a
+  `TRANSFER` webhook event
+- `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
+  Defaults to `Shelvr Pro`
+- `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
+- `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
+  `unconfigured` and no attempt is spent
+- `RESEND_SEGMENT_ID` — Resend segment for `shelvr` waitlist signups
+- `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
+  `unconfigured` until it is set
+- `RESEND_TOPIC_ID` — Resend topic the contact is opted into
 
 ## Working conventions
 
@@ -128,6 +221,12 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Never pass `userId` from the client into Convex public functions.
 - Keep `returns:` validators accurate — Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
+- Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
+  `subscriptions.ts`.
+- The AI pipeline may only write `suggested` rows in `spaceItems`. `saved` and `dismissed` are
+  user-owned, so the pipeline never overwrites a user decision.
+- Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
+  bare `convexTest(schema, ...)`.
 
 <!-- convex-ai-start -->
 

@@ -19,6 +19,8 @@ for Shelvr.
 - [Convex](https://convex.dev/) (`apps/native/convex/`)
 - [Convex Auth](https://labs.convex.dev/auth/) (Google + Apple OAuth, dev Anonymous)
 - Vercel AI SDK with the direct Google provider (`gemini-3.1-flash-lite`)
+- [Vitest](https://vitest.dev/) + [`convex-test`](https://docs.convex.dev/testing/convex-test)
+  for the native app and the Convex backend
 
 ## What’s inside
 
@@ -149,18 +151,39 @@ Convex deployment to add Android signups to a dedicated Resend segment.
 pnpm dev
 ```
 
-Runs backend, web (landing), and native via Turbo.
+Runs web (landing) and native via Turbo. It does not start the Convex backend.
+Run the backend in a second terminal:
+
+```sh
+pnpm --filter native-app exec convex dev
+```
+
+### 6. Test
+
+```sh
+pnpm --filter native-app test    # vitest run
+pnpm --filter native-app check   # lint, then typecheck, then test
+```
+
+Tests are `*.test.ts` files next to the code under `apps/native/convex/` and
+`apps/native/src/`. Convex function tests use `convex-test` and opt into the
+edge runtime per file with a `// @vitest-environment edge-runtime` pragma.
 
 ## Domain model (Convex)
 
 - **`items`** — saved links / images / notes (`processing` → `ready` | `failed`)
 - **`spaces`** — themed collections owned by a user
-- **`spaceItems`** — join table
+- **`spaceItems`** — join table, with a `suggested` / `saved` / `dismissed` status
+- **`itemOperations`** — per-import idempotency ledger
+- **`subscriptions`** — one Pro entitlement row per user
+- **`notificationDevices`** / **`notificationPreferences`** / **`weeklyDigests`** /
+  **`itemReads`** — push tokens, weekly shelf settings, shelves, and read state
 - **`waitlistSignups`** — platform availability waitlists and prior launch records
 
-Public product APIs live in `items.ts`, `spaces.ts`, `subscriptions.ts`, and
-`users.ts`. The Node action pipeline is in `ai.ts` (`processItem`,
-`reclassifyForNewSpace`). Auth always derives `userId` from Convex Auth via
+Public product APIs live in `items.ts`, `spaces.ts`, `subscriptions.ts`,
+`notifications.ts`, and `users.ts`. The Node action pipeline is in `ai.ts`
+(`processItem`, `recommendForSpace`, `steerItemForSpace`, `findProductLinks`).
+Auth always derives `userId` from Convex Auth via
 `model/auth.ts` (the stable users-table id extracted from the session-bearing
 JWT `sub`) — never from a client argument.
 
