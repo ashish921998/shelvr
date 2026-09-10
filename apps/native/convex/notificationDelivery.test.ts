@@ -144,6 +144,43 @@ describe("durable digest delivery", () => {
     ).toEqual(["token-a"]);
   });
 
+  it("targets enabled devices when many disabled rows precede them", async () => {
+    const { t, digestId } = await seed([]);
+    await t.run(async (ctx) => {
+      // Older, disabled rows sort first in every user index. They must neither
+      // fill the recipient page nor appear as recipients.
+      for (let i = 0; i < 30; i++)
+        await ctx.db.insert("notificationDevices", {
+          userId: "user-a",
+          token: `stale-${i}`,
+          enabled: false,
+          platform: "ios",
+          lastSeenAt: Date.now(),
+        });
+      await ctx.db.insert("notificationDevices", {
+        userId: "user-a",
+        token: "live-a",
+        enabled: true,
+        platform: "ios",
+        lastSeenAt: Date.now(),
+      });
+      // Another user's enabled device is never a recipient.
+      await ctx.db.insert("notificationDevices", {
+        userId: "user-b",
+        token: "live-b",
+        enabled: true,
+        platform: "android",
+        lastSeenAt: Date.now(),
+      });
+    });
+    const claimed = await t.mutation(internal.notificationDelivery.claim, {
+      digestId,
+    });
+    expect(claimed?.recipients).toEqual([
+      { token: "live-a", state: "pending" },
+    ]);
+  });
+
   it("recovers an interrupted attempt after its lease and rejects stale completion", async () => {
     const { t, digestId, advance, digest } = await seed();
     const first = await t.mutation(internal.notificationDelivery.claim, {
