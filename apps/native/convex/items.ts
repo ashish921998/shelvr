@@ -1088,7 +1088,11 @@ export const findLinks = mutation({
  */
 export const reprocessItem = mutation({
   args: { id: v.id("items") },
-  returns: v.null(),
+  // True when a new run was scheduled. False means the item is not retryable
+  // as the server sees it, which the client can only guess at: its stale check
+  // runs on the device clock, so a fast clock offers a retry the server still
+  // considers in flight. The client uses this to say so instead of going quiet.
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
@@ -1101,7 +1105,7 @@ export const reprocessItem = mutation({
       (item.status === "ready" && item.enrichment === "partial") ||
       isStaleProcessing(item, Date.now());
     if (!retryable) {
-      return null;
+      return false;
     }
     await rateLimiter.limit(ctx, "reprocessItem", {
       key: userId,
@@ -1119,7 +1123,7 @@ export const reprocessItem = mutation({
       itemId: args.id,
       runId: run.processingRunId,
     });
-    return null;
+    return true;
   },
 });
 

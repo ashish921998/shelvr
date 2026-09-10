@@ -872,16 +872,19 @@ export const processItem = internalAction({
             `processItem gone for ${args.itemId}:`,
             summarizeError(read.error),
           );
-          await ctx.runMutation(internal.items.failItem, {
+          const failed = await ctx.runMutation(internal.items.failItem, {
             itemId: args.itemId,
             runId: args.runId,
             reason: "not_found",
           });
-          await captureCategorizationTelemetry({
-            outcome: "not_found",
-            itemType: item.type,
-            durationMs: Date.now() - startedAt,
-          });
+          // Same fence as finalize: a superseded run's outcome is nobody's.
+          if (failed === "applied") {
+            await captureCategorizationTelemetry({
+              outcome: "not_found",
+              itemType: item.type,
+              durationMs: Date.now() - startedAt,
+            });
+          }
           return null;
         }
         linkRead = read;
@@ -1057,12 +1060,12 @@ export const processItem = internalAction({
       const errorCategory = summarizeError(error);
       if (error instanceof StoredImageError) {
         const tooLarge = error.code === "too_large";
-        await ctx.runMutation(internal.items.failItem, {
+        const failed = await ctx.runMutation(internal.items.failItem, {
           itemId: args.itemId,
           runId: args.runId,
           reason: tooLarge ? "image_too_large" : "not_found",
         });
-        if (itemType !== undefined) {
+        if (itemType !== undefined && failed === "applied") {
           await captureCategorizationTelemetry({
             outcome: tooLarge ? "rejected" : "not_found",
             itemType,
@@ -1089,13 +1092,13 @@ export const processItem = internalAction({
       }
       // failItem is run-fenced: if a retry already superseded this run the
       // write is skipped, which is exactly right — the newer run owns the
-      // item's status now.
-      await ctx.runMutation(internal.items.failItem, {
+      // item's status now, and its outcome is the one worth counting.
+      const failed = await ctx.runMutation(internal.items.failItem, {
         itemId: args.itemId,
         runId: args.runId,
         reason: "error",
       });
-      if (itemType !== undefined) {
+      if (itemType !== undefined && failed === "applied") {
         await captureCategorizationTelemetry({
           outcome: "failed",
           itemType,

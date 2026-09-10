@@ -126,6 +126,10 @@ describe("run fencing in processItem", () => {
   });
 
   it("does not fail an item a newer run owns when a superseded run errors", async () => {
+    // Telemetry is live so the assertion below proves the fence also covers
+    // the outcome event, not only the status write.
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
+    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
     generateObject.mockRejectedValue(new DOMException("deadline", "TimeoutError"));
     const t = newConvexTest();
     const itemId = await note(t, "run-new");
@@ -138,6 +142,8 @@ describe("run fencing in processItem", () => {
       status: "processing",
       processingRunId: "run-new",
     });
+    // The newer run owns the outcome; this one records nothing.
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("finalizes normally when the run still owns the item", async () => {

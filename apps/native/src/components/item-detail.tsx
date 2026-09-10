@@ -425,7 +425,15 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
             guard(async () => {
               setRetrying(true);
               try {
-                await reprocess({ id: item._id });
+                const scheduled = await reprocess({ id: item._id });
+                if (!scheduled) {
+                  // The server still sees this run as live. Usually a device
+                  // clock running ahead of the backend's stale threshold.
+                  Alert.alert(
+                    'Still working on it',
+                    'Give it a few more minutes. If it never finishes, the retry will appear again.',
+                  );
+                }
               } catch {
                 Alert.alert("Couldn't retry", 'Please try again in a moment.');
               } finally {

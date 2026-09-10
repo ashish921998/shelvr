@@ -2054,7 +2054,7 @@ describe("stale processing runs", () => {
       fresh: await ctx.db.get(fresh),
     }));
 
-    await t.mutation(api.items.reprocessItem, { id: stale });
+    expect(await t.mutation(api.items.reprocessItem, { id: stale })).toBe(true);
     const retried = await t.run((ctx) => ctx.db.get(stale));
     expect(retried).toMatchObject({ status: "processing", processingStartedAt: Date.now() });
     expect(retried?.processingRunId).not.toBe(before.stale?.processingRunId);
@@ -2065,7 +2065,9 @@ describe("stale processing runs", () => {
     expect(legacyRetried?.processingStartedAt).toBe(Date.now());
 
     // Fresh: its action may still finish, so nothing changes and no job queues.
-    await t.mutation(api.items.reprocessItem, { id: fresh });
+    // The false return is what lets a client with a fast clock tell the user
+    // instead of going quiet.
+    expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(false);
     expect(await t.run((ctx) => ctx.db.get(fresh))).toEqual(before.fresh);
 
     const jobs = await scheduledJobs(t, "ai:processItem");
