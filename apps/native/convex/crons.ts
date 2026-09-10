@@ -13,6 +13,18 @@ crons.interval(
   {},
 );
 
+// Fail `processing` items whose pipeline run is older than PROCESSING_STALE_MS
+// (15 min). Their action died outside its try block, so nothing else will ever
+// flip them and the client would spin forever. Bounded to 100 rows per run;
+// a full page that made progress chains itself. Every 10 minutes keeps the
+// worst-case wait (threshold + one interval) at about 25 minutes.
+crons.interval(
+  "fail stale processing items",
+  { minutes: 10 },
+  internal.items.failStaleProcessingItems,
+  {},
+);
+
 // Retry Resend projection for waitlist rows that saved but never synced, so a
 // provider outage does not leave signups unrecoverable.
 crons.interval(

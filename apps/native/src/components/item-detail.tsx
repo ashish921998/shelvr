@@ -1,4 +1,4 @@
-import { isTerminalFailure } from '@convex/model/itemFields';
+import { isStaleProcessing, isTerminalFailure } from '@convex/model/itemFields';
 import { IMAGE_TOO_LARGE_MESSAGE } from '@convex/model/imagePolicy';
 import { ProductsSection } from '@/components/products-section';
 import { ArticleReaderView } from '@/components/article-reader-view';
@@ -21,7 +21,7 @@ import { Link } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -308,13 +308,25 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState = 'image_too_large' | 'gone' | 'failed' | 'partial' | 'no_article';
+type SaveState =
+  | 'image_too_large'
+  | 'gone'
+  | 'failed'
+  | 'stalled'
+  | 'partial'
+  | 'no_article';
 
-function saveState(item: DetailItem): SaveState | null {
+function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === 'failed') {
     if (item.failureReason === 'image_too_large') return 'image_too_large';
     // Missing sources cannot be recovered by retrying.
     return item.failureReason === 'not_found' ? 'gone' : 'failed';
+  }
+  // A run older than the backend's stale threshold has lost its action. The
+  // sweeper will fail it on its next tick; until then offer the retry here,
+  // which reprocessItem accepts for exactly this case.
+  if (isStaleProcessing(item, now)) {
+    return 'stalled';
   }
   if (item.status !== 'ready') {
     return null;
@@ -331,6 +343,7 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   image_too_large: IMAGE_TOO_LARGE_MESSAGE,
   gone: 'This page is gone — it was deleted, or the link was wrong.',
   failed: "Shelvr couldn't read this page.",
+  stalled: 'This is taking longer than it should.',
   partial:
     "Saved from the link alone — the page wouldn't load, so these details are a guess.",
   no_article:
@@ -361,8 +374,22 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   // Guards the retry gesture: disabled while in flight, and a rejection gets
   // user-visible feedback instead of an unhandled promise.
   const [retrying, setRetrying] = useState(false);
+  // Seeded in a useState initializer and advanced inside the effect so Date.now
+  // stays out of the render body (the React compiler flags impure calls
+  // there). The minute tick runs only while the item is processing, so a
+  // spinner left open ages into the retry notice on its own; every other
+  // state never ticks.
+  const [now, setNow] = useState(() => Date.now());
+  const processing = item.status === 'processing';
+  useEffect(() => {
+    if (!processing) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [processing]);
 
-  if (item.status === 'processing') {
+  const state = saveState(item, now);
+
+  if (processing && state === null) {
     return (
       <View style={styles.processingRow}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -371,7 +398,6 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
     );
   }
 
-  const state = saveState(item);
   if (state === null) {
     return null;
   }
@@ -399,7 +425,15 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
             guard(async () => {
               setRetrying(true);
               try {
-                await reprocess({ id: item._id });
+                const scheduled = await reprocess({ id: item._id });
+                if (!scheduled) {
+                  // The server still sees this run as live. Usually a device
+                  // clock running ahead of the backend's stale threshold.
+                  Alert.alert(
+                    'Still working on it',
+                    'Give it a few more minutes. If it never finishes, the retry will appear again.',
+                  );
+                }
               } catch {
                 Alert.alert("Couldn't retry", 'Please try again in a moment.');
               } finally {

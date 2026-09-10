@@ -14,9 +14,22 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
-import { enrichmentValidator, failureReasonValidator, isTerminalFailure } from "./model/itemFields";
+import {
+  enrichmentValidator,
+  failureReasonValidator,
+  intentKindValidator,
+  intentValidator,
+  isStaleProcessing,
+  isTerminalFailure,
+  PROCESSING_STALE_MS,
+} from "./model/itemFields";
 import { imageSizeError, MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 import { safeDeleteStorage } from "./model/storage";
+
+// Re-exported for spaces.ts, which builds its membership validators from the
+// same intent shape. The definitions live in model/itemFields so the schema,
+// these validators, and the zod enum in ai.ts share one list of kinds.
+export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
@@ -28,26 +41,6 @@ const itemStatusValidator = v.union(
   v.literal("ready"),
   v.literal("failed"),
 );
-
-// A pressable action the AI attaches to an item. `kind` is a closed set so the
-// client can map each one to a guaranteed-executable handler and a valid icon;
-// `label` is the button text and `value` is the payload (URL, text, number…).
-export const intentKindValidator = v.union(
-  v.literal("open_url"),
-  v.literal("copy"),
-  v.literal("web_search"),
-  v.literal("open_maps"),
-  v.literal("call"),
-  v.literal("email"),
-  v.literal("message"),
-  v.literal("add_event"),
-);
-
-export const intentValidator = v.object({
-  kind: intentKindValidator,
-  label: v.string(),
-  value: v.string(),
-});
 
 // A real product result from the user-triggered "Find links" pass. Mirrors
 // the schema; price stays a display string ("$1,299.00") — no math happens.
@@ -93,8 +86,39 @@ const itemFields = {
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
   enrichment: v.optional(enrichmentValidator),
+  processingRunId: v.optional(v.string()),
+  processingStartedAt: v.optional(v.number()),
   searchText: v.string(),
 };
+
+/**
+ * Fields that start a new pipeline run: the item flips to `processing` under a
+ * fresh run id stamped with the start time. The same id is handed to the
+ * scheduled processItem action, and finalizeItem/failItem write only while it
+ * still matches, so a run that is superseded (by a retry, or by the stale
+ * sweeper's timestamp check) becomes a no-op instead of clobbering the newer
+ * state. Every place that sets `status: "processing"` must spread this in.
+ */
+function beginProcessingRun(): {
+  status: "processing";
+  processingRunId: string;
+  processingStartedAt: number;
+} {
+  return {
+    status: "processing",
+    processingRunId: crypto.randomUUID(),
+    processingStartedAt: Date.now(),
+  };
+}
+
+/** What a run-fenced write did. `stale_run` means another run now owns the
+ * item and the caller must treat its own result as discarded (not an error);
+ * `missing` means the item was deleted while the action ran. */
+const runWriteOutcomeValidator = v.union(
+  v.literal("applied"),
+  v.literal("stale_run"),
+  v.literal("missing"),
+);
 
 // Exported so spaces.ts reuses the exact same shape — a second hand-written
 // copy is how `capturedAt`/`intents` drifted out of getSpace's validator.
@@ -692,10 +716,11 @@ export const finalizeImageImport = mutation({
       throw new Error("Operation has no attached upload");
     }
 
+    const run = beginProcessingRun();
     const itemId = await ctx.db.insert("items", {
       userId,
       type: "image",
-      status: "processing",
+      ...run,
       storageId: op.storageId,
       aspectRatio: args.aspectRatio,
       isSticker: args.isSticker,
@@ -713,7 +738,10 @@ export const finalizeImageImport = mutation({
       itemId,
       updatedAt: Date.now(),
     });
-    await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
+    await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+      itemId,
+      runId: run.processingRunId,
+    });
     await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId, {
       photoCount: photoCount + 1,
       storedBytes,
@@ -918,10 +946,11 @@ async function insertLinkOrNote(
   spaceId?: Id<"spaces">,
   analyticsSessionId?: string,
 ): Promise<Id<"items">> {
+  const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
     userId,
     type: kind,
-    status: "processing",
+    ...run,
     ...(kind === "link" && "url" in payload ? { url: payload.url } : {}),
     ...(kind === "note" && "note" in payload ? { note: payload.note } : {}),
     tags: [],
@@ -930,7 +959,10 @@ async function insertLinkOrNote(
   if (spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, spaceId);
   }
-  await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
+  await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+    itemId,
+    runId: run.processingRunId,
+  });
   await scheduleSaveTelemetry(ctx, itemId, analyticsSessionId);
   return itemId;
 }
@@ -1041,16 +1073,26 @@ export const findLinks = mutation({
 
 /**
  * User-triggered retry for a save whose page fetch or classification did not
- * fully succeed: a `failed` item or a `ready` one flagged `enrichment: "partial"`
- * (classified from its URL because the page body was unreadable). Re-runs the
- * same pipeline, so it is rate-limited like a create.
+ * fully succeed: a `failed` item, a `ready` one flagged `enrichment: "partial"`
+ * (classified from its URL because the page body was unreadable), or a
+ * `processing` one whose run is older than PROCESSING_STALE_MS (its action is
+ * dead — see the constant's rationale — and the sweeper has not reached it
+ * yet). Re-runs the same pipeline, so it is rate-limited like a create.
+ *
+ * A fresh `processing` item is refused: its action may still finish, and
+ * minting a second run would only waste a model call. A stale one gets a new
+ * run id, which fences the old run's finalize/fail should it somehow land.
  *
  * Unavailable sources and oversized photos are terminal; retrying would
  * spend classification capacity without changing the result.
  */
 export const reprocessItem = mutation({
   args: { id: v.id("items") },
-  returns: v.null(),
+  // True when a new run was scheduled. False means the item is not retryable
+  // as the server sees it, which the client can only guess at: its stale check
+  // runs on the device clock, so a fast clock offers a retry the server still
+  // considers in flight. The client uses this to say so instead of going quiet.
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
@@ -1060,16 +1102,18 @@ export const reprocessItem = mutation({
     }
     const retryable =
       (item.status === "failed" && !isTerminalFailure(item.failureReason)) ||
-      (item.status === "ready" && item.enrichment === "partial");
+      (item.status === "ready" && item.enrichment === "partial") ||
+      isStaleProcessing(item, Date.now());
     if (!retryable) {
-      return null;
+      return false;
     }
     await rateLimiter.limit(ctx, "reprocessItem", {
       key: userId,
       throws: true,
     });
+    const run = beginProcessingRun();
     await ctx.db.patch(args.id, {
-      status: "processing",
+      ...run,
       failureReason: undefined,
       // Dropped up front so an in-flight retry — and a retry that fails again —
       // never carries the previous run's "partial" marker.
@@ -1077,8 +1121,9 @@ export const reprocessItem = mutation({
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, {
       itemId: args.id,
+      runId: run.processingRunId,
     });
-    return null;
+    return true;
   },
 });
 
@@ -1139,18 +1184,38 @@ export const listReadyItemsInternal = internalQuery({
   returns: v.array(v.object(itemFields)),
   handler: async (ctx, args) => {
     const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
-    const items = await ctx.db
+    // Index-scoped to `ready` so a library full of failed or in-flight saves
+    // still yields `limit` candidates; the old by_user read took 2x and
+    // filtered in JS, which starved users with many failed items.
+    return await ctx.db
       .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", args.userId).eq("status", "ready"),
+      )
       .order("desc")
-      .take(limit * 2);
-    return items.filter((item) => item.status === "ready").slice(0, limit);
+      .take(limit);
   },
 });
+
+/**
+ * Run fencing for the two writes that end a pipeline run. The run that owns
+ * the item is whichever one most recently flipped it to `processing`; a
+ * caller whose `runId` differs was superseded (a retry, or a stale-sweep
+ * followed by a retry) and must not touch the row. Both sides absent counts
+ * as a match so a job scheduled before fencing shipped can still finish the
+ * pre-fencing item it was scheduled for.
+ */
+function ownsRun(item: Doc<"items">, runId: string | undefined): boolean {
+  return item.processingRunId === runId;
+}
 
 export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
+    // The run id processItem was scheduled with. Optional only so actions
+    // queued before this argument existed still validate; every new schedule
+    // passes it.
+    runId: v.optional(v.string()),
     title: v.string(),
     description: v.string(),
     tags: v.array(v.string()),
@@ -1166,11 +1231,20 @@ export const finalizeItem = internalMutation({
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
-  returns: v.boolean(),
+  returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) {
-      return false;
+      return "missing";
+    }
+    // Race: the user pressed retry while this run was still awaiting the
+    // model. The retry owns the item now; writing here would overwrite its
+    // result with ours (or flip a newer `processing` back to `ready` with
+    // stale content). Status is deliberately NOT checked: a run the sweeper
+    // failed by timestamp still owns the row, so if it does finish it may
+    // repair the item — a late success beats a presumed failure.
+    if (!ownsRun(item, args.runId)) {
+      return "stale_run";
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
@@ -1206,7 +1280,7 @@ export const finalizeItem = internalMutation({
     ) {
       await safeDeleteStorage(ctx, item.storageId);
     }
-    return true;
+    return "applied";
   },
 });
 
@@ -1279,18 +1353,82 @@ export const setProductsInternal = internalMutation({
 });
 
 export const failItem = internalMutation({
-  args: { itemId: v.id("items"), reason: failureReasonValidator },
-  returns: v.null(),
+  args: {
+    itemId: v.id("items"),
+    reason: failureReasonValidator,
+    // See finalizeItem: the owning run's id, optional only for pre-fencing jobs.
+    runId: v.optional(v.string()),
+  },
+  returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) {
-      return null;
+      return "missing";
+    }
+    // A superseded run must not fail an item a newer run is processing (or
+    // has already finished): the user would see a failure for work that is
+    // still in flight, or a `ready` item flip to `failed`.
+    if (!ownsRun(item, args.runId)) {
+      return "stale_run";
     }
     await ctx.db.patch(args.itemId, {
       status: "failed",
       failureReason: args.reason,
     });
-    return null;
+    return "applied";
+  },
+});
+
+/** Rows swept per transaction. A full page that made progress chains a
+ * follow-up run so a backlog drains at scheduler speed. */
+const STALE_PROCESSING_PAGE_SIZE = 100;
+
+/**
+ * Sweep `processing` items whose run started more than PROCESSING_STALE_MS ago
+ * and mark them `failed` with reason `error` — the reason the client already
+ * renders as "couldn't read this" with a Try again button. Their action died
+ * outside its try block (runtime kill, timeout, OOM, deploy), so nothing else
+ * will ever flip them; without this they spin forever and reprocessItem used
+ * to refuse them.
+ *
+ * Pre-fencing rows carry no `processingStartedAt`. They sort at the front of
+ * the index range (undefined precedes every number) and are judged by
+ * `_creationTime` instead, so no backfill migration is needed. Such a row that
+ * is not yet stale is skipped — it becomes stale on its own within the
+ * threshold and the next tick takes it. The chain-on-full-page rule therefore
+ * also requires progress: a full page of skipped rows must not loop at
+ * scheduler speed until they age.
+ *
+ * The run id is left untouched on purpose: if the presumed-dead action does
+ * finish, its finalizeItem still owns the row and repairs the item.
+ */
+export const failStaleProcessingItems = internalMutation({
+  args: {},
+  returns: v.object({ failed: v.number(), scanned: v.number() }),
+  handler: async (ctx): Promise<{ failed: number; scanned: number }> => {
+    const now = Date.now();
+    const cutoff = now - PROCESSING_STALE_MS;
+    const candidates = await ctx.db
+      .query("items")
+      .withIndex("by_status_and_processingStartedAt", (q) =>
+        q.eq("status", "processing").lt("processingStartedAt", cutoff),
+      )
+      .take(STALE_PROCESSING_PAGE_SIZE);
+    let failed = 0;
+    for (const item of candidates) {
+      if (!isStaleProcessing(item, now)) {
+        continue;
+      }
+      await ctx.db.patch(item._id, {
+        status: "failed",
+        failureReason: "error",
+      });
+      failed++;
+    }
+    if (candidates.length === STALE_PROCESSING_PAGE_SIZE && failed > 0) {
+      await ctx.scheduler.runAfter(0, internal.items.failStaleProcessingItems, {});
+    }
+    return { failed, scanned: candidates.length };
   },
 });
 

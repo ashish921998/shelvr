@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { STALE_IMPORT_CUTOFF_MS } from "./items";
+import { PROCESSING_STALE_MS, STALE_IMPORT_CUTOFF_MS } from "./items";
 import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -1830,5 +1830,292 @@ describe("photo rejection before classification", () => {
     expect(
       await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
     ).not.toBeNull();
+  });
+});
+
+describe("stale processing runs", () => {
+  const STALE_AGE = PROCESSING_STALE_MS + 60 * 1000;
+  const FRESH_AGE = 60 * 1000;
+
+  /** Insert a `processing` link for `userId` whose run started `ageMs` ago.
+   * `legacy` rows omit the run fields the way pre-fencing rows do, so their
+   * age has to come from `_creationTime` — which convex-test stamps from
+   * Date.now(), hence the faked clock below. convex-test also keeps
+   * `_creationTime` monotonic per instance, so legacy rows must be inserted
+   * before newer rows, oldest first. */
+  async function processingLink(
+    t: TestCtx,
+    userId: string,
+    ageMs: number,
+    options: { legacy?: boolean } = {},
+  ): Promise<Id<"items">> {
+    const now = Date.now();
+    if (options.legacy) {
+      vi.setSystemTime(now - ageMs);
+    }
+    try {
+      return await t.run((ctx) =>
+        ctx.db.insert("items", {
+          userId,
+          type: "link",
+          url: "https://example.com/slow",
+          status: "processing",
+          tags: [],
+          searchText: "",
+          ...(options.legacy
+            ? {}
+            : {
+                processingRunId: `run-${ageMs}-${Math.random()}`,
+                processingStartedAt: now - ageMs,
+              }),
+        }),
+      );
+    } finally {
+      vi.setSystemTime(now);
+    }
+  }
+
+  async function scheduledJobs(t: TestCtx, name: string) {
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    return jobs.filter((job) => job.name === name);
+  }
+
+  beforeEach(() => {
+    // Date joins the faked clocks so legacy rows can be created "in the past".
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+  });
+
+  it("stamps a run id and start time on every path that starts processing", async () => {
+    const t = await as("run-stamp");
+    const noteId = await t.mutation(api.items.createNoteItem, { text: "a note" });
+    const note = await t.run((ctx) => ctx.db.get(noteId));
+    expect(note).toMatchObject({
+      status: "processing",
+      processingStartedAt: Date.now(),
+    });
+    expect(typeof note?.processingRunId).toBe("string");
+    // The scheduled action carries the same run id it must finalize under.
+    const [job] = await scheduledJobs(t, "ai:processItem");
+    expect(job.args[0]).toEqual({ itemId: noteId, runId: note?.processingRunId });
+
+    // A retry mints a NEW run so the old action is fenced out.
+    await t.run((ctx) =>
+      ctx.db.patch(noteId, { status: "failed", failureReason: "error" }),
+    );
+    await t.mutation(api.items.reprocessItem, { id: noteId });
+    const retried = await t.run((ctx) => ctx.db.get(noteId));
+    expect(retried?.status).toBe("processing");
+    expect(retried?.processingRunId).not.toBe(note?.processingRunId);
+    const jobs = await scheduledJobs(t, "ai:processItem");
+    expect(jobs.map((j) => j.args[0])).toContainEqual({
+      itemId: noteId,
+      runId: retried?.processingRunId,
+    });
+  });
+
+  it("sweeps stale processing items and leaves fresh ones alone", async () => {
+    const t = newConvexTest();
+    const legacyStale = await processingLink(t, "sweep", STALE_AGE, { legacy: true });
+    const legacyFresh = await processingLink(t, "sweep", FRESH_AGE, { legacy: true });
+    const stale = await processingLink(t, "sweep", STALE_AGE);
+    const fresh = await processingLink(t, "sweep", FRESH_AGE);
+
+    const result = await t.mutation(internal.items.failStaleProcessingItems, {});
+    // Both legacy rows sort into the range (undefined precedes every number);
+    // only the stale one is failed, so scanned counts 3 and failed counts 2.
+    expect(result).toEqual({ failed: 2, scanned: 3 });
+
+    const byId = async (id: Id<"items">) => await t.run((ctx) => ctx.db.get(id));
+    expect(await byId(stale)).toMatchObject({ status: "failed", failureReason: "error" });
+    expect(await byId(legacyStale)).toMatchObject({ status: "failed", failureReason: "error" });
+    expect(await byId(fresh)).toMatchObject({ status: "processing" });
+    expect(await byId(legacyFresh)).toMatchObject({ status: "processing" });
+    // The stale row keeps its run id: if the presumed-dead action does finish,
+    // its finalize still owns the row and may repair the item.
+    expect((await byId(stale))?.processingRunId).toBeDefined();
+    // A partial page does not chain.
+    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(0);
+  });
+
+  it("chains another sweep only when a full page made progress", async () => {
+    const t = newConvexTest();
+    for (let i = 0; i < 100; i++) {
+      await processingLink(t, "sweep-full", STALE_AGE + i * 1000);
+    }
+    const extra = await processingLink(t, "sweep-full", STALE_AGE);
+
+    const first = await t.mutation(internal.items.failStaleProcessingItems, {});
+    expect(first).toEqual({ failed: 100, scanned: 100 });
+    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(1);
+
+    // The chained run (executed directly here; the scheduler is frozen) picks
+    // up the remainder and, with a partial page, stops.
+    const second = await t.mutation(internal.items.failStaleProcessingItems, {});
+    expect(second).toEqual({ failed: 1, scanned: 1 });
+    expect(await t.run((ctx) => ctx.db.get(extra))).toMatchObject({ status: "failed" });
+    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(1);
+  });
+
+  it("does not loop on a full page of legacy rows that are not yet stale", async () => {
+    // Only possible in the first threshold window after deploy: rows created
+    // by the previous code have no start time and sit at the front of the
+    // range. They must age out on a later tick, not spin the scheduler now.
+    const t = newConvexTest();
+    for (let i = 0; i < 100; i++) {
+      await processingLink(t, "sweep-legacy", FRESH_AGE, { legacy: true });
+    }
+    const result = await t.mutation(internal.items.failStaleProcessingItems, {});
+    expect(result).toEqual({ failed: 0, scanned: 100 });
+    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(0);
+  });
+
+  it("finalizeItem and failItem are no-ops for a superseded run", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "fence", FRESH_AGE);
+    const current = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+
+    // The old run's result arrives after a retry replaced it.
+    const stale = await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId: "run-superseded",
+      title: "Old result",
+      description: "From the run the user retried past",
+      tags: ["stale"],
+      status: "ready",
+    });
+    expect(stale).toBe("stale_run");
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "processing",
+      processingRunId: current,
+    });
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.title).toBeUndefined();
+
+    const staleFail = await t.mutation(internal.items.failItem, {
+      itemId,
+      runId: "run-superseded",
+      reason: "error",
+    });
+    expect(staleFail).toBe("stale_run");
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "processing",
+    });
+
+    // The owning run still lands.
+    const applied = await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId: current,
+      title: "Current result",
+      description: "From the run that owns the item",
+      tags: ["current"],
+      status: "ready",
+    });
+    expect(applied).toBe("applied");
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "ready",
+      title: "Current result",
+    });
+  });
+
+  it("finalizeItem reports a deleted item as missing", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "gone", FRESH_AGE);
+    await t.run((ctx) => ctx.db.delete(itemId));
+    await expect(
+      t.mutation(internal.items.finalizeItem, {
+        itemId,
+        title: "x",
+        description: "y",
+        tags: [],
+        status: "ready",
+      }),
+    ).resolves.toBe("missing");
+  });
+
+  it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
+    const t = newConvexTest().withIdentity({ subject: "retry-stale|session-1" });
+    // The legacy row is created first so its `_creationTime` can be back-dated
+    // past the Pro row `as` would otherwise insert at "now".
+    const legacyStale = await processingLink(t, "retry-stale", STALE_AGE, { legacy: true });
+    await t.run((ctx) =>
+      ctx.db.insert("subscriptions", {
+        userId: "retry-stale",
+        status: "pro",
+        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+        updatedAt: Date.now(),
+      }),
+    );
+    const stale = await processingLink(t, "retry-stale", STALE_AGE);
+    const fresh = await processingLink(t, "retry-stale", FRESH_AGE);
+    const before = await t.run(async (ctx) => ({
+      stale: await ctx.db.get(stale),
+      fresh: await ctx.db.get(fresh),
+    }));
+
+    expect(await t.mutation(api.items.reprocessItem, { id: stale })).toBe(true);
+    const retried = await t.run((ctx) => ctx.db.get(stale));
+    expect(retried).toMatchObject({ status: "processing", processingStartedAt: Date.now() });
+    expect(retried?.processingRunId).not.toBe(before.stale?.processingRunId);
+
+    await t.mutation(api.items.reprocessItem, { id: legacyStale });
+    const legacyRetried = await t.run((ctx) => ctx.db.get(legacyStale));
+    expect(legacyRetried?.processingRunId).toBeDefined();
+    expect(legacyRetried?.processingStartedAt).toBe(Date.now());
+
+    // Fresh: its action may still finish, so nothing changes and no job queues.
+    // The false return is what lets a client with a fast clock tell the user
+    // instead of going quiet.
+    expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(false);
+    expect(await t.run((ctx) => ctx.db.get(fresh))).toEqual(before.fresh);
+
+    const jobs = await scheduledJobs(t, "ai:processItem");
+    expect(jobs.map((j) => (j.args[0] as { itemId: Id<"items"> }).itemId).sort()).toEqual(
+      [stale, legacyStale].sort(),
+    );
+  });
+
+  it("listReadyItemsInternal returns `limit` ready items despite many failed ones", async () => {
+    const t = newConvexTest();
+    await t.run(async (ctx) => {
+      // Failed rows are newer than every ready row, so the old by_user read
+      // (2x limit, newest first) would have returned mostly failures.
+      for (let i = 0; i < 5; i++) {
+        await ctx.db.insert("items", {
+          userId: "ready-list",
+          type: "note",
+          note: `ready ${i}`,
+          status: "ready",
+          tags: [],
+          searchText: "",
+        });
+      }
+      for (let i = 0; i < 20; i++) {
+        await ctx.db.insert("items", {
+          userId: "ready-list",
+          type: "link",
+          url: "https://example.com/broken",
+          status: "failed",
+          failureReason: "error",
+          tags: [],
+          searchText: "",
+        });
+      }
+      await ctx.db.insert("items", {
+        userId: "someone-else",
+        type: "note",
+        note: "not mine",
+        status: "ready",
+        tags: [],
+        searchText: "",
+      });
+    });
+    const items = await t.query(internal.items.listReadyItemsInternal, {
+      userId: "ready-list",
+      limit: 5,
+    });
+    expect(items).toHaveLength(5);
+    expect(items.every((item) => item.status === "ready" && item.userId === "ready-list")).toBe(true);
   });
 });
