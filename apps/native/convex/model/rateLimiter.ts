@@ -13,6 +13,15 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Retrying a failed/partial save re-runs the fetch + one classification, so
   // it costs the same as a create; capped tighter since it is a manual repair.
   reprocessItem: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
+  // Filing an item into a space (add / accept suggestion) schedules one
+  // purpose-steering classification. No page fetch, so it is cheaper than a
+  // create; the burst is wider because a tidy-up session files many items in
+  // a row. acceptAllSuggestions draws from this bucket without throwing.
+  steerItem: { kind: "token bucket", rate: 120, period: HOUR, capacity: 40 },
+  // Creating a space (or turning dynamic on) runs one recommendation pass
+  // over up to 100 items: the largest single prompt we send. Onboarding
+  // creates a handful of spaces back to back, so the burst covers that.
+  recommendSpace: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
   // Email-keyed limit still stops one address from looping. IP and global
   // buckets stop a client from rotating emails (or one IP from flooding).
   // The global bucket gates every signup site-wide, so it must sit well

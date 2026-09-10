@@ -115,6 +115,20 @@ export default defineSchema({
     // Dynamic = Shelvr keeps suggesting new saves into this space. Absent means
     // false (legacy spaces stay quiet until edited).
     dynamic: v.optional(v.boolean()),
+    // Denormalized membership summary so the spaces list never has to walk
+    // `spaceItems`. Counts mirror the spaceItems status vocabulary: `saved`
+    // rows (user-owned memberships) and `suggested` rows (pending AI picks);
+    // `dismissed` rows are never counted. The preview lists hold up to
+    // PREVIEW_LIMIT item ids per bucket, most recently added first. Every
+    // spaceItems write goes through model/memberships.ts, which updates
+    // these fields in the same transaction, so they can never drift from the
+    // join rows. All four are absent on rows written before this existed;
+    // `spaces:backfillSpaceCounters` fills them in, and listSpaces falls back
+    // to a bounded scan until it has run.
+    savedCount: v.optional(v.number()),
+    suggestedCount: v.optional(v.number()),
+    previewItemIds: v.optional(v.array(v.id("items"))),
+    suggestedPreviewItemIds: v.optional(v.array(v.id("items"))),
   })
     .index("by_user", ["userId"])
     // Space names are the stable key used by onboarding replay. Keeping this

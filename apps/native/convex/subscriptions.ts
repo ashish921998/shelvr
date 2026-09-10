@@ -63,17 +63,29 @@ export async function requireProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<void> {
-  if (await isDevelopmentAnonymousUser(ctx, userId)) return;
+  if (!(await hasProEntitlement(ctx, userId))) {
+    throw new Error(PRO_REQUIRED);
+  }
+}
+
+/**
+ * The same rule as {@link requireProEntitlement}, as a boolean. For mutations
+ * whose core write must succeed for every user but whose paid side effect
+ * (an LLM pass) is Pro-only: the caller keeps the write and skips the spend.
+ */
+export async function hasProEntitlement(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
   const sub = await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
   if (sub === null) {
-    throw new Error(PRO_REQUIRED);
+    return false;
   }
-  if (!isEntitled(sub.status, sub.expiresAt, Date.now())) {
-    throw new Error(PRO_REQUIRED);
-  }
+  return isEntitled(sub.status, sub.expiresAt, Date.now());
 }
 
 /**

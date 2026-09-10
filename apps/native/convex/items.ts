@@ -6,7 +6,13 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
-import { effectiveStatus } from "./model/memberships";
+import {
+  deleteMembership,
+  deleteMembershipsForItem,
+  effectiveStatus,
+  getMembership,
+  insertMembership,
+} from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { enrichmentValidator, failureReasonValidator, isTerminalFailure } from "./model/itemFields";
 import { imageSizeError, MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
@@ -274,7 +280,7 @@ async function saveIntoSpace(
   if (space === null || space.userId !== userId) {
     throw new Error("Space not found");
   }
-  await ctx.db.insert("spaceItems", {
+  await insertMembership(ctx, {
     userId,
     spaceId,
     itemId,
@@ -1085,13 +1091,8 @@ export const deleteItem = mutation({
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
     }
-    const joins = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_item", (q) => q.eq("itemId", item._id))
-      .collect();
-    for (const join of joins) {
-      await ctx.db.delete(join._id);
-    }
+    // Drops the item from every space and fixes each space's counts/covers.
+    await deleteMembershipsForItem(ctx, item._id);
     // Release the import operation(s) that produced this item so a durable
     // operationId can be re-performed after an explicit delete (Tidy undo).
     // Pending rows have no itemId and are excluded by the index; this only
@@ -1320,7 +1321,7 @@ export const setSpacesForItem = internalMutation({
     for (const join of existing) {
       touched.add(join.spaceId);
       if (effectiveStatus(join) === "suggested" && !wanted.has(join.spaceId)) {
-        await ctx.db.delete(join._id);
+        await deleteMembership(ctx, join);
       }
     }
     for (const spaceId of wanted) {
@@ -1332,7 +1333,7 @@ export const setSpacesForItem = internalMutation({
       const space = await ctx.db.get(spaceId);
       // Only suggest into dynamic spaces that exist and belong to the owner.
       if (space !== null && space.userId === item.userId && space.dynamic === true) {
-        await ctx.db.insert("spaceItems", {
+        await insertMembership(ctx, {
           userId: item.userId,
           spaceId,
           itemId: args.itemId,
@@ -1359,21 +1360,18 @@ export const suggestItemsForSpace = internalMutation({
     if (space === null) {
       return null;
     }
-    const existing = await ctx.db
-      .query("spaceItems")
-      .withIndex("by_space", (q) => q.eq("spaceId", args.spaceId))
-      .collect();
     // Any existing row blocks a new suggestion — saved and dismissed are
-    // user decisions, and a live suggestion needn't be re-written.
-    const existingItemIds = new Set(existing.map((j) => j.itemId));
+    // user decisions, and a live suggestion needn't be re-written. Checked
+    // per item (the model returns at most a handful) instead of loading the
+    // whole space's join list.
     const unique = [...new Set(args.itemIds)];
     for (const itemId of unique) {
-      if (existingItemIds.has(itemId)) {
+      if ((await getMembership(ctx, itemId, args.spaceId)) !== null) {
         continue;
       }
       const item = await ctx.db.get(itemId);
       if (item !== null && item.userId === space.userId) {
-        await ctx.db.insert("spaceItems", {
+        await insertMembership(ctx, {
           userId: space.userId,
           spaceId: args.spaceId,
           itemId,
