@@ -7,7 +7,7 @@ import {
 import { parseExifDate } from '@/lib/date';
 import { resolvePickedImageLocation } from '@/lib/picked-image-location';
 import { usePaywallGuard } from '@/lib/entitlement';
-import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
+import { type ImageSaveRequest, saveFailureReason, useSaveImages } from '@/lib/use-save-image';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
@@ -185,6 +185,10 @@ function AddContent({ close, openCamera }: AddContentProps) {
         return;
       }
       const savedCount = results.length - failed.length;
+      analytics.capture('images_save_failed', {
+        reason: saveFailureReason(failed[0].message),
+        image_count: failed.length,
+      });
       Alert.alert(
         'Could not save all images',
         `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,

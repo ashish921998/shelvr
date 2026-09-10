@@ -395,10 +395,12 @@ async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
  * inserts into it, so Convex's serializable OCC retries the loser, which then
  * sees the full count and throws. ConvexError, not Error: production redacts
  * plain Error messages to "Server Error", and this one is meant for the user. */
-async function requirePhotoQuota(ctx: MutationCtx, userId: string): Promise<void> {
-  if ((await countPhotos(ctx, userId)) >= MAX_PHOTOS_PER_ACCOUNT) {
+async function requirePhotoQuota(ctx: MutationCtx, userId: string): Promise<number> {
+  const count = await countPhotos(ctx, userId);
+  if (count >= MAX_PHOTOS_PER_ACCOUNT) {
     throw new ConvexError(PHOTO_LIMIT_MESSAGE);
   }
+  return count;
 }
 
 export const photoUsage = query({
@@ -658,12 +660,14 @@ export const finalizeImageImport = mutation({
     // sits here too — after the idempotent completed-return above, so a retry of
     // an already-finished import is never charged against the bucket.
     await requireProEntitlement(ctx, userId);
-    await requirePhotoQuota(ctx, userId);
+    const photoCount = await requirePhotoQuota(ctx, userId);
+    let storedBytes: number | undefined;
     if (op?.storageId) {
       const metadata = await ctx.db.system.get("_storage", op.storageId);
       if (!metadata) throw new Error("Storage object not found");
       const error = imageSizeError(metadata.size);
       if (error) throw new ConvexError(error);
+      storedBytes = metadata.size;
     }
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 
@@ -704,7 +708,10 @@ export const finalizeImageImport = mutation({
       updatedAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
-    await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId);
+    await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId, {
+      photoCount: photoCount + 1,
+      storedBytes,
+    });
     return itemId;
   },
 });
@@ -926,6 +933,7 @@ async function scheduleSaveTelemetry(
   ctx: MutationCtx,
   itemId: Id<"items">,
   sessionId?: string,
+  photo?: { photoCount: number; storedBytes?: number },
 ): Promise<void> {
   const item = await ctx.db.get(itemId);
   if (!item) return;
@@ -935,6 +943,7 @@ async function scheduleSaveTelemetry(
     itemType: item.type,
     savedAt: item._creationTime,
     sessionId: sessionId?.slice(0, 128),
+    ...photo,
   });
 }
 

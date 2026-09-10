@@ -28,6 +28,8 @@ export type ItemAction =
   | "message"
   | "calendar_sheet_opened";
 
+export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
+
 export type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
@@ -75,6 +77,9 @@ export type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
+  // Photo saves fail as data, never as thrown errors, so error tracking never
+  // sees them. `reason` is one of three fixed words, never the message text.
+  images_save_failed: { reason: ImageSaveFailureReason; image_count: number };
   photo_captured: { capture_mode: "photo" | "sticker" };
   item_space_membership_changed: {
     membership_added: boolean;
@@ -84,7 +89,7 @@ export type AnalyticsEventProperties = {
   };
   item_shared: Record<string, never>;
   item_link_copied: Record<string, never>;
-  item_deleted: Record<string, never>;
+  item_deleted: { item_type: AnalyticsItem["type"] };
   suggestion_accepted: Record<string, never>;
   suggestion_dismissed: Record<string, never>;
   space_created: { dynamic: boolean };

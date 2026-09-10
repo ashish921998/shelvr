@@ -67,8 +67,10 @@ describe("canonical save telemetry", () => {
     expect(telemetry).toHaveLength(2);
     expect(telemetry.map((job) => job.args[0])).toEqual(expect.arrayContaining([
       expect.objectContaining({ itemId: linkId, itemType: "link" }),
-      expect.objectContaining({ itemId: imageId, itemType: "image", sessionId: "image-session" }),
+      // The 4-byte blob from storeBlob; photo_count is the account total after this save.
+      expect.objectContaining({ itemId: imageId, itemType: "image", sessionId: "image-session", photoCount: 1, storedBytes: 4 }),
     ]));
+    expect(telemetry.find((job) => job.args[0].itemType === "link")?.args[0]).not.toHaveProperty("photoCount");
   });
 });
 

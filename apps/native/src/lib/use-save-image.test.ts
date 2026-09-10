@@ -4,6 +4,7 @@
 // per-image settled-result contract lives. Runs in the Node default env.
 import {
   MAX_CONCURRENT_SAVES,
+  saveFailureReason,
   saveImageOperations,
   type ImageSaveResult,
   type SaveImageDeps,
@@ -327,6 +328,21 @@ describe("saveImageOperations", () => {
       stage: "begin",
       message: "Photo limit reached (1,000). Delete some photos to save more.",
     });
+  });
+
+  it("buckets the server's quota and size refusals, everything else as other", async () => {
+    const { ConvexError } = await import("convex/values");
+    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");
+    // Server refusals arrive as ConvexError; client-side failures as plain Error.
+    const failWith = async (error: unknown) => {
+      const deps = makeDeps({ upload: async () => { throw error; } });
+      const [result] = await saveImageOperations([{ image: img("a") }], deps);
+      return saveFailureReason((result as Extract<ImageSaveResult, { status: "failed" }>).message);
+    };
+    expect(await failWith(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe("photo_limit");
+    expect(await failWith(new ConvexError(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
+    expect(await failWith(new Error(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
+    expect(await failWith(new Error("Upload failed (503)"))).toBe("other");
   });
 
   it("falls back to a generic message when the thrown value is not an Error", async () => {
