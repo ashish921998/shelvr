@@ -2,6 +2,7 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
+import * as safeFetchModule from "./model/safeFetch";
 import { newConvexTest } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
@@ -77,10 +78,10 @@ describe("stored photo processing", () => {
     const { itemId, storageId, spaceId } = await photo(t);
     await t.action(internal.ai.processItem, { itemId });
     const image = generateObject.mock.calls[0][0].messages[0].content.find(
-      (part: { type: string }) => part.type === "image",
+      (part: { type: string }) => part.type === "file",
     );
-    expect(image.image).toBeInstanceOf(Uint8Array);
-    expect(Array.from(image.image)).toEqual(Array.from(bytes));
+    expect(image.data).toBeInstanceOf(Uint8Array);
+    expect(Array.from(image.data)).toEqual(Array.from(bytes));
     expect(image.mediaType).toBe("image/png");
     const saved = await t.run(async (ctx) => ({
       item: await ctx.db.get(itemId),
@@ -106,9 +107,9 @@ describe("stored photo processing", () => {
     generateObject.mockResolvedValue({ object: { query: "" } });
     await t.action(internal.ai.findProductLinks, { itemId });
     const image = generateObject.mock.calls[0][0].messages[0].content.find(
-      (part: { type: string }) => part.type === "image",
+      (part: { type: string }) => part.type === "file",
     );
-    expect(Array.from(image.image)).toEqual(Array.from(bytes));
+    expect(Array.from(image.data)).toEqual(Array.from(bytes));
     expect(image.mediaType).toBe("image/png");
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({ productsStatus: "ready", products: [] });
@@ -177,9 +178,19 @@ describe("stored photo processing", () => {
     });
   });
 
-  it("bounds image prompt space data including JSON escapes and multibyte text", async () => {
+  it.each(["image", "link", "note"] as const)("bounds %s prompt space data including JSON escapes and multibyte text", async (type) => {
     const t = newConvexTest();
     const { itemId } = await photo(t);
+    if (type !== "image") {
+      await t.run((ctx) => ctx.db.patch(itemId, {
+        type, url: type === "link" ? "https://example.com/article" : undefined,
+        note: type === "note" ? "A saved note" : undefined,
+      }));
+    }
+    if (type === "link") {
+      vi.spyOn(safeFetchModule, "safeFetch").mockResolvedValue({ ok: false, code: "fetch_failed" });
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+    }
     await t.run(async (ctx) => {
       for (let i = 0; i < 100; i++)
         await ctx.db.insert("spaces", {
@@ -190,7 +201,8 @@ describe("stored photo processing", () => {
         });
     });
     await t.action(internal.ai.processItem, { itemId });
-    const prompt = generateObject.mock.calls[0][0].messages[0].content[0].text;
+    const call = generateObject.mock.calls[0][0];
+    const prompt = type === "image" ? call.messages[0].content[0].text : call.prompt;
     expect(
       new TextEncoder().encode(JSON.stringify(prompt)).byteLength,
     ).toBeLessThan(70 * 1024);
@@ -241,9 +253,9 @@ describe("stored photo processing", () => {
     for (const [call] of generateObject.mock.calls) {
       expect(
         call.messages[0].content.find(
-          (part: { type: string }) => part.type === "image",
+          (part: { type: string }) => part.type === "file",
         ),
-      ).toMatchObject({ image: heic, mediaType: "image/heic" });
+      ).toMatchObject({ data: heic, mediaType: "image/heic" });
     }
   });
 

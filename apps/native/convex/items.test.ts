@@ -23,9 +23,9 @@ const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 // convex-test runs `runAfter(0, ...)` jobs via a real `setTimeout`, so the AI
 // action would fire during worker teardown (`EnvironmentTeardownError`). Fake
 // timers keep the jobs queued: `_scheduled_functions` rows are still written
-// and assertable, but nothing executes.
+// and assertable, but nothing executes. Leave Date and other clocks real.
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
 
 afterEach(() => {
@@ -312,7 +312,7 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
       storageId: first,
     });
-    expect(r1.storageId).toBe(first);
+    expect(r1).toEqual({ storageId: first });
 
     // A racing retry attaches a different storage id; first attachment wins and
     // the redundant blob is deleted.
@@ -320,7 +320,7 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
       storageId: second,
     });
-    expect(r2.storageId).toBe(first);
+    expect(r2).toEqual({ storageId: first });
 
     // The redundant blob is gone; the canonical one survives.
     const secondGone = await t.run(async (ctx) =>
@@ -527,7 +527,7 @@ describe("image import lifecycle", () => {
       operationId: OP_ID,
       storageId: redundant,
     });
-    expect(result.storageId).toBe(canonical);
+    expect(result).toEqual({ storageId: canonical });
 
     const redundantGone = await t.run(async (ctx) =>
       ctx.db.system.get("_storage", redundant),
@@ -1696,7 +1696,7 @@ describe("photo rejection before classification", () => {
         operationId: OP_ID,
         storageId,
       });
-      expect(result.error).toBeTruthy();
+      expect(result).toEqual({ storageId, error: expect.any(String) });
       expect(
         await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
       ).toBeNull();

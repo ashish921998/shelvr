@@ -2,6 +2,7 @@ import { imageSizeError } from '@convex/model/imagePolicy';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
@@ -66,7 +67,7 @@ export type SaveImageDeps = {
   attach: (
     operationId: string,
     storageId: Id<'_storage'>,
-  ) => Promise<{ storageId: Id<'_storage'> }>;
+  ) => Promise<FunctionReturnType<typeof api.items.attachImageUpload>>;
   finalize: (input: {
     operationId: string;
     aspectRatio?: number;
@@ -138,8 +139,9 @@ export async function saveImageOperations(
         // Attach records the uploaded storage id on the pending operation (and,
         // for a racing retry that already attached a different id, discards this
         // redundant upload server-side). finalize reads the canonical id back
-        // from the ledger, so we don't need the return value here.
-        await deps.attach(operationId, uploadedStorageId);
+        // from the ledger. Rejections must stop this operation before finalize.
+        const attached = await deps.attach(operationId, uploadedStorageId);
+        if (attached.error) throw new Error(attached.error);
 
         stage = 'finalize';
         const aspectRatio =
@@ -203,11 +205,7 @@ export function useSaveImages() {
           };
           return storageId;
         },
-        attach: async (operationId, storageId) => {
-          const result = await attachImageUpload({ operationId, storageId });
-          if (result.error) throw new Error(result.error);
-          return result;
-        },
+        attach: (operationId, storageId) => attachImageUpload({ operationId, storageId }),
         finalize: (input) => finalizeImageImport({ ...input, analyticsSessionId: analytics.sessionId() }),
       };
       return await saveImageOperations(requests, deps, options);

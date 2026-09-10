@@ -9,7 +9,10 @@ const heic = Uint8Array.from([
 ]);
 
 describe("stored image MIME type through the real AI SDK", () => {
-  it("sends HEIC bytes to Google when the stored MIME type is supplied", async () => {
+  it.each([
+    { name: "HEIC with stored MIME metadata", bytes: heic, mediaType: "image/heic", expectedType: "image/heic" },
+    { name: "PNG without MIME metadata", bytes: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]), mediaType: "image", expectedType: "image/png" },
+  ])("sends $name to Google", async ({ bytes, mediaType, expectedType }) => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -34,7 +37,7 @@ describe("stored image MIME type through the real AI SDK", () => {
       messages: [
         {
           role: "user",
-          content: [{ type: "image", image: heic, mediaType: "image/heic" }],
+          content: [{ type: "file", data: bytes, mediaType }],
         },
       ],
     });
@@ -42,8 +45,8 @@ describe("stored image MIME type through the real AI SDK", () => {
     expect(request).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(request.mock.calls[0][1]?.body));
     expect(body.contents[0].parts[0].inlineData).toEqual({
-      mimeType: "image/heic",
-      data: Buffer.from(heic).toString("base64"),
+      mimeType: expectedType,
+      data: Buffer.from(bytes).toString("base64"),
     });
   });
 });

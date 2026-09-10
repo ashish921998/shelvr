@@ -17,6 +17,7 @@ import {
   type SafeFetchError,
 } from "./model/safeFetch";
 import { isTikTokUrl } from "./model/externalUrl";
+import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
@@ -755,25 +756,19 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
 
 function spacesPromptBlock(
   spaces: { name: string; description?: string }[],
-  imageRequest = false,
 ): string {
   if (spaces.length === 0) {
     return "The user has no spaces yet, so spaceNames must be an empty array.";
   }
-  // Bound the only user-sized prompt input for inline image requests. Count
-  // JSON-escaped UTF-8 bytes, not characters; preserve exact space names.
-  let remaining = 64 * 1024;
+  // Count JSON-escaped UTF-8 bytes, not characters; preserve exact space names.
+  let remaining = MAX_SPACE_PROMPT_BYTES;
   const candidates: string[] = [];
   for (const space of spaces) {
-    const description = imageRequest
-      ? Array.from(space.description ?? "").slice(0, 512).join("")
-      : space.description;
+    const description = Array.from(space.description ?? "").slice(0, 512).join("");
     const line = `- "${space.name}"${description ? `: ${description}` : ""}`;
-    if (imageRequest) {
-      const size = Buffer.byteLength(JSON.stringify(line + "\n"), "utf8");
-      if (size > remaining) continue;
-      remaining -= size;
-    }
+    const size = Buffer.byteLength(JSON.stringify(line + "\n"), "utf8");
+    if (size > remaining) continue;
+    remaining -= size;
     candidates.push(line);
   }
   const lines = candidates.join("\n");
@@ -801,7 +796,7 @@ export const processItem = internalAction({
         userId: item.userId,
       });
       const spaces = allSpaces.filter((s) => s.dynamic === true);
-      const spacesBlock = spacesPromptBlock(spaces, item.type === "image");
+      const spacesBlock = spacesPromptBlock(spaces);
 
       let page: PageData | undefined;
       let result: z.infer<typeof itemAnalysisSchema>;
@@ -892,7 +887,7 @@ export const processItem = internalAction({
                     INTENTS_PROMPT_BLOCK,
                   ].join("\n\n"),
                 },
-                { type: "image", image: image.bytes, mediaType: image.mediaType },
+                { type: "file", data: image.bytes, mediaType: image.mediaType ?? "image" },
               ],
             },
           ],
@@ -1273,7 +1268,7 @@ export const findProductLinks = internalAction({
                   type: "text",
                   text: "Identify the primary product shown in this image and produce a shopping search query for it. If nothing in the image is a purchasable product, return an empty query.",
                 },
-                { type: "image", image: image.bytes, mediaType: image.mediaType },
+                { type: "file", data: image.bytes, mediaType: image.mediaType ?? "image" },
               ],
             },
           ],

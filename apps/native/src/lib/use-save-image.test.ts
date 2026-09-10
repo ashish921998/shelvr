@@ -83,6 +83,27 @@ describe("saveImageOperations", () => {
     expect(failed.message).toBe("boom");
   });
 
+  it("reports a soft attach rejection and finalizes only successful siblings", async () => {
+    const finalize = vi.fn<SaveImageDeps["finalize"]>(async () => "ks_items_final" as never);
+    const deps = makeDeps({
+      attach: async (operationId, storageId) => operationId === "image:rejected"
+        ? { storageId, error: "This photo is empty. Please save it again." }
+        : { storageId },
+      finalize,
+    });
+    const results = await saveImageOperations([
+      { image: img("empty"), operationId: "image:rejected" },
+      { image: img("valid"), operationId: "image:valid" },
+    ], deps);
+    expect(results[0]).toEqual({
+      status: "failed", operationId: "image:rejected", image: img("empty"),
+      stage: "attach", message: "This photo is empty. Please save it again.",
+    });
+    expect(results[1].status).toBe("saved");
+    expect(finalize).toHaveBeenCalledTimes(1);
+    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({ operationId: "image:valid" }));
+  });
+
   it("lets a retry submit only the failed operation id, reusing it verbatim", async () => {
     // First pass: finalize is down, so every request fails at that stage.
     const finalized = new Set<string>();

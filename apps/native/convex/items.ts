@@ -511,8 +511,12 @@ export const attachImageUpload = mutation({
 
     // Skip the size check for completed ops and for a different already-attached
     // file; those paths return idempotently below.
-    if (op?.status !== "complete" && (!op?.storageId || op.storageId === args.storageId)) {
-      const metadata = await ctx.db.system.get("_storage", args.storageId);
+    const validatesNewUpload =
+      op?.status !== "complete" && (!op?.storageId || op.storageId === args.storageId);
+    const metadata = validatesNewUpload
+      ? await ctx.db.system.get("_storage", args.storageId)
+      : null;
+    if (validatesNewUpload) {
       const error = metadata ? imageSizeError(metadata.size) : undefined;
       if (error) {
         if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
@@ -534,7 +538,7 @@ export const attachImageUpload = mutation({
       // another operation. NOTE: existence + unreferenced is NOT proof the
       // caller owns this blob during the un-attached window — see the residual
       // documented on isStorageUnreferenced.
-      if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
+      if (metadata === null) {
         throw new Error("Storage object not found");
       }
       if (!(await isStorageUnreferenced(ctx, args.storageId))) {
@@ -578,7 +582,7 @@ export const attachImageUpload = mutation({
     // No canonical id yet, or the caller re-sent the same id: adopt it, with
     // the same existence and unreferenced defenses as the no-begin path.
     if (op.storageId === undefined) {
-      if ((await ctx.db.system.get("_storage", args.storageId)) === null) {
+      if (metadata === null) {
         throw new Error("Storage object not found");
       }
       if (!(await isStorageUnreferenced(ctx, args.storageId))) {

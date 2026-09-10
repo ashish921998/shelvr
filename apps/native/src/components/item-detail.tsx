@@ -337,6 +337,16 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
     'This page has no readable article — saved as a plain link.',
 };
 
+function noticeFor(state: SaveState, type: DetailItem['type']): string {
+  if (state === 'gone' && type === 'image') {
+    return 'This photo is unavailable or empty. Please save it again.';
+  }
+  if (state === 'failed' && type !== 'link') {
+    return `Shelvr couldn't read this ${type === 'image' ? 'photo' : 'note'}.`;
+  }
+  return SAVE_STATE_NOTICE[state];
+}
+
 /**
  * How the save itself went: still reading, unreadable, gone, or enriched from
  * the URL alone. Without this a failed item renders as an untitled page with no
@@ -380,11 +390,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
         }
       />
       <Text style={styles.noticeText}>
-        {state === 'gone' && item.type === 'image'
-          ? 'This photo is unavailable or empty. Please save it again.'
-          : state === 'failed' && item.type !== 'link'
-            ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
-            : SAVE_STATE_NOTICE[state]}
+        {noticeFor(state, item.type)}
       </Text>
       {isTerminalFailure(item.failureReason) || state === 'no_article' ? null : (
         <Pressable
