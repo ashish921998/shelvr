@@ -7,6 +7,17 @@ import type { LocalImage } from '@/lib/use-save-image';
 export const MAX_IMAGE_EDGE = 1600;
 const JPEG_QUALITY = 0.8;
 
+/** PNG when the source says so, by MIME or by extension when the picker or
+ * share sheet gives no MIME. No alpha scan: an opaque PNG screenshot costs a
+ * few hundred KB more than JPEG would; sniff alpha if that ever dominates. */
+function keepPng(image: LocalImage): boolean {
+  return (
+    image.isSticker === true ||
+    image.mimeType?.toLowerCase() === 'image/png' ||
+    /\.png$/i.test(image.uri.split('?')[0])
+  );
+}
+
 /**
  * Re-encodes a picked or captured file into the copy Shelvr stores: long edge
  * capped, EXIF orientation baked into pixels, HEIC decoded to JPEG. PNG input
@@ -15,20 +26,20 @@ const JPEG_QUALITY = 0.8;
  * at import.
  */
 export async function normalizeImage(image: LocalImage): Promise<LocalImage> {
-  let rendered = await ImageManipulator.manipulate(image.uri).renderAsync();
+  // One context: the first render applies orientation, and the resize appends
+  // to the same chain so iOS does not redraw the full-size image a second time.
+  const context = ImageManipulator.manipulate(image.uri);
+  let rendered = await context.renderAsync();
   if (Math.max(rendered.width, rendered.height) > MAX_IMAGE_EDGE) {
-    rendered = await ImageManipulator.manipulate(rendered)
-      .resize(
-        rendered.width >= rendered.height
-          ? { width: MAX_IMAGE_EDGE }
-          : { height: MAX_IMAGE_EDGE },
-      )
-      .renderAsync();
+    // Axis from the oriented dimensions; a rotated 4000x3000 is 3000x4000 here.
+    context.resize(
+      rendered.width >= rendered.height
+        ? { width: MAX_IMAGE_EDGE }
+        : { height: MAX_IMAGE_EDGE },
+    );
+    rendered = await context.renderAsync();
   }
-  // ponytail: format by source type, no alpha scan; opaque PNGs cost a few
-  // hundred KB more each. Sniff alpha if screenshots dominate storage.
-  const format =
-    image.isSticker || image.mimeType === 'image/png' ? SaveFormat.PNG : SaveFormat.JPEG;
+  const format = keepPng(image) ? SaveFormat.PNG : SaveFormat.JPEG;
   const saved = await rendered.saveAsync({ compress: JPEG_QUALITY, format });
   return {
     ...image,
