@@ -784,6 +784,27 @@ describe("decodeWithContentType", () => {
     expect(decoded).toBe("s\u2019");
   });
 
+  it("maps the Windows-1252 C1 range with the WHATWG table on every Node version", () => {
+    // 0x93/0x94 are the curly double quotes, 0x80 is the euro sign.
+    const bytes = new Uint8Array([0x93, 0x68, 0x69, 0x94, 0x20, 0x80, 0x35]);
+    expect(decodeWithContentType(bytes, "text/html; charset=windows-1252")).toBe(
+      "\u201chi\u201d \u20ac5",
+    );
+    // The five bytes the standard leaves unmapped decode to themselves.
+    const unmapped = new Uint8Array([0x81, 0x8d, 0x8f, 0x90, 0x9d]);
+    expect(decodeWithContentType(unmapped, "text/html; charset=windows-1252")).toBe(
+      "\u0081\u008d\u008f\u0090\u009d",
+    );
+  });
+
+  it("treats ISO-8859-1 and its aliases as Windows-1252, as browsers do", () => {
+    // 0x92 in a page declared ISO-8859-1 is almost always a Windows-1252 apostrophe.
+    const bytes = new Uint8Array([0x73, 0x92, 0xe9]);
+    for (const label of ["iso-8859-1", "latin1", "cp1252", "ISO-8859-1"]) {
+      expect(decodeWithContentType(bytes, `text/html; charset=${label}`)).toBe("s\u2019\u00e9");
+    }
+  });
+
   it("falls back to UTF-8 for an unsupported charset", () => {
     const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]);
     // Non-existent charset — should fall back to UTF-8 without throwing.

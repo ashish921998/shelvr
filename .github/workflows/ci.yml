@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,21 +19,20 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
 
-      # Node 24 is required, not a preference. On Node 20 and Node 22 the
-      # TextDecoder for legacy charsets follows the ICU mapping, so the byte
-      # 0x92 in windows-1252 decodes to U+0092. Node 24 follows the WHATWG
-      # mapping and decodes it to U+2019. A safeFetch test asserts the WHATWG
-      # result, so the suite only passes on Node 24. See the pull request.
+      # CI runs the exact minimum Node version the root package.json `engines`
+      # field supports, so a newer local runtime cannot mask a regression there.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20.20.0
           cache: pnpm
 
       - name: Install dependencies

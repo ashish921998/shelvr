@@ -183,8 +183,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
 
-**Convex deployment** (via `convex env set` or dashboard). The names are declared in
-`apps/native/convex/convex.config.ts`, so a required one that is missing fails the deploy:
+**Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
+`apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and
+`AUTH_*` variables itself. Only `GOOGLE_GENERATIVE_AI_API_KEY` is marked required there, so a
+deploy fails without it. The auth and integration variables are optional at deploy time and are
+needed at runtime by the features that use them:
 
 - `JWT_PRIVATE_KEY` / `JWKS` — RS256 keypair Convex Auth uses to sign its JWTs (generate via
   `node generateKeys.mjs`, see [Manual Setup](https://labs.convex.dev/auth/setup/manual))
@@ -223,8 +226,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
-- The AI pipeline may only write `suggested` rows in `spaceItems`. `saved` and `dismissed` are
-  user-owned, so the pipeline never overwrites a user decision.
+- The classifier and recommendation passes may only create or remove `suggested` memberships in
+  `spaceItems`. Purpose steering (`steerItemForSpace`) may update `intents` on `saved`
+  memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
+  no AI pass ever overwrites a user decision.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 
