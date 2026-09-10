@@ -1,7 +1,8 @@
 import { Link } from "expo-router";
 import type { Id } from "@convex/_generated/dataModel";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { AppSymbolIcon } from "@/components/symbol";
 
 export function ItemSpaces({
   itemId,
@@ -10,6 +11,8 @@ export function ItemSpaces({
   itemId: Id<"items">;
   spaces: { _id: Id<"spaces">; name: string }[];
 }) {
+  const { theme } = useUnistyles();
+
   return (
     <View style={styles.row}>
       <Text style={styles.label} numberOfLines={2}>
@@ -20,10 +23,15 @@ export function ItemSpaces({
       <Link href={{ pathname: "/manage-spaces", params: { itemId } }} asChild>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Change spaces"
-          style={styles.button}
+          accessibilityLabel="Add to space"
+          style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
-          <Text style={styles.action}>Change</Text>
+          <AppSymbolIcon
+            name="rectangle.stack"
+            size={13}
+            tintColor={theme.colors.primaryText}
+          />
+          <Text style={styles.action}>Add to space</Text>
         </Pressable>
       </Link>
     </View>
@@ -38,15 +46,22 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     color: theme.colors.muted,
   },
+  // A filled pill rather than bare text: the save's space assignment is a
+  // first-class action, so the control should read as one (and hold a 44pt
+  // touch target). primarySoft/primaryText keeps contrast in every appearance.
   button: {
-    minHeight: 44,
-    minWidth: 60,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    backgroundColor: theme.colors.primarySoft,
+    borderRadius: 50,
   },
+  pressed: { opacity: 0.7 },
   action: {
     fontFamily: theme.fonts.bold,
-    fontSize: 13,
+    fontSize: 14,
     color: theme.colors.primaryText,
   },
 }));
