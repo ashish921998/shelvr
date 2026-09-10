@@ -88,6 +88,10 @@ export function isWaitlistSource(value: unknown): value is WaitlistSource {
 export function normalizeIp(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const ip = value.trim().slice(0, MAX_IP_LENGTH);
+  // A zone id (`fe80::1%eth0`) is link-local scope and can never describe a
+  // client of a public server. ipaddr.js keeps it in the normalized form, so
+  // without this check each zone spelling would mint a fresh limiter bucket.
+  if (ip.includes("%")) return undefined;
   if (!ipaddr.isValid(ip)) return undefined;
   const parsed = ipaddr.parse(ip);
   if (parsed.kind() === "ipv6") {

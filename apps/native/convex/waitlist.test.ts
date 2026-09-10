@@ -343,7 +343,7 @@ describe("POST /waitlist/join", () => {
     const t = setup();
     // A missing IP and every malformed spelling must land in the same bucket
     // even when the mutation is called directly with the raw value.
-    const garbage = [undefined, "::::", "aaaa:", "not an ip", "999.1.1.1", "gggg::1", "1.2.3.4.5", ""];
+    const garbage = [undefined, "::::", "aaaa:", "not an ip", "999.1.1.1", "2001:db8::1%1", "2001:db8::1%2", ""];
     const direct = (i: number, ip: string | undefined) =>
       t.mutation(internal.waitlist.upsertSignup, {
         email: `direct-${i}@example.com`,
@@ -370,6 +370,13 @@ describe("normalizeIp", () => {
     expect(normalizeIp("not an ip; drop table")).toBeUndefined();
     expect(normalizeIp("")).toBeUndefined();
     expect(normalizeIp(undefined)).toBeUndefined();
+  });
+
+  it("rejects zone-qualified IPv6 so zone ids cannot mint separate buckets", () => {
+    // ipaddr.js accepts these and keeps the zone in the normalized string.
+    expect(normalizeIp("fe80::1%eth0")).toBeUndefined();
+    expect(normalizeIp("2001:db8::1%1")).toBeUndefined();
+    expect(normalizeIp("2001:db8::1%2")).toBeUndefined();
   });
 
   it("normalizes equivalent IPv6 spellings to one key", () => {
