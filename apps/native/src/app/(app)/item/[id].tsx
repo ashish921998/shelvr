@@ -228,6 +228,13 @@ export default function ItemScreen() {
 
   const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(activeItem);
 
+  // Same picker the inline control opens, so membership behavior (and the
+  // formSheet presentation) is identical whichever entry point is used.
+  const openSpaces = useCallback(() => {
+    if (!activeItem) return;
+    router.push({ pathname: '/manage-spaces', params: { itemId: activeItem._id } });
+  }, [activeItem, router]);
+
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
   // drops away as the suggestion becomes a real membership.
@@ -350,6 +357,9 @@ export default function ItemScreen() {
                     label="Save actions"
                     title={activeItem?.title ?? activeItem?.note ?? 'Save actions'}
                     actions={[
+                      ...(activeItem?.status === 'ready'
+                        ? [{ label: 'Add to space', onPress: openSpaces }]
+                        : []),
                       { label: 'Share', onPress: shareActive },
                       ...(activeItem?.url ? [{ label: 'Copy link', onPress: copyLink }] : []),
                       ...(activeItem?.status === 'ready'
@@ -368,6 +378,11 @@ export default function ItemScreen() {
       </Stack.Title>
       {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis">
+          {activeItem?.status === 'ready' ? (
+            <Stack.Toolbar.MenuAction icon="rectangle.stack" onPress={openSpaces}>
+              Add to space
+            </Stack.Toolbar.MenuAction>
+          ) : null}
           <Stack.Toolbar.MenuAction icon="square.and.arrow.up" onPress={shareActive}>
             Share
           </Stack.Toolbar.MenuAction>
