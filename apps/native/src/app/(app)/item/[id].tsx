@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 import { useFindLinks } from '@/lib/use-find-links';
+import { useHomeFeed } from '@/lib/home-feed';
 import { useItemOpen } from '@/lib/use-item-open';
 
 export default function ItemScreen() {
@@ -55,18 +56,15 @@ export default function ItemScreen() {
   const listRef = useRef<FlashListRef<DetailItem>>(null);
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
-  // Each of these queries is already warm in the cache from the source screen,
-  // so this is a cache read, not a network round-trip.
+  // The home feed is paginated and shared through HomeFeedProvider, so every
+  // page the user scrolled to is already here; the other two queries are warm
+  // in the cache from the source screen. Either way this is a cache read, not
+  // a network round-trip.
   // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
   // React Query still subscribes through the Convex adapter, and an invalid
   // arg (e.g. an empty-string id) throws ArgumentValidationError on every
   // socket reconnect, which the server answers by closing the WebSocket.
-  const listQ = useQuery(
-    convexQuery(
-      api.items.listItems,
-      from !== 'space' && from !== 'search' ? {} : 'skip',
-    ),
-  );
+  const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
     convexQuery(
       api.spaces.getSpace,
@@ -92,8 +90,8 @@ export default function ItemScreen() {
         : undefined;
     }
     if (from === 'search') return searchQ.data;
-    return listQ.data;
-  }, [from, spaceQ.data, searchQ.data, listQ.data]);
+    return homeFeed.items;
+  }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
   const suggestedIds = useMemo(
     () => new Set(spaceQ.data?.suggestions.map((i) => i._id) ?? []),
@@ -168,6 +166,11 @@ export default function ItemScreen() {
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
+  // List rows are card-shaped (no article body, no shopping status), so the
+  // toolbar reads those from getItem. `single` follows the debounced `id`
+  // param and can lag a swipe, hence the identity check.
+  const activeFull = single && single._id === activeItem?._id ? single : undefined;
+
   const markOpened = useCallback(({ itemId }: { itemId: string }) =>
     markItemOpened({ itemId: itemId as Id<'items'> }), [markItemOpened]);
   useItemOpen(activeItem, from ?? 'direct', markOpened);
@@ -181,7 +184,7 @@ export default function ItemScreen() {
     let shareSheetOnly = false;
     try {
       if (activeItem.type === 'note') {
-        const message = activeItem.note ?? activeItem.content ?? activeItem.description ?? activeItem.title;
+        const message = activeItem.note ?? activeFull?.content ?? activeItem.description ?? activeItem.title;
         if (!message) return;
         const result = await Share.share({ message });
         shared = result.action !== Share.dismissedAction;
@@ -214,7 +217,7 @@ export default function ItemScreen() {
       analytics.capture('item_shared');
       analytics.itemAction(activeItem, shareSheetOnly ? 'share_sheet_opened' : 'share');
     }
-  }, [activeItem]);
+  }, [activeItem, activeFull]);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
@@ -226,7 +229,7 @@ export default function ItemScreen() {
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(activeItem);
+  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(activeFull ?? activeItem);
 
   // Same picker the inline control opens, so membership behavior (and the
   // formSheet presentation) is identical whichever entry point is used.

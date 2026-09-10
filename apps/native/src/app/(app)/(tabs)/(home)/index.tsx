@@ -1,16 +1,14 @@
 import { EmptyState } from '@/components/empty-state';
 import { MasonryFeed } from '@/components/masonry-feed';
 import { ScreenLoader } from '@/components/ui/screen-loader';
+import { useHomeFeed } from '@/lib/home-feed';
 import { useReviewPrompt } from '@/lib/review-prompt';
-import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 export default function HomeScreen() {
-  const { data: items } = useQuery(convexQuery(api.items.listItems, {}));
+  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   useReviewPrompt(items);
 
   if (items === undefined) {
@@ -36,6 +34,8 @@ export default function HomeScreen() {
         items={items}
         numColumns={2}
         source={{ from: 'home' }}
+        onEndReached={canLoadMore ? loadMore : undefined}
+        loadingMore={loadingMore}
       />
       <ProgressiveBlurHeader />
     </View>

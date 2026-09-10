@@ -1,14 +1,13 @@
+import type { DetailItem } from '@/components/item-detail';
 import { api } from '@convex/_generated/api';
 import { useMutation } from 'convex/react';
 import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { usePaywallGuard } from './entitlement';
-import type { FunctionReturnType } from 'convex/server';
 
-type SearchableItem = Pick<
-  FunctionReturnType<typeof api.items.listItems>[number],
-  '_id' | 'status' | 'productsStatus'
->;
+// `productsStatus` is optional: a card row has not loaded it yet, and the
+// server refuses a duplicate search anyway.
+type SearchableItem = Pick<DetailItem, '_id' | 'status' | 'productsStatus'>;
 
 export function useFindLinks(item: SearchableItem | undefined) {
   const search = useMutation(api.items.findLinks);

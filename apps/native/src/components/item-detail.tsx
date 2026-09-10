@@ -21,7 +21,7 @@ import { Link } from 'expo-router';
 import { AppSymbolIcon } from '@/components/symbol';
 import * as WebBrowser from 'expo-web-browser';
 import type { FunctionReturnType } from 'convex/server';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,13 +34,19 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-// A row as returned by the list queries (listItems / searchItems / getSpace) —
-// carries every display field except the space memberships, which only
-// getItem resolves. Rows from getSpace additionally carry `spaceIntents`:
+type CardRow = FunctionReturnType<typeof api.items.listItems>['page'][number];
+type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
+
+// A row as handed to a detail page. The list queries (listItems / searchItems
+// / similarItems) return the card shape: everything a card shows, but not the
+// article body or the shopping results, which only getItem and getSpace carry.
+// The body fields are therefore optional here and ItemDetail fills them in
+// from getItem. Rows from getSpace additionally carry `spaceIntents`:
 // purpose-steered actions scoped to that space's membership.
-export type DetailItem = FunctionReturnType<typeof api.items.listItems>[number] & {
-  spaceIntents?: FunctionReturnType<typeof api.items.listItems>[number]['intents'];
-};
+export type DetailItem = CardRow &
+  Partial<Pick<FullRow, 'content' | 'products' | 'productsStatus'>> & {
+    spaceIntents?: CardRow['intents'];
+  };
 
 type Props = {
   item: DetailItem;
@@ -49,14 +55,29 @@ type Props = {
   isZoomTarget: boolean;
 };
 
-// Shared data for both render paths: space memberships (fetched separately
-// since list rows don't carry them), similar items, the hero URI, and parsed
-// article paragraphs.
+// Shared data for both render paths: the full document (list rows carry
+// neither the article body nor the space memberships), similar items, the hero
+// URI, and parsed article paragraphs.
 function useItemDetailData(item: DetailItem) {
   const { data: withSpaces } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
   const spaces = withSpaces?.spaces ?? [];
+
+  // The full document wins once it arrives; until then the row is all we have.
+  // `spaceIntents` is the one field only the row knows. Memoized so the
+  // children see a stable `item` across parent re-renders.
+  const detail = useMemo<DetailItem>(
+    () => (withSpaces ? { ...item, ...withSpaces, spaceIntents: item.spaceIntents } : item),
+    [item, withSpaces],
+  );
+
+  // A link's layout depends on whether it has an article body, and a card row
+  // cannot say. Hold the body until getItem answers rather than paint the plain
+  // layout and then jump to the reader. Rows that already carry `content`
+  // (getSpace) and non-link items render at once.
+  const bodyPending =
+    item.type === 'link' && item.content === undefined && withSpaces === undefined;
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
@@ -67,13 +88,16 @@ function useItemDetailData(item: DetailItem) {
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
 
-  const paragraphs =
-    item.content
-      ?.split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0) ?? [];
+  const paragraphs = useMemo(
+    () =>
+      detail.content
+        ?.split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0) ?? [],
+    [detail.content],
+  );
 
-  return { spaces, similar, heroUri, paragraphs };
+  return { detail, bodyPending, spaces, similar, heroUri, paragraphs };
 }
 
 // Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
@@ -86,16 +110,16 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
+  const { detail, bodyPending, spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
 
   // A video's "content" is its caption, not an article: keep the poster layout.
   const isVideo = item.type === 'link' && isTikTokUrl(item.url);
 
   // Link saves with extracted content get the compact reader layout.
-  if (item.type === 'link' && !isVideo && paragraphs.length > 0) {
+  if (!bodyPending && item.type === 'link' && !isVideo && paragraphs.length > 0) {
     return (
       <ArticleReaderView
-        item={item}
+        item={detail}
         isZoomTarget={isZoomTarget}
         headerHeight={headerHeight}
         spaces={spaces}
@@ -169,19 +193,36 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       heroImage
     );
 
-  return (
-    <ScrollView
-      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
-      contentInsetAdjustmentBehavior="never"
-      style={[styles.container, { paddingTop: headerHeight + theme.gap(5) }]}
-      contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
-      showsVerticalScrollIndicator={false}
-    >
-      {heroUri ? (
-        <View style={item.isSticker ? undefined : styles.heroContainer}>
-          {isZoomTarget ? <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget> : hero}
+  const heroBlock = heroUri ? (
+    <View style={item.isSticker ? undefined : styles.heroContainer}>
+      {isZoomTarget ? <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget> : hero}
+    </View>
+  ) : null;
+
+  const scrollProps = {
+    testID: item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined,
+    contentInsetAdjustmentBehavior: 'never' as const,
+    style: [styles.container, { paddingTop: headerHeight + theme.gap(5) }],
+    contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
+    showsVerticalScrollIndicator: false,
+  };
+
+  if (bodyPending) {
+    // The hero is up so the zoom transition has its target; the body waits for
+    // getItem (see useItemDetailData).
+    return (
+      <ScrollView {...scrollProps}>
+        {heroBlock}
+        <View style={styles.bodyPending}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
         </View>
-      ) : null}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView {...scrollProps}>
+      {heroBlock}
 
       <View
         style={[
@@ -243,7 +284,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Text style={styles.description}>{item.description}</Text>
         ) : null}
 
-        {item.url && !item.content ? (
+        {item.url && !detail.content ? (
           // No article body came back, so the address itself is the content —
           // show it as a real, tappable row instead of a sparse gap.
           <Pressable
@@ -276,7 +317,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
         ) : null}
 
         {item.status === 'ready' ? (
-          <ProductsSection item={item} />
+          <ProductsSection item={detail} />
         ) : null}
 
         {item.type === 'note' && item.note ? (
@@ -504,6 +545,10 @@ const styles = StyleSheet.create((theme) => ({
   body: {
     gap: theme.gap(5),
     paddingHorizontal: theme.gap(2),
+  },
+  bodyPending: {
+    paddingTop: theme.gap(5),
+    alignItems: 'center',
   },
   processingRow: {
     flexDirection: 'row',

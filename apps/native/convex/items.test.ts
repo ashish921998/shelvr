@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { PROCESSING_STALE_MS, STALE_IMPORT_CUTOFF_MS } from "./items";
+import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
 import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -31,6 +31,190 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+/** Seeds `count` ready link items for `userId`, oldest first, each carrying an
+ * article body so a leak into the card shape is detectable. Returns ids in
+ * insertion order (convex-test gives strictly increasing creation times). */
+async function seedFeed(
+  t: TestCtx,
+  userId: string,
+  count: number,
+  overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {},
+): Promise<Id<"items">[]> {
+  return await t.run(async (ctx) => {
+    const ids: Id<"items">[] = [];
+    for (let i = 0; i < count; i++) {
+      ids.push(
+        await ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: overrides.status ?? "ready",
+          title: `Save ${i}`,
+          url: `https://example.com/${i}`,
+          content: `Article body ${i} `.repeat(20),
+          products: [{ title: "Chair", url: "https://shop.example.com/chair" }],
+          productsStatus: "ready",
+          tags: ["tag"],
+          searchText: `save ${i}`,
+        }),
+      );
+    }
+    return ids;
+  });
+}
+
+describe("listItems pagination", () => {
+  it("pages newest-first with a working cursor and isDone on the last page", async () => {
+    const t = await as("feed-user");
+    const ids = await seedFeed(t, "feed-user", 5);
+    const newestFirst = [...ids].reverse();
+
+    const first = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    expect(first.page.map((item) => item._id)).toEqual(newestFirst.slice(0, 2));
+    expect(first.isDone).toBe(false);
+
+    const second = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 2, cursor: first.continueCursor },
+    });
+    expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(2, 4));
+    expect(second.isDone).toBe(false);
+
+    const third = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 2, cursor: second.continueCursor },
+    });
+    expect(third.page.map((item) => item._id)).toEqual(newestFirst.slice(4));
+    expect(third.isDone).toBe(true);
+  });
+
+  it("returns the card shape without article bodies or shopping results", async () => {
+    const t = await as("feed-user");
+    const [id] = await seedFeed(t, "feed-user", 1);
+
+    const { page } = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(page).toHaveLength(1);
+    const row = page[0];
+    expect(row._id).toBe(id);
+    for (const dropped of ["content", "searchText", "products", "productsStatus", "userId"]) {
+      expect(row).not.toHaveProperty(dropped);
+    }
+    // What the card and the detail pager's first paint still need.
+    expect(row).toMatchObject({
+      type: "link",
+      status: "ready",
+      title: "Save 0",
+      url: "https://example.com/0",
+      tags: ["tag"],
+      imageUrl: null,
+    });
+    expect(typeof row._creationTime).toBe("number");
+
+    // The full document is still one getItem away.
+    const full = await t.query(api.items.getItem, { id });
+    expect(full?.content).toContain("Article body 0");
+    expect(full?.products).toHaveLength(1);
+  });
+
+  it("only returns the caller's items", async () => {
+    // One shared backend, so the userId scope — not database isolation — is
+    // what keeps the two feeds apart.
+    const backend = newConvexTest();
+    const ta = backend.withIdentity({ subject: "feed-a|session-1" });
+    const tb = backend.withIdentity({ subject: "feed-b|session-1" });
+    const aIds = await seedFeed(ta, "feed-a", 2);
+    const bIds = await seedFeed(tb, "feed-b", 3);
+
+    const mine = await ta.query(api.items.listItems, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(mine.page.map((item) => item._id)).toEqual([...aIds].reverse());
+    expect(mine.isDone).toBe(true);
+
+    const theirs = await tb.query(api.items.listItems, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(theirs.page.map((item) => item._id)).toEqual([...bIds].reverse());
+  });
+
+  it("rejects unauthenticated callers", async () => {
+    const t = newConvexTest();
+    await expect(
+      t.query(api.items.listItems, { paginationOpts: { numItems: 10, cursor: null } }),
+    ).rejects.toThrow("Not authenticated");
+  });
+});
+
+describe("listRecentItems", () => {
+  it("returns the newest ready items up to the limit, skipping unready ones", async () => {
+    const t = await as("recent-user");
+    const older = await seedFeed(t, "recent-user", 3);
+    const pending = await seedFeed(t, "recent-user", 1, { status: "processing" });
+    const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
+
+    const recent = await t.query(api.items.listRecentItems, { limit: 2 });
+    expect(recent.map((item) => item._id)).toEqual([older[2], older[1]]);
+    expect(recent.map((item) => item._id)).not.toContain(pending[0]);
+    expect(recent.map((item) => item._id)).not.toContain(failed[0]);
+    expect(recent[0]).not.toHaveProperty("content");
+  });
+
+  it("caps the limit and scopes to the caller", async () => {
+    const t = await as("recent-user");
+    await seedFeed(t, "recent-user", RECENT_ITEMS_MAX + 5);
+    await seedFeed(t, "someone-else", 2);
+
+    const capped = await t.query(api.items.listRecentItems, { limit: 1000 });
+    expect(capped).toHaveLength(RECENT_ITEMS_MAX);
+    expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
+
+    // A non-positive or fractional limit still yields at least one item.
+    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(1);
+  });
+});
+
+describe("listLocatedItems", () => {
+  it("returns only the caller's photos that carry coordinates", async () => {
+    const t = await as("map-user");
+    const { located, unlocated } = await t.run(async (ctx) => {
+      const located = await ctx.db.insert("items", {
+        userId: "map-user",
+        type: "image",
+        status: "ready",
+        title: "Belém Tower",
+        latitude: 38.6916,
+        longitude: -9.216,
+        tags: [],
+        searchText: "",
+      });
+      const unlocated = await ctx.db.insert("items", {
+        userId: "map-user",
+        type: "image",
+        status: "ready",
+        tags: [],
+        searchText: "",
+      });
+      await ctx.db.insert("items", {
+        userId: "other-user",
+        type: "image",
+        status: "ready",
+        latitude: 1,
+        longitude: 1,
+        tags: [],
+        searchText: "",
+      });
+      return { located, unlocated };
+    });
+
+    const markers = await t.query(api.items.listLocatedItems, {});
+    expect(markers).toEqual([
+      { _id: located, title: "Belém Tower", latitude: 38.6916, longitude: -9.216, imageUrl: null },
+    ]);
+    expect(markers.map((m) => m._id)).not.toContain(unlocated);
+  });
 });
 
 describe("canonical save telemetry", () => {

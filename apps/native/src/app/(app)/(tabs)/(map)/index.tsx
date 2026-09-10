@@ -91,22 +91,22 @@ function fitCamera(items: Located[]) {
 export default function MapScreen() {
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
+  // Only photos with coordinates, already filtered server-side, so the map
+  // never subscribes to the feed.
   const { data: items } = useQuery({
-    ...convexQuery(api.items.listItems, {}),
+    ...convexQuery(api.items.listLocatedItems, {}),
     enabled: !entitlementLoading && entitled,
   });
 
-  const located = useMemo(
+  const located = useMemo<Located[]>(
     () =>
-      (items ?? [])
-        .filter((i) => i.latitude !== undefined && i.longitude !== undefined)
-        .map((i) => ({
-          id: i._id,
-          title: i.title ?? 'Saved photo',
-          latitude: i.latitude!,
-          longitude: i.longitude!,
-          imageUrl: i.imageUrl,
-        })),
+      (items ?? []).map((i) => ({
+        id: i._id,
+        title: i.title ?? 'Saved photo',
+        latitude: i.latitude,
+        longitude: i.longitude,
+        imageUrl: i.imageUrl,
+      })),
     [items],
   );
 
