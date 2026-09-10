@@ -12,6 +12,7 @@ const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_DEVICES_PER_DIGEST = 20;
 const resultSchema = z.object({
   status: z.enum(["ok", "error"]),
   id: z.string().optional(),
@@ -97,11 +98,15 @@ export const claim = internalMutation({
       });
       return null;
     }
+    // Read enabled devices straight from the index. A user who has cycled many
+    // tokens keeps every disabled row, and those rows must not count against
+    // the page of live recipients or be scanned on every attempt.
     const devices = await ctx.db
       .query("notificationDevices")
-      .withIndex("by_user", (q) => q.eq("userId", digest.userId))
-      .filter((q) => q.eq(q.field("enabled"), true))
-      .take(20);
+      .withIndex("by_user_and_enabled", (q) =>
+        q.eq("userId", digest.userId).eq("enabled", true),
+      )
+      .take(MAX_DEVICES_PER_DIGEST);
     const tokens = new Set(devices.map((device) => device.token));
     const recipients: Recipient[] = (
       digest.deliveryRecipients ??

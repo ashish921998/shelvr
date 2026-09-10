@@ -232,8 +232,12 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  // One Expo push token per device. Tokens are user-scoped so a device can be
-  // moved safely when a different account signs in on it.
+  // One Expo push token per device. A token row moves to a different account
+  // only after its current owner disables it (the client revokes every stored
+  // token before sign-out); an enabled row owned by someone else is never
+  // re-bound, so knowing a token is not enough to take over its deliveries.
+  // `by_user_and_enabled` lets delivery read only live devices without
+  // scanning a user's disabled rows.
   notificationDevices: defineTable({
     userId: v.string(),
     token: v.string(),
@@ -242,6 +246,7 @@ export default defineSchema({
     lastSeenAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_enabled", ["userId", "enabled"])
     .index("by_token", ["token"]),
 
   // Delivery preferences and the next UTC instant at which the weekly shelf
