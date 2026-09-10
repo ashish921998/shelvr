@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "./_generated/api";
+import { internal } from "@convex/_generated/api";
 import { newConvexTest } from "./test.setup";
 
 const generateObject = vi.hoisted(() => vi.fn());
@@ -159,6 +159,41 @@ describe("stored photo processing", () => {
       });
     },
   );
+
+  it("makes an absent storage ID terminal", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.run((ctx) => ctx.db.patch(itemId, { storageId: undefined }));
+    await expect(t.action(internal.ai.processItem, { itemId })).rejects.toThrow(
+      "stored_image:not_found",
+    );
+    expect(generateObject).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "failed",
+      failureReason: "not_found",
+    });
+  });
+
+  it("bounds image prompt space data including JSON escapes and multibyte text", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 100; i++)
+        await ctx.db.insert("spaces", {
+          userId: "photo-user",
+          dynamic: true,
+          name: `Space ${i}`,
+          description: "\u0000😀".repeat(10000),
+        });
+    });
+    await t.action(internal.ai.processItem, { itemId });
+    const prompt = generateObject.mock.calls[0][0].messages[0].content[0].text;
+    expect(
+      new TextEncoder().encode(JSON.stringify(prompt)).byteLength,
+    ).toBeLessThan(70 * 1024);
+    expect(prompt).toContain('"Space 0"');
+    expect(prompt).not.toContain('"Space 99"');
+  });
 
   it("preserves HEIC metadata in both vision calls", async () => {
     const t = newConvexTest();

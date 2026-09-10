@@ -755,13 +755,28 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
 
 function spacesPromptBlock(
   spaces: { name: string; description?: string }[],
+  imageRequest = false,
 ): string {
   if (spaces.length === 0) {
     return "The user has no spaces yet, so spaceNames must be an empty array.";
   }
-  const lines = spaces
-    .map((s) => `- "${s.name}"${s.description ? `: ${s.description}` : ""}`)
-    .join("\n");
+  // Bound the only user-sized prompt input for inline image requests. Count
+  // JSON-escaped UTF-8 bytes, not characters; preserve exact space names.
+  let remaining = 64 * 1024;
+  const candidates: string[] = [];
+  for (const space of spaces) {
+    const description = imageRequest
+      ? space.description?.slice(0, 512)
+      : space.description;
+    const line = `- "${space.name}"${description ? `: ${description}` : ""}`;
+    if (imageRequest) {
+      const size = Buffer.byteLength(JSON.stringify(line + "\n"), "utf8");
+      if (size > remaining) continue;
+      remaining -= size;
+    }
+    candidates.push(line);
+  }
+  const lines = candidates.join("\n");
   return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
 }
 
@@ -786,7 +801,7 @@ export const processItem = internalAction({
         userId: item.userId,
       });
       const spaces = allSpaces.filter((s) => s.dynamic === true);
-      const spacesBlock = spacesPromptBlock(spaces);
+      const spacesBlock = spacesPromptBlock(spaces, item.type === "image");
 
       let page: PageData | undefined;
       let result: z.infer<typeof itemAnalysisSchema>;
@@ -858,7 +873,7 @@ export const processItem = internalAction({
         result = object;
       } else if (item.type === "image") {
         if (!item.storageId) {
-          throw new Error("Image item has no storageId");
+          throw new StoredImageError("not_found");
         }
         const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({

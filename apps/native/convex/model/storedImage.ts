@@ -1,8 +1,9 @@
 import type { StorageActionWriter } from "convex/server";
-import type { Id } from "../_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 
 // Base64 expands this to ~19.6 MB, leaving room for prompts below Gemini's
-// 20 MB inline request limit. Check before allocating the file's byte buffer.
+// 20 MB inline request limit. Image space candidates are capped at 64 KiB
+// of JSON-escaped UTF-8 in ai.ts. Check before allocating the byte buffer.
 export const MAX_STORED_IMAGE_BYTES = 14 * 1024 * 1024;
 export type StoredImageErrorCode = "not_found" | "empty" | "too_large";
 
