@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { generateObject } from "ai";
+import { DownloadError, generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { Readability } from "@mozilla/readability";
@@ -17,6 +17,7 @@ import {
   type SafeFetchError,
 } from "./model/safeFetch";
 import { isTikTokUrl } from "./model/externalUrl";
+import { readStoredImageBytes, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
@@ -531,6 +532,44 @@ export function linkEnrichment(
  * or cause, which may carry a URL, response body, or resolved address.
  */
 function summarizeError(error: unknown): string {
+  if (error instanceof StoredImageError) return `stored_image:${error.code}`;
+  if (DownloadError.isInstance(error)) {
+    const status = error.statusCode;
+    if (
+      typeof status === "number" &&
+      Number.isInteger(status) &&
+      status >= 100 &&
+      status <= 599
+    ) {
+      return `image_download:http_${status}`;
+    }
+    const cause = error.cause;
+    if (cause instanceof Error) {
+      if (cause.message.includes("Cannot find module 'undici'"))
+        return "image_download:undici_unavailable";
+      if (
+        cause.message ===
+          "Node.js built-in module node:module is unavailable" ||
+        cause.message === "Node.js built-in module node:dns is unavailable"
+      )
+        return "image_download:node_builtin_unavailable";
+      if (
+        "code" in cause &&
+        typeof cause.code === "string" &&
+        [
+          "ENOTFOUND",
+          "EAI_AGAIN",
+          "ECONNRESET",
+          "ETIMEDOUT",
+          "ERR_MODULE_NOT_FOUND",
+          "MODULE_NOT_FOUND",
+        ].includes(cause.code)
+      ) {
+        return `image_download:${cause.code}`;
+      }
+    }
+    return "image_download:failed";
+  }
   if (isPageFetchError(error)) {
     return `page_fetch_error:${error.code}`;
   }
@@ -858,10 +897,7 @@ export const processItem = internalAction({
         if (!item.storageId) {
           throw new Error("Image item has no storageId");
         }
-        const imageUrl = await ctx.storage.getUrl(item.storageId);
-        if (imageUrl === null) {
-          throw new Error("Image file not found in storage");
-        }
+        const imageBytes = await readStoredImageBytes(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
           system: SYSTEM_PROMPT,
@@ -878,7 +914,7 @@ export const processItem = internalAction({
                     INTENTS_PROMPT_BLOCK,
                   ].join("\n\n"),
                 },
-                { type: "image", image: new URL(imageUrl) },
+                { type: "image", image: imageBytes },
               ],
             },
           ],
@@ -1228,11 +1264,7 @@ export const findProductLinks = internalAction({
       // and notes already have classified text that describes the thing.
       let query: string;
       if (item.type === "image" && item.storageId) {
-        const imageUrl = await ctx.storage.getUrl(item.storageId);
-        if (imageUrl === null) {
-          await fail();
-          return null;
-        }
+        const imageBytes = await readStoredImageBytes(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
           schema: productQuerySchema,
@@ -1244,7 +1276,7 @@ export const findProductLinks = internalAction({
                   type: "text",
                   text: "Identify the primary product shown in this image and produce a shopping search query for it. If nothing in the image is a purchasable product, return an empty query.",
                 },
-                { type: "image", image: new URL(imageUrl) },
+                { type: "image", image: imageBytes },
               ],
             },
           ],

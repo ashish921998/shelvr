@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
 import { newConvexTest } from "./test.setup";
@@ -19,6 +19,11 @@ type TestCtx = TestConvexForDataModel<DataModel>;
 // A representative operation id (UUID-shaped, within the 8–200 char bound).
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
 const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
+
+// These mutation tests assert queued jobs, not execution of the AI pipeline.
+// Keep scheduled callbacks from escaping into network calls during teardown.
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {

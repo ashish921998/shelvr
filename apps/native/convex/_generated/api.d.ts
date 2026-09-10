@@ -31,6 +31,7 @@ import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_revenuecatTransfer from "../model/revenuecatTransfer.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as model_storage from "../model/storage.js";
+import type * as model_storedImage from "../model/storedImage.js";
 import type * as notificationDelivery from "../notificationDelivery.js";
 import type * as notifications from "../notifications.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   "model/revenuecatTransfer": typeof model_revenuecatTransfer;
   "model/safeFetch": typeof model_safeFetch;
   "model/storage": typeof model_storage;
+  "model/storedImage": typeof model_storedImage;
   notificationDelivery: typeof notificationDelivery;
   notifications: typeof notifications;
   paymentTelemetry: typeof paymentTelemetry;
