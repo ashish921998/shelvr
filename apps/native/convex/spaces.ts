@@ -681,9 +681,12 @@ export const backfillSpaceCounters = internalMutation({
       const scanLimit = Math.min(BACKFILL_SCAN_LIMIT, remaining - 1);
       const summary = await summarizeMemberships(ctx, space._id, scanLimit);
       remaining -= summary.scanned;
-      if (!summary.complete && !first) {
+      if (!summary.complete && !first && scanLimit < BACKFILL_SCAN_LIMIT) {
         // Cut short by the budget, not by the space's size: leave the cursor
         // before this space so the continuation retries it with a full budget.
+        // A later scan that still had the full ceiling and came back incomplete
+        // is over the ceiling, so it falls through and is skipped like a first
+        // scan would be.
         moreAfterBatch = true;
         break;
       }
