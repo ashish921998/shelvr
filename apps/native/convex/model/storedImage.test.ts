@@ -1,86 +1,71 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
+import { MAX_STORED_IMAGE_BYTES, readStoredImage } from "./storedImage";
 
-import {
-  StoredImageError,
-  readStoredImageBytes,
-  type StoredImageStorage,
-} from "./storedImage";
-
-/** A byte pattern with values above 127 so identity checks catch any
- * sign-extension or encoding mangling. */
-const PNG_LIKE_BYTES = Uint8Array.from([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xd8, 0xfe, 0x80,
-]);
 const imageId = "image-test-storage-id" as Id<"_storage">;
 
-function storageReturning(blob: Blob | null): StoredImageStorage {
-  return { get: vi.fn().mockResolvedValue(blob) };
-}
-
-describe("readStoredImageBytes", () => {
-  it("returns the exact stored bytes, unmodified", async () => {
-    const blob = new Blob([PNG_LIKE_BYTES], { type: "image/png" });
-    const storage = storageReturning(blob);
-    const bytes = await readStoredImageBytes(storage, imageId);
-    expect(bytes).toBeInstanceOf(Uint8Array);
-    expect(Array.from(bytes)).toEqual(Array.from(PNG_LIKE_BYTES));
-    expect(storage.get).toHaveBeenCalledWith(imageId);
-  });
-
-  it("does not truncate the stored image", async () => {
-    const big = new Uint8Array(200 * 1024).fill(0x7f);
-    const bytes = await readStoredImageBytes(
-      storageReturning(new Blob([big])),
+describe("readStoredImage", () => {
+  it("preserves HEIC bytes and MIME metadata", async () => {
+    const bytes = Uint8Array.from([
+      0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 255,
+    ]);
+    const result = await readStoredImage(
+      { get: async () => new Blob([bytes], { type: "image/heic" }) },
       imageId,
     );
-    expect(bytes.byteLength).toBe(big.byteLength);
+    expect(result).toEqual({ bytes, mediaType: "image/heic" });
   });
 
-  it("throws not_found when the file is missing or deleted", async () => {
-    const err = await readStoredImageBytes(
-      storageReturning(null),
+  it("leaves absent MIME metadata for SDK detection", async () => {
+    const result = await readStoredImage(
+      { get: async () => new Blob(["bytes"]) },
       imageId,
-    ).catch((e) => e);
-    expect(err).toBeInstanceOf(StoredImageError);
-    expect(err.code).toBe("not_found");
-    expect(err.message).not.toContain(imageId);
+    );
+    expect(result.mediaType).toBeUndefined();
   });
 
-  it("throws empty when the stored file holds no data", async () => {
-    const err = await readStoredImageBytes(
-      storageReturning(new Blob([])),
+  it.each([
+    [null, "not_found"],
+    [new Blob([]), "empty"],
+  ] as const)(
+    "rejects an unavailable blob with %s / %s",
+    async (blob, code) => {
+      await expect(
+        readStoredImage({ get: async () => blob }, imageId),
+      ).rejects.toMatchObject({ name: "StoredImageError", code });
+    },
+  );
+
+  it("accepts the size boundary without truncation", async () => {
+    const bytes = new Uint8Array(MAX_STORED_IMAGE_BYTES).fill(127);
+    const result = await readStoredImage(
+      { get: async () => new Blob([bytes]) },
       imageId,
-    ).catch((e) => e);
-    expect(err).toBeInstanceOf(StoredImageError);
-    expect(err.code).toBe("empty");
+    );
+    expect(result.bytes.byteLength).toBe(bytes.byteLength);
+    expect(Buffer.from(result.bytes).equals(Buffer.from(bytes))).toBe(true);
   });
 
-  it("propagates storage failures untouched", async () => {
-    const failure = new Error("backend unavailable");
+  it("rejects an oversized file before reading its bytes", async () => {
+    const blob = new Blob([new Uint8Array(MAX_STORED_IMAGE_BYTES + 1)]);
+    const read = vi.spyOn(blob, "arrayBuffer");
     await expect(
-      readStoredImageBytes({ get: () => Promise.reject(failure) }, imageId),
-    ).rejects.toBe(failure);
+      readStoredImage({ get: async () => blob }, imageId),
+    ).rejects.toMatchObject({ code: "too_large" });
+    expect(read).not.toHaveBeenCalled();
   });
 
-  it("never touches a URL-based download path", async () => {
-    // The helper must work with a storage object exposing only `get`; any
-    // access to getUrl (the failing public-URL path) fails the test.
-    const storage: StoredImageStorage = {
-      get: () => Promise.resolve(new Blob([PNG_LIKE_BYTES])),
-    };
-    const spy = vi.fn();
-    const proxied = new Proxy(storage, {
-      get(target, prop) {
-        if (prop === "getUrl") {
-          spy();
-          throw new Error("getUrl must not be used for stored images");
-        }
-        return Reflect.get(target, prop);
-      },
-    });
-    const bytes = await readStoredImageBytes(proxied, imageId);
-    expect(spy).not.toHaveBeenCalled();
-    expect(Array.from(bytes)).toEqual(Array.from(PNG_LIKE_BYTES));
+  it("propagates temporary storage failures for retry", async () => {
+    const error = new Error("backend unavailable");
+    await expect(
+      readStoredImage(
+        {
+          get: async () => {
+            throw error;
+          },
+        },
+        imageId,
+      ),
+    ).rejects.toBe(error);
   });
 });

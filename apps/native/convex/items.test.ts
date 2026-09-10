@@ -1584,6 +1584,22 @@ describe("failed saves and retry", () => {
     expect(item?.failureReason).toBe("not_found");
   });
 
+  it.each(["not_found", "image_too_large"] as const)("does not spend retry capacity on a terminal photo (%s)", async (failureReason) => {
+    const t = await as("terminal-photo");
+    const id = await t.run(ctx => ctx.db.insert("items", {
+      userId: "terminal-photo", type: "image", status: "failed", failureReason, tags: [], searchText: "",
+    }));
+    for (let i = 0; i < 20; i++) {
+      await t.mutation(api.items.reprocessItem, { id });
+    }
+    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "failed", failureReason });
+    expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+    // A legitimate retry still succeeds after the terminal attempts.
+    await t.run(ctx => ctx.db.patch(id, { failureReason: "error" }));
+    await t.mutation(api.items.reprocessItem, { id });
+    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "processing" });
+  });
+
   it("does not retry a fully enriched item", async () => {
     const t = await as("retry-ready");
     const itemId = await seedLink(t, "retry-ready", { status: "ready" });

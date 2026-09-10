@@ -7,11 +7,12 @@ import { v } from "convex/values";
  * hand-copied validator — these two fields must not become the next instance.
  */
 
-// Why processing failed. `not_found` is terminal (the page is gone, 404/410);
+// Terminal failures: unavailable source or oversized photo.
 // `error` is a pipeline fault worth retrying. Only set with `status: "failed"`.
 export const failureReasonValidator = v.union(
   v.literal("not_found"),
   v.literal("error"),
+  v.literal("image_too_large"),
 );
 
 // How much of the item could be enriched. "partial" = classified from the URL

@@ -961,8 +961,8 @@ export const findLinks = mutation({
  * (classified from its URL because the page body was unreadable). Re-runs the
  * same pipeline, so it is rate-limited like a create.
  *
- * A `not_found` failure is NOT retryable — the page is gone (404/410) and a
- * retry would burn a classification to reach the same conclusion.
+ * Unavailable sources and oversized photos are terminal; retrying would
+ * spend classification capacity without changing the result.
  */
 export const reprocessItem = mutation({
   args: { id: v.id("items") },
@@ -975,7 +975,9 @@ export const reprocessItem = mutation({
       throw new Error("Item not found");
     }
     const retryable =
-      (item.status === "failed" && item.failureReason !== "not_found") ||
+      (item.status === "failed" &&
+        item.failureReason !== "not_found" &&
+        item.failureReason !== "image_too_large") ||
       (item.status === "ready" && item.enrichment === "partial");
     if (!retryable) {
       return null;

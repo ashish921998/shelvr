@@ -7,7 +7,7 @@ import {
 import { memo } from 'react';
 import { displayHost } from '@/lib/url';
 import { isTikTokUrl } from '@convex/model/externalUrl';
-import { enrichmentValidator } from '@convex/model/itemFields';
+import { enrichmentValidator, failureReasonValidator } from '@convex/model/itemFields';
 import type { Infer } from 'convex/values';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -45,7 +45,7 @@ export type FeedItem = {
   heroImageUrl?: string;
   aspectRatio?: number;
   isSticker?: boolean;
-  failureReason?: 'not_found' | 'error';
+  failureReason?: Infer<typeof failureReasonValidator>;
   enrichment?: Infer<typeof enrichmentValidator>;
   tags: string[];
   // Suggested this item into the current space; it isn't a member
@@ -108,11 +108,15 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
   // indistinguishable from one still processing.
   const failedLabel =
     item.status === 'failed'
-      ? item.failureReason === 'not_found'
-        ? 'Page not found'
-        : item.type === 'image'
-          ? "Couldn't read photo"
-          : "Couldn't be saved"
+      ? item.failureReason === 'image_too_large'
+        ? 'Photo too large'
+        : item.failureReason === 'not_found'
+          ? item.type === 'image'
+            ? 'Photo unavailable'
+            : 'Page not found'
+          : item.type === 'image'
+            ? "Couldn't read photo"
+            : "Couldn't be saved"
       : undefined;
   const captionTitle =
     item.title ?? item.note ?? failedLabel ?? (item.url ? displayHost(item.url) : undefined);

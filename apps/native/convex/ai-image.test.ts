@@ -1,7 +1,6 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DownloadError } from "ai";
 import { internal } from "./_generated/api";
 import { newConvexTest } from "./test.setup";
 
@@ -43,11 +42,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function photo(t: ReturnType<typeof newConvexTest>) {
+async function photo(
+  t: ReturnType<typeof newConvexTest>,
+  blob = new Blob([bytes], { type: "image/png" }),
+) {
   return t.run(async (ctx) => {
-    const storageId = await ctx.storage.store(
-      new Blob([bytes], { type: "image/png" }),
-    );
+    const storageId = await ctx.storage.store(blob);
     const itemId = await ctx.db.insert("items", {
       userId: "photo-user",
       type: "image",
@@ -81,6 +81,7 @@ describe("stored photo processing", () => {
     );
     expect(image.image).toBeInstanceOf(Uint8Array);
     expect(Array.from(image.image)).toEqual(Array.from(bytes));
+    expect(image.mediaType).toBe("image/png");
     const saved = await t.run(async (ctx) => ({
       item: await ctx.db.get(itemId),
       memberships: await ctx.db
@@ -108,6 +109,7 @@ describe("stored photo processing", () => {
       (part: { type: string }) => part.type === "image",
     );
     expect(Array.from(image.image)).toEqual(Array.from(bytes));
+    expect(image.mediaType).toBe("image/png");
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({ productsStatus: "ready", products: [] });
     expect(fetch).not.toHaveBeenCalled();
@@ -122,7 +124,10 @@ describe("stored photo processing", () => {
     );
     expect(generateObject).not.toHaveBeenCalled();
     const item = await t.run((ctx) => ctx.db.get(itemId));
-    expect(item?.status).toBe("failed");
+    expect(item).toMatchObject({
+      status: "failed",
+      failureReason: "not_found",
+    });
     const membership = await t.run((ctx) =>
       ctx.db
         .query("spaceItems")
@@ -132,22 +137,44 @@ describe("stored photo processing", () => {
     expect(membership).toMatchObject({ spaceId, status: "saved" });
   });
 
-  it("logs a missing downloader dependency without exposing URLs or error messages", async () => {
+  it.each([
+    [new Blob([]), "empty", "not_found"],
+    [
+      new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]),
+      "too_large",
+      "image_too_large",
+    ],
+  ] as const)(
+    "makes %s / %s terminal without calling the model",
+    async (blob, code, reason) => {
+      const t = newConvexTest();
+      const { itemId } = await photo(t, blob);
+      await expect(
+        t.action(internal.ai.processItem, { itemId }),
+      ).rejects.toThrow(`stored_image:${code}`);
+      expect(generateObject).not.toHaveBeenCalled();
+      expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+        status: "failed",
+        failureReason: reason,
+      });
+    },
+  );
+
+  it("preserves HEIC metadata in both vision calls", async () => {
     const t = newConvexTest();
-    const { itemId } = await photo(t);
-    generateObject.mockRejectedValue(
-      new DownloadError({
-        url: "https://private.example/photo?token=secret",
-        cause: new Error(
-          "Cannot find module 'undici' from /private/server/location",
+    const heic = new Uint8Array([
+      0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99,
+    ]);
+    const { itemId } = await photo(t, new Blob([heic], { type: "image/heic" }));
+    await t.action(internal.ai.processItem, { itemId });
+    generateObject.mockResolvedValue({ object: { query: "" } });
+    await t.action(internal.ai.findProductLinks, { itemId });
+    for (const [call] of generateObject.mock.calls) {
+      expect(
+        call.messages[0].content.find(
+          (part: { type: string }) => part.type === "image",
         ),
-      }),
-    );
-    await expect(t.action(internal.ai.processItem, { itemId })).rejects.toThrow(
-      "image_download:undici_unavailable",
-    );
-    const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
-    expect(logged).toContain("image_download:undici_unavailable");
-    expect(logged).not.toMatch(/private|secret|undici'|https:/);
+      ).toMatchObject({ image: heic, mediaType: "image/heic" });
+    }
   });
 });

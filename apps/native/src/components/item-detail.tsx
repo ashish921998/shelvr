@@ -306,11 +306,12 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
-type SaveState = 'gone' | 'failed' | 'partial' | 'no_article';
+type SaveState = 'image_too_large' | 'gone' | 'failed' | 'partial' | 'no_article';
 
 function saveState(item: DetailItem): SaveState | null {
   if (item.status === 'failed') {
-    // A `not_found` page is gone for good; any other failure is retryable.
+    if (item.failureReason === 'image_too_large') return 'image_too_large';
+    // Missing sources cannot be recovered by retrying.
     return item.failureReason === 'not_found' ? 'gone' : 'failed';
   }
   if (item.status !== 'ready') {
@@ -325,6 +326,8 @@ function saveState(item: DetailItem): SaveState | null {
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
+  image_too_large:
+    'This photo is too large to read. Save a smaller copy (under 14 MB).',
   gone: 'This page is gone — it was deleted, or the link was wrong.',
   failed: "Shelvr couldn't read this page.",
   partial:
@@ -376,11 +379,13 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
         }
       />
       <Text style={styles.noticeText}>
-        {state === 'failed' && item.type !== 'link'
-          ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
-          : SAVE_STATE_NOTICE[state]}
+        {state === 'gone' && item.type === 'image'
+          ? 'This photo is unavailable or empty. Please save it again.'
+          : state === 'failed' && item.type !== 'link'
+            ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
+            : SAVE_STATE_NOTICE[state]}
       </Text>
-      {state === 'gone' || state === 'no_article' ? null : (
+      {state === 'gone' || state === 'image_too_large' || state === 'no_article' ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
