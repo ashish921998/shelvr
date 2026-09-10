@@ -4,6 +4,8 @@
 // per-image settled-result contract lives. Runs in the Node default env.
 import {
   MAX_CONCURRENT_SAVES,
+  reportSaveFailures,
+  saveFailureReason,
   saveImageOperations,
   type ImageSaveResult,
   type SaveImageDeps,
@@ -17,7 +19,10 @@ import { describe, expect, it, vi } from "vitest";
 // exercised.
 vi.mock("expo-file-system", () => ({ File: class {} }));
 vi.mock("@/lib/normalize-image", () => ({ normalizeImage: vi.fn() }));
-vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => undefined } }));
+const captured: unknown[] = [];
+vi.mock("@/lib/analytics", () => ({
+  analytics: { sessionId: () => undefined, capture: (...args: unknown[]) => captured.push(args) },
+}));
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
   // A counter (not a constant) so tests can assert each image in a batch mints
@@ -327,6 +332,48 @@ describe("saveImageOperations", () => {
       stage: "begin",
       message: "Photo limit reached (1,000). Delete some photos to save more.",
     });
+  });
+
+  it("buckets the server's quota and size refusals, everything else as other", async () => {
+    const { ConvexError } = await import("convex/values");
+    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");
+    // Server refusals arrive as ConvexError; client-side failures as plain Error.
+    const failWith = async (error: unknown) => {
+      const deps = makeDeps({ upload: async () => { throw error; } });
+      const [result] = await saveImageOperations([{ image: img("a") }], deps);
+      return saveFailureReason((result as Extract<ImageSaveResult, { status: "failed" }>).message);
+    };
+    expect(await failWith(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe("photo_limit");
+    expect(await failWith(new ConvexError(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
+    expect(await failWith(new Error(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
+    expect(await failWith(new Error("Upload failed (503)"))).toBe("other");
+  });
+
+  it("reports one images_save_failed event per reason in a mixed batch", async () => {
+    const { ConvexError } = await import("convex/values");
+    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");
+    const errors: Record<string, unknown> = {
+      a: new ConvexError(PHOTO_LIMIT_MESSAGE),
+      b: new ConvexError(PHOTO_LIMIT_MESSAGE),
+      c: new ConvexError(IMAGE_TOO_LARGE_MESSAGE),
+    };
+    const deps = makeDeps({
+      upload: async (image) => {
+        if (image.uri in errors) throw errors[image.uri];
+        return "ks_storage_uploaded" as never;
+      },
+    });
+    const results = await saveImageOperations(
+      ["a", "b", "c", "ok"].map((uri) => ({ image: img(uri) })),
+      deps,
+    );
+    captured.length = 0;
+    reportSaveFailures(results);
+    expect(captured).toEqual(expect.arrayContaining([
+      ["images_save_failed", { reason: "photo_limit", image_count: 2 }],
+      ["images_save_failed", { reason: "too_large", image_count: 1 }],
+    ]));
+    expect(captured).toHaveLength(2);
   });
 
   it("falls back to a generic message when the thrown value is not an Error", async () => {

@@ -310,7 +310,7 @@ export default function ItemScreen() {
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
-      analytics.capture('item_deleted');
+      analytics.capture('item_deleted', { item_type: activeItem.type });
       if (neighbor) {
         setActiveId(neighbor._id);
         router.setParams({ id: neighbor._id });

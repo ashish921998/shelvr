@@ -1,4 +1,8 @@
-import { imageSizeError } from '@convex/model/imagePolicy';
+import {
+  IMAGE_TOO_LARGE_MESSAGE,
+  imageSizeError,
+  PHOTO_LIMIT_MESSAGE,
+} from '@convex/model/imagePolicy';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
@@ -8,7 +12,7 @@ import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useCallback } from 'react';
-import { analytics } from '@/lib/analytics';
+import { analytics, type ImageSaveFailureReason } from '@/lib/analytics';
 import { normalizeImage } from '@/lib/normalize-image';
 
 export type LocalImage = {
@@ -83,6 +87,28 @@ export type SaveImageDeps = {
     spaceId?: Id<'spaces'>;
   }) => Promise<Id<'items'>>;
 };
+
+/** Buckets a failed result for analytics. The server messages are constants
+ * with no ids or URLs, so sanitizeMessage passes them through unchanged. */
+export function saveFailureReason(message: string): ImageSaveFailureReason {
+  if (message === PHOTO_LIMIT_MESSAGE) return 'photo_limit';
+  if (message === IMAGE_TOO_LARGE_MESSAGE) return 'too_large';
+  return 'other';
+}
+
+/** One `images_save_failed` event per distinct reason in a batch, so a mixed
+ * batch (one over quota, one too large) is not counted under a single bucket. */
+export function reportSaveFailures(results: ImageSaveResult[]): void {
+  const counts = new Map<ImageSaveFailureReason, number>();
+  for (const result of results) {
+    if (result.status !== 'failed') continue;
+    const reason = saveFailureReason(result.message);
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  for (const [reason, image_count] of counts) {
+    analytics.capture('images_save_failed', { reason, image_count });
+  }
+}
 
 /** Prefix lets operation ids stand out in server logs while keeping the UUID
  * as the stable, unique portion. */

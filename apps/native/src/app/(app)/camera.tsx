@@ -1,6 +1,6 @@
 import { parseExifDate } from '@/lib/date';
 import { resolvePickedImageLocation } from '@/lib/picked-image-location';
-import { type ImageSaveRequest, useSaveImages } from '@/lib/use-save-image';
+import { type ImageSaveRequest, reportSaveFailures, useSaveImages } from '@/lib/use-save-image';
 import type { Id } from '@convex/_generated/dataModel';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -100,6 +100,7 @@ export default function CameraScreen() {
         return;
       }
       const savedCount = results.length - failed.length;
+      reportSaveFailures(results);
       Alert.alert(
         'Could not save all images',
         `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
@@ -160,12 +161,13 @@ export default function CameraScreen() {
         router.back();
         return;
       }
+      reportSaveFailures([result]);
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
       Alert.alert(
         'Capture failed',
-        'Could not save that photo. Try again.',
+        `${result.message} Try again.`,
         [
           {
             text: 'Retry',
