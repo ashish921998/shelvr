@@ -246,20 +246,20 @@ describe("stored photo processing", () => {
       ).toMatchObject({ image: heic, mediaType: "image/heic" });
     }
   });
-});
 
-it("records oversized input as rejected without reporting an action fault", async () => {
-  vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
-  vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
-  const t = newConvexTest();
-  const { itemId } = await photo(
-    t,
-    new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]),
-  );
-  await expect(
-    t.action(internal.ai.processItem, { itemId }),
-  ).resolves.toBeNull();
-  const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
-  expect(body.event).toBe("ai_categorization_rejected");
-  expect(console.error).not.toHaveBeenCalled();
+  it("records oversized input as rejected without reporting an action fault", async () => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
+    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
+    const t = newConvexTest();
+    const { itemId } = await photo(
+      t,
+      new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]),
+    );
+    await expect(
+      t.action(internal.ai.processItem, { itemId }),
+    ).resolves.toBeNull();
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.event).toBe("ai_categorization_rejected");
+    expect(console.error).not.toHaveBeenCalled();
+  });
 });

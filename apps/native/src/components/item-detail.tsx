@@ -328,8 +328,7 @@ function saveState(item: DetailItem): SaveState | null {
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
-  image_too_large:
-    IMAGE_TOO_LARGE_MESSAGE,
+  image_too_large: IMAGE_TOO_LARGE_MESSAGE,
   gone: 'This page is gone — it was deleted, or the link was wrong.',
   failed: "Shelvr couldn't read this page.",
   partial:

@@ -509,14 +509,19 @@ export const attachImageUpload = mutation({
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
 
-    // Preserve completed/idempotent retries and an already-attached canonical file.
+    // Skip the size check for completed ops and for a different already-attached
+    // file; those paths return idempotently below.
     if (op?.status !== "complete" && (!op?.storageId || op.storageId === args.storageId)) {
       const metadata = await ctx.db.system.get("_storage", args.storageId);
       const error = metadata ? imageSizeError(metadata.size) : undefined;
       if (error) {
-        if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) throw new Error(STORAGE_IN_USE);
+        if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
+          throw new Error(STORAGE_IN_USE);
+        }
         await safeDeleteStorage(ctx, args.storageId);
-        if (op) await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
+        if (op) {
+          await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
+        }
         // Return, don't throw: throwing would roll back storage cleanup.
         return { storageId: args.storageId, error };
       }
@@ -1003,8 +1008,7 @@ export const reprocessItem = mutation({
       throw new Error("Item not found");
     }
     const retryable =
-      (item.status === "failed" &&
-        !isTerminalFailure(item.failureReason)) ||
+      (item.status === "failed" && !isTerminalFailure(item.failureReason)) ||
       (item.status === "ready" && item.enrichment === "partial");
     if (!retryable) {
       return null;

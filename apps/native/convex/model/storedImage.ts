@@ -1,5 +1,5 @@
 import type { StorageActionWriter } from "convex/server";
-import type { Id } from "@convex/_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import { MAX_STORED_IMAGE_BYTES, heifMediaType } from "./imagePolicy";
 
 export type StoredImageErrorCode = "not_found" | "empty" | "too_large";

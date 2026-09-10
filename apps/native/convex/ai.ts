@@ -996,12 +996,19 @@ export const processItem = internalAction({
       // message (which may include a URL) is not leaked either.
       const errorCategory = summarizeError(error);
       if (error instanceof StoredImageError) {
-        const reason = error.code === "too_large" ? "image_too_large" : "not_found";
-        await ctx.runMutation(internal.items.failItem, { itemId: args.itemId, reason });
-        if (itemType !== undefined) await captureCategorizationTelemetry({
-          outcome: error.code === "too_large" ? "rejected" : "not_found",
-          itemType, durationMs: Date.now() - startedAt, errorCategory,
+        const tooLarge = error.code === "too_large";
+        await ctx.runMutation(internal.items.failItem, {
+          itemId: args.itemId,
+          reason: tooLarge ? "image_too_large" : "not_found",
         });
+        if (itemType !== undefined) {
+          await captureCategorizationTelemetry({
+            outcome: tooLarge ? "rejected" : "not_found",
+            itemType,
+            durationMs: Date.now() - startedAt,
+            errorCategory,
+          });
+        }
         return null;
       }
       console.error(`processItem failed for ${args.itemId}:`, errorCategory);
@@ -1251,7 +1258,9 @@ export const findProductLinks = internalAction({
       // and notes already have classified text that describes the thing.
       let query: string;
       if (item.type === "image") {
-        if (!item.storageId) throw new StoredImageError("not_found");
+        if (!item.storageId) {
+          throw new StoredImageError("not_found");
+        }
         const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
@@ -1330,7 +1339,8 @@ export const findProductLinks = internalAction({
     } catch (error) {
       if (error instanceof StoredImageError) {
         await ctx.runMutation(internal.items.setProductsInternal, {
-          itemId: args.itemId, productsStatus: "unavailable",
+          itemId: args.itemId,
+          productsStatus: "unavailable",
         });
         return null;
       }

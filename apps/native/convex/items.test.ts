@@ -20,10 +20,17 @@ type TestCtx = TestConvexForDataModel<DataModel>;
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
 const OP_ID_2 = "image:22222222-2222-4222-8222-222222222222";
 
-// These mutation tests assert queued jobs, not execution of the AI pipeline.
-// Keep scheduled callbacks from escaping into network calls during teardown.
-beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+// convex-test runs `runAfter(0, ...)` jobs via a real `setTimeout`, so the AI
+// action would fire during worker teardown (`EnvironmentTeardownError`). Fake
+// timers keep the jobs queued: `_scheduled_functions` rows are still written
+// and assertable, but nothing executes.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
@@ -1584,21 +1591,38 @@ describe("failed saves and retry", () => {
     expect(item?.failureReason).toBe("not_found");
   });
 
-  it.each(["not_found", "image_too_large"] as const)("does not spend retry capacity on a terminal photo (%s)", async (failureReason) => {
-    const t = await as("terminal-photo");
-    const id = await t.run(ctx => ctx.db.insert("items", {
-      userId: "terminal-photo", type: "image", status: "failed", failureReason, tags: [], searchText: "",
-    }));
-    for (let i = 0; i < 20; i++) {
+  it.each(["not_found", "image_too_large"] as const)(
+    "does not spend retry capacity on a terminal photo (%s)",
+    async (failureReason) => {
+      const t = await as("terminal-photo");
+      const id = await t.run((ctx) =>
+        ctx.db.insert("items", {
+          userId: "terminal-photo",
+          type: "image",
+          status: "failed",
+          failureReason,
+          tags: [],
+          searchText: "",
+        }),
+      );
+      for (let i = 0; i < 20; i++) {
+        await t.mutation(api.items.reprocessItem, { id });
+      }
+      expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+        status: "failed",
+        failureReason,
+      });
+      expect(
+        await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+      ).toHaveLength(0);
+      // A legitimate retry still succeeds after the terminal attempts.
+      await t.run((ctx) => ctx.db.patch(id, { failureReason: "error" }));
       await t.mutation(api.items.reprocessItem, { id });
-    }
-    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "failed", failureReason });
-    expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
-    // A legitimate retry still succeeds after the terminal attempts.
-    await t.run(ctx => ctx.db.patch(id, { failureReason: "error" }));
-    await t.mutation(api.items.reprocessItem, { id });
-    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "processing" });
-  });
+      expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+        status: "processing",
+      });
+    },
+  );
 
   it("does not retry a fully enriched item", async () => {
     const t = await as("retry-ready");
@@ -1657,53 +1681,112 @@ describe("rate limiting", () => {
   });
 });
 
-
 describe("photo rejection before classification", () => {
-  it.each([0, 14 * 1024 * 1024 + 1])("cleans up rejected attachments of %s bytes and creates no item", async size => {
-    const t = await as("oversized-attach");
-    await t.mutation(api.items.beginImageImport, {operationId: OP_ID});
-    const storageId = await t.run(ctx => ctx.storage.store(new Blob([new Uint8Array(size)])));
-    const result = await t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId});
-    expect(result.error).toBeTruthy();
-    expect(await t.run(ctx => ctx.db.system.get("_storage", storageId))).toBeNull();
-    await expect(t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).rejects.toThrow("no attached upload");
-    expect(await t.run(ctx => ctx.db.query("items").collect())).toHaveLength(0);
-    const valid = await storeBlob(t);
-    await t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId: valid});
-    expect(await t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).toBeTruthy();
-  });
+  const OVERSIZED = 14 * 1024 * 1024 + 1;
+
+  it.each([0, OVERSIZED])(
+    "cleans up rejected attachments of %s bytes and creates no item",
+    async (size) => {
+      const t = await as("oversized-attach");
+      await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+      const storageId = await t.run((ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array(size)])),
+      );
+      const result = await t.mutation(api.items.attachImageUpload, {
+        operationId: OP_ID,
+        storageId,
+      });
+      expect(result.error).toBeTruthy();
+      expect(
+        await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
+      ).toBeNull();
+      await expect(
+        t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+      ).rejects.toThrow("no attached upload");
+      expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(0);
+
+      const valid = await storeBlob(t);
+      await t.mutation(api.items.attachImageUpload, {
+        operationId: OP_ID,
+        storageId: valid,
+      });
+      expect(
+        await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+      ).toBeTruthy();
+    },
+  );
 
   it("blocks legacy oversized pending uploads at finalization", async () => {
     const t = await as("legacy-oversized");
-    await t.run(async ctx => {
-      const storageId = await ctx.storage.store(new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]));
-      await ctx.db.insert("itemOperations", {userId: "legacy-oversized", operationId: OP_ID, kind: "image", status: "pending", storageId, updatedAt: Date.now()});
+    await t.run(async (ctx) => {
+      const storageId = await ctx.storage.store(
+        new Blob([new Uint8Array(OVERSIZED)]),
+      );
+      await ctx.db.insert("itemOperations", {
+        userId: "legacy-oversized",
+        operationId: OP_ID,
+        kind: "image",
+        status: "pending",
+        storageId,
+        updatedAt: Date.now(),
+      });
     });
-    await expect(t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).rejects.toThrow("too large");
-    expect(await t.run(ctx => ctx.db.query("items").collect())).toHaveLength(0);
+    await expect(
+      t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow("too large");
+    expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(0);
   });
 
   it("does not charge or queue product-search retries for missing photos", async () => {
     const t = await as("missing-product-photo");
-    const id = await t.run(ctx => ctx.db.insert("items", {userId: "missing-product-photo", type: "image", status: "ready", tags: [], searchText: ""}));
-    for (let i = 0; i < 20; i++) await t.mutation(api.items.findLinks, {id});
-    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({productsStatus: "unavailable"});
-    expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
-    await t.run(ctx => ctx.db.patch(id, {type: "note", note: "chair", productsStatus: undefined}));
-    await t.mutation(api.items.findLinks, {id});
-    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({productsStatus: "searching"});
-  });
-});
+    const id = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "missing-product-photo",
+        type: "image",
+        status: "ready",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    for (let i = 0; i < 20; i++) {
+      await t.mutation(api.items.findLinks, { id });
+    }
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "unavailable",
+    });
+    expect(
+      await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+    ).toHaveLength(0);
 
-
-it("does not delete an oversized photo referenced by another item", async () => {
-  const t = await as("rejected-shared-upload");
-  const storageId = await t.run(async ctx => {
-    const id = await ctx.storage.store(new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]));
-    await ctx.db.insert("items", {userId: "other-user", type: "image", storageId: id, status: "ready", tags: [], searchText: ""});
-    return id;
+    await t.run((ctx) =>
+      ctx.db.patch(id, { type: "note", note: "chair", productsStatus: undefined }),
+    );
+    await t.mutation(api.items.findLinks, { id });
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      productsStatus: "searching",
+    });
   });
-  await t.mutation(api.items.beginImageImport, {operationId: OP_ID});
-  await expect(t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId})).rejects.toThrow("already in use");
-  expect(await t.run(ctx => ctx.db.system.get("_storage", storageId))).not.toBeNull();
+
+  it("does not delete an oversized photo referenced by another item", async () => {
+    const t = await as("rejected-shared-upload");
+    const storageId = await t.run(async (ctx) => {
+      const id = await ctx.storage.store(new Blob([new Uint8Array(OVERSIZED)]));
+      await ctx.db.insert("items", {
+        userId: "other-user",
+        type: "image",
+        storageId: id,
+        status: "ready",
+        tags: [],
+        searchText: "",
+      });
+      return id;
+    });
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await expect(
+      t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId }),
+    ).rejects.toThrow("already in use");
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
+    ).not.toBeNull();
+  });
 });
