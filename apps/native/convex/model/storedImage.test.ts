@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
-import { MAX_STORED_IMAGE_BYTES, readStoredImage } from "./storedImage";
+import { MAX_STORED_IMAGE_BYTES } from "./imagePolicy";
+import { readStoredImage } from "./storedImage";
 
 const imageId = "image-test-storage-id" as Id<"_storage">;
 

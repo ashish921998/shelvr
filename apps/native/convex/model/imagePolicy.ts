@@ -1,4 +1,7 @@
 const MAX_IMAGE_MIB = 14;
+// Base64 expands this to ~19.6 MB, leaving room for prompts below Gemini's
+// 20 MB inline request limit. Image space candidates are capped at 64 KiB
+// of JSON-escaped UTF-8 in ai.ts. Check before allocating the byte buffer.
 export const MAX_STORED_IMAGE_BYTES = MAX_IMAGE_MIB * 1024 * 1024;
 export const IMAGE_TOO_LARGE_MESSAGE = `This photo is too large to read. Save a smaller copy (under ${MAX_IMAGE_MIB} MB).`;
 

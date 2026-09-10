@@ -1,5 +1,5 @@
-import { isTerminalFailure } from "@convex/model/itemFields";
-import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
+import { isTerminalFailure } from '@convex/model/itemFields';
+import { IMAGE_TOO_LARGE_MESSAGE } from '@convex/model/imagePolicy';
 import { ProductsSection } from '@/components/products-section';
 import { ArticleReaderView } from '@/components/article-reader-view';
 import { ItemSpaces } from '@/components/item-spaces';
