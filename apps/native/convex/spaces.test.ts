@@ -462,11 +462,11 @@ describe("denormalized space summary", () => {
       return rows.filter((row) => row.savedCount !== undefined).map((row) => row._id);
     };
 
-    // Budget 8: the first space reads 5 rows (the first scan always gets the
-    // full per-space ceiling), leaving 3, so the second space can only be
-    // scanned to a 2-row limit and comes back incomplete. That is a budget
-    // stop, not an oversize space: nothing is skipped and the cursor points at
-    // the first space so the second is retried with a full budget.
+    // Budget 8: the first space scans to a 7-row limit and reads 5 rows,
+    // leaving 3, so the second space can only be scanned to a 2-row limit and
+    // comes back incomplete. That is a budget stop, not an oversize space:
+    // nothing is skipped and the cursor points at the first space so the
+    // second is retried with a full budget.
     const first = await t.mutation(internal.spaces.backfillSpaceCounters, {
       readBudget: 8,
     });
@@ -492,6 +492,21 @@ describe("denormalized space summary", () => {
       expect(await readSpace(t, spaceId)).toMatchObject({ savedCount: 5, suggestedCount: 0 });
       expect((await readSpace(t, spaceId)).previewItemIds).toHaveLength(3);
     }
+
+    // Budget 4: the first scan is capped at 3 rows and a 5-row space comes
+    // back incomplete. The budget is never exceeded, the space is skipped as
+    // oversize, and the cursor moves past it, so the run cannot stall on it.
+    await t.run((ctx) => ctx.db.patch(spaces[0], {
+      savedCount: undefined, suggestedCount: undefined,
+      previewItemIds: undefined, suggestedPreviewItemIds: undefined,
+    }));
+    const tight = await t.mutation(internal.spaces.backfillSpaceCounters, {
+      batchSize: 1, readBudget: 4,
+    });
+    expect(tight).toMatchObject({
+      processed: 1, updated: 0, skipped: [spaces[0]], done: false, cursor: spaces[0],
+    });
+    expect((await readSpace(t, spaces[0])).savedCount).toBeUndefined();
 
     // With the default budget the three small spaces fit one transaction, and
     // `force` recomputes rows that already carry a summary.

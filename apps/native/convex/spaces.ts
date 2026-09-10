@@ -47,10 +47,10 @@ const SPACE_DELETE_BATCH = 500;
 
 /**
  * Backfill bounds. A transaction visits at most BACKFILL_BATCH spaces and reads
- * at most about BACKFILL_READ_BUDGET join rows in total; a single space may
- * use the whole budget (BACKFILL_SCAN_LIMIT), and one above that ceiling is
- * left legacy. Convex caps documents read per transaction, so the two limits
- * together keep a batch of large spaces from exceeding it.
+ * at most BACKFILL_READ_BUDGET join rows in total (plus one probe row per
+ * space); a single space may use the whole budget, and one above that ceiling
+ * is left legacy. Convex caps documents read per transaction, so the two
+ * limits together keep a batch of large spaces from exceeding it.
  */
 const BACKFILL_BATCH = 10;
 const BACKFILL_SCAN_LIMIT = 8000;
@@ -615,8 +615,9 @@ export const acceptAllSuggestions = mutation({
  * transaction, and schedules itself until done. The cursor is the id of the
  * last space fully handled, so a batch that stops early because its read
  * budget is spent resumes exactly at the next space. Each space's joins are
- * read in full (up to BACKFILL_SCAN_LIMIT) so the persisted counts are exact;
- * a space over that ceiling is reported in `skipped` and left legacy. Only
+ * read in full (up to the smaller of BACKFILL_SCAN_LIMIT and the budget) so
+ * the persisted counts are exact; a space over that ceiling is reported in
+ * `skipped` and left legacy. Only
  * spaces missing a field are touched unless `force` is set, which recomputes
  * every visited space (a repair tool if the summary ever drifts).
  *
@@ -641,7 +642,8 @@ export const backfillSpaceCounters = internalMutation({
   }),
   handler: async (ctx, args) => {
     const batchSize = args.batchSize ?? BACKFILL_BATCH;
-    const readBudget = args.readBudget ?? BACKFILL_READ_BUDGET;
+    // At least two: one row to scan plus the completeness probe.
+    const readBudget = Math.max(2, args.readBudget ?? BACKFILL_READ_BUDGET);
     const after = args.cursor ?? null;
     // One extra row tells us whether anything follows the batch.
     const candidates = await ctx.db
@@ -664,20 +666,20 @@ export const backfillSpaceCounters = internalMutation({
         cursor = space._id;
         continue;
       }
-      // The first scan of a transaction always gets the full per-space
-      // ceiling, so a space that needs it is judged on its own size and the
-      // loop below cannot stall on it. Later scans get what is left.
+      // Every scan, including the first, stays inside the budget so one
+      // transaction never reads more than the caller allowed. The first scan
+      // of a transaction is judged on its own: if it comes back incomplete the
+      // space is over the effective ceiling and is skipped, never retried, so
+      // the loop cannot stall on it. Later scans get what is left.
       const first = remaining === readBudget;
       if (!first && remaining <= 1) {
         moreAfterBatch = true;
         break;
       }
-      const scanLimit = first
-        ? BACKFILL_SCAN_LIMIT
-        : Math.min(BACKFILL_SCAN_LIMIT, remaining - 1);
+      const scanLimit = Math.min(BACKFILL_SCAN_LIMIT, remaining - 1);
       const summary = await summarizeMemberships(ctx, space._id, scanLimit);
       remaining -= summary.scanned;
-      if (!summary.complete && scanLimit < BACKFILL_SCAN_LIMIT) {
+      if (!summary.complete && !first) {
         // Cut short by the budget, not by the space's size: leave the cursor
         // before this space so the continuation retries it with a full budget.
         moreAfterBatch = true;
