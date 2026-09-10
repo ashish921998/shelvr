@@ -41,6 +41,7 @@ export default function ProfileScreen() {
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
+  const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const fixtureResetEnabled =
@@ -309,7 +310,14 @@ export default function ProfileScreen() {
           size={18}
           tintColor={theme.colors.primaryText}
         />
-        <Text style={styles.proLabel}>{proLabel}</Text>
+        <View style={styles.proCopy}>
+          <Text style={styles.proLabel}>{proLabel}</Text>
+          {photoUsage ? (
+            <Text style={styles.preferenceDescription}>
+              {photoUsage.count.toLocaleString()} of {photoUsage.limit.toLocaleString()} photos
+            </Text>
+          ) : null}
+        </View>
         <AppSymbolIcon
           name="chevron.right"
           size={16}
@@ -505,8 +513,10 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
     color: theme.colors.muted,
   },
-  proLabel: {
+  proCopy: {
     flex: 1,
+  },
+  proLabel: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.foreground,

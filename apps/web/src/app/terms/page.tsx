@@ -58,7 +58,8 @@ export default function TermsPage() {
               in your App Store subscription settings, and cancelling before
               the trial ends means you won&rsquo;t be charged. Prices are shown
               before purchase and may change with notice. Refunds are handled
-              by Apple under App Store policies.
+              by Apple under App Store policies. Pro includes storage for up to
+              1,000 photos per account; links and notes are not limited.
             </p>
           </section>
 

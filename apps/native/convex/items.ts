@@ -9,7 +9,7 @@ import { rateLimiter } from "./model/rateLimiter";
 import { effectiveStatus } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { enrichmentValidator, failureReasonValidator, isTerminalFailure } from "./model/itemFields";
-import { imageSizeError } from "./model/imagePolicy";
+import { imageSizeError, MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 import { safeDeleteStorage } from "./model/storage";
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
@@ -381,6 +381,34 @@ async function isStorageUnreferenced(
   return ops.every((op) => op._id === excludeOperation);
 }
 
+// ponytail: counts by scanning the index (≤MAX docs per image save). Denormalize
+// onto users if the cap grows past a few thousand.
+async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
+  const photos = await ctx.db
+    .query("items")
+    .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("type", "image"))
+    .take(MAX_PHOTOS_PER_ACCOUNT);
+  return photos.length;
+}
+
+/** Concurrent finalizes at the cap both read the same index range and one
+ * inserts into it, so Convex's serializable OCC retries the loser, which then
+ * sees the full count and throws. */
+async function requirePhotoQuota(ctx: MutationCtx, userId: string): Promise<void> {
+  if ((await countPhotos(ctx, userId)) >= MAX_PHOTOS_PER_ACCOUNT) {
+    throw new Error(PHOTO_LIMIT_MESSAGE);
+  }
+}
+
+export const photoUsage = query({
+  args: {},
+  returns: v.object({ count: v.number(), limit: v.number() }),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    return { count: await countPhotos(ctx, userId), limit: MAX_PHOTOS_PER_ACCOUNT };
+  },
+});
+
 /** Discriminated return for beginImageImport. A named type (rather than inline
  * object literals) keeps `kind` a literal so the `returns` validator matches. */
 type BeginImageImportResult =
@@ -438,7 +466,9 @@ export const beginImageImport = mutation({
     }
 
     // Every remaining path creates, recycles, or refreshes work — gate once.
+    // Quota here saves the client an upload it could never finalize.
     await requireProEntitlement(ctx, userId);
+    await requirePhotoQuota(ctx, userId);
 
     if (op === null) {
       // (userId, operationId) uniqueness is enforced by Convex's serializable
@@ -627,6 +657,7 @@ export const finalizeImageImport = mutation({
     // sits here too — after the idempotent completed-return above, so a retry of
     // an already-finished import is never charged against the bucket.
     await requireProEntitlement(ctx, userId);
+    await requirePhotoQuota(ctx, userId);
     if (op?.storageId) {
       const metadata = await ctx.db.system.get("_storage", op.storageId);
       if (!metadata) throw new Error("Storage object not found");
