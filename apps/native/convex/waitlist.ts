@@ -1,7 +1,6 @@
 import { v, type Infer } from "convex/values";
 import { internal } from "./_generated/api";
 import {
-  action,
   internalAction,
   internalMutation,
   internalQuery,
@@ -30,6 +29,7 @@ const sourceValidator = v.union(
   v.literal("footer"),
   v.literal("unknown"),
 );
+type WaitlistSource = Infer<typeof sourceValidator>;
 
 const resendStatusValidator = v.union(
   v.literal("pending"),
@@ -37,6 +37,19 @@ const resendStatusValidator = v.union(
   v.literal("failed"),
   v.literal("unconfigured"),
 );
+
+// Why a Resend sync failed, without the provider's message. Resend echoes the
+// submitted address inside its error text, so the message is never stored or
+// logged; the category plus HTTP status is enough to triage an outage.
+const resendErrorCategoryValidator = v.union(
+  v.literal("rate_limited"),
+  v.literal("invalid_recipient"),
+  v.literal("auth_error"),
+  v.literal("provider_error"),
+  v.literal("timeout"),
+  v.literal("network_error"),
+);
+export type ResendErrorCategory = Infer<typeof resendErrorCategoryValidator>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_IP_LENGTH = 64;
@@ -53,10 +66,23 @@ function isValidEmail(email: string): boolean {
   return emailPattern.test(email) && email.length <= 254;
 }
 
-// The route derives the IP from proxy headers it does not fully control, and
-// `join` is callable directly, so treat anything that is not a plausible IP
-// address as absent rather than persisting attacker-chosen limiter keys.
-function normalizeIp(value: string | undefined): string | undefined {
+export function isWaitlistProduct(value: unknown): value is WaitlistProduct {
+  return value === "shelvr" || value === "shelvr-android";
+}
+
+export function isWaitlistSource(value: unknown): value is WaitlistSource {
+  return (
+    value === "hero" ||
+    value === "preview" ||
+    value === "footer" ||
+    value === "unknown"
+  );
+}
+
+// The web route derives the IP from proxy headers it does not fully control,
+// so treat anything that is not a plausible IP address as absent rather than
+// persisting attacker-chosen limiter keys.
+export function normalizeIp(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const ip = value.trim().slice(0, MAX_IP_LENGTH);
   if (ip.includes(":")) {
@@ -136,12 +162,26 @@ export const upsertSignup = internalMutation({
   },
 });
 
+/**
+ * Serialize a failure into the `resendError` column. The column predates the
+ * category split and is a plain string, so the two parts are joined as
+ * `<category>:<status>` (status omitted when the failure never got an HTTP
+ * response). Nothing from the provider's response body is included.
+ */
+export function formatResendError(
+  category: ResendErrorCategory,
+  status: number | undefined,
+): string {
+  return status === undefined ? category : `${category}:${status}`;
+}
+
 export const updateResendStatus = internalMutation({
   args: {
     id: v.id("waitlistSignups"),
     status: resendStatusValidator,
     contactId: v.optional(v.string()),
-    error: v.optional(v.string()),
+    errorCategory: v.optional(resendErrorCategoryValidator),
+    errorStatus: v.optional(v.number()),
     attempts: v.optional(v.number()),
     preserveError: v.optional(v.boolean()),
   },
@@ -155,9 +195,16 @@ export const updateResendStatus = internalMutation({
         ? {}
         : { resendContactId: args.contactId }),
       ...(args.attempts === undefined ? {} : { resendAttempts: args.attempts }),
-      // Same for the error text: the unconfigured path has nothing new to
-      // record and must keep the last real failure message visible.
-      ...(args.preserveError ? {} : { resendError: args.error }),
+      // Same for the error: the unconfigured path has nothing new to record
+      // and must keep the last real failure visible.
+      ...(args.preserveError
+        ? {}
+        : {
+            resendError:
+              args.errorCategory === undefined
+                ? undefined
+                : formatResendError(args.errorCategory, args.errorStatus),
+          }),
     });
     return null;
   },
@@ -229,6 +276,50 @@ export const listSignupsNeedingResendSync = internalQuery({
   },
 });
 
+/**
+ * A Resend call that returned a non-success HTTP status. Carries only the
+ * status and which step failed; the response body (which can echo the
+ * address) is never read into the error.
+ */
+class ResendResponseError extends Error {
+  constructor(
+    readonly step: "create" | "lookup" | "segment" | "topic",
+    readonly status: number,
+  ) {
+    super(`Resend ${step} failed (${status}).`);
+    this.name = "ResendResponseError";
+  }
+}
+
+/**
+ * Reduce any failure from the sync path to a fixed category and, when there
+ * was an HTTP response, its status code. Exported for testing.
+ */
+export function classifyResendError(error: unknown): {
+  category: ResendErrorCategory;
+  status: number | undefined;
+} {
+  if (error instanceof ResendResponseError) {
+    const { status } = error;
+    if (status === 429) return { category: "rate_limited", status };
+    if (status === 401 || status === 403)
+      return { category: "auth_error", status };
+    if (status === 400 || status === 422) {
+      return { category: "invalid_recipient", status };
+    }
+    return { category: "provider_error", status };
+  }
+  // `AbortSignal.timeout` rejects with a DOMException named TimeoutError (or
+  // AbortError on older runtimes).
+  if (
+    error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  ) {
+    return { category: "timeout", status: undefined };
+  }
+  return { category: "network_error", status: undefined };
+}
+
 async function resendRequest(apiKey: string, path: string, init: RequestInit) {
   return await fetch(`https://api.resend.com${path}`, {
     ...init,
@@ -274,7 +365,7 @@ async function syncResendContact(
       { method: "GET" },
     );
     if (!getResponse.ok) {
-      throw new Error(`Resend lookup failed (${getResponse.status}).`);
+      throw new ResendResponseError("lookup", getResponse.status);
     }
     const result = (await getResponse.json()) as { id?: string };
     contactId = result.id;
@@ -286,9 +377,7 @@ async function syncResendContact(
         { method: "POST" },
       );
       if (!segmentResponse.ok && segmentResponse.status !== 409) {
-        throw new Error(
-          `Resend segment sync failed (${segmentResponse.status}).`,
-        );
+        throw new ResendResponseError("segment", segmentResponse.status);
       }
     }
     if (topicId) {
@@ -303,11 +392,11 @@ async function syncResendContact(
         },
       );
       if (!topicResponse.ok) {
-        throw new Error(`Resend topic sync failed (${topicResponse.status}).`);
+        throw new ResendResponseError("topic", topicResponse.status);
       }
     }
   } else {
-    throw new Error(`Resend contact sync failed (${createResponse.status}).`);
+    throw new ResendResponseError("create", createResponse.status);
   }
   return contactId;
 }
@@ -343,59 +432,83 @@ async function persistResendSync(
     });
     return true;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message.slice(0, 500) : "Unknown error";
-    console.error("Waitlist Resend sync failed", message);
+    // Log and persist only the shape of the failure. The provider message (and
+    // the email it can echo) stays out of both the database and the logs.
+    const { category, status } = classifyResendError(error);
+    const step = error instanceof ResendResponseError ? error.step : undefined;
+    console.error("Waitlist Resend sync failed", { category, status, step });
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "failed",
-      error: message,
+      errorCategory: category,
+      errorStatus: status,
       attempts: attempts + 1,
     });
     return false;
   }
 }
 
-export const join = action({
-  args: {
-    email: v.string(),
-    product: v.optional(productValidator),
-    source: sourceValidator,
-    ip: v.optional(v.string()),
-  },
-  returns: v.object({
-    saved: v.boolean(),
-    emailProviderSynced: v.boolean(),
-  }),
-  handler: async (ctx, args) => {
-    const email = normalizeEmail(args.email);
-    if (!isValidEmail(email)) {
-      throw new Error("Enter a valid email address.");
-    }
-    const ip = normalizeIp(args.ip);
-    const product = args.product ?? "shelvr";
+/**
+ * Thrown by `joinWaitlist` for caller mistakes (bad email) so the HTTP layer
+ * can answer 400 instead of 5xx.
+ */
+export class WaitlistInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WaitlistInputError";
+  }
+}
 
-    const signup = await ctx.runMutation(internal.waitlist.upsertSignup, {
-      email,
-      product,
-      source: args.source,
-      ip,
-    });
+export type JoinWaitlistArgs = {
+  email: string;
+  product?: WaitlistProduct;
+  source: WaitlistSource;
+  ip?: string;
+};
 
-    if (signup.resendStatus === "synced") {
-      return { saved: true, emailProviderSynced: true };
-    }
+export type JoinWaitlistResult = {
+  saved: boolean;
+  emailProviderSynced: boolean;
+};
 
-    const emailProviderSynced = await persistResendSync(
-      ctx,
-      signup.id,
-      email,
-      product,
-      signup.resendAttempts,
-    );
-    return { saved: true, emailProviderSynced };
-  },
-});
+/**
+ * Persist a waitlist signup and project it to Resend. This is deliberately a
+ * plain helper, not a public `action`: the only legitimate caller is the
+ * `/waitlist/join` HTTP action in `http.ts`, which authenticates the web
+ * server with a shared secret and supplies the real client IP. A public action
+ * would let anyone omit or forge `ip` and skip the per-IP limiter.
+ */
+export async function joinWaitlist(
+  ctx: ActionCtx,
+  args: JoinWaitlistArgs,
+): Promise<JoinWaitlistResult> {
+  const email = normalizeEmail(args.email);
+  if (!isValidEmail(email)) {
+    throw new WaitlistInputError("Enter a valid email address.");
+  }
+  const ip = normalizeIp(args.ip);
+  const product = args.product ?? "shelvr";
+
+  const signup = await ctx.runMutation(internal.waitlist.upsertSignup, {
+    email,
+    product,
+    source: args.source,
+    ip,
+  });
+
+  if (signup.resendStatus === "synced") {
+    return { saved: true, emailProviderSynced: true };
+  }
+
+  const emailProviderSynced = await persistResendSync(
+    ctx,
+    signup.id,
+    email,
+    product,
+    signup.resendAttempts,
+  );
+  return { saved: true, emailProviderSynced };
+}
 
 export const retryFailedResendSyncs = internalAction({
   args: {},
