@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { env, mutation, query, type MutationCtx } from "./_generated/server";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
+import { insertMembership } from "./model/memberships";
 import { safeDeleteStorage } from "./model/storage";
 
 const RESET_LIMIT = 200;
@@ -200,25 +201,25 @@ export const resetCurrentUser = mutation({
       dynamic: true,
     });
 
-    await ctx.db.insert("spaceItems", {
+    await insertMembership(ctx, {
       userId,
       spaceId: recipesId,
       itemId: ramenId,
       status: "saved",
     });
-    await ctx.db.insert("spaceItems", {
+    await insertMembership(ctx, {
       userId,
       spaceId: tripsId,
       itemId: belemId,
       status: "saved",
     });
-    await ctx.db.insert("spaceItems", {
+    await insertMembership(ctx, {
       userId,
       spaceId: apartmentId,
       itemId: checklistId,
       status: "saved",
     });
-    await ctx.db.insert("spaceItems", {
+    await insertMembership(ctx, {
       userId,
       spaceId: apartmentId,
       itemId: craftId,

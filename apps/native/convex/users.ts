@@ -111,6 +111,9 @@ async function deleteUserOwnedDataBatch(
 ): Promise<boolean> {
   const userKey = userId as string;
 
+  // Raw deletes on purpose: every spaceItems write normally goes through
+  // model/memberships.ts to keep the space summary exact, but these spaces
+  // are deleted in the same pass, so patching their counters would be waste.
   const memberships = await ctx.db
     .query("spaceItems")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
