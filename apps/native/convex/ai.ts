@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { generateObject } from "ai";
+import { generateObject, wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { Readability } from "@mozilla/readability";
@@ -23,7 +23,18 @@ import { readStoredImage, StoredImageError } from "./model/storedImage";
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
 // reads the GOOGLE_GENERATIVE_AI_API_KEY deployment env var.
 const MODEL_NAME = "gemini-3.1-flash-lite";
-const MODEL = google(MODEL_NAME);
+// Token usage lands in the Convex log stream of whichever action made the call,
+// so classification and product-search spend can be told apart per invocation.
+const MODEL = wrapLanguageModel({
+  model: google(MODEL_NAME),
+  middleware: {
+    wrapGenerate: async ({ doGenerate }) => {
+      const result = await doGenerate();
+      console.log(`${MODEL_NAME} usage`, JSON.stringify(result.usage));
+      return result;
+    },
+  },
+});
 
 type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "rejected" | "failed";
 
