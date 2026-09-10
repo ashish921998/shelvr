@@ -5,6 +5,7 @@ import { recipientValidator } from "./model/notificationDelivery";
 import {
   enrichmentValidator,
   failureReasonValidator,
+  intentValidator,
 } from "./model/itemFields";
 
 export default defineSchema({
@@ -48,25 +49,8 @@ export default defineSchema({
     heroImageUrl: v.optional(v.string()),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
-    // without a backfill. `kind` is a closed union (mirrors items.ts).
-    intents: v.optional(
-      v.array(
-        v.object({
-          kind: v.union(
-            v.literal("open_url"),
-            v.literal("copy"),
-            v.literal("web_search"),
-            v.literal("open_maps"),
-            v.literal("call"),
-            v.literal("email"),
-            v.literal("message"),
-            v.literal("add_event"),
-          ),
-          label: v.string(),
-          value: v.string(),
-        }),
-      ),
-    ),
+    // without a backfill. `kind` is the closed union from model/itemFields.
+    intents: v.optional(v.array(intentValidator)),
     // Real product results from the user-triggered "Find links" pass
     // (SerpAPI Google Shopping). `productsStatus` tracks the in-flight action
     // so the button can show progress; absent = never searched.
@@ -93,11 +77,31 @@ export default defineSchema({
     // "no_article" = page fetched successfully but has no readable article body.
     // Absent means fully enriched.
     enrichment: v.optional(enrichmentValidator),
+    // Identity of the pipeline run that currently owns this item. Every flip
+    // to `processing` mints a fresh id and passes it to the scheduled
+    // processItem action; finalizeItem/failItem write only when the caller's
+    // id still matches, so a superseded run (a retry issued while the old
+    // action was still awaiting the model) can never overwrite the newer
+    // result. Absent on rows written before run fencing existed.
+    processingRunId: v.optional(v.string()),
+    // When the current run started (ms epoch). The stale-processing sweeper
+    // and reprocessItem treat a `processing` row older than
+    // PROCESSING_STALE_MS as orphaned. Absent on pre-fencing rows, which fall
+    // back to `_creationTime` (their only run is the one create scheduled).
+    processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
   })
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
     .index("by_user_and_type", ["userId", "type"])
+    // Status-scoped reads for one user (e.g. the ready items a recommendation
+    // pass samples) without over-reading and filtering in JS.
+    .index("by_user_and_status", ["userId", "status"])
+    // Stale-processing sweeper: pages `processing` rows across all users by
+    // run start. `undefined` sorts before every number, so pre-fencing rows
+    // with no processingStartedAt land at the front of the range and are
+    // judged by `_creationTime` instead.
+    .index("by_status_and_processingStartedAt", ["status", "processingStartedAt"])
     // Lets attachImageUpload confirm a client-supplied storage id is not
     // referenced by any completed item before deleting/adopting it, so a
     // malicious caller can't point attach at another user's storage object.
@@ -153,25 +157,8 @@ export default defineSchema({
     ),
     // Purpose-steered actions scoped to THIS space's membership: the same
     // couch gets a shopping link in "apartment shopping" and nothing extra in
-    // "interior design". Mirrors items.intents; kinds kept in sync with items.ts.
-    intents: v.optional(
-      v.array(
-        v.object({
-          kind: v.union(
-            v.literal("open_url"),
-            v.literal("copy"),
-            v.literal("web_search"),
-            v.literal("open_maps"),
-            v.literal("call"),
-            v.literal("email"),
-            v.literal("message"),
-            v.literal("add_event"),
-          ),
-          label: v.string(),
-          value: v.string(),
-        }),
-      ),
-    ),
+    // "interior design". Same shape as items.intents (model/itemFields).
+    intents: v.optional(v.array(intentValidator)),
   })
     .index("by_space", ["spaceId"])
     // Preview refills read one status bucket at a time, so a pile of

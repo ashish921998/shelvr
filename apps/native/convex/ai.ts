@@ -18,6 +18,7 @@ import {
 } from "./model/safeFetch";
 import { isTikTokUrl } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
+import { INTENT_KINDS } from "./model/itemFields";
 import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
@@ -35,6 +36,45 @@ const MODEL = wrapLanguageModel({
     },
   },
 });
+
+// Deadlines for every generateObject call. Without one a hung provider holds
+// the action until Convex kills it at 10 minutes and the item stays
+// `processing` with no failure path. The signal spans retries (the SDK does
+// not retry an abort), so each figure is the per-call worst case. Per action
+// the budget is one model call plus the safeFetch deadlines around it (15 s
+// page + 10 s hero image + 10 s poster), so the longest processItem run ends
+// in about 100 s — far under both the action limit and PROCESSING_STALE_MS.
+const CLASSIFY_TIMEOUT_MS = 60_000;
+// Ranking up to 100 titled items is a longer prompt but a tiny output.
+const RECOMMEND_TIMEOUT_MS = 45_000;
+// One short query or 0-3 intents: a small output over a small prompt.
+const SMALL_TIMEOUT_MS = 30_000;
+// One retry on retryable provider errors (429/5xx). The default of 2 would let
+// a flaky provider triple the wall-clock spend inside a single deadline.
+const MODEL_MAX_RETRIES = 1;
+
+function modelCallOptions(timeoutMs: number): {
+  abortSignal: AbortSignal;
+  maxRetries: number;
+} {
+  return {
+    abortSignal: AbortSignal.timeout(timeoutMs),
+    maxRetries: MODEL_MAX_RETRIES,
+  };
+}
+
+/** True for the error a timed-out or aborted model call rejects with. The SDK
+ * rethrows the raw signal reason (a DOMException named TimeoutError for
+ * AbortSignal.timeout, AbortError for a manual abort). Checked by name so the
+ * error's message (which can echo the request) is never inspected. */
+function isModelTimeout(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "name" in error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  );
+}
 
 type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "rejected" | "failed";
 
@@ -88,19 +128,10 @@ const SYSTEM_PROMPT =
   "punchy — like a label on a folder, not a headline. Aim for 2-4 words, never a full " +
   "sentence, and never end with a period.";
 
-// The closed set of intent kinds the model may emit. Kept in sync with the
-// Convex validator in items.ts; anything outside this set is dropped before
-// finalize so a hallucinated kind can never reach the DB.
-const INTENT_KINDS = [
-  "open_url",
-  "copy",
-  "web_search",
-  "open_maps",
-  "call",
-  "email",
-  "message",
-  "add_event",
-] as const;
+// The closed set of intent kinds the model may emit is INTENT_KINDS from
+// model/itemFields — the same tuple the Convex validators derive from, so the
+// zod enum below and the DB shape cannot drift. Anything outside it is
+// dropped in sanitizeIntents before finalize.
 
 // Appended to every classification prompt. Describes the catalog and the rules
 // that keep intents genuinely useful (and, for social posts, honest).
@@ -548,6 +579,12 @@ function summarizeError(error: unknown): string {
   if (isPageFetchError(error)) {
     return `page_fetch_error:${error.code}`;
   }
+  // A model call that hit its AbortSignal.timeout deadline. Its own stable
+  // category so provider slowness is visible in telemetry separately from
+  // genuine bugs, and so callers can treat it as retryable.
+  if (isModelTimeout(error)) {
+    return "model_timeout";
+  }
   // Defensive: safeFetch returns error codes in its result type and never
   // throws SafeFetchErrorClass itself, but if a future caller uses the
   // throwing variant directly this branch ensures the error is summarized.
@@ -787,7 +824,14 @@ function spacesPromptBlock(
 }
 
 export const processItem = internalAction({
-  args: { itemId: v.id("items") },
+  args: {
+    itemId: v.id("items"),
+    // The run id the scheduling mutation stamped on the item. Passed through
+    // to finalizeItem/failItem, which write only while it still matches, so
+    // this run cannot overwrite a newer one. Optional only so jobs scheduled
+    // before run fencing shipped still validate.
+    runId: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const startedAt = Date.now();
@@ -830,6 +874,7 @@ export const processItem = internalAction({
           );
           await ctx.runMutation(internal.items.failItem, {
             itemId: args.itemId,
+            runId: args.runId,
             reason: "not_found",
           });
           await captureCategorizationTelemetry({
@@ -853,6 +898,7 @@ export const processItem = internalAction({
         }
         const { object } = await generateObject({
           model: MODEL,
+          ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
           system: SYSTEM_PROMPT,
           schema: itemAnalysisSchema,
           prompt: [
@@ -884,6 +930,7 @@ export const processItem = internalAction({
         const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
+          ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
           system: SYSTEM_PROMPT,
           schema: itemAnalysisSchema,
           messages: [
@@ -910,6 +957,7 @@ export const processItem = internalAction({
         }
         const { object } = await generateObject({
           model: MODEL,
+          ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
           system: SYSTEM_PROMPT,
           schema: itemAnalysisSchema,
           prompt: [
@@ -943,6 +991,7 @@ export const processItem = internalAction({
         internal.items.finalizeItem,
         {
           itemId: args.itemId,
+          runId: args.runId,
           title: result.title,
           description: result.description,
           tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
@@ -960,7 +1009,12 @@ export const processItem = internalAction({
           status: "ready",
         },
       );
-      if (!finalized) {
+      if (finalized !== "applied") {
+        // The item was deleted, or a newer run owns it (the user retried while
+        // this run was awaiting the model). Either way this run's output is
+        // discarded: release the poster it stored and stop without touching
+        // memberships or telemetry for a result nobody will see. Not an
+        // error — the fence working is the expected outcome of that race.
         if (posterStorageId !== undefined) {
           await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
             storageId: posterStorageId,
@@ -1005,6 +1059,7 @@ export const processItem = internalAction({
         const tooLarge = error.code === "too_large";
         await ctx.runMutation(internal.items.failItem, {
           itemId: args.itemId,
+          runId: args.runId,
           reason: tooLarge ? "image_too_large" : "not_found",
         });
         if (itemType !== undefined) {
@@ -1017,14 +1072,27 @@ export const processItem = internalAction({
         }
         return null;
       }
-      console.error(`processItem failed for ${args.itemId}:`, errorCategory);
+      // A timed-out model call is an expected operational condition, not a
+      // bug: warn (not error), fail the item with the retryable `error` reason
+      // so the client offers Try again, record the outcome with its category,
+      // and resolve — rethrowing would page on provider slowness.
+      const timedOut = isModelTimeout(error);
+      if (timedOut) {
+        console.warn(`processItem timed out for ${args.itemId}:`, errorCategory);
+      } else {
+        console.error(`processItem failed for ${args.itemId}:`, errorCategory);
+      }
       if (posterStorageId !== undefined) {
         await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
           storageId: posterStorageId,
         });
       }
+      // failItem is run-fenced: if a retry already superseded this run the
+      // write is skipped, which is exactly right — the newer run owns the
+      // item's status now.
       await ctx.runMutation(internal.items.failItem, {
         itemId: args.itemId,
+        runId: args.runId,
         reason: "error",
       });
       if (itemType !== undefined) {
@@ -1034,6 +1102,9 @@ export const processItem = internalAction({
           durationMs: Date.now() - startedAt,
           errorCategory,
         });
+      }
+      if (timedOut) {
+        return null;
       }
       // Rethrow so Convex error tracking sees the failure.
       throw new Error(`ai_categorization_failed:${errorCategory}`);
@@ -1131,6 +1202,7 @@ export const recommendForSpace = internalAction({
 
       const { object } = await generateObject({
         model: MODEL,
+        ...modelCallOptions(RECOMMEND_TIMEOUT_MS),
         schema: recommendSchema,
         prompt: [
           "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Shelvr recommends a few existing saves for it — the user decides which to keep.",
@@ -1270,6 +1342,7 @@ export const findProductLinks = internalAction({
         const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
+          ...modelCallOptions(SMALL_TIMEOUT_MS),
           schema: productQuerySchema,
           messages: [
             {
@@ -1288,6 +1361,7 @@ export const findProductLinks = internalAction({
       } else {
         const { object } = await generateObject({
           model: MODEL,
+          ...modelCallOptions(SMALL_TIMEOUT_MS),
           schema: productQuerySchema,
           prompt: [
             "Identify the primary purchasable product described by this saved item and produce a shopping search query for it. If it does not describe a product, return an empty query.",
@@ -1394,6 +1468,7 @@ export const steerItemForSpace = internalAction({
 
       const { object } = await generateObject({
         model: MODEL,
+        ...modelCallOptions(SMALL_TIMEOUT_MS),
         schema: steerSchema,
         prompt: [
           `You are helping a save-it-for-later app. The user filed a saved item into their space "${space.name}" — treat that title as a statement of purpose and propose up to 3 actions ('intents') that serve it for this specific item.`,

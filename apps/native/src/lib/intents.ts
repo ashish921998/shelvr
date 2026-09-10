@@ -6,18 +6,12 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import type { IntentKind } from '@convex/model/itemFields';
 
-// The closed set of action kinds the AI can attach to an item. Mirrors the
-// Convex `intentKindValidator` in convex/items.ts.
-export type IntentKind =
-  | 'open_url'
-  | 'copy'
-  | 'web_search'
-  | 'open_maps'
-  | 'call'
-  | 'email'
-  | 'message'
-  | 'add_event';
+// The closed set of action kinds the AI can attach to an item, derived from
+// the same INTENT_KINDS tuple the Convex validators use so the exhaustive
+// switch below fails to compile when the backend learns a new kind.
+export type { IntentKind };
 
 /**
  * Execute an intent. Each kind maps to a guaranteed-installed Expo primitive.
