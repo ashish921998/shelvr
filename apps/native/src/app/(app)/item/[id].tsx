@@ -429,7 +429,7 @@ export default function ItemScreen() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.primary }}
             >
-              <AppSymbolIcon name="sparkles" size={15} tintColor="#fff" />
+              <AppSymbolIcon name="sparkles" size={15} tintColor={theme.colors.primaryForeground} />
               <Text style={styles.acceptText}>Add to space</Text>
             </GlassView>
           </Pressable>
@@ -500,6 +500,6 @@ const styles = StyleSheet.create((theme) => ({
   acceptText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: '#fff',
+    color: theme.colors.primaryForeground,
   },
 }));

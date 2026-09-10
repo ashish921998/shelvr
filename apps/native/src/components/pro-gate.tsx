@@ -72,6 +72,6 @@ const styles = StyleSheet.create((theme) => ({
   ctaText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.primaryForeground,
   },
 }));
