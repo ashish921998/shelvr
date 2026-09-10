@@ -29,12 +29,16 @@ export async function getMembership(
   itemId: Id<"items">,
   spaceId: Id<"spaces">,
 ): Promise<Doc<"spaceItems"> | null> {
-  // `by_item` bounds the scan to one item's rows (at most one per space the
-  // user owns); `.first()` stops at the match instead of loading them all.
+  // The pair is unique by construction (every insert goes through
+  // insertMembership after a lookup here), so the compound index lands on the
+  // one row without scanning the item's other spaces. `.first()` rather than
+  // `.unique()` so a duplicate left by old data degrades to the oldest row
+  // instead of failing every action on the pair.
   return await ctx.db
     .query("spaceItems")
-    .withIndex("by_item", (q) => q.eq("itemId", itemId))
-    .filter((q) => q.eq(q.field("spaceId"), spaceId))
+    .withIndex("by_item_and_space", (q) =>
+      q.eq("itemId", itemId).eq("spaceId", spaceId),
+    )
     .first();
 }
 
@@ -86,13 +90,14 @@ export function hasSummary(
  * Compute the summary from the join rows, reading the most recent
  * `scanLimit + 1` of them. `complete` is false when the space has more rows
  * than `scanLimit`; the counts are then a floor, not the truth, and callers
- * must not persist them.
+ * must not persist them. `scanned` is the number of rows actually read, so a
+ * caller that visits many spaces in one transaction can budget its reads.
  */
 export async function summarizeMemberships(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   scanLimit: number,
-): Promise<MembershipSummary & { complete: boolean }> {
+): Promise<MembershipSummary & { complete: boolean; scanned: number }> {
   const joins = await ctx.db
     .query("spaceItems")
     .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
@@ -119,7 +124,37 @@ export async function summarizeMemberships(
       }
     }
   }
-  return { ...summary, complete };
+  return { ...summary, complete, scanned: joins.length };
+}
+
+/**
+ * The newest `PREVIEW_LIMIT` item ids in one status bucket, read through
+ * `by_space_and_status` so rows of other statuses are never scanned. A space
+ * that accumulates hundreds of dismissed rows therefore cannot push its saved
+ * rows out of a bounded scan and leave the preview empty while the count is
+ * positive. Legacy rows store no `status` yet read as saved, so the saved
+ * bucket merges the explicit and the absent key.
+ */
+export async function previewItemIdsForStatus(
+  ctx: QueryCtx,
+  spaceId: Id<"spaces">,
+  status: CountedStatus,
+): Promise<Id<"items">[]> {
+  const keys: (MembershipStatus | undefined)[] =
+    status === "saved" ? ["saved", undefined] : ["suggested"];
+  const rows: Doc<"spaceItems">[] = [];
+  for (const key of keys) {
+    const page = await ctx.db
+      .query("spaceItems")
+      .withIndex("by_space_and_status", (q) =>
+        q.eq("spaceId", spaceId).eq("status", key),
+      )
+      .order("desc")
+      .take(PREVIEW_LIMIT);
+    rows.push(...page);
+  }
+  rows.sort((a, b) => b._creationTime - a._creationTime);
+  return rows.slice(0, PREVIEW_LIMIT).map((row) => row.itemId);
 }
 
 /** The four persisted fields of a summary, without the `complete` marker. */
@@ -201,18 +236,17 @@ async function applyTransition(
     );
   }
   // A bucket that lost a previewed member may still have more rows than the
-  // shortened list shows; top it up from a bounded scan. This is the only
+  // shortened list shows; top it up from that bucket alone. This is the only
   // path that reads join rows, and it runs only on removals of a cover item.
   for (const status of refill) {
     const count = patch[countField(status)] ?? space[countField(status)];
     const list = patch[previewField(status)] ?? space[previewField(status)];
     if (list.length < PREVIEW_LIMIT && count > list.length) {
-      const summary = await summarizeMemberships(
+      patch[previewField(status)] = await previewItemIdsForStatus(
         ctx,
         spaceId,
-        SUMMARY_SCAN_LIMIT,
+        status,
       );
-      patch[previewField(status)] = summary[previewField(status)];
     }
   }
   await ctx.db.patch(spaceId, patch);

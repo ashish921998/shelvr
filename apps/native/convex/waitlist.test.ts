@@ -10,8 +10,10 @@ import {
   CONSENT_TEXT,
   CONSENT_VERSION,
   RESEND_MAX_ATTEMPTS,
+  UNKNOWN_IP_LIMITER_KEY,
   classifyResendError,
   formatResendError,
+  normalizeIp,
 } from "./waitlist";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
 import { newConvexTest } from "./test.setup";
@@ -303,6 +305,75 @@ describe("POST /waitlist/join", () => {
       { ip: "not an ip; drop table" },
     );
     expect(response.status).toBe(200);
+  });
+
+  it("counts requests without a usable IP against one shared bucket", async () => {
+    const t = setup();
+    // Distinct emails so the per-email bucket never trips. Two requests carry
+    // no IP header and six carry a malformed one; all eight must land in the
+    // same bucket, whose capacity is 8, so the ninth is refused.
+    for (let i = 0; i < 2; i++) {
+      const response = await join(t, {
+        email: `anon-${i}@example.com`,
+        source: "hero",
+      });
+      expect(response.status).toBe(200);
+    }
+    for (let i = 0; i < 6; i++) {
+      const response = await join(
+        t,
+        { email: `anon-garbage-${i}@example.com`, source: "hero" },
+        { ip: "::::" },
+      );
+      expect(response.status).toBe(200);
+    }
+    const ninth = await join(t, { email: "anon-9@example.com", source: "hero" });
+    expect(ninth.status).toBe(429);
+
+    // A request with a real IP is unaffected by the shared bucket.
+    const known = await join(
+      t,
+      { email: "known@example.com", source: "hero" },
+      { ip: "198.51.100.9" },
+    );
+    expect(known.status).toBe(200);
+  });
+
+  it("applies the shared bucket inside upsertSignup, not only at the HTTP edge", async () => {
+    const t = setup();
+    const direct = (i: number) =>
+      t.mutation(internal.waitlist.upsertSignup, {
+        email: `direct-${i}@example.com`,
+        product: "shelvr",
+        source: "hero",
+      });
+    for (let i = 0; i < 8; i++) {
+      await direct(i);
+    }
+    await expect(direct(8)).rejects.toThrow();
+    expect(UNKNOWN_IP_LIMITER_KEY).toBe("unknown");
+  });
+});
+
+describe("normalizeIp", () => {
+  it("rejects malformed addresses that only look like IPv6", () => {
+    expect(normalizeIp("::::")).toBeUndefined();
+    expect(normalizeIp("aaaa:")).toBeUndefined();
+    expect(normalizeIp("not an ip; drop table")).toBeUndefined();
+    expect(normalizeIp("")).toBeUndefined();
+    expect(normalizeIp(undefined)).toBeUndefined();
+  });
+
+  it("normalizes equivalent IPv6 spellings to one key", () => {
+    const short = normalizeIp("2001:db8::1");
+    expect(short).toBeDefined();
+    expect(normalizeIp("2001:0db8:0000::0001")).toBe(short);
+    expect(normalizeIp(" 2001:DB8::1 ")).toBe(short);
+  });
+
+  it("unwraps IPv4-mapped IPv6 to the IPv4 key", () => {
+    expect(normalizeIp("::ffff:1.2.3.4")).toBe("1.2.3.4");
+    expect(normalizeIp("1.2.3.4")).toBe("1.2.3.4");
   });
 });
 

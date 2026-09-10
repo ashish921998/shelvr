@@ -607,18 +607,78 @@ export function decodeUtf8(bytes: Uint8Array): string {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
+/**
+ * Charset labels the WHATWG Encoding Standard maps to windows-1252. Browsers
+ * treat a page declared as ISO-8859-1 or ASCII as windows-1252, so the C1
+ * bytes 0x80-0x9F carry the curly quotes, dashes, and euro sign that authors
+ * actually meant. Node's TextDecoder followed ICU for these labels before
+ * Node 24 and left the C1 range as control characters, so the mapping is done
+ * here to keep the output identical on every supported Node version.
+ */
+const WINDOWS_1252_LABELS = new Set([
+  "ansi_x3.4-1968",
+  "ascii",
+  "cp1252",
+  "cp819",
+  "csisolatin1",
+  "ibm819",
+  "iso-8859-1",
+  "iso-ir-100",
+  "iso8859-1",
+  "iso88591",
+  "iso_8859-1",
+  "iso_8859-1:1987",
+  "l1",
+  "latin1",
+  "us-ascii",
+  "windows-1252",
+  "x-cp1252",
+]);
+
+/**
+ * WHATWG windows-1252 code points for bytes 0x80-0x9F, indexed by byte - 0x80.
+ * The five bytes the standard leaves unmapped (0x81, 0x8D, 0x8F, 0x90, 0x9D)
+ * decode to the same code point as the byte, exactly as the standard's
+ * index-single-byte visualization does.
+ */
+const WINDOWS_1252_C1: readonly number[] = [
+  0x20ac, 0x0081, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021,
+  0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008d, 0x017d, 0x008f,
+  0x0090, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
+  0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x009d, 0x017e, 0x0178,
+];
+
+/** Decode windows-1252 bytes. Every byte maps to exactly one code point, so
+ * this is a plain table walk: ASCII and 0xA0-0xFF are identity (as in
+ * ISO-8859-1), and the C1 range comes from the WHATWG table above. */
+function decodeWindows1252(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    out += String.fromCharCode(
+      byte >= 0x80 && byte <= 0x9f ? WINDOWS_1252_C1[byte - 0x80] : byte,
+    );
+  }
+  return out;
+}
+
 /** Decode bounded bytes as text, honoring the charset declared in the
  * Content-Type header. Extracts `charset=...` from the header (case-insensitive),
  * uses it if Node's TextDecoder supports it, and falls back to UTF-8 when the
  * charset is absent or unsupported. This avoids mojibake on pages served as
- * ISO-8859-1, Windows-1252, Shift_JIS, etc. */
+ * ISO-8859-1, Windows-1252, Shift_JIS, etc. Labels the Encoding Standard maps
+ * to windows-1252 are decoded locally so the result does not depend on the
+ * runtime's legacy-charset tables. */
 export function decodeWithContentType(
   bytes: Uint8Array,
   contentType: string,
 ): string {
-  const match = contentType.match(/charset\s*=\s*["']?([\w-]+)/i);
+  const match = contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i);
   const charset = match?.[1]?.toLowerCase();
   if (charset && charset !== "utf-8" && charset !== "utf8") {
+    if (WINDOWS_1252_LABELS.has(charset)) {
+      return decodeWindows1252(bytes);
+    }
     try {
       return new TextDecoder(charset).decode(bytes);
     } catch {

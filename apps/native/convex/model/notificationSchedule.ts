@@ -46,17 +46,42 @@ export function resolveTimezone(timezone: string | undefined): string {
   return timezone !== undefined && isValidTimezone(timezone) ? timezone : "UTC";
 }
 
-export function nextWeeklyDigestAt(now: number, timezone = "UTC"): number {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: resolveTimezone(timezone),
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
+const WALL_CLOCK_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+};
+
+/**
+ * The wall-clock formatter for a stored zone. Building the formatter is itself
+ * the validity check, so a bad zone costs one failed construction instead of a
+ * probe formatter plus the real one. Stored rows may predate input validation
+ * and must never make a digest fail forever, so an invalid zone falls back to
+ * UTC in the same way `resolveTimezone` does.
+ */
+function wallClockFormatter(timezone: string | undefined): Intl.DateTimeFormat {
+  if (timezone !== undefined && timezone.length <= MAX_TIMEZONE_LENGTH) {
+    try {
+      return new Intl.DateTimeFormat("en-US", {
+        ...WALL_CLOCK_FORMAT,
+        timeZone: timezone,
+      });
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    ...WALL_CLOCK_FORMAT,
+    timeZone: "UTC",
   });
+}
+
+export function nextWeeklyDigestAt(now: number, timezone = "UTC"): number {
+  const formatter = wallClockFormatter(timezone);
   const localTimestamp = (instant: number) => {
     const parts = formatter.formatToParts(instant);
     const part = (type: Intl.DateTimeFormatPartTypes) =>

@@ -379,6 +379,128 @@ describe("denormalized space summary", () => {
     expect(again).toMatchObject({ processed: 2, updated: 0, done: true });
   });
 
+  it("refills saved previews from the saved bucket even under a pile of newer dismissed rows", async () => {
+    const t = await entitledUser("user-a");
+    const spaceId = await t.mutation(api.spaces.createSpace, { name: "Recipes" });
+    const a = await seedItem(t, "user-a", "a");
+    const b = await seedItem(t, "user-a", "b");
+    const c = await seedItem(t, "user-a", "c");
+    const d = await seedItem(t, "user-a", "d");
+    for (const itemId of [a, b, c, d]) {
+      await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
+    }
+    // Sixty dismissals, all newer than the saved joins. Dismissed rows are not
+    // counted, so writing them directly leaves the summary truthful.
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 60; i++) {
+        const itemId = await ctx.db.insert("items", {
+          userId: "user-a", type: "note", status: "ready", tags: [], searchText: `d${i}`,
+        });
+        await ctx.db.insert("spaceItems", {
+          userId: "user-a", spaceId, itemId, status: "dismissed",
+        });
+      }
+    });
+    expect(await readSpace(t, spaceId)).toMatchObject({
+      savedCount: 4, previewItemIds: [d, c, b],
+    });
+
+    // Removing a cover leaves two covers for three saved rows, which forces a
+    // refill. It must find the saved rows behind sixty newer dismissed ones.
+    await t.mutation(api.spaces.removeItemFromSpace, { itemId: d, spaceId });
+    expect(await readSpace(t, spaceId)).toMatchObject({
+      savedCount: 3, previewItemIds: [c, b, a],
+    });
+  });
+
+  it("refills the saved bucket from legacy status-less rows too", async () => {
+    const t = await entitledUser("user-a");
+    const spaceId = await t.mutation(api.spaces.createSpace, { name: "Recipes" });
+    const legacy = await seedItem(t, "user-a", "legacy");
+    await t.run((ctx) =>
+      ctx.db.insert("spaceItems", { userId: "user-a", spaceId, itemId: legacy }),
+    );
+    // The direct insert bypassed the summary; heal the count by hand so the
+    // refill condition (count > list length) holds.
+    await t.run((ctx) => ctx.db.patch(spaceId, { savedCount: 1 }));
+    const a = await seedItem(t, "user-a", "a");
+    const b = await seedItem(t, "user-a", "b");
+    const c = await seedItem(t, "user-a", "c");
+    for (const itemId of [a, b, c]) {
+      await t.mutation(api.spaces.addItemToSpace, { itemId, spaceId });
+    }
+    expect(await readSpace(t, spaceId)).toMatchObject({
+      savedCount: 4, previewItemIds: [c, b, a],
+    });
+    await t.mutation(api.spaces.removeItemFromSpace, { itemId: c, spaceId });
+    expect(await readSpace(t, spaceId)).toMatchObject({
+      savedCount: 3, previewItemIds: [b, a, legacy],
+    });
+  });
+
+  it("backfill stops a batch when its read budget is spent and resumes at the next space", async () => {
+    const t = await entitledUser("user-a");
+    const spaces: Id<"spaces">[] = [];
+    for (const name of ["one", "two", "three"]) {
+      const spaceId = await t.run((ctx) =>
+        ctx.db.insert("spaces", { userId: "user-a", name }),
+      );
+      spaces.push(spaceId);
+      await t.run(async (ctx) => {
+        for (let i = 0; i < 5; i++) {
+          const itemId = await ctx.db.insert("items", {
+            userId: "user-a", type: "note", status: "ready", tags: [], searchText: `${name}${i}`,
+          });
+          await ctx.db.insert("spaceItems", {
+            userId: "user-a", spaceId, itemId, status: "saved",
+          });
+        }
+      });
+    }
+    const withSummary = async () => {
+      const rows = await Promise.all(spaces.map((id) => readSpace(t, id)));
+      return rows.filter((row) => row.savedCount !== undefined).map((row) => row._id);
+    };
+
+    // Budget 8: the first space reads 5 rows (the first scan always gets the
+    // full per-space ceiling), leaving 3, so the second space can only be
+    // scanned to a 2-row limit and comes back incomplete. That is a budget
+    // stop, not an oversize space: nothing is skipped and the cursor points at
+    // the first space so the second is retried with a full budget.
+    const first = await t.mutation(internal.spaces.backfillSpaceCounters, {
+      readBudget: 8,
+    });
+    expect(first).toMatchObject({ processed: 1, updated: 1, skipped: [], done: false });
+    expect(first.cursor).not.toBeNull();
+    expect(await withSummary()).toEqual([first.cursor]);
+    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    const continuation = jobs.filter((job) => job.name === "spaces:backfillSpaceCounters");
+    expect(continuation).toHaveLength(1);
+    expect(continuation[0].args[0]).toMatchObject({ cursor: first.cursor, readBudget: 8 });
+
+    const second = await t.mutation(internal.spaces.backfillSpaceCounters, {
+      cursor: first.cursor, readBudget: 8,
+    });
+    expect(second).toMatchObject({ processed: 1, updated: 1, done: false });
+    expect(second.cursor).not.toBe(first.cursor);
+    expect(await withSummary()).toHaveLength(2);
+    const third = await t.mutation(internal.spaces.backfillSpaceCounters, {
+      cursor: second.cursor, readBudget: 8,
+    });
+    expect(third).toMatchObject({ processed: 1, updated: 1, done: true, cursor: null });
+    for (const spaceId of spaces) {
+      expect(await readSpace(t, spaceId)).toMatchObject({ savedCount: 5, suggestedCount: 0 });
+      expect((await readSpace(t, spaceId)).previewItemIds).toHaveLength(3);
+    }
+
+    // With the default budget the three small spaces fit one transaction, and
+    // `force` recomputes rows that already carry a summary.
+    await t.run((ctx) => ctx.db.patch(spaces[0], { savedCount: 99 }));
+    const forced = await t.mutation(internal.spaces.backfillSpaceCounters, { force: true });
+    expect(forced).toMatchObject({ processed: 3, updated: 3, done: true });
+    expect(await readSpace(t, spaces[0])).toMatchObject({ savedCount: 5 });
+  });
+
   it("heals a small legacy row on its first write", async () => {
     const t = await entitledUser("user-a");
     const legacy = await t.run((ctx) =>

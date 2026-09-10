@@ -139,9 +139,10 @@ export default defineSchema({
     userId: v.string(),
     spaceId: v.id("spaces"),
     itemId: v.id("items"),
-    // The membership state machine. The AI may only ever write `suggested`
-    // rows and only ever touch `suggested` rows; `saved` and `dismissed` are
-    // user-owned, so the pipeline can never clobber a user decision.
+    // The membership state machine. The classifier and recommendation passes
+    // may only create or remove `suggested` rows; `saved` and `dismissed` are
+    // user-owned, so the pipeline can never clobber a user decision. Purpose
+    // steering may fill `intents` on a `saved` row but never moves its status.
     // Absent = legacy row = "saved".
     status: v.optional(
       v.union(
@@ -173,7 +174,13 @@ export default defineSchema({
     ),
   })
     .index("by_space", ["spaceId"])
+    // Preview refills read one status bucket at a time, so a pile of
+    // dismissed rows can never hide the saved rows behind them.
+    .index("by_space_and_status", ["spaceId", "status"])
     .index("by_item", ["itemId"])
+    // The (item, space) pair is the membership key; every user decision and
+    // steering write looks it up.
+    .index("by_item_and_space", ["itemId", "spaceId"])
     .index("by_user", ["userId"]),
 
   // Generic per-import idempotency ledger. One row per (userId, operationId),
