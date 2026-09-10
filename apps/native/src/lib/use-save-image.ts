@@ -36,7 +36,7 @@ export type ImageSaveRequest = {
   operationId?: string;
 };
 
-export type ImageSaveStage = 'begin' | 'upload' | 'attach' | 'finalize';
+export type ImageSaveStage = 'begin' | 'normalize' | 'upload' | 'attach' | 'finalize';
 
 /** A settled per-image outcome. A failure is data, not a rejected promise, so
  * one image failing can never erase its siblings' success information. A caller
@@ -65,8 +65,8 @@ export type SaveImageDeps = {
     | { kind: 'complete'; itemId: Id<'items'> }
   >;
   /** Re-encodes the file before upload; its output feeds both the upload and
-   * the stored aspect ratio. Absent in tests. */
-  normalize?: (image: LocalImage) => Promise<LocalImage>;
+   * the stored aspect ratio. */
+  normalize: (image: LocalImage) => Promise<LocalImage>;
   upload: (image: LocalImage, uploadUrl: string) => Promise<Id<'_storage'>>;
   attach: (
     operationId: string,
@@ -156,8 +156,10 @@ async function saveImageOperation(
       return { status: 'saved', operationId, image, itemId: began.itemId };
     }
 
+    stage = 'normalize';
+    const stored = await deps.normalize(image);
+
     stage = 'upload';
-    const stored = deps.normalize ? await deps.normalize(image) : image;
     const uploadedStorageId = await deps.upload(stored, began.uploadUrl);
 
     stage = 'attach';

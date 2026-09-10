@@ -35,7 +35,7 @@ vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 function makeDeps(overrides: Partial<SaveImageDeps> = {}): SaveImageDeps {
   return {
     begin: overrides.begin ?? (async () => ({ kind: "upload", uploadUrl: "https://upload.test" })),
-    normalize: overrides.normalize,
+    normalize: overrides.normalize ?? (async (image) => image),
     upload: overrides.upload ?? (async () => "ks_storage_uploaded" as never),
     attach: overrides.attach ?? (async (_op, storageId) => ({ storageId })),
     finalize: overrides.finalize ?? (async () => "ks_items_final" as never),
@@ -269,7 +269,7 @@ describe("saveImageOperations", () => {
     ]);
   });
 
-  it("uploads the normalized file and stores its aspect ratio, failing at the upload stage", async () => {
+  it("uploads the normalized file and stores its aspect ratio, failing at the normalize stage", async () => {
     const uploaded: string[] = [];
     const finalizeInputs: { aspectRatio?: number }[] = [];
     const deps = makeDeps({
@@ -294,7 +294,7 @@ describe("saveImageOperations", () => {
     expect(finalizeInputs).toEqual([expect.objectContaining({ aspectRatio: 2 })]);
     // The result still carries the original so a retry re-normalizes from it.
     expect(results[0]).toMatchObject({ status: "saved", image: { uri: "a" } });
-    expect(results[1]).toMatchObject({ status: "failed", stage: "upload" });
+    expect(results[1]).toMatchObject({ status: "failed", stage: "normalize", message: "decode failed" });
   });
 
   it("runs at most MAX_CONCURRENT_SAVES operations at a time", async () => {
