@@ -21,6 +21,7 @@ import type * as model_accountCreated from "../model/accountCreated.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
+import type * as model_imagePolicy from "../model/imagePolicy.js";
 import type * as model_itemFields from "../model/itemFields.js";
 import type * as model_memberships from "../model/memberships.js";
 import type * as model_notificationDelivery from "../model/notificationDelivery.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
+  "model/imagePolicy": typeof model_imagePolicy;
   "model/itemFields": typeof model_itemFields;
   "model/memberships": typeof model_memberships;
   "model/notificationDelivery": typeof model_notificationDelivery;

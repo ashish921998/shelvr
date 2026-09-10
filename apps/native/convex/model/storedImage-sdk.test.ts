@@ -2,15 +2,14 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-// A 24-byte ftyp box, as emitted by Apple's HEIC encoder. The installed
-// SDK recognizes only a 32-byte ftyp box with the heic major brand.
+// A 24-byte ftyp box, as emitted by Apple's HEIC encoder.
 const heic = Uint8Array.from([
   0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99, 0, 0, 0, 0, 104, 101, 105,
   99, 109, 105, 102, 49,
 ]);
 
 describe("stored image MIME type through the real AI SDK", () => {
-  it("sends unrecognized HEIC bytes to Google when the stored MIME type is supplied", async () => {
+  it("sends HEIC bytes to Google when the stored MIME type is supplied", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -29,20 +28,6 @@ describe("stored image MIME type through the real AI SDK", () => {
       fetch: request,
     });
     const model = google("gemini-3.1-flash-lite");
-    const messages = [
-      {
-        role: "user" as const,
-        content: [{ type: "image" as const, image: heic }],
-      },
-    ];
-
-    await expect(
-      generateText({ model, messages, maxRetries: 0 }),
-    ).rejects.toMatchObject({
-      name: "AI_UnsupportedFunctionalityError",
-    });
-    expect(request).not.toHaveBeenCalled();
-
     const result = await generateText({
       model,
       maxRetries: 0,

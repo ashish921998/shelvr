@@ -20,7 +20,7 @@ export function useFindLinks(item: SearchableItem | undefined) {
     finding ||
     !item ||
     item.status !== 'ready' ||
-    item.productsStatus === 'searching';
+    item.productsStatus === 'searching' || item.productsStatus === 'unavailable';
 
   const findLinks = useCallback(async () => {
     if (disabled || !item || inFlight.current) return;

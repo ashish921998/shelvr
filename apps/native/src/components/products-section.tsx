@@ -23,6 +23,16 @@ export function ProductsSection({ item }: { item: DetailItem }) {
   const products = item.products;
   const searching = item.productsStatus === 'searching';
 
+  if (item.productsStatus === 'unavailable') {
+    return (
+      <View style={styles.findLinksRow}>
+        <Text style={styles.chipLabel}>
+          {"This photo can't be used for product search. Save a smaller, valid copy."}
+        </Text>
+      </View>
+    );
+  }
+
   if (searching) {
     return (
       <View style={styles.findLinksRow}>

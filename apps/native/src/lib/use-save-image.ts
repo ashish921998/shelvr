@@ -1,3 +1,4 @@
+import { imageSizeError } from "@convex/model/imagePolicy";
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
@@ -187,9 +188,11 @@ export function useSaveImages() {
         begin: (operationId) => beginImageImport({ operationId }),
         upload: async (image, uploadUrl) => {
           const file = new File(image.uri);
+          const error = imageSizeError(file.size);
+          if (error) throw new Error(error);
           const result = await expoFetch(uploadUrl, {
             method: 'POST',
-            headers: { 'Content-Type': image.mimeType ?? 'image/jpeg' },
+            headers: image.mimeType?.startsWith('image/') ? { 'Content-Type': image.mimeType } : {},
             body: file,
           });
           if (!result.ok) {
@@ -200,8 +203,11 @@ export function useSaveImages() {
           };
           return storageId;
         },
-        attach: (operationId, storageId) =>
-          attachImageUpload({ operationId, storageId }),
+        attach: async (operationId, storageId) => {
+          const result = await attachImageUpload({ operationId, storageId });
+          if (result.error) throw new Error(result.error);
+          return result;
+        },
         finalize: (input) => finalizeImageImport({ ...input, analyticsSessionId: analytics.sessionId() }),
       };
       return await saveImageOperations(requests, deps, options);

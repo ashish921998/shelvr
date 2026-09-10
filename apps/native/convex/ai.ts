@@ -24,7 +24,7 @@ import { readStoredImage, StoredImageError } from "./model/storedImage";
 const MODEL_NAME = "gemini-3.1-flash-lite";
 const MODEL = google(MODEL_NAME);
 
-type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "failed";
+type CategorizationOutcome = "succeeded" | "partial" | "not_found" | "rejected" | "failed";
 
 /** No item ids, URLs, content, or user identifiers leave Convex. */
 async function captureCategorizationTelemetry(args: {
@@ -766,7 +766,7 @@ function spacesPromptBlock(
   const candidates: string[] = [];
   for (const space of spaces) {
     const description = imageRequest
-      ? space.description?.slice(0, 512)
+      ? Array.from(space.description ?? "").slice(0, 512).join("")
       : space.description;
     const line = `- "${space.name}"${description ? `: ${description}` : ""}`;
     if (imageRequest) {
@@ -995,6 +995,15 @@ export const processItem = internalAction({
       // addresses. For other errors log a generic category so a thrown Error's
       // message (which may include a URL) is not leaked either.
       const errorCategory = summarizeError(error);
+      if (error instanceof StoredImageError) {
+        const reason = error.code === "too_large" ? "image_too_large" : "not_found";
+        await ctx.runMutation(internal.items.failItem, { itemId: args.itemId, reason });
+        if (itemType !== undefined) await captureCategorizationTelemetry({
+          outcome: error.code === "too_large" ? "rejected" : "not_found",
+          itemType, durationMs: Date.now() - startedAt, errorCategory,
+        });
+        return null;
+      }
       console.error(`processItem failed for ${args.itemId}:`, errorCategory);
       if (posterStorageId !== undefined) {
         await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
@@ -1003,12 +1012,7 @@ export const processItem = internalAction({
       }
       await ctx.runMutation(internal.items.failItem, {
         itemId: args.itemId,
-        reason:
-          error instanceof StoredImageError
-            ? error.code === "too_large"
-              ? "image_too_large"
-              : "not_found"
-            : "error",
+        reason: "error",
       });
       if (itemType !== undefined) {
         await captureCategorizationTelemetry({
@@ -1246,7 +1250,8 @@ export const findProductLinks = internalAction({
       // Build the product query. Images go through the vision model; links
       // and notes already have classified text that describes the thing.
       let query: string;
-      if (item.type === "image" && item.storageId) {
+      if (item.type === "image") {
+        if (!item.storageId) throw new StoredImageError("not_found");
         const image = await readStoredImage(ctx.storage, item.storageId);
         const { object } = await generateObject({
           model: MODEL,
@@ -1323,6 +1328,12 @@ export const findProductLinks = internalAction({
         productsStatus: "ready",
       });
     } catch (error) {
+      if (error instanceof StoredImageError) {
+        await ctx.runMutation(internal.items.setProductsInternal, {
+          itemId: args.itemId, productsStatus: "unavailable",
+        });
+        return null;
+      }
       // Sanitized error log: never the raw error object (which may carry the
       // request URL with the API key, or a response body). summarizeError
       // reduces fetch-policy errors to a code and everything else to a category.

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 
 /**
  * Item-field validators shared by `schema.ts` (the document shape) and
@@ -23,3 +23,9 @@ export const enrichmentValidator = v.union(
   v.literal("partial"),
   v.literal("no_article"),
 );
+
+export function isTerminalFailure(
+  reason: Infer<typeof failureReasonValidator> | undefined,
+): boolean {
+  return reason === "not_found" || reason === "image_too_large";
+}

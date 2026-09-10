@@ -82,7 +82,7 @@ export default defineSchema({
       ),
     ),
     productsStatus: v.optional(
-      v.union(v.literal("searching"), v.literal("ready"), v.literal("failed")),
+      v.union(v.literal("searching"), v.literal("ready"), v.literal("failed"), v.literal("unavailable")),
     ),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with

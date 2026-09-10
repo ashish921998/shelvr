@@ -1656,3 +1656,54 @@ describe("rate limiting", () => {
     ).rejects.toThrow();
   });
 });
+
+
+describe("photo rejection before classification", () => {
+  it.each([0, 14 * 1024 * 1024 + 1])("cleans up rejected attachments of %s bytes and creates no item", async size => {
+    const t = await as("oversized-attach");
+    await t.mutation(api.items.beginImageImport, {operationId: OP_ID});
+    const storageId = await t.run(ctx => ctx.storage.store(new Blob([new Uint8Array(size)])));
+    const result = await t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId});
+    expect(result.error).toBeTruthy();
+    expect(await t.run(ctx => ctx.db.system.get("_storage", storageId))).toBeNull();
+    await expect(t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).rejects.toThrow("no attached upload");
+    expect(await t.run(ctx => ctx.db.query("items").collect())).toHaveLength(0);
+    const valid = await storeBlob(t);
+    await t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId: valid});
+    expect(await t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).toBeTruthy();
+  });
+
+  it("blocks legacy oversized pending uploads at finalization", async () => {
+    const t = await as("legacy-oversized");
+    await t.run(async ctx => {
+      const storageId = await ctx.storage.store(new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]));
+      await ctx.db.insert("itemOperations", {userId: "legacy-oversized", operationId: OP_ID, kind: "image", status: "pending", storageId, updatedAt: Date.now()});
+    });
+    await expect(t.mutation(api.items.finalizeImageImport, {operationId: OP_ID})).rejects.toThrow("too large");
+    expect(await t.run(ctx => ctx.db.query("items").collect())).toHaveLength(0);
+  });
+
+  it("does not charge or queue product-search retries for missing photos", async () => {
+    const t = await as("missing-product-photo");
+    const id = await t.run(ctx => ctx.db.insert("items", {userId: "missing-product-photo", type: "image", status: "ready", tags: [], searchText: ""}));
+    for (let i = 0; i < 20; i++) await t.mutation(api.items.findLinks, {id});
+    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({productsStatus: "unavailable"});
+    expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+    await t.run(ctx => ctx.db.patch(id, {type: "note", note: "chair", productsStatus: undefined}));
+    await t.mutation(api.items.findLinks, {id});
+    expect(await t.run(ctx => ctx.db.get(id))).toMatchObject({productsStatus: "searching"});
+  });
+});
+
+
+it("does not delete an oversized photo referenced by another item", async () => {
+  const t = await as("rejected-shared-upload");
+  const storageId = await t.run(async ctx => {
+    const id = await ctx.storage.store(new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]));
+    await ctx.db.insert("items", {userId: "other-user", type: "image", storageId: id, status: "ready", tags: [], searchText: ""});
+    return id;
+  });
+  await t.mutation(api.items.beginImageImport, {operationId: OP_ID});
+  await expect(t.mutation(api.items.attachImageUpload, {operationId: OP_ID, storageId})).rejects.toThrow("already in use");
+  expect(await t.run(ctx => ctx.db.system.get("_storage", storageId))).not.toBeNull();
+});

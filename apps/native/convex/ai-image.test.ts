@@ -119,9 +119,10 @@ describe("stored photo processing", () => {
     const t = newConvexTest();
     const { itemId, storageId, spaceId } = await photo(t);
     await t.run((ctx) => ctx.storage.delete(storageId));
-    await expect(t.action(internal.ai.processItem, { itemId })).rejects.toThrow(
-      "stored_image:not_found",
-    );
+    await expect(
+      t.action(internal.ai.processItem, { itemId }),
+    ).resolves.toBeNull();
+    expect(console.error).not.toHaveBeenCalled();
     expect(generateObject).not.toHaveBeenCalled();
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({
@@ -146,12 +147,13 @@ describe("stored photo processing", () => {
     ],
   ] as const)(
     "makes %s / %s terminal without calling the model",
-    async (blob, code, reason) => {
+    async (blob, _code, reason) => {
       const t = newConvexTest();
       const { itemId } = await photo(t, blob);
       await expect(
         t.action(internal.ai.processItem, { itemId }),
-      ).rejects.toThrow(`stored_image:${code}`);
+      ).resolves.toBeNull();
+      expect(console.error).not.toHaveBeenCalled();
       expect(generateObject).not.toHaveBeenCalled();
       expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
         status: "failed",
@@ -164,9 +166,10 @@ describe("stored photo processing", () => {
     const t = newConvexTest();
     const { itemId } = await photo(t);
     await t.run((ctx) => ctx.db.patch(itemId, { storageId: undefined }));
-    await expect(t.action(internal.ai.processItem, { itemId })).rejects.toThrow(
-      "stored_image:not_found",
-    );
+    await expect(
+      t.action(internal.ai.processItem, { itemId }),
+    ).resolves.toBeNull();
+    expect(console.error).not.toHaveBeenCalled();
     expect(generateObject).not.toHaveBeenCalled();
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "failed",
@@ -195,6 +198,37 @@ describe("stored photo processing", () => {
     expect(prompt).not.toContain('"Space 99"');
   });
 
+  it("makes missing product-search photos terminal without an action error", async () => {
+    const t = newConvexTest();
+    const { itemId, storageId } = await photo(t);
+    await t.run((ctx) => ctx.storage.delete(storageId));
+    await expect(
+      t.action(internal.ai.findProductLinks, { itemId }),
+    ).resolves.toBeNull();
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      productsStatus: "unavailable",
+    });
+    expect(generateObject).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("does not split emoji when shortening space descriptions", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.run((ctx) =>
+      ctx.db.insert("spaces", {
+        userId: "photo-user",
+        dynamic: true,
+        name: "Emoji",
+        description: "a".repeat(511) + "😀end",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId });
+    const prompt = generateObject.mock.calls[0][0].messages[0].content[0].text;
+    expect(prompt).toContain("a".repeat(511) + "😀");
+    expect(prompt).not.toContain("😀end");
+  });
+
   it("preserves HEIC metadata in both vision calls", async () => {
     const t = newConvexTest();
     const heic = new Uint8Array([
@@ -212,4 +246,20 @@ describe("stored photo processing", () => {
       ).toMatchObject({ image: heic, mediaType: "image/heic" });
     }
   });
+});
+
+it("records oversized input as rejected without reporting an action fault", async () => {
+  vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
+  vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
+  const t = newConvexTest();
+  const { itemId } = await photo(
+    t,
+    new Blob([new Uint8Array(14 * 1024 * 1024 + 1)]),
+  );
+  await expect(
+    t.action(internal.ai.processItem, { itemId }),
+  ).resolves.toBeNull();
+  const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+  expect(body.event).toBe("ai_categorization_rejected");
+  expect(console.error).not.toHaveBeenCalled();
 });

@@ -4,7 +4,8 @@ import type { Id } from "@convex/_generated/dataModel";
 // Base64 expands this to ~19.6 MB, leaving room for prompts below Gemini's
 // 20 MB inline request limit. Image space candidates are capped at 64 KiB
 // of JSON-escaped UTF-8 in ai.ts. Check before allocating the byte buffer.
-export const MAX_STORED_IMAGE_BYTES = 14 * 1024 * 1024;
+import { MAX_STORED_IMAGE_BYTES, heifMediaType } from "./imagePolicy";
+export { MAX_STORED_IMAGE_BYTES } from "./imagePolicy";
 export type StoredImageErrorCode = "not_found" | "empty" | "too_large";
 
 export class StoredImageError extends Error {
@@ -25,8 +26,11 @@ export async function readStoredImage(
   if (blob.size === 0) throw new StoredImageError("empty");
   if (blob.size > MAX_STORED_IMAGE_BYTES)
     throw new StoredImageError("too_large");
+  const bytes = new Uint8Array(await blob.arrayBuffer());
   return {
-    bytes: new Uint8Array(await blob.arrayBuffer()),
-    mediaType: blob.type || undefined,
+    bytes,
+    mediaType:
+      heifMediaType(bytes) ??
+      (blob.type.startsWith("image/") ? blob.type : undefined),
   };
 }

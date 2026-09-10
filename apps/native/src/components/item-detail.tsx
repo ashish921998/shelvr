@@ -1,3 +1,5 @@
+import { isTerminalFailure } from "@convex/model/itemFields";
+import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
 import { ProductsSection } from '@/components/products-section';
 import { ArticleReaderView } from '@/components/article-reader-view';
 import { ItemSpaces } from '@/components/item-spaces';
@@ -327,7 +329,7 @@ function saveState(item: DetailItem): SaveState | null {
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   image_too_large:
-    'This photo is too large to read. Save a smaller copy (under 14 MB).',
+    IMAGE_TOO_LARGE_MESSAGE,
   gone: 'This page is gone — it was deleted, or the link was wrong.',
   failed: "Shelvr couldn't read this page.",
   partial:
@@ -385,7 +387,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
             ? `Shelvr couldn't read this ${item.type === 'image' ? 'photo' : 'note'}.`
             : SAVE_STATE_NOTICE[state]}
       </Text>
-      {state === 'gone' || state === 'image_too_large' || state === 'no_article' ? null : (
+      {isTerminalFailure(item.failureReason) || state === 'no_article' ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
