@@ -96,6 +96,20 @@ export function saveFailureReason(message: string): ImageSaveFailureReason {
   return 'other';
 }
 
+/** One `images_save_failed` event per distinct reason in a batch, so a mixed
+ * batch (one over quota, one too large) is not counted under a single bucket. */
+export function reportSaveFailures(results: ImageSaveResult[]): void {
+  const counts = new Map<ImageSaveFailureReason, number>();
+  for (const result of results) {
+    if (result.status !== 'failed') continue;
+    const reason = saveFailureReason(result.message);
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  for (const [reason, image_count] of counts) {
+    analytics.capture('images_save_failed', { reason, image_count });
+  }
+}
+
 /** Prefix lets operation ids stand out in server logs while keeping the UUID
  * as the stable, unique portion. */
 function generateOperationId(): string {
