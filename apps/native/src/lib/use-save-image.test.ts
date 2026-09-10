@@ -3,6 +3,7 @@
 // here — only the dependency-injected orchestration, which is where the
 // per-image settled-result contract lives. Runs in the Node default env.
 import {
+  MAX_CONCURRENT_SAVES,
   saveImageOperations,
   type ImageSaveResult,
   type SaveImageDeps,
@@ -15,6 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 // time. Only the orchestration (which receives its deps as arguments) is
 // exercised.
 vi.mock("expo-file-system", () => ({ File: class {} }));
+vi.mock("@/lib/normalize-image", () => ({ normalizeImage: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ analytics: { sessionId: () => undefined } }));
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
@@ -33,6 +35,7 @@ vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 function makeDeps(overrides: Partial<SaveImageDeps> = {}): SaveImageDeps {
   return {
     begin: overrides.begin ?? (async () => ({ kind: "upload", uploadUrl: "https://upload.test" })),
+    normalize: overrides.normalize,
     upload: overrides.upload ?? (async () => "ks_storage_uploaded" as never),
     attach: overrides.attach ?? (async (_op, storageId) => ({ storageId })),
     finalize: overrides.finalize ?? (async () => "ks_items_final" as never),
@@ -264,6 +267,51 @@ describe("saveImageOperations", () => {
         spaceId: "space-1",
       },
     ]);
+  });
+
+  it("uploads the normalized file and stores its aspect ratio, failing at the upload stage", async () => {
+    const uploaded: string[] = [];
+    const finalizeInputs: { aspectRatio?: number }[] = [];
+    const deps = makeDeps({
+      normalize: async (image) =>
+        image.uri === "bad"
+          ? Promise.reject(new Error("decode failed"))
+          : { ...image, uri: `${image.uri}-small`, width: 1600, height: 800 },
+      upload: async (image) => {
+        uploaded.push(image.uri);
+        return "ks_storage_uploaded" as never;
+      },
+      finalize: async (input) => {
+        finalizeInputs.push(input);
+        return "final-item" as never;
+      },
+    });
+    const results = await saveImageOperations(
+      [{ image: { uri: "a", width: 4000, height: 2000 } }, { image: img("bad") }],
+      deps,
+    );
+    expect(uploaded).toEqual(["a-small"]);
+    expect(finalizeInputs).toEqual([expect.objectContaining({ aspectRatio: 2 })]);
+    // The result still carries the original so a retry re-normalizes from it.
+    expect(results[0]).toMatchObject({ status: "saved", image: { uri: "a" } });
+    expect(results[1]).toMatchObject({ status: "failed", stage: "upload" });
+  });
+
+  it("runs at most MAX_CONCURRENT_SAVES operations at a time", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const deps = makeDeps({
+      upload: async () => {
+        peak = Math.max(peak, ++inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+        return "ks_storage_uploaded" as never;
+      },
+    });
+    const requests = Array.from({ length: 10 }, (_, i) => ({ image: img(`img-${i}`) }));
+    const results = await saveImageOperations(requests, deps);
+    expect(peak).toBe(MAX_CONCURRENT_SAVES);
+    expect(results.map((r) => r.image.uri)).toEqual(requests.map((r) => r.image.uri));
   });
 
   it("falls back to a generic message when the thrown value is not an Error", async () => {

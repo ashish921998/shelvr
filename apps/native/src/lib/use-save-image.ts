@@ -8,6 +8,7 @@ import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useCallback } from 'react';
 import { analytics } from '@/lib/analytics';
+import { normalizeImage } from '@/lib/normalize-image';
 
 export type LocalImage = {
   uri: string;
@@ -63,6 +64,9 @@ export type SaveImageDeps = {
     | { kind: 'upload'; uploadUrl: string }
     | { kind: 'complete'; itemId: Id<'items'> }
   >;
+  /** Re-encodes the file before upload; its output feeds both the upload and
+   * the stored aspect ratio. Absent in tests. */
+  normalize?: (image: LocalImage) => Promise<LocalImage>;
   upload: (image: LocalImage, uploadUrl: string) => Promise<Id<'_storage'>>;
   attach: (
     operationId: string,
@@ -101,10 +105,14 @@ function sanitizeMessage(error: unknown, stage: ImageSaveStage): string {
   return `Could not complete (${stage})`;
 }
 
+/** Normalizing decodes the full original; ten 12MP photos at once is enough
+ * to get the app killed for memory. */
+export const MAX_CONCURRENT_SAVES = 3;
+
 /**
  * Drives the begin -> upload -> attach -> finalize lifecycle for each image
- * concurrently and returns one settled result per input, in input order. Each
- * task catches its own errors (Promise.all never rejects here), so a failure is
+ * (at most MAX_CONCURRENT_SAVES at a time) and returns one settled result per
+ * input, in input order. Each task catches its own errors, so a failure is
  * reported as data rather than discarding sibling successes. A request without
  * an operationId gets a fresh one; a retry must pass the failed result's id.
  */
@@ -113,62 +121,77 @@ export async function saveImageOperations(
   deps: SaveImageDeps,
   options?: { spaceId?: Id<'spaces'> },
 ): Promise<ImageSaveResult[]> {
-  return await Promise.all(
-    requests.map(async (request): Promise<ImageSaveResult> => {
-      const image = request.image;
-      let stage: ImageSaveStage = 'begin';
-      // Minted inside the try: if id generation itself throws, that image must
-      // settle as a failed result like any other error — a rejection here would
-      // reject the whole Promise.all and erase sibling successes.
-      let operationId = request.operationId;
-      try {
-        // `||` (not `??`): the empty-string placeholder from a mint failure
-        // must also get a fresh id on retry.
-        operationId = operationId || generateOperationId();
-        const began = await deps.begin(operationId);
-        if (began.kind === 'complete') {
-          // Already finalized server-side (a previous attempt landed); skip the
-          // upload entirely and report the existing item.
-          return { status: 'saved', operationId, image, itemId: began.itemId };
-        }
-
-        stage = 'upload';
-        const uploadedStorageId = await deps.upload(image, began.uploadUrl);
-
-        stage = 'attach';
-        // Attach records the uploaded storage id on the pending operation (and,
-        // for a racing retry that already attached a different id, discards this
-        // redundant upload server-side). finalize reads the canonical id back
-        // from the ledger. Rejections must stop this operation before finalize.
-        const attached = await deps.attach(operationId, uploadedStorageId);
-        if (attached.error) throw new Error(attached.error);
-
-        stage = 'finalize';
-        const aspectRatio =
-          image.width && image.height ? image.width / image.height : undefined;
-        const itemId = await deps.finalize({
-          operationId,
-          aspectRatio,
-          isSticker: image.isSticker,
-          capturedAt: image.capturedAt,
-          latitude: image.latitude,
-          longitude: image.longitude,
-          spaceId: options?.spaceId,
-        });
-        return { status: 'saved', operationId, image, itemId };
-      } catch (error) {
-        return {
-          status: 'failed',
-          // Only undefined if minting itself threw; the placeholder keeps the
-          // result shape intact and a retry of it simply mints a fresh id.
-          operationId: operationId ?? '',
-          image,
-          stage,
-          message: sanitizeMessage(error, stage),
-        };
-      }
-    }),
+  const results: ImageSaveResult[] = new Array(requests.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < requests.length) {
+      const index = next++;
+      results[index] = await saveImageOperation(requests[index], deps, options);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(MAX_CONCURRENT_SAVES, requests.length) }, worker),
   );
+  return results;
+}
+
+async function saveImageOperation(
+  request: ImageSaveRequest,
+  deps: SaveImageDeps,
+  options?: { spaceId?: Id<'spaces'> },
+): Promise<ImageSaveResult> {
+  const image = request.image;
+  let stage: ImageSaveStage = 'begin';
+  // Minted inside the try: if id generation itself throws, that image must
+  // settle as a failed result like any other error.
+  let operationId = request.operationId;
+  try {
+    // `||` (not `??`): the empty-string placeholder from a mint failure
+    // must also get a fresh id on retry.
+    operationId = operationId || generateOperationId();
+    const began = await deps.begin(operationId);
+    if (began.kind === 'complete') {
+      // Already finalized server-side (a previous attempt landed); skip the
+      // upload entirely and report the existing item.
+      return { status: 'saved', operationId, image, itemId: began.itemId };
+    }
+
+    stage = 'upload';
+    const stored = deps.normalize ? await deps.normalize(image) : image;
+    const uploadedStorageId = await deps.upload(stored, began.uploadUrl);
+
+    stage = 'attach';
+    // Attach records the uploaded storage id on the pending operation (and,
+    // for a racing retry that already attached a different id, discards this
+    // redundant upload server-side). finalize reads the canonical id back
+    // from the ledger. Rejections must stop this operation before finalize.
+    const attached = await deps.attach(operationId, uploadedStorageId);
+    if (attached.error) throw new Error(attached.error);
+
+    stage = 'finalize';
+    const aspectRatio =
+      stored.width && stored.height ? stored.width / stored.height : undefined;
+    const itemId = await deps.finalize({
+      operationId,
+      aspectRatio,
+      isSticker: image.isSticker,
+      capturedAt: image.capturedAt,
+      latitude: image.latitude,
+      longitude: image.longitude,
+      spaceId: options?.spaceId,
+    });
+    return { status: 'saved', operationId, image, itemId };
+  } catch (error) {
+    return {
+      status: 'failed',
+      // Only undefined if minting itself threw; the placeholder keeps the
+      // result shape intact and a retry of it simply mints a fresh id.
+      operationId: operationId ?? '',
+      image,
+      stage,
+      message: sanitizeMessage(error, stage),
+    };
+  }
 }
 
 /**
@@ -188,6 +211,7 @@ export function useSaveImages() {
     ): Promise<ImageSaveResult[]> => {
       const deps: SaveImageDeps = {
         begin: (operationId) => beginImageImport({ operationId }),
+        normalize: normalizeImage,
         upload: async (image, uploadUrl) => {
           const file = new File(image.uri);
           const error = imageSizeError(file.size);
