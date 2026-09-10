@@ -96,6 +96,8 @@ export default defineSchema({
     searchText: v.string(),
   })
     .index("by_user", ["userId"])
+    // Photo quota: count an account's image items without scanning links/notes.
+    .index("by_user_and_type", ["userId", "type"])
     // Lets attachImageUpload confirm a client-supplied storage id is not
     // referenced by any completed item before deleting/adopting it, so a
     // malicious caller can't point attach at another user's storage object.

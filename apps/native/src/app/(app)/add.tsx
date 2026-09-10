@@ -187,7 +187,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
       const savedCount = results.length - failed.length;
       Alert.alert(
         'Could not save all images',
-        `${savedCount} of ${results.length} saved. Retry the failed images?`,
+        `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
         [
           {
             text: 'Retry failed',

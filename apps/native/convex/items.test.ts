@@ -9,6 +9,7 @@ import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
 import { STALE_IMPORT_CUTOFF_MS } from "./items";
+import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
 // Used as the shared param type for helpers that drive either a base or
@@ -117,6 +118,45 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
     );
   });
 }
+
+describe("photo quota", () => {
+  it("refuses a new photo at the cap, reports usage, and frees the slot on delete", async () => {
+    const t = await as("user-a");
+    // Fill the account to one under the cap, then take the last slot for real.
+    await t.run(async (ctx) => {
+      for (let i = 0; i < MAX_PHOTOS_PER_ACCOUNT - 1; i++) {
+        await ctx.db.insert("items", {
+          userId: "user-a",
+          type: "image",
+          status: "ready",
+          tags: [],
+          searchText: "",
+        });
+      }
+      // Links and notes never count.
+      await ctx.db.insert("items", { userId: "user-a", type: "link", status: "ready", tags: [], searchText: "" });
+    });
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId: await storeBlob(t) });
+    const lastId = await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID });
+    expect(await t.query(api.items.photoUsage, {})).toEqual({
+      count: MAX_PHOTOS_PER_ACCOUNT,
+      limit: MAX_PHOTOS_PER_ACCOUNT,
+    });
+
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 }),
+    ).rejects.toThrow(PHOTO_LIMIT_MESSAGE);
+    // A completed operation still returns its item to a full account.
+    expect(await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID })).toBe(lastId);
+
+    await t.mutation(api.items.deleteItem, { id: lastId });
+    expect((await t.query(api.items.photoUsage, {})).count).toBe(MAX_PHOTOS_PER_ACCOUNT - 1);
+    expect(
+      (await t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 })).kind,
+    ).toBe("upload");
+  });
+});
 
 describe("image import lifecycle", () => {
   it("finalizes a pending operation into one item and schedules processing", async () => {
