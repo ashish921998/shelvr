@@ -22,10 +22,15 @@ jobs:
         with:
           version: 10.33.0
 
+      # Node 24 is required, not a preference. On Node 20 and Node 22 the
+      # TextDecoder for legacy charsets follows the ICU mapping, so the byte
+      # 0x92 in windows-1252 decodes to U+0092. Node 24 follows the WHATWG
+      # mapping and decodes it to U+2019. A safeFetch test asserts the WHATWG
+      # result, so the suite only passes on Node 24. See the pull request.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
