@@ -58,6 +58,13 @@ const BACKFILL_BATCH = 10;
 const BACKFILL_SCAN_LIMIT = 8000;
 const BACKFILL_READ_BUDGET = BACKFILL_SCAN_LIMIT + 1;
 
+/** A whole number at or above `min`, or `fallback` for anything else. */
+function knob(value: number | undefined, min: number, fallback: number): number {
+  return value !== undefined && Number.isFinite(value) && value >= min
+    ? Math.floor(value)
+    : fallback;
+}
+
 /** A space's joins split by who owns them: the user (saved) vs Shelvr (suggested). */
 async function splitJoins(ctx: QueryCtx, spaceId: Id<"spaces">) {
   const joins = await ctx.db
@@ -643,9 +650,11 @@ export const backfillSpaceCounters = internalMutation({
     cursor: v.union(v.id("spaces"), v.null()),
   }),
   handler: async (ctx, args) => {
-    const batchSize = args.batchSize ?? BACKFILL_BATCH;
-    // At least two: one row to scan plus the completeness probe.
-    const readBudget = Math.max(2, args.readBudget ?? BACKFILL_READ_BUDGET);
+    // Operator knobs. A batch below one would reschedule forever without
+    // advancing the cursor, and a budget below two cannot fit one row plus its
+    // completeness probe, so anything outside the floor uses the default.
+    const batchSize = knob(args.batchSize, 1, BACKFILL_BATCH);
+    const readBudget = knob(args.readBudget, 2, BACKFILL_READ_BUDGET);
     const after = args.cursor ?? null;
     // One extra row tells us whether anything follows the batch.
     const candidates = await ctx.db

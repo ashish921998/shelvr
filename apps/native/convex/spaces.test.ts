@@ -514,6 +514,16 @@ describe("denormalized space summary", () => {
     const forced = await t.mutation(internal.spaces.backfillSpaceCounters, { force: true });
     expect(forced).toMatchObject({ processed: 3, updated: 3, done: true });
     expect(await readSpace(t, spaces[0])).toMatchObject({ savedCount: 5 });
+
+    // Knobs below their floor fall back to the defaults instead of stalling:
+    // batchSize 0 would otherwise reschedule forever without moving the cursor.
+    const before = (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).length;
+    const zero = await t.mutation(internal.spaces.backfillSpaceCounters, {
+      batchSize: 0, readBudget: -5, force: true,
+    });
+    expect(zero).toMatchObject({ processed: 3, updated: 3, done: true, cursor: null });
+    const after = (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).length;
+    expect(after).toBe(before);
   });
 
   it("heals a small legacy row on its first write", async () => {
