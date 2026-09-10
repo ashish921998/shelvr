@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -393,10 +393,11 @@ async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
 
 /** Concurrent finalizes at the cap both read the same index range and one
  * inserts into it, so Convex's serializable OCC retries the loser, which then
- * sees the full count and throws. */
+ * sees the full count and throws. ConvexError, not Error: production redacts
+ * plain Error messages to "Server Error", and this one is meant for the user. */
 async function requirePhotoQuota(ctx: MutationCtx, userId: string): Promise<void> {
   if ((await countPhotos(ctx, userId)) >= MAX_PHOTOS_PER_ACCOUNT) {
-    throw new Error(PHOTO_LIMIT_MESSAGE);
+    throw new ConvexError(PHOTO_LIMIT_MESSAGE);
   }
 }
 
@@ -662,7 +663,7 @@ export const finalizeImageImport = mutation({
       const metadata = await ctx.db.system.get("_storage", op.storageId);
       if (!metadata) throw new Error("Storage object not found");
       const error = imageSizeError(metadata.size);
-      if (error) throw new Error(error);
+      if (error) throw new ConvexError(error);
     }
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 

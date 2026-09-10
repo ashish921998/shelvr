@@ -314,6 +314,21 @@ describe("saveImageOperations", () => {
     expect(results.map((r) => r.image.uri)).toEqual(requests.map((r) => r.image.uri));
   });
 
+  it("surfaces a ConvexError's data as the message, not the transport string", async () => {
+    const { ConvexError } = await import("convex/values");
+    const deps = makeDeps({
+      begin: async () => {
+        throw new ConvexError("Photo limit reached (1,000). Delete some photos to save more.");
+      },
+    });
+    const results = await saveImageOperations([{ image: img("a") }], deps);
+    expect(results[0]).toMatchObject({
+      status: "failed",
+      stage: "begin",
+      message: "Photo limit reached (1,000). Delete some photos to save more.",
+    });
+  });
+
   it("falls back to a generic message when the thrown value is not an Error", async () => {
     const deps = makeDeps({
       upload: async () => {

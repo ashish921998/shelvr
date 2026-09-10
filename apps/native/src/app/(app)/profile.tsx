@@ -312,7 +312,7 @@ export default function ProfileScreen() {
         />
         <View style={styles.proCopy}>
           <Text style={styles.proLabel}>{proLabel}</Text>
-          {photoUsage ? (
+          {photoUsage && hasSubscription && status !== 'lapsed' ? (
             <Text style={styles.preferenceDescription}>
               {photoUsage.count.toLocaleString()} of {photoUsage.limit.toLocaleString()} photos
             </Text>

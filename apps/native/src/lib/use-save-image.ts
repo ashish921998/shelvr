@@ -2,6 +2,7 @@ import { imageSizeError } from '@convex/model/imagePolicy';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import type { FunctionReturnType } from 'convex/server';
 import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
@@ -92,6 +93,12 @@ function generateOperationId(): string {
 /** Maps an unknown thrown value to a short, user-safe message. Never surfaces
  * upload URLs, storage ids, or backend stack traces to the UI. */
 function sanitizeMessage(error: unknown, stage: ImageSaveStage): string {
+  // A ConvexError carries the server's user-facing sentence in `data`; its
+  // `message` is the prefixed transport string, and production redacts a plain
+  // Error's message to "Server Error" entirely.
+  if (error instanceof ConvexError && typeof error.data === 'string') {
+    return error.data;
+  }
   if (error instanceof Error && error.message) {
     // Strip anything that looks like a URL or id leaked through a thrown
     // error. Real Convex ids are long unbroken lowercase-alphanumeric tokens
