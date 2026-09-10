@@ -341,17 +341,25 @@ describe("POST /waitlist/join", () => {
 
   it("applies the shared bucket inside upsertSignup, not only at the HTTP edge", async () => {
     const t = setup();
-    const direct = (i: number) =>
+    // A missing IP and every malformed spelling must land in the same bucket
+    // even when the mutation is called directly with the raw value.
+    const garbage = [undefined, "::::", "aaaa:", "not an ip", "999.1.1.1", "gggg::1", "1.2.3.4.5", ""];
+    const direct = (i: number, ip: string | undefined) =>
       t.mutation(internal.waitlist.upsertSignup, {
         email: `direct-${i}@example.com`,
         product: "shelvr",
         source: "hero",
+        ip,
       });
     for (let i = 0; i < 8; i++) {
-      await direct(i);
+      await direct(i, garbage[i]);
     }
-    await expect(direct(8)).rejects.toThrow();
+    await expect(direct(8, "::::")).rejects.toThrow();
     expect(UNKNOWN_IP_LIMITER_KEY).toBe("unknown");
+    // A real address is a different bucket and is not affected.
+    await expect(direct(9, "198.51.100.9")).resolves.toMatchObject({
+      resendStatus: "pending",
+    });
   });
 });
 

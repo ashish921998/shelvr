@@ -121,7 +121,9 @@ export const upsertSignup = internalMutation({
   handler: async (ctx, args) => {
     await rateLimiter.limit(ctx, "waitlistJoinGlobal", { throws: true });
     await rateLimiter.limit(ctx, "waitlistJoinIp", {
-      key: args.ip ?? UNKNOWN_IP_LIMITER_KEY,
+      // Normalized here as well as at the HTTP edge, so a caller that hands
+      // in a raw header value cannot mint a bucket per malformed string.
+      key: normalizeIp(args.ip) ?? UNKNOWN_IP_LIMITER_KEY,
       throws: true,
     });
     await rateLimiter.limit(ctx, "waitlistJoin", {

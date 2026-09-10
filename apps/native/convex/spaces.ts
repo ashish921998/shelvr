@@ -47,14 +47,16 @@ const SPACE_DELETE_BATCH = 500;
 
 /**
  * Backfill bounds. A transaction visits at most BACKFILL_BATCH spaces and reads
- * at most BACKFILL_READ_BUDGET join rows in total (plus one probe row per
- * space); a single space may use the whole budget, and one above that ceiling
- * is left legacy. Convex caps documents read per transaction, so the two
- * limits together keep a batch of large spaces from exceeding it.
+ * at most BACKFILL_READ_BUDGET join rows in total, completeness probes
+ * included. The default budget is the per-space ceiling plus its probe, so a
+ * space with exactly BACKFILL_SCAN_LIMIT rows still fits one transaction and
+ * one above that ceiling is left legacy. Convex caps documents read per
+ * transaction, so the two limits together keep a batch of large spaces from
+ * exceeding it.
  */
 const BACKFILL_BATCH = 10;
 const BACKFILL_SCAN_LIMIT = 8000;
-const BACKFILL_READ_BUDGET = BACKFILL_SCAN_LIMIT;
+const BACKFILL_READ_BUDGET = BACKFILL_SCAN_LIMIT + 1;
 
 /** A space's joins split by who owns them: the user (saved) vs Shelvr (suggested). */
 async function splitJoins(ctx: QueryCtx, spaceId: Id<"spaces">) {
