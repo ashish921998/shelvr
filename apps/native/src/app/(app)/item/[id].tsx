@@ -114,6 +114,12 @@ export default function ItemScreen() {
     [startIndex, list, single],
   );
 
+  // The pager shows the feed's loaded pages, so swiping toward their end must
+  // fetch the next one just as scrolling the feed does; otherwise a swipe that
+  // started on page one stops at its last item.
+  const onEndReached =
+    items === homeFeed.items && homeFeed.canLoadMore ? homeFeed.loadMore : undefined;
+
   // The id the screen was pushed with owns the Apple-zoom target; captured once
   // so swiping (which rewrites the `id` param) never re-pairs the transition.
   const [pushedId] = useState(id);
@@ -418,6 +424,8 @@ export default function ItemScreen() {
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={viewabilityConfig}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={2}
       />
 
       {activeIsSuggested ? (
