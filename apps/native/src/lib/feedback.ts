@@ -123,6 +123,7 @@ export function parseInvitationState(
 // Session scope is enough — the native review flow only exists in-session.
 
 let reviewPromptedAt: number | null = null;
+let reviewAttemptInFlight = false;
 
 export function markNativeReviewPrompted(): void {
   reviewPromptedAt = Date.now();
@@ -130,6 +131,17 @@ export function markNativeReviewPrompted(): void {
 
 export function lastNativeReviewPromptAt(): number | null {
   return reviewPromptedAt;
+}
+
+/** The review prompt claims the moment before `StoreReview.hasAction()`
+ * resolves and marks the timestamp only after. The invitation waits out this
+ * window so a slow `hasAction()` cannot let both prompts appear together. */
+export function setNativeReviewAttemptInFlight(inFlight: boolean): void {
+  reviewAttemptInFlight = inFlight;
+}
+
+export function isNativeReviewAttemptInFlight(): boolean {
+  return reviewAttemptInFlight;
 }
 
 // --- route gating -----------------------------------------------------------

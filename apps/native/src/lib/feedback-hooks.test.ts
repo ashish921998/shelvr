@@ -3,7 +3,7 @@
 // without a renderer: useState/useRef keep values by call order, useEffect
 // diffs deps and runs cleanups, and a setState outside a render re-renders.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readInvitationState } from "./feedback";
+import { readInvitationState, setNativeReviewAttemptInFlight } from "./feedback";
 import { useFeedbackInvitation } from "./feedback-invitation";
 import { useReviewPrompt } from "./review-prompt";
 
@@ -146,6 +146,7 @@ beforeEach(() => {
   mock.user = { _id: "user-1" };
   mock.paywallPending = false;
   mock.secure.clear();
+  setNativeReviewAttemptInFlight(false);
   mock.kv.clear();
 });
 
@@ -204,6 +205,27 @@ describe("useFeedbackInvitation", () => {
     expect(react.rerender<Result>().invitationVisible).toBe(true);
     expect(readInvitationState("user-1").shownCount).toBe(1);
     expect(mock.capture).toHaveBeenCalledWith("feedback_invitation_shown", { surface: "home", ready_count: 3 });
+  });
+
+  it("waits out a pending native review check so both prompts cannot appear together", () => {
+    const items = threeReady();
+    // useReviewPrompt has claimed the moment but hasAction() has not resolved,
+    // so no timestamp is marked yet. The invitation must not slip in.
+    setNativeReviewAttemptInFlight(true);
+    react.mount(() => useFeedbackInvitation(items));
+
+    vi.advanceTimersByTime(2000);
+    expect(react.rerender<Result>().invitationVisible).toBe(false);
+    expect(readInvitationState("user-1").shownCount).toBe(0);
+
+    // The check resolved without a prompt (no review action): the window is
+    // over and the invitation proceeds on its next tick. Had the prompt fired,
+    // the mark it leaves is honored by the same attempt, as the cooldown
+    // tests cover.
+    setNativeReviewAttemptInFlight(false);
+    vi.advanceTimersByTime(2000);
+    expect(react.rerender<Result>().invitationVisible).toBe(true);
+    expect(readInvitationState("user-1").shownCount).toBe(1);
   });
 
   it("clears the paywall poll on unmount", () => {

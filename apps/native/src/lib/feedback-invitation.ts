@@ -9,6 +9,7 @@ import {
   feedbackAnalytics,
   FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS,
   isHomeRootRoute,
+  isNativeReviewAttemptInFlight,
   lastNativeReviewPromptAt,
   readInvitationState,
   withReadyCount,
@@ -51,9 +52,11 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
     let timer: ReturnType<typeof setTimeout>;
     const attempt = () => {
       if (AppState.currentState !== 'active') return;
-      // The paywall has no reactive signal, so keep checking until it closes
-      // rather than dropping an invitation nothing would re-trigger.
-      if (isPaywallPending()) {
+      // Neither the paywall nor a pending native review check has a reactive
+      // signal, so keep checking until they clear rather than dropping an
+      // invitation nothing would re-trigger. The review check marks its
+      // timestamp only once resolved; that mark is honored just below.
+      if (isPaywallPending() || isNativeReviewAttemptInFlight()) {
         timer = setTimeout(attempt, INVITATION_RECHECK_MS);
         return;
       }

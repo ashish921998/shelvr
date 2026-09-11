@@ -1,5 +1,11 @@
 import { analytics } from '@/lib/analytics';
-import { countEligibleSaves, isHomeRootRoute, markNativeReviewPrompted, type FeedbackFeedItem } from '@/lib/feedback';
+import {
+  countEligibleSaves,
+  isHomeRootRoute,
+  markNativeReviewPrompted,
+  setNativeReviewAttemptInFlight,
+  type FeedbackFeedItem,
+} from '@/lib/feedback';
 import { isPaywallPending } from '@/lib/entitlement';
 import { useSegments } from 'expo-router';
 import { AppState } from 'react-native';
@@ -33,6 +39,7 @@ export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
     // while hasAction() is pending. Nothing is persisted until the prompt is
     // actually about to fire.
     triggered.current = true;
+    setNativeReviewAttemptInFlight(true);
 
     (async () => {
       let prompted = false;
@@ -49,6 +56,7 @@ export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
       } catch {
         // Best-effort — Apple rate-limits internally and returns no signal.
       } finally {
+        setNativeReviewAttemptInFlight(false);
         // A suppressed attempt (left Home, paywall opened, backgrounded, or no
         // review action) recorded nothing, so a later feed change may retry.
         if (!prompted) triggered.current = false;
