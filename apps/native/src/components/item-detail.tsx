@@ -34,10 +34,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-type CardRow = FunctionReturnType<typeof api.items.listItems>['page'][number];
+type CardRow = FunctionReturnType<typeof api.items.listItemsPage>['page'][number];
 type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 
-// A row as handed to a detail page. The list queries (listItems / searchItems
+// A row as handed to a detail page. The list queries (listItemsPage / searchItems
 // / similarItems) return the card shape: everything a card shows, but not the
 // article body or the shopping results, which only getItem and getSpace carry.
 // The body fields are therefore optional here and ItemDetail fills them in

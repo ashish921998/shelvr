@@ -5,7 +5,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 export const HOME_FEED_PAGE_SIZE = 40;
 
-export type HomeFeedItem = FunctionReturnType<typeof api.items.listItems>['page'][number];
+export type HomeFeedItem = FunctionReturnType<typeof api.items.listItemsPage>['page'][number];
 
 type HomeFeed = {
   // `undefined` until the first page has arrived, like a plain query's `data`.
@@ -29,7 +29,7 @@ export function HomeFeedProvider({ children }: { children: ReactNode }) {
   // before auth is ready: requireUserId would reject it and crash the tree.
   const { isAuthenticated } = useConvexAuth();
   const { results, status, loadMore } = usePaginatedQuery(
-    api.items.listItems,
+    api.items.listItemsPage,
     isAuthenticated ? {} : 'skip',
     { initialNumItems: HOME_FEED_PAGE_SIZE },
   );

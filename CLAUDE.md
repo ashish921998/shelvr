@@ -224,6 +224,12 @@ needed at runtime by the features that use them:
 - Never pass `userId` from the client into Convex public functions.
 - Keep `returns:` validators accurate — Convex enforces them at runtime.
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
+- Public Convex functions are contracts with every app build in the wild, and the backend
+  deploys independently of the app (`npx convex deploy` is manual; OTA updates land one launch
+  later; store builds lag for weeks). Never change a public function's argument or return shape
+  in the same release that moves the client. Expand first (add a new function or accept both
+  shapes), deploy, move the client, then contract once the production update channel shows no
+  old bundle still calling it.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
 - The classifier and recommendation passes may only create or remove `suggested` memberships in
