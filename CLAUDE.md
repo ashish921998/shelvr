@@ -24,6 +24,12 @@ dismisses each suggestion.
 
 Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
+This repo holds product code, tests, release tooling, and agent configuration only. `docs/`
+carries what an agent needs to change the product safely: analytics event methodology and SQL,
+the App Store review process, and architecture decisions. Business notes, marketing copy and
+assets, dated metric snapshots, research, and store media (videos, screenshots) live in the
+separate `shelvr-notes` repo. Do not add them here.
+
 ## Toolchain & commands
 
 **Use `pnpm`** (workspace package manager). Root scripts go through Turbo.
