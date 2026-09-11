@@ -91,7 +91,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Confirm the Annual 7-day trial offer is available in every intended storefront. Generic app actions use **View Pro plans** because the Monthly plan does not include a trial.
 - Confirm App Privacy is published and matches `apps/native/privacy.json`, `ios.privacyManifests`, and the hosted Privacy Policy.
 - Add complete contact information and the notes below to App Review Information.
-- Attach `apps/native/store-assets/preview/shelvr-preview-6.9.mp4` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, save, restore, permissions, and account deletion.
+- Attach the preview video from `shelvr-notes/store-assets/preview/` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, save, restore, permissions, and account deletion.
 - Remove every unresolved review issue or mark it resolved before resubmitting.
 
 ## Paste-ready App Review notes

@@ -23,7 +23,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 import { activationPal } from 'activation-pal';
 
-// Onboarding v2 — an 8-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
+// Onboarding v2 — an 8-step quiz-funnel flow.
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
 // a thin progress bar, and step transitions between the step components.
 // Each step owns its own CTA copy and advance condition; the orchestrator

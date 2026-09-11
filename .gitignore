@@ -84,3 +84,8 @@ tmp/
 
 # App Store Connect CLI output; the analytics docs summarize what matters
 .asc/
+
+# Store media and marketing assets live in the shelvr-notes repo
+apps/native/store-assets/
+assets/marketing/
+assets/product-hunt/
