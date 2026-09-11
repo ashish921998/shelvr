@@ -26,7 +26,10 @@ workflow described there.
 4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
-The root check runs lint, typecheck, coverage thresholds, Knip, and Syncpack.
+The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
+the dependency audit (`pnpm run audit`, blocks on high/critical). Advisories
+with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
+the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
 under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
 `newConvexTest()` from `convex/test.setup.ts`.
