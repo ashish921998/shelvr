@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, RECENT_ITEMS_SCAN_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
+import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
 import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -173,14 +173,13 @@ describe("listRecentItems", () => {
     expect(recent.map((item) => item._id)).toEqual([ready[2], ready[1], ready[0]]);
   });
 
-  it("stops scanning at the cap when nothing is ready", async () => {
+  it("finds a ready item behind any number of newer failed ones", async () => {
     const t = await as("recent-user");
-    await seedFeed(t, "recent-user", 1);
-    await seedFeed(t, "recent-user", RECENT_ITEMS_SCAN_MAX, { status: "failed" });
+    const ready = await seedFeed(t, "recent-user", 1);
+    await seedFeed(t, "recent-user", 200, { status: "failed" });
 
-    // The one ready row sits past the cap, so the widget is empty rather than
-    // the query walking the whole library.
-    expect(await t.query(api.items.listRecentItems, { limit: 5 })).toHaveLength(0);
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ready[0]]);
   });
 
   it("caps the limit and scopes to the caller", async () => {

@@ -59,7 +59,7 @@ type Props = {
 // neither the article body nor the space memberships), similar items, the hero
 // URI, and parsed article paragraphs.
 function useItemDetailData(item: DetailItem) {
-  const { data: withSpaces } = useQuery(
+  const { data: withSpaces, isError: fullRowFailed } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
   const spaces = withSpaces?.spaces ?? [];
@@ -75,9 +75,13 @@ function useItemDetailData(item: DetailItem) {
   // A link's layout depends on whether it has an article body, and a card row
   // cannot say. Hold the body until getItem answers rather than paint the plain
   // layout and then jump to the reader. Rows that already carry `content`
-  // (getSpace) and non-link items render at once.
+  // (getSpace) and non-link items render at once. If getItem fails, paint what
+  // the row has rather than spin forever.
   const bodyPending =
-    item.type === 'link' && item.content === undefined && withSpaces === undefined;
+    item.type === 'link' &&
+    item.content === undefined &&
+    withSpaces === undefined &&
+    !fullRowFailed;
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.

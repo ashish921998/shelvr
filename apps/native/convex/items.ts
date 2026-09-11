@@ -38,8 +38,6 @@ const LIST_CAP = 1000;
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
-/** Rows `listRecentItems` reads before it stops looking for ready ones. */
-export const RECENT_ITEMS_SCAN_MAX = 200;
 
 const itemTypeValidator = v.union(v.literal("image"), v.literal("link"), v.literal("note"));
 
@@ -220,32 +218,20 @@ export const listItems = query({
 });
 
 /** The newest `ready` saves, for surfaces that show a handful of items and
- * must not subscribe to the feed (the home-screen widget). Items still
- * processing or failed are skipped, so the scan window is wider than `limit`;
- * a run of more than three failures per ready save would shorten the result,
- * which the widget tolerates. */
+ * must not subscribe to the feed (the home-screen widget). The status index
+ * reads exactly `limit` ready rows, so a burst of fresh imports still
+ * processing can never push older ready saves out of view. */
 export const listRecentItems = query({
   args: { limit: v.number() },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const limit = Math.min(Math.max(1, Math.floor(args.limit)), RECENT_ITEMS_MAX);
-    // Walk newest-first and stop as soon as the limit is met, so a burst of
-    // fresh imports still processing cannot push every ready save out of a
-    // fixed window and blank the widget. The scan cap keeps a library of
-    // nothing but failures from being read end to end.
-    const ready: Doc<"items">[] = [];
-    let scanned = 0;
-    for await (const item of ctx.db
+    const ready = await ctx.db
       .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")) {
-      if (item.status === "ready") {
-        ready.push(item);
-        if (ready.length === limit) break;
-      }
-      if (++scanned >= RECENT_ITEMS_SCAN_MAX) break;
-    }
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "ready"))
+      .order("desc")
+      .take(limit);
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
   },
 });
