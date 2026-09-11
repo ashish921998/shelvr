@@ -107,6 +107,10 @@ export type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
+  // Feedback events never carry message text; see lib/feedback.ts.
+  feedback_invitation_shown: { surface: string; ready_count: number };
+  feedback_invitation_dismissed: { surface: string };
+  feedback_opened: { surface: string };
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
 };

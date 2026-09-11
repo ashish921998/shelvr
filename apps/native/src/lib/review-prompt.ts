@@ -1,4 +1,8 @@
 import { analytics } from '@/lib/analytics';
+import { countEligibleSaves, isHomeRootRoute, markNativeReviewPrompted, type FeedbackFeedItem } from '@/lib/feedback';
+import { isPaywallPending } from '@/lib/entitlement';
+import { useSegments } from 'expo-router';
+import { AppState } from 'react-native';
 import * as StoreReview from 'expo-store-review';
 import { useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
@@ -6,15 +10,17 @@ import * as SecureStore from 'expo-secure-store';
 const PROMPTED_KEY = 'shelvr.review.prompted';
 const READY_ITEM_THRESHOLD = 3;
 
-type FeedItem = { status: 'processing' | 'ready' | 'failed' };
-
-export function useReviewPrompt(items: FeedItem[] | undefined) {
+export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
   const triggered = useRef(false);
+  const home = isHomeRootRoute(useSegments());
+  const homeRef = useRef(home);
+  useEffect(() => { homeRef.current = home; }, [home]);
 
   useEffect(() => {
-    if (!items || triggered.current) return;
+    if (!home || !items || triggered.current || isPaywallPending() || AppState.currentState !== 'active') return;
+    if (items.some((item) => item.status === 'processing')) return;
 
-    const readyCount = items.filter((i) => i.status === 'ready').length;
+    const readyCount = countEligibleSaves(items);
     if (readyCount < READY_ITEM_THRESHOLD) return;
 
     const alreadyPrompted = SecureStore.getItem(PROMPTED_KEY) === 'true';
@@ -25,10 +31,13 @@ export function useReviewPrompt(items: FeedItem[] | undefined) {
 
     triggered.current = true;
     SecureStore.setItem(PROMPTED_KEY, 'true');
+    // The in-app feedback invitation shares this threshold; tell it the native
+    // review flow claimed this moment so the two never fire together.
+    markNativeReviewPrompted();
 
     (async () => {
       try {
-        if (await StoreReview.hasAction()) {
+        if (await StoreReview.hasAction() && homeRef.current && !isPaywallPending() && AppState.currentState === 'active') {
           analytics.capture('review_prompted', { ready_count: readyCount });
           await StoreReview.requestReview();
         }
@@ -36,5 +45,5 @@ export function useReviewPrompt(items: FeedItem[] | undefined) {
         // Best-effort — Apple rate-limits internally and returns no signal.
       }
     })();
-  }, [items]);
+  }, [items, home]);
 }
