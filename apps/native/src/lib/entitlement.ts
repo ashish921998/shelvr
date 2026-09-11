@@ -324,7 +324,7 @@ async function purchasedPlan(): Promise<string> {
   }
 }
 
-export async function presentPaywall(
+async function presentPaywallImpl(
   placement = 'pro_gate',
 ): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
@@ -378,6 +378,21 @@ export async function presentPaywall(
     return mapPaywallResult(result);
   } catch {
     return 'unavailable';
+  }
+}
+
+let pendingPaywalls = 0;
+
+export function isPaywallPending(): boolean {
+  return pendingPaywalls > 0;
+}
+
+export async function presentPaywall(placement = 'pro_gate'): Promise<PaywallOutcome> {
+  pendingPaywalls += 1;
+  try {
+    return await presentPaywallImpl(placement);
+  } finally {
+    pendingPaywalls -= 1;
   }
 }
 

@@ -1,3 +1,4 @@
+import { FeedbackModal } from '@/components/feedback/feedback-modal';
 import { Wordmark } from '@/components/wordmark';
 import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import {
@@ -47,6 +48,7 @@ export default function ProfileScreen() {
     convexQuery(api.notifications.getPreferences, {}),
   );
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
@@ -389,6 +391,19 @@ export default function ProfileScreen() {
       <View style={styles.linkGroup}>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Send feedback"
+          onPress={() => setFeedbackOpen(true)}
+        >
+          <Text style={styles.linkLabel}>Send feedback</Text>
+          <AppSymbolIcon
+            name="arrow.up.right"
+            size={14}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(SUPPORT_URL)}
         >
           <Text style={styles.linkLabel}>Contact Support</Text>
@@ -463,7 +478,12 @@ export default function ProfileScreen() {
           {deleting ? 'Deleting…' : 'Delete account'}
         </Text>
       </Pressable>
-
+      {feedbackOpen ? (
+        <FeedbackModal
+          surface="profile"
+          onClose={() => setFeedbackOpen(false)}
+        />
+      ) : null}
     </ScrollView>
   );
 }

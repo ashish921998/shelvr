@@ -1,7 +1,10 @@
 import { EmptyState } from '@/components/empty-state';
 import { MasonryFeed } from '@/components/masonry-feed';
+import { FeedbackInvitation } from '@/components/feedback/feedback-invitation';
+import { FeedbackModal } from '@/components/feedback/feedback-modal';
 import { ScreenLoader } from '@/components/ui/screen-loader';
 import { useHomeFeed } from '@/lib/home-feed';
+import { useBusySaving, useFeedbackInvitation } from '@/lib/feedback-invitation';
 import { useReviewPrompt } from '@/lib/review-prompt';
 import { ProgressiveBlurHeader } from 'progressive-blur';
 import { View } from 'react-native';
@@ -10,6 +13,9 @@ import { StyleSheet } from 'react-native-unistyles';
 export default function HomeScreen() {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   useReviewPrompt(items);
+
+  const feedback = useFeedbackInvitation(items);
+  const busySaving = useBusySaving(items);
 
   if (items === undefined) {
     return (
@@ -36,8 +42,24 @@ export default function HomeScreen() {
         source={{ from: 'home' }}
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
+        // Inside the feed so contentInsetAdjustmentBehavior clears the blur
+        // header on iOS and the invitation scrolls with the content.
+        ListHeaderComponent={
+          feedback.invitationVisible && !busySaving ? (
+            <FeedbackInvitation
+              onSendFeedback={feedback.openFeedbackFromInvitation}
+              onDismiss={feedback.dismissInvitation}
+            />
+          ) : undefined
+        }
       />
       <ProgressiveBlurHeader />
+      {feedback.modalOpen ? (
+        <FeedbackModal
+          surface="home"
+          onClose={feedback.closeFeedback}
+        />
+      ) : null}
     </View>
   );
 }
