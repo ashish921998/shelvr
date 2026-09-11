@@ -10,15 +10,16 @@ import {
 } from '@/components/onboarding/space-picker';
 import { SurveyStep } from '@/components/onboarding/survey';
 import type { FeedItem } from '@/components/item-card';
-import { useEntitlement } from '@/lib/entitlement';
 import { useOnboarding } from '@/lib/onboarding';
-import { setPendingSpaces } from '@/lib/pending-onboarding';
+import {
+  getOnboardingProgress,
+  setOnboardingProgress,
+  setPendingSpaces,
+} from '@/lib/pending-onboarding';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
 import { activationPal } from 'activation-pal';
@@ -96,20 +97,38 @@ const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { completeOnboarding } = useOnboarding();
-  const { entitled } = useEntitlement();
-  const { isAuthenticated } = useConvexAuth();
 
-  const [step, setStep] = useState<StepIndex>(STEPS.promise);
-  const [q1, setQ1] = useState<string[]>([]);
-  const [q2, setQ2] = useState<SaveKind[]>([]);
-  const [spaces, setSpaces] = useState<string[]>([]);
+  // Read the persisted record ONCE, lazily, in the state initializers — a
+  // remount (e.g., after the inline sign-in re-renders this tree) re-reads it,
+  // but only into fresh state, never over live user changes.
+  const [initialProgress] = useState(() => getOnboardingProgress());
+
+  const [step, setStep] = useState<StepIndex>(() =>
+    initialProgress.demo && (initialProgress.step ?? 0) >= STEPS.demo
+      ? STEPS.demo
+      : initialProgress.step !== null && isStepIndex(initialProgress.step)
+      ? initialProgress.step
+      : STEPS.promise,
+  );
+  const [q1, setQ1] = useState<string[]>(initialProgress.q1);
+  const [q2, setQ2] = useState<SaveKind[]>(
+    initialProgress.q2.filter((value): value is SaveKind => Q2_OPTIONS.some((option) => option === value)),
+  );
+  const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
-  const spacesInitRef = useRef(false);
+  const spacesInitRef = useRef(initialProgress.spaces.length > 0);
   const trackedStepsRef = useRef(new Set<number>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<StepIndex | null>(null);
+  // An in-flight demo save captured before the inline sign-in; resumed (once)
+  // by the demo step if the user is already authenticated on arrival.
+  const resumeDemo = initialProgress.demo;
+
+  // Keep the persisted record in lockstep with the visible flow.
+  useEffect(() => {
+    setOnboardingProgress({ q1, q2, spaces, step });
+  }, [q1, q2, spaces, step]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -119,7 +138,7 @@ export default function OnboardingScreen() {
       step_id: STEP_IDS[step],
       step_index: step,
     });
-  }, [step]);
+  }, [q1, q2, spaces, step]);
 
   const recordCurrentStep = useCallback(() => {
     if (trackedStepsRef.current.has(step)) return;
@@ -191,9 +210,6 @@ export default function OnboardingScreen() {
     activationPal.onboardingCompleted();
     setPendingSpaces(spaces);
     completeOnboarding();
-    if (!isAuthenticated) {
-      router.replace('/(auth)/sign-in');
-    }
   };
 
   // Progress bar value for the current step. Steps outside the quiz window
@@ -259,10 +275,11 @@ export default function OnboardingScreen() {
 
           {step === STEPS.demo && (
             <LiveDemoStep
-              entitled={entitled}
-              // The demo step reports the classified item up so the recap can
-              // show it. If the user skips, demoItem stays null and ready shows
-              // the spaces only.
+              selectedSpaces={spaces}
+              // The demo step reports the classified item up so the recap
+              // (ready step) can render the same card. If the user skips,
+              // demoItem stays null and ready shows the spaces only.
+              resumeDemo={resumeDemo}
               onReady={setDemoItem}
               onAdvance={advance}
             />

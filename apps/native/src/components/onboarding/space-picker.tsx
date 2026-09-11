@@ -113,7 +113,7 @@ export function SpacePickerStep({
         Pick your spaces.
       </Animated.Text>
       <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={styles.support}>
-        Shelvr files every save into these automatically. Add or rename anytime.
+        Shelvr suggests saves for these spaces. Add or rename anytime.
       </Animated.Text>
 
       <ScrollView

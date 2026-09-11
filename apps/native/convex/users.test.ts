@@ -324,4 +324,51 @@ describe("deleteCurrentUserAccount", () => {
       ).toHaveLength(0);
     });
   });
+
+  // Regression: the onboarding demo table must drain with the account — no
+  // orphan allowance row (or dangling item reference) may survive deletion.
+  it("removes the onboarding demo allowance with the account", async () => {
+    const backend = newConvexTest();
+    const { userId, sessionId } = await backend.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "demo-delete@example.com",
+      });
+      const sessionId = await ctx.db.insert("authSessions", {
+        userId,
+        expirationTime: Date.now() + 60_000,
+      });
+      const itemId = await ctx.db.insert("items", {
+        userId: userId as string,
+        type: "link",
+        status: "processing",
+        url: "https://example.com",
+        tags: [],
+        searchText: "",
+      });
+      await ctx.db.insert("onboardingDemos", {
+        userId: userId as string,
+        itemId,
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("subscriptions", {
+        userId: userId as string,
+        status: "pro",
+        expiresAt: Date.now() + 60_000,
+        updatedAt: Date.now(),
+      });
+      return { userId, sessionId };
+    });
+
+    const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+
+    await backend.run(async (ctx) => {
+      expect(
+        await ctx.db
+          .query("onboardingDemos")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .collect(),
+      ).toHaveLength(0);
+    });
+  });
 });
