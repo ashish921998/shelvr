@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { redirectSystemPath } from '@/app/+native-intent';
 
-const { markPendingShare } = vi.hoisted(() => ({
-  markPendingShare: vi.fn(),
+const { markPendingShareOnDevice } = vi.hoisted(() => ({
+  markPendingShareOnDevice: vi.fn(),
 }));
 
-vi.mock('@/lib/share/pending-share-store', () => ({ markPendingShare }));
+vi.mock('@/lib/share/pending-share-store', () => ({ markPendingShareOnDevice }));
 
 describe('redirectSystemPath', () => {
   beforeEach(() => {
-    markPendingShare.mockClear();
+    markPendingShareOnDevice.mockClear();
   });
 
   it.each([
@@ -17,14 +17,14 @@ describe('redirectSystemPath', () => {
     'shelvr:///auth/callback?code=verification-code',
   ])('keeps OAuth callbacks on the sign-in route for %s', (path) => {
     expect(redirectSystemPath({ path, initial: false })).toBe('/sign-in');
-    expect(markPendingShare).not.toHaveBeenCalled();
+    expect(markPendingShareOnDevice).not.toHaveBeenCalled();
   });
 
   it('continues routing share intents to the share receiver', () => {
     expect(
       redirectSystemPath({ path: 'shelvr://expo-sharing', initial: false }),
     ).toBe('/share');
-    expect(markPendingShare).toHaveBeenCalledOnce();
+    expect(markPendingShareOnDevice).toHaveBeenCalledOnce();
   });
 
   it('leaves unrelated deep links untouched', () => {
