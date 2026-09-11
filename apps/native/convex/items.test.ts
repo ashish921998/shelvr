@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
+import { LIST_PAGE_MAX, PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
 import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -87,6 +87,24 @@ describe("listItems pagination", () => {
     });
     expect(third.page.map((item) => item._id)).toEqual(newestFirst.slice(4));
     expect(third.isDone).toBe(true);
+  });
+
+  it("caps the page size a client can ask for and keeps the rest reachable", async () => {
+    const t = await as("feed-user");
+    const ids = await seedFeed(t, "feed-user", LIST_PAGE_MAX + 3);
+    const newestFirst = [...ids].reverse();
+
+    const first = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 100_000, cursor: null },
+    });
+    expect(first.page.map((item) => item._id)).toEqual(newestFirst.slice(0, LIST_PAGE_MAX));
+    expect(first.isDone).toBe(false);
+
+    const second = await t.query(api.items.listItems, {
+      paginationOpts: { numItems: 100_000, cursor: first.continueCursor },
+    });
+    expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(LIST_PAGE_MAX));
+    expect(second.isDone).toBe(true);
   });
 
   it("returns the card shape without article bodies or shopping results", async () => {

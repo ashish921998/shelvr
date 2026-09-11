@@ -35,6 +35,17 @@ export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
 
+/** Most rows one `listItems` page may return. The client asks for 40; the
+ * cap keeps a stray argument from reading the whole library in one
+ * transaction, which Convex would reject and the feed would show as an error. */
+export const LIST_PAGE_MAX = 100;
+/** Bytes of item documents one `listItems` page may read. The page is read as
+ * full documents, article bodies included, even though only the card shape is
+ * returned, so a page of long articles can approach Convex's per-query read
+ * limit. Past this the page comes back short and `usePaginatedQuery` splits
+ * it, instead of the query failing. Half the platform limit. */
+const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
@@ -198,18 +209,25 @@ function buildSearchText(parts: {
 // ---------------------------------------------------------------------------
 
 /** The home feed, newest first, one page at a time. Card shape only — see
- * `itemCardValidator`. `paginationOpts` is passed through untouched so the
- * client's reactive page splitting keeps working. */
+ * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
+ * untouched so the client's reactive page splitting keeps working; the size
+ * fields are bounded here so no argument can make one page read more than the
+ * platform allows. */
 export const listItems = query({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    const opts = args.paginationOpts;
     const result = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .paginate(args.paginationOpts);
+      .paginate({
+        ...opts,
+        numItems: Math.min(opts.numItems, LIST_PAGE_MAX),
+        maximumBytesRead: Math.min(opts.maximumBytesRead ?? Infinity, LIST_PAGE_MAX_BYTES),
+      });
     return {
       ...result,
       page: await Promise.all(result.page.map((item) => toItemCard(ctx, item))),
