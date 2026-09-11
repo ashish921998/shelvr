@@ -1,22 +1,22 @@
-import { api } from '@convex/_generated/api';
-import { isEntitled } from '@convex/model/entitlement';
-import { convexQuery } from '@convex-dev/react-query';
-import { useConvexAuth } from 'convex/react';
-import { useQuery } from '@tanstack/react-query';
-import { useCurrentUser } from '@/lib/current-user';
-import { activationPal } from 'activation-pal';
-import { analytics } from '@/lib/analytics';
-import { observePaywallPresentation } from '@/lib/paywall-telemetry';
-import { randomUUID } from 'expo-crypto';
+import { api } from "@convex/_generated/api";
+import { isEntitled } from "@convex/model/entitlement";
+import { convexQuery } from "@convex-dev/react-query";
+import { useConvexAuth } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/lib/current-user";
+import { activationPal } from "activation-pal";
+import { analytics } from "@/lib/analytics";
+import { observePaywallPresentation } from "@/lib/paywall-telemetry";
+import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
   shouldOpenPaywallFallback,
   type PaywallOutcome,
-} from '@/lib/paywall-result';
-import { REVENUECAT_API_KEY } from '@/lib/revenuecat-api-key';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { NativeModules } from 'react-native';
+} from "@/lib/paywall-result";
+import { REVENUECAT_API_KEY } from "@/lib/revenuecat-api-key";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { NativeModules } from "react-native";
 
 /**
  * Shelvr Pro entitlement.
@@ -74,36 +74,31 @@ function makeLazyModule<T>(
 }
 
 const getPurchases = makeLazyModule<
-  typeof import('react-native-purchases').default
+  typeof import("react-native-purchases").default
 >(
-  ['RNPurchases', 'RNPurchasesModule'],
+  ["RNPurchases", "RNPurchasesModule"],
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  () => require('react-native-purchases'),
+  () => require("react-native-purchases"),
 );
 
 const getRCUI = makeLazyModule<
-  typeof import('react-native-purchases-ui').default
+  typeof import("react-native-purchases-ui").default
 >(
   // react-native-purchases-ui registers its native module as `RNPaywalls`
   // (plural). The older `RNPaywall` (singular) name is retained as a fallback
   // for any older linking variant.
-  ['RNPaywalls', 'RNPaywall', 'RNRevenueCatUI', 'RCPurchasesUiModule'],
+  ["RNPaywalls", "RNPaywall", "RNRevenueCatUI", "RCPurchasesUiModule"],
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  () => require('react-native-purchases-ui'),
+  () => require("react-native-purchases-ui"),
 );
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type EntitlementStatus =
-  | 'trialing'
-  | 'pro'
-  | 'lapsed'
-  | 'lifetime'
-  | 'none';
+type EntitlementStatus = "trialing" | "pro" | "lapsed" | "lifetime" | "none";
 
-export type Entitlement = {
+type Entitlement = {
   status: EntitlementStatus;
   entitled: boolean;
   loading: boolean;
@@ -170,7 +165,7 @@ async function awaitRcSyncReady(): Promise<boolean> {
  * RNSScreen"), so callers `router.back()` / complete a transition first, then
  * await this. One home for the magic number so it can't drift between screens.
  */
-export const SHEET_SETTLE_MS = 600;
+const SHEET_SETTLE_MS = 600;
 
 export function waitForSheetTransition(): Promise<void> {
   return new Promise((r) => setTimeout(r, SHEET_SETTLE_MS));
@@ -188,7 +183,7 @@ let configured = false;
  * isn't set (e.g. dev without RC configured) — entitlement then stays `none`
  * until a subscription row is written by the webhook.
  */
-export async function configureRevenueCat(appUserID: string): Promise<void> {
+async function configureRevenueCat(appUserID: string): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
   if (!rc) return;
@@ -258,7 +253,7 @@ export function useEntitlement(): Entitlement {
   const { data } = useQuery(
     convexQuery(
       api.subscriptions.getEntitlement,
-      isAuthenticated ? {} : 'skip',
+      isAuthenticated ? {} : "skip",
     ),
   );
   // The clock is seeded once and refreshed on an interval so a trial expiring
@@ -279,17 +274,17 @@ export function useEntitlement(): Entitlement {
   // authenticated Convex query in that state, and never render persisted data
   // from a previous account as this user's entitlement.
   if (!isAuthenticated) {
-    return { status: 'none', entitled: false, loading: authLoading };
+    return { status: "none", entitled: false, loading: authLoading };
   }
-  if (!data || data.status === 'none') {
-    return { status: 'none', entitled: false, loading: data === undefined };
+  if (!data || data.status === "none") {
+    return { status: "none", entitled: false, loading: data === undefined };
   }
   const expiresAt = data.expiresAt;
   // The shared gate — same logic the server uses in requireProEntitlement, so
   // the client's advisory view can never grant access the server denies.
   const active = isEntitled(data.status, expiresAt, now);
   return {
-    status: active ? data.status : 'lapsed',
+    status: active ? data.status : "lapsed",
     entitled: active,
     loading: false,
     expiresAt,
@@ -311,27 +306,25 @@ export function useEntitlement(): Entitlement {
  */
 async function purchasedPlan(): Promise<string> {
   const rc = getPurchases();
-  if (!rc) return 'unknown';
+  if (!rc) return "unknown";
 
   try {
     const customerInfo = await rc.getCustomerInfo();
     return (
       Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ??
-      'unknown'
+      "unknown"
     );
   } catch {
-    return 'unknown';
+    return "unknown";
   }
 }
 
-export async function presentPaywall(
-  placement = 'pro_gate',
-): Promise<PaywallOutcome> {
+async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
-  analytics.capture('paywall_requested', properties);
+  analytics.capture("paywall_requested", properties);
   const failed = (reason: string) =>
-    analytics.capture('paywall_failed', {
+    analytics.capture("paywall_failed", {
       ...properties,
       reason,
       duration_ms: Math.max(0, Date.now() - requestedAt),
@@ -341,14 +334,14 @@ export async function presentPaywall(
   // The awaitRcSyncReady timeout returns unavailable so the caller can show a
   // retryable fallback without opening a purchase flow under an unsafe identity.
   if (!(await awaitRcSyncReady())) {
-    failed('identity_not_ready');
-    return 'unavailable';
+    failed("identity_not_ready");
+    return "unavailable";
   }
 
   const rcui = getRCUI();
   if (!rcui) {
-    failed('sdk_unavailable');
-    return 'unavailable';
+    failed("sdk_unavailable");
+    return "unavailable";
   }
   try {
     const presentedAt = Date.now();
@@ -356,15 +349,15 @@ export async function presentPaywall(
       rcui.presentPaywall(),
     );
     if (
-      result === 'CANCELLED' ||
-      result === 'PURCHASED' ||
-      result === 'RESTORED'
+      result === "CANCELLED" ||
+      result === "PURCHASED" ||
+      result === "RESTORED"
     ) {
       activationPal.paywallShown(placement, presentedAt);
     }
-    if (result === 'CANCELLED') {
+    if (result === "CANCELLED") {
       activationPal.paywallDismissed();
-    } else if (result === 'PURCHASED') {
+    } else if (result === "PURCHASED") {
       // RevenueCat's imperative sheet API reports the selected package only
       // after checkout. Read the newly active product so plan selection and
       // purchase use the exact App Store product identifier. This lookup is
@@ -377,7 +370,7 @@ export async function presentPaywall(
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     return mapPaywallResult(result);
   } catch {
-    return 'unavailable';
+    return "unavailable";
   }
 }
 
@@ -389,13 +382,13 @@ export async function presentPaywall(
  */
 export async function openPaywall(
   router: ReturnType<typeof useRouter>,
-  placement = 'pro_gate',
+  placement = "pro_gate",
 ): Promise<boolean> {
   const outcome = await presentPaywall(placement);
   if (shouldOpenPaywallFallback(outcome)) {
-    router.push('/(app)/paywall');
+    router.push("/(app)/paywall");
   }
-  return outcome === 'success';
+  return outcome === "success";
 }
 
 // ---------------------------------------------------------------------------
@@ -425,7 +418,7 @@ export async function presentCustomerCenter(): Promise<boolean> {
   if (!(await awaitRcSyncReady())) return false;
 
   const rcui = getRCUI();
-  if (!rcui || typeof rcui.presentCustomerCenter !== 'function') return false;
+  if (!rcui || typeof rcui.presentCustomerCenter !== "function") return false;
   try {
     await rcui.presentCustomerCenter();
     return true;
@@ -434,7 +427,7 @@ export async function presentCustomerCenter(): Promise<boolean> {
   }
 }
 
-export type RestorePurchasesOutcome = 'restored' | 'none' | 'unavailable';
+type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
 
 /**
  * Restore App Store purchases for the signed-in RevenueCat identity. This is a
@@ -442,17 +435,17 @@ export type RestorePurchasesOutcome = 'restored' | 'none' | 'unavailable';
  * that Restore is hidden inside the paywall or Customer Center.
  */
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
-  if (!(await awaitRcSyncReady())) return 'unavailable';
+  if (!(await awaitRcSyncReady())) return "unavailable";
 
   const rc = getPurchases();
-  if (!rc) return 'unavailable';
+  if (!rc) return "unavailable";
   try {
     const customerInfo = await rc.restorePurchases();
     return Object.keys(customerInfo.entitlements.active).length > 0
-      ? 'restored'
-      : 'none';
+      ? "restored"
+      : "none";
   } catch {
-    return 'unavailable';
+    return "unavailable";
   }
 }
 
@@ -474,7 +467,7 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
  * callers should disable the affordance or show a loading state. The hook also
  * returns `loading` so callers can read it without a second `useEntitlement`.
  */
-export function usePaywallGuard(placement = 'pro_gate'): {
+export function usePaywallGuard(placement = "pro_gate"): {
   guard: (action?: () => void) => Promise<boolean>;
   loading: boolean;
 } {

@@ -11,11 +11,11 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.39",
-    "@ai-sdk/react": "^4.0.15",
     "@auth/core": "0.41.1",
     "@convex-dev/auth": "0.0.95",
     "@convex-dev/rate-limiter": "^0.3.2",
@@ -36,7 +36,6 @@
     "expo": "~57.0.12",
     "expo-apple-authentication": "~57.0.1",
     "expo-auth-session": "~57.0.1",
-    "expo-blur": "~57.0.0",
     "expo-build-properties": "~57.0.10",
     "expo-calendar": "~57.0.0",
     "expo-clipboard": "~57.0.0",
@@ -54,8 +53,8 @@
     "expo-localization": "~57.0.1",
     "expo-maps": "~57.0.0",
     "expo-media-library": "~57.0.1",
+    "expo-modules-core": "~57.0.10",
     "expo-notifications": "~57.0.17",
-    "expo-observe": "~57.0.12",
     "expo-router": "~57.0.12",
     "expo-secure-store": "~57.0.0",
     "expo-sharing": "~57.0.11",
@@ -90,11 +89,14 @@
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
     "@types/react": "~19.2.2",
+    "@vitest/coverage-v8": "4.1.11",
     "convex-test": "^0.0.54",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.0",
+    "jose": "^6.2.8",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
   },
   "private": true
 }

@@ -16,7 +16,7 @@ type ItemProperties = {
   item_age_ms: number;
 };
 
-export type ItemAction =
+type ItemAction =
   | "copy"
   | "share"
   | "share_sheet_opened"
@@ -30,7 +30,7 @@ export type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-export type AnalyticsEventProperties = {
+type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
     step_id: string;
@@ -111,7 +111,7 @@ export type AnalyticsEventProperties = {
   review_prompted: { ready_count: number };
 };
 
-export type AnalyticsEvent = keyof AnalyticsEventProperties;
+type AnalyticsEvent = keyof AnalyticsEventProperties;
 
 function capture<Event extends AnalyticsEvent>(
   event: Event,

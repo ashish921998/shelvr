@@ -47,9 +47,9 @@ export type RawSharePayload = {
 /** The kind of item a resolved entry will save as. `unsupported` covers audio,
  * video, file, and any future content type the share target deliberately does
  * not import — it is reported, never silently coerced into a note. */
-export type ShareEntryKind = 'link' | 'note' | 'image' | 'unsupported';
+export type ShareEntryKind = "link" | "note" | "image" | "unsupported";
 
-export type ShareEntryStatus = 'pending' | 'saved' | 'failed' | 'unsupported';
+export type ShareEntryStatus = "pending" | "saved" | "failed" | "unsupported";
 
 /** A single resolved share entry plus its stable operation id and outcome. The
  * operation id is `share:<session>:<index>` — index is the entry's position in
@@ -79,7 +79,7 @@ export type ShareSession = {
    * reconcileSession treat a userId mismatch as "no session" (start fresh). */
   userId: string;
   sessionId: string;
-  phase: 'active' | 'complete';
+  phase: "active" | "complete";
   entries: ShareEntry[];
 };
 
@@ -88,14 +88,19 @@ export const SESSION_SCHEMA_VERSION = 1;
 /** The status/kind enums, centralized so loadSession can validate every entry
  * against a closed set rather than trusting arbitrary persisted strings. */
 const ENTRY_STATUSES = new Set<ShareEntryStatus>([
-  'pending',
-  'saved',
-  'failed',
-  'unsupported',
+  "pending",
+  "saved",
+  "failed",
+  "unsupported",
 ]);
-const ENTRY_KINDS = new Set<ShareEntryKind>(['link', 'note', 'image', 'unsupported']);
+const ENTRY_KINDS = new Set<ShareEntryKind>([
+  "link",
+  "note",
+  "image",
+  "unsupported",
+]);
 
-export const SESSION_KEY = 'incoming-share-session';
+export const SESSION_KEY = "incoming-share-session";
 
 // ---------------------------------------------------------------------------
 // Fingerprinting
@@ -106,7 +111,9 @@ export const SESSION_KEY = 'incoming-share-session';
  * can collide across distinct batches (e.g. `"a|b"` vs `"a","b"`). Order and
  * duplicates are preserved so two identical entries in one batch stay distinct
  * and a re-ordering reads as a different batch (a new session). */
-export function fingerprintSharePayloads(rawPayloads: RawSharePayload[]): string {
+export function fingerprintSharePayloads(
+  rawPayloads: RawSharePayload[],
+): string {
   // Sort object keys for determinism: an undefined mimeType serialized as
   // {mimeType: undefined} vs {mimeType omitted} must not flip the fingerprint.
   const normalized = rawPayloads.map((p) => ({
@@ -133,14 +140,14 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
   try {
     const parsed = JSON.parse(raw) as Partial<ShareSession>;
     if (
-      typeof parsed.version !== 'number' ||
+      typeof parsed.version !== "number" ||
       parsed.version !== SESSION_SCHEMA_VERSION ||
-      typeof parsed.fingerprint !== 'string' ||
-      typeof parsed.userId !== 'string' ||
+      typeof parsed.fingerprint !== "string" ||
+      typeof parsed.userId !== "string" ||
       parsed.userId.length === 0 ||
-      typeof parsed.sessionId !== 'string' ||
+      typeof parsed.sessionId !== "string" ||
       parsed.sessionId.length === 0 ||
-      (parsed.phase !== 'active' && parsed.phase !== 'complete') ||
+      (parsed.phase !== "active" && parsed.phase !== "complete") ||
       !Array.isArray(parsed.entries) ||
       parsed.entries.length === 0 ||
       !parsed.entries.every(isValidEntry)
@@ -161,17 +168,17 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
  * entry invalidates the whole record (we cannot tell which entries are trusted
  * if one is corrupt), so the caller drops it and starts a fresh session. */
 function isValidEntry(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== "object" || value === null) return false;
   const e = value as Record<string, unknown>;
   return (
-    typeof e.index === 'number' &&
+    typeof e.index === "number" &&
     Number.isInteger(e.index) &&
     e.index >= 0 &&
-    typeof e.operationId === 'string' &&
+    typeof e.operationId === "string" &&
     e.operationId.length > 0 &&
-    typeof e.kind === 'string' &&
+    typeof e.kind === "string" &&
     ENTRY_KINDS.has(e.kind as ShareEntryKind) &&
-    typeof e.status === 'string' &&
+    typeof e.status === "string" &&
     ENTRY_STATUSES.has(e.status as ShareEntryStatus)
   );
 }
@@ -196,11 +203,11 @@ export function operationIdFor(sessionId: string, index: number): string {
 // Reconciliation
 // ---------------------------------------------------------------------------
 
-export type ReconcileResult =
-  | { kind: 'empty' }
-  | { kind: 'new'; session: ShareSession }
-  | { kind: 'resume'; session: ShareSession }
-  | { kind: 'clear'; session: ShareSession };
+type ReconcileResult =
+  | { kind: "empty" }
+  | { kind: "new"; session: ShareSession }
+  | { kind: "resume"; session: ShareSession }
+  | { kind: "clear"; session: ShareSession };
 
 /** The single entry point the UI calls on every render/mount with the current
  * raw shared payloads. It decides — atomically with respect to the store —
@@ -227,7 +234,7 @@ export function reconcileSession(
   // resume or clear.
   if (rawPayloads.length === 0) {
     deleteSession(store);
-    return { kind: 'empty' };
+    return { kind: "empty" };
   }
 
   const currentFp = fingerprintSharePayloads(rawPayloads);
@@ -236,30 +243,48 @@ export function reconcileSession(
   // A session from a different user, or no session at all: start fresh. The
   // mismatched record is replaced by newSession below.
   if (existing === null || existing.userId !== userId) {
-    return { kind: 'new', session: newSession(store, userId, currentFp, rawPayloads, generateSessionId) };
+    return {
+      kind: "new",
+      session: newSession(
+        store,
+        userId,
+        currentFp,
+        rawPayloads,
+        generateSessionId,
+      ),
+    };
   }
 
   if (existing.fingerprint !== currentFp) {
     // Different batch: a new share superseded the previous one. Start fresh,
     // replacing the stale record. (The previous session's native payloads are
     // gone — a new share cannot arrive while old ones linger natively.)
-    return { kind: 'new', session: newSession(store, userId, currentFp, rawPayloads, generateSessionId) };
+    return {
+      kind: "new",
+      session: newSession(
+        store,
+        userId,
+        currentFp,
+        rawPayloads,
+        generateSessionId,
+      ),
+    };
   }
 
   // Same batch as the persisted session.
-  if (existing.phase === 'complete') {
+  if (existing.phase === "complete") {
     // Direct the caller to clear the native payloads WITHOUT deleting the
     // record here: the caller's native clear may throw, and if it does the
     // completed session MUST stay so a remount reconciles and retries the
     // clear. The caller deletes the record only after a non-throwing clear
     // (single-use: once cleared, a later identical re-share starts a fresh
     // session instead of matching this stale completed record).
-    return { kind: 'clear', session: existing };
+    return { kind: "clear", session: existing };
   }
 
   // Active session, same batch: resume only pending/failed entries. Saved
   // entries are kept as-is and NOT re-processed by the caller.
-  return { kind: 'resume', session: existing };
+  return { kind: "resume", session: existing };
 }
 
 /** Allocates a brand-new active session for `rawPayloads` and persists it. All
@@ -278,12 +303,12 @@ function newSession(
     fingerprint: fp,
     userId,
     sessionId,
-    phase: 'active',
+    phase: "active",
     entries: rawPayloads.map((_, index) => ({
       index,
       operationId: operationIdFor(sessionId, index),
-      kind: 'link', // placeholder; the processor classifies each entry
-      status: 'pending',
+      kind: "link", // placeholder; the processor classifies each entry
+      status: "pending",
     })),
   };
   saveSession(store, session);
@@ -328,8 +353,8 @@ export function markComplete(
   const session = loadSession(store);
   if (session === null) return;
   if (sessionId !== undefined && session.sessionId !== sessionId) return;
-  if (session.phase === 'complete') return; // idempotent
-  session.phase = 'complete';
+  if (session.phase === "complete") return; // idempotent
+  session.phase = "complete";
   saveSession(store, session);
 }
 
@@ -351,12 +376,17 @@ export function deleteSession(
  * unsupported) state, i.e. there is nothing left to attempt. */
 export function allEntriesSettled(session: ShareSession): boolean {
   return session.entries.every(
-    (e) => e.status === 'saved' || e.status === 'failed' || e.status === 'unsupported',
+    (e) =>
+      e.status === "saved" ||
+      e.status === "failed" ||
+      e.status === "unsupported",
   );
 }
 
 /** The entries the processor should (re)attempt: those still pending or failed.
  * Saved and unsupported entries are excluded — successes are never re-saved. */
 export function entriesToProcess(session: ShareSession): ShareEntry[] {
-  return session.entries.filter((e) => e.status === 'pending' || e.status === 'failed');
+  return session.entries.filter(
+    (e) => e.status === "pending" || e.status === "failed",
+  );
 }

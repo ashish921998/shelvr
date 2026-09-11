@@ -15,5 +15,18 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "convex/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "./coverage",
+      include: ["convex/**/*.ts", "src/lib/**/*.ts"],
+      exclude: ["**/*.test.ts", "convex/_generated/**", "convex/test.setup.ts"],
+      thresholds: {
+        statements: 60,
+        branches: 55,
+        functions: 60,
+        lines: 60,
+      },
+    },
   },
 });

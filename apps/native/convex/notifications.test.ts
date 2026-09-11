@@ -453,7 +453,7 @@ describe("weekly shelf notifications", () => {
     expect(digest?.items.map((item) => item._id).sort()).toEqual(
       unopenedIds.sort(),
     );
-  });
+  }, 20_000); // seeding 1003 reads can exceed the 5s default under coverage
 
   it("starts disabled until the user opts in", async () => {
     const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });

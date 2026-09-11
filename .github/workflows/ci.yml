@@ -41,5 +41,14 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck
 
-      - name: Test
-        run: pnpm --filter native-app test
+      - name: Dead code
+        run: pnpm run knip
+
+      - name: Dependency hygiene
+        run: pnpm run knip:dependencies
+
+      - name: Version drift
+        run: pnpm run syncpack:lint
+
+      - name: Test coverage
+        run: pnpm run coverage
