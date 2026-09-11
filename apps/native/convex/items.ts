@@ -35,11 +35,11 @@ export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
 
-/** Most rows one `listItems` page may return. The client asks for 40; the
+/** Most rows one `listItemsPage` page may return. The client asks for 40; the
  * cap keeps a stray argument from reading the whole library in one
  * transaction, which Convex would reject and the feed would show as an error. */
 export const LIST_PAGE_MAX = 100;
-/** Bytes of item documents one `listItems` page may read. The page is read as
+/** Bytes of item documents one `listItemsPage` page may read. The page is read as
  * full documents, article bodies included, even though only the card shape is
  * returned, so a page of long articles can approach Convex's per-query read
  * limit. Past this the page comes back short and `usePaginatedQuery` splits
@@ -208,12 +208,32 @@ function buildSearchText(parts: {
 // Public queries
 // ---------------------------------------------------------------------------
 
+/** The home feed as installed builds before the paginated feed still call it:
+ * every item, full rows, newest first. Public function signatures are
+ * contracts with every app build in the wild, so this keeps its exact shape
+ * until the production update channel shows no bundle still calling it, then
+ * remove it (`LIST_CAP` stays: the image backfill uses it too). New code uses
+ * `listItemsPage`. */
+export const listItems = query({
+  args: {},
+  returns: v.array(enrichedItemValidator),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const items = await ctx.db
+      .query("items")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(LIST_CAP);
+    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+  },
+});
+
 /** The home feed, newest first, one page at a time. Card shape only — see
  * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
  * untouched so the client's reactive page splitting keeps working; the size
  * fields are bounded here so no argument can make one page read more than the
  * platform allows. */
-export const listItems = query({
+export const listItemsPage = query({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(itemCardValidator),
   handler: async (ctx, args) => {

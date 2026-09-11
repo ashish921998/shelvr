@@ -64,25 +64,49 @@ async function seedFeed(
   });
 }
 
-describe("listItems pagination", () => {
+describe("listItems (installed builds)", () => {
+  it("still returns every item as a full row, newest first", async () => {
+    const t = await as("feed-user");
+    const ids = await seedFeed(t, "feed-user", 3);
+
+    const items = await t.query(api.items.listItems, {});
+    expect(items.map((item) => item._id)).toEqual([...ids].reverse());
+    // The pre-pagination detail screen read the article body off this row.
+    expect(items[0].content).toContain("Article body 2");
+    expect(items[0]).toHaveProperty("imageUrl");
+  });
+
+  it("only returns the caller's items", async () => {
+    const backend = newConvexTest();
+    const ta = backend.withIdentity({ subject: "feed-a|session-1" });
+    const tb = backend.withIdentity({ subject: "feed-b|session-1" });
+    const aIds = await seedFeed(ta, "feed-a", 2);
+    await seedFeed(tb, "feed-b", 1);
+
+    const mine = await ta.query(api.items.listItems, {});
+    expect(mine.map((item) => item._id)).toEqual([...aIds].reverse());
+  });
+});
+
+describe("listItemsPage", () => {
   it("pages newest-first with a working cursor and isDone on the last page", async () => {
     const t = await as("feed-user");
     const ids = await seedFeed(t, "feed-user", 5);
     const newestFirst = [...ids].reverse();
 
-    const first = await t.query(api.items.listItems, {
+    const first = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 2, cursor: null },
     });
     expect(first.page.map((item) => item._id)).toEqual(newestFirst.slice(0, 2));
     expect(first.isDone).toBe(false);
 
-    const second = await t.query(api.items.listItems, {
+    const second = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 2, cursor: first.continueCursor },
     });
     expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(2, 4));
     expect(second.isDone).toBe(false);
 
-    const third = await t.query(api.items.listItems, {
+    const third = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 2, cursor: second.continueCursor },
     });
     expect(third.page.map((item) => item._id)).toEqual(newestFirst.slice(4));
@@ -94,13 +118,13 @@ describe("listItems pagination", () => {
     const ids = await seedFeed(t, "feed-user", LIST_PAGE_MAX + 3);
     const newestFirst = [...ids].reverse();
 
-    const first = await t.query(api.items.listItems, {
+    const first = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 100_000, cursor: null },
     });
     expect(first.page.map((item) => item._id)).toEqual(newestFirst.slice(0, LIST_PAGE_MAX));
     expect(first.isDone).toBe(false);
 
-    const second = await t.query(api.items.listItems, {
+    const second = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 100_000, cursor: first.continueCursor },
     });
     expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(LIST_PAGE_MAX));
@@ -111,7 +135,7 @@ describe("listItems pagination", () => {
     const t = await as("feed-user");
     const [id] = await seedFeed(t, "feed-user", 1);
 
-    const { page } = await t.query(api.items.listItems, {
+    const { page } = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(page).toHaveLength(1);
@@ -146,13 +170,13 @@ describe("listItems pagination", () => {
     const aIds = await seedFeed(ta, "feed-a", 2);
     const bIds = await seedFeed(tb, "feed-b", 3);
 
-    const mine = await ta.query(api.items.listItems, {
+    const mine = await ta.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(mine.page.map((item) => item._id)).toEqual([...aIds].reverse());
     expect(mine.isDone).toBe(true);
 
-    const theirs = await tb.query(api.items.listItems, {
+    const theirs = await tb.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(theirs.page.map((item) => item._id)).toEqual([...bIds].reverse());
@@ -161,7 +185,7 @@ describe("listItems pagination", () => {
   it("rejects unauthenticated callers", async () => {
     const t = newConvexTest();
     await expect(
-      t.query(api.items.listItems, { paginationOpts: { numItems: 10, cursor: null } }),
+      t.query(api.items.listItemsPage, { paginationOpts: { numItems: 10, cursor: null } }),
     ).rejects.toThrow("Not authenticated");
   });
 });
