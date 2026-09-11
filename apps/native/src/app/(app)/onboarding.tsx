@@ -21,7 +21,6 @@ import { useRouter } from 'expo-router';
 import { useConvexAuth } from 'convex/react';
 import { StyleSheet } from 'react-native-unistyles';
 import { analytics } from '@/lib/analytics';
-import { activationPal } from 'activation-pal';
 
 // Onboarding v2 — an 8-step quiz-funnel flow (spec: docs/onboarding-v2-spec.html).
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
@@ -124,22 +123,13 @@ export default function OnboardingScreen() {
   const recordCurrentStep = useCallback(() => {
     if (trackedStepsRef.current.has(step)) return;
 
-    const answer =
-      step === STEPS.surveyQ1
-        ? q1.join(',')
-        : step === STEPS.surveyQ2
-          ? q2.join(',')
-          : step === STEPS.spaces
-            ? spaces.join(',')
-            : undefined;
-    activationPal.onboardingStep(step, STEP_IDS[step], answer || undefined);
     analytics.capture('onboarding_step_completed', {
       step_id: STEP_IDS[step],
       step_index: step,
       duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
     });
     trackedStepsRef.current.add(step);
-  }, [q1, q2, spaces, step]);
+  }, [step]);
 
   const advance = useCallback(() => {
     recordCurrentStep();
@@ -188,7 +178,6 @@ export default function OnboardingScreen() {
       $set: { save_pileup: q1, save_types: q2 },
     });
     recordCurrentStep();
-    activationPal.onboardingCompleted();
     setPendingSpaces(spaces);
     completeOnboarding();
     if (!isAuthenticated) {

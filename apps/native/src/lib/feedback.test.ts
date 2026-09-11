@@ -26,7 +26,6 @@ const posthogMock = vi.hoisted(() => ({
   flush: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/posthog", () => ({ posthog: posthogMock }));
-vi.mock("activation-pal", () => ({ activationPal: { track: vi.fn() } }));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

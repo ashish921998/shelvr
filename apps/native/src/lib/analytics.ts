@@ -1,5 +1,4 @@
 import { posthog } from "@/lib/posthog";
-import { activationPal } from "activation-pal";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -121,18 +120,6 @@ function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
-  if (
-    event === "article_saved" ||
-    event === "note_saved" ||
-    event === "images_saved" ||
-    event === "space_created"
-  ) {
-    activationPal.track(
-      event,
-      properties as Record<string, string | boolean | number> | undefined,
-    );
-  }
-
   if (!posthog) return;
 
   try {
@@ -180,7 +167,6 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
 // Convex: sending it as a person property would copy PII into a third party
 // (and into replay-linked person profiles) for no analytics gain.
 function identify(userId: string): void {
-  activationPal.setUserId(userId);
   if (!posthog) return;
 
   try {
@@ -191,7 +177,6 @@ function identify(userId: string): void {
 }
 
 function reset(): void {
-  activationPal.setUserId();
   if (!posthog) return;
 
   try {
