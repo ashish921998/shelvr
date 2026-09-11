@@ -1,4 +1,5 @@
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -33,6 +34,21 @@ export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
 
 /** Practical per-query cap so a very large library can't blow the read limit. */
 const LIST_CAP = 1000;
+
+/** Most rows one `listItems` page may return. The client asks for 40; the
+ * cap keeps a stray argument from reading the whole library in one
+ * transaction, which Convex would reject and the feed would show as an error. */
+export const LIST_PAGE_MAX = 100;
+/** Bytes of item documents one `listItems` page may read. The page is read as
+ * full documents, article bodies included, even though only the card shape is
+ * returned, so a page of long articles can approach Convex's per-query read
+ * limit. Past this the page comes back short and `usePaginatedQuery` splits
+ * it, instead of the query failing. Half the platform limit. */
+const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+/** Upper bound on `listRecentItems`. The home-screen widget shows five; the
+ * cap keeps a stray client argument from turning it back into a feed query. */
+export const RECENT_ITEMS_MAX = 20;
 
 const itemTypeValidator = v.union(v.literal("image"), v.literal("link"), v.literal("note"));
 
@@ -138,9 +154,42 @@ const enrichedItemWithSpacesValidator = v.object({
   ),
 });
 
+// The feed row. Everything a card, the masonry layout, the widget, and the
+// detail pager's first paint read — and nothing that only the detail body
+// shows. `content` is the extracted article (up to ai.ts's
+// MAX_STORED_CONTENT_CHARS, 100k, per link) and `searchText` its index copy;
+// `products` is the shopping result list.
+// Shipping those with every feed push was the whole cost of the old list
+// query, so consumers that need them go through `getItem`. Derived from
+// `enrichedItemValidator` so a new field lands in both shapes by default and
+// has to be dropped here on purpose.
+export const itemCardValidator = enrichedItemValidator.omit(
+  "userId",
+  "content",
+  "searchText",
+  "products",
+  "productsStatus",
+);
+
+export type ItemCard = Infer<typeof itemCardValidator>;
+
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   const imageUrl = item.storageId ? await ctx.storage.getUrl(item.storageId) : null;
   return { ...item, imageUrl };
+}
+
+export async function toItemCard(ctx: QueryCtx, item: Doc<"items">): Promise<ItemCard> {
+  // Destructure rather than pick so the compiler flags a field that exists on
+  // the document but is missing from the validator (or vice versa).
+  const {
+    userId: _userId,
+    content: _content,
+    searchText: _searchText,
+    products: _products,
+    productsStatus: _productsStatus,
+    ...card
+  } = await enrichItem(ctx, item);
+  return card;
 }
 
 function buildSearchText(parts: {
@@ -159,17 +208,86 @@ function buildSearchText(parts: {
 // Public queries
 // ---------------------------------------------------------------------------
 
+/** The home feed, newest first, one page at a time. Card shape only — see
+ * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
+ * untouched so the client's reactive page splitting keeps working; the size
+ * fields are bounded here so no argument can make one page read more than the
+ * platform allows. */
 export const listItems = query({
-  args: {},
-  returns: v.array(enrichedItemValidator),
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(itemCardValidator),
+  handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const items = await ctx.db
+    const opts = args.paginationOpts;
+    const result = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .take(LIST_CAP);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+      .paginate({
+        ...opts,
+        numItems: Math.min(opts.numItems, LIST_PAGE_MAX),
+        maximumBytesRead: Math.min(opts.maximumBytesRead ?? Infinity, LIST_PAGE_MAX_BYTES),
+      });
+    return {
+      ...result,
+      page: await Promise.all(result.page.map((item) => toItemCard(ctx, item))),
+    };
+  },
+});
+
+/** The newest `ready` saves, for surfaces that show a handful of items and
+ * must not subscribe to the feed (the home-screen widget). The status index
+ * reads exactly `limit` ready rows, so a burst of fresh imports still
+ * processing can never push older ready saves out of view. */
+export const listRecentItems = query({
+  args: { limit: v.number() },
+  returns: v.array(itemCardValidator),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const limit = Math.min(Math.max(1, Math.floor(args.limit)), RECENT_ITEMS_MAX);
+    const ready = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "ready"))
+      .order("desc")
+      .take(limit);
+    return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+  },
+});
+
+/** Every photo with a location, for the map. Only image imports carry
+ * coordinates, so the scan is bounded by the photo quota rather than the whole
+ * library, and the row is just what a marker needs. */
+export const listLocatedItems = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("items"),
+      title: v.optional(v.string()),
+      latitude: v.number(),
+      longitude: v.number(),
+      imageUrl: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const photos = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("type", "image"))
+      .order("desc")
+      .take(MAX_PHOTOS_PER_ACCOUNT);
+    const located = photos.filter(
+      (item): item is Doc<"items"> & { latitude: number; longitude: number } =>
+        item.latitude !== undefined && item.longitude !== undefined,
+    );
+    return await Promise.all(
+      located.map(async (item) => ({
+        _id: item._id,
+        title: item.title,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        imageUrl: item.storageId ? await ctx.storage.getUrl(item.storageId) : null,
+      })),
+    );
   },
 });
 
@@ -203,9 +321,12 @@ export const getItem = query({
   },
 });
 
+// Search results and similar items feed the same masonry cards as the home
+// feed (and the detail pager, which loads bodies through getItem), so they
+// return the card shape too.
 export const searchItems = query({
   args: { query: v.string() },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const trimmed = args.query.trim();
@@ -218,7 +339,7 @@ export const searchItems = query({
         q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(items.map((item) => toItemCard(ctx, item)));
   },
 });
 
@@ -240,7 +361,7 @@ function searchTokens(text: string): Set<string> {
 
 export const similarItems = query({
   args: { id: v.id("items") },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const item = await ctx.db.get(args.id);
@@ -281,7 +402,7 @@ export const similarItems = query({
     }
     scored.sort((a, b) => b.score - a.score);
     return await Promise.all(
-      scored.slice(0, SIMILAR_LIMIT).map(({ item: match }) => enrichItem(ctx, match)),
+      scored.slice(0, SIMILAR_LIMIT).map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });

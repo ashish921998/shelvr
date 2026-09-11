@@ -108,18 +108,18 @@ let syncChain: Promise<void> = Promise.resolve();
 
 /**
  * Keeps the "Recent Saves" home screen widget fed with the latest ready items.
- * Renders nothing; mount once inside the signed-in tree so it shares the
- * feed's listItems subscription.
+ * Renders nothing; mount once inside the signed-in tree. It subscribes to its
+ * own five-item query rather than the feed, so a change deep in the library
+ * never re-sends the whole feed here.
  */
 export function RecentSavesWidgetSync() {
-  const { data: items } = useQuery(convexQuery(api.items.listItems, {}));
+  const { data: recent } = useQuery(
+    convexQuery(api.items.listRecentItems, { limit: WIDGET_ITEM_COUNT }),
+  );
   const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios' || items === undefined) return;
-    const recent = items
-      .filter((item) => item.status === 'ready')
-      .slice(0, WIDGET_ITEM_COUNT);
+    if (Platform.OS !== 'ios' || recent === undefined) return;
     // Only re-sync when something the widget shows actually changed.
     const key = recent
       .map((item) => `${item._id}:${item.title ?? ''}:${item.imageUrl ?? item.heroImageUrl ?? ''}`)
@@ -133,7 +133,7 @@ export function RecentSavesWidgetSync() {
         lastKey.current = null;
         console.warn('Recent Saves widget sync failed', error);
       });
-  }, [items]);
+  }, [recent]);
 
   return null;
 }

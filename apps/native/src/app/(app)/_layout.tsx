@@ -1,4 +1,5 @@
 import { useOnboarding } from '@/lib/onboarding';
+import { HomeFeedProvider } from '@/lib/home-feed';
 import { ScreenLoader } from '@/components/ui/screen-loader';
 import { HeaderIconButton } from '@/components/ui/header-icon-button';
 import { useReplayOnboarding } from '@/lib/replay-onboarding';
@@ -6,7 +7,6 @@ import { useResumePendingShare } from '@/lib/share/use-resume-pending-share';
 import { RecentSavesWidgetSync } from '@/lib/widget-sync';
 import { useConvexAuth } from 'convex/react';
 import { Redirect, Stack, useRouter } from 'expo-router';
-import { Fragment } from 'react';
 import { Platform } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
@@ -32,7 +32,7 @@ export default function AppLayout() {
   }
 
   return (
-    <Fragment>
+    <HomeFeedProvider>
       <RecentSavesWidgetSync />
       <Stack
         screenOptions={{
@@ -159,6 +159,6 @@ export default function AppLayout() {
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack.Protected>
       </Stack>
-    </Fragment>
+    </HomeFeedProvider>
   );
 }
