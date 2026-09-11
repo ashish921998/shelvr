@@ -193,7 +193,7 @@ function SpaceForm(props: SpaceFormProps) {
             style={styles.saveButtonState}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={theme.colors.primaryForeground} />
             ) : (
               <Text style={styles.saveButtonText}>
                 {editing ? 'Save changes' : 'Create space'}
@@ -283,6 +283,6 @@ const styles = StyleSheet.create((theme) => ({
   saveButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.primaryForeground,
   },
 }));

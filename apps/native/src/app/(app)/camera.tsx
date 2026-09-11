@@ -243,7 +243,7 @@ export default function CameraScreen() {
       'Camera access needed',
       'Shelvr uses the camera to capture things you want to keep.',
       <Pressable style={[styles.fallbackButton, styles.fallbackPrimary]} onPress={requestPermission}>
-        <Text style={[styles.fallbackButtonText, { color: '#fff' }]}>Allow camera</Text>
+        <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>Allow camera</Text>
       </Pressable>,
     );
   } else if (device == null) {
@@ -426,6 +426,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   fallbackPrimary: {
     backgroundColor: theme.colors.primary,
+  },
+  fallbackPrimaryText: {
+    color: theme.colors.primaryForeground,
   },
   fallbackButtonText: {
     fontFamily: theme.fonts.bold,

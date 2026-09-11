@@ -863,6 +863,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   }),
   buttonTextPrimary: (theme: Theme) => ({
-    color: '#fffdf8',
+    color: theme.colors.primaryForeground,
   }),
 }));

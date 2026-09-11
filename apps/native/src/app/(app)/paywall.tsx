@@ -98,7 +98,7 @@ const styles = StyleSheet.create((theme) => ({
   buttonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.primaryForeground,
   },
   secondary: {
     paddingVertical: theme.gap(1),
