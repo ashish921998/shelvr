@@ -211,8 +211,8 @@ function buildSearchText(parts: {
 /** The home feed as installed builds before the paginated feed still call it:
  * every item, full rows, newest first. Public function signatures are
  * contracts with every app build in the wild, so this keeps its exact shape
- * until the production update channel shows no bundle still calling it.
- * Remove it, and `LIST_CAP` with it, in the release after that. New code uses
+ * until the production update channel shows no bundle still calling it, then
+ * remove it (`LIST_CAP` stays: the image backfill uses it too). New code uses
  * `listItemsPage`. */
 export const listItems = query({
   args: {},
