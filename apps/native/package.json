@@ -93,6 +93,7 @@
     "convex-test": "^0.0.54",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.0",
+    "eslint-plugin-check-file": "^3.3.2",
     "jose": "^6.2.8",
     "typescript": "~6.0.3",
     "vite": "^8.2.0",

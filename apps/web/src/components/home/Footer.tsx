@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { APP_STORE_URL } from "@/lib/app-store";
+import { APP_STORE_URL } from "@/lib/appStore";
 import Logo from "../common/Logo";
 import FooterAppStoreLink from "./FooterAppStoreLink";
 
@@ -24,7 +24,7 @@ const Footer = () => {
             </p>
           </div>
           <nav className="grid grid-cols-2 gap-x-10 gap-y-3 sm:text-right">
-            {links.map((item) => (
+            {links.map((item) =>
               item.url === APP_STORE_URL ? (
                 <FooterAppStoreLink key={item.title}>
                   {item.title}
@@ -37,8 +37,8 @@ const Footer = () => {
                 >
                   {item.title}
                 </Link>
-              )
-            ))}
+              ),
+            )}
           </nav>
         </div>
 
@@ -47,17 +47,11 @@ const Footer = () => {
             © {new Date().getFullYear()} Shelvr. All rights reserved.
           </p>
           <p className="text-sm text-muted">
-            <Link
-              href="/terms"
-              className="transition-colors hover:text-ink"
-            >
+            <Link href="/terms" className="transition-colors hover:text-ink">
               Terms
             </Link>{" "}
             ·{" "}
-            <Link
-              href="/privacy"
-              className="transition-colors hover:text-ink"
-            >
+            <Link href="/privacy" className="transition-colors hover:text-ink">
               Privacy
             </Link>
           </p>

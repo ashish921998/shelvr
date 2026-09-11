@@ -1,6 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
-import { Link } from 'expo-router';
-import { ItemCard, type FeedItem, type ItemSource } from './item-card';
+import { FlashList } from "@shopify/flash-list";
+import { Link } from "expo-router";
+import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
 
 type Props = {
   items: FeedItem[];
@@ -13,7 +13,14 @@ type Props = {
   ListHeaderComponent?: React.ComponentType | React.ReactElement;
 };
 
-export function MasonryFeed({ items, numColumns = 2, source, firstItemZoomTarget, ListEmptyComponent, ListHeaderComponent }: Props) {
+export function MasonryFeed({
+  items,
+  numColumns = 2,
+  source,
+  firstItemZoomTarget,
+  ListEmptyComponent: listEmptyComponent,
+  ListHeaderComponent: listHeaderComponent,
+}: Props) {
   return (
     <FlashList
       data={items}
@@ -37,8 +44,8 @@ export function MasonryFeed({ items, numColumns = 2, source, firstItemZoomTarget
         paddingTop: 8,
         paddingBottom: 8,
       }}
-      ListEmptyComponent={ListEmptyComponent}
-      ListHeaderComponent={ListHeaderComponent}
+      ListEmptyComponent={listEmptyComponent}
+      ListHeaderComponent={listHeaderComponent}
     />
   );
 }

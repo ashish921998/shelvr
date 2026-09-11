@@ -18,6 +18,20 @@ workflow described there.
 - `apps/web` is the marketing site and its server-backed waitlist routes.
 - `apps/native/convex` is the backend source of truth.
 
+## Naming conventions
+
+ESLint enforces file and identifier naming (`eslint-plugin-check-file` and
+`@typescript-eslint/naming-convention`; generated Convex files are exempt).
+
+- `apps/native/convex/**` modules and their co-located tests are
+  lowerCamelCase.
+- `apps/native/src/**` files are kebab-case.
+- `apps/web/src/components/**` are PascalCase, `src/lib` modules are
+  lowerCamelCase, and `src/app` keeps the fixed Next.js route filenames.
+- Variables, functions, and parameters are camelCase, constants may be
+  UPPER_CASE, and types, classes, interfaces, and enums are PascalCase.
+  Leading underscores are allowed.
+
 ## Execution loop
 
 1. Inspect the relevant files and preserve existing user changes.

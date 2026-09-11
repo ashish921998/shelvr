@@ -1,7 +1,7 @@
 "use client";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
-import { APP_STORE_URL } from "@/lib/app-store";
+import { APP_STORE_URL } from "@/lib/appStore";
 
 type AppStoreButtonProps = {
   source: "header" | "hero" | "footer" | "footer-nav";
