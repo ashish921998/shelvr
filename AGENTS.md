@@ -32,6 +32,15 @@ ESLint enforces file and identifier naming (`eslint-plugin-check-file` and
   UPPER_CASE, and types, classes, interfaces, and enums are PascalCase.
   Leading underscores are allowed.
 
+## Complexity limits
+
+ESLint fails on functions over cyclomatic complexity 30, 50 statements,
+block depth 4, or 4 nested callbacks. Extract helpers, hooks, or
+subcomponents instead of disabling the rules. `max-lines-per-function` is
+intentionally unset: long JSX render trees and long tests are common here and
+carry less risk than branchy logic. The native app lints with plain
+`eslint .` (not `expo lint`), which silently skips the `convex/` backend.
+
 ## Execution loop
 
 1. Inspect the relevant files and preserve existing user changes.

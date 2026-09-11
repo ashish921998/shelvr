@@ -1,27 +1,27 @@
-import { isStaleProcessing, isTerminalFailure } from '@convex/model/itemFields';
-import { IMAGE_TOO_LARGE_MESSAGE } from '@convex/model/imagePolicy';
-import { ProductsSection } from '@/components/products-section';
-import { ArticleReaderView } from '@/components/article-reader-view';
-import { ItemSpaces } from '@/components/item-spaces';
-import { analytics } from '@/lib/analytics';
-import { IntentChip } from '@/components/intent-chip';
-import { SimilarGrid } from '@/components/similar-grid';
-import { TagChip } from '@/components/tag-chip';
-import { usePaywallGuard } from '@/lib/entitlement';
-import { useAppHeaderHeight } from '@/lib/header-layout';
-import { runIntent } from '@/lib/intents';
-import { displayHost } from '@/lib/url';
-import { isTikTokUrl } from '@convex/model/externalUrl';
-import { convexQuery } from '@convex-dev/react-query';
-import { api } from '@convex/_generated/api';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import * as WebBrowser from 'expo-web-browser';
-import type { FunctionReturnType } from 'convex/server';
-import { memo, useEffect, useState } from 'react';
+import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
+import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
+import { ProductsSection } from "@/components/products-section";
+import { ArticleReaderView } from "@/components/article-reader-view";
+import { ItemSpaces } from "@/components/item-spaces";
+import { analytics } from "@/lib/analytics";
+import { IntentChip } from "@/components/intent-chip";
+import { SimilarGrid } from "@/components/similar-grid";
+import { TagChip } from "@/components/tag-chip";
+import { usePaywallGuard } from "@/lib/entitlement";
+import { useAppHeaderHeight } from "@/lib/header-layout";
+import { runIntent } from "@/lib/intents";
+import { displayHost } from "@/lib/url";
+import { isTikTokUrl } from "@convex/model/externalUrl";
+import { convexQuery } from "@convex-dev/react-query";
+import { api } from "@convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { Image } from "expo-image";
+import { Link } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import * as WebBrowser from "expo-web-browser";
+import type { FunctionReturnType } from "convex/server";
+import { memo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,16 +30,20 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // A row as returned by the list queries (listItems / searchItems / getSpace) —
 // carries every display field except the space memberships, which only
 // getItem resolves. Rows from getSpace additionally carry `spaceIntents`:
 // purpose-steered actions scoped to that space's membership.
-export type DetailItem = FunctionReturnType<typeof api.items.listItems>[number] & {
-  spaceIntents?: FunctionReturnType<typeof api.items.listItems>[number]['intents'];
+export type DetailItem = FunctionReturnType<
+  typeof api.items.listItems
+>[number] & {
+  spaceIntents?: FunctionReturnType<
+    typeof api.items.listItems
+  >[number]["intents"];
 };
 
 type Props = {
@@ -62,7 +66,7 @@ function useItemDetailData(item: DetailItem) {
   // upgrade slots in behind the same query). Only ready items have signal.
   const { data: similar } = useQuery({
     ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === 'ready',
+    enabled: item.status === "ready",
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
@@ -76,47 +80,32 @@ function useItemDetailData(item: DetailItem) {
   return { spaces, similar, heroUri, paragraphs };
 }
 
-// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
-// is stable across swipes (Convex query data, staleTime Infinity). Without this,
-// every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
-export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props) {
-  const headerHeight = useAppHeaderHeight();
+// Shared "open the source" gesture for the video poster, source row, and URL
+// row. Each call site renders only when item.url exists.
+function openSource(item: DetailItem) {
+  void WebBrowser.openBrowserAsync(item.url!)
+    .then(() => analytics.itemAction(item, "open_source"))
+    .catch(() => {});
+}
+
+// The hero: framed photo or video poster. Sized up front from its aspect
+// ratio: fill the width the frame allows, but never taller than the cap —
+// and when the cap bites, pull the width back in too so the image keeps its
+// shape and the frame hugs it (no cropping, no lopsided gap). The frame
+// insets the image by its own horizontal margin + padding.
+function DetailHero({
+  item,
+  isVideo,
+  isZoomTarget,
+  heroUri,
+}: {
+  item: DetailItem;
+  isVideo: boolean;
+  isZoomTarget: boolean;
+  heroUri: string | null | undefined;
+}) {
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
-
-  // A video's "content" is its caption, not an article: keep the poster layout.
-  const isVideo = item.type === 'link' && isTikTokUrl(item.url);
-
-  // Link saves with extracted content get the compact reader layout.
-  if (item.type === 'link' && !isVideo && paragraphs.length > 0) {
-    return (
-      <ArticleReaderView
-        item={item}
-        isZoomTarget={isZoomTarget}
-        headerHeight={headerHeight}
-        spaces={spaces}
-        similar={similar}
-        heroUri={heroUri}
-        paragraphs={paragraphs}
-      />
-    );
-  }
-
-  // The item's own actions, plus any purpose-steered ones from the space this
-  // page was opened through (deduped — steering may echo a general intent).
-  const intents = (() => {
-    const base = item.intents ?? [];
-    const scoped = item.spaceIntents ?? [];
-    const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-    return [
-      ...base,
-      ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
-    ];
-  })();
 
   // Cap the hero so a tall portrait image can't fill the whole screen and hide
   // the title, description, and actions below it.
@@ -124,13 +113,8 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
   // Source shape; OG images default to 1200×630 (≈1.91).
   const heroAspect =
-    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === 'link' ? 1.91 : 1.4);
+    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
-  // Size the framed photo up front from its aspect ratio: fill the width the
-  // frame allows, but never taller than the cap — and when the cap bites, pull
-  // the width back in too so the image keeps its shape and the frame hugs it
-  // (no cropping, no lopsided gap). The frame insets the image by its own
-  // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
   const heroMaxWidth = width - frameInset;
   const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
@@ -154,9 +138,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Play on TikTok"
-        onPress={() => {
-          void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
-        }}
+        onPress={() => openSource(item)}
       >
         {heroImage}
         <View style={styles.playOverlay} pointerEvents="none">
@@ -169,19 +151,121 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       heroImage
     );
 
+  if (heroUri === null || heroUri === undefined) {
+    return null;
+  }
+  return (
+    <View style={item.isSticker ? undefined : styles.heroContainer}>
+      {isZoomTarget ? (
+        <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
+      ) : (
+        hero
+      )}
+    </View>
+  );
+}
+
+// The item's own actions, plus any purpose-steered ones from the space this
+// page was opened through (deduped — steering may echo a general intent).
+function mergedIntents(item: DetailItem) {
+  const base = item.intents ?? [];
+  const scoped = item.spaceIntents ?? [];
+  const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
+  return [
+    ...base,
+    ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
+  ];
+}
+
+// Intent chips (open in browser, add to calendar, …). Hidden entirely when
+// the item has none.
+function ItemIntents({
+  item,
+  intents,
+}: {
+  item: DetailItem;
+  intents: DetailItem["intents"];
+}) {
+  if (!intents || intents.length === 0) {
+    return null;
+  }
+  return (
+    <View style={styles.intentsRow}>
+      {intents.map((intent, index) => (
+        <IntentChip
+          key={`${intent.kind}-${index}`}
+          kind={intent.kind}
+          label={intent.label}
+          onPress={() => {
+            void runIntent(intent.kind, intent.value)
+              .then(() => {
+                analytics.itemAction(
+                  item,
+                  intent.kind === "open_url"
+                    ? "open_source"
+                    : intent.kind === "add_event"
+                      ? "calendar_sheet_opened"
+                      : intent.kind,
+                );
+              })
+              .catch(() => {});
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
+// is stable across swipes (Convex query data, staleTime Infinity). Without this,
+// every parent re-render (setActiveId on each swipe) re-rendered every mounted
+// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
+export const ItemDetail = memo(function ItemDetail({
+  item,
+  isZoomTarget,
+}: Props) {
+  const headerHeight = useAppHeaderHeight();
+  const { theme } = useUnistyles();
+  const insets = useSafeAreaInsets();
+
+  const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
+
+  // A video's "content" is its caption, not an article: keep the poster layout.
+  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+
+  // Link saves with extracted content get the compact reader layout.
+  if (item.type === "link" && !isVideo && paragraphs.length > 0) {
+    return (
+      <ArticleReaderView
+        item={item}
+        isZoomTarget={isZoomTarget}
+        headerHeight={headerHeight}
+        spaces={spaces}
+        similar={similar}
+        heroUri={heroUri}
+        paragraphs={paragraphs}
+      />
+    );
+  }
+
+  const intents = mergedIntents(item);
+
   return (
     <ScrollView
-      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
+      testID={
+        item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
+      }
       contentInsetAdjustmentBehavior="never"
       style={[styles.container, { paddingTop: headerHeight + theme.gap(5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
       showsVerticalScrollIndicator={false}
     >
-      {heroUri ? (
-        <View style={item.isSticker ? undefined : styles.heroContainer}>
-          {isZoomTarget ? <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget> : hero}
-        </View>
-      ) : null}
+      <DetailHero
+        item={item}
+        isVideo={isVideo}
+        isZoomTarget={isZoomTarget}
+        heroUri={heroUri}
+      />
 
       <View
         style={[
@@ -193,18 +277,18 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
       >
         <SaveStatusNotice item={item} />
 
-        {item.status === 'ready' ? <ItemSpaces itemId={item._id} spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
 
         {item.url ? (
           <View style={styles.titleContainer}>
             <Pressable
               style={styles.sourceRow}
-              onPress={() => {
-                void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
-              }}
+              onPress={() => openSource(item)}
             >
               <AppSymbolIcon
-                name={isVideo ? 'play.rectangle' : 'safari'}
+                name={isVideo ? "play.rectangle" : "safari"}
                 size={15}
                 tintColor={theme.colors.muted}
               />
@@ -222,22 +306,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           </View>
         ) : null}
 
-        {intents.length > 0 ? (
-          <View style={styles.intentsRow}>
-            {intents.map((intent, index) => (
-              <IntentChip
-                key={`${intent.kind}-${index}`}
-                kind={intent.kind}
-                label={intent.label}
-                onPress={() => {
-                  void runIntent(intent.kind, intent.value).then(() => {
-                    analytics.itemAction(item, intent.kind === 'open_url' ? 'open_source' : intent.kind === 'add_event' ? 'calendar_sheet_opened' : intent.kind);
-                  }).catch(() => {});
-                }}
-              />
-            ))}
-          </View>
-        ) : null}
+        <ItemIntents item={item} intents={intents} />
 
         {item.description ? (
           <Text style={styles.description}>{item.description}</Text>
@@ -249,12 +318,14 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           <Pressable
             style={styles.urlRow}
             accessibilityRole="link"
-            onPress={() => {
-              void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
-            }}
+            onPress={() => openSource(item)}
             hitSlop={4}
           >
-            <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
+            <AppSymbolIcon
+              name="link"
+              size={11}
+              tintColor={theme.colors.faint}
+            />
             <Text style={styles.urlText} numberOfLines={2}>
               {item.url}
             </Text>
@@ -263,7 +334,7 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 
         {isVideo && paragraphs.length > 0 ? (
           <Text selectable style={styles.paragraph}>
-            {paragraphs.join('\n\n')}
+            {paragraphs.join("\n\n")}
           </Text>
         ) : null}
 
@@ -275,11 +346,9 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
           </View>
         ) : null}
 
-        {item.status === 'ready' ? (
-          <ProductsSection item={item} />
-        ) : null}
+        {item.status === "ready" ? <ProductsSection item={item} /> : null}
 
-        {item.type === 'note' && item.note ? (
+        {item.type === "note" && item.note ? (
           <Text selectable style={styles.paragraph}>
             {item.note}
           </Text>
@@ -309,53 +378,52 @@ export const ItemDetail = memo(function ItemDetail({ item, isZoomTarget }: Props
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
 type SaveState =
-  | 'image_too_large'
-  | 'gone'
-  | 'failed'
-  | 'stalled'
-  | 'partial'
-  | 'no_article';
+  | "image_too_large"
+  | "gone"
+  | "failed"
+  | "stalled"
+  | "partial"
+  | "no_article";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
-  if (item.status === 'failed') {
-    if (item.failureReason === 'image_too_large') return 'image_too_large';
+  if (item.status === "failed") {
+    if (item.failureReason === "image_too_large") return "image_too_large";
     // Missing sources cannot be recovered by retrying.
-    return item.failureReason === 'not_found' ? 'gone' : 'failed';
+    return item.failureReason === "not_found" ? "gone" : "failed";
   }
   // A run older than the backend's stale threshold has lost its action. The
   // sweeper will fail it on its next tick; until then offer the retry here,
   // which reprocessItem accepts for exactly this case.
   if (isStaleProcessing(item, now)) {
-    return 'stalled';
+    return "stalled";
   }
-  if (item.status !== 'ready') {
+  if (item.status !== "ready") {
     return null;
   }
-  if (item.enrichment === 'partial') {
-    return 'partial';
+  if (item.enrichment === "partial") {
+    return "partial";
   }
   // The page loaded but had no extractable article: the URL itself is the
   // save. Explained, but not retryable — a re-run would reach the same result.
-  return item.enrichment === 'no_article' ? 'no_article' : null;
+  return item.enrichment === "no_article" ? "no_article" : null;
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, string> = {
   image_too_large: IMAGE_TOO_LARGE_MESSAGE,
-  gone: 'This page is gone — it was deleted, or the link was wrong.',
+  gone: "This page is gone — it was deleted, or the link was wrong.",
   failed: "Shelvr couldn't read this page.",
-  stalled: 'This is taking longer than it should.',
+  stalled: "This is taking longer than it should.",
   partial:
     "Saved from the link alone — the page wouldn't load, so these details are a guess.",
-  no_article:
-    'This page has no readable article — saved as a plain link.',
+  no_article: "This page has no readable article — saved as a plain link.",
 };
 
-function noticeFor(state: SaveState, type: DetailItem['type']): string {
-  if (state === 'gone' && type === 'image') {
-    return 'This photo is unavailable or empty. Please save it again.';
+function noticeFor(state: SaveState, type: DetailItem["type"]): string {
+  if (state === "gone" && type === "image") {
+    return "This photo is unavailable or empty. Please save it again.";
   }
-  if (state === 'failed' && type !== 'link') {
-    return `Shelvr couldn't read this ${type === 'image' ? 'photo' : 'note'}.`;
+  if (state === "failed" && type !== "link") {
+    return `Shelvr couldn't read this ${type === "image" ? "photo" : "note"}.`;
   }
   return SAVE_STATE_NOTICE[state];
 }
@@ -370,7 +438,7 @@ function noticeFor(state: SaveState, type: DetailItem['type']): string {
 function SaveStatusNotice({ item }: { item: DetailItem }) {
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
-  const { guard, loading: entitlementLoading } = usePaywallGuard('item_detail');
+  const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
   // Guards the retry gesture: disabled while in flight, and a rejection gets
   // user-visible feedback instead of an unhandled promise.
   const [retrying, setRetrying] = useState(false);
@@ -380,7 +448,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   // spinner left open ages into the retry notice on its own; every other
   // state never ticks.
   const [now, setNow] = useState(() => Date.now());
-  const processing = item.status === 'processing';
+  const processing = item.status === "processing";
   useEffect(() => {
     if (!processing) return;
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -405,20 +473,23 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   return (
     <View style={styles.noticeRow}>
       <AppSymbolIcon
-        name={state === 'no_article' ? 'info.circle' : 'exclamationmark.triangle.fill'}
+        name={
+          state === "no_article"
+            ? "info.circle"
+            : "exclamationmark.triangle.fill"
+        }
         size={14}
         tintColor={
-          state === 'gone'
+          state === "gone"
             ? theme.colors.faint
-            : state === 'no_article'
+            : state === "no_article"
               ? theme.colors.muted
               : theme.colors.danger
         }
       />
-      <Text style={styles.noticeText}>
-        {noticeFor(state, item.type)}
-      </Text>
-      {isTerminalFailure(item.failureReason) || state === 'no_article' ? null : (
+      <Text style={styles.noticeText}>{noticeFor(state, item.type)}</Text>
+      {isTerminalFailure(item.failureReason) ||
+      state === "no_article" ? null : (
         <Pressable
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
@@ -430,12 +501,12 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
                   // The server still sees this run as live. Usually a device
                   // clock running ahead of the backend's stale threshold.
                   Alert.alert(
-                    'Still working on it',
-                    'Give it a few more minutes. If it never finishes, the retry will appear again.',
+                    "Still working on it",
+                    "Give it a few more minutes. If it never finishes, the retry will appear again.",
                   );
                 }
               } catch {
-                Alert.alert("Couldn't retry", 'Please try again in a moment.');
+                Alert.alert("Couldn't retry", "Please try again in a moment.");
               } finally {
                 setRetrying(false);
               }
@@ -447,7 +518,11 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
           {retrying ? (
             <ActivityIndicator size="small" color={theme.colors.primaryText} />
           ) : (
-            <AppSymbolIcon name="arrow.clockwise" size={12} tintColor={theme.colors.primaryText} />
+            <AppSymbolIcon
+              name="arrow.clockwise"
+              size={12}
+              tintColor={theme.colors.primaryText}
+            />
           )}
           <Text style={styles.chipLabel}>Try again</Text>
         </Pressable>
@@ -462,52 +537,52 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
   },
   hero: {
-    width: '100%',
+    width: "100%",
     // Full-bleed so the card image (a die-cut sticker) zooms edge-to-edge.
   },
   // Non-sticker heroes get the same white matted frame as the home cards, so
   // the padded look carries through the Apple zoom into this screen.
   heroContainer: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     // Hug the image so a capped portrait sits as a centered card rather than
     // leaving a gap in a full-width frame.
-    alignSelf: 'center',
+    alignSelf: "center",
     marginHorizontal: theme.gap(2),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: theme.gap(1),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
   heroImage: {
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   playOverlay: {
-    position: 'absolute',
+    position: "absolute",
     inset: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   playButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     // Nudge the glyph to the optical center of the circle.
     paddingLeft: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   body: {
     gap: theme.gap(5),
     paddingHorizontal: theme.gap(2),
   },
   processingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1),
   },
   processingText: {
@@ -516,9 +591,9 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   noticeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
     gap: theme.gap(1),
   },
   noticeText: {
@@ -530,12 +605,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   titleContainer: {
     gap: theme.gap(1),
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   sourceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   sourceText: {
@@ -547,16 +622,16 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 17,
     lineHeight: 25,
-    textAlign: 'center',
+    textAlign: "center",
     color: theme.colors.muted,
   },
   urlRow: {
-    maxWidth: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 5,
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingHorizontal: theme.gap(1),
   },
   urlText: {
@@ -564,20 +639,20 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: "center",
     color: theme.colors.faint,
   },
   chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(0.75),
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   intentsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(1),
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   article: {
     gap: theme.gap(1.5),
@@ -606,8 +681,8 @@ const styles = StyleSheet.create((theme) => ({
   // Shared pill for the detail screen's small actions (retry a failed save,
   // find shopping links).
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     backgroundColor: theme.colors.primarySoft,
     paddingVertical: 7,

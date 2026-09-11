@@ -1,41 +1,44 @@
-import { SuggestedBadge } from '@/components/suggested-badge';
-import { analytics } from '@/lib/analytics';
+import { SuggestedBadge } from "@/components/suggested-badge";
+import { analytics } from "@/lib/analytics";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
+import { memo } from "react";
+import { displayHost } from "@/lib/url";
+import { isTikTokUrl } from "@convex/model/externalUrl";
 import {
-  ActionMenu,
-  type ActionMenuItem,
-} from '@/components/ui/action-menu';
-import { memo } from 'react';
-import { displayHost } from '@/lib/url';
-import { isTikTokUrl } from '@convex/model/externalUrl';
-import { enrichmentValidator, failureReasonValidator } from '@convex/model/itemFields';
-import type { Infer } from 'convex/values';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useMutation } from 'convex/react';
-import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { Link, useRouter } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import { Alert, ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
+  enrichmentValidator,
+  failureReasonValidator,
+} from "@convex/model/itemFields";
+import type { Infer } from "convex/values";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+import { Link, useRouter } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import {
+  Alert,
+  ActivityIndicator,
+  Pressable,
+  Share,
+  Text,
+  View,
+} from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
   useReducedMotion,
   ZoomOut,
-} from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import {
-  EASE_OUT,
-  REDUCED_FADE_IN,
-  REDUCED_FADE_OUT,
-} from '@/lib/motion';
+} from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 export type FeedItem = {
-  _id: Id<'items'>;
+  _id: Id<"items">;
   _creationTime?: number;
   fixtureKey?: string;
-  type: 'image' | 'link' | 'note';
-  status: 'processing' | 'ready' | 'failed';
+  type: "image" | "link" | "note";
+  status: "processing" | "ready" | "failed";
   title?: string;
   url?: string;
   siteName?: string;
@@ -54,25 +57,37 @@ export type FeedItem = {
 };
 
 const FAILURE_LABELS: Record<
-  NonNullable<FeedItem['failureReason']>,
-  Record<FeedItem['type'], string>
+  NonNullable<FeedItem["failureReason"]>,
+  Record<FeedItem["type"], string>
 > = {
-  image_too_large: { image: 'Photo too large', link: 'Photo too large', note: 'Photo too large' },
-  not_found: { image: 'Photo unavailable', link: 'Page not found', note: 'Page not found' },
-  error: { image: "Couldn't read photo", link: "Couldn't be saved", note: "Couldn't be saved" },
+  image_too_large: {
+    image: "Photo too large",
+    link: "Photo too large",
+    note: "Photo too large",
+  },
+  not_found: {
+    image: "Photo unavailable",
+    link: "Page not found",
+    note: "Page not found",
+  },
+  error: {
+    image: "Couldn't read photo",
+    link: "Couldn't be saved",
+    note: "Couldn't be saved",
+  },
 };
 
 function failureLabel(item: FeedItem): string | undefined {
-  if (item.status !== 'failed') return;
-  return FAILURE_LABELS[item.failureReason ?? 'error'][item.type];
+  if (item.status !== "failed") return;
+  return FAILURE_LABELS[item.failureReason ?? "error"][item.type];
 }
 
 // Describes which list a card belongs to, so the detail screen can rebuild the
 // same ordered sibling set for horizontal swipe-paging.
 export type ItemSource =
-  | { from: 'home' }
-  | { from: 'space'; spaceId: string }
-  | { from: 'search'; q: string };
+  | { from: "home" }
+  | { from: "space"; spaceId: string }
+  | { from: "search"; q: string };
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.
@@ -88,11 +103,245 @@ function clampRatio(ratio: number | undefined, fallback: number) {
   return Math.min(Math.max(value, 0.5), 2);
 }
 
+// In-card action menu; mirrors CardLinkMenu (the iOS long-press context menu).
+function cardMenuActions({
+  isSuggested,
+  hasUrl,
+  isReady,
+  accept,
+  dismiss,
+  share,
+  changeSpaces,
+  confirmDelete,
+}: {
+  isSuggested: boolean;
+  hasUrl: boolean;
+  isReady: boolean;
+  accept: () => void;
+  dismiss: () => void;
+  share: () => void;
+  changeSpaces: () => void;
+  confirmDelete: () => void;
+}): ActionMenuItem[] {
+  if (isSuggested) {
+    return [
+      { label: "Add to space", onPress: accept },
+      { label: "Dismiss suggestion", destructive: true, onPress: dismiss },
+    ];
+  }
+  const actions: ActionMenuItem[] = [];
+  if (hasUrl) {
+    actions.push({ label: "Share", onPress: share });
+  }
+  if (isReady) {
+    actions.push({ label: "Change spaces", onPress: changeSpaces });
+  }
+  actions.push({ label: "Delete", destructive: true, onPress: confirmDelete });
+  return actions;
+}
+
+// The card face: a framed image or video poster when one exists, otherwise
+// the text face (title/note/failure/host), so a failed or text save still
+// renders a usable tile.
+function CardMedia({
+  item,
+  failedLabel,
+}: {
+  item: FeedItem;
+  failedLabel?: string;
+}) {
+  const { theme } = useUnistyles();
+  const imageUri = item.imageUrl ?? item.heroImageUrl;
+  // Video saves get a 9:16 poster with a play badge and the creator handle.
+  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  if (imageUri) {
+    return (
+      <View style={!item.isSticker && styles.imageContainer}>
+        <Image
+          source={{ uri: imageUri }}
+          recyclingKey={item._id}
+          transition={200}
+          contentFit={item.isSticker ? "contain" : "cover"}
+          style={[
+            item.isSticker ? styles.sticker : styles.image,
+            {
+              aspectRatio: clampRatio(
+                item.aspectRatio,
+                isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+              ),
+            },
+          ]}
+        />
+        {isVideo && (
+          <View style={styles.videoBadge}>
+            <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
+            {item.author ? (
+              <Text style={styles.videoBadgeText} numberOfLines={1}>
+                {item.author}
+              </Text>
+            ) : null}
+          </View>
+        )}
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.textFace, item.type === "note" && styles.noteFace]}>
+      {item.type === "link" && (
+        <AppSymbolIcon
+          name="link"
+          size={13}
+          tintColor={theme.colors.faint}
+          style={{ marginBottom: 6 }}
+        />
+      )}
+      <Text style={styles.textFaceTitle} numberOfLines={5}>
+        {item.title ?? item.note ?? failedLabel ?? displayHost(item.url)}
+      </Text>
+    </View>
+  );
+}
+
+function CardCaption({
+  item,
+  captionTitle,
+  menuActions,
+}: {
+  item: FeedItem;
+  captionTitle: string | undefined;
+  menuActions: ActionMenuItem[];
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.caption}>
+      <View style={styles.captionText}>
+        <Text style={styles.captionTitle} numberOfLines={1}>
+          {captionTitle}
+        </Text>
+        {item.type === "link" && item.url ? (
+          <View style={styles.captionHostRow}>
+            <Text style={styles.captionHost} numberOfLines={1}>
+              {item.siteName === "TikTok" ? "TikTok" : displayHost(item.url)}
+            </Text>
+            <AppSymbolIcon
+              name="arrow.up.right"
+              size={9}
+              tintColor={theme.colors.faint}
+            />
+          </View>
+        ) : null}
+      </View>
+      <ActionMenu
+        label="Save actions"
+        title="Save actions"
+        actions={menuActions}
+        style={styles.menuButton}
+      >
+        <AppSymbolIcon
+          name="ellipsis"
+          size={15}
+          tintColor={theme.colors.foreground}
+        />
+      </ActionMenu>
+    </View>
+  );
+}
+
+// One corner slot for the transient states: a spinner while the pipeline
+// runs, a warning once it has failed.
+function CardStatusCorner({ item }: { item: FeedItem }) {
+  const { theme } = useUnistyles();
+  const reducedMotion = useReducedMotion();
+  if (item.status !== "processing" && item.status !== "failed") {
+    return null;
+  }
+  return (
+    <Animated.View
+      entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
+      exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+      collapsable={false}
+      style={styles.processing}
+    >
+      {item.status === "processing" ? (
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+      ) : (
+        <AppSymbolIcon
+          name="exclamationmark.triangle.fill"
+          size={13}
+          tintColor={theme.colors.danger}
+        />
+      )}
+    </Animated.View>
+  );
+}
+
+// iOS long-press context menu; mirrors the in-card ActionMenu.
+function CardLinkMenu({
+  item,
+  isSuggested,
+  accept,
+  dismiss,
+  share,
+  changeSpaces,
+  confirmDelete,
+}: {
+  item: FeedItem;
+  isSuggested: boolean;
+  accept: () => void;
+  dismiss: () => void;
+  share: () => void;
+  changeSpaces: () => void;
+  confirmDelete: () => void;
+}) {
+  if (isSuggested) {
+    return (
+      <>
+        <Link.MenuAction title="Add to space" icon="plus" onPress={accept} />
+        <Link.MenuAction
+          title="Dismiss suggestion"
+          icon="xmark"
+          destructive
+          onPress={dismiss}
+        />
+      </>
+    );
+  }
+  return (
+    <>
+      {item.url ? (
+        <Link.MenuAction
+          title="Share"
+          icon="square.and.arrow.up"
+          onPress={share}
+        />
+      ) : null}
+      {item.status === "ready" ? (
+        <Link.MenuAction
+          title="Change spaces"
+          icon="tray.and.arrow.up"
+          onPress={changeSpaces}
+        />
+      ) : null}
+      <Link.MenuAction
+        title="Delete"
+        icon="trash"
+        destructive
+        onPress={confirmDelete}
+      />
+    </>
+  );
+}
+
 // Memoized: feed rows are the highest-churn surface in the app (every live-query
 // tick and parent re-render touches the list), so skip re-renders when a row's
 // `item` ref is unchanged.
-export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedItem; source?: ItemSource }) {
-  const { theme } = useUnistyles();
+export const ItemCard = memo(function ItemCard({
+  item,
+  source,
+}: {
+  item: FeedItem;
+  source?: ItemSource;
+}) {
   const reducedMotion = useReducedMotion();
   const router = useRouter();
   const deleteItem = useMutation(api.items.deleteItem);
@@ -100,35 +349,42 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
 
   const spaceId =
-    source?.from === 'space' ? (source.spaceId as Id<'spaces'>) : undefined;
+    source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
   const isSuggested = item.suggested === true && spaceId !== undefined;
-  const changeSpaces = () => router.push({ pathname: '/manage-spaces', params: { itemId: item._id } });
+  const changeSpaces = () =>
+    router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
   const share = async () => {
     if (!item.url) return;
     try {
       const result = await Share.share({ url: item.url });
-      if (result.action === Share.sharedAction && item._creationTime !== undefined) {
-        analytics.itemAction({ ...item, _creationTime: item._creationTime }, 'share');
+      if (
+        result.action === Share.sharedAction &&
+        item._creationTime !== undefined
+      ) {
+        analytics.itemAction(
+          { ...item, _creationTime: item._creationTime },
+          "share",
+        );
       }
     } catch {
       // A dismissed or failed share is not a completed action.
     }
   };
 
-  const imageUri = item.imageUrl ?? item.heroImageUrl;
-  // Video saves get a 9:16 poster with a play badge and the creator handle.
-  const isVideo = item.type === 'link' && isTikTokUrl(item.url);
   // A failed save has no AI title, so without this the card is blank forever and
   // indistinguishable from one still processing.
   const failedLabel = failureLabel(item);
   const captionTitle =
-    item.title ?? item.note ?? failedLabel ?? (item.url ? displayHost(item.url) : undefined);
+    item.title ??
+    item.note ??
+    failedLabel ??
+    (item.url ? displayHost(item.url) : undefined);
 
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
   // exit animation is the confirmation — no navigation, no dialog.
   const accept = () => {
     if (spaceId === undefined) return;
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     acceptSuggestion({ itemId: item._id, spaceId });
@@ -141,46 +397,29 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
 
   const confirmDelete = () => {
     Alert.alert(
-      'Delete this save?',
-      'This removes it from Shelvr and every space. This can\u2019t be undone.',
+      "Delete this save?",
+      "This removes it from Shelvr and every space. This can\u2019t be undone.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => deleteItem({ id: item._id }),
         },
       ],
     );
   };
 
-  const menuActions: ActionMenuItem[] = [];
-  if (isSuggested) {
-    menuActions.push({ label: 'Add to space', onPress: accept });
-    menuActions.push({
-      label: 'Dismiss suggestion',
-      destructive: true,
-      onPress: dismiss,
-    });
-  } else {
-    if (item.url) {
-      menuActions.push({
-        label: 'Share',
-        onPress: share,
-      });
-    }
-    if (item.status === 'ready') {
-      menuActions.push({
-        label: 'Change spaces',
-        onPress: changeSpaces,
-      });
-    }
-    menuActions.push({
-      label: 'Delete',
-      destructive: true,
-      onPress: confirmDelete,
-    });
-  }
+  const menuActions = cardMenuActions({
+    isSuggested,
+    hasUrl: item.url !== undefined,
+    isReady: item.status === "ready",
+    accept,
+    dismiss,
+    share,
+    changeSpaces,
+    confirmDelete,
+  });
 
   return (
     <Animated.View
@@ -188,84 +427,26 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
       style={styles.cell}
     >
       <Link
-        href={{ pathname: '/item/[id]', params: { id: item._id, ...source } }}
+        href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
         asChild
       >
         <Link.Trigger withAppleZoom>
           <Pressable
-            testID={item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined}
+            testID={
+              item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
+            }
             style={({ pressed }) => [
               styles.card,
               item.isSticker && styles.cardSticker,
               pressed && { opacity: 0.85 },
             ]}
           >
-            {imageUri ? (
-              <View style={!item.isSticker && styles.imageContainer}>
-                <Image
-                  source={{ uri: imageUri }}
-                  recyclingKey={item._id}
-                  transition={200}
-                  contentFit={item.isSticker ? 'contain' : 'cover'}
-                  style={[
-                    item.isSticker ? styles.sticker : styles.image,
-                    { aspectRatio: clampRatio(item.aspectRatio, isVideo ? 9 / 16 : item.type === 'link' ? OG_RATIO : 1) },
-                  ]}
-                />
-                {isVideo && (
-                  <View style={styles.videoBadge}>
-                    <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
-                    {item.author ? (
-                      <Text style={styles.videoBadgeText} numberOfLines={1}>
-                        {item.author}
-                      </Text>
-                    ) : null}
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={[styles.textFace, item.type === 'note' && styles.noteFace]}>
-                {item.type === 'link' && (
-                  <AppSymbolIcon
-                    name="link"
-                    size={13}
-                    tintColor={theme.colors.faint}
-                    style={{ marginBottom: 6 }}
-                  />
-                )}
-                <Text style={styles.textFaceTitle} numberOfLines={5}>
-                  {item.title ?? item.note ?? failedLabel ?? displayHost(item.url)}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.caption}>
-              <View style={styles.captionText}>
-                <Text style={styles.captionTitle} numberOfLines={1}>
-                  {captionTitle}
-                </Text>
-                {item.type === 'link' && item.url ? (
-                  <View style={styles.captionHostRow}>
-                    <Text style={styles.captionHost} numberOfLines={1}>
-                      {item.siteName === 'TikTok' ? 'TikTok' : displayHost(item.url)}
-                    </Text>
-                    <AppSymbolIcon
-                      name="arrow.up.right"
-                      size={9}
-                      tintColor={theme.colors.faint}
-                    />
-                  </View>
-                ) : null}
-              </View>
-              <ActionMenu
-                label="Save actions"
-                title="Save actions"
-                actions={menuActions}
-                style={styles.menuButton}
-              >
-                <AppSymbolIcon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
-              </ActionMenu>
-            </View>
+            <CardMedia item={item} failedLabel={failedLabel} />
+            <CardCaption
+              item={item}
+              captionTitle={captionTitle}
+              menuActions={menuActions}
+            />
 
             {isSuggested && (
               // The badge pops off with a spring when the suggestion resolves
@@ -282,65 +463,19 @@ export const ItemCard = memo(function ItemCard({ item, source }: { item: FeedIte
               </Animated.View>
             )}
 
-            {(item.status === 'processing' || item.status === 'failed') && (
-              // One corner slot for the transient states: a spinner while the
-              // pipeline runs, a warning once it has failed.
-              <Animated.View
-                entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
-                exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
-                collapsable={false}
-                style={styles.processing}
-              >
-                {item.status === 'processing' ? (
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                ) : (
-                  <AppSymbolIcon
-                    name="exclamationmark.triangle.fill"
-                    size={13}
-                    tintColor={theme.colors.danger}
-                  />
-                )}
-              </Animated.View>
-            )}
+            <CardStatusCorner item={item} />
           </Pressable>
         </Link.Trigger>
         <Link.Preview />
-        <Link.Menu>
-          {isSuggested ? (
-            <>
-              <Link.MenuAction title="Add to space" icon="plus" onPress={accept} />
-              <Link.MenuAction
-                title="Dismiss suggestion"
-                icon="xmark"
-                destructive
-                onPress={dismiss}
-              />
-            </>
-          ) : (
-            <>
-              {item.url ? (
-                <Link.MenuAction
-                  title="Share"
-                  icon="square.and.arrow.up"
-                  onPress={share}
-                />
-              ) : null}
-              {item.status === 'ready' ? (
-                <Link.MenuAction
-                  title="Change spaces"
-                  icon="tray.and.arrow.up"
-                  onPress={changeSpaces}
-                />
-              ) : null}
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={confirmDelete}
-              />
-            </>
-          )}
-        </Link.Menu>
+        <CardLinkMenu
+          item={item}
+          isSuggested={isSuggested}
+          accept={accept}
+          dismiss={dismiss}
+          share={share}
+          changeSpaces={changeSpaces}
+          confirmDelete={confirmDelete}
+        />
       </Link>
     </Animated.View>
   );
@@ -352,54 +487,53 @@ const styles = StyleSheet.create((theme) => ({
   },
   card: {
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
+    borderCurve: "continuous",
+    overflow: "hidden",
   },
   // Stickers are transparent die-cut PNGs — let the drop shadow spill past the
   // tile bounds instead of being clipped by the card's overflow.
   cardSticker: {
-    overflow: 'visible',
+    overflow: "visible",
   },
   image: {
     borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
 
   imageContainer: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: theme.gap(0.5),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
-
   },
   videoBadge: {
-    position: 'absolute',
+    position: "absolute",
     left: theme.gap(1.25),
     bottom: theme.gap(1.25),
-    maxWidth: '80%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    maxWidth: "80%",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 50,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
   },
   videoBadgeText: {
     flexShrink: 1,
     fontFamily: theme.fonts.bold,
     fontSize: 10,
     lineHeight: 12,
-    color: 'white',
+    color: "white",
   },
   // No fill / border / rounding: the white die-cut edge is baked into the PNG.
   // The iOS layer shadow is cast from the image's opaque pixels, so it hugs the
   // silhouette rather than a rectangle.
   sticker: {
-    width: '100%',
-    shadowColor: '#000',
+    width: "100%",
+    shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
@@ -407,9 +541,9 @@ const styles = StyleSheet.create((theme) => ({
   textFace: {
     padding: theme.gap(1.5),
     minHeight: 96,
-    justifyContent: 'center',
+    justifyContent: "center",
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   noteFace: {
@@ -422,8 +556,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   caption: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: theme.gap(0.5),
     paddingHorizontal: theme.gap(0.5),
     paddingTop: theme.gap(0.75),
@@ -439,8 +573,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   captionHostRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
   },
   captionHost: {
@@ -453,22 +587,22 @@ const styles = StyleSheet.create((theme) => ({
   menuButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 20,
   },
   suggestedBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 10,
     right: 10,
   },
   processing: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     backgroundColor: theme.colors.surface,
     borderRadius: 50,
     padding: 5,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+    boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
   },
 }));

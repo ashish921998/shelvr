@@ -423,6 +423,71 @@ export async function safeFetch(
   );
 }
 
+/** Resolve one 3xx hop. Location is mandatory; relative targets are resolved
+ * against the current URL and re-run through the full URL policy (scheme,
+ * credentials, port, length), and IP-literal destinations are re-checked (a
+ * public page can redirect to a private IP literal). Throws on redirect
+ * limit, missing Location, policy-rejected targets, and private literals. */
+function followRedirect(
+  response: Dispatcher.ResponseData,
+  currentUrl: string,
+  redirectsDone: number,
+  maxRedirects: number,
+): string {
+  if (redirectsDone >= maxRedirects) {
+    throw new SafeFetchErrorClass("redirect_limit", "too many redirects");
+  }
+  const location = response.headers["location"];
+  if (typeof location !== "string" || location === "") {
+    throw new SafeFetchErrorClass("fetch_failed", "redirect without Location");
+  }
+  let nextUrl: string;
+  try {
+    nextUrl = normalizeExternalUrl(new URL(location, currentUrl).toString());
+  } catch (e) {
+    if (isUrlPolicyError(e)) {
+      throw new SafeFetchErrorClass(
+        e.code,
+        "redirect target rejected by url policy",
+      );
+    }
+    throw new SafeFetchErrorClass("fetch_failed", "invalid redirect target");
+  }
+  try {
+    assertHostAllowed(nextUrl);
+  } catch (e) {
+    if (isSafeFetchError(e)) {
+      throw e;
+    }
+    throw new SafeFetchErrorClass(
+      "blocked_destination",
+      "redirect target rejected",
+    );
+  }
+  return nextUrl;
+}
+
+/** Pre-check a declared Content-Length against the cap before streaming.
+ * Skipped in truncate mode — the reader stops at maxBytes and returns the
+ * prefix instead of failing. */
+async function rejectOversizeContentLength(
+  response: Dispatcher.ResponseData,
+  maxBytes: number,
+): Promise<void> {
+  const declared = response.headers["content-length"];
+  if (typeof declared !== "string") {
+    return;
+  }
+  const len = Number(declared);
+  if (Number.isFinite(len) && len > maxBytes) {
+    await safeDump(response.body);
+    throw new SafeFetchErrorClass(
+      "response_too_large",
+      "content-length over cap",
+    );
+  }
+}
+
 async function safeFetchThrowing(
   rawUrl: string,
   options: SafeFetchOptions,
@@ -470,50 +535,13 @@ async function safeFetchThrowing(
       // or return (read bounded body).
       if (response.statusCode >= 300 && response.statusCode < 400) {
         await safeDump(response.body);
-        if (redirects >= maxRedirects) {
-          throw new SafeFetchErrorClass("redirect_limit", "too many redirects");
-        }
-        const location = response.headers["location"];
-        if (typeof location !== "string" || location === "") {
-          throw new SafeFetchErrorClass(
-            "fetch_failed",
-            "redirect without Location",
-          );
-        }
-        // Resolve relative Location against the current URL, then re-run full
-        // URL policy (scheme, credentials, port, length).
-        let nextUrl: string;
-        try {
-          nextUrl = normalizeExternalUrl(
-            new URL(location, currentUrl).toString(),
-          );
-        } catch (e) {
-          if (isUrlPolicyError(e)) {
-            throw new SafeFetchErrorClass(
-              e.code,
-              "redirect target rejected by url policy",
-            );
-          }
-          throw new SafeFetchErrorClass(
-            "fetch_failed",
-            "invalid redirect target",
-          );
-        }
-        // Re-check IP-literal destinations on the redirect target too (a public
-        // page can redirect to a private IP literal).
-        try {
-          assertHostAllowed(nextUrl);
-        } catch (e) {
-          if (isSafeFetchError(e)) {
-            throw e;
-          }
-          throw new SafeFetchErrorClass(
-            "blocked_destination",
-            "redirect target rejected",
-          );
-        }
+        currentUrl = followRedirect(
+          response,
+          currentUrl,
+          redirects,
+          maxRedirects,
+        );
         redirects++;
-        currentUrl = nextUrl;
         continue;
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -540,17 +568,7 @@ async function safeFetchThrowing(
       // Skip this pre-check in truncate mode — the reader will stop at maxBytes
       // and return the prefix instead of failing.
       if (onOverflow === "error") {
-        const declared = response.headers["content-length"];
-        if (typeof declared === "string") {
-          const len = Number(declared);
-          if (Number.isFinite(len) && len > maxBytes) {
-            await safeDump(response.body);
-            throw new SafeFetchErrorClass(
-              "response_too_large",
-              "content-length over cap",
-            );
-          }
-        }
+        await rejectOversizeContentLength(response, maxBytes);
       }
       const bytes = await readBounded(
         response.body,

@@ -6,7 +6,10 @@ const checkFile = require("eslint-plugin-check-file");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // Globally ignored: build output and generated Convex code (the generated
+    // files carry their own eslint-disable headers, which only produce
+    // unused-directive warnings when linted).
+    ignores: ["dist/*", "convex/_generated/**"],
   },
   {
     files: ["**/*.{ts,tsx}"],
@@ -53,6 +56,15 @@ module.exports = defineConfig([
           leadingUnderscore: "allow",
         },
       ],
+      // Complexity limits — decompose instead of raising them. Cyclomatic 30
+      // and 50 statements leave headroom for flat validation-style code
+      // while catching pipeline and component sprawl.
+      // max-lines-per-function is intentionally not set: long JSX and long
+      // tests are common and low-risk; these four cover the real signal.
+      complexity: ["error", 30],
+      "max-statements": ["error", 50],
+      "max-depth": ["error", 4],
+      "max-nested-callbacks": ["error", 4],
     },
   },
 ]);
