@@ -99,7 +99,7 @@ failure mode.
 
 ## Launch preparation
 
-[Reddit and short-video plan](../early-user-recruitment.md) contains the founder
+The Reddit and short-video plan (`shelvr-notes/marketing/early-user-recruitment.md`) contains the founder
 post, three video briefs, channel links, and measurement caveats. No posts or ads
 have been published and no ad spend is authorized. Account/community eligibility
 must be checked before publishing; paid campaigns require a target market and cap.
