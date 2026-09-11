@@ -8,6 +8,8 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
+const REPLAY_VARIANTS = new Set<unknown>(['development', 'preview']);
+
 // Analytics is optional in local development and in builds that do not have
 // PostHog configured. The analytics boundary treats this as a no-op instead of
 // making the app fail during module initialization.
@@ -16,7 +18,10 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
-        enableSessionReplay: true,
+        // Replay stays off in production until visual masking is verified on a
+        // signed build. Fail closed: only builds that declare a non-production
+        // variant record, so a missing `extra` can never turn replay on.
+        enableSessionReplay: REPLAY_VARIANTS.has(Constants.expoConfig?.extra?.variant),
         sessionReplayConfig: {
           maskAllTextInputs: true,
           maskAllImages: true,
