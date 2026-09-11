@@ -210,7 +210,7 @@ export function LiveDemoStep({
         });
         setError(
           used
-            ? 'Your demo save was already used. Continue to see your shelf.'
+            ? 'Your demo save was already used. Tap Skip for now to see your shelf.'
             : 'Could not save that link. Try another, or skip.',
         );
         setPhase('input');
