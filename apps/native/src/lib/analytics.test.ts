@@ -7,9 +7,6 @@ const mock = vi.hoisted(() => ({
   getSessionId: vi.fn(() => "session-1"),
 }));
 vi.mock("@/lib/posthog", () => ({ posthog: mock }));
-vi.mock("activation-pal", () => ({
-  activationPal: { track: vi.fn(), setUserId: vi.fn() },
-}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

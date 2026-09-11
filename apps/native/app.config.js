@@ -62,14 +62,6 @@ if (buildPlatform === 'android') {
     'a goog_ Google Play public SDK key',
   );
 }
-if (buildPlatform !== 'android') {
-  requireProductionValue(
-    'ACTIVATION_PAL_IOS_KEY',
-    process.env.ACTIVATION_PAL_IOS_KEY,
-    (value) => value?.startsWith('ap_pk_'),
-    'an ap_pk_ public app key',
-  );
-}
 // The production Convex URL must parse as https:// with a hostname — a bare
 // prefix check would let `https://` (no host) reach a store build.
 requireProductionValue(
@@ -117,12 +109,6 @@ module.exports = ({ config }) => ({
               NSAllowsArbitraryLoads: false,
               NSAllowsLocalNetworking: false,
             },
-          }
-        : {}),
-      ...(process.env.ACTIVATION_PAL_IOS_KEY
-        ? {
-            ActivationPalApp: 'shelvr',
-            ActivationPalKey: process.env.ACTIVATION_PAL_IOS_KEY,
           }
         : {}),
     },
