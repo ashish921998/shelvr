@@ -108,7 +108,9 @@ the agreed cap and review. No promised CAC or universal conversion target.
 
 ## Publication status
 
-Reddit copy, channel links, and video briefs are prepared. No posts, invitations,
-creator engagements, ad purchases, or platform-account changes have been made.
-Publication needs the chosen account/community and final rule verification; paid
-ads additionally need an explicit budget and target market.
+Reddit copy, channel links, and video briefs are prepared. None of the launch
+material in this document has been posted, and no invitations, creator engagements,
+or ad purchases have been made. This statement covers launch activity only; it is
+not a record of the `@shelvrapp` account's history. Publication needs the chosen
+account/community and final rule verification; paid ads additionally need an
+explicit budget and target market.
