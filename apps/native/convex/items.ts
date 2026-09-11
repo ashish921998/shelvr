@@ -38,6 +38,8 @@ const LIST_CAP = 1000;
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
+/** Rows `listRecentItems` reads before it stops looking for ready ones. */
+export const RECENT_ITEMS_SCAN_MAX = 200;
 
 const itemTypeValidator = v.union(v.literal("image"), v.literal("link"), v.literal("note"));
 
@@ -228,12 +230,22 @@ export const listRecentItems = query({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const limit = Math.min(Math.max(1, Math.floor(args.limit)), RECENT_ITEMS_MAX);
-    const newest = await ctx.db
+    // Walk newest-first and stop as soon as the limit is met, so a burst of
+    // fresh imports still processing cannot push every ready save out of a
+    // fixed window and blank the widget. The scan cap keeps a library of
+    // nothing but failures from being read end to end.
+    const ready: Doc<"items">[] = [];
+    let scanned = 0;
+    for await (const item of ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(limit * 4);
-    const ready = newest.filter((item) => item.status === "ready").slice(0, limit);
+      .order("desc")) {
+      if (item.status === "ready") {
+        ready.push(item);
+        if (ready.length === limit) break;
+      }
+      if (++scanned >= RECENT_ITEMS_SCAN_MAX) break;
+    }
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
   },
 });

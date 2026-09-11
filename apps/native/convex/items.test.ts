@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
+import { PROCESSING_STALE_MS, RECENT_ITEMS_MAX, RECENT_ITEMS_SCAN_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
 import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
@@ -160,6 +160,27 @@ describe("listRecentItems", () => {
     expect(recent.map((item) => item._id)).not.toContain(pending[0]);
     expect(recent.map((item) => item._id)).not.toContain(failed[0]);
     expect(recent[0]).not.toHaveProperty("content");
+  });
+
+  it("finds older ready items behind a burst of newer processing ones", async () => {
+    const t = await as("recent-user");
+    const ready = await seedFeed(t, "recent-user", 3);
+    // A bulk photo import: far more fresh processing rows than any fixed
+    // window would cover. The widget must still show the older ready saves.
+    await seedFeed(t, "recent-user", 30, { status: "processing" });
+
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ready[2], ready[1], ready[0]]);
+  });
+
+  it("stops scanning at the cap when nothing is ready", async () => {
+    const t = await as("recent-user");
+    await seedFeed(t, "recent-user", 1);
+    await seedFeed(t, "recent-user", RECENT_ITEMS_SCAN_MAX, { status: "failed" });
+
+    // The one ready row sits past the cap, so the widget is empty rather than
+    // the query walking the whole library.
+    expect(await t.query(api.items.listRecentItems, { limit: 5 })).toHaveLength(0);
   });
 
   it("caps the limit and scopes to the caller", async () => {
