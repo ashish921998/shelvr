@@ -16,7 +16,7 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
-        enableSessionReplay: true,
+        enableSessionReplay: Constants.expoConfig?.extra?.variant !== 'production',
         sessionReplayConfig: {
           maskAllTextInputs: true,
           maskAllImages: true,
