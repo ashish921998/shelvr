@@ -300,6 +300,20 @@ export default defineSchema({
     .index("by_user_and_week", ["userId", "weekStart"])
     .index("by_delivery_status_and_attempt", ["deliveryStatus", "deliveryNextAttemptAt"]),
 
+  // The pre-payment onboarding demo save. One row per user (the allowance is
+  // server-enforced), pointing at the one real item the user saved during the
+  // demo step. Written only by `createDemoItem`; the (empty-index read +
+  // insert) pair relies on Convex's serializable OCC so two racing calls
+  // cannot both mint an allowance.
+  onboardingDemos: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    createdAt: v.number(),
+    // Persistent retry cap (in addition to the time-bounded rate limiter) so a
+    // permanently unclassifiable page cannot loop pipeline runs forever.
+    retryCount: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
+
   // Provider-independent waitlist source of truth. Resend is only a delivery
   // and preference-management projection of these records, so a provider
   // outage or migration can never lose the original signup or consent trail.

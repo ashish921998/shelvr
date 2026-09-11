@@ -23,7 +23,7 @@ export function ReadyStep({
   return (
     <View style={styles.wrap}>
       <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
-        Your shelf is ready.
+        Your shelf starts here.
       </Animated.Text>
 
       {spaceNames.length > 0 && (
@@ -37,7 +37,7 @@ export function ReadyStep({
       )}
 
       {demoItem && (
-        <Animated.View entering={FadeIn.delay(200).duration(400)}>
+        <Animated.View pointerEvents="none" entering={FadeIn.delay(200).duration(400)}>
           <ItemCard item={demoItem} />
         </Animated.View>
       )}

@@ -115,7 +115,7 @@ const itemFields = {
  * sweeper's timestamp check) becomes a no-op instead of clobbering the newer
  * state. Every place that sets `status: "processing"` must spread this in.
  */
-function beginProcessingRun(): {
+export function beginProcessingRun(): {
   status: "processing";
   processingRunId: string;
   processingStartedAt: number;

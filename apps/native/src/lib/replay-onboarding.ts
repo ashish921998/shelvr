@@ -1,29 +1,34 @@
 import { api } from '@convex/_generated/api';
 import { analytics } from '@/lib/analytics';
+import { useOnboarding } from '@/lib/onboarding';
 import { useConvexAuth, useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  clearLegacyDemoUrl,
   clearPending,
-  getPendingSpaces,
   getPendingDemoUrl,
+  getPendingSpaces,
   getOrCreatePendingOperationId,
-  getPendingOnboardingRevision,
   hasPending,
   subscribePendingOnboarding,
+  getPendingOnboardingRevision,
   updatePendingSpaces,
 } from '@/lib/pending-onboarding';
 import { openPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
 
 /**
- * After sign-in, replay deferred onboarding data: create the spaces the user
- * picked and the demo link they saved. Then present the paywall. Runs once.
+ * After onboarding is finished and the user signs in, replay the deferred
+ * onboarding spaces, then present the paywall. Runs once.
  *
- * Mounted in (app)/_layout.tsx so it fires as soon as the user is authenticated
- * and lands in the app group.
+ * Mounted in (app)/_layout.tsx. Gated on `onboarded`: onboarding replay must
+ * never fire mid-onboarding (the demo step's inline sign-in authenticates the
+ * user while the flow is still running — spaces the demo created are
+ * deduplicated server-side by name if replay later runs).
  */
 export function useReplayOnboarding() {
   const { isAuthenticated } = useConvexAuth();
+  const { onboarded } = useOnboarding();
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const createSpace = useMutation(api.spaces.createSpace);
@@ -45,6 +50,7 @@ export function useReplayOnboarding() {
 
   useEffect(() => {
     if (!isAuthenticated || ranRef.current) return;
+    if (!onboarded) return;
     if (entitlementLoading) return;
     if (runningRef.current) {
       // If entitlement changes while the paywall or mutations are in flight,
@@ -59,18 +65,19 @@ export function useReplayOnboarding() {
     if (!entitled && awaitingEntitlementRef.current) return;
 
     const spaces = getPendingSpaces();
-    const demoUrl = getPendingDemoUrl();
+
+    const legacyDemoUrl = getPendingDemoUrl();
 
     runningRef.current = true;
     startedEntitledRef.current = entitled;
 
     const run = async () => {
       try {
-        // Show the paywall before Pro-gated mutations. createSpace and
-        // createLinkItem both call requireProEntitlement on the server, so
-        // they will fail for non-entitled users. If the user cancels, keep
-        // the pending data — the effect re-runs when `entitled` changes
-        // (e.g., after a future purchase via the paywall route).
+        // Show the paywall before Pro-gated mutations. createSpace calls
+        // requireProEntitlement on the server, so it will fail for
+        // non-entitled users. If the user cancels, keep the pending data —
+        // the effect re-runs when `entitled` changes (e.g., after a future
+        // purchase via the paywall route).
         if (!entitled) {
           await waitForSheetTransition();
           const purchased = await openPaywall(router, 'onboarding');
@@ -84,37 +91,35 @@ export function useReplayOnboarding() {
 
         awaitingEntitlementRef.current = false;
 
-        // entitled is true — the server sees the subscription row, so
-        // requireProEntitlement will pass. Create everything now.
+        // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
-          spaces.map((name) => createSpace({ name })),
+          spaces.map((name) => createSpace({ name, dynamic: true })),
         );
         const failedSpaces = spaceResults
           .map((result, index) =>
             result.status === 'rejected' ? spaces[index] : null,
           )
           .filter((name): name is string => name !== null);
-        // Persist only the failed work before attempting the demo item. If the
-        // demo fails, a later replay retries it without recreating spaces that
-        // already succeeded.
+        // Persist only the failed work so a later replay retries it without
+        // recreating spaces that already succeeded.
         updatePendingSpaces(failedSpaces);
         const allSpacesOk = failedSpaces.length === 0;
 
-        let demoOk = true;
-        if (demoUrl) {
+        if (legacyDemoUrl) {
           try {
             await createLinkItem({
-              url: demoUrl,
+              url: legacyDemoUrl,
               operationId: getOrCreatePendingOperationId(),
               analyticsSessionId: analytics.sessionId(),
             });
+            clearLegacyDemoUrl();
           } catch {
-            demoOk = false;
+            return;
           }
         }
 
         // Only mark as done when all required mutations succeed.
-        if (!allSpacesOk || !demoOk) return;
+        if (!allSpacesOk) return;
 
         ranRef.current = true;
         clearPending();
@@ -131,6 +136,7 @@ export function useReplayOnboarding() {
     void run();
   }, [
     isAuthenticated,
+    onboarded,
     createSpace,
     createLinkItem,
     entitled,

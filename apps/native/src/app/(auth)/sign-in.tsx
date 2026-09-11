@@ -1,9 +1,6 @@
 import { LEGAL_URLS } from '@/lib/legal';
-import { analytics } from '@/lib/analytics';
-import { useAuthActions } from '@convex-dev/auth/react';
+import { useOAuthSignIn } from '@/lib/oauth-sign-in';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
 import * as React from 'react';
 import {
   Linking,
@@ -15,72 +12,16 @@ import {
 } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-const oauthRedirectTo = makeRedirectUri({
-  native: 'shelvr://auth/callback',
-  scheme: 'shelvr',
-  path: 'auth/callback',
-});
-
 /**
- * Convex Auth OAuth sign-in (React Native).
- *
- * The flow is provider-agnostic: `signIn(provider)` returns a `redirect` URL
- * hosted on the Convex backend. We open it in a system browser session
- * (expo-web-browser `openAuthSessionAsync`); after the user authenticates the
- * browser redirects back to the app with a `?code=` param. We extract that code
- * and call `signIn(provider, { code })` to complete the handshake.
- *
- * Google and Apple are configured on the backend (convex/auth.ts). The
- * "Continue" / "Dev login" button is only shown when Anonymous is enabled on the
- * deployment (AUTH_ENABLE_ANONYMOUS=true).
+ * Convex Auth OAuth sign-in (React Native). The flow lives in
+ * `lib/oauth-sign-in.ts` (shared with the onboarding demo's inline sign-in);
+ * this screen is its full-page presentation. Google and Apple are configured
+ * on the backend (convex/auth.ts). The "Dev login" button is only shown when
+ * Anonymous is enabled on the deployment (AUTH_ENABLE_ANONYMOUS=true).
  */
 export default function Page() {
-  const { signIn } = useAuthActions();
+  const { signInWith: handleOAuth, pendingProvider: pending, lastError } = useOAuthSignIn();
   const colorScheme = useColorScheme();
-  const [pending, setPending] = React.useState<string | null>(null);
-  const [lastError, setLastError] = React.useState<string | null>(null);
-
-  const handleOAuth = async (provider: string) => {
-    analytics.capture('auth_started', { provider });
-    setPending(provider);
-    setLastError(null);
-    try {
-      // Convex Auth must persist the same return URI that the browser session
-      // watches for; otherwise the provider callback can open Shelvr without
-      // resolving this promise and the one-time code is never exchanged.
-      const { redirect } = await signIn(provider, {
-        redirectTo: oauthRedirectTo,
-      });
-      // `redirect` is undefined for providers that sign in immediately
-      // (Anonymous) — nothing more to do, the session is established.
-      if (!redirect) return;
-      const result = await WebBrowser.openAuthSessionAsync(
-        redirect.toString(),
-        oauthRedirectTo,
-      );
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        analytics.capture('auth_cancelled', { provider });
-        return;
-      }
-      if (result.type !== 'success') {
-        throw new Error(`OAuth browser session ended with ${result.type}`);
-      }
-      // Hand the callback URL's code back to the provider to finish the sign-in.
-      const code = new URL(result.url).searchParams.get('code');
-      if (!code) {
-        throw new Error('OAuth callback did not include a verification code');
-      }
-      await signIn(provider, { code });
-    } catch (err) {
-      analytics.capture('auth_failed', { provider });
-      const detail =
-        err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-      console.error('OAuth provider sign-in failed', provider, detail, err);
-      setLastError(detail);
-    } finally {
-      setPending(null);
-    }
-  };
 
   const anonEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';

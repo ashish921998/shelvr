@@ -111,6 +111,13 @@ export type AnalyticsEventProperties = {
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
   feedback_opened: { surface: string };
+  // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
+  // space names — only the outcome of the user's one real demo save.
+  onboarding_demo_submitted: Record<string, never>;
+  onboarding_demo_result: {
+    outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
+  };
+  onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
 };
