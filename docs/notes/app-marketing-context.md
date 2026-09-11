@@ -1,6 +1,6 @@
 # Shelvr marketing context
 
-Last updated: 2026-09-03
+Last updated: 2026-09-07
 
 This is the working brief for organic growth and App Store marketing. Statements
 marked **hypothesis** should be validated with PostHog data and customer language
@@ -14,7 +14,12 @@ before they become permanent positioning.
 - **Category:** Productivity
 - **Secondary category:** Lifestyle
 - **Platform:** iPhone now; Android planned
-- **Price model:** Freemium with Shelvr Pro subscription
+- **Price model:** Free download; Shelvr Pro is required for new saves. Monthly
+  bills immediately; annual includes a seven-day free trial and then renews
+  annually unless cancelled. Existing saves remain read-only after Pro expires.
+  Do not describe this as a free saving tier or optional Pro. Prices and terms
+  are shown before purchase. Verified against the live App Store listing on
+  2026-09-07: https://apps.apple.com/us/app/shelvr-save-organize-later/id6798143550
 - **Launch status:** Available on the App Store
 - **Current version:** 1.0.1
 
