@@ -9,10 +9,11 @@ removal is maintained in a separate PR; merge it before making that build.
 ## Scope
 
 Ship the existing onboarding, paywall, saving, and server payment measurement.
-User explicitly chose **PostHog only** on September 9. ActivationPal imports,
+User explicitly chose **PostHog only** on September 9. ActivationPal removal (imports,
 native module, dependency, lockfile entries, Info.plist configuration, and required
-build key have been removed. Production session replay is disabled pending visual
-masking verification. This does not disable PostHog funnel events.
+build key) is a separate PR that must merge before the 1.0.2 build. This PR disables
+production session replay pending visual masking verification; PostHog funnel events
+stay on.
 
 The native release includes the current mainline fixes through `3040441` plus the
 release changes above; it is not an analytics-only backport to the August binary.
