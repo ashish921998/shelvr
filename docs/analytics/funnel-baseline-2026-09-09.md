@@ -121,10 +121,9 @@ have seven days of follow-up, and historical test traffic is incompletely classi
 
 - [Daily acquisition CSV](funnel-baseline-2026-09-09-daily.csv), checked against the
   Apple response totals (5 downloads, 72 impressions, 41 page views).
-- Raw CLI responses: `.asc/reports/funnel-baseline-2026-09-09/overview.json`,
-  `sources.json`, `metrics-sep1-7.json`, and `benchmarks.json`. These contain aggregate
-  results, not session cookies or credentials.
-- A diagnostic `metrics-sep1-7-week.json` query showed that weekly frequency expands
+- Raw CLI responses are not committed. The App Store Connect CLI writes them to
+  `.asc/reports/` locally (gitignored); regenerate them with the commands below.
+- A diagnostic weekly-frequency query showed that weekly frequency expands
   to calendar-week buckets (including August 31 and the week of September 7). Its
   six downloads and 73 impressions do not match the exact requested daily window;
   it is deliberately excluded from this baseline. Use daily frequency for exact dates.

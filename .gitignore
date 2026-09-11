@@ -81,3 +81,6 @@ tmp/
 *.ipa
 /ios/
 /app.json
+
+# App Store Connect CLI output; the analytics docs summarize what matters
+.asc/
