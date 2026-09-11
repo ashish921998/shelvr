@@ -3,10 +3,12 @@ import { mutation } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { beginProcessingRun } from "./items";
 import { requireUserId } from "./model/auth";
 import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure } from "./model/itemFields";
+import { insertMembership } from "./model/memberships";
 import { rateLimiter } from "./model/rateLimiter";
 
 // User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
@@ -51,6 +53,12 @@ async function findOrCreateDynamicSpace(
     userId,
     name,
     dynamic: true,
+    // Born with an exact (empty) summary, like createSpace, so it never takes
+    // the legacy scan path in listSpaces.
+    savedCount: 0,
+    suggestedCount: 0,
+    previewItemIds: [],
+    suggestedPreviewItemIds: [],
   });
 }
 
@@ -126,29 +134,31 @@ export const createDemoItem = mutation({
     // Limit after the idempotent return so a retry is never billed a token.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
 
+    // Same run stamp as every other save, so finalizeItem/failItem fence this
+    // run and the stale sweeper measures from now rather than creation.
+    const run = beginProcessingRun();
     const itemId = await ctx.db.insert("items", {
       userId,
       type: "link",
-      status: "processing",
+      ...run,
       url,
       tags: [],
       searchText: "",
     });
     if (destination !== undefined) {
       const spaceId = await findOrCreateDynamicSpace(ctx, userId, destination);
-      await ctx.db.insert("spaceItems", {
-        userId,
-        spaceId,
-        itemId,
-        status: "saved",
-      });
+      // Through the helper so the space's saved count and preview stay exact.
+      await insertMembership(ctx, { userId, spaceId, itemId, status: "saved" });
     }
     await ctx.db.insert("onboardingDemos", {
       userId,
       itemId,
       createdAt: Date.now(),
     });
-    await ctx.scheduler.runAfter(0, internal.ai.processItem, { itemId });
+    await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+      itemId,
+      runId: run.processingRunId,
+    });
     const item = await ctx.db.get(itemId);
     await ctx.scheduler.runAfter(0, internal.analytics.captureSave, {
       itemId,
@@ -209,12 +219,16 @@ export const retryDemoItem = mutation({
     await ctx.db.patch(demo._id, {
       retryCount: (demo.retryCount ?? 0) + 1,
     });
+    // A fresh run id: the previous run, if it is somehow still alive, can no
+    // longer write over this retry's result.
+    const run = beginProcessingRun();
     await ctx.db.patch(item._id, {
-      status: "processing",
+      ...run,
       failureReason: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, {
       itemId: item._id,
+      runId: run.processingRunId,
     });
     return { scheduled: true, status: "processing" as const };
   },

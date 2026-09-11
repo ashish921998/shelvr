@@ -57,7 +57,13 @@ describe("onboarding demo allowance", () => {
     const jobs = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );
-    expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(1);
+    const runs = jobs.filter((job) => job.name === "ai:processItem");
+    expect(runs).toHaveLength(1);
+    // Run-fenced like every other save: the item carries a run id and the
+    // scheduled action was handed the same one.
+    expect(item?.processingRunId).toBeDefined();
+    expect(item?.processingStartedAt).toBeDefined();
+    expect(runs[0].args[0]).toMatchObject({ itemId, runId: item?.processingRunId });
   });
 
   it("is idempotent: a repeat — even with a different URL — returns the same item and never re-schedules processing", async () => {
@@ -143,6 +149,13 @@ describe("onboarding demo allowance", () => {
         .collect();
       expect(spaces).toHaveLength(1);
       expect(spaces[0]).toMatchObject({ name: "Travel", dynamic: true });
+      // The join went through insertMembership, so the space's denormalized
+      // summary already reflects the save and listSpaces needs no scan.
+      expect(spaces[0]).toMatchObject({
+        savedCount: 1,
+        suggestedCount: 0,
+        previewItemIds: [itemId],
+      });
       const joins = await ctx.db
         .query("spaceItems")
         .withIndex("by_item", (q) => q.eq("itemId", itemId))
@@ -269,11 +282,21 @@ describe("retryDemoItem", () => {
       await ctx.db.patch(itemId, { status: "failed", failureReason: "error" });
     });
 
+    const before = await t.run(async (ctx) => await ctx.db.get(itemId));
     const retry = await t.mutation(api.demo.retryDemoItem, {});
     expect(retry.scheduled).toBe(true);
 
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("processing");
+    // A retry is a new run: fresh id so the old action cannot overwrite it,
+    // fresh start time so the stale sweeper measures from the retry.
+    expect(item?.processingRunId).toBeDefined();
+    expect(item?.processingRunId).not.toBe(before?.processingRunId);
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const latest = jobs.filter((job) => job.name === "ai:processItem").at(-1);
+    expect(latest?.args[0]).toMatchObject({ itemId, runId: item?.processingRunId });
 
     await t.run(async (ctx) => {
       const items = await ctx.db
