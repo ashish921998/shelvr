@@ -11,8 +11,11 @@ import * as SecureStore from 'expo-secure-store';
 
 const PENDING_KEY = 'shelvr.pending.onboarding';
 
-/** An in-flight demo save captured before the inline sign-in, so an app kill
- * mid-OAuth (or a relaunch) resumes the exact save the user asked for. */
+/** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
+ * while the save is still processing) resumes the exact save the user asked
+ * for. Scoped to the demo step: the step clears it when it advances (or
+ * skips), and `setPendingSpaces` — the finish path — drops it too, so a
+ * completed save is never replayed or left behind in SecureStore. */
 export type PendingDemo = {
   url: string;
   /** The demo's explicit single destination ("just my shelf" when null). */
@@ -118,7 +121,11 @@ function ensureOperationId(): string {
 // Replay retries (refreshOperationId=false) update the existing operation
 // rather than starting a new one; otherwise a successfully-created demo link
 // could be duplicated after a partial space-creation failure.
-function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
+function writePendingSpaces(
+  spaces: string[],
+  refreshOperationId: boolean,
+  demo: PendingDemo | null,
+) {
   const existing = readPendingRecord();
   const operationId =
     spaces.length > 0 && refreshOperationId && !existing?.demoUrl
@@ -131,17 +138,21 @@ function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
     q1: existing?.q1 ?? [],
     q2: existing?.q2 ?? [],
     step: existing?.step ?? null,
-    demo: existing?.demo ?? null,
+    demo,
   });
   notifyChanged();
 }
 
+/** Onboarding finished: hand the picked spaces to the replay hook. The demo
+ * step is over, so its in-flight record is dropped here as well — otherwise a
+ * completed save would outlive onboarding in SecureStore (`hasPending` ignores
+ * it, so nothing downstream would ever clear it). */
 export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true);
+  writePendingSpaces(spaces, true, null);
 }
 
 export function updatePendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, false);
+  writePendingSpaces(spaces, false, readPendingRecord()?.demo ?? null);
 }
 
 export function getPendingSpaces(): string[] {

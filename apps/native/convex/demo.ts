@@ -4,12 +4,14 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
+import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { isTerminalFailure } from "./model/itemFields";
 import { rateLimiter } from "./model/rateLimiter";
 
-/** Thrown when the demo allowance is spent and its item no longer exists.
- * Stable literal so the client can show "already used" instead of a generic failure. */
-export const DEMO_USED = "Demo save already used";
+// User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
+// a ConvexError with structured data the client branches on. A plain Error's
+// message is redacted to "Server Error" in production.
 
 const MAX_SPACE_NAME_LENGTH = 60;
 /** Total retry cap for the demo item, on top of the demoRetry rate limiter's cooldown. */
@@ -26,7 +28,7 @@ function validateDestination(spaceName: string | undefined): string | undefined 
   if (spaceName === undefined) return undefined;
   const name = spaceName.trim();
   if (name === "" || name.length > MAX_SPACE_NAME_LENGTH) {
-    throw new Error("Invalid space name");
+    throw demoError("invalid_space_name");
   }
   return name;
 }
@@ -77,7 +79,7 @@ async function savedSpaceNames(
  *
  *  - Idempotent: a repeat (retry, double-tap, different URL) returns the same
  *    itemId with `reused: true` and never schedules a second `processItem`.
- *    Deleting the item does not reset the allowance ({@link DEMO_USED}).
+ *    Deleting the item does not reset the allowance (`demo_used`).
  *  - Race-safe: the (empty index read + insert) pair relies on Convex's
  *    serializable OCC, same idiom as operation ids in `items.ts`.
  *  - `spaceName` is the user's explicit pick and becomes a `saved` membership;
@@ -107,7 +109,7 @@ export const createDemoItem = mutation({
       // the newly typed input.
       const item = await ctx.db.get(existing.itemId);
       if (item === null || item.userId !== userId || !item.url) {
-        throw new Error(DEMO_USED);
+        throw demoError("demo_used");
       }
       return {
         itemId: existing.itemId,
@@ -169,6 +171,10 @@ export const createDemoItem = mutation({
  * cannot lock a non-entitled user out (reprocessItem is Pro-gated). Re-runs the
  * pipeline on the same item; only a `failed` item is rescheduled. Bounded by
  * the `demoRetry` rate limiter (cooldown) and `retryCount` (total cap).
+ *
+ * Same gate as `reprocessItem`: a terminal failure (the page is gone) is
+ * refused outright — it would spend a classification without changing the
+ * result — and consumes neither the retry cap nor the rate-limit bucket.
  */
 export const retryDemoItem = mutation({
   args: {},
@@ -183,18 +189,21 @@ export const retryDemoItem = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     if (demo === null) {
-      throw new Error("No demo save");
+      throw demoError("no_demo");
     }
     const item = await ctx.db.get(demo.itemId);
     // Defense-in-depth ownership check on the item row itself.
     if (item === null || item.userId !== userId) {
-      throw new Error(DEMO_USED);
+      throw demoError("demo_used");
     }
     if (item.status !== "failed") {
       return { scheduled: false, status: item.status };
     }
+    if (isTerminalFailure(item.failureReason)) {
+      throw demoError("terminal_failure");
+    }
     if ((demo.retryCount ?? 0) >= MAX_DEMO_RETRIES) {
-      throw new Error("Too many retries");
+      throw demoError("too_many_retries");
     }
     await rateLimiter.limit(ctx, "demoRetry", { key: userId, throws: true });
     await ctx.db.patch(demo._id, {

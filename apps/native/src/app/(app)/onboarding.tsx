@@ -104,10 +104,13 @@ export default function OnboardingScreen() {
   // but only into fresh state, never over live user changes.
   const [initialProgress] = useState(() => getOnboardingProgress());
 
+  // Always the persisted step. The demo record does not steer this: the demo
+  // step owns it (written on submit, cleared when the step advances), so an
+  // in-flight save can only exist while `step` is already the demo step. A
+  // relaunch on permissions/ready therefore lands there, not on a replay of a
+  // save that already finished.
   const [step, setStep] = useState<StepIndex>(() =>
-    initialProgress.demo && (initialProgress.step ?? 0) >= STEPS.demo
-      ? STEPS.demo
-      : initialProgress.step !== null && isStepIndex(initialProgress.step)
+    initialProgress.step !== null && isStepIndex(initialProgress.step)
       ? initialProgress.step
       : STEPS.promise,
   );
@@ -122,8 +125,10 @@ export default function OnboardingScreen() {
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<StepIndex | null>(null);
   // An in-flight demo save captured before the inline sign-in; resumed (once)
-  // by the demo step if the user is already authenticated on arrival.
-  const resumeDemo = initialProgress.demo;
+  // by the demo step if the user is already authenticated on arrival. Only
+  // meaningful while the restored step IS the demo step; anything else is a
+  // stale record from an interrupted advance, and finish() drops it.
+  const resumeDemo = initialProgress.step === STEPS.demo ? initialProgress.demo : null;
 
   // Keep the persisted record in lockstep with the visible flow.
   useEffect(() => {

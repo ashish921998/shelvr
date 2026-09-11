@@ -4,6 +4,8 @@ import { clearLegacyDemoUrlIfSaved, setPendingDemo, type PendingDemo } from '@/l
 import { AppSymbolIcon } from '@/components/symbol';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
+import { demoErrorCode, isRateLimitedError } from '@convex/model/demoErrors';
+import { isTerminalFailure } from '@convex/model/itemFields';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { useConvexAuth, useMutation } from 'convex/react';
@@ -28,6 +30,12 @@ import { useOAuthSignIn, type OAuthProvider } from '@/lib/oauth-sign-in';
 // sign-in (no navigation, so onboarding state survives) with the pending save
 // persisted, so an app kill mid-OAuth resumes the same save. There is no
 // canned card — skip/error/timeout never claim a save happened.
+//
+// The persisted demo record (lib/pending-onboarding) means "this step has a
+// save in flight": it is written on submit, kept through processing/reveal so
+// a relaunch re-attaches to the same server item, and cleared the moment the
+// step is left (advance or skip). Later steps never see it, so a relaunch on
+// permissions/ready restores that step instead of replaying the save.
 
 // Curated sample links — each is a real, classifiable page that exercises the
 // pipeline end to end (fetch → readability → tag → file). Kept generic so they
@@ -39,10 +47,6 @@ const SAMPLE_LINKS: { label: string; url: string }[] = [
 ];
 
 const TIMEOUT_MS = 15_000;
-// Must match DEMO_USED on the server (convex/demo.ts) — the error arrives as a
-// thrown message string, and importing the server module client-side would
-// pull the Convex runtime into the bundle.
-const DEMO_USED_MESSAGE = 'Demo save already used';
 
 type DemoPhase = 'input' | 'auth' | 'processing' | 'reveal' | 'failed';
 
@@ -95,9 +99,12 @@ export function LiveDemoStep({
   });
   const item = itemQuery.data;
 
+  // Leaving the step ends the in-flight demo: clear the persisted record so a
+  // relaunch restores the next step rather than replaying a completed save.
   const advance = () => {
     if (advancedRef.current) return;
     advancedRef.current = true;
+    setPendingDemo(null);
     onAdvance();
   };
 
@@ -195,8 +202,9 @@ export function LiveDemoStep({
         setPendingDemo({ url: result.url, destination: result.savedSpaceNames[0] ?? null });
         clearLegacyDemoUrlIfSaved(result.url);
       } catch (err) {
-        const used =
-          err instanceof Error && err.message.includes(DEMO_USED_MESSAGE);
+        // Structured ConvexError data, never `err.message`: production
+        // redacts a plain server Error to "Server Error".
+        const used = demoErrorCode(err) === 'demo_used';
         analytics.capture('onboarding_demo_result', {
           outcome: used ? 'already_used' : 'error',
         });
@@ -248,13 +256,15 @@ export function LiveDemoStep({
       if (result.scheduled) setDeadlineNonce((nonce) => nonce + 1);
       setPhase('processing');
     } catch (err) {
-      const message = err instanceof Error ? err.message : '';
+      const code = demoErrorCode(err);
       setError(
-        /too many retries/i.test(message)
-          ? 'This one keeps failing. It stays on your shelf — you can move on.'
-          : /ratelimited|demoRetry|too many/i.test(message)
-            ? 'That failed a few times. Try again later, or skip for now.'
-            : 'Could not retry right now. Try again, or skip.',
+        code === 'terminal_failure'
+          ? 'That page could not be found, so a retry would not help. The link stays on your shelf — you can move on.'
+          : code === 'too_many_retries'
+            ? 'This one keeps failing. It stays on your shelf — you can move on.'
+            : isRateLimitedError(err)
+              ? 'That failed a few times. Try again later, or skip for now.'
+              : 'Could not retry right now. Try again, or skip.',
       );
     } finally {
       inFlightRef.current = false;
@@ -387,33 +397,40 @@ export function LiveDemoStep({
   }
 
   // ---- Failed state: honest failure with a real retry --------------------
+  // A terminal failure (the page is gone) gets no Retry button: the server
+  // refuses it anyway, mirroring reprocessItem, and offering one would only
+  // end in an error line.
   if (phase === 'failed') {
+    const terminal = isTerminalFailure(item?.failureReason);
     return (
       <View style={styles.wrap}>
         <Text style={styles.headline}>Your link is saved.</Text>
         <Text style={styles.support}>
-          Shelvr couldn&apos;t finish processing it right now.
-          Retry, or find it on your shelf either way.
+          {terminal
+            ? 'That page could not be found, so there is nothing more to read from it. The link stays on your shelf.'
+            : 'Shelvr couldn\'t finish processing it right now. Retry, or find it on your shelf either way.'}
         </Text>
 
         {error !== null && <Text style={styles.error}>{error}</Text>}
 
         <View style={styles.footer}>
-          <Pressable
-            onPress={() => void retry()}
-            disabled={submitting}
-            style={({ pressed }) => [
-              styles.submitBtn,
-              submitting && { opacity: 0.5 },
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color={theme.colors.primaryForeground} />
-            ) : (
-              <Text style={styles.submitText}>Retry</Text>
-            )}
-          </Pressable>
+          {terminal ? null : (
+            <Pressable
+              onPress={() => void retry()}
+              disabled={submitting}
+              style={({ pressed }) => [
+                styles.submitBtn,
+                submitting && { opacity: 0.5 },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color={theme.colors.primaryForeground} />
+              ) : (
+                <Text style={styles.submitText}>Retry</Text>
+              )}
+            </Pressable>
+          )}
           <Pressable onPress={advance}>
             <Text style={styles.skipText}>Continue</Text>
           </Pressable>
@@ -553,7 +570,6 @@ export function LiveDemoStep({
           disabled={submitting}
           onPress={() => {
             analytics.capture('onboarding_demo_skipped');
-            setPendingDemo(null);
             advance();
           }}
         >

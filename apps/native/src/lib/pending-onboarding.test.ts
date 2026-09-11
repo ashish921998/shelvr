@@ -66,4 +66,27 @@ describe('onboarding recovery', () => {
     expect(getOnboardingProgress().demo).toBeNull();
     expect(getOnboardingProgress().spaces).toEqual(['Inspiration']);
   });
+
+  it('drops a completed demo when onboarding finishes, even with no spaces picked', () => {
+    setOnboardingProgress({ q1: [], q2: [], spaces: [], step: 5 });
+    setPendingDemo({ url: 'https://example.com/design', destination: null });
+    setOnboardingProgress({ q1: [], q2: [], spaces: [], step: 7 });
+    // finish(): nothing for the replay hook to do, and no stale save left in
+    // SecureStore that a later mount could replay.
+    setPendingSpaces([]);
+    expect(getOnboardingProgress().demo).toBeNull();
+    expect(hasPending()).toBe(false);
+  });
+
+  it('keeps the in-flight demo through a partial replay update but not through finish', () => {
+    setPendingDemo({ url: 'https://example.com/design', destination: 'Inspiration' });
+    updatePendingSpaces(['Recipes']);
+    expect(getOnboardingProgress().demo).toEqual({
+      url: 'https://example.com/design', destination: 'Inspiration',
+    });
+    setPendingSpaces(['Recipes']);
+    expect(getOnboardingProgress().demo).toBeNull();
+    expect(getOnboardingProgress().spaces).toEqual(['Recipes']);
+    expect(hasPending()).toBe(true);
+  });
 });
