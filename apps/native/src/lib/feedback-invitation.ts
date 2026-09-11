@@ -16,6 +16,9 @@ import {
   type FeedbackFeedItem,
 } from '@/lib/feedback';
 
+/** Minimum settle time before showing, and the poll interval while a paywall is up. */
+const INVITATION_RECHECK_MS = 2000;
+
 export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
@@ -30,6 +33,10 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
     return () => subscription.remove();
   }, []);
 
+  // A save that interrupts a visible invitation ends it. The next one has to
+  // pass the gate again instead of reappearing the moment the save settles.
+  if (busy && invitedUser !== null) setInvitedUser(null);
+
   useEffect(() => {
     if (!home || busy || appState !== 'active' || !items || !userId || formUser) return;
     if (!feedbackAnalytics.isAvailable()) return;
@@ -37,12 +44,19 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
     writeInvitationState(userId, state);
 
     const reviewAt = lastNativeReviewPromptAt();
-    const delay = Math.max(2000, reviewAt === null ? 0
+    const delay = Math.max(INVITATION_RECHECK_MS, reviewAt === null ? 0
       : reviewAt + FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS - Date.now());
     if (!canShowInvitation(state, { now: Date.now() + delay, reviewPromptedAt: reviewAt })) return;
 
-    const timer = setTimeout(() => {
-      if (AppState.currentState !== 'active' || isPaywallPending()) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      if (AppState.currentState !== 'active') return;
+      // The paywall has no reactive signal, so keep checking until it closes
+      // rather than dropping an invitation nothing would re-trigger.
+      if (isPaywallPending()) {
+        timer = setTimeout(attempt, INVITATION_RECHECK_MS);
+        return;
+      }
       if (!feedbackAnalytics.isAvailable()) return;
       const current = readInvitationState(userId);
       const now = Date.now();
@@ -52,7 +66,8 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
       });
       feedbackAnalytics.invitationShown('home', current.readyCount);
       setInvitedUser(userId);
-    }, delay);
+    };
+    timer = setTimeout(attempt, delay);
     return () => clearTimeout(timer);
   }, [items, userId, home, busy, appState, formUser]);
 

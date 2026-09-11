@@ -47,6 +47,9 @@ export function FeedbackModal({
   const openedRef = useRef(false);
 
   const analyticsAvailable = feedbackAnalytics.isAvailable();
+  // A resolved-but-null user has no account to record the send against, so
+  // the form offers the support channel instead of a Send that does nothing.
+  const available = analyticsAvailable && user !== null;
 
   useEffect(() => {
     if (openedRef.current) return;
@@ -55,7 +58,7 @@ export function FeedbackModal({
   }, [surface]);
 
   // Wait for the user id so a queued send is always recorded against the account.
-  const canSend = !sending && user !== undefined && message.trim().length > 0;
+  const canSend = !sending && !!user && message.trim().length > 0;
 
   const send = async () => {
     if (sendingRef.current || !user) return;
@@ -120,10 +123,10 @@ export function FeedbackModal({
                   </Pressable>
                 </View>
               </>
-            ) : phase === 'error' || !analyticsAvailable ? (
+            ) : phase === 'error' || !available ? (
               <>
                 <Text style={styles.body}>
-                  {analyticsAvailable
+                  {available
                     ? 'Feedback couldn’t be sent just now.'
                     : 'Feedback is unavailable right now.'}{' '}
                   You can reach us directly instead:
@@ -144,7 +147,7 @@ export function FeedbackModal({
                     tintColor={theme.colors.muted}
                   />
                 </Pressable>
-                {analyticsAvailable ? (
+                {available ? (
                   <View style={styles.buttonRow}>
                     <Pressable
                       accessibilityRole="button"
