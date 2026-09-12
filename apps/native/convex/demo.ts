@@ -9,7 +9,7 @@ import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure } from "./model/itemFields";
 import { insertMembership } from "./model/memberships";
-import { MAX_SPACE_NAME_LENGTH } from "./model/spaceName";
+import { validateSpaceName } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
 
 // User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
@@ -28,11 +28,12 @@ const demoStatusValidator = v.union(
 /** The optional space the user picked for this link; omitted means "just my shelf". */
 function validateDestination(spaceName: string | undefined): string | undefined {
   if (spaceName === undefined) return undefined;
-  const name = spaceName.trim();
-  if (name === "" || name.length > MAX_SPACE_NAME_LENGTH) {
+  try {
+    return validateSpaceName(spaceName);
+  } catch {
+    // Same rule as createSpace, but the demo client branches on codes.
     throw demoError("invalid_space_name");
   }
-  return name;
 }
 
 /** Same idempotency key as createSpace (trimmed name), but not Pro-gated and

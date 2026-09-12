@@ -137,6 +137,7 @@ describe("space creation", () => {
     const empty = await t
       .mutation(api.spaces.createSpace, { name: "   " })
       .then(() => null, (e: unknown) => e);
+    expect(empty).toBeInstanceOf(ConvexError);
     expect((empty as ConvexError<string>).data).toBe(SPACE_NAME_EMPTY_MESSAGE);
 
     // Exactly the limit is fine, and the same rule guards a rename.
@@ -144,9 +145,34 @@ describe("space creation", () => {
     const renamed = await t
       .mutation(api.spaces.updateSpace, { id, name: overLimit })
       .then(() => null, (e: unknown) => e);
+    expect(renamed).toBeInstanceOf(ConvexError);
     expect((renamed as ConvexError<string>).data).toBe(SPACE_NAME_TOO_LONG_MESSAGE);
     const row = await t.run(async (ctx) => await ctx.db.get(id));
     expect(row?.name).toBe(atLimit);
+  });
+
+  it("leaves a space named before the limit usable: replay finds it, edits keep it", async () => {
+    const t = await entitledUser("user-a");
+    const legacyName = "y".repeat(MAX_SPACE_NAME_LENGTH + 5);
+    const legacyId = await t.run(async (ctx) =>
+      await ctx.db.insert("spaces", { userId: "user-a", name: legacyName, dynamic: false }),
+    );
+
+    // Onboarding replay keys on the trimmed name; the lookup must win over
+    // validation or recovery of a persisted legacy space fails.
+    expect(await t.mutation(api.spaces.createSpace, { name: ` ${legacyName} ` })).toBe(legacyId);
+
+    // The edit form always submits the current name. Unchanged, it is not
+    // re-validated, so the other settings can still be edited.
+    await t.mutation(api.spaces.updateSpace, { id: legacyId, name: legacyName, dynamic: true });
+    const row = await t.run(async (ctx) => await ctx.db.get(legacyId));
+    expect(row).toMatchObject({ name: legacyName, dynamic: true });
+
+    // A changed name is held to the limit like any other.
+    const renamed = await t
+      .mutation(api.spaces.updateSpace, { id: legacyId, name: legacyName + "z" })
+      .then(() => null, (e: unknown) => e);
+    expect(renamed).toBeInstanceOf(ConvexError);
   });
 });
 
