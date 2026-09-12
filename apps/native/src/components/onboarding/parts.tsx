@@ -42,7 +42,7 @@ export function FeatureRow({
 /**
  * The shared primary CTA used by every step's footer. `disabled` dims it and
  * blocks the press — used by steps that gate advance on a selection (min 1
- * space, etc.). Always orange + white text to match v1.
+ * space, etc.). Uses contrasting text on the active accent color.
  */
 export function CtaButton({
   label,
@@ -106,6 +106,6 @@ const styles = StyleSheet.create((theme) => ({
   ctaText: {
     fontFamily: theme.fonts.bold,
     fontSize: 17,
-    color: "#fff",
+    color: theme.colors.primaryForeground,
   },
 }));

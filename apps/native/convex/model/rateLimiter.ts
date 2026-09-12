@@ -21,7 +21,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Creating a space (or turning dynamic on) runs one recommendation pass
   // over up to 100 items: the largest single prompt we send. Onboarding
   // creates a handful of spaces back to back, so the burst covers that.
-  recommendSpace: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
+  recommendSpace: {
+    kind: "token bucket",
+    rate: 30,
+    period: HOUR,
+    capacity: 10,
+  },
+  // The onboarding demo's Pro-free retry of a FAILED demo classification.
+  // Tighter than reprocessItem: the demo is the one uncapped-price save a
+  // non-paying user gets, so retries stay strictly bounded.
+  demoRetry: { kind: "token bucket", rate: 4, period: HOUR, capacity: 3 },
   // Email-keyed limit still stops one address from looping. IP and global
   // buckets stop a client from rotating emails (or one IP from flooding).
   // The global bucket gates every signup site-wide, so it must sit well

@@ -148,7 +148,7 @@ const styles = StyleSheet.create((theme) => ({
   buttonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 14,
-    color: "#fff",
+    color: theme.colors.primaryForeground,
   },
   errorButton: {
     alignSelf: "center",

@@ -3,7 +3,7 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -212,13 +212,8 @@
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": [
-              "image/*",
-              "text/*"
-            ],
-            "multipleShareMimeTypes": [
-              "image/*"
-            ]
+            "singleShareMimeTypes": ["image/*", "text/*"],
+            "multipleShareMimeTypes": ["image/*"]
           }
         }
       ],

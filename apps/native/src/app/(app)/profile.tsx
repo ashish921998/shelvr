@@ -1,5 +1,8 @@
+import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
+import { useAppearanceMode } from "@/lib/appearance-runtime";
 import {
   openPaywall,
   presentCustomerCenter,
@@ -43,8 +46,11 @@ export default function ProfileScreen() {
     convexQuery(api.notifications.getPreferences, {}),
   );
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
+  const { mode: appearanceMode, setMode: setAppearanceMode } =
+    useAppearanceMode();
   const fixtureResetEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
   const { data: canResetFlowFixtures } = useQuery(
@@ -327,6 +333,40 @@ export default function ProfileScreen() {
         />
       </Pressable>
 
+      <View
+        style={styles.linkGroup}
+        accessibilityLabel="Appearance"
+        accessibilityRole="radiogroup"
+      >
+        {APPEARANCE_MODES.map((mode) => {
+          const selected = mode === appearanceMode;
+          return (
+            <Pressable
+              key={mode}
+              accessibilityRole="radio"
+              accessibilityLabel={`Appearance: ${APPEARANCE_LABELS[mode]}`}
+              accessibilityState={{ selected }}
+              style={({ pressed }) => [
+                styles.appearanceRow,
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => setAppearanceMode(mode)}
+            >
+              <Text style={styles.appearanceLabel}>
+                {APPEARANCE_LABELS[mode]}
+              </Text>
+              {selected ? (
+                <AppSymbolIcon
+                  name="checkmark"
+                  size={16}
+                  tintColor={theme.colors.primaryText}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.preferenceRow}>
         <View style={styles.preferenceCopy}>
           <Text style={styles.preferenceLabel}>Weekly shelf</Text>
@@ -348,6 +388,19 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.linkGroup}>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Send feedback"
+          onPress={() => setFeedbackOpen(true)}
+        >
+          <Text style={styles.linkLabel}>Send feedback</Text>
+          <AppSymbolIcon
+            name="arrow.up.right"
+            size={14}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(SUPPORT_URL)}
@@ -424,6 +477,12 @@ export default function ProfileScreen() {
           {deleting ? "Deleting…" : "Delete account"}
         </Text>
       </Pressable>
+      {feedbackOpen ? (
+        <FeedbackModal
+          surface="profile"
+          onClose={() => setFeedbackOpen(false)}
+        />
+      ) : null}
     </ScrollView>
   );
 }
@@ -553,6 +612,19 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     paddingVertical: theme.gap(1.5),
     paddingHorizontal: theme.gap(1.5),
+  },
+  appearanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
+  },
+  appearanceLabel: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.foreground,
   },
   linkLabel: {
     fontFamily: theme.fonts.medium,

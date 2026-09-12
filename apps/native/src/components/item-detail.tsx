@@ -21,7 +21,7 @@ import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,17 +34,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// A row as returned by the list queries (listItems / searchItems / getSpace) —
-// carries every display field except the space memberships, which only
-// getItem resolves. Rows from getSpace additionally carry `spaceIntents`:
-// purpose-steered actions scoped to that space's membership.
-export type DetailItem = FunctionReturnType<
-  typeof api.items.listItems
->[number] & {
-  spaceIntents?: FunctionReturnType<
-    typeof api.items.listItems
-  >[number]["intents"];
-};
+type CardRow = FunctionReturnType<
+  typeof api.items.listItemsPage
+>["page"][number];
+type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
+
+// A row as handed to a detail page. The feed and similar-items queries return
+// the card shape: everything a card shows, but not the article body or the
+// shopping results. getItem and getSpace carry those, and so does searchItems
+// for now (it keeps full rows while builds before the paginated feed are
+// installed). The body fields are therefore optional here; a row that lacks
+// them is filled in from getItem, and one that has them paints at once. Rows
+// from getSpace additionally carry `spaceIntents`: purpose-steered actions
+// scoped to that space's membership.
+export type DetailItem = CardRow &
+  Partial<Pick<FullRow, "content" | "products" | "productsStatus">> & {
+    spaceIntents?: CardRow["intents"];
+  };
 
 type Props = {
   item: DetailItem;
@@ -53,14 +59,36 @@ type Props = {
   isZoomTarget: boolean;
 };
 
-// Shared data for both render paths: space memberships (fetched separately
-// since list rows don't carry them), similar items, the hero URI, and parsed
-// article paragraphs.
+// Shared data for both render paths: the full document (list rows carry
+// neither the article body nor the space memberships), similar items, the hero
+// URI, and parsed article paragraphs.
 function useItemDetailData(item: DetailItem) {
-  const { data: withSpaces } = useQuery(
+  const { data: withSpaces, isError: fullRowFailed } = useQuery(
     convexQuery(api.items.getItem, { id: item._id }),
   );
   const spaces = withSpaces?.spaces ?? [];
+
+  // The full document wins once it arrives; until then the row is all we have.
+  // `spaceIntents` is the one field only the row knows. Memoized so the
+  // children see a stable `item` across parent re-renders.
+  const detail = useMemo<DetailItem>(
+    () =>
+      withSpaces
+        ? { ...item, ...withSpaces, spaceIntents: item.spaceIntents }
+        : item,
+    [item, withSpaces],
+  );
+
+  // A link's layout depends on whether it has an article body, and a card row
+  // cannot say. Hold the body until getItem answers rather than paint the plain
+  // layout and then jump to the reader. Rows that already carry `content`
+  // (getSpace) and non-link items render at once. If getItem fails, paint what
+  // the row has rather than spin forever.
+  const bodyPending =
+    item.type === "link" &&
+    item.content === undefined &&
+    withSpaces === undefined &&
+    !fullRowFailed;
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
@@ -71,41 +99,68 @@ function useItemDetailData(item: DetailItem) {
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
 
-  const paragraphs =
-    item.content
-      ?.split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0) ?? [];
+  const paragraphs = useMemo(
+    () =>
+      detail.content
+        ?.split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0) ?? [],
+    [detail.content],
+  );
 
-  return { spaces, similar, heroUri, paragraphs };
+  return { detail, bodyPending, spaces, similar, heroUri, paragraphs };
 }
 
-// Shared "open the source" gesture for the video poster, source row, and URL
-// row. Each call site renders only when item.url exists.
-function openSource(item: DetailItem) {
-  void WebBrowser.openBrowserAsync(item.url!)
-    .then(() => analytics.itemAction(item, "open_source"))
-    .catch(() => {});
-}
-
-// The hero: framed photo or video poster. Sized up front from its aspect
-// ratio: fill the width the frame allows, but never taller than the cap —
-// and when the cap bites, pull the width back in too so the image keeps its
-// shape and the frame hugs it (no cropping, no lopsided gap). The frame
-// insets the image by its own horizontal margin + padding.
-function DetailHero({
+// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
+// is stable across swipes (Convex query data, staleTime Infinity). Without this,
+// every parent re-render (setActiveId on each swipe) re-rendered every mounted
+// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
+export const ItemDetail = memo(function ItemDetail({
   item,
-  isVideo,
   isZoomTarget,
-  heroUri,
-}: {
-  item: DetailItem;
-  isVideo: boolean;
-  isZoomTarget: boolean;
-  heroUri: string | null | undefined;
-}) {
+}: Props) {
+  const headerHeight = useAppHeaderHeight();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
+    useItemDetailData(item);
+
+  // A video's "content" is its caption, not an article: keep the poster layout.
+  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+
+  // Link saves with extracted content get the compact reader layout.
+  if (
+    !bodyPending &&
+    item.type === "link" &&
+    !isVideo &&
+    paragraphs.length > 0
+  ) {
+    return (
+      <ArticleReaderView
+        item={detail}
+        isZoomTarget={isZoomTarget}
+        headerHeight={headerHeight}
+        spaces={spaces}
+        similar={similar}
+        heroUri={heroUri}
+        paragraphs={paragraphs}
+      />
+    );
+  }
+
+  // The item's own actions, plus any purpose-steered ones from the space this
+  // page was opened through (deduped — steering may echo a general intent).
+  const intents = (() => {
+    const base = item.intents ?? [];
+    const scoped = item.spaceIntents ?? [];
+    const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
+    return [
+      ...base,
+      ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
+    ];
+  })();
 
   // Cap the hero so a tall portrait image can't fill the whole screen and hide
   // the title, description, and actions below it.
@@ -115,6 +170,11 @@ function DetailHero({
   const heroAspect =
     item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
+  // Size the framed photo up front from its aspect ratio: fill the width the
+  // frame allows, but never taller than the cap — and when the cap bites, pull
+  // the width back in too so the image keeps its shape and the frame hugs it
+  // (no cropping, no lopsided gap). The frame insets the image by its own
+  // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
   const heroMaxWidth = width - frameInset;
   const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
@@ -138,7 +198,11 @@ function DetailHero({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Play on TikTok"
-        onPress={() => openSource(item)}
+        onPress={() => {
+          void WebBrowser.openBrowserAsync(item.url!)
+            .then(() => analytics.itemAction(item, "open_source"))
+            .catch(() => {});
+        }}
       >
         {heroImage}
         <View style={styles.playOverlay} pointerEvents="none">
@@ -151,10 +215,7 @@ function DetailHero({
       heroImage
     );
 
-  if (heroUri === null || heroUri === undefined) {
-    return null;
-  }
-  return (
+  const heroBlock = heroUri ? (
     <View style={item.isSticker ? undefined : styles.heroContainer}>
       {isZoomTarget ? (
         <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
@@ -162,218 +223,212 @@ function DetailHero({
         hero
       )}
     </View>
-  );
-}
+  ) : null;
 
-// The item's own actions, plus any purpose-steered ones from the space this
-// page was opened through (deduped — steering may echo a general intent).
-function mergedIntents(item: DetailItem) {
-  const base = item.intents ?? [];
-  const scoped = item.spaceIntents ?? [];
-  const seen = new Set(base.map((i) => `${i.kind}|${i.value.toLowerCase()}`));
-  return [
-    ...base,
-    ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
-  ];
-}
+  const scrollProps = {
+    testID: item.fixtureKey
+      ? `fixture-item-detail-${item.fixtureKey}`
+      : undefined,
+    contentInsetAdjustmentBehavior: "never" as const,
+    style: [styles.container, { paddingTop: headerHeight + theme.gap(5) }],
+    contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
+    showsVerticalScrollIndicator: false,
+  };
 
-// Intent chips (open in browser, add to calendar, …). Hidden entirely when
-// the item has none.
-function ItemIntents({
-  item,
-  intents,
-}: {
-  item: DetailItem;
-  intents: DetailItem["intents"];
-}) {
-  if (!intents || intents.length === 0) {
-    return null;
-  }
-  return (
-    <View style={styles.intentsRow}>
-      {intents.map((intent, index) => (
-        <IntentChip
-          key={`${intent.kind}-${index}`}
-          kind={intent.kind}
-          label={intent.label}
-          onPress={() => {
-            void runIntent(intent.kind, intent.value)
-              .then(() => {
-                analytics.itemAction(
-                  item,
-                  intent.kind === "open_url"
-                    ? "open_source"
-                    : intent.kind === "add_event"
-                      ? "calendar_sheet_opened"
-                      : intent.kind,
-                );
-              })
-              .catch(() => {});
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-// Memoized: this is a FlashList page in a horizontal pager, and its `item` ref
-// is stable across swipes (Convex query data, staleTime Infinity). Without this,
-// every parent re-render (setActiveId on each swipe) re-rendered every mounted
-// page and its ~100+ paragraph Text nodes — the dominant swipe cost profiled.
-export const ItemDetail = memo(function ItemDetail({
-  item,
-  isZoomTarget,
-}: Props) {
-  const headerHeight = useAppHeaderHeight();
-  const { theme } = useUnistyles();
-  const insets = useSafeAreaInsets();
-
-  const { spaces, similar, heroUri, paragraphs } = useItemDetailData(item);
-
-  // A video's "content" is its caption, not an article: keep the poster layout.
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
-
-  // Link saves with extracted content get the compact reader layout.
-  if (item.type === "link" && !isVideo && paragraphs.length > 0) {
+  if (bodyPending) {
+    // The hero is up so the zoom transition has its target; the body waits for
+    // getItem (see useItemDetailData).
     return (
-      <ArticleReaderView
-        item={item}
-        isZoomTarget={isZoomTarget}
-        headerHeight={headerHeight}
-        spaces={spaces}
-        similar={similar}
-        heroUri={heroUri}
-        paragraphs={paragraphs}
-      />
+      <ScrollView {...scrollProps}>
+        {heroBlock}
+        <View style={styles.bodyPending}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+      </ScrollView>
     );
   }
 
-  const intents = mergedIntents(item);
-
   return (
-    <ScrollView
-      testID={
-        item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
-      }
-      contentInsetAdjustmentBehavior="never"
-      style={[styles.container, { paddingTop: headerHeight + theme.gap(5) }]}
-      contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
-      showsVerticalScrollIndicator={false}
-    >
-      <DetailHero
+    <ScrollView {...scrollProps}>
+      {heroBlock}
+
+      <ItemDetailBody
         item={item}
+        detail={detail}
+        spaces={spaces}
+        similar={similar}
+        paragraphs={paragraphs}
         isVideo={isVideo}
-        isZoomTarget={isZoomTarget}
+        intents={intents}
         heroUri={heroUri}
+        headerHeight={headerHeight}
       />
-
-      <View
-        style={[
-          styles.body,
-          // Without a hero to sit under, the text needs to clear the notch and
-          // the floating controls.
-          { paddingTop: heroUri ? theme.gap(5) : headerHeight + theme.gap(5) },
-        ]}
-      >
-        <SaveStatusNotice item={item} />
-
-        {item.status === "ready" ? (
-          <ItemSpaces itemId={item._id} spaces={spaces} />
-        ) : null}
-
-        {item.url ? (
-          <View style={styles.titleContainer}>
-            <Pressable
-              style={styles.sourceRow}
-              onPress={() => openSource(item)}
-            >
-              <AppSymbolIcon
-                name={isVideo ? "play.rectangle" : "safari"}
-                size={15}
-                tintColor={theme.colors.muted}
-              />
-              <Text style={styles.sourceText}>
-                {isVideo && item.author
-                  ? `${item.author} · TikTok`
-                  : (item.siteName ?? displayHost(item.url))}
-              </Text>
-              <AppSymbolIcon
-                name="arrow.up.right"
-                size={11}
-                tintColor={theme.colors.faint}
-              />
-            </Pressable>
-          </View>
-        ) : null}
-
-        <ItemIntents item={item} intents={intents} />
-
-        {item.description ? (
-          <Text style={styles.description}>{item.description}</Text>
-        ) : null}
-
-        {item.url && !item.content ? (
-          // No article body came back, so the address itself is the content —
-          // show it as a real, tappable row instead of a sparse gap.
-          <Pressable
-            style={styles.urlRow}
-            accessibilityRole="link"
-            onPress={() => openSource(item)}
-            hitSlop={4}
-          >
-            <AppSymbolIcon
-              name="link"
-              size={11}
-              tintColor={theme.colors.faint}
-            />
-            <Text style={styles.urlText} numberOfLines={2}>
-              {item.url}
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {isVideo && paragraphs.length > 0 ? (
-          <Text selectable style={styles.paragraph}>
-            {paragraphs.join("\n\n")}
-          </Text>
-        ) : null}
-
-        {item.tags.length > 0 ? (
-          <View style={styles.chipsRow}>
-            {item.tags.map((tag) => (
-              <TagChip key={tag} label={tag} />
-            ))}
-          </View>
-        ) : null}
-
-        {item.status === "ready" ? <ProductsSection item={item} /> : null}
-
-        {item.type === "note" && item.note ? (
-          <Text selectable style={styles.paragraph}>
-            {item.note}
-          </Text>
-        ) : null}
-
-        {!isVideo && paragraphs.length > 0 ? (
-          <View style={styles.article}>
-            {paragraphs.map((paragraph, index) => (
-              <Text selectable key={index} style={styles.paragraph}>
-                {paragraph}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        {similar && similar.length > 0 ? (
-          <View style={styles.similarSection}>
-            <Text style={styles.similarTitle}>More like this</Text>
-            <SimilarGrid items={similar} />
-          </View>
-        ) : null}
-      </View>
     </ScrollView>
   );
 });
+
+type ItemIntent = NonNullable<DetailItem["intents"]>[number];
+
+/** The scroll body under the hero: identity, intents, content, and related
+ * saves. Split from ItemDetail so each render tree stays under the lint
+ * complexity budget. */
+function ItemDetailBody({
+  item,
+  detail,
+  spaces,
+  similar,
+  paragraphs,
+  isVideo,
+  intents,
+  heroUri,
+  headerHeight,
+}: {
+  item: DetailItem;
+  detail: ReturnType<typeof useItemDetailData>["detail"];
+  spaces: ReturnType<typeof useItemDetailData>["spaces"];
+  similar: ReturnType<typeof useItemDetailData>["similar"];
+  paragraphs: string[];
+  isVideo: boolean;
+  intents: ItemIntent[];
+  heroUri: string | null | undefined;
+  headerHeight: number;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View
+      style={[
+        styles.body,
+        // Without a hero to sit under, the text needs to clear the notch and
+        // the floating controls.
+        { paddingTop: heroUri ? theme.gap(5) : headerHeight + theme.gap(5) },
+      ]}
+    >
+      <SaveStatusNotice item={item} />
+
+      {item.status === "ready" ? (
+        <ItemSpaces itemId={item._id} spaces={spaces} />
+      ) : null}
+
+      {item.url ? (
+        <View style={styles.titleContainer}>
+          <Pressable
+            style={styles.sourceRow}
+            onPress={() => {
+              void WebBrowser.openBrowserAsync(item.url!)
+                .then(() => analytics.itemAction(item, "open_source"))
+                .catch(() => {});
+            }}
+          >
+            <AppSymbolIcon
+              name={isVideo ? "play.rectangle" : "safari"}
+              size={15}
+              tintColor={theme.colors.muted}
+            />
+            <Text style={styles.sourceText}>
+              {isVideo && item.author
+                ? `${item.author} · TikTok`
+                : (item.siteName ?? displayHost(item.url))}
+            </Text>
+            <AppSymbolIcon
+              name="arrow.up.right"
+              size={11}
+              tintColor={theme.colors.faint}
+            />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {intents.length > 0 ? (
+        <View style={styles.intentsRow}>
+          {intents.map((intent, index) => (
+            <IntentChip
+              key={`${intent.kind}-${index}`}
+              kind={intent.kind}
+              label={intent.label}
+              onPress={() => {
+                void runIntent(intent.kind, intent.value)
+                  .then(() => {
+                    analytics.itemAction(
+                      item,
+                      intent.kind === "open_url"
+                        ? "open_source"
+                        : intent.kind === "add_event"
+                          ? "calendar_sheet_opened"
+                          : intent.kind,
+                    );
+                  })
+                  .catch(() => {});
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      {item.description ? (
+        <Text style={styles.description}>{item.description}</Text>
+      ) : null}
+
+      {item.url && !detail.content ? (
+        // No article body came back, so the address itself is the content —
+        // show it as a real, tappable row instead of a sparse gap.
+        <Pressable
+          style={styles.urlRow}
+          accessibilityRole="link"
+          onPress={() => {
+            void WebBrowser.openBrowserAsync(item.url!)
+              .then(() => analytics.itemAction(item, "open_source"))
+              .catch(() => {});
+          }}
+          hitSlop={4}
+        >
+          <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
+          <Text style={styles.urlText} numberOfLines={2}>
+            {item.url}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {isVideo && paragraphs.length > 0 ? (
+        <Text selectable style={styles.paragraph}>
+          {paragraphs.join("\n\n")}
+        </Text>
+      ) : null}
+
+      {item.tags.length > 0 ? (
+        <View style={styles.chipsRow}>
+          {item.tags.map((tag) => (
+            <TagChip key={tag} label={tag} />
+          ))}
+        </View>
+      ) : null}
+
+      {item.status === "ready" ? <ProductsSection item={detail} /> : null}
+
+      {item.type === "note" && item.note ? (
+        <Text selectable style={styles.paragraph}>
+          {item.note}
+        </Text>
+      ) : null}
+
+      {!isVideo && paragraphs.length > 0 ? (
+        <View style={styles.article}>
+          {paragraphs.map((paragraph, index) => (
+            <Text selectable key={index} style={styles.paragraph}>
+              {paragraph}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {similar && similar.length > 0 ? (
+        <View style={styles.similarSection}>
+          <Text style={styles.similarTitle}>More like this</Text>
+          <SimilarGrid items={similar} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 /** How the save itself went, derived once from the item's pipeline fields so
  * the rendering below stays a flat switch. */
@@ -579,6 +634,10 @@ const styles = StyleSheet.create((theme) => ({
   body: {
     gap: theme.gap(5),
     paddingHorizontal: theme.gap(2),
+  },
+  bodyPending: {
+    paddingTop: theme.gap(5),
+    alignItems: "center",
   },
   processingRow: {
     flexDirection: "row",

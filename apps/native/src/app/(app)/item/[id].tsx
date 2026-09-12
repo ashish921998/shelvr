@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { useFindLinks } from "@/lib/use-find-links";
+import { useHomeFeed } from "@/lib/home-feed";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
 
@@ -39,10 +40,6 @@ import { useItemShare } from "@/lib/use-item-share";
 // React Query still subscribes through the Convex adapter, and an invalid
 // arg (e.g. an empty-string id) throws ArgumentValidationError on every
 // socket reconnect, which the server answers by closing the WebSocket.
-function listQueryArg(from?: string): "skip" | Record<string, never> {
-  return from !== "space" && from !== "search" ? {} : "skip";
-}
-
 function spaceQueryArg(
   from?: string,
   spaceId?: string,
@@ -67,6 +64,18 @@ function acceptedNoticeVisible(
     accepted?.itemId === activeItem?._id &&
     space?.items.some((item) => item._id === accepted?.itemId),
   );
+}
+
+// The pager shows the feed's loaded pages, so swiping toward their end must
+// fetch the next one just as scrolling the feed does; otherwise a swipe that
+// started on page one stops at its last item.
+function pagerEndReached(
+  items: DetailItem[] | undefined,
+  homeFeed: ReturnType<typeof useHomeFeed>,
+): (() => void) | undefined {
+  return items === homeFeed.items && homeFeed.canLoadMore
+    ? homeFeed.loadMore
+    : undefined;
 }
 
 export default function ItemScreen() {
@@ -94,9 +103,15 @@ export default function ItemScreen() {
   const listRef = useRef<FlashListRef<DetailItem>>(null);
 
   // Rebuild the ordered sibling list from whichever list the user opened from.
-  // Each of these queries is already warm in the cache from the source screen,
-  // so this is a cache read, not a network round-trip.
-  const listQ = useQuery(convexQuery(api.items.listItems, listQueryArg(from)));
+  // The home feed is paginated and shared through HomeFeedProvider, so every
+  // page the user scrolled to is already here; the other two queries are warm
+  // in the cache from the source screen. Either way this is a cache read, not
+  // a network round-trip.
+  // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
+  // React Query still subscribes through the Convex adapter, and an invalid
+  // arg (e.g. an empty-string id) throws ArgumentValidationError on every
+  // socket reconnect, which the server answers by closing the WebSocket.
+  const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
     convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
   );
@@ -119,8 +134,8 @@ export default function ItemScreen() {
         : undefined;
     }
     if (from === "search") return searchQ.data;
-    return listQ.data;
-  }, [from, spaceQ.data, searchQ.data, listQ.data]);
+    return homeFeed.items;
+  }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
   const suggestedIds = useMemo(
     () => new Set(spaceQ.data?.suggestions.map((i) => i._id) ?? []),
@@ -142,6 +157,8 @@ export default function ItemScreen() {
             : undefined,
     [startIndex, list, single],
   );
+
+  const onEndReached = pagerEndReached(items, homeFeed);
 
   // The id the screen was pushed with owns the Apple-zoom target; captured once
   // so swiping (which rewrites the `id` param) never re-pairs the transition.
@@ -195,6 +212,12 @@ export default function ItemScreen() {
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
 
+  // List rows are card-shaped (no article body, no shopping status), so the
+  // toolbar reads those from getItem. `single` follows the debounced `id`
+  // param and can lag a swipe, hence the identity check.
+  const activeFull =
+    single && single._id === activeItem?._id ? single : undefined;
+
   const markOpened = useCallback(
     ({ itemId }: { itemId: string }) =>
       markItemOpened({ itemId: itemId as Id<"items"> }),
@@ -202,7 +225,10 @@ export default function ItemScreen() {
   );
   useItemOpen(activeItem, from ?? "direct", markOpened);
 
-  const shareActive = useItemShare(activeItem);
+  // A link shares its URL; a saved image/sticker shares the picture itself.
+  // Prefers the full getItem row when it has caught up, so link saves can use
+  // the extracted article content a card row does not carry.
+  const shareActive = useItemShare(activeFull ?? activeItem);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
@@ -214,8 +240,9 @@ export default function ItemScreen() {
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } =
-    useFindLinks(activeItem);
+  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(
+    activeFull ?? activeItem,
+  );
 
   // Same picker the inline control opens, so membership behavior (and the
   // formSheet presentation) is identical whichever entry point is used.
@@ -445,6 +472,8 @@ export default function ItemScreen() {
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={viewabilityConfig}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={2}
       />
 
       {activeIsSuggested ? (
@@ -485,7 +514,11 @@ export default function ItemScreen() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.primary }}
             >
-              <AppSymbolIcon name="sparkles" size={15} tintColor="#fff" />
+              <AppSymbolIcon
+                name="sparkles"
+                size={15}
+                tintColor={theme.colors.primaryForeground}
+              />
               <Text style={styles.acceptText}>Add to space</Text>
             </GlassView>
           </Pressable>
@@ -596,6 +629,6 @@ const styles = StyleSheet.create((theme) => ({
   acceptText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: "#fff",
+    color: theme.colors.primaryForeground,
   },
 }));

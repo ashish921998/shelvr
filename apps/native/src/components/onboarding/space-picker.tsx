@@ -1,37 +1,37 @@
-import { CtaButton } from '@/components/onboarding/parts';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { CtaButton } from "@/components/onboarding/parts";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The closed set of Q2 ("What do you save most?") answers. The picker maps each
 // to one or more starter space names so a user who picked "Recipes" lands here
 // with "Recipes" and "Restaurants to try" already selected.
 export type SaveKind =
-  | 'Articles'
-  | 'Recipes'
-  | 'Products'
-  | 'Home & decor'
-  | 'Travel'
-  | 'Fitness'
-  | 'Inspiration'
-  | 'Videos';
+  | "Articles"
+  | "Recipes"
+  | "Products"
+  | "Home & decor"
+  | "Travel"
+  | "Fitness"
+  | "Inspiration"
+  | "Videos";
 
 // Static preset map — no backend, no config. Every Q2 answer seeds a focused
 // starter set; generic presets below catch everyone. Deduped at render time so
 // overlapping answers (e.g. Inspiration + Travel) don't double-list a space.
 const SPACE_PRESETS: Record<SaveKind, string[]> = {
-  Articles: ['Articles', 'Read later', 'Long reads'],
-  Recipes: ['Recipes', 'Restaurants to try'],
-  Products: ['Wishlist', 'Gift ideas'],
-  'Home & decor': ['Home', 'Decor ideas'],
-  Travel: ['Travel', 'Trip ideas'],
-  Fitness: ['Fitness', 'Workouts'],
-  Inspiration: ['Inspiration', 'Ideas'],
-  Videos: ['Videos', 'Watch later'],
+  Articles: ["Articles", "Read later", "Long reads"],
+  Recipes: ["Recipes", "Restaurants to try"],
+  Products: ["Wishlist", "Gift ideas"],
+  "Home & decor": ["Home", "Decor ideas"],
+  Travel: ["Travel", "Trip ideas"],
+  Fitness: ["Fitness", "Workouts"],
+  Inspiration: ["Inspiration", "Ideas"],
+  Videos: ["Videos", "Watch later"],
 };
 
 // Always offered, regardless of Q2 — these are the universally useful shelves.
-const GENERIC_PRESETS = ['Read later', 'Inspiration', 'Wishlist'];
+const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
 
 /**
  * Derive the deduped preset space names from Q2 answers, preserving first-seen
@@ -109,11 +109,17 @@ export function SpacePickerStep({
 
   return (
     <View style={styles.wrap}>
-      <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
+      <Animated.Text
+        entering={FadeInDown.duration(400)}
+        style={styles.headline}
+      >
         Pick your spaces.
       </Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={styles.support}>
-        Shelvr files every save into these automatically. Add or rename anytime.
+      <Animated.Text
+        entering={FadeInDown.delay(80).duration(400)}
+        style={styles.support}
+      >
+        Shelvr suggests saves for these spaces. Add or rename anytime.
       </Animated.Text>
 
       <ScrollView
@@ -134,15 +140,27 @@ export function SpacePickerStep({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{name}</Text>
-                {active && <Text style={[styles.check, { color: theme.colors.primary }]}>✓</Text>}
+                <Text
+                  style={[styles.chipLabel, active && styles.chipLabelActive]}
+                >
+                  {name}
+                </Text>
+                {active && (
+                  <Text style={[styles.check, { color: theme.colors.primary }]}>
+                    ✓
+                  </Text>
+                )}
               </Pressable>
             );
           })}
         </View>
       </ScrollView>
 
-      <CtaButton label="Create my spaces" onPress={onAdvance} disabled={!canAdvance} />
+      <CtaButton
+        label="Create my spaces"
+        onPress={onAdvance}
+        disabled={!canAdvance}
+      />
     </View>
   );
 }
@@ -171,13 +189,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(1),
   },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(1),
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingVertical: theme.gap(1.25),
     paddingHorizontal: theme.gap(2),

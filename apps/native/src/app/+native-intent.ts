@@ -1,4 +1,4 @@
-import { markPendingShareOnDevice } from '@/lib/share/pending-share-store';
+import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 
 // expo-sharing launches the app with a `<scheme>://expo-sharing` deep link when
 // something is shared into Shelvr from another app. Route those to the receiver
@@ -14,14 +14,28 @@ export function redirectSystemPath({
   initial: boolean;
 }) {
   try {
-    if (new URL(path).hostname === 'expo-sharing') {
+    const url = new URL(path);
+
+    // The OAuth browser session receives this URL to finish the token
+    // exchange. Expo Router receives the same native intent and would also
+    // try to render `/auth/callback`, which is not an app screen. Keep the
+    // user on sign-in until Convex Auth flips the authenticated route guard.
+    const isOAuthCallback =
+      url.protocol === "shelvr:" &&
+      ((url.hostname === "auth" && url.pathname === "/callback") ||
+        (url.hostname === "" && url.pathname === "/auth/callback"));
+    if (isOAuthCallback) {
+      return "/sign-in";
+    }
+
+    if (url.hostname === "expo-sharing") {
       try {
         markPendingShareOnDevice();
       } catch {
         // Best-effort: a SecureStore failure loses only the resume flag —
         // it must not stop this recognized share from routing to /share.
       }
-      return '/share';
+      return "/share";
     }
   } catch {
     // Relative/malformed paths aren't share intents — fall through.

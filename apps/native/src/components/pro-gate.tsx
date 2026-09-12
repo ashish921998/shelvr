@@ -1,7 +1,7 @@
-import { openPaywall } from '@/lib/entitlement';
-import { useRouter } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { openPaywall } from "@/lib/entitlement";
+import { useRouter } from "expo-router";
+import { Pressable, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 type Props = {
   title: string;
@@ -20,11 +20,11 @@ type Props = {
 export function ProGate({
   title,
   message,
-  ctaLabel = 'View Pro plans',
+  ctaLabel = "View Pro plans",
   onPress,
 }: Props) {
   const router = useRouter();
-  const handlePress = onPress ?? (() => openPaywall(router, 'pro_gate'));
+  const handlePress = onPress ?? (() => openPaywall(router, "pro_gate"));
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -42,8 +42,8 @@ export function ProGate({
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: theme.gap(4),
     gap: theme.gap(1.5),
     backgroundColor: theme.colors.background,
@@ -58,20 +58,20 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 21,
     color: theme.colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
   },
   cta: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     paddingVertical: theme.gap(1.75),
     paddingHorizontal: theme.gap(4),
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: theme.gap(1),
   },
   ctaText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.primaryForeground,
   },
 }));

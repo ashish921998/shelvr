@@ -4,7 +4,6 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
-import { activationPal } from "activation-pal";
 import { analytics } from "@/lib/analytics";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import { randomUUID } from "expo-crypto";
@@ -304,22 +303,9 @@ export function useEntitlement(): Entitlement {
  * Convex user id has been logged in to RC), so a purchase is always attributed
  * to the correct user.
  */
-async function purchasedPlan(): Promise<string> {
-  const rc = getPurchases();
-  if (!rc) return "unknown";
-
-  try {
-    const customerInfo = await rc.getCustomerInfo();
-    return (
-      Object.values(customerInfo.entitlements.active)[0]?.productIdentifier ??
-      "unknown"
-    );
-  } catch {
-    return "unknown";
-  }
-}
-
-async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
+async function presentPaywallImpl(
+  placement = "pro_gate",
+): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
   analytics.capture("paywall_requested", properties);
@@ -344,33 +330,28 @@ async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
     return "unavailable";
   }
   try {
-    const presentedAt = Date.now();
     const result = await observePaywallPresentation(properties, () =>
       rcui.presentPaywall(),
     );
-    if (
-      result === "CANCELLED" ||
-      result === "PURCHASED" ||
-      result === "RESTORED"
-    ) {
-      activationPal.paywallShown(placement, presentedAt);
-    }
-    if (result === "CANCELLED") {
-      activationPal.paywallDismissed();
-    } else if (result === "PURCHASED") {
-      // RevenueCat's imperative sheet API reports the selected package only
-      // after checkout. Read the newly active product so plan selection and
-      // purchase use the exact App Store product identifier. This lookup is
-      // analytics-only and must not delay a completed purchase.
-      void purchasedPlan().then((plan) => {
-        activationPal.paywallPlanSelected(plan);
-        activationPal.paywallPurchased(plan);
-      });
-    }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     return mapPaywallResult(result);
   } catch {
     return "unavailable";
+  }
+}
+
+let pendingPaywalls = 0;
+
+export function isPaywallPending(): boolean {
+  return pendingPaywalls > 0;
+}
+
+async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
+  pendingPaywalls += 1;
+  try {
+    return await presentPaywallImpl(placement);
+  } finally {
+    pendingPaywalls -= 1;
   }
 }
 

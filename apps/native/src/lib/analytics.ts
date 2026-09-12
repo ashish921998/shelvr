@@ -1,5 +1,4 @@
 import { posthog } from "@/lib/posthog";
-import { activationPal } from "activation-pal";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -107,6 +106,17 @@ type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
+  // Feedback events never carry message text; see lib/feedback.ts.
+  feedback_invitation_shown: { surface: string; ready_count: number };
+  feedback_invitation_dismissed: { surface: string };
+  feedback_opened: { surface: string };
+  // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
+  // space names — only the outcome of the user's one real demo save.
+  onboarding_demo_submitted: Record<string, never>;
+  onboarding_demo_result: {
+    outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
+  };
+  onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
 };
@@ -117,18 +127,6 @@ function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
-  if (
-    event === "article_saved" ||
-    event === "note_saved" ||
-    event === "images_saved" ||
-    event === "space_created"
-  ) {
-    activationPal.track(
-      event,
-      properties as Record<string, string | boolean | number> | undefined,
-    );
-  }
-
   if (!posthog) return;
 
   try {
@@ -216,7 +214,6 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
 // Convex: sending it as a person property would copy PII into a third party
 // (and into replay-linked person profiles) for no analytics gain.
 function identify(userId: string): void {
-  activationPal.setUserId(userId);
   if (!posthog) return;
 
   try {
@@ -227,7 +224,6 @@ function identify(userId: string): void {
 }
 
 function reset(): void {
-  activationPal.setUserId();
   if (!posthog) return;
 
   try {

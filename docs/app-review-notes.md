@@ -54,11 +54,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission | When requested | Why |
-|---|---|---|
-| Camera | User opens Camera to capture | Save a photo into Shelvr |
-| Photo Library | User imports a photo or opens Tidy | Import / tidy photos |
-| Calendar | User adds an event from an item intent | Create calendar event from saved content |
+| Permission    | When requested                         | Why                                      |
+| ------------- | -------------------------------------- | ---------------------------------------- |
+| Camera        | User opens Camera to capture           | Save a photo into Shelvr                 |
+| Photo Library | User imports a photo or opens Tidy     | Import / tidy photos                     |
+| Calendar      | User adds an event from an item intent | Create calendar event from saved content |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 
@@ -91,7 +91,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Confirm the Annual 7-day trial offer is available in every intended storefront. Generic app actions use **View Pro plans** because the Monthly plan does not include a trial.
 - Confirm App Privacy is published and matches `apps/native/privacy.json`, `ios.privacyManifests`, and the hosted Privacy Policy.
 - Add complete contact information and the notes below to App Review Information.
-- Attach `apps/native/store-assets/preview/shelvr-preview-6.9.mp4` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, save, restore, permissions, and account deletion.
+- Attach the preview video from `shelvr-notes/store-assets/preview/` as the review demo if it reflects the submitted build; otherwise record a fresh walkthrough of sign-in, onboarding, paywall, save, restore, permissions, and account deletion.
 - Remove every unresolved review issue or mark it resolved before resubmitting.
 
 ## Paste-ready App Review notes
@@ -99,11 +99,13 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 Shelvr is a private save-it-for-later app for links, notes, and images. It uses AI to generate titles, descriptions, tags, and private Spaces. It has no public feed, messaging, or user-generated content shared between users.
 
 Account access:
+
 1. Launch Shelvr and complete the optional onboarding questions.
 2. Choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required.
 3. Sign in completes through Apple's system authentication flow.
 
 Subscription testing:
+
 1. After onboarding and sign-in, Shelvr presents the RevenueCat paywall using Apple's sandbox environment.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
@@ -111,6 +113,7 @@ Subscription testing:
 5. If subscription status takes a moment to refresh after purchase or restore, close the paywall and reopen Profile.
 
 Core review flow:
+
 1. From Home, tap Add.
 2. Save a URL or note. The item first shows processing, then receives an AI-generated title, description, tags, and Space suggestions.
 3. Open Search to find the saved item.
@@ -119,6 +122,7 @@ Core review flow:
 6. The Map uses only GPS metadata embedded in photos the user selects; Shelvr does not request or track live device location.
 
 Account and support controls:
+
 - Profile contains Contact Support, Restore Purchases, subscription management, Terms of Service, Privacy Policy, Sign out, and Delete account.
 - Delete account permanently removes the user's saves, spaces, uploads, subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
 

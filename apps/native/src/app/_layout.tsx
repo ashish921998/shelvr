@@ -27,10 +27,11 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect, useRef } from "react";
-import { Pressable, Text, useColorScheme, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
   useNotificationObserver,
@@ -142,12 +143,15 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme();
-  const { theme } = useUnistyles();
-  const base = scheme === "dark" ? DarkTheme : DefaultTheme;
+  const { theme, rt } = useUnistyles();
+  // Base the navigator palette on the ACTIVE app theme, not the OS scheme:
+  // the user can pin a dark appearance while the system stays light.
+  const appThemeIsDark = isDarkThemeName(rt.themeName);
+  const base = appThemeIsDark ? DarkTheme : DefaultTheme;
 
   const navTheme = {
     ...base,
+    dark: appThemeIsDark,
     colors: {
       ...base.colors,
       background: theme.colors.background,
@@ -170,12 +174,18 @@ function NavThemeProvider({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const { rt } = useUnistyles();
+  // Contrast with the active app theme (not the OS scheme); camera stays light
+  // over the viewfinder.
+  const appThemeIsDark = isDarkThemeName(rt.themeName);
+  const statusBarStyle =
+    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
         <Slot />
-        <StatusBar style={pathname === "/camera" ? "light" : "auto"} />
+        <StatusBar style={statusBarStyle} />
       </NavThemeProvider>
     </OnboardingProvider>
   );

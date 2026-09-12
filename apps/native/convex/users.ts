@@ -47,6 +47,7 @@ export const getCurrentUser = query({
  *  - space memberships
  *  - spaces
  *  - itemOperations (including pending upload storage)
+ *  - onboardingDemos (the demo allowance row and its item reference)
  *  - subscriptions
  *  - Convex Auth sessions, refresh tokens, accounts, and the users row
  *
@@ -156,6 +157,15 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(op._id);
   }
   if (operations.length === DELETE_BATCH) return false;
+
+  const demos = await ctx.db
+    .query("onboardingDemos")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const demo of demos) {
+    await ctx.db.delete(demo._id);
+  }
+  if (demos.length === DELETE_BATCH) return false;
 
   const reads = await ctx.db
     .query("itemReads")
