@@ -28,6 +28,10 @@ build
 *.pem
 dist
 
+# Play API key written by release.yml from the
+# EAS_GOOGLE_SERVICE_ACCOUNT_KEY secret; eas.json points at this path.
+apps/native/google-service-account-key.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
