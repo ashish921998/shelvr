@@ -202,10 +202,10 @@ pnpm --filter web-app build
 
 1. Deploys Convex to production. One-time setup, in this order: add a
    required reviewer to the GitHub `production` environment **before** adding
-   secrets — every green push to `main` auto-deploys the backend once they
-   exist — then add a deploy key from the Convex dashboard (production
+   secrets, then add a deploy key from the Convex dashboard (production
    deployment → Settings → Deploy keys) as the `CONVEX_DEPLOY_KEY` repo
-   secret. The deploy waits for that reviewer's approval.
+   secret. The required reviewer queues each backend deploy until they
+   approve it.
 2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
    `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
    get the update only after the approved deploy lands, so a client never
@@ -223,7 +223,7 @@ JSON key), mode `ota` publishes an EAS Update to the `production` channel.
 that environment's variables, and the production-value guards in
 `app.config.js` only run during `eas build`. Both workflows fail fast unless
 `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
-there (`eas env:create <name> --environment production`).
+there (`eas env:set --name <name> --value <value> --environment production`).
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native

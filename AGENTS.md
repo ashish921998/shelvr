@@ -81,8 +81,8 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
 - `deploy.yml` runs after CI completes on `main`: the `production`-environment
   job deploys Convex behind a required-reviewer approval, then an EAS Update
   goes to the `internal-test` channel. One-time setup, in this order: add a
-  required reviewer to the GitHub `production` environment first (every green
-  push to `main` auto-deploys the backend once the secrets exist), then add
+  required reviewer to the GitHub `production` environment first (the
+  reviewer queues each backend deploy until they approve it), then add
   the `CONVEX_DEPLOY_KEY` and `EXPO_TOKEN` repo secrets.
 - `release.yml` is dispatched manually for EAS store builds (`--auto-submit`
   requires store credentials on EAS servers) or production-channel OTA.
@@ -91,7 +91,8 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
   `app.config.js` only run during `eas build`. Both workflows therefore
   verify that the EAS `production` environment declares
   `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` before
-  publishing; set them with `eas env:create <name> --environment production`.
+  publishing; set them with `eas env:set` (`--name`, `--value`,
+  `--environment production`).
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
   fingerprint (a native dependency added or removed, a native config change)
   makes new updates invisible to binaries built from the old fingerprint:
