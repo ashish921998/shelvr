@@ -200,10 +200,12 @@ pnpm --filter web-app build
 **Convex production + tester OTA** run through the Deploy workflow
 (`.github/workflows/deploy.yml`). After CI completes on `main`, the workflow:
 
-1. Deploys Convex to production (one-time setup: add a deploy key from the
-   Convex dashboard — production deployment → Settings → Deploy keys — as the
-   `CONVEX_DEPLOY_KEY` repo secret, and add a required reviewer to the GitHub
-   `production` environment). The deploy waits for that reviewer's approval.
+1. Deploys Convex to production. One-time setup, in this order: add a
+   required reviewer to the GitHub `production` environment **before** adding
+   secrets — every green push to `main` auto-deploys the backend once they
+   exist — then add a deploy key from the Convex dashboard (production
+   deployment → Settings → Deploy keys) as the `CONVEX_DEPLOY_KEY` repo
+   secret. The deploy waits for that reviewer's approval.
 2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
    `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
    get the update only after the approved deploy lands, so a client never
@@ -212,8 +214,21 @@ pnpm --filter web-app build
 **Store builds and production OTA** run through the Release workflow
 (`.github/workflows/release.yml`), dispatched manually from `main`: mode
 `build` runs `eas build` for the chosen platform/profile (`--auto-submit`
-once store credentials are configured on EAS), mode `ota` publishes an EAS
-Update to the `production` channel.
+once store credentials are configured on EAS; Android submits also need the
+`EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret — the base64 of the Play API
+JSON key), mode `ota` publishes an EAS Update to the `production` channel.
+
+**OTA publishes require the EAS `production` environment.** With
+`--environment production`, `app.config.js` is resolved on EAS servers with
+that environment's variables, and the production-value guards in
+`app.config.js` only run during `eas build`. Both workflows fail fast unless
+`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
+there (`eas env:create <name> --environment production`).
+
+**Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
+change that alters it — a native dependency added or removed, a native
+config change — makes new updates invisible to binaries built from the old
+fingerprint. Cut a fresh store build before resuming OTA publishes.
 
 Ordering rule: installed clients update on their own schedule, so deploy
 backend changes the clients can tolerate first. Never push a Convex change an
