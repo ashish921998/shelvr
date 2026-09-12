@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  # One-click store builds and production OTA updates, replacing local
+  # `eas build` / `eas update` invocations. Every run records its inputs.
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: >-
+          "build" runs eas build (optionally with submit); "ota" publishes an
+          EAS Update to the production channel without a store build.
+        type: choice
+        options: [build, ota]
+        default: build
+      platform:
+        description: Platform to build (ignored for ota)
+        type: choice
+        options: [all, ios, android]
+        default: all
+      profile:
+        description: eas.json build profile (ignored for ota)
+        type: choice
+        options: [production, internal-test]
+        default: production
+      submit:
+        description: >-
+          Submit to the stores after the build. Requires store credentials on
+          EAS servers: an App Store Connect API key for iOS and a Play service
+          account for Android. Leave off until those are configured.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: ${{ inputs.mode == 'ota' && 'Publish production OTA' || 'Build' }}
+    # Releases only ever ship from main. The production environment's
+    # required reviewer is the approval gate before anything reaches users.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not set. Create a robot access token at expo.dev (Account settings > Access tokens) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: pnpm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build with EAS
+        if: inputs.mode == 'build'
+        working-directory: apps/native
+        run: >-
+          eas build
+          --platform ${{ inputs.platform }}
+          --profile ${{ inputs.profile }}
+          --non-interactive
+          --wait
+          ${{ inputs.submit && '--auto-submit' || '' }}
+
+      - name: Publish production OTA
+        if: inputs.mode == 'ota'
+        working-directory: apps/native
+        run: eas update --channel production --message "main $(git rev-parse --short HEAD)" --non-interactive

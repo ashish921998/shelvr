@@ -1,0 +1,122 @@
+name: Deploy
+
+on:
+  # Runs after CI on main. The production Convex deploy waits for manual
+  # approval (the GitHub "production" environment needs a required reviewer
+  # configured), and the tester OTA publishes only after that deploy lands,
+  # so a client that needs new backend functions can never ship ahead of
+  # them. Deploying exactly the CI-validated commit keeps the gate honest.
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  # Manual re-deploy of main (e.g. after a flaky run) without pushing again.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never cancel a deploy halfway; queue the next one instead.
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  convex-production:
+    name: Deploy Convex production
+    if: |
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The deploy key identifies the production deployment to the CLI. The
+      # job fails fast with setup instructions rather than a CLI auth error.
+      - name: Verify deploy key
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "CONVEX_DEPLOY_KEY is not set. Create one in the Convex dashboard (production deployment, Settings > Deploy Keys) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Deploy to Convex production
+        working-directory: apps/native
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: pnpm exec convex deploy
+
+  eas-update-internal-test:
+    name: Publish tester OTA (internal-test)
+    needs: convex-production
+    if: |
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN is not set. Create a robot access token at expo.dev (Account settings > Access tokens) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: pnpm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # internal-test builds point at the production backend, which is why
+      # this job waits on the approved Convex deploy above.
+      - name: Publish EAS Update
+        working-directory: apps/native
+        run: eas update --channel internal-test --message "main $(git rev-parse --short HEAD)" --non-interactive

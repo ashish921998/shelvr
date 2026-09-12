@@ -76,6 +76,20 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
 - ESLint `no-console` blocks ad-hoc logging outside those logger modules and
   tests; `console.warn` stays allowed in native `src/`.
 
+## Deployment
+
+- `deploy.yml` runs after CI completes on `main`: the `production`-environment
+  job deploys Convex behind a required-reviewer approval, then an EAS Update
+  goes to the `internal-test` channel. One-time setup: `CONVEX_DEPLOY_KEY` and
+  `EXPO_TOKEN` repo secrets, and a required reviewer on the GitHub
+  `production` environment.
+- `release.yml` is dispatched manually for EAS store builds (`--auto-submit`
+  requires store credentials on EAS servers) or production-channel OTA.
+- Web deploys via the Vercel Git integration on `main`; no workflow needed.
+- Backend-first ordering: deploy compatible Convex changes before the client
+  that needs them. Breaking changes go out as expand/contract — an installed
+  client must never reach a missing function or a stricter validator.
+
 ## Non-negotiable boundaries
 
 - Derive the authenticated user from Convex context. Never accept a client-supplied

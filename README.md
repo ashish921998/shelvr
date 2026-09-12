@@ -187,16 +187,38 @@ Auth always derives `userId` from Convex Auth via
 `model/auth.ts` (the stable users-table id extracted from the session-bearing
 JWT `sub`) — never from a client argument.
 
-## Deploying web
+## Deploying
 
-The marketing site is a Next.js build. Android waitlist signup needs
-`CONVEX_URL` at runtime:
+**Web** deploys itself: Vercel's Git integration builds and publishes every
+commit on `main` (`apps/web/vercel.json` sets `turbo run build` as the build
+command). Android waitlist signup needs `CONVEX_URL` at runtime:
 
 ```sh
 pnpm --filter web-app build
 ```
 
-`apps/web/vercel.json` uses `turbo run build`.
+**Convex production + tester OTA** run through the Deploy workflow
+(`.github/workflows/deploy.yml`). After CI completes on `main`, the workflow:
+
+1. Deploys Convex to production (one-time setup: add a deploy key from the
+   Convex dashboard — production deployment → Settings → Deploy keys — as the
+   `CONVEX_DEPLOY_KEY` repo secret, and add a required reviewer to the GitHub
+   `production` environment). The deploy waits for that reviewer's approval.
+2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
+   `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
+   get the update only after the approved deploy lands, so a client never
+   ships ahead of the backend it depends on.
+
+**Store builds and production OTA** run through the Release workflow
+(`.github/workflows/release.yml`), dispatched manually from `main`: mode
+`build` runs `eas build` for the chosen platform/profile (`--auto-submit`
+once store credentials are configured on EAS), mode `ota` publishes an EAS
+Update to the `production` channel.
+
+Ordering rule: installed clients update on their own schedule, so deploy
+backend changes the clients can tolerate first. Never push a Convex change an
+installed client can't survive — ship breaking changes as expand/contract
+(add the tolerant version, tighten once old clients are gone).
 
 ## Adding dependencies
 

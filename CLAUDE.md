@@ -239,6 +239,11 @@ needed at runtime by the features that use them:
   `spaceItems`. Purpose steering (`steerItemForSpace`) may update `intents` on `saved`
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
   no AI pass ever overwrites a user decision.
+- Deploy backend changes in a compatible order: the Convex deploy lands before
+  the client update that needs it (`.github/workflows/deploy.yml` enforces
+  this: approved production deploy, then tester OTA). Breaking changes ship as
+  expand/contract — deploy the tolerant version first, tighten once old
+  clients are gone.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 
