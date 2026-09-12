@@ -74,8 +74,12 @@ jobs:
   eas-update-internal-test:
     name: Publish tester OTA (internal-test)
     needs: convex-production
+    # Same guard as the deploy job above, so neither path can slip past the
+    # push/same-repo checks even if the needs chain is ever rewired.
     if: |
       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_branch == 'main') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -116,6 +120,23 @@ jobs:
           eas-version: latest
           packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
+
+      # With --environment production, app.config.js is resolved on EAS
+      # servers with that environment's variables — and the production-value
+      # guards in app.config.js only run during eas build. A missing variable
+      # would otherwise publish a broken update instead of failing here.
+      - name: Verify the EAS production environment
+        working-directory: apps/native
+        run: |
+          vars="$(eas env:list --environment production --json)"
+          missing=0
+          for name in EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL; do
+            if ! printf '%s' "$vars" | grep -q "\"$name\""; then
+              echo "::error title=Missing EAS variable::$name is not set in the EAS production environment. Add it with 'eas env:create $name --environment production' (or in the expo.dev dashboard) before publishing an OTA update."
+              missing=1
+            fi
+          done
+          exit "$missing"
 
       # internal-test builds point at the production backend, which is why
       # this job waits on the approved Convex deploy above.

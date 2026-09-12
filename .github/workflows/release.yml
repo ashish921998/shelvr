@@ -82,6 +82,24 @@ jobs:
           packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # With --environment production, app.config.js is resolved on EAS
+      # servers with that environment's variables — and the production-value
+      # guards in app.config.js only run during eas build. A missing variable
+      # would otherwise publish a broken update instead of failing here.
+      - name: Verify the EAS production environment
+        if: inputs.mode == 'ota'
+        working-directory: apps/native
+        run: |
+          vars="$(eas env:list --environment production --json)"
+          missing=0
+          for name in EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL; do
+            if ! printf '%s' "$vars" | grep -q "\"$name\""; then
+              echo "::error title=Missing EAS variable::$name is not set in the EAS production environment. Add it with 'eas env:create $name --environment production' (or in the expo.dev dashboard) before publishing an OTA update."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       # Android submission needs the Play API key on disk at the path eas.json
       # declares. It arrives as a base64 repo secret so the JSON never lands in
       # the checkout; without it the CLI would hit a non-interactive prompt and
