@@ -5,7 +5,8 @@ import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { mapRevenueCatStatus, parseRevenueCatEvent } from "./model/revenuecat";
 import { reconcileRevenueCatTransfer } from "./model/revenuecatTransfer";
-import { parsePaymentTelemetry } from './model/paymentTelemetry';
+import { errorName, logEvent } from "./model/log";
+import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { secureCompare } from "./model/secureCompare";
 import {
   WaitlistInputError,
@@ -116,8 +117,31 @@ http.route({
       eventTimestampMs,
     });
     const payment = parsePaymentTelemetry(body);
-    if (payment) await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
+    if (payment)
+      await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
     return new Response(null, { status: 200 });
+  }),
+});
+
+/**
+ * Liveness/readiness probe for uptime monitors (Convex dashboard, PostHog
+ * health checks, an external pinger). Unauthenticated and payload-free: 200
+ * means the deployment answered and reached its database, 503 means the
+ * database read failed. No env vars, no secrets, no user data.
+ */
+http.route({
+  path: "/health",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    try {
+      await ctx.runQuery(internal.health.ping);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      logEvent("error", "health_check_failed", {
+        error_name: errorName(error),
+      });
+      return json({ ok: false }, 503);
+    }
   }),
 });
 
@@ -194,10 +218,9 @@ http.route({
       }
       // Convex argument errors print the failing args, which include the
       // address. Log the error class only.
-      console.error(
-        "Waitlist join failed",
-        error instanceof Error ? error.name : typeof error,
-      );
+      logEvent("error", "waitlist_join_failed", {
+        error_name: errorName(error),
+      });
       return json({ message: "Could not join right now." }, 500);
     }
   }),

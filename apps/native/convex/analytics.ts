@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { logEvent } from "./model/log";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
 
 class PermanentPaymentDeliveryError extends Error {}
@@ -52,8 +53,14 @@ export const capturePayment = internalAction({
         }),
       });
       if (response.ok) return null;
-      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-        throw new PermanentPaymentDeliveryError(`Payment analytics HTTP ${response.status}`);
+      if (
+        response.status >= 400 &&
+        response.status < 500 &&
+        response.status !== 429
+      ) {
+        throw new PermanentPaymentDeliveryError(
+          `Payment analytics HTTP ${response.status}`,
+        );
       }
       throw new Error(`Payment analytics HTTP ${response.status}`);
     } catch (error) {
@@ -121,7 +128,9 @@ export const captureSave = internalAction({
       });
       if (response.ok) return null;
       if (response.status < 500 && response.status !== 429) {
-        console.warn("save_telemetry_rejected", response.status);
+        logEvent("warn", "save_telemetry_rejected", {
+          status: response.status,
+        });
         return null;
       }
     } catch {
@@ -139,7 +148,9 @@ export const captureSave = internalAction({
         },
       );
     } else {
-      console.warn("save_telemetry_delivery_failed");
+      logEvent("warn", "save_telemetry_delivery_failed", {
+        attempts: attempt + 1,
+      });
     }
     return null;
   },

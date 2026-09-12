@@ -142,6 +142,46 @@ function capture<Event extends AnalyticsEvent>(
   }
 }
 
+// Convex validation and network failures can interpolate user content (saved
+// URLs, note text) into Error.message, so only messages known to be fixed
+// strings cross the wire. The class name and stack always ship.
+const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
+
+/**
+ * Report a handled failure to error tracking. `event` is a stable
+ * snake_case discriminator (e.g. "share_save_failed") so PostHog issues stay
+ * filterable by call site. The console output stays for development, where
+ * PostHog is usually unconfigured; console autocapture is off in the SDK
+ * config, so nothing double-reports.
+ */
+function captureError(
+  event: string,
+  error: unknown,
+  properties: Record<string, string | number | boolean> = {},
+): void {
+  console.error(event, error);
+  if (!posthog) return;
+
+  try {
+    const original = error instanceof Error ? error : new Error(typeof error);
+    const reported =
+      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+        ? original
+        : Object.assign(new Error(original.name), {
+            name: original.name,
+            stack: original.stack,
+          });
+    posthog.captureException(reported, {
+      ...properties,
+      error_event: event,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Error reporting must never mask or replace the original failure.
+  }
+}
+
 function sessionId(): string | undefined {
   try {
     return posthog?.getSessionId() || undefined;
@@ -214,6 +254,7 @@ function screen(route: string): void {
 
 export const analytics = {
   capture,
+  captureError,
   identify,
   reset,
   sessionId,

@@ -57,6 +57,15 @@ export default defineConfig([
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],
       "max-nested-callbacks": ["error", 4],
+      // Server logging flows through src/lib/serverLog.ts (one JSON line per
+      // event for the log drain); client failures go through
+      // captureWebException in src/lib/analytics.ts.
+      "no-console": "error",
     },
+  },
+  {
+    // The server logger is the console boundary; tests may spy on console.
+    files: ["src/lib/serverLog.ts", "**/*.test.{ts,tsx}"],
+    rules: { "no-console": "off" },
   },
 ]);

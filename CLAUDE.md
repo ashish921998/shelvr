@@ -96,8 +96,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   claim/finish/recover delivery machine.
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
-- **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`) and the RevenueCat webhook at
-  `/webhooks/revenuecat`, authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret.
+- **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
+  `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
+  the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
+  monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
   and weekly shelf delivery recovery.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
@@ -123,6 +125,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
+- **`model/log.ts`** — `logEvent(level, event, fields)` structured logging: one JSON line per event
+  into the Convex log stream, scalar fields only. All backend logging goes through it (ESLint
+  `no-console` enforces this).
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider
 (auth via the `GOOGLE_GENERATIVE_AI_API_KEY` Convex deployment env var — an AI Studio API key).
@@ -226,6 +231,10 @@ needed at runtime by the features that use them:
 - Prefer `withIndex` / search indexes over `.filter()` on growing tables.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
+- Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
+  `analytics.captureError` (native app) so events land in the Convex log stream or PostHog
+  error tracking in a queryable shape. Keep messages, URLs, and user content out of log
+  fields — log categories and codes instead.
 - The classifier and recommendation passes may only create or remove `suggested` memberships in
   `spaceItems`. Purpose steering (`steerItemForSpace`) may update `intents` on `saved`
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so

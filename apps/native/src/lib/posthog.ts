@@ -1,5 +1,5 @@
-import Constants from 'expo-constants';
-import PostHog from 'posthog-react-native';
+import Constants from "expo-constants";
+import PostHog from "posthog-react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -26,8 +26,14 @@ export const posthog =
           sampleRate: 0.2,
           throttleDelayMs: 1000,
         },
+        // The object form resolves omitted keys to false — an empty
+        // `console: []` alone silently disables crash capture. Exceptions are
+        // additionally gated server-side by the project's "exception
+        // autocapture" remote config.
         errorTracking: {
           autocapture: {
+            uncaughtExceptions: true,
+            unhandledRejections: true,
             console: [],
           },
         },
@@ -35,6 +41,6 @@ export const posthog =
     : undefined;
 
 posthog?.register({
-  environment: Constants.expoConfig?.extra?.variant ?? 'development',
+  environment: Constants.expoConfig?.extra?.variant ?? "development",
   analytics_version: 1,
 });

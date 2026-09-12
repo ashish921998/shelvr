@@ -65,6 +65,28 @@ module.exports = defineConfig([
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],
       "max-nested-callbacks": ["error", 4],
+      // All logging flows through the structured loggers (convex/model/log.ts
+      // for the backend, analytics.captureError for the app) so events reach
+      // Convex log streams and PostHog in a queryable shape. The overrides
+      // below mark those two modules, tests, and src/ console.warn as the
+      // only allowed console usage.
+      "no-console": "error",
     },
+  },
+  {
+    // console.warn stays in app code for transient best-effort notices that
+    // are not worth an error-tracking event.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: { "no-console": ["error", { allow: ["warn"] }] },
+  },
+  {
+    // The loggers are the console boundary; tests spy on console to assert
+    // what would have been logged.
+    files: [
+      "convex/model/log.ts",
+      "src/lib/analytics.ts",
+      "**/*.test.{ts,tsx}",
+    ],
+    rules: { "no-console": "off" },
   },
 ]);

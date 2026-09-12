@@ -1,22 +1,23 @@
-import { Wordmark } from '@/components/wordmark';
-import { HeaderIconButton } from '@/components/ui/header-icon-button';
+import { Wordmark } from "@/components/wordmark";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import {
   openPaywall,
   presentCustomerCenter,
   restorePurchases,
   useEntitlement,
   waitForSheetTransition,
-} from '@/lib/entitlement';
-import { useCurrentUser } from '@/lib/current-user';
-import { LEGAL_URLS, SUPPORT_URL } from '@/lib/legal';
-import { useNotificationSession } from '@/lib/notifications';
-import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import { useRouter } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import { useState } from 'react';
+} from "@/lib/entitlement";
+import { analytics } from "@/lib/analytics";
+import { useCurrentUser } from "@/lib/current-user";
+import { LEGAL_URLS, SUPPORT_URL } from "@/lib/legal";
+import { useNotificationSession } from "@/lib/notifications";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { useRouter } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import { useState } from "react";
 import {
   Alert,
   Linking,
@@ -26,14 +27,14 @@ import {
   Switch,
   Text,
   View,
-} from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function ProfileScreen() {
   const { session, operation } = useNotificationSession();
-  const deleting = operation === 'delete_account';
-  const signingOut = operation === 'sign_out';
-  const busy = operation !== 'idle';
+  const deleting = operation === "delete_account";
+  const signingOut = operation === "sign_out";
+  const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -45,11 +46,11 @@ export default function ProfileScreen() {
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const fixtureResetEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
   const { data: canResetFlowFixtures } = useQuery(
     convexQuery(
       api.devFixtures.canResetCurrentUser,
-      fixtureResetEnabled && user ? {} : 'skip',
+      fixtureResetEnabled && user ? {} : "skip",
     ),
   );
   const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
@@ -61,26 +62,26 @@ export default function ProfileScreen() {
     }
     // A development reload or direct link can restore Profile as the root
     // route. In that state there is no history entry for Android Back to pop.
-    router.replace('/');
+    router.replace("/");
   };
 
   const proLabel =
-    status === 'trialing'
-      ? 'Pro — Trial'
-      : status === 'pro'
-        ? 'Pro'
-        : status === 'lifetime'
-          ? 'Pro — Lifetime'
-          : status === 'lapsed'
-            ? 'Pro — Lapsed'
+    status === "trialing"
+      ? "Pro — Trial"
+      : status === "pro"
+        ? "Pro"
+        : status === "lifetime"
+          ? "Pro — Lifetime"
+          : status === "lapsed"
+            ? "Pro — Lapsed"
             : loading
-              ? '…'
-              : 'View Pro plans';
+              ? "…"
+              : "View Pro plans";
 
   // Customer Center is only relevant to users who have (or had) a subscription
   // — any non-`none` status. A `none` user has nothing to manage and should see
   // the "View Pro plans" paywall row instead.
-  const hasSubscription = status !== 'none' && !loading;
+  const hasSubscription = status !== "none" && !loading;
 
   // RevenueCat UI (paywall / Customer Center) presents from the root view
   // controller, and UIKit refuses to present while this profile sheet is up
@@ -98,24 +99,24 @@ export default function ProfileScreen() {
       // than leaving the tap with no visible effect.
       if (!presented) {
         Alert.alert(
-          'Manage subscription',
-          'Manage your subscription in the App Store.',
+          "Manage subscription",
+          "Manage your subscription in the App Store.",
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: "Cancel", style: "cancel" },
             {
-              text: 'Open App Store',
+              text: "Open App Store",
               onPress: () =>
                 void Linking.openURL(
-                  Platform.OS === 'ios'
-                    ? 'https://apps.apple.com/account/subscriptions'
-                    : 'https://play.google.com/store/account/subscriptions',
+                  Platform.OS === "ios"
+                    ? "https://apps.apple.com/account/subscriptions"
+                    : "https://play.google.com/store/account/subscriptions",
                 ),
             },
           ],
         );
       }
     } else {
-      void openPaywall(router, 'profile');
+      void openPaywall(router, "profile");
     }
   };
 
@@ -127,35 +128,35 @@ export default function ProfileScreen() {
     try {
       if ((await session.setWeeklyShelf(enabled)) === false) {
         Alert.alert(
-          'Notifications are off',
-          'Allow notifications for Shelvr in your device settings to turn on the weekly shelf.',
+          "Notifications are off",
+          "Allow notifications for Shelvr in your device settings to turn on the weekly shelf.",
         );
       }
     } catch (error) {
-      console.error('Weekly shelf preference failed', error);
-      Alert.alert('Couldn’t update notifications', 'Try again in a moment.');
+      analytics.captureError("weekly_shelf_preference_failed", error);
+      Alert.alert("Couldn’t update notifications", "Try again in a moment.");
     }
   };
 
   const handleRestorePurchases = async () => {
     if (restoring) return;
-    const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+    const storeName = Platform.OS === "ios" ? "App Store" : "Google Play";
     setRestoring(true);
     try {
       const outcome = await restorePurchases();
-      if (outcome === 'restored') {
+      if (outcome === "restored") {
         Alert.alert(
-          'Purchases restored',
+          "Purchases restored",
           `Your ${storeName} purchase was found. Shelvr Pro may take a moment to update.`,
         );
-      } else if (outcome === 'none') {
+      } else if (outcome === "none") {
         Alert.alert(
-          'No active purchase found',
+          "No active purchase found",
           `No active Shelvr Pro purchase was found for this ${storeName} account.`,
         );
       } else {
         Alert.alert(
-          'Couldn’t restore purchases',
+          "Couldn’t restore purchases",
           `Check your connection and try again. You can also manage your plan in ${storeName}.`,
         );
       }
@@ -168,36 +169,36 @@ export default function ProfileScreen() {
     try {
       await session.signOut();
     } catch (error) {
-      console.error('Sign-out failed', error);
-      Alert.alert('Couldn’t sign out', 'Check your connection and try again.');
+      analytics.captureError("sign_out_failed", error);
+      Alert.alert("Couldn’t sign out", "Check your connection and try again.");
     }
   };
 
   const confirmDeleteAccount = () => {
     Alert.alert(
-      'Delete account?',
+      "Delete account?",
       [
-        'This permanently deletes your Shelvr account and all of your saves:',
-        '• Links, notes, and images',
-        '• Spaces and memberships',
-        '• Pending uploads and account identity',
-        '',
-        'Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.',
-      ].join('\n'),
+        "This permanently deletes your Shelvr account and all of your saves:",
+        "• Links, notes, and images",
+        "• Spaces and memberships",
+        "• Pending uploads and account identity",
+        "",
+        "Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.",
+      ].join("\n"),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete account',
-          style: 'destructive',
+          text: "Delete account",
+          style: "destructive",
           onPress: () => {
             void (async () => {
               try {
                 await session.deleteAccount();
               } catch (err) {
-                console.error('Account deletion failed', err);
+                analytics.captureError("account_deletion_failed", err);
                 Alert.alert(
-                  'Couldn’t delete account',
-                  'Something went wrong. Check your connection and try again, or email support@shelvr.app.',
+                  "Couldn’t delete account",
+                  "Something went wrong. Check your connection and try again, or email support@shelvr.app.",
                 );
               }
             })();
@@ -209,13 +210,13 @@ export default function ProfileScreen() {
 
   const confirmResetFlowFixtures = () => {
     Alert.alert(
-      'Reset flow fixtures?',
-      'This replaces this anonymous development account’s saves and spaces with deterministic flow data.',
+      "Reset flow fixtures?",
+      "This replaces this anonymous development account’s saves and spaces with deterministic flow data.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Reset',
-          style: 'destructive',
+          text: "Reset",
+          style: "destructive",
           onPress: () => {
             void (async () => {
               if (resettingFixtures) return;
@@ -223,14 +224,14 @@ export default function ProfileScreen() {
               try {
                 const result = await resetFlowFixtures({});
                 Alert.alert(
-                  'Flow fixtures ready',
+                  "Flow fixtures ready",
                   `${result.items} saves and ${result.spaces} spaces were created.`,
                 );
               } catch (error) {
-                console.error('Flow fixture reset failed', error);
+                analytics.captureError("flow_fixture_reset_failed", error);
                 Alert.alert(
-                  'Couldn’t reset fixtures',
-                  'Use an anonymous account on a development deployment and try again.',
+                  "Couldn’t reset fixtures",
+                  "Use an anonymous account on a development deployment and try again.",
                 );
               } finally {
                 setResettingFixtures(false);
@@ -248,7 +249,7 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      {process.env.EXPO_OS === 'android' ? (
+      {process.env.EXPO_OS === "android" ? (
         <View style={styles.sheetHeader}>
           <Wordmark size={30} />
           <HeaderIconButton
@@ -271,7 +272,7 @@ export default function ProfileScreen() {
           />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
-          {user?.email ?? 'Signed in'}
+          {user?.email ?? "Signed in"}
         </Text>
       </View>
 
@@ -290,8 +291,8 @@ export default function ProfileScreen() {
         >
           <Text style={styles.fixtureResetText}>
             {resettingFixtures
-              ? 'Resetting flow fixtures…'
-              : 'Reset flow fixtures'}
+              ? "Resetting flow fixtures…"
+              : "Reset flow fixtures"}
           </Text>
         </Pressable>
       ) : null}
@@ -312,9 +313,10 @@ export default function ProfileScreen() {
         />
         <View style={styles.proCopy}>
           <Text style={styles.proLabel}>{proLabel}</Text>
-          {photoUsage && hasSubscription && status !== 'lapsed' ? (
+          {photoUsage && hasSubscription && status !== "lapsed" ? (
             <Text style={styles.preferenceDescription}>
-              {photoUsage.count.toLocaleString()} of {photoUsage.limit.toLocaleString()} photos
+              {photoUsage.count.toLocaleString()} of{" "}
+              {photoUsage.limit.toLocaleString()} photos
             </Text>
           ) : null}
         </View>
@@ -367,7 +369,7 @@ export default function ProfileScreen() {
           onPress={() => void handleRestorePurchases()}
         >
           <Text style={styles.linkLabel}>
-            {restoring ? 'Restoring Purchases…' : 'Restore Purchases'}
+            {restoring ? "Restoring Purchases…" : "Restore Purchases"}
           </Text>
           <AppSymbolIcon
             name="arrow.clockwise"
@@ -405,7 +407,7 @@ export default function ProfileScreen() {
         onPress={() => void handleSignOut()}
       >
         <Text style={styles.signOutText}>
-          {signingOut ? 'Signing out…' : 'Sign out'}
+          {signingOut ? "Signing out…" : "Sign out"}
         </Text>
       </Pressable>
 
@@ -419,7 +421,7 @@ export default function ProfileScreen() {
         onPress={confirmDeleteAccount}
       >
         <Text style={styles.deleteAccountText}>
-          {deleting ? 'Deleting…' : 'Delete account'}
+          {deleting ? "Deleting…" : "Delete account"}
         </Text>
       </Pressable>
     </ScrollView>
@@ -433,14 +435,14 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.gap(4),
     paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
-    alignItems: 'center',
+    alignItems: "center",
   },
   sheetHeader: {
-    width: '100%',
+    width: "100%",
     minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   slogan: {
     fontFamily: theme.fonts.regular,
@@ -449,24 +451,24 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: theme.gap(1),
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1.5),
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.gap(1.5),
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: theme.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   email: {
     flex: 1,
@@ -475,25 +477,25 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   proRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1.25),
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     padding: theme.gap(1.5),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
   preferenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1.5),
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     padding: theme.gap(1.5),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -522,11 +524,11 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   fixtureReset: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
+    alignSelf: "stretch",
+    alignItems: "center",
     paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -537,18 +539,18 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primary,
   },
   linkGroup: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: theme.gap(1.5),
     paddingHorizontal: theme.gap(1.5),
   },
@@ -558,11 +560,11 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   signOut: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
+    alignSelf: "stretch",
+    alignItems: "center",
     paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -573,8 +575,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.danger,
   },
   deleteAccount: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
+    alignSelf: "stretch",
+    alignItems: "center",
     paddingVertical: theme.gap(1.25),
   },
   deleteAccountText: {

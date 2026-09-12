@@ -135,7 +135,7 @@ export function NotificationSessionProvider({
         deleteAccount: () => deleteAccount({}),
         resetAnalytics: analytics.reset,
         reportError: (error) =>
-          console.error("Notification session cleanup failed", error),
+          analytics.captureError("notification_session_cleanup_failed", error),
       }),
     [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
   );
@@ -152,7 +152,7 @@ export function NotificationSessionProvider({
       try {
         await session.register(() => getExpoPushToken(false, devicePushToken));
       } catch (error) {
-        console.error("Notification registration failed", error);
+        analytics.captureError("notification_registration_failed", error);
       }
     };
 

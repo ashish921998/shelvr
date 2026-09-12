@@ -60,6 +60,22 @@ Use `pnpm run coverage` when iterating on test changes. Tests are co-located
 under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
 `newConvexTest()` from `convex/test.setup.ts`.
 
+## Observability
+
+- Native app: report handled failures with `analytics.captureError(event, error)`
+  (stable snake_case event, sanitized message). Crashes are covered by the root
+  `ErrorBoundary` in `src/app/_layout.tsx` plus PostHog exception autocapture,
+  which the PostHog project setting must also enable server-side.
+- Convex backend: `logEvent(level, event, fields)` from `convex/model/log.ts`
+  emits one JSON line per event into the Convex log stream. Fields are scalars
+  only (categories, codes, ids, counts) — never messages, URLs, or user content.
+- Web: server code uses `serverLog` from `apps/web/src/lib/serverLog.ts`; client
+  render failures report via `captureWebException` from `app/error.tsx` and
+  `app/global-error.tsx`.
+- `GET /health` on the Convex site URL answers 200/503 for uptime monitors.
+- ESLint `no-console` blocks ad-hoc logging outside those logger modules and
+  tests; `console.warn` stays allowed in native `src/`.
+
 ## Non-negotiable boundaries
 
 - Derive the authenticated user from Convex context. Never accept a client-supplied

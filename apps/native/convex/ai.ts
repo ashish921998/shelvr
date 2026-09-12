@@ -20,6 +20,7 @@ import {
 import { isTikTokUrl } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS } from "./model/itemFields";
+import { logEvent } from "./model/log";
 import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
@@ -32,7 +33,13 @@ const MODEL = wrapLanguageModel({
   middleware: {
     wrapGenerate: async ({ doGenerate }) => {
       const result = await doGenerate();
-      console.log(`${MODEL_NAME} usage`, JSON.stringify(result.usage));
+      logEvent("info", "model_usage", {
+        model: MODEL_NAME,
+        input_tokens: result.usage.inputTokens.total,
+        cache_read_tokens: result.usage.inputTokens.cacheRead,
+        output_tokens: result.usage.outputTokens.total,
+        reasoning_tokens: result.usage.outputTokens.reasoning,
+      });
       return result;
     },
   },
@@ -122,10 +129,12 @@ async function captureCategorizationTelemetry(args: {
       }),
     });
     if (!response.ok) {
-      console.warn("ai_observability_delivery_failed", response.status);
+      logEvent("warn", "ai_observability_delivery_failed", {
+        status: response.status,
+      });
     }
   } catch {
-    console.warn("ai_observability_delivery_failed");
+    logEvent("warn", "ai_observability_delivery_failed");
   }
 }
 
@@ -924,10 +933,10 @@ async function analyzeLinkItem(
   const read = await readPage(item.url);
   if (read.status === "gone") {
     // Nothing to read and nothing to retry: a 404/410 is terminal.
-    console.error(
-      `processItem gone for ${args.itemId}:`,
-      summarizeError(read.error),
-    );
+    logEvent("error", "process_item_gone", {
+      item_id: args.itemId,
+      error_category: summarizeError(read.error),
+    });
     const failed = await ctx.runMutation(internal.items.failItem, {
       itemId: args.itemId,
       runId: args.runId,
@@ -947,10 +956,10 @@ async function analyzeLinkItem(
     // Refused (403/429), server error, timeout, or oversized: the link is
     // probably still good, so save a usable item classified from the URL
     // and let the user retry the fetch later.
-    console.warn(
-      `processItem unreadable for ${args.itemId}:`,
-      summarizeError(read.error),
-    );
+    logEvent("warn", "process_item_unreadable", {
+      item_id: args.itemId,
+      error_category: summarizeError(read.error),
+    });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
   const { object } = await generateObject({
@@ -1090,11 +1099,11 @@ async function handleProcessingFailure(
     return null;
   }
   const timedOut = isModelTimeout(error);
-  if (timedOut) {
-    console.warn(`processItem timed out for ${args.itemId}:`, errorCategory);
-  } else {
-    console.error(`processItem failed for ${args.itemId}:`, errorCategory);
-  }
+  logEvent(
+    timedOut ? "warn" : "error",
+    timedOut ? "process_item_timed_out" : "process_item_failed",
+    { item_id: args.itemId, error_category: errorCategory },
+  );
   if (run.posterStorageId !== undefined) {
     await ctx.runMutation(internal.items.deleteStorageIfUnreferenced, {
       storageId: run.posterStorageId,
@@ -1369,10 +1378,10 @@ export const recommendForSpace = internalAction({
       }
     } catch (error) {
       // Sanitized: log a category, not the raw error object.
-      console.error(
-        `recommendForSpace failed for ${args.spaceId}:`,
-        summarizeError(error),
-      );
+      logEvent("error", "recommend_for_space_failed", {
+        space_id: args.spaceId,
+        error_category: summarizeError(error),
+      });
     }
     return null;
   },
@@ -1467,7 +1476,10 @@ export const findProductLinks = internalAction({
       }
       const apiKey = env.SERPAPI_KEY;
       if (!apiKey) {
-        console.error("findProductLinks: SERPAPI_KEY is not set");
+        logEvent("error", "find_product_links_unconfigured", {
+          item_id: args.itemId,
+          missing_env: "SERPAPI_KEY",
+        });
         await fail();
         return null;
       }
@@ -1547,9 +1559,10 @@ export const findProductLinks = internalAction({
       if (!result.ok) {
         // Log only the policy code — never the URL (it carries the API key),
         // never a response body or resolved address.
-        console.error(
-          `findProductLinks: serpapi fetch blocked (${result.code}) for ${args.itemId}`,
-        );
+        logEvent("error", "find_product_links_blocked", {
+          item_id: args.itemId,
+          fetch_code: result.code,
+        });
         await fail();
         return null;
       }
@@ -1571,10 +1584,10 @@ export const findProductLinks = internalAction({
       // Sanitized error log: never the raw error object (which may carry the
       // request URL with the API key, or a response body). summarizeError
       // reduces fetch-policy errors to a code and everything else to a category.
-      console.error(
-        `findProductLinks failed for ${args.itemId}:`,
-        summarizeError(error),
-      );
+      logEvent("error", "find_product_links_failed", {
+        item_id: args.itemId,
+        error_category: summarizeError(error),
+      });
       await fail();
     }
     return null;
@@ -1643,10 +1656,11 @@ export const steerItemForSpace = internalAction({
       }
     } catch (error) {
       // Sanitized: log a category, not the raw error object.
-      console.error(
-        `steerItemForSpace failed for ${args.itemId} in ${args.spaceId}:`,
-        summarizeError(error),
-      );
+      logEvent("error", "steer_item_for_space_failed", {
+        item_id: args.itemId,
+        space_id: args.spaceId,
+        error_category: summarizeError(error),
+      });
     }
     return null;
   },

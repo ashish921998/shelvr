@@ -1,5 +1,22 @@
 type AnalyticsProperties = Record<string, boolean | number | string>;
 
+/**
+ * Report a client render failure to PostHog error tracking. Only the error
+ * class crosses the wire: a message can interpolate user input (a waitlist
+ * email, a query param), and the marketing site has no stack worth sending.
+ * The `$exception` event is what PostHog's error tracking product consumes.
+ */
+export function captureWebException(
+  error: unknown,
+  properties: AnalyticsProperties = {},
+) {
+  captureWebAnalyticsEvent("$exception", {
+    $exception_type: error instanceof Error ? error.name : typeof error,
+    $exception_level: "error",
+    ...properties,
+  });
+}
+
 export function captureWebAnalyticsEvent(
   event: string,
   properties: AnalyticsProperties = {},

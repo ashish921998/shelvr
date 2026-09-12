@@ -1,10 +1,10 @@
-import { LEGAL_URLS } from '@/lib/legal';
-import { analytics } from '@/lib/analytics';
-import { useAuthActions } from '@convex-dev/auth/react';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as React from 'react';
+import { LEGAL_URLS } from "@/lib/legal";
+import { analytics } from "@/lib/analytics";
+import { useAuthActions } from "@convex-dev/auth/react";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { makeRedirectUri } from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+import * as React from "react";
 import {
   Linking,
   Platform,
@@ -12,13 +12,13 @@ import {
   Text,
   useColorScheme,
   View,
-} from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 const oauthRedirectTo = makeRedirectUri({
-  native: 'shelvr://auth/callback',
-  scheme: 'shelvr',
-  path: 'auth/callback',
+  native: "shelvr://auth/callback",
+  scheme: "shelvr",
+  path: "auth/callback",
 });
 
 /**
@@ -41,7 +41,7 @@ export default function Page() {
   const [lastError, setLastError] = React.useState<string | null>(null);
 
   const handleOAuth = async (provider: string) => {
-    analytics.capture('auth_started', { provider });
+    analytics.capture("auth_started", { provider });
     setPending(provider);
     setLastError(null);
     try {
@@ -58,24 +58,24 @@ export default function Page() {
         redirect.toString(),
         oauthRedirectTo,
       );
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        analytics.capture('auth_cancelled', { provider });
+      if (result.type === "cancel" || result.type === "dismiss") {
+        analytics.capture("auth_cancelled", { provider });
         return;
       }
-      if (result.type !== 'success') {
+      if (result.type !== "success") {
         throw new Error(`OAuth browser session ended with ${result.type}`);
       }
       // Hand the callback URL's code back to the provider to finish the sign-in.
-      const code = new URL(result.url).searchParams.get('code');
+      const code = new URL(result.url).searchParams.get("code");
       if (!code) {
-        throw new Error('OAuth callback did not include a verification code');
+        throw new Error("OAuth callback did not include a verification code");
       }
       await signIn(provider, { code });
     } catch (err) {
-      analytics.capture('auth_failed', { provider });
+      analytics.capture("auth_failed", { provider });
       const detail =
         err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-      console.error('OAuth provider sign-in failed', provider, detail, err);
+      analytics.captureError("auth_failed", err, { provider });
       setLastError(detail);
     } finally {
       setPending(null);
@@ -83,7 +83,7 @@ export default function Page() {
   };
 
   const anonEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
 
   return (
     <View style={styles.container}>
@@ -94,14 +94,14 @@ export default function Page() {
         </View>
 
         <View style={styles.buttons}>
-          {Platform.OS === 'ios' ? (
+          {Platform.OS === "ios" ? (
             <AppleAuthentication.AppleAuthenticationButton
               testID="apple-sign-in-button"
               buttonType={
                 AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
               }
               buttonStyle={
-                colorScheme === 'dark'
+                colorScheme === "dark"
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
@@ -110,8 +110,8 @@ export default function Page() {
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
               ]}
-              pointerEvents={pending !== null ? 'none' : 'auto'}
-              onPress={() => handleOAuth('apple')}
+              pointerEvents={pending !== null ? "none" : "auto"}
+              onPress={() => handleOAuth("apple")}
             />
           ) : (
             <Pressable
@@ -120,7 +120,7 @@ export default function Page() {
                 pending !== null && styles.buttonDisabled,
                 pressed && styles.buttonPressed,
               ]}
-              onPress={() => handleOAuth('apple')}
+              onPress={() => handleOAuth("apple")}
               disabled={pending !== null}
             >
               <Text style={styles.appleFallbackButtonText}>
@@ -134,7 +134,7 @@ export default function Page() {
               pending !== null && styles.buttonDisabled,
               pressed && styles.buttonPressed,
             ]}
-            onPress={() => handleOAuth('google')}
+            onPress={() => handleOAuth("google")}
             disabled={pending !== null}
           >
             <Text style={styles.googleButtonText}>Continue with Google</Text>
@@ -147,7 +147,7 @@ export default function Page() {
                 pending !== null && styles.buttonDisabled,
                 pressed && styles.buttonPressed,
               ]}
-              onPress={() => handleOAuth('anonymous')}
+              onPress={() => handleOAuth("anonymous")}
               disabled={pending !== null}
             >
               <Text style={styles.devButtonText}>Continue without account</Text>
@@ -157,14 +157,14 @@ export default function Page() {
       </View>
 
       <Text style={styles.terms}>
-        By continuing you agree to our{' '}
+        By continuing you agree to our{" "}
         <Text
           style={styles.termsLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
         >
           Terms
-        </Text>{' '}
-        and acknowledge our{' '}
+        </Text>{" "}
+        and acknowledge our{" "}
         <Text
           style={styles.termsLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
@@ -188,17 +188,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     padding: theme.gap(2.5),
     paddingTop: rt.insets.top + theme.gap(3),
     paddingBottom: rt.insets.bottom + theme.gap(2),
-    alignItems: 'center',
+    alignItems: "center",
   },
   center: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'stretch',
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
     gap: theme.gap(8),
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: theme.gap(1),
   },
   title: {
@@ -212,18 +212,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.muted,
   },
   buttons: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: theme.gap(2),
   },
   appleButton: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     height: 52,
   },
   appleFallbackButton: {
     backgroundColor: theme.colors.foreground,
     paddingVertical: theme.gap(2),
     borderRadius: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   appleFallbackButtonText: {
     color: theme.colors.background,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
     paddingVertical: theme.gap(2),
     borderRadius: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   googleButtonText: {
     color: theme.colors.foreground,
@@ -244,9 +244,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 16,
   },
   devButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     paddingVertical: theme.gap(1.25),
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: theme.gap(0.5),
   },
   devButtonText: {
@@ -259,14 +259,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 12,
     lineHeight: 17,
     color: theme.colors.faint,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: theme.gap(4),
     marginBottom: theme.gap(2),
   },
   termsLink: {
     fontFamily: theme.fonts.medium,
     color: theme.colors.muted,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   error: {
     marginTop: 16,

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { serverLog } from "@/lib/serverLog";
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type WaitlistSource = "hero" | "footer" | "unknown";
@@ -62,9 +64,10 @@ export async function POST(request: Request) {
   const siteUrl = convexSiteUrl();
   const secret = process.env.WAITLIST_SHARED_SECRET;
   if (!siteUrl || !secret) {
-    console.error(
-      "Android waitlist is missing CONVEX_URL/CONVEX_SITE_URL or WAITLIST_SHARED_SECRET.",
-    );
+    serverLog("error", "android_waitlist_unconfigured", {
+      has_site_url: siteUrl !== undefined,
+      has_shared_secret: secret !== undefined,
+    });
     return NextResponse.json(
       { message: "The waitlist is being connected. Please try again shortly." },
       { status: 503 },
@@ -119,10 +122,12 @@ export async function POST(request: Request) {
   } catch (error) {
     // Log name and message only (never the error object): our own messages
     // above carry just a status, and fetch/timeout errors carry no body.
-    console.error(
-      "Android waitlist persistence failed",
-      error instanceof Error ? `${error.name}: ${error.message}` : typeof error,
-    );
+    serverLog("error", "android_waitlist_failed", {
+      error:
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : typeof error,
+    });
     return NextResponse.json(
       { message: "Could not join right now. Please try again." },
       { status: 502 },
