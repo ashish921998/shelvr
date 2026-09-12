@@ -37,12 +37,14 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 type CardRow = FunctionReturnType<typeof api.items.listItemsPage>['page'][number];
 type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 
-// A row as handed to a detail page. The list queries (listItemsPage / searchItems
-// / similarItems) return the card shape: everything a card shows, but not the
-// article body or the shopping results, which only getItem and getSpace carry.
-// The body fields are therefore optional here and ItemDetail fills them in
-// from getItem. Rows from getSpace additionally carry `spaceIntents`:
-// purpose-steered actions scoped to that space's membership.
+// A row as handed to a detail page. The feed and similar-items queries return
+// the card shape: everything a card shows, but not the article body or the
+// shopping results. getItem and getSpace carry those, and so does searchItems
+// for now (it keeps full rows while builds before the paginated feed are
+// installed). The body fields are therefore optional here; a row that lacks
+// them is filled in from getItem, and one that has them paints at once. Rows
+// from getSpace additionally carry `spaceIntents`: purpose-steered actions
+// scoped to that space's membership.
 export type DetailItem = CardRow &
   Partial<Pick<FullRow, 'content' | 'products' | 'productsStatus'>> & {
     spaceIntents?: CardRow['intents'];

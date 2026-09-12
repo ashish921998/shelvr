@@ -86,6 +86,18 @@ describe("listItems (installed builds)", () => {
     const mine = await ta.query(api.items.listItems, {});
     expect(mine.map((item) => item._id)).toEqual([...aIds].reverse());
   });
+
+  it("searchItems keeps the article body on the row those builds open from", async () => {
+    const t = await as("feed-user");
+    const [id] = await seedFeed(t, "feed-user", 1);
+
+    const results = await t.query(api.items.searchItems, { query: "save" });
+    expect(results.map((item) => item._id)).toEqual([id]);
+    // The pre-pagination detail screen renders `content` straight off this
+    // row; without it, search → open shows a link with no article.
+    expect(results[0].content).toContain("Article body 0");
+    expect(results[0]).toHaveProperty("imageUrl");
+  });
 });
 
 describe("listItemsPage", () => {
