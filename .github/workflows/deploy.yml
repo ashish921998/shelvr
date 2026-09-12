@@ -132,7 +132,7 @@ jobs:
           missing=0
           for name in EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL; do
             if ! printf '%s' "$vars" | grep -q "\"$name\""; then
-              echo "::error title=Missing EAS variable::$name is not set in the EAS production environment. Add it with 'eas env:create $name --environment production' (or in the expo.dev dashboard) before publishing an OTA update."
+              echo "::error title=Missing EAS variable::$name is not set in the EAS production environment. Add it with 'eas env:set --name $name --value <value> --environment production' (or in the expo.dev dashboard) before publishing an OTA update."
               missing=1
             fi
           done
