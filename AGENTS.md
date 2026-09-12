@@ -38,8 +38,10 @@ ESLint fails on functions over cyclomatic complexity 30, 50 statements,
 block depth 4, or 4 nested callbacks. Extract helpers, hooks, or
 subcomponents instead of disabling the rules. `max-lines-per-function` is
 intentionally unset: long JSX render trees and long tests are common here and
-carry less risk than branchy logic. The native app lints with plain
-`eslint .` (not `expo lint`), which silently skips the `convex/` backend.
+carry less risk than branchy logic. Both apps lint with
+`eslint . --max-warnings 0`, so a warning fails the gate the same as an
+error; fix it or justify a targeted disable comment. The native app does not
+use `expo lint`, which silently skips the `convex/` backend.
 
 ## Execution loop
 
@@ -50,7 +52,8 @@ carry less risk than branchy logic. The native app lints with plain
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
 The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
-the dependency audit (`pnpm run audit`, blocks on high/critical). Advisories
+the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
+same steps, so the pre-commit hook and the remote gate cannot drift. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
