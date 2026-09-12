@@ -9,13 +9,13 @@ import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure } from "./model/itemFields";
 import { insertMembership } from "./model/memberships";
+import { MAX_SPACE_NAME_LENGTH } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
 
 // User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
 // a ConvexError with structured data the client branches on. A plain Error's
 // message is redacted to "Server Error" in production.
 
-const MAX_SPACE_NAME_LENGTH = 60;
 /** Total retry cap for the demo item, on top of the demoRetry rate limiter's cooldown. */
 export const MAX_DEMO_RETRIES = 5;
 

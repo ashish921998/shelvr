@@ -3,9 +3,11 @@ import { ScreenLoader } from '@/components/ui/screen-loader';
 import { usePaywallGuard } from '@/lib/entitlement';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
+import { MAX_SPACE_NAME_LENGTH } from '@convex/model/spaceName';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -127,10 +129,14 @@ function SpaceForm(props: SpaceFormProps) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       router.back();
-    } catch {
+    } catch (error) {
+      // A ConvexError carries the server's user-facing sentence in `data`;
+      // anything else is redacted to "Server Error" in production.
       Alert.alert(
         editing ? 'Could not save space' : 'Could not create space',
-        'Something went wrong. Try again.',
+        error instanceof ConvexError && typeof error.data === 'string'
+          ? error.data
+          : 'Something went wrong. Try again.',
       );
       setSaving(false);
     }
@@ -154,6 +160,7 @@ function SpaceForm(props: SpaceFormProps) {
         placeholderTextColor={theme.colors.faint}
         value={name}
         onChangeText={setName}
+        maxLength={MAX_SPACE_NAME_LENGTH}
         autoFocus={!editing}
       />
 

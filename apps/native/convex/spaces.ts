@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -275,10 +276,7 @@ export const createSpace = mutation({
   returns: v.id("spaces"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const name = args.name.trim();
-    if (name === "") {
-      throw new Error("Space name is empty");
-    }
+    const name = validateSpaceName(args.name);
 
     // Onboarding replay may retry after a process death. Treat the user's
     // trimmed name as the idempotency key so a successful mutation is never
@@ -351,11 +349,7 @@ export const updateSpace = mutation({
     }
     const patch: { name?: string; dynamic?: boolean } = {};
     if (args.name !== undefined) {
-      const name = args.name.trim();
-      if (name === "") {
-        throw new Error("Space name is empty");
-      }
-      patch.name = name;
+      patch.name = validateSpaceName(args.name);
     }
     if (args.dynamic !== undefined) {
       patch.dynamic = args.dynamic;

@@ -5,6 +5,12 @@ import { newConvexTest } from "./test.setup";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "@convex/_generated/api";
 import type { DataModel, Doc, Id } from "@convex/_generated/dataModel";
+import { ConvexError } from "convex/values";
+import {
+  MAX_SPACE_NAME_LENGTH,
+  SPACE_NAME_EMPTY_MESSAGE,
+  SPACE_NAME_TOO_LONG_MESSAGE,
+} from "./model/spaceName";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 
@@ -113,6 +119,34 @@ describe("space creation", () => {
         .collect(),
     );
     expect(spaces).toHaveLength(1);
+  });
+
+  it("bounds the name on create and rename with a message the client can show", async () => {
+    const t = await entitledUser("user-a");
+    const atLimit = "x".repeat(MAX_SPACE_NAME_LENGTH);
+    const overLimit = atLimit + "x";
+
+    // ConvexError, not Error: production redacts a plain Error to "Server
+    // Error", so the sentence has to travel in `data`.
+    const tooLong = await t
+      .mutation(api.spaces.createSpace, { name: overLimit })
+      .then(() => null, (e: unknown) => e);
+    expect(tooLong).toBeInstanceOf(ConvexError);
+    expect((tooLong as ConvexError<string>).data).toBe(SPACE_NAME_TOO_LONG_MESSAGE);
+
+    const empty = await t
+      .mutation(api.spaces.createSpace, { name: "   " })
+      .then(() => null, (e: unknown) => e);
+    expect((empty as ConvexError<string>).data).toBe(SPACE_NAME_EMPTY_MESSAGE);
+
+    // Exactly the limit is fine, and the same rule guards a rename.
+    const id = await t.mutation(api.spaces.createSpace, { name: atLimit });
+    const renamed = await t
+      .mutation(api.spaces.updateSpace, { id, name: overLimit })
+      .then(() => null, (e: unknown) => e);
+    expect((renamed as ConvexError<string>).data).toBe(SPACE_NAME_TOO_LONG_MESSAGE);
+    const row = await t.run(async (ctx) => await ctx.db.get(id));
+    expect(row?.name).toBe(atLimit);
   });
 });
 
