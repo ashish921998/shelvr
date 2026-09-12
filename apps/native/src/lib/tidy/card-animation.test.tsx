@@ -187,4 +187,41 @@ describe("CardAnimationProvider", () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
   });
+
+  it("commits a save on a diagonal fling where the vertical axis dominates", () => {
+    const { card, onDecision } = setup(0);
+    // Both axes cross their thresholds; the larger travel wins.
+    fire("onEnd", { translationX: 150, translationY: -400 });
+    expect(card.panY.value).toEqual({ driver: "timing", value: -800 * 1.15 });
+    expect(card.panX.value).toEqual({ driver: "timing", value: 0 });
+    expect(flushDecision()).toBe("save");
+    expect(onDecision).toHaveBeenCalledWith(0, "save");
+  });
+
+  it("commits a keep on a diagonal fling where the horizontal axis dominates", () => {
+    const { card, onDecision } = setup(0);
+    fire("onEnd", { translationX: 250, translationY: -200 });
+    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
+    expect(card.panY.value).toEqual({ driver: "timing", value: 0 });
+    expect(flushDecision()).toBe("keep");
+    expect(onDecision).toHaveBeenCalledWith(0, "keep");
+  });
+
+  it("breaks an exact diagonal tie toward the horizontal axis", () => {
+    const { onDecision } = setup(0);
+    // The up-commit demands strictly more upward travel than horizontal;
+    // the side commit accepts a tie, so a perfect diagonal deletes.
+    fire("onEnd", { translationX: -250, translationY: -250 });
+    expect(flushDecision()).toBe("delete");
+    expect(onDecision).toHaveBeenCalledWith(0, "delete");
+  });
+
+  it("springs back on a diagonal where neither axis crosses its threshold", () => {
+    const { card, onDecision } = setup(0);
+    fire("onEnd", { translationX: 80, translationY: -120 });
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
+  });
 });

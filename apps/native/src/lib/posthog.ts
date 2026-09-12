@@ -42,10 +42,15 @@ function redactExceptionProperties(properties: unknown): void {
       };
     });
   }
-  record.$exception_message = sanitizeExceptionValue(
-    record.$exception_message,
-    record.$exception_type,
-  );
+  // Only rewrite the message when the SDK captured one — an unconditional
+  // assignment would stamp an undefined `$exception_message` key onto every
+  // lifecycle and custom event passing through the hook.
+  if ("$exception_message" in record) {
+    record.$exception_message = sanitizeExceptionValue(
+      record.$exception_message,
+      record.$exception_type,
+    );
+  }
 }
 
 // Analytics is optional in local development and in builds that do not have

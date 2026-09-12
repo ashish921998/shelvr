@@ -7,12 +7,25 @@ const mock = vi.hoisted(() => ({
   identify: vi.fn(),
   getSessionId: vi.fn(() => "session-1"),
 }));
-vi.mock("@/lib/posthog", () => ({
-  posthog: mock,
-  // The allowlist lives in lib/posthog.ts; the stub mirrors the real set so
-  // captureError's policy stays exercisable against this boundary.
-  SAFE_ERROR_MESSAGES: new Set(["Network request failed"]),
-}));
+const posthogCtor = vi.hoisted(() => {
+  // The real posthog module imports the native SDK at the top level even
+  // when no client is constructed, so the SDK is stubbed for Node exactly
+  // as in posthog.test.ts.
+  class PostHogStub {
+    register: unknown;
+    constructor() {
+      this.register = vi.fn();
+    }
+  }
+  return PostHogStub;
+});
+vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
+vi.mock("@/lib/posthog", async (importOriginal) => {
+  // Spread the real module so captureError exercises the production
+  // allowlist instead of a drift-prone hard-coded copy; swap only the client.
+  const actual = await importOriginal<typeof import("@/lib/posthog")>();
+  return { ...actual, posthog: mock };
+});
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

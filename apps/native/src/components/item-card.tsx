@@ -103,7 +103,9 @@ function clampRatio(ratio: number | undefined, fallback: number) {
   return Math.min(Math.max(value, 0.5), 2);
 }
 
-// In-card action menu; mirrors CardLinkMenu (the iOS long-press context menu).
+// In-card action menu shown by CardCaption's overflow control. The iOS
+// long-press menu in ItemCard repeats the same actions as literal
+// Link.MenuAction children.
 function cardMenuActions({
   isSuggested,
   hasUrl,

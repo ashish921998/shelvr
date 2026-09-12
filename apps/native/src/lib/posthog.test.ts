@@ -118,6 +118,18 @@ describe("posthog before_send", () => {
       properties: { item_id: "items:1", message: "anything at all" },
     };
     expect(beforeSend(event)).toBe(event);
+    // Value equality, not just identity: the hook must not stamp exception
+    // keys (not even undefined ones) onto ordinary events.
+    expect(event.properties).toEqual({
+      item_id: "items:1",
+      message: "anything at all",
+    });
+  });
+
+  it("adds no keys to an exception event without a message or list", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(exceptionEvent({ type: "RangeError" }));
+    expect(Object.keys(sent.properties ?? {})).toEqual(["$exception_type"]);
   });
 
   it("tolerates a malformed exception list", () => {

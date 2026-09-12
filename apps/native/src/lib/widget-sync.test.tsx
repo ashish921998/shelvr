@@ -3,7 +3,8 @@
 // widget runtime, and query layer are all stubbed, so the tests exercise the
 // observable contract: one snapshot per changed widget-visible set, mapped
 // titles/subtitles, downsized thumbnails that never block the sync on
-// failure, key-based dedupe, and stale-thumbnail cleanup.
+// failure, key-based dedupe, stale-thumbnail cleanup, and the key reset that
+// lets a later render retry after a failed sync.
 import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,7 @@ const fsx = vi.hoisted(() => ({
   platformOs: "ios",
   nativeModulePresent: true,
   failImages: false,
+  failSnapshot: false,
   files: new Map<string, boolean>(),
   listed: [] as unknown[],
   snapshots: [] as unknown[],
@@ -77,6 +79,7 @@ vi.mock("expo-widgets", () => ({ widgetsDirectory: "/widgets" }));
 vi.mock("@/widgets/recent-saves-widget", () => ({
   default: {
     updateSnapshot: (snapshot: unknown) => {
+      if (fsx.failSnapshot) throw new Error("widget unavailable");
       fsx.snapshots.push(snapshot);
     },
   },
@@ -141,6 +144,7 @@ beforeEach(() => {
   fsx.platformOs = "ios";
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
+  fsx.failSnapshot = false;
   fsx.files.clear();
   fsx.listed = [];
   fsx.snapshots = [];
@@ -255,6 +259,32 @@ describe("RecentSavesWidgetSync", () => {
     // The failing image degrades to the text tile; its sibling still syncs.
     expect(snapshot.items[0].imageUri).toBeUndefined();
     expect(snapshot.items[1].id).toBe("i2");
+    spy.mockRestore();
+  });
+
+  it("resets the dedupe key on failure so a later render retries", async () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = renderSync([link]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+
+    // A changed widget set fails mid-sync: the snapshot never lands and the
+    // failure clears the dedupe key.
+    fsx.failSnapshot = true;
+    tanstack.data = [{ ...link, title: "Renamed" }];
+    rerender(<RecentSavesWidgetSync />);
+    await act(async () => {});
+    expect(fsx.snapshots).toHaveLength(1);
+    expect(spy).toHaveBeenCalledWith(
+      "Recent Saves widget sync failed",
+      expect.anything(),
+    );
+
+    // The original set arrives again as a new instance; without the reset
+    // its unchanged key would be skipped as an already-synced snapshot.
+    fsx.failSnapshot = false;
+    tanstack.data = [link];
+    rerender(<RecentSavesWidgetSync />);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
     spy.mockRestore();
   });
 });
