@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -276,13 +277,12 @@ export const createSpace = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const name = args.name.trim();
-    if (name === "") {
-      throw new Error("Space name is empty");
-    }
 
     // Onboarding replay may retry after a process death. Treat the user's
     // trimmed name as the idempotency key so a successful mutation is never
     // duplicated merely because the client did not persist its acknowledgement.
+    // The lookup runs before validation on purpose: a space created before
+    // the length limit existed must still be found by its replay.
     const existing = await ctx.db
       .query("spaces")
       .withIndex("by_user_and_name", (q) =>
@@ -292,6 +292,7 @@ export const createSpace = mutation({
     if (existing.length > 0) {
       return existing[0]._id;
     }
+    validateSpaceName(name);
 
     await requireProEntitlement(ctx, userId);
     // The recommendation pass is a paid model call; bound it before writing so
@@ -350,12 +351,11 @@ export const updateSpace = mutation({
       });
     }
     const patch: { name?: string; dynamic?: boolean } = {};
-    if (args.name !== undefined) {
-      const name = args.name.trim();
-      if (name === "") {
-        throw new Error("Space name is empty");
-      }
-      patch.name = name;
+    // The edit form always submits the name, changed or not. Only a changed
+    // name is validated, so a space named before the length limit existed can
+    // still have its other settings edited.
+    if (args.name !== undefined && args.name.trim() !== space.name) {
+      patch.name = validateSpaceName(args.name);
     }
     if (args.dynamic !== undefined) {
       patch.dynamic = args.dynamic;

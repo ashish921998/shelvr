@@ -93,10 +93,12 @@ export function LiveDemoStep({
 
   // Subscribe to the item once we have an id — re-renders as the AI pipeline
   // fills in title/tags/spaces and flips status to ready.
-  const itemQuery = useQuery({
-    ...convexQuery(api.items.getItem, { id: itemId! }),
-    enabled: itemId !== null,
-  });
+  // 'skip', not `enabled`: a disabled React Query still subscribes through the
+  // Convex adapter and sends `id: null`, which fails argument validation on
+  // the server for every demo run.
+  const itemQuery = useQuery(
+    convexQuery(api.items.getItem, itemId === null ? 'skip' : { id: itemId }),
+  );
   const item = itemQuery.data;
 
   // Leaving the step ends the in-flight demo: clear the persisted record so a
