@@ -1,4 +1,4 @@
-import { posthog } from "@/lib/posthog";
+import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -140,10 +140,8 @@ function capture<Event extends AnalyticsEvent>(
   }
 }
 
-// Convex validation and network failures can interpolate user content (saved
-// URLs, note text) into Error.message, so only messages known to be fixed
-// strings cross the wire. The class name and stack always ship.
-const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
+// The message allowlist lives in lib/posthog.ts so handled errors
+// (captureError below) and SDK-autocaptured crashes share one policy.
 
 /**
  * Report a handled failure to error tracking. `event` is a stable

@@ -7,7 +7,12 @@ const mock = vi.hoisted(() => ({
   identify: vi.fn(),
   getSessionId: vi.fn(() => "session-1"),
 }));
-vi.mock("@/lib/posthog", () => ({ posthog: mock }));
+vi.mock("@/lib/posthog", () => ({
+  posthog: mock,
+  // The allowlist lives in lib/posthog.ts; the stub mirrors the real set so
+  // captureError's policy stays exercisable against this boundary.
+  SAFE_ERROR_MESSAGES: new Set(["Network request failed"]),
+}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

@@ -937,19 +937,12 @@ async function analyzeLinkItem(
       item_id: args.itemId,
       error_category: summarizeError(read.error),
     });
-    const failed = await ctx.runMutation(internal.items.failItem, {
-      itemId: args.itemId,
-      runId: args.runId,
-      reason: "not_found",
-    });
-    // Same fence as finalize: a superseded run's outcome is nobody's.
-    if (failed === "applied") {
-      await captureCategorizationTelemetry({
-        outcome: "not_found",
-        itemType: item.type,
-        durationMs: Date.now() - startedAt,
-      });
-    }
+    await failItemAndRecordOutcome(
+      ctx,
+      args,
+      { itemType: item.type, startedAt },
+      { reason: "not_found", telemetry: "not_found" },
+    );
     return { terminal: true };
   }
   if (read.status === "unreadable") {
@@ -1058,6 +1051,40 @@ function spaceNameIds(
 type ActionCtx = GenericActionCtx<DataModel>;
 
 /**
+ * Fail the item and count the outcome exactly once: failItem is run-fenced,
+ * so telemetry is recorded only when this run's write was the applied one and
+ * the item type is known. Shared by the terminal 404 path and
+ * handleProcessingFailure so the fail-and-record sequence cannot drift apart.
+ */
+async function failItemAndRecordOutcome(
+  ctx: ActionCtx,
+  args: { itemId: Id<"items">; runId?: string },
+  run: { itemType?: "image" | "link" | "note"; startedAt: number },
+  outcome: {
+    reason: "image_too_large" | "not_found" | "error";
+    telemetry: CategorizationOutcome;
+    errorCategory?: string;
+  },
+): Promise<void> {
+  const failed = await ctx.runMutation(internal.items.failItem, {
+    itemId: args.itemId,
+    runId: args.runId,
+    reason: outcome.reason,
+  });
+  // Same fence as finalize: a superseded run's outcome is nobody's.
+  if (run.itemType !== undefined && failed === "applied") {
+    await captureCategorizationTelemetry({
+      outcome: outcome.telemetry,
+      itemType: run.itemType,
+      durationMs: Date.now() - run.startedAt,
+      ...(outcome.errorCategory !== undefined
+        ? { errorCategory: outcome.errorCategory }
+        : {}),
+    });
+  }
+}
+
+/**
  * Fail the item and record the outcome. A stored-image policy failure maps
  * to its own reason; a timed-out model call is an expected operational
  * condition, so it warns (not errors) and fails with the retryable `error`
@@ -1083,19 +1110,11 @@ async function handleProcessingFailure(
   const errorCategory = summarizeError(error);
   if (error instanceof StoredImageError) {
     const tooLarge = error.code === "too_large";
-    const failed = await ctx.runMutation(internal.items.failItem, {
-      itemId: args.itemId,
-      runId: args.runId,
+    await failItemAndRecordOutcome(ctx, args, run, {
       reason: tooLarge ? "image_too_large" : "not_found",
+      telemetry: tooLarge ? "rejected" : "not_found",
+      errorCategory,
     });
-    if (run.itemType !== undefined && failed === "applied") {
-      await captureCategorizationTelemetry({
-        outcome: tooLarge ? "rejected" : "not_found",
-        itemType: run.itemType,
-        durationMs: Date.now() - run.startedAt,
-        errorCategory,
-      });
-    }
     return null;
   }
   const timedOut = isModelTimeout(error);
@@ -1112,19 +1131,11 @@ async function handleProcessingFailure(
   // failItem is run-fenced: if a retry already superseded this run the write
   // is skipped, which is exactly right — the newer run owns the item's status
   // now, and its outcome is the one worth counting.
-  const failed = await ctx.runMutation(internal.items.failItem, {
-    itemId: args.itemId,
-    runId: args.runId,
+  await failItemAndRecordOutcome(ctx, args, run, {
     reason: "error",
+    telemetry: "failed",
+    errorCategory,
   });
-  if (run.itemType !== undefined && failed === "applied") {
-    await captureCategorizationTelemetry({
-      outcome: "failed",
-      itemType: run.itemType,
-      durationMs: Date.now() - run.startedAt,
-      errorCategory,
-    });
-  }
   return timedOut ? null : errorCategory;
 }
 

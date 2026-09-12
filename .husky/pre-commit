@@ -1,2 +1,4 @@
+# Staged-file lint only. The full check (typecheck, coverage, knip, audit)
+# runs in CI on every push — duplicating it here added minutes per commit
+# without extra safety, and the network-bound audit could fail offline.
 pnpm exec lint-staged
-pnpm run check

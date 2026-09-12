@@ -1,18 +1,41 @@
-type AnalyticsProperties = Record<string, boolean | number | string>;
+type AnalyticsProperties = Record<
+  string,
+  boolean | number | string | unknown[]
+>;
+
+// Error messages can interpolate user input (a waitlist email, a query
+// param), so the grouped exception value keeps only fixed shapes: mail and
+// URL substrings are replaced before anything reaches PostHog.
+function safeExceptionValue(message: string): string {
+  return message
+    .replace(/\b[\w.+-]+@[\w.-]+\.\w+\b/g, "[email]")
+    .replace(/\bhttps?:\/\/\S+/gi, "[url]");
+}
 
 /**
- * Report a client render failure to PostHog error tracking. Only the error
- * class crosses the wire: a message can interpolate user input (a waitlist
- * email, a query param), and the marketing site has no stack worth sending.
- * The `$exception` event is what PostHog's error tracking product consumes.
+ * Report a client render failure to PostHog error tracking. The event is
+ * grouped by the `$exception_list` entry: its type is the error class and its
+ * value is the message scrubbed of emails and URLs, since a message can
+ * interpolate user input (a waitlist email, a query param). The marketing
+ * site has no stack worth sending.
  */
 export function captureWebException(
   error: unknown,
   properties: AnalyticsProperties = {},
 ) {
+  const type = error instanceof Error ? error.name : typeof error;
   captureWebAnalyticsEvent("$exception", {
-    $exception_type: error instanceof Error ? error.name : typeof error,
+    $exception_type: type,
     $exception_level: "error",
+    $exception_list: [
+      {
+        type,
+        value:
+          error instanceof Error
+            ? safeExceptionValue(error.message)
+            : String(error),
+      },
+    ],
     ...properties,
   });
 }

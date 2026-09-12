@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 
+import { readPositiveNumber, readRecord, readString } from "./revenuecat";
+
 export const paymentTelemetryValidator = v.object({
   eventId: v.string(),
   userId: v.string(),
@@ -13,29 +15,9 @@ export const paymentTelemetryValidator = v.object({
 });
 
 // RevenueCat webhook payloads are untyped JSON, so every field passes through
-// a narrow guard before it reaches the telemetry row.
-
-function asRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function nonEmptyString(
-  data: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = data[key];
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-function positiveNumber(
-  data: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = data[key];
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : undefined;
-}
+// the shared guards from model/revenuecat.ts before it reaches the telemetry
+// row. Keeping one copy of the guards prevents the two parsers from
+// drifting apart.
 
 function parseEnvironment(
   value: unknown,
@@ -77,7 +59,7 @@ function classifyPayment(
   ) {
     return;
   }
-  const revenueUsd = positiveNumber(data, "price");
+  const revenueUsd = readPositiveNumber(data.price);
   if (revenueUsd === undefined) return;
   const paymentKind =
     type === "RENEWAL"
@@ -95,13 +77,15 @@ function classifyPayment(
 }
 
 export function parsePaymentTelemetry(body: unknown) {
-  if (!asRecord(body) || !asRecord(body.event)) return;
-  const data: Record<string, unknown> = { ...body.event };
-  const eventId = nonEmptyString(data, "id");
-  const userId = nonEmptyString(data, "app_user_id");
-  const productId = nonEmptyString(data, "product_id");
+  const payload = readRecord(body);
+  const event = readRecord(payload?.event);
+  if (!payload || !event) return;
+  const data: Record<string, unknown> = { ...event };
+  const eventId = readString(data.id);
+  const userId = readString(data.app_user_id);
+  const productId = readString(data.product_id);
   const environment = parseEnvironment(data.environment);
-  const timestamp = positiveNumber(data, "purchased_at_ms");
+  const timestamp = readPositiveNumber(data.purchased_at_ms);
   if (!eventId || !userId || !productId || !environment || !timestamp) return;
   if (data.is_family_share === true) return;
   const paid = classifyPayment(data);

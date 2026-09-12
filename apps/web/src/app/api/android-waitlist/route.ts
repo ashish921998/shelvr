@@ -120,12 +120,17 @@ export async function POST(request: Request) {
       emailProviderSynced: result.emailProviderSynced === true,
     });
   } catch (error) {
-    // Log name and message only (never the error object): our own messages
-    // above carry just a status, and fetch/timeout errors carry no body.
+    // A fixed category, never message text: the upstream status code when our
+    // own error carries one, otherwise the error class name.
+    const statusMatch =
+      error instanceof Error
+        ? error.message.match(/returned (\d{3})/)
+        : undefined;
     serverLog("error", "android_waitlist_failed", {
-      error:
-        error instanceof Error
-          ? `${error.name}: ${error.message}`
+      error_category: statusMatch
+        ? `convex_status_${statusMatch[1]}`
+        : error instanceof Error
+          ? error.name
           : typeof error,
     });
     return NextResponse.json(

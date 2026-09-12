@@ -50,9 +50,6 @@ jobs:
       - name: Dead code
         run: pnpm run knip
 
-      - name: Dependency hygiene
-        run: pnpm run knip:dependencies
-
       - name: Security audit
         run: pnpm run audit
 

@@ -142,15 +142,19 @@ function cardMenuActions({
 
 // The card face: a framed image or video poster when one exists, otherwise
 // the text face (title/note/failure/host), so a failed or text save still
-// renders a usable tile.
+// renders a usable tile. Theme comes from the single useUnistyles call in the
+// card root — one hook instance per row, not three.
+type UnistylesTheme = ReturnType<typeof useUnistyles>["theme"];
+
 function CardMedia({
   item,
   failedLabel,
+  theme,
 }: {
   item: FeedItem;
   failedLabel?: string;
+  theme: UnistylesTheme;
 }) {
-  const { theme } = useUnistyles();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   // Video saves get a 9:16 poster with a play badge and the creator handle.
   const isVideo = item.type === "link" && isTikTokUrl(item.url);
@@ -206,12 +210,13 @@ function CardCaption({
   item,
   captionTitle,
   menuActions,
+  theme,
 }: {
   item: FeedItem;
   captionTitle: string | undefined;
   menuActions: ActionMenuItem[];
+  theme: UnistylesTheme;
 }) {
-  const { theme } = useUnistyles();
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
@@ -248,13 +253,18 @@ function CardCaption({
 }
 
 // One corner slot for the transient states: a spinner while the pipeline
-// runs, a warning once it has failed.
-function CardStatusCorner({ item }: { item: FeedItem }) {
-  const { theme } = useUnistyles();
-  const reducedMotion = useReducedMotion();
-  if (item.status !== "processing" && item.status !== "failed") {
-    return null;
-  }
+// runs, a warning once it has failed. Mounted only for those states (the
+// mount site owns the guard), and both theme and motion come from the card
+// root so a grid of cards registers one hook of each, not a handful.
+function CardStatusCorner({
+  item,
+  theme,
+  reducedMotion,
+}: {
+  item: FeedItem;
+  theme: UnistylesTheme;
+  reducedMotion: boolean;
+}) {
   return (
     <Animated.View
       entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
@@ -275,63 +285,6 @@ function CardStatusCorner({ item }: { item: FeedItem }) {
   );
 }
 
-// iOS long-press context menu; mirrors the in-card ActionMenu.
-function CardLinkMenu({
-  item,
-  isSuggested,
-  accept,
-  dismiss,
-  share,
-  changeSpaces,
-  confirmDelete,
-}: {
-  item: FeedItem;
-  isSuggested: boolean;
-  accept: () => void;
-  dismiss: () => void;
-  share: () => void;
-  changeSpaces: () => void;
-  confirmDelete: () => void;
-}) {
-  if (isSuggested) {
-    return (
-      <>
-        <Link.MenuAction title="Add to space" icon="plus" onPress={accept} />
-        <Link.MenuAction
-          title="Dismiss suggestion"
-          icon="xmark"
-          destructive
-          onPress={dismiss}
-        />
-      </>
-    );
-  }
-  return (
-    <>
-      {item.url ? (
-        <Link.MenuAction
-          title="Share"
-          icon="square.and.arrow.up"
-          onPress={share}
-        />
-      ) : null}
-      {item.status === "ready" ? (
-        <Link.MenuAction
-          title="Change spaces"
-          icon="tray.and.arrow.up"
-          onPress={changeSpaces}
-        />
-      ) : null}
-      <Link.MenuAction
-        title="Delete"
-        icon="trash"
-        destructive
-        onPress={confirmDelete}
-      />
-    </>
-  );
-}
-
 // Memoized: feed rows are the highest-churn surface in the app (every live-query
 // tick and parent re-render touches the list), so skip re-renders when a row's
 // `item` ref is unchanged.
@@ -342,6 +295,9 @@ export const ItemCard = memo(function ItemCard({
   item: FeedItem;
   source?: ItemSource;
 }) {
+  // One theme and one reduced-motion instance per card; subcomponents take
+  // them as props instead of registering their own.
+  const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const router = useRouter();
   const deleteItem = useMutation(api.items.deleteItem);
@@ -441,11 +397,12 @@ export const ItemCard = memo(function ItemCard({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <CardMedia item={item} failedLabel={failedLabel} />
+            <CardMedia item={item} failedLabel={failedLabel} theme={theme} />
             <CardCaption
               item={item}
               captionTitle={captionTitle}
               menuActions={menuActions}
+              theme={theme}
             />
 
             {isSuggested && (
@@ -463,19 +420,59 @@ export const ItemCard = memo(function ItemCard({
               </Animated.View>
             )}
 
-            <CardStatusCorner item={item} />
+            {(item.status === "processing" || item.status === "failed") && (
+              <CardStatusCorner
+                item={item}
+                theme={theme}
+                reducedMotion={reducedMotion}
+              />
+            )}
           </Pressable>
         </Link.Trigger>
         <Link.Preview />
-        <CardLinkMenu
-          item={item}
-          isSuggested={isSuggested}
-          accept={accept}
-          dismiss={dismiss}
-          share={share}
-          changeSpaces={changeSpaces}
-          confirmDelete={confirmDelete}
-        />
+        {/* The iOS long-press context menu. Expo Router walks the Link's
+            direct children by element type, so these must be literal
+            Link.Menu / Link.MenuAction elements here — a component returning
+            them is silently discarded and the menu renders empty. */}
+        <Link.Menu>
+          {isSuggested && (
+            <Link.MenuAction
+              title="Add to space"
+              icon="plus"
+              onPress={accept}
+            />
+          )}
+          {isSuggested && (
+            <Link.MenuAction
+              title="Dismiss suggestion"
+              icon="xmark"
+              destructive
+              onPress={dismiss}
+            />
+          )}
+          {!isSuggested && item.url ? (
+            <Link.MenuAction
+              title="Share"
+              icon="square.and.arrow.up"
+              onPress={share}
+            />
+          ) : null}
+          {!isSuggested && item.status === "ready" ? (
+            <Link.MenuAction
+              title="Change spaces"
+              icon="tray.and.arrow.up"
+              onPress={changeSpaces}
+            />
+          ) : null}
+          {!isSuggested && (
+            <Link.MenuAction
+              title="Delete"
+              icon="trash"
+              destructive
+              onPress={confirmDelete}
+            />
+          )}
+        </Link.Menu>
       </Link>
     </Animated.View>
   );
