@@ -341,12 +341,17 @@ export const getItem = query({
   },
 });
 
-// Search results and similar items feed the same masonry cards as the home
-// feed (and the detail pager, which loads bodies through getItem), so they
-// return the card shape too.
+// Search still returns full rows. Installed builds before the paginated feed
+// read the article body straight off the row a detail page was opened from,
+// and search is the one list they open from that lost it; a result set is
+// capped at 50, so this costs what those builds always paid. Switch to
+// `itemCardValidator` and `toItemCard` together with the removal of the
+// legacy `listItems` above, once the production channel shows no old bundle.
+// The current client accepts either shape (see DetailItem) and paints the
+// body at once when the row already carries it.
 export const searchItems = query({
   args: { query: v.string() },
-  returns: v.array(itemCardValidator),
+  returns: v.array(enrichedItemValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const trimmed = args.query.trim();
@@ -359,10 +364,13 @@ export const searchItems = query({
         q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => toItemCard(ctx, item)));
+    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
   },
 });
 
+// Similar items feed the same masonry cards as the home feed, and a tap on
+// one opens the detail pager with no source list, which loads the body
+// through getItem, so the card shape is enough here.
 // Similar-items v0: lexical overlap, no new infra. Tags carry most of the
 // signal (they're the classifier's own summary), searchText tokens catch the
 // rest. A vector index over real embeddings replaces this in v1.
