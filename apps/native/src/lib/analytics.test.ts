@@ -108,7 +108,10 @@ describe("captureError", () => {
   it("reports the class and stack but never a content-carrying message", () => {
     const error = new TypeError("Value: https://private.example/note text");
     analytics.captureError("share_save_failed", error, { entry_count: 2 });
-    expect(console.error).toHaveBeenCalledWith("share_save_failed", error);
+    // The console log gets the event id only — the raw error carries the
+    // user content that the PostHog path below strips.
+    expect(console.error).toHaveBeenCalledWith("share_save_failed");
+    expect(console.error).not.toHaveBeenCalledWith("share_save_failed", error);
     expect(mock.captureException).toHaveBeenCalledTimes(1);
     const [reported, properties] = mock.captureException.mock.calls[0];
     expect(reported).toBeInstanceOf(Error);

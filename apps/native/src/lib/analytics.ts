@@ -162,7 +162,10 @@ function captureError(
   error: unknown,
   properties: Record<string, string | number | boolean> = {},
 ): void {
-  console.error(event, error);
+  // The event id is the only field here: the raw error's message can carry
+  // user content, so it stays out of the log stream (the PostHog report
+  // below applies the same sanitization).
+  console.error(event);
   if (!posthog) return;
 
   try {
