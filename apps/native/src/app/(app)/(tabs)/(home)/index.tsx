@@ -20,6 +20,15 @@ export default function HomeScreen() {
   const busySaving = useBusySaving(items);
   const cancelSurvey = useCancelSurvey();
 
+  // One element, two slots (empty feed and feed header) — the survey claims
+  // the Home moment when both prompts are eligible.
+  const cancelSurveyCard = cancelSurvey.visible ? (
+    <CancelSurveyCard
+      onSubmit={cancelSurvey.submit}
+      onDismiss={cancelSurvey.dismiss}
+    />
+  ) : null;
+
   if (items === undefined) {
     return (
       <ScreenLoader label="Warming your shelf" />
@@ -34,12 +43,7 @@ export default function HomeScreen() {
           message={'Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it.'}
         />
         {/* A canceller with zero saves is exactly who the survey is for. */}
-        {cancelSurvey.visible ? (
-          <CancelSurveyCard
-            onSubmit={cancelSurvey.submit}
-            onDismiss={cancelSurvey.dismiss}
-          />
-        ) : null}
+        {cancelSurveyCard}
       </View>
     );
   }
@@ -56,17 +60,12 @@ export default function HomeScreen() {
         // header on iOS and the invitation scrolls with the content. The
         // cancel survey claims the slot when both are eligible.
         ListHeaderComponent={
-          cancelSurvey.visible ? (
-            <CancelSurveyCard
-              onSubmit={cancelSurvey.submit}
-              onDismiss={cancelSurvey.dismiss}
-            />
-          ) : feedback.invitationVisible && !busySaving ? (
+          cancelSurveyCard ?? (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
               onSendFeedback={feedback.openFeedbackFromInvitation}
               onDismiss={feedback.dismissInvitation}
             />
-          ) : undefined
+          ) : undefined)
         }
       />
       <ProgressiveBlurHeader />

@@ -107,7 +107,10 @@ vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
 vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
 vi.mock("@/lib/entitlement", () => ({ isPaywallPending: () => mock.paywallPending }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
-vi.mock("@/lib/posthog", () => ({ posthog: mock.posthog }));
+vi.mock("@/lib/posthog", () => ({
+  posthog: mock.posthog,
+  isAnalyticsAvailable: () => !mock.posthog.isDisabled && !mock.posthog.optedOut,
+}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

@@ -419,6 +419,26 @@ export async function presentCustomerCenter(): Promise<boolean> {
 
 export type RestorePurchasesOutcome = 'restored' | 'none' | 'unavailable';
 
+/**
+ * Restore App Store purchases for the signed-in RevenueCat identity. This is a
+ * first-class Profile action so a returning subscriber does not have to infer
+ * that Restore is hidden inside the paywall or Customer Center.
+ */
+export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  if (!(await awaitRcSyncReady())) return 'unavailable';
+
+  const rc = getPurchases();
+  if (!rc) return 'unavailable';
+  try {
+    const customerInfo = await rc.restorePurchases();
+    return Object.keys(customerInfo.entitlements.active).length > 0
+      ? 'restored'
+      : 'none';
+  } catch {
+    return 'unavailable';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Trial cancellation detection (next-visit cancel survey)
 // ---------------------------------------------------------------------------
@@ -443,26 +463,6 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
     );
   } catch {
     return 'unknown';
-  }
-}
-
-/**
- * Restore App Store purchases for the signed-in RevenueCat identity. This is a
- * first-class Profile action so a returning subscriber does not have to infer
- * that Restore is hidden inside the paywall or Customer Center.
- */
-export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
-  if (!(await awaitRcSyncReady())) return 'unavailable';
-
-  const rc = getPurchases();
-  if (!rc) return 'unavailable';
-  try {
-    const customerInfo = await rc.restorePurchases();
-    return Object.keys(customerInfo.entitlements.active).length > 0
-      ? 'restored'
-      : 'none';
-  } catch {
-    return 'unavailable';
   }
 }
 

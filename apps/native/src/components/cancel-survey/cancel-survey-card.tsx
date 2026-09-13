@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+import { InlineCard } from '@/components/ui/inline-card';
 import {
   CANCEL_SURVEY_REASONS,
   type CancelSurveyReason,
@@ -26,14 +27,11 @@ export function CancelSurveyCard({
   onDismiss: () => void;
 }) {
   return (
-    <View style={styles.card} testID="cancel-survey-card">
-      <Text style={styles.title} accessibilityRole="header">
-        What made you cancel?
-      </Text>
-      <Text style={styles.body}>
-        Your trial is still active, but auto-renew is off. One tap helps us
-        understand — it won’t change anything about your subscription.
-      </Text>
+    <InlineCard
+      testID="cancel-survey-card"
+      title="What made you cancel?"
+      body="Your trial is still active, but auto-renew is off. One tap helps us understand — it won’t change anything about your subscription."
+    >
       <View style={styles.options}>
         {CANCEL_SURVEY_REASONS.map((reason) => (
           <Pressable
@@ -58,34 +56,11 @@ export function CancelSurveyCard({
       >
         <Text style={styles.skipText}>Skip</Text>
       </Pressable>
-    </View>
+    </InlineCard>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  card: {
-    alignSelf: 'stretch',
-    borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    padding: theme.gap(2),
-    gap: theme.gap(1),
-    marginHorizontal: theme.gap(2),
-    marginTop: theme.gap(1),
-  },
-  title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  body: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
-  },
   options: {
     gap: theme.gap(1),
     marginTop: theme.gap(0.5),

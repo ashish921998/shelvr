@@ -1,6 +1,6 @@
 import { createMMKV } from 'react-native-mmkv';
 import { analytics, type CancelSurveyReason } from '@/lib/analytics';
-import { posthog } from '@/lib/posthog';
+import { isAnalyticsAvailable } from '@/lib/posthog';
 
 export type { CancelSurveyReason };
 
@@ -109,7 +109,7 @@ export function markCancelSurveySubmitted(userId: string): void {
 
 export const cancelSurveyAnalytics = {
   isAvailable(): boolean {
-    return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;
+    return isAnalyticsAvailable();
   },
 
   shown(): void {

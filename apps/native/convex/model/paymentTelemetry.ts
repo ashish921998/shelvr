@@ -66,21 +66,29 @@ type LifecycleEvent =
   | "trial_expired"
   | "subscription_uncancelled";
 
-/** Map RevenueCat lifecycle webhook types to cancellation telemetry events.
- * `EXPIRATION` only counts for trials (a lapsed unconverted trial); paid
- * expirations are not part of the trial funnel. `UNCANCELLATION` fires for
- * paid subscriptions too, so it keeps a general name and `payment_kind`
- * carries the trial/subscription split. */
-function lifecycleEvent(
+/** Map RevenueCat lifecycle webhook types to their telemetry event and
+ * payment_kind together — they are one decision. `EXPIRATION` only counts
+ * for trials (a lapsed unconverted trial); paid expirations are not part of
+ * the trial funnel. `UNCANCELLATION` fires for paid subscriptions too, so it
+ * keeps a general name and `payment_kind` carries the trial/subscription
+ * split. */
+function lifecyclePayment(
   type: unknown,
   periodType: unknown,
-): LifecycleEvent | undefined {
-  if (type === "CANCELLATION")
+): { event: LifecycleEvent; payment_kind: string } | undefined {
+  if (type === "CANCELLATION") {
     return periodType === "TRIAL"
-      ? "trial_cancelled"
-      : "subscription_cancelled";
-  if (type === "EXPIRATION" && periodType === "TRIAL") return "trial_expired";
-  if (type === "UNCANCELLATION") return "subscription_uncancelled";
+      ? { event: "trial_cancelled", payment_kind: "trial" }
+      : { event: "subscription_cancelled", payment_kind: "subscription" };
+  }
+  if (type === "EXPIRATION" && periodType === "TRIAL") {
+    return { event: "trial_expired", payment_kind: "trial_lapsed" };
+  }
+  if (type === "UNCANCELLATION") {
+    return periodType === "TRIAL"
+      ? { event: "subscription_uncancelled", payment_kind: "trial" }
+      : { event: "subscription_uncancelled", payment_kind: "subscription" };
+  }
   return undefined;
 }
 
@@ -118,7 +126,7 @@ export function parsePaymentTelemetry(body: unknown) {
 
   const storeEnvironment =
     environment === "PRODUCTION" ? ("production" as const) : ("sandbox" as const);
-  const lifecycle = lifecycleEvent(type, period_type);
+  const lifecycle = lifecyclePayment(type, period_type);
 
   // Lifecycle events timestamp the lifecycle moment (`event_timestamp_ms`);
   // purchases keep `purchased_at_ms` per the existing contract.
@@ -132,33 +140,25 @@ export function parsePaymentTelemetry(body: unknown) {
 
   if (lifecycle) {
     const cancelled =
-      lifecycle === "trial_cancelled" || lifecycle === "subscription_cancelled";
+      lifecycle.event === "trial_cancelled" ||
+      lifecycle.event === "subscription_cancelled";
     return {
       eventId: id,
       userId: app_user_id,
-      event: lifecycle,
+      event: lifecycle.event,
       timestamp,
       environment: storeEnvironment,
       product_id,
-      payment_kind:
-        lifecycle === "trial_cancelled"
-          ? "trial"
-          : lifecycle === "trial_expired"
-            ? "trial_lapsed"
-            : lifecycle === "subscription_cancelled"
-              ? "subscription"
-              : period_type === "TRIAL"
-                ? "trial"
-                : "subscription",
+      payment_kind: lifecycle.payment_kind,
       ...(typeof data.country_code === "string"
         ? { country_code: data.country_code }
         : {}),
       ...(cancelled
         ? {
+            cancel_category: cancelCategory(cancel_reason),
             ...(typeof cancel_reason === "string" && cancel_reason
               ? { cancel_reason }
               : {}),
-            cancel_category: cancelCategory(cancel_reason),
           }
         : {}),
     };
