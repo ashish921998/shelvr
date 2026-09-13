@@ -29,9 +29,12 @@ const PAYWALL_RECHECK_MS = 2000;
  * The ask is durably one-per-account (convex/cancelSurvey.ts). The server
  * row is the authority across devices and reinstalls; the hook fails closed
  * and never asks while the row's state is unknown (still loading) or asked.
- * When the row turns asked while the card is up — another device won the
- * same moment — the card comes down and emits no analytics: only the
- * markShown call that consumed the ask may count a `shown`.
+ * When the row turns asked while the card is up, the card comes down as
+ * soon as this device's own markShown verdict confirms it lost the race;
+ * a verdict still in flight holds the card, because the asked flip may be
+ * this device's own insert echoing back through the live query. A losing
+ * card emits no analytics: only the markShown call that consumed the ask
+ * may count a `shown`.
  *
  * The ask is consumed only when the card actually renders (`presented`),
  * never at detection time — closing the app on Home's loading screen leaves
@@ -80,12 +83,15 @@ export function useCancelSurvey(): {
   // The server row is the authority across devices: a second device can
   // still hold the card up from a stale `asked: false` read, and once the
   // detection episode is spent (above) nothing else would clear it. When the
-  // row reports asked and this device did not win the ask, take the card
-  // down. `undefined` (verdict in flight) also loses: without a win to cite,
-  // a card that outlives its premise must not stay up.
+  // row reports asked, take the card down — but only on a known loss. While
+  // this device's verdict is in flight, the asked flip may well be our own
+  // markShown insert propagating through the live query before the mutation
+  // resolves: hiding then would retire the winner's card and strand the
+  // account's one ask. The loser still comes down the moment its own
+  // rejected verdict lands (below).
   useEffect(() => {
     if (surveyStatus === undefined) return;
-    if (surveyStatus.asked && askWon.current !== true) setVisible(false);
+    if (surveyStatus.asked && askWon.current === false) setVisible(false);
   }, [surveyStatus]);
 
   useEffect(() => {
@@ -142,14 +148,23 @@ export function useCancelSurvey(): {
     // verdict arbitrates the cross-device race: only the call that consumed
     // the ask may emit `shown`; a loser (another device got there first)
     // takes its card down and stays silent.
-    void markShown({}).then((result) => {
-      askWon.current = result.accepted;
-      if (result.accepted) {
-        cancelSurveyAnalytics.shown();
-      } else {
+    void markShown({})
+      .then((result) => {
+        askWon.current = result.accepted;
+        if (result.accepted) {
+          cancelSurveyAnalytics.shown();
+        } else {
+          setVisible(false);
+        }
+      })
+      .catch(() => {
+        // A failed verdict never committed (Convex resolves a mutation
+        // exactly once), so the ask is unspent — but this mount cannot cite
+        // a win either. Take the card down; a later mount re-asks while the
+        // row still says unasked.
+        askWon.current = false;
         setVisible(false);
-      }
-    });
+      });
   }, [userId, markShown]);
 
   // One response ever per mount: two rapid taps (or a tap racing dismiss)

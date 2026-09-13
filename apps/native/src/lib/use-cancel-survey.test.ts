@@ -382,7 +382,7 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("hides the card when the status row turns asked while the verdict is in flight", async () => {
+  it("keeps the card up when the row turns asked while our own verdict is in flight, then counts the win", async () => {
     let release!: (value: { accepted: boolean }) => void;
     mock.markShown.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -393,12 +393,40 @@ describe("useCancelSurvey", () => {
     await flush();
     latest().presented();
 
-    // Another device's markShown lands first: the reactive row flips to
-    // asked while our own verdict is still pending — the card's premise is
-    // gone either way and it must come down.
+    // The asked flip can be this device's own markShown insert propagating
+    // through the live query before the mutation's resolution arrives. A
+    // pending claim is not a lost claim: the card must survive until this
+    // device's verdict lands, or the account's one ask is stranded.
     mock.surveyStatus = { asked: true };
     latest();
-    expect(latest().visible).toBe(false);
+    expect(latest().visible).toBe(true);
+
+    release({ accepted: true });
+    await flush();
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
+    ).toHaveLength(1);
+    expect(latest().visible).toBe(true);
+  });
+
+  it("takes the card down when the in-flight verdict comes back rejected", async () => {
+    let release!: (value: { accepted: boolean }) => void;
+    mock.markShown.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().presented();
+
+    // Same asked flip as above, but this device lost the race. Pending
+    // keeps the card; the rejected verdict is what retires it — silently.
+    mock.surveyStatus = { asked: true };
+    latest();
+    expect(latest().visible).toBe(true);
 
     release({ accepted: false });
     await flush();
@@ -408,6 +436,23 @@ describe("useCancelSurvey", () => {
       ),
     ).toHaveLength(0);
     expect(latest().visible).toBe(false);
+  });
+
+  it("takes the card down when the markShown verdict fails outright", async () => {
+    mock.markShown.mockRejectedValueOnce(new Error("convex unavailable"));
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().presented();
+    await flush();
+
+    // A failed verdict never committed, so the ask is unspent — but this
+    // mount cannot cite a win. Fail closed and let a later mount re-ask.
+    expect(latest().visible).toBe(false);
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
+    ).toHaveLength(0);
   });
 
   it("double-tapping a reason submits exactly once", async () => {
