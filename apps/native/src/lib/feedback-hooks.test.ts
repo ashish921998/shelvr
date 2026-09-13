@@ -231,6 +231,21 @@ describe("useFeedbackInvitation", () => {
     expect(readInvitationState("user-1").shownCount).toBe(1);
   });
 
+  it("defers its one-shot claim while the cancel survey owns the Home moment", () => {
+    const items = threeReady();
+    react.mount(() => useFeedbackInvitation(items, { defer: true }));
+
+    // Long past the settle delay — no claim, no shown event, no gate burn.
+    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
+    expect(react.rerender<Result>().invitationVisible).toBe(false);
+    expect(readInvitationState("user-1").shownCount).toBe(0);
+    expect(mock.capture).not.toHaveBeenCalledWith(
+      "feedback_invitation_shown",
+      expect.anything(),
+    );
+  });
+
   it("clears the paywall poll on unmount", () => {
     const items = threeReady();
     mock.paywallPending = true;

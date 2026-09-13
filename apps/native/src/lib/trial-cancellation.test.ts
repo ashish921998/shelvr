@@ -40,6 +40,14 @@ describe('classifyTrialCancellation', () => {
     ).toBe('cancelled');
   });
 
+  it('is order-independent with several trials: any cancelled trial wins', () => {
+    const renewing = entitlement({ periodType: 'TRIAL', willRenew: true });
+    const cancelled = entitlement({ periodType: 'TRIAL', willRenew: false });
+    expect(classifyTrialCancellation([renewing, cancelled])).toBe('cancelled');
+    expect(classifyTrialCancellation([cancelled, renewing])).toBe('cancelled');
+    expect(classifyTrialCancellation([renewing, entitlement({ periodType: 'TRIAL', willRenew: true })])).toBe('none');
+  });
+
   it('treats unfamiliar period types as non-trials', () => {
     expect(
       classifyTrialCancellation([

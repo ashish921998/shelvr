@@ -55,7 +55,11 @@ const CANCEL_CATEGORIES: Record<string, CancelCategory> = {
 };
 
 function cancelCategory(reason: unknown): CancelCategory {
-  return typeof reason === "string" && reason in CANCEL_CATEGORIES
+  // Object.hasOwn, not `in`: a crafted `cancel_reason` like "constructor"
+  // would pass `in` (inherited property) and leak the inherited value as
+  // the category — which the enqueue validator would then reject, dropping
+  // the entire webhook event. Own-property check falls back to `unknown`.
+  return typeof reason === "string" && Object.hasOwn(CANCEL_CATEGORIES, reason)
     ? CANCEL_CATEGORIES[reason]
     : "unknown";
 }

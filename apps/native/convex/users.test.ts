@@ -129,6 +129,18 @@ describe("deleteCurrentUserAccount", () => {
       ).not.toBeNull();
     });
 
+    // The one-time cancel-survey ask row is user-owned state; it must drain
+    // with the account too.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("cancelSurveys", {
+        userId,
+        askedAt: 1700000000000,
+        outcome: "submitted",
+        reason: "too_expensive",
+        respondedAt: 1700000000001,
+      });
+    });
+
     await t.mutation(api.users.deleteCurrentUserAccount, {});
 
     await t.run(async (ctx) => {

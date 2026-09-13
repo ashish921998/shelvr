@@ -16,9 +16,13 @@ export default function HomeScreen() {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   useReviewPrompt(items);
 
-  const feedback = useFeedbackInvitation(items);
-  const busySaving = useBusySaving(items);
   const cancelSurvey = useCancelSurvey();
+  // The cancel survey owns the Home moment when visible; defer the feedback
+  // invitation's one-shot claim so it is never consumed behind the card.
+  const feedback = useFeedbackInvitation(items, {
+    defer: cancelSurvey.visible,
+  });
+  const busySaving = useBusySaving(items);
 
   // One element, two slots (empty feed and feed header) — the survey claims
   // the Home moment when both prompts are eligible.

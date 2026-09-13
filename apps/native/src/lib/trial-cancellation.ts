@@ -27,9 +27,12 @@ export type TrialCancellationState =
 export function classifyTrialCancellation(
   activeEntitlements: { periodType: string; willRenew: boolean }[],
 ): TrialCancellationState {
-  const trial = activeEntitlements.find(
-    (entitlement) => entitlement.periodType === 'TRIAL',
+  // Any non-renewing trial means cancelled-in-window. Today the app has a
+  // single entitlement so there is exactly one trial at most, but if RC
+  // ever reports several active trials, a cancelled one must not be masked
+  // by a renewing one (order-independent by construction).
+  const cancelledTrial = activeEntitlements.some(
+    (entitlement) => entitlement.periodType === 'TRIAL' && !entitlement.willRenew,
   );
-  if (!trial) return 'none';
-  return trial.willRenew ? 'none' : 'cancelled';
+  return cancelledTrial ? 'cancelled' : 'none';
 }

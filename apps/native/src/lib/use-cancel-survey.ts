@@ -7,8 +7,12 @@ import { useMutation } from 'convex/react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/current-user';
 import { isHomeRootRoute } from '@/lib/feedback';
-import { readRcTrialCancellation } from '@/lib/entitlement';
+import { isPaywallPending, readRcTrialCancellation } from '@/lib/entitlement';
 import { cancelSurveyAnalytics, type CancelSurveyReason } from '@/lib/cancel-survey';
+
+/** Poll interval while a paywall sheet has the moment (feedback-invitation
+ * uses the same cadence). */
+const PAYWALL_RECHECK_MS = 2000;
 
 /**
  * Drives the next-visit cancel survey card.
@@ -69,13 +73,21 @@ export function useCancelSurvey(): {
     // Wait for the server gate without spending the episode: when it lands,
     // this effect re-runs and the check proceeds.
     if (surveyStatus === undefined) return;
-    episodeChecked.current = true;
     if (!cancelSurveyAnalytics.isAvailable()) return;
+    episodeChecked.current = true;
 
     let cancelled = false;
-    void (async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = async () => {
       const state = await readRcTrialCancellation();
       if (cancelled) return;
+      // Never compete with a paywall sheet for the moment — including one
+      // that opened during the read. Poll until it clears rather than
+      // spending the ask under a sheet (feedback-invitation's discipline).
+      if (isPaywallPending()) {
+        timer = setTimeout(() => void attempt(), PAYWALL_RECHECK_MS);
+        return;
+      }
       if (state === 'cancelled' && !surveyStatus.asked) {
         setVisible(true);
       } else if (state === 'none') {
@@ -83,23 +95,36 @@ export function useCancelSurvey(): {
         setVisible(false);
       }
       // `unknown` leaves everything as-is; the next episode retries.
-    })();
+    };
+    void attempt();
     return () => {
       cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [home, appState, userId, surveyStatus]);
 
+  // The ask is presented once per user per mount: a remount of the card
+  // (feed refresh, empty-feed ↔ feed branch switch) must not emit a second
+  // `cancel_survey_shown` — the server markShown is idempotent, analytics
+  // is not.
+  const presentedFor = useRef<string | null>(null);
   const presented = useCallback(() => {
-    if (!userId) return;
+    if (!userId || presentedFor.current === userId) return;
+    presentedFor.current = userId;
     // Only now is the ask spent — the card is on screen. Fire-and-forget:
     // the Convex client queues and retries the mutation if offline.
     cancelSurveyAnalytics.shown();
     void markShown({});
   }, [userId, markShown]);
 
+  // One response ever per mount: two rapid taps (or a tap racing dismiss)
+  // must not emit duplicate `cancel_survey_submitted` events — the server
+  // keeps only the first outcome, so analytics must match it.
+  const responded = useRef(false);
   const submit = useCallback(
     (reason: CancelSurveyReason) => {
-      if (!userId) return;
+      if (!userId || responded.current) return;
+      responded.current = true;
       cancelSurveyAnalytics.submitted(reason);
       void respond({ outcome: 'submitted', reason });
       setVisible(false);
@@ -108,7 +133,8 @@ export function useCancelSurvey(): {
   );
 
   const dismiss = useCallback(() => {
-    if (!userId) return;
+    if (!userId || responded.current) return;
+    responded.current = true;
     cancelSurveyAnalytics.dismissed();
     void respond({ outcome: 'dismissed' });
     setVisible(false);

@@ -403,6 +403,21 @@ describe("cancellation lifecycle telemetry", () => {
     expect(parsed).not.toHaveProperty("cancel_reason");
   });
 
+  it("maps inherited-property reasons like 'constructor' to unknown instead of poisoning the event", () => {
+    // `in` would pass (inherited from Object.prototype) and surface the
+    // constructor function as cancel_category, which the enqueue validator
+    // would reject — dropping the whole webhook event. Own-property check
+    // must fall back to unknown.
+    const parsed = parsePaymentTelemetry({
+      event: { ...lifecycle, cancel_reason: "constructor" },
+    });
+    expect(parsed).toMatchObject({
+      event: "trial_cancelled",
+      cancel_category: "unknown",
+      cancel_reason: "constructor",
+    });
+  });
+
   it("emits subscription_cancelled for non-trial cancellations", () => {
     expect(
       parsePaymentTelemetry({

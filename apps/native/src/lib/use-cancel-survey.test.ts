@@ -92,6 +92,7 @@ const mock = vi.hoisted(() => ({
   user: { _id: "user-1" } as { _id: string } | null | undefined,
   rcState: "cancelled" as "cancelled" | "none" | "unknown",
   surveyStatus: { asked: false } as { asked: boolean } | undefined,
+  paywallPending: false,
   markShown: vi.fn(),
   respond: vi.fn(),
   capture: vi.fn(),
@@ -113,6 +114,7 @@ vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
 vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
 vi.mock("@/lib/entitlement", () => ({
   readRcTrialCancellation: vi.fn(async () => mock.rcState),
+  isPaywallPending: () => mock.paywallPending,
 }));
 vi.mock("@/lib/feedback", () => ({ isHomeRootRoute: () => mock.segments[2] === "(home)" }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
@@ -152,16 +154,24 @@ const roundTrip = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Fake only the retry timer (2s paywall poll); setImmediate-based flush
+  // and promise microtasks stay real so async detection resolves normally.
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   mock.appState = "active";
   mock.appStateListeners = [];
   mock.segments = ["(app)", "(tabs)", "(home)"];
   mock.user = { _id: "user-1" };
   mock.rcState = "cancelled";
   mock.surveyStatus = { asked: false };
+  mock.paywallPending = false;
   mock.mutationCalls = 0;
 });
 
-afterEach(() => react.unmount());
+afterEach(() => {
+  vi.runAllTimers();
+  vi.useRealTimers();
+  react.unmount();
+});
 
 describe("useCancelSurvey", () => {
   it("shows the card when RevenueCat reports a cancelled trial and the ask is unspent", async () => {
@@ -237,7 +247,7 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("submit and dismiss record the outcome server-side and close the card", async () => {
+  it("submit records the outcome server-side and closes the card", async () => {
     react.mount(() => useCancelSurvey());
     await flush();
     latest().submit("too_expensive");
@@ -250,9 +260,68 @@ describe("useCancelSurvey", () => {
       survey_source: "next_visit_card",
     });
     expect(latest().visible).toBe(false);
+  });
 
+  it("dismiss records the outcome server-side and closes the card", async () => {
+    react.mount(() => useCancelSurvey());
+    await flush();
     latest().dismiss();
     expect(mock.respond).toHaveBeenCalledWith({ outcome: "dismissed" });
     expect(latest().visible).toBe(false);
+  });
+
+  it("waits out a paywall sheet instead of spending the ask under it", async () => {
+    mock.paywallPending = true;
+    react.mount(() => useCancelSurvey());
+    await flush(); // read resolves, sees the sheet, schedules a retry
+    expect(latest().visible).toBe(false);
+    expect(mock.markShown).not.toHaveBeenCalled();
+
+    mock.paywallPending = false; // the sheet closes
+    vi.advanceTimersByTime(2000);
+    await flush();
+
+    expect(latest().visible).toBe(true);
+  });
+
+  it("emits shown once per ask even when the card remounts", async () => {
+    react.mount(() => useCancelSurvey());
+    await flush();
+    const survey = latest();
+    survey.presented(); // e.g. empty-feed → feed branch switch remounts it
+    survey.presented();
+
+    expect(mock.markShown).toHaveBeenCalledTimes(1);
+    expect(
+      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_shown"),
+    ).toHaveLength(1);
+  });
+
+  it("double-tapping a reason submits exactly once", async () => {
+    react.mount(() => useCancelSurvey());
+    await flush();
+    const survey = latest();
+    survey.submit("too_expensive");
+    survey.submit("other"); // second tap lands before the re-render hides the card
+
+    expect(mock.respond).toHaveBeenCalledTimes(1);
+    expect(
+      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted"),
+    ).toHaveLength(1);
+    expect(latest().visible).toBe(false);
+  });
+
+  it("ignores a dismiss racing a submit", async () => {
+    react.mount(() => useCancelSurvey());
+    await flush();
+    const survey = latest();
+    survey.submit("too_expensive");
+    survey.dismiss();
+
+    expect(mock.respond).toHaveBeenCalledTimes(1);
+    expect(mock.respond).toHaveBeenCalledWith({
+      outcome: "submitted",
+      reason: "too_expensive",
+    });
   });
 });
