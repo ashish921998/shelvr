@@ -103,6 +103,7 @@ function AndroidAddHeader({
           <AnimatedText
             text={title}
             width={titleWidth}
+            truncate
             height={44}
             style={styles.androidHeaderTitle}
           />
@@ -291,7 +292,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
           between "Save something" / "New note" / "Save an article". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
-          <AnimatedText text={title} style={styles.heading} />
+          <AnimatedText text={title} style={styles.heading} truncate />
         </Stack.Title>
       ) : null}
       {Platform.OS === "android" ? (

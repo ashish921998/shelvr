@@ -273,3 +273,8 @@ it("refreshes loaded map fallback titles without changing saved titles", async (
   expect(screen.queryByText("Saved photo")).toBeNull();
   expect(screen.getByText("My own title")).toBeTruthy();
 });
+
+it("keeps long header glyphs inside the available title width", () => {
+  render(<AnimatedText text="Long header" width={40} truncate />);
+  expect(screen.getByTestId("canvas").textContent).toBe("Lon…");
+});
