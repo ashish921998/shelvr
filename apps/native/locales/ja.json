@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvrはカメラを使って、あとで見たいものを撮影します。",
+    "NSPhotoLibraryUsageDescription": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
+    "NSCalendarsUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。",
+    "NSCalendarsFullAccessUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。"
+  }
+}

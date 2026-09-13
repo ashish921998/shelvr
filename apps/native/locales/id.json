@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr menggunakan kamera agar Anda dapat memotret hal yang ingin disimpan untuk nanti.",
+    "NSPhotoLibraryUsageDescription": "Shelvr memungkinkan Anda menyimpan foto dan tangkapan layar dari koleksi ke pusat simpanan serta merapikan koleksi foto.",
+    "NSCalendarsUsageDescription": "Shelvr menambahkan acara ke kalender dari hal yang Anda simpan.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr menambahkan acara ke kalender dari hal yang Anda simpan."
+  }
+}

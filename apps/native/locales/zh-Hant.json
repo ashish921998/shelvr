@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr使用相機，讓你拍下想留待以後檢視的內容。",
+    "NSPhotoLibraryUsageDescription": "Shelvr讓你將相簿中的照片和截圖儲存到收藏中心，並整理照片相簿。",
+    "NSCalendarsUsageDescription": "Shelvr根據你儲存的內容向日歷新增日程。",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr根據你儲存的內容向日歷新增日程。"
+  }
+}

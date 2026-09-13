@@ -1,3 +1,4 @@
+import { needsNativeText } from "@/lib/text-shaping";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Text as RNText,
@@ -197,7 +198,7 @@ export function AnimatedText({
   const [cells, setCells] = useState<Cell[]>([]);
 
   useEffect(() => {
-    if (!font) return;
+    if (!font || needsNativeText(text)) return;
 
     let displayText = text;
     if (truncate) {
@@ -262,11 +263,14 @@ export function AnimatedText({
     [],
   );
 
-  // Until the Skia font loads, fall back to plain text so the title still shows.
-  if (!font) {
+  // Native text shapes joined scripts, bidi, combining marks and emoji as runs.
+  if (!font || needsNativeText(text)) {
     return (
       <View style={[styles.container, containerStyle]}>
-        <RNText style={style} numberOfLines={truncate ? 1 : undefined}>
+        <RNText
+          style={[style, { maxWidth: width, fontFamily: undefined }]}
+          numberOfLines={truncate ? 1 : undefined}
+        >
           {text}
         </RNText>
       </View>

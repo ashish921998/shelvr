@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "પછી માટે સાચવવાની વસ્તુઓ કૅપ્ચર કરી શકો તે માટે Shelvr કૅમેરા વાપરે છે.",
+    "NSPhotoLibraryUsageDescription": "Shelvr તમને લાઇબ્રેરીના ફોટા અને સ્ક્રીનશૉટ તમારા કેન્દ્રમાં સાચવવા તથા ફોટો લાઇબ્રેરી ગોઠવવા દે છે.",
+    "NSCalendarsUsageDescription": "Shelvr તમારી સાચવેલી વસ્તુઓમાંથી કૅલેન્ડરમાં પ્રસંગો ઉમેરે છે.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr તમારી સાચવેલી વસ્તુઓમાંથી કૅલેન્ડરમાં પ્રસંગો ઉમેરે છે."
+  }
+}

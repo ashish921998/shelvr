@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 /**
  * Paywall fallback screen. In production, the paywall is presented natively by
  * RevenueCat's `presentPaywall()` SDK (designed in the RevenueCat dashboard).
@@ -17,14 +18,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
 export default function PaywallScreen() {
+  useAppLocale();
   const router = useRouter();
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <Text style={styles.title}>Shelvr Pro</Text>
       <Text style={styles.message}>
-        We couldn’t load subscription options right now. Check your connection
-        and try again. If you already purchased Pro, restore after the paywall
-        loads, or manage your plan in Profile.
+        {t(
+          "We couldn’t load subscription options right now. Check your connection and try again. If you already purchased Pro, restore after the paywall loads, or manage your plan in Profile.",
+        )}
       </Text>
       <Pressable
         style={({ pressed }) => [styles.button, pressed && { opacity: 0.8 }]}
@@ -39,27 +41,27 @@ export default function PaywallScreen() {
           })();
         }}
       >
-        <Text style={styles.buttonText}>Try again</Text>
+        <Text style={styles.buttonText}>{t("Try again")}</Text>
       </Pressable>
       <Pressable
         style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
         onPress={() => router.back()}
       >
-        <Text style={styles.secondaryText}>Not now</Text>
+        <Text style={styles.secondaryText}>{t("Not now")}</Text>
       </Pressable>
       <Text style={styles.legal}>
         <Text
           style={styles.legalLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
         >
-          Terms
+          {t("Terms")}
         </Text>
         {" · "}
         <Text
           style={styles.legalLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
         >
-          Privacy
+          {t("Privacy")}
         </Text>
       </Text>
     </SafeAreaView>

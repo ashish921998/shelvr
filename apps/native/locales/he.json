@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr משתמש במצלמה כדי לצלם דברים שברצונך לשמור לאחר כך.",
+    "NSPhotoLibraryUsageDescription": "Shelvr מאפשר לשמור תמונות וצילומי מסך מהספרייה במרכז שלך, ולסדר את ספריית התמונות.",
+    "NSCalendarsUsageDescription": "Shelvr מוסיף אירועים ליומן מתוך דברים ששמרת.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr מוסיף אירועים ליומן מתוך דברים ששמרת."
+  }
+}

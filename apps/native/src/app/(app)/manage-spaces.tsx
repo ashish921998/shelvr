@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -21,6 +22,7 @@ import { analytics } from "@/lib/analytics";
 // Per-space membership toggles for one item. Every write here is the user's
 // hand — `saved` rows only; flipping a space on also overrides a dismissal.
 export default function ManageSpacesScreen() {
+  useAppLocale();
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const id = itemId as Id<"items">;
 
@@ -104,8 +106,8 @@ export default function ManageSpacesScreen() {
         return { itemId: id, values };
       });
       Alert.alert(
-        "Couldn't change space",
-        "Your previous choice is still saved. Please try again.",
+        t("Couldn't change space"),
+        t("Your previous choice is still saved. Please try again."),
       );
     } finally {
       busyRef.current = false;
@@ -124,20 +126,25 @@ export default function ManageSpacesScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>Spaces</Text>
-      <Text style={styles.subheading}>Choose where this save lives.</Text>
+      <Text style={styles.heading}>{t("Spaces")}</Text>
       <Text style={styles.subheading}>
-        Removed saves stay out of that Space unless you add them again.
+        {t("Choose where this save lives.")}
+      </Text>
+      <Text style={styles.subheading}>
+        {t("Removed saves stay out of that Space unless you add them again.")}
       </Text>
 
       {lastChange?.itemId === id ? (
         <View style={styles.undoRow} accessibilityLiveRegion="polite">
           <Text style={styles.rowLabel}>
-            {lastChange.added ? "Added to" : "Removed from"} {lastChange.name}
+            {t(
+              lastChange.added ? "Added to %{space}" : "Removed from %{space}",
+              { space: lastChange.name },
+            )}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Undo space change"
+            accessibilityLabel={t("Undo space change")}
             accessibilityState={{ disabled: busy }}
             disabled={busy}
             style={styles.undoButton}
@@ -145,7 +152,7 @@ export default function ManageSpacesScreen() {
               void toggle(lastChange.spaceId, !lastChange.added, true)
             }
           >
-            <Text style={styles.undoText}>Undo</Text>
+            <Text style={styles.undoText}>{t("Undo")}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -153,10 +160,13 @@ export default function ManageSpacesScreen() {
       {loading ? (
         <ActivityIndicator style={styles.spinner} />
       ) : item === null ? (
-        <EmptyState title="Unavailable" message="This save is unavailable." />
+        <EmptyState
+          title={t("Unavailable")}
+          message={t("This save is unavailable.")}
+        />
       ) : spaces.length === 0 ? (
         <Text style={styles.empty}>
-          No spaces yet — create one from the Spaces tab.
+          {t("No spaces yet — create one from the Spaces tab.")}
         </Text>
       ) : (
         <View style={styles.list}>

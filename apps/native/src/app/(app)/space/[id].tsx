@@ -1,29 +1,34 @@
-import { EmptyState } from '@/components/empty-state';
-import { HeaderActionMenu, HeaderIconButton } from '@/components/ui/header-icon-button';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import type { FeedItem } from '@/components/item-card';
-import { MasonryFeed } from '@/components/masonry-feed';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import { ProgressiveBlurHeader } from 'progressive-blur';
-import { useMemo } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
+import { t, useAppLocale } from "@/lib/i18n";
+import { EmptyState } from "@/components/empty-state";
+import {
+  HeaderActionMenu,
+  HeaderIconButton,
+} from "@/components/ui/header-icon-button";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import type { FeedItem } from "@/components/item-card";
+import { MasonryFeed } from "@/components/masonry-feed";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import * as Haptics from "expo-haptics";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import { ProgressiveBlurHeader } from "progressive-blur";
+import { useMemo } from "react";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
 
 export default function SpaceScreen() {
+  useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
-    convexQuery(api.spaces.getSpace, { id: id as Id<'spaces'> }),
+    convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
@@ -41,42 +46,47 @@ export default function SpaceScreen() {
 
   // `undefined` = loading (nothing cached yet); `null` = not found.
   if (space === undefined) {
-    return (
-      <ScreenLoader label="Opening space" />
-    );
+    return <ScreenLoader label={t("Opening space")} />;
   }
 
   if (space === null) {
     return (
       <View style={styles.loading}>
-        <EmptyState title="Gone" message="This space no longer exists." />
+        <EmptyState
+          title={t("Gone")}
+          message={t("This space no longer exists.")}
+        />
       </View>
     );
   }
 
   const confirmDelete = () => {
-    Alert.alert('Delete space?', 'Your saves stay in Home — only the shelf goes away.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          router.back();
-          await deleteSpace({ id: space._id });
-          analytics.capture('space_deleted');
+    Alert.alert(
+      t("Delete space?"),
+      t("Your saves stay in Home — only the shelf goes away."),
+      [
+        { text: t("Cancel"), style: "cancel" },
+        {
+          text: t("Delete"),
+          style: "destructive",
+          onPress: async () => {
+            router.back();
+            await deleteSpace({ id: space._id });
+            analytics.capture("space_deleted");
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const addAll = () => {
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     acceptAllSuggestions({ spaceId: space._id })
       .then((count) => {
         if (count > 0) {
-          analytics.capture('space_suggestions_accepted', {
+          analytics.capture("space_suggestions_accepted", {
             suggestion_count: count,
           });
         }
@@ -89,36 +99,56 @@ export default function SpaceScreen() {
   return (
     <>
       <Stack.Screen
-        options={Platform.OS === 'android' ? {
-          title: space.name,
-          headerTransparent: false,
-          headerStyle: { backgroundColor: theme.colors.background },
-          headerTitleAlign: 'center',
-          headerTitleStyle: {
-            fontFamily: theme.fonts.display,
-            color: theme.colors.foreground,
-          },
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <HeaderIconButton
-                icon="plus"
-                label="Add to space"
-                onPress={() => router.push({ pathname: '/add', params: { spaceId: id } })}
-              />
-              <HeaderActionMenu
-                icon="ellipsis"
-                label="Space actions"
-                title={space.name}
-                actions={[
-                  { label: 'Edit space', onPress: () => router.push({ pathname: '/new-space', params: { id } }) },
-                  { label: 'Delete space', destructive: true, onPress: confirmDelete },
-                ]}
-              />
-            </View>
-          ),
-        } : undefined}
+        options={
+          Platform.OS === "android"
+            ? {
+                title: space.name,
+                headerTransparent: false,
+                headerStyle: { backgroundColor: theme.colors.background },
+                headerTitleAlign: "center",
+                headerTitleStyle: {
+                  fontFamily: theme.fonts.display,
+                  color: theme.colors.foreground,
+                },
+                headerRight: () => (
+                  <View style={styles.headerActions}>
+                    <HeaderIconButton
+                      icon="plus"
+                      label={t("Add to space")}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/add",
+                          params: { spaceId: id },
+                        })
+                      }
+                    />
+                    <HeaderActionMenu
+                      icon="ellipsis"
+                      label={t("Space actions")}
+                      title={space.name}
+                      actions={[
+                        {
+                          label: t("Edit space"),
+                          onPress: () =>
+                            router.push({
+                              pathname: "/new-space",
+                              params: { id },
+                            }),
+                        },
+                        {
+                          label: t("Delete space"),
+                          destructive: true,
+                          onPress: confirmDelete,
+                        },
+                      ]}
+                    />
+                  </View>
+                ),
+              }
+            : undefined
+        }
       />
-      {Platform.OS === 'ios' ? (
+      {Platform.OS === "ios" ? (
         <Stack.Title
           style={{
             fontFamily: theme.fonts.display,
@@ -128,37 +158,47 @@ export default function SpaceScreen() {
           {space.name}
         </Stack.Title>
       ) : null}
-      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon="plus"
-          tintColor={theme.colors.foreground}
-          onPress={() =>
-            router.push({ pathname: '/add', params: { spaceId: id } })
-          }
-        >
-          Add
-        </Stack.Toolbar.Button>
-        <Stack.Toolbar.Menu icon="ellipsis">
-          <Stack.Toolbar.MenuAction
-            icon="pencil"
+      {Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="plus"
+            tintColor={theme.colors.foreground}
             onPress={() =>
-              router.push({ pathname: '/new-space', params: { id } })
+              router.push({ pathname: "/add", params: { spaceId: id } })
             }
           >
-            Edit space
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction icon="trash" destructive onPress={confirmDelete}>
-            Delete space
-          </Stack.Toolbar.MenuAction>
-        </Stack.Toolbar.Menu>
-      </Stack.Toolbar> : null}
+            {t("Add")}
+          </Stack.Toolbar.Button>
+          <Stack.Toolbar.Menu icon="ellipsis">
+            <Stack.Toolbar.MenuAction
+              icon="pencil"
+              onPress={() =>
+                router.push({ pathname: "/new-space", params: { id } })
+              }
+            >
+              {t("Edit space")}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={confirmDelete}
+            >
+              {t("Delete space")}
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      ) : null}
       <View
-        testID={space.fixtureKey ? `fixture-space-detail-${space.fixtureKey}` : undefined}
+        testID={
+          space.fixtureKey
+            ? `fixture-space-detail-${space.fixtureKey}`
+            : undefined
+        }
         style={styles.container}
       >
         <MasonryFeed
           items={feedItems}
-          source={{ from: 'space', spaceId: id }}
+          source={{ from: "space", spaceId: id }}
           firstItemZoomTarget
           ListHeaderComponent={
             suggestionCount > 0 ? (
@@ -167,30 +207,34 @@ export default function SpaceScreen() {
                 exiting={FadeOut.duration(200)}
                 style={styles.suggestionsPill}
               >
-                <AppSymbolIcon name="sparkles" size={14} tintColor={theme.colors.primaryText} />
+                <AppSymbolIcon
+                  name="sparkles"
+                  size={14}
+                  tintColor={theme.colors.primaryText}
+                />
                 <Text style={styles.suggestionsText}>
-                  {suggestionCount === 1
-                    ? '1 suggestion'
-                    : `${suggestionCount} suggestions`}
+                  {t("Suggestions: %{count}", { count: suggestionCount })}
                 </Text>
                 <Pressable
                   onPress={addAll}
                   hitSlop={8}
                   style={({ pressed }) => pressed && { opacity: 0.7 }}
                 >
-                  <Text style={styles.addAllText}>Add all</Text>
+                  <Text style={styles.addAllText}>{t("Add all")}</Text>
                 </Pressable>
               </Animated.View>
             ) : undefined
           }
           ListEmptyComponent={
             <EmptyState
-              title="Nothing here yet"
-              message={'Shelvr is looking for saves that fit this space —\nor add your own with the + above.'}
+              title={t("Nothing here yet")}
+              message={t(
+                "Shelvr is looking for saves that fit this space —\nor add your own with the + above.",
+              )}
             />
           }
         />
-        {Platform.OS === 'ios' ? <ProgressiveBlurHeader /> : null}
+        {Platform.OS === "ios" ? <ProgressiveBlurHeader /> : null}
       </View>
     </>
   );
@@ -201,20 +245,20 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.gap(1),
   },
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
   suggestionsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1),
-    alignSelf: 'center',
+    alignSelf: "center",
     backgroundColor: theme.colors.primarySoft,
     borderRadius: 50,
     paddingVertical: theme.gap(1),
@@ -231,6 +275,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 13,
     color: theme.colors.primaryText,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
 }));

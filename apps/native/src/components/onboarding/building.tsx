@@ -1,16 +1,22 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Step 5 — the "preparing your shelf" beat. This is deliberately a visual
 // interstitial only. Persistence happens after onboarding through the durable,
 // idempotent replay path so a failed request cannot silently lose a space.
 const MIN_DURATION_MS = 1800;
 
-const ROTATING_LINES = ['Warming the shelves', 'Teaching Shelvr your taste', 'Sorting your saves'];
+const ROTATING_LINES = [
+  "Warming the shelves",
+  "Teaching Shelvr your taste",
+  "Sorting your saves",
+];
 
 export function BuildingStep({ onDone }: { onDone: () => void }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const [line, setLine] = useState(ROTATING_LINES[0]);
 
@@ -38,7 +44,7 @@ export function BuildingStep({ onDone }: { onDone: () => void }) {
     <View style={styles.wrap}>
       <Animated.View entering={FadeIn.duration(300)} style={styles.center}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.line}>{line}…</Text>
+        <Text style={styles.line}>{t(line)}…</Text>
       </Animated.View>
     </View>
   );
@@ -47,11 +53,11 @@ export function BuildingStep({ onDone }: { onDone: () => void }) {
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   center: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: theme.gap(2),
   },
   line: {

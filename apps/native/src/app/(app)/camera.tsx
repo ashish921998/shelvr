@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { parseExifDate } from "@/lib/date";
 import { resolvePickedImageLocation } from "@/lib/picked-image-location";
 import {
@@ -38,6 +39,7 @@ const ACCENT = "#e6a23c";
 const INACTIVE = "rgba(255,255,255,0.55)";
 
 export default function CameraScreen() {
+  useAppLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   // Opened from a space's add flow: captures are pre-pinned to that space.
@@ -106,11 +108,14 @@ export default function CameraScreen() {
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        "Could not save all images",
-        `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
+        t("Could not save all images"),
+        t("%{saved} of %{total} saved. Retry the failed images?", {
+          saved: savedCount,
+          total: results.length,
+        }),
         [
           {
-            text: "Retry failed",
+            text: t("Retry failed"),
             onPress: () => {
               void runImageRequests(
                 failed.map((r) => ({
@@ -120,12 +125,12 @@ export default function CameraScreen() {
               );
             },
           },
-          { text: "Done", onPress: () => router.back() },
+          { text: t("Done"), onPress: () => router.back() },
         ],
       );
       setBusy(false);
     } catch {
-      Alert.alert("Could not save", "Uploading failed. Try again.");
+      Alert.alert(t("Could not save"), t("Uploading failed. Try again."));
       setBusy(false);
     }
   };
@@ -172,18 +177,25 @@ export default function CameraScreen() {
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
-      Alert.alert("Capture failed", `${result.message} Try again.`, [
-        {
-          text: "Retry",
-          onPress: () => {
-            void saveSingle(failed);
+      Alert.alert(
+        t("Capture failed"),
+        t("Could not save that photo. Try again."),
+        [
+          {
+            text: t("Retry"),
+            onPress: () => {
+              void saveSingle(failed);
+            },
           },
-        },
-        { text: "Cancel", onPress: () => setBusy(false) },
-      ]);
+          { text: t("Cancel"), onPress: () => setBusy(false) },
+        ],
+      );
       setBusy(false);
     } catch {
-      Alert.alert("Capture failed", "Could not save that photo. Try again.");
+      Alert.alert(
+        t("Capture failed"),
+        t("Could not save that photo. Try again."),
+      );
       setBusy(false);
     }
   };
@@ -203,8 +215,8 @@ export default function CameraScreen() {
         const sticker = await liftSubject(uri);
         if (!sticker.hasSubject) {
           Alert.alert(
-            "No subject found",
-            "Point the camera at a clear subject and try again.",
+            t("No subject found"),
+            t("Point the camera at a clear subject and try again."),
           );
           setBusy(false);
           return;
@@ -223,7 +235,10 @@ export default function CameraScreen() {
       }
       await saveSingle(request);
     } catch {
-      Alert.alert("Capture failed", "Could not take that photo. Try again.");
+      Alert.alert(
+        t("Capture failed"),
+        t("Could not take that photo. Try again."),
+      );
       setBusy(false);
     }
   };
@@ -239,7 +254,9 @@ export default function CameraScreen() {
       <Text style={styles.fallbackMessage}>{message}</Text>
       {action}
       <Pressable style={styles.fallbackButton} onPress={pickFromLibrary}>
-        <Text style={styles.fallbackButtonText}>Pick from library instead</Text>
+        <Text style={styles.fallbackButtonText}>
+          {t("Pick from library instead")}
+        </Text>
       </Pressable>
     </View>
   );
@@ -254,7 +271,7 @@ export default function CameraScreen() {
         onPress={requestPermission}
       >
         <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>
-          Allow camera
+          {t("Allow camera")}
         </Text>
       </Pressable>,
     );
@@ -316,12 +333,12 @@ export default function CameraScreen() {
             >
               <Pressable hitSlop={10} onPress={() => switchMode("photo")}>
                 <Animated.Text style={[styles.modeLabel, photoLabelStyle]}>
-                  PHOTO
+                  {t("PHOTO")}
                 </Animated.Text>
               </Pressable>
               <Pressable hitSlop={10} onPress={() => switchMode("sticker")}>
                 <Animated.Text style={[styles.modeLabel, stickerLabelStyle]}>
-                  STICKER
+                  {t("STICKER")}
                 </Animated.Text>
               </Pressable>
             </View>

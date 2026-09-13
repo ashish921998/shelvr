@@ -15,7 +15,8 @@
     "check": "pnpm run lint && pnpm run typecheck && pnpm run coverage && pnpm run knip && pnpm run syncpack:lint && pnpm run audit",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
-    "prepare": "husky"
+    "prepare": "husky",
+    "localization:generate": "node tools/generate-localizations.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

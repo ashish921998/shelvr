@@ -1,20 +1,22 @@
-import { Stack } from 'expo-router';
-import { Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { Stack } from "expo-router";
+import { Text } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function MapStackLayout() {
+  useAppLocale();
   return (
     <Stack
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
       }}
     >
       <Stack.Screen name="index">
         <Stack.Title asChild>
           <Text testID="map-screen-title" style={styles.title}>
-            map
+            {t("map")}
           </Text>
         </Stack.Title>
       </Stack.Screen>

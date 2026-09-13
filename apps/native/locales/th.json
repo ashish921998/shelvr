@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr ใช้กล้องเพื่อให้คุณถ่ายสิ่งที่อยากบันทึกไว้ใช้ทีหลัง",
+    "NSPhotoLibraryUsageDescription": "Shelvr ให้คุณบันทึกรูปและภาพหน้าจอจากคลังไว้ในที่เดียว และจัดระเบียบคลังรูปของคุณ",
+    "NSCalendarsUsageDescription": "Shelvr เพิ่มกิจกรรมลงปฏิทินจากสิ่งที่คุณบันทึก",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr เพิ่มกิจกรรมลงปฏิทินจากสิ่งที่คุณบันทึก"
+  }
+}

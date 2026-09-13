@@ -1,3 +1,4 @@
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { AnimatedSwitch } from "@/components/ui/animated-switch";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { usePaywallGuard } from "@/lib/entitlement";
@@ -42,6 +43,7 @@ const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(100).easing(EASE_OUT);
 // is keyed by the loaded space so its `useState` initializers seed once from
 // the server value and a cached query refresh never overwrites in-flight edits.
 export default function NewSpaceScreen() {
+  useAppLocale();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = id !== undefined;
 
@@ -60,7 +62,7 @@ export default function NewSpaceScreen() {
 
   // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {
-    return <ScreenLoader label="Opening space" />;
+    return <ScreenLoader label={t("Opening space")} />;
   }
 
   // The space is gone, inaccessible, or the link is stale. This guard is the
@@ -70,7 +72,7 @@ export default function NewSpaceScreen() {
   if (editing && (isError || space === null)) {
     return (
       <View style={styles.loading}>
-        <Text>This space is no longer available.</Text>
+        <Text>{t("This space is no longer available.")}</Text>
       </View>
     );
   }
@@ -89,6 +91,7 @@ type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic">;
 type SpaceFormProps = { mode: "create" } | { mode: "edit"; space: Space };
 
 function SpaceForm(props: SpaceFormProps) {
+  useAppLocale();
   const editing = props.mode === "edit";
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -142,10 +145,10 @@ function SpaceForm(props: SpaceFormProps) {
       // A ConvexError carries the server's user-facing sentence in `data`;
       // anything else is redacted to "Server Error" in production.
       Alert.alert(
-        editing ? "Could not save space" : "Could not create space",
+        editing ? t("Could not save space") : t("Could not create space"),
         error instanceof ConvexError && typeof error.data === "string"
-          ? error.data
-          : "Something went wrong. Try again.",
+          ? localizeError(error.data, "Something went wrong. Try again.")
+          : t("Something went wrong. Try again."),
       );
       setSaving(false);
     }
@@ -157,15 +160,18 @@ function SpaceForm(props: SpaceFormProps) {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>{editing ? "Edit space" : "New space"}</Text>
+      <Text style={styles.heading}>
+        {editing ? t("Edit space") : t("New space")}
+      </Text>
       <Text style={styles.subheading}>
-        Give it a title — Shelvr will suggest a few of your saves that fit. You
-        choose what sticks.
+        {t(
+          "Give it a title — Shelvr will suggest a few of your saves that fit. You choose what sticks.",
+        )}
       </Text>
 
       <TextInput
         style={styles.nameInput}
-        placeholder="Apartment shopping list"
+        placeholder={t("Apartment shopping list")}
         placeholderTextColor={theme.colors.faint}
         value={name}
         onChangeText={setName}
@@ -175,9 +181,9 @@ function SpaceForm(props: SpaceFormProps) {
 
       <View style={styles.dynamicRow}>
         <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>Dynamic</Text>
+          <Text style={styles.dynamicLabel}>{t("Dynamic")}</Text>
           <Text style={styles.dynamicHint}>
-            Shelvr keeps suggesting things that fit
+            {t("Shelvr keeps suggesting things that fit")}
           </Text>
         </View>
         <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
@@ -213,7 +219,7 @@ function SpaceForm(props: SpaceFormProps) {
               />
             ) : (
               <Text style={styles.saveButtonText}>
-                {editing ? "Save changes" : "Create space"}
+                {editing ? t("Save changes") : t("Create space")}
               </Text>
             )}
           </Animated.View>

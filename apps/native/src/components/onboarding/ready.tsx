@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -18,6 +19,7 @@ export function ReadyStep({
   demoItem: FeedItem | null;
   onFinish: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
   return (
@@ -26,7 +28,7 @@ export function ReadyStep({
         entering={FadeInDown.duration(400)}
         style={styles.headline}
       >
-        Your shelf starts here.
+        {t("Your shelf starts here.")}
       </Animated.Text>
 
       {spaceNames.length > 0 && (
@@ -61,7 +63,7 @@ export function ReadyStep({
           tintColor={theme.colors.muted}
         />
         <Text style={styles.tipText}>
-          Save from any app with the share sheet.
+          {t("Save from any app with the share sheet.")}
         </Text>
       </Animated.View>
 
@@ -70,7 +72,7 @@ export function ReadyStep({
           entering={FadeInDown.delay(360).duration(400)}
           style={styles.fullWidth}
         >
-          <CtaButton label="Start saving" onPress={onFinish} />
+          <CtaButton label={t("Start saving")} onPress={onFinish} />
         </Animated.View>
       </View>
     </View>

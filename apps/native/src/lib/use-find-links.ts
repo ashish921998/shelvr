@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import type { DetailItem } from "@/components/item-detail";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -10,6 +11,7 @@ import { usePaywallGuard } from "./entitlement";
 type SearchableItem = Pick<DetailItem, "_id" | "status" | "productsStatus">;
 
 export function useFindLinks(item: SearchableItem | undefined) {
+  useAppLocale();
   const search = useMutation(api.items.findLinks);
   const { guard, loading } = usePaywallGuard("item_detail");
   const inFlight = useRef(false);
@@ -29,7 +31,7 @@ export function useFindLinks(item: SearchableItem | undefined) {
     try {
       if (await guard()) await search({ id: item._id });
     } catch {
-      Alert.alert("Couldn't search", "Please try again in a moment.");
+      Alert.alert(t("Couldn't search"), t("Please try again in a moment."));
     } finally {
       inFlight.current = false;
       setFinding(false);

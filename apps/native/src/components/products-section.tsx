@@ -1,16 +1,17 @@
-import type { DetailItem } from '@/components/item-detail';
-import { AppSymbolIcon } from '@/components/symbol';
-import { useFindLinks } from '@/lib/use-find-links';
-import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
+import { t, useAppLocale } from "@/lib/i18n";
+import type { DetailItem } from "@/components/item-detail";
+import { AppSymbolIcon } from "@/components/symbol";
+import { useFindLinks } from "@/lib/use-find-links";
+import { Image } from "expo-image";
+import * as WebBrowser from "expo-web-browser";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
   View,
-} from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched
 // from the toolbar's action menu (an idle item renders no inline chip — it
@@ -18,16 +19,19 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 // inline: results as product cards, a spinner while searching, and a retry
 // chip when the search failed.
 export function ProductsSection({ item }: { item: DetailItem }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { findLinks, finding, disabled } = useFindLinks(item);
   const products = item.products;
-  const searching = item.productsStatus === 'searching';
+  const searching = item.productsStatus === "searching";
 
-  if (item.productsStatus === 'unavailable') {
+  if (item.productsStatus === "unavailable") {
     return (
       <View style={styles.findLinksRow}>
         <Text style={styles.chipLabel}>
-          {"This photo can't be used for product search. Save a smaller, valid copy."}
+          {t(
+            "This photo can't be used for product search. Save a smaller, valid copy.",
+          )}
         </Text>
       </View>
     );
@@ -38,7 +42,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
       <View style={styles.findLinksRow}>
         <View style={styles.chip}>
           <ActivityIndicator size="small" color={theme.colors.primaryText} />
-          <Text style={styles.chipLabel}>Finding links…</Text>
+          <Text style={styles.chipLabel}>{t("Finding links…")}</Text>
         </View>
       </View>
     );
@@ -47,7 +51,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
   if (products && products.length > 0) {
     return (
       <View style={styles.productsSection}>
-        <Text style={styles.productsTitle}>Shop</Text>
+        <Text style={styles.productsTitle}>{t("Shop")}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -122,9 +126,9 @@ export function ProductsSection({ item }: { item: DetailItem }) {
           />
         )}
         <Text style={styles.chipLabel}>
-          {item.productsStatus === 'failed'
-            ? 'Find links — try again'
-            : 'No matches — search again'}
+          {item.productsStatus === "failed"
+            ? t("Find links — try again")
+            : t("No matches — search again")}
         </Text>
       </Pressable>
     </View>
@@ -133,14 +137,14 @@ export function ProductsSection({ item }: { item: DetailItem }) {
 
 const styles = StyleSheet.create((theme) => ({
   findLinksRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   // Shared pill for the detail screen's small actions (retry a failed save,
   // find shopping links).
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     backgroundColor: theme.colors.primarySoft,
     paddingVertical: 7,
@@ -171,12 +175,12 @@ const styles = StyleSheet.create((theme) => ({
     width: 150,
     height: 130,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   productImageEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   productName: {
     fontFamily: theme.fonts.medium,
@@ -185,8 +189,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   productMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(0.75),
   },
   productPrice: {

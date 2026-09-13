@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr uporablja kamero, da lahko posnamete stvari, ki jih želite shraniti za pozneje.",
+    "NSPhotoLibraryUsageDescription": "Shelvr omogoča shranjevanje fotografij in posnetkov zaslona iz knjižnice na eno mesto ter pospravljanje knjižnice fotografij.",
+    "NSCalendarsUsageDescription": "Shelvr doda dogodke v koledar iz stvari, ki ste jih shranili.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr doda dogodke v koledar iz stvari, ki ste jih shranili."
+  }
+}

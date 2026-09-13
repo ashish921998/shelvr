@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { analytics } from "@/lib/analytics";
 import {
@@ -71,6 +72,7 @@ export function LiveDemoStep({
   onReady: (item: FeedItem) => void;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { isAuthenticated } = useConvexAuth();
   const createDemoItem = useMutation(api.demo.createDemoItem);
@@ -294,7 +296,7 @@ export function LiveDemoStep({
   };
 
   const destinationOptions: { label: string; value: string | null }[] = [
-    { label: "Just my shelf", value: null },
+    { label: t("Just my shelf"), value: null },
     ...selectedSpaces.map((name) => ({ label: name, value: name })),
   ];
 
@@ -320,13 +322,13 @@ export function LiveDemoStep({
           entering={FadeInDown.duration(400)}
           style={styles.headline}
         >
-          Filed.
+          {t("Filed.")}
         </Animated.Text>
         <Animated.Text
           entering={FadeInDown.delay(60).duration(400)}
           style={styles.support}
         >
-          That&apos;s Shelvr. Every save gets a title, tags, and a home.
+          {t("That's Shelvr. Every save gets a title, tags, and a home.")}
         </Animated.Text>
 
         <Animated.View
@@ -339,7 +341,7 @@ export function LiveDemoStep({
 
         <View
           style={styles.destinationChips}
-          accessibilityLabel="Labels for your save"
+          accessibilityLabel={t("Labels for your save")}
         >
           {item?.tags.map((tag) => (
             <View key={tag} style={styles.destinationChip}>
@@ -349,7 +351,7 @@ export function LiveDemoStep({
         </View>
         {item?.enrichment === "partial" ? (
           <Text style={styles.support}>
-            Saved the link. This page did not allow a full preview.
+            {t("Saved the link. This page did not allow a full preview.")}
           </Text>
         ) : null}
 
@@ -359,7 +361,7 @@ export function LiveDemoStep({
             style={styles.destination}
           >
             <Text style={styles.destinationLabel}>
-              You chose where this goes — filed into:
+              {t("You chose where this goes — filed into:")}
             </Text>
             <View style={styles.destinationChips}>
               {savedSpaces.map((name) => (
@@ -370,18 +372,20 @@ export function LiveDemoStep({
             </View>
           </Animated.View>
         ) : (
-          <Text style={styles.destinationLabel}>Saved to your inbox.</Text>
+          <Text style={styles.destinationLabel}>
+            {t("Saved to your inbox.")}
+          </Text>
         )}
 
         {reused ? (
           <Text style={styles.reuseNote}>
-            That&apos;s your one demo save, already on your shelf.
+            {t("That's your one demo save, already on your shelf.")}
           </Text>
         ) : null}
 
         <View style={styles.footer}>
           <Pressable style={styles.skipRow} onPress={advance}>
-            <Text style={styles.continueText}>Continue</Text>
+            <Text style={styles.continueText}>{t("Continue")}</Text>
             <AppSymbolIcon
               name="chevron.right"
               size={14}
@@ -401,14 +405,18 @@ export function LiveDemoStep({
     const terminal = isTerminalFailure(item?.failureReason);
     return (
       <View style={styles.wrap}>
-        <Text style={styles.headline}>Your link is saved.</Text>
+        <Text style={styles.headline}>{t("Your link is saved.")}</Text>
         <Text style={styles.support}>
           {terminal
-            ? "That page could not be found, so there is nothing more to read from it. The link stays on your shelf."
-            : "Shelvr couldn't finish processing it right now. Retry, or find it on your shelf either way."}
+            ? t(
+                "That page could not be found, so there is nothing more to read from it. The link stays on your shelf.",
+              )
+            : t(
+                "Shelvr couldn't finish processing it right now. Retry, or find it on your shelf either way.",
+              )}
         </Text>
 
-        {error !== null && <Text style={styles.error}>{error}</Text>}
+        {error !== null && <Text style={styles.error}>{t(error)}</Text>}
 
         <View style={styles.footer}>
           {terminal ? null : (
@@ -424,12 +432,12 @@ export function LiveDemoStep({
               {submitting ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
-                <Text style={styles.submitText}>Retry</Text>
+                <Text style={styles.submitText}>{t("Retry")}</Text>
               )}
             </Pressable>
           )}
           <Pressable onPress={advance}>
-            <Text style={styles.skipText}>Continue</Text>
+            <Text style={styles.skipText}>{t("Continue")}</Text>
           </Pressable>
         </View>
       </View>
@@ -440,21 +448,25 @@ export function LiveDemoStep({
   if (phase === "processing") {
     return (
       <View style={styles.wrap}>
-        <Text style={styles.headline}>Watch Shelvr file a save.</Text>
+        <Text style={styles.headline}>{t("Watch Shelvr file a save.")}</Text>
         <Text style={styles.support}>
-          Reading the page, pulling a title, picking tags…
+          {t("Reading the page, pulling a title, picking tags…")}
         </Text>
 
         <View style={styles.processingCard}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.processingLine}>Classifying your save…</Text>
+          <Text style={styles.processingLine}>
+            {t("Classifying your save…")}
+          </Text>
         </View>
 
         <View style={styles.footer}>
           {timedOut ? (
             <>
               <Text style={styles.support}>
-                Taking longer than usual. It will land on your shelf either way.
+                {t(
+                  "Taking longer than usual. It will land on your shelf either way.",
+                )}
               </Text>
               <View style={styles.timeoutRow}>
                 <Pressable
@@ -464,7 +476,7 @@ export function LiveDemoStep({
                     pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Text style={styles.continueText}>Keep waiting</Text>
+                  <Text style={styles.continueText}>{t("Keep waiting")}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -474,14 +486,16 @@ export function LiveDemoStep({
                     advance();
                   }}
                 >
-                  <Text style={styles.skipText}>Continue without waiting</Text>
+                  <Text style={styles.skipText}>
+                    {t("Continue without waiting")}
+                  </Text>
                 </Pressable>
               </View>
             </>
           ) : (
             <Pressable onPress={advance}>
               <Text style={styles.skipText}>
-                Still working — it&apos;ll be on your shelf
+                {t("Still working — it'll be on your shelf")}
               </Text>
             </Pressable>
           )}
@@ -493,30 +507,32 @@ export function LiveDemoStep({
   // ---- Input state: paste field, destination, sample links ---------------
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>Watch Shelvr file a save.</Text>
-      <Text style={styles.support}>Paste a link, or try one of ours.</Text>
+      <Text style={styles.headline}>{t("Watch Shelvr file a save.")}</Text>
+      <Text style={styles.support}>
+        {t("Paste a link, or try one of ours.")}
+      </Text>
 
       <View style={styles.inputRow}>
         <TextInput
           value={url}
           onChangeText={setUrl}
-          placeholder="Paste a URL"
+          placeholder={t("Paste a URL")}
           placeholderTextColor={theme.colors.faint}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
           returnKeyType="go"
-          accessibilityLabel="Link to save"
+          accessibilityLabel={t("Link to save")}
           style={styles.input}
           onSubmitEditing={() => void submit(url)}
         />
         <Pressable onPress={() => void paste()} style={styles.pasteBtn}>
-          <Text style={styles.pasteText}>Paste</Text>
+          <Text style={styles.pasteText}>{t("Paste")}</Text>
         </Pressable>
       </View>
 
       <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>Save this link to</Text>
+        <Text style={styles.samplesLabel}>{t("Save this link to")}</Text>
         <View style={styles.sampleRow}>
           {destinationOptions.map((option) => (
             <Pressable
@@ -543,10 +559,10 @@ export function LiveDemoStep({
         </View>
       </View>
 
-      {error !== null && <Text style={styles.error}>{error}</Text>}
+      {error !== null && <Text style={styles.error}>{t(error)}</Text>}
 
       <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>Try one:</Text>
+        <Text style={styles.samplesLabel}>{t("Try one:")}</Text>
         <View style={styles.sampleRow}>
           {SAMPLE_LINKS.map((s) => (
             <Pressable
@@ -558,7 +574,7 @@ export function LiveDemoStep({
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <Text style={styles.sampleLabel}>{s.label}</Text>
+              <Text style={styles.sampleLabel}>{t(s.label)}</Text>
             </Pressable>
           ))}
         </View>
@@ -573,7 +589,7 @@ export function LiveDemoStep({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={styles.submitText}>Save it</Text>
+            <Text style={styles.submitText}>{t("Save it")}</Text>
           </Pressable>
         )}
         <Pressable
@@ -583,7 +599,7 @@ export function LiveDemoStep({
             advance();
           }}
         >
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={styles.skipText}>{t("Skip for now")}</Text>
         </Pressable>
       </View>
     </View>
@@ -601,17 +617,20 @@ function DemoAuthView({
   onSignIn: (provider: OAuthProvider) => void;
   onBack: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>Sign in to save it for real.</Text>
+      <Text style={styles.headline}>{t("Sign in to save it for real.")}</Text>
       <Text style={styles.support}>
-        Your link is waiting — sign in and Shelvr will file it on your shelf.
+        {t(
+          "Your link is waiting — sign in and Shelvr will file it on your shelf.",
+        )}
       </Text>
 
       {pendingProvider === null && lastError !== null && (
         <Text style={styles.error}>
-          Sign-in didn&apos;t finish. Try again, or go back.
+          {t("Sign-in didn't finish. Try again, or go back.")}
         </Text>
       )}
 
@@ -630,7 +649,7 @@ function DemoAuthView({
             <Text
               style={[styles.authBtnText, { color: theme.colors.background }]}
             >
-              Continue with Apple
+              {t("Continue with Apple")}
             </Text>
           </Pressable>
         ) : null}
@@ -643,16 +662,18 @@ function DemoAuthView({
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Text style={styles.authBtnText}>Continue with Google</Text>
+          <Text style={styles.authBtnText}>{t("Continue with Google")}</Text>
         </Pressable>
         {__DEV__ &&
           process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" && (
             <Pressable onPress={() => onSignIn("anonymous")}>
-              <Text style={styles.skipText}>Continue without account</Text>
+              <Text style={styles.skipText}>
+                {t("Continue without account")}
+              </Text>
             </Pressable>
           )}
         <Pressable onPress={onBack}>
-          <Text style={styles.skipText}>Back</Text>
+          <Text style={styles.skipText}>{t("Back")}</Text>
         </Pressable>
       </View>
     </View>

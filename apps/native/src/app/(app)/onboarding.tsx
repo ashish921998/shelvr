@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { BuildingStep } from "@/components/onboarding/building";
 import { LiveDemoStep } from "@/components/onboarding/live-demo";
 import { PermissionsStep } from "@/components/onboarding/permissions";
@@ -95,6 +96,7 @@ const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
 const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
+  useAppLocale();
   const insets = useSafeAreaInsets();
   const { completeOnboarding } = useOnboarding();
 
@@ -237,24 +239,24 @@ export default function OnboardingScreen() {
 
           {step === STEPS.surveyQ1 && (
             <SurveyStep
-              headline="Where do your saves pile up today?"
-              support="Be honest — we've seen worse."
+              headline={t("Where do your saves pile up today?")}
+              support={t("Be honest — we've seen worse.")}
               options={Q1_OPTIONS}
               selected={q1}
               onToggle={toggle(setQ1)}
-              ctaLabel="Continue"
+              ctaLabel={t("Continue")}
               onAdvance={advance}
             />
           )}
 
           {step === STEPS.surveyQ2 && (
             <SurveyStep
-              headline="What do you save most?"
-              support="This shapes your shelf."
+              headline={t("What do you save most?")}
+              support={t("This shapes your shelf.")}
               options={Q2_OPTIONS}
               selected={q2}
               onToggle={toggle(setQ2)}
-              ctaLabel="Continue"
+              ctaLabel={t("Continue")}
               onAdvance={advance}
             />
           )}

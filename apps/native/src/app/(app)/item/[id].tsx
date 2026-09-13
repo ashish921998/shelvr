@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -79,6 +80,11 @@ function pagerEndReached(
 }
 
 export default function ItemScreen() {
+  useAppLocale();
+  return <ItemScreenContent />;
+}
+
+function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
     from?: string;
@@ -281,7 +287,7 @@ export default function ItemScreen() {
         setAccepted(membership);
       }
     } catch {
-      Alert.alert("Couldn't add to space", "Please try again.");
+      Alert.alert(t("Couldn't add to space"), t("Please try again."));
     } finally {
       decisionPending.current = false;
       setDecisionBusy(false);
@@ -305,8 +311,8 @@ export default function ItemScreen() {
       setAccepted(null);
     } catch {
       Alert.alert(
-        "Couldn't undo",
-        "The save is still in this Space. Please try again.",
+        t("Couldn't undo"),
+        t("The save is still in this Space. Please try again."),
       );
     } finally {
       decisionPending.current = false;
@@ -359,18 +365,24 @@ export default function ItemScreen() {
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
     } catch {
-      Alert.alert("Couldn't delete save", "Please try again in a moment.");
+      Alert.alert(
+        t("Couldn't delete save"),
+        t("Please try again in a moment."),
+      );
     }
   }, [activeItem, items, deleteItem, router]);
 
   if (items === undefined) {
-    return <ScreenLoader label="Opening save" />;
+    return <ScreenLoader label={t("Opening save")} />;
   }
 
   if (items.length === 0) {
     return (
       <View style={styles.loading}>
-        <EmptyState title="Gone" message="This save no longer exists." />
+        <EmptyState
+          title={t("Gone")}
+          message={t("This save no longer exists.")}
+        />
       </View>
     );
   }
@@ -386,28 +398,32 @@ export default function ItemScreen() {
                 headerRight: () => (
                   <HeaderActionMenu
                     icon="ellipsis"
-                    label="Save actions"
+                    label={t("Save actions")}
                     title={
-                      activeItem?.title ?? activeItem?.note ?? "Save actions"
+                      activeItem?.title ?? activeItem?.note ?? t("Save actions")
                     }
                     actions={[
                       ...(activeItem?.status === "ready"
-                        ? [{ label: "Add to space", onPress: openSpaces }]
+                        ? [{ label: t("Add to space"), onPress: openSpaces }]
                         : []),
-                      { label: "Share", onPress: shareActive },
+                      { label: t("Share"), onPress: shareActive },
                       ...(activeItem?.url
-                        ? [{ label: "Copy link", onPress: copyLink }]
+                        ? [{ label: t("Copy link"), onPress: copyLink }]
                         : []),
                       ...(activeItem?.status === "ready"
                         ? [
                             {
-                              label: "Find links",
+                              label: t("Find links"),
                               onPress: onFindLinks,
                               disabled: searchDisabled,
                             },
                           ]
                         : []),
-                      { label: "Delete", destructive: true, onPress: onDelete },
+                      {
+                        label: t("Delete"),
+                        destructive: true,
+                        onPress: onDelete,
+                      },
                     ]}
                   />
                 ),
@@ -426,18 +442,18 @@ export default function ItemScreen() {
                 icon="rectangle.stack"
                 onPress={openSpaces}
               >
-                Add to space
+                {t("Add to space")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.up"
               onPress={shareActive}
             >
-              Share
+              {t("Share")}
             </Stack.Toolbar.MenuAction>
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
-                Copy link
+                {t("Copy link")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             {activeItem?.status === "ready" ? (
@@ -446,7 +462,7 @@ export default function ItemScreen() {
                 onPress={onFindLinks}
                 disabled={searchDisabled}
               >
-                Find links
+                {t("Find links")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
@@ -454,7 +470,7 @@ export default function ItemScreen() {
               destructive
               onPress={onDelete}
             >
-              Delete
+              {t("Delete")}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
@@ -499,7 +515,7 @@ export default function ItemScreen() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.surface }}
             >
-              <Text style={styles.dismissText}>Dismiss</Text>
+              <Text style={styles.dismissText}>{t("Dismiss")}</Text>
             </GlassView>
           </Pressable>
           <Pressable
@@ -519,7 +535,7 @@ export default function ItemScreen() {
                 size={15}
                 tintColor={theme.colors.primaryForeground}
               />
-              <Text style={styles.acceptText}>Add to space</Text>
+              <Text style={styles.acceptText}>{t("Add to space")}</Text>
             </GlassView>
           </Pressable>
         </Animated.View>
@@ -538,16 +554,16 @@ export default function ItemScreen() {
           accessibilityLiveRegion="polite"
         >
           <Text style={styles.acceptedLabel} numberOfLines={2}>
-            Added to {spaceQ.data?.name ?? "space"}
+            {t("Added to %{space}", { space: spaceQ.data?.name ?? "" })}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Undo add to space"
+            accessibilityLabel={t("Undo add to space")}
             disabled={decisionBusy}
             onPress={undoAccept}
             style={styles.undoButton}
           >
-            <Text style={styles.undoText}>Undo</Text>
+            <Text style={styles.undoText}>{t("Undo")}</Text>
           </Pressable>
         </View>
       ) : null}

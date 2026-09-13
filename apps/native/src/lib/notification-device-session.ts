@@ -5,7 +5,8 @@ type TokenStore = {
 
 type SessionDependencies = {
   getToken: (requestPermission: boolean) => Promise<string | null>;
-  saveToken: (token: string) => Promise<unknown>;
+  saveToken: (token: string, locale?: string) => Promise<unknown>;
+  getLocale?: () => string;
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
@@ -26,7 +27,7 @@ export class NotificationDeviceSession {
   private operation: NotificationOperation = "idle";
   private listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
-  private registeredToken: string | null = null;
+  private registeredKey: string | null = null;
 
   constructor(
     private readonly store: TokenStore,
@@ -62,13 +63,13 @@ export class NotificationDeviceSession {
   start() {
     this.generation++;
     this.paused = false;
-    this.registeredToken = null;
+    this.registeredKey = null;
   }
 
   stop() {
     this.generation++;
     this.paused = true;
-    this.registeredToken = null;
+    this.registeredKey = null;
   }
 
   register(getToken = () => this.deps.getToken(false)): Promise<boolean> {
@@ -82,14 +83,17 @@ export class NotificationDeviceSession {
       if (!current()) return false;
       const token = await getToken();
       if (!token || !current()) return false;
-      if (token === this.registeredToken) return true;
+      const locale = this.deps.getLocale?.();
+      const key = `${token}\0${locale ?? ""}`;
+      if (key === this.registeredKey) return true;
       // Persist before the server write so a restart can still revoke an accepted token.
       const tokens = await this.store.read();
       if (!tokens.includes(token)) await this.store.write([...tokens, token]);
       if (!current()) return false;
-      await this.deps.saveToken(token);
+      if (locale === undefined) await this.deps.saveToken(token);
+      else await this.deps.saveToken(token, locale);
       if (!current()) return false;
-      this.registeredToken = token;
+      this.registeredKey = key;
       return true;
     });
     this.queue = operation.then(

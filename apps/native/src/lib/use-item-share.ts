@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import type { DetailItem } from "@/components/item-detail";
 import { File, Paths } from "expo-file-system";
@@ -6,6 +7,7 @@ import { useCallback } from "react";
 import { Share } from "react-native";
 
 export function useItemShare(activeItem: DetailItem | undefined) {
+  useAppLocale();
   return useCallback(async () => {
     if (!activeItem) return;
 
@@ -37,7 +39,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         await Sharing.shareAsync(file.uri, {
           mimeType: activeItem.isSticker ? "image/png" : "image/jpeg",
           UTI: activeItem.isSticker ? "public.png" : "public.jpeg",
-          dialogTitle: activeItem.title ?? "Share",
+          dialogTitle: activeItem.title ?? t("Share"),
         });
         shared = true;
         shareSheetOnly = true;

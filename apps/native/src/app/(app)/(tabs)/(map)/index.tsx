@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ProGate as ProGateView } from "@/components/pro-gate";
@@ -87,6 +88,7 @@ function fitCamera(items: Located[]) {
 }
 
 export default function MapScreen() {
+  useAppLocale();
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // Only photos with coordinates, already filtered server-side, so the map
@@ -100,7 +102,7 @@ export default function MapScreen() {
     () =>
       (items ?? []).map((i) => ({
         id: i._id,
-        title: i.title ?? "Saved photo",
+        title: i.title ?? t("Saved photo"),
         latitude: i.latitude,
         longitude: i.longitude,
         imageUrl: i.imageUrl,
@@ -136,7 +138,7 @@ export default function MapScreen() {
   );
 
   if (entitlementLoading) {
-    return <ScreenLoader label="Opening your map" />;
+    return <ScreenLoader label={t("Opening your map")} />;
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
@@ -145,24 +147,26 @@ export default function MapScreen() {
   if (!entitled) {
     return (
       <ProGateView
-        title="Map is a Pro feature"
-        message="See every saved photo by location with a Shelvr Pro subscription."
+        title={t("Map is a Pro feature")}
+        message={t(
+          "See every saved photo by location with a Shelvr Pro subscription.",
+        )}
       />
     );
   }
 
   if (items === undefined) {
-    return <ScreenLoader label="Loading saved places" />;
+    return <ScreenLoader label={t("Loading saved places")} />;
   }
 
   if (located.length === 0) {
     return (
       <View style={styles.container}>
         <EmptyState
-          title="Nothing on the map yet"
-          message={
-            "Photos you save keep the place they were taken.\nNew saves with location data will show up here."
-          }
+          title={t("Nothing on the map yet")}
+          message={t(
+            "Photos you save keep the place they were taken.\nNew saves with location data will show up here.",
+          )}
         />
       </View>
     );

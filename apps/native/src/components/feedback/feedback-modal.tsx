@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -38,6 +39,7 @@ export function FeedbackModal({
   surface: FeedbackSurface;
   onClose: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
   const [message, setMessage] = useState("");
@@ -97,7 +99,7 @@ export function FeedbackModal({
         <Pressable
           style={styles.backdropPress}
           onPress={onClose}
-          accessibilityLabel="Close feedback"
+          accessibilityLabel={t("Close feedback")}
         />
         <View style={styles.sheet}>
           <ScrollView
@@ -105,23 +107,23 @@ export function FeedbackModal({
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.title} accessibilityRole="header">
-              Send feedback
+              {t("Send feedback")}
             </Text>
 
             {phase === "queued" ? (
               <>
-                <Text style={styles.body}>Thanks for the feedback!</Text>
+                <Text style={styles.body}>{t("Thanks for the feedback!")}</Text>
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Done"
+                    accessibilityLabel={t("Done")}
                     style={({ pressed }) => [
                       styles.primaryButton,
                       pressed && { opacity: 0.7 },
                     ]}
                     onPress={onClose}
                   >
-                    <Text style={styles.primaryButtonText}>Done</Text>
+                    <Text style={styles.primaryButtonText}>{t("Done")}</Text>
                   </Pressable>
                 </View>
               </>
@@ -129,20 +131,20 @@ export function FeedbackModal({
               <>
                 <Text style={styles.body}>
                   {available
-                    ? "Feedback couldn’t be sent just now."
-                    : "Feedback is unavailable right now."}{" "}
-                  You can reach us directly instead:
+                    ? t("Feedback couldn’t be sent just now.")
+                    : t("Feedback is unavailable right now.")}{" "}
+                  {t("You can reach us directly instead:")}
                 </Text>
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel="Email support"
+                  accessibilityLabel={t("Email support")}
                   style={({ pressed }) => [
                     styles.supportRow,
                     pressed && { opacity: 0.7 },
                   ]}
                   onPress={openSupport}
                 >
-                  <Text style={styles.supportText}>Contact Support</Text>
+                  <Text style={styles.supportText}>{t("Contact Support")}</Text>
                   <AppSymbolIcon
                     name="arrow.up.right"
                     size={14}
@@ -153,14 +155,16 @@ export function FeedbackModal({
                   <View style={styles.buttonRow}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Close"
+                      accessibilityLabel={t("Close")}
                       style={({ pressed }) => [
                         styles.secondaryButton,
                         pressed && { opacity: 0.7 },
                       ]}
                       onPress={onClose}
                     >
-                      <Text style={styles.secondaryButtonText}>Close</Text>
+                      <Text style={styles.secondaryButtonText}>
+                        {t("Close")}
+                      </Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -168,14 +172,14 @@ export function FeedbackModal({
             ) : (
               <>
                 <Text style={styles.body}>
-                  What were you trying to do, and what got in your way?
+                  {t("What were you trying to do, and what got in your way?")}
                 </Text>
                 <TextInput
-                  accessibilityLabel="Feedback message"
+                  accessibilityLabel={t("Feedback message")}
                   style={styles.input}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="Your feedback…"
+                  placeholder={t("Your feedback…")}
                   placeholderTextColor={theme.colors.faint}
                   multiline
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
@@ -188,7 +192,7 @@ export function FeedbackModal({
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Cancel feedback"
+                    accessibilityLabel={t("Cancel feedback")}
                     style={({ pressed }) => [
                       styles.secondaryButton,
                       pressed && { opacity: 0.7 },
@@ -196,11 +200,13 @@ export function FeedbackModal({
                     disabled={sending}
                     onPress={onClose}
                   >
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                    <Text style={styles.secondaryButtonText}>
+                      {t("Cancel")}
+                    </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Send feedback"
+                    accessibilityLabel={t("Send feedback")}
                     accessibilityState={{ disabled: !canSend }}
                     style={({ pressed }) => [
                       styles.primaryButton,
@@ -211,7 +217,7 @@ export function FeedbackModal({
                     onPress={() => void send()}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {sending ? "Sending…" : "Send"}
+                      {sending ? t("Sending…") : t("Send")}
                     </Text>
                   </Pressable>
                 </View>

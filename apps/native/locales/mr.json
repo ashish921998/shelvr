@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "नंतरसाठी जतन करायच्या गोष्टी टिपता याव्यात म्हणून Shelvr कॅमेरा वापरते.",
+    "NSPhotoLibraryUsageDescription": "Shelvr लायब्ररीतील फोटो आणि स्क्रीनशॉट तुमच्या केंद्रात जतन करू देते आणि फोटो लायब्ररी आवरण्यास मदत करते.",
+    "NSCalendarsUsageDescription": "Shelvr तुमच्या जतन केलेल्या गोष्टींमधून कॅलेंडरमध्ये कार्यक्रम जोडते.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr तुमच्या जतन केलेल्या गोष्टींमधून कॅलेंडरमध्ये कार्यक्रम जोडते."
+  }
+}

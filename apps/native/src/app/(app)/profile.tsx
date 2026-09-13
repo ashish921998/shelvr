@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -34,6 +35,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function ProfileScreen() {
+  useAppLocale();
   const { session, operation } = useNotificationSession();
   const deleting = operation === "delete_account";
   const signingOut = operation === "sign_out";
@@ -73,16 +75,16 @@ export default function ProfileScreen() {
 
   const proLabel =
     status === "trialing"
-      ? "Pro — Trial"
+      ? t("Pro — Trial")
       : status === "pro"
         ? "Pro"
         : status === "lifetime"
-          ? "Pro — Lifetime"
+          ? t("Pro — Lifetime")
           : status === "lapsed"
-            ? "Pro — Lapsed"
+            ? t("Pro — Lapsed")
             : loading
               ? "…"
-              : "View Pro plans";
+              : t("View Pro plans");
 
   // Customer Center is only relevant to users who have (or had) a subscription
   // — any non-`none` status. A `none` user has nothing to manage and should see
@@ -105,12 +107,12 @@ export default function ProfileScreen() {
       // than leaving the tap with no visible effect.
       if (!presented) {
         Alert.alert(
-          "Manage subscription",
-          "Manage your subscription in the App Store.",
+          t("Manage subscription"),
+          t("Manage your subscription in the App Store."),
           [
-            { text: "Cancel", style: "cancel" },
+            { text: t("Cancel"), style: "cancel" },
             {
-              text: "Open App Store",
+              text: t("Open App Store"),
               onPress: () =>
                 void Linking.openURL(
                   Platform.OS === "ios"
@@ -134,13 +136,18 @@ export default function ProfileScreen() {
     try {
       if ((await session.setWeeklyShelf(enabled)) === false) {
         Alert.alert(
-          "Notifications are off",
-          "Allow notifications for Shelvr in your device settings to turn on the weekly shelf.",
+          t("Notifications are off"),
+          t(
+            "Allow notifications for Shelvr in your device settings to turn on the weekly shelf.",
+          ),
         );
       }
     } catch (error) {
       analytics.captureError("weekly_shelf_preference_failed", error);
-      Alert.alert("Couldn’t update notifications", "Try again in a moment.");
+      Alert.alert(
+        t("Couldn’t update notifications"),
+        t("Try again in a moment."),
+      );
     }
   };
 
@@ -152,18 +159,27 @@ export default function ProfileScreen() {
       const outcome = await restorePurchases();
       if (outcome === "restored") {
         Alert.alert(
-          "Purchases restored",
-          `Your ${storeName} purchase was found. Shelvr Pro may take a moment to update.`,
+          t("Purchases restored"),
+          t(
+            "Your %{store} purchase was found. Shelvr Pro may take a moment to update.",
+            { store: storeName },
+          ),
         );
       } else if (outcome === "none") {
         Alert.alert(
-          "No active purchase found",
-          `No active Shelvr Pro purchase was found for this ${storeName} account.`,
+          t("No active purchase found"),
+          t(
+            "No active Shelvr Pro purchase was found for this %{store} account.",
+            { store: storeName },
+          ),
         );
       } else {
         Alert.alert(
-          "Couldn’t restore purchases",
-          `Check your connection and try again. You can also manage your plan in ${storeName}.`,
+          t("Couldn’t restore purchases"),
+          t(
+            "Check your connection and try again. You can also manage your plan in %{store}.",
+            { store: storeName },
+          ),
         );
       }
     } finally {
@@ -176,25 +192,32 @@ export default function ProfileScreen() {
       await session.signOut();
     } catch (error) {
       analytics.captureError("sign_out_failed", error);
-      Alert.alert("Couldn’t sign out", "Check your connection and try again.");
+      Alert.alert(
+        t("Couldn’t sign out"),
+        t("Check your connection and try again."),
+      );
     }
   };
 
   const confirmDeleteAccount = () => {
     Alert.alert(
-      "Delete account?",
+      t("Delete account?"),
       [
-        "This permanently deletes your Shelvr account and all of your saves:",
-        "• Links, notes, and images",
-        "• Spaces and memberships",
-        "• Pending uploads and account identity",
+        t(
+          "This permanently deletes your Shelvr account and all of your saves:",
+        ),
+        t("• Links, notes, and images"),
+        t("• Spaces and memberships"),
+        t("• Pending uploads and account identity"),
         "",
-        "Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.",
+        t(
+          "Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.",
+        ),
       ].join("\n"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Delete account",
+          text: t("Delete account"),
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -203,8 +226,10 @@ export default function ProfileScreen() {
               } catch (err) {
                 analytics.captureError("account_deletion_failed", err);
                 Alert.alert(
-                  "Couldn’t delete account",
-                  "Something went wrong. Check your connection and try again, or email support@shelvr.app.",
+                  t("Couldn’t delete account"),
+                  t(
+                    "Something went wrong. Check your connection and try again, or email support@shelvr.app.",
+                  ),
                 );
               }
             })();
@@ -216,12 +241,14 @@ export default function ProfileScreen() {
 
   const confirmResetFlowFixtures = () => {
     Alert.alert(
-      "Reset flow fixtures?",
-      "This replaces this anonymous development account’s saves and spaces with deterministic flow data.",
+      t("Reset flow fixtures?"),
+      t(
+        "This replaces this anonymous development account’s saves and spaces with deterministic flow data.",
+      ),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Reset",
+          text: t("Reset"),
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -230,14 +257,16 @@ export default function ProfileScreen() {
               try {
                 const result = await resetFlowFixtures({});
                 Alert.alert(
-                  "Flow fixtures ready",
+                  t("Flow fixtures ready"),
                   `${result.items} saves and ${result.spaces} spaces were created.`,
                 );
               } catch (error) {
                 analytics.captureError("flow_fixture_reset_failed", error);
                 Alert.alert(
-                  "Couldn’t reset fixtures",
-                  "Use an anonymous account on a development deployment and try again.",
+                  t("Couldn’t reset fixtures"),
+                  t(
+                    "Use an anonymous account on a development deployment and try again.",
+                  ),
                 );
               } finally {
                 setResettingFixtures(false);
@@ -260,14 +289,14 @@ export default function ProfileScreen() {
           <Wordmark size={30} />
           <HeaderIconButton
             icon="xmark"
-            label="Close profile"
+            label={t("Close profile")}
             onPress={closeProfile}
           />
         </View>
       ) : (
         <Wordmark size={30} />
       )}
-      <Text style={styles.slogan}>Save it for later.</Text>
+      <Text style={styles.slogan}>{t("Save it for later.")}</Text>
 
       <View style={styles.card}>
         <View style={styles.avatar}>
@@ -278,7 +307,7 @@ export default function ProfileScreen() {
           />
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
-          {user?.email ?? "Signed in"}
+          {user?.email ?? t("Signed in")}
         </Text>
       </View>
 
@@ -286,7 +315,7 @@ export default function ProfileScreen() {
         <Pressable
           testID="reset-flow-fixtures"
           accessibilityRole="button"
-          accessibilityLabel="Reset flow fixtures"
+          accessibilityLabel={t("Reset flow fixtures")}
           style={({ pressed }) => [
             styles.fixtureReset,
             pressed && { opacity: 0.7 },
@@ -297,8 +326,8 @@ export default function ProfileScreen() {
         >
           <Text style={styles.fixtureResetText}>
             {resettingFixtures
-              ? "Resetting flow fixtures…"
-              : "Reset flow fixtures"}
+              ? t("Resetting flow fixtures…")
+              : t("Reset flow fixtures")}
           </Text>
         </Pressable>
       ) : null}
@@ -321,8 +350,10 @@ export default function ProfileScreen() {
           <Text style={styles.proLabel}>{proLabel}</Text>
           {photoUsage && hasSubscription && status !== "lapsed" ? (
             <Text style={styles.preferenceDescription}>
-              {photoUsage.count.toLocaleString()} of{" "}
-              {photoUsage.limit.toLocaleString()} photos
+              {t("Photos: %{count} / %{limit}", {
+                count: photoUsage.count,
+                limit: photoUsage.limit,
+              })}
             </Text>
           ) : null}
         </View>
@@ -335,7 +366,7 @@ export default function ProfileScreen() {
 
       <View
         style={styles.linkGroup}
-        accessibilityLabel="Appearance"
+        accessibilityLabel={t("Appearance")}
         accessibilityRole="radiogroup"
       >
         {APPEARANCE_MODES.map((mode) => {
@@ -344,7 +375,9 @@ export default function ProfileScreen() {
             <Pressable
               key={mode}
               accessibilityRole="radio"
-              accessibilityLabel={`Appearance: ${APPEARANCE_LABELS[mode]}`}
+              accessibilityLabel={t("Appearance: %{appearance}", {
+                appearance: t(APPEARANCE_LABELS[mode]),
+              })}
               accessibilityState={{ selected }}
               style={({ pressed }) => [
                 styles.appearanceRow,
@@ -353,7 +386,7 @@ export default function ProfileScreen() {
               onPress={() => setAppearanceMode(mode)}
             >
               <Text style={styles.appearanceLabel}>
-                {APPEARANCE_LABELS[mode]}
+                {t(APPEARANCE_LABELS[mode])}
               </Text>
               {selected ? (
                 <AppSymbolIcon
@@ -369,13 +402,13 @@ export default function ProfileScreen() {
 
       <View style={styles.preferenceRow}>
         <View style={styles.preferenceCopy}>
-          <Text style={styles.preferenceLabel}>Weekly shelf</Text>
+          <Text style={styles.preferenceLabel}>{t("Weekly shelf")}</Text>
           <Text style={styles.preferenceDescription}>
-            A few unopened saves every Sunday
+            {t("A few unopened saves every Sunday")}
           </Text>
         </View>
         <Switch
-          accessibilityLabel="Weekly shelf notifications"
+          accessibilityLabel={t("Weekly shelf notifications")}
           value={notificationPreferences?.weeklyShelfEnabled ?? false}
           disabled={notificationPreferences === undefined || busy}
           onValueChange={(value) => void toggleWeeklyShelf(value)}
@@ -391,10 +424,10 @@ export default function ProfileScreen() {
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           accessibilityRole="button"
-          accessibilityLabel="Send feedback"
+          accessibilityLabel={t("Send feedback")}
           onPress={() => setFeedbackOpen(true)}
         >
-          <Text style={styles.linkLabel}>Send feedback</Text>
+          <Text style={styles.linkLabel}>{t("Send feedback")}</Text>
           <AppSymbolIcon
             name="arrow.up.right"
             size={14}
@@ -405,7 +438,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(SUPPORT_URL)}
         >
-          <Text style={styles.linkLabel}>Contact Support</Text>
+          <Text style={styles.linkLabel}>{t("Contact Support")}</Text>
           <AppSymbolIcon
             name="arrow.up.right"
             size={14}
@@ -422,7 +455,7 @@ export default function ProfileScreen() {
           onPress={() => void handleRestorePurchases()}
         >
           <Text style={styles.linkLabel}>
-            {restoring ? "Restoring Purchases…" : "Restore Purchases"}
+            {restoring ? t("Restoring Purchases…") : t("Restore Purchases")}
           </Text>
           <AppSymbolIcon
             name="arrow.clockwise"
@@ -434,7 +467,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.terms)}
         >
-          <Text style={styles.linkLabel}>Terms of Service</Text>
+          <Text style={styles.linkLabel}>{t("Terms of Service")}</Text>
           <AppSymbolIcon
             name="arrow.up.right"
             size={14}
@@ -445,7 +478,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           onPress={() => openExternal(LEGAL_URLS.privacy)}
         >
-          <Text style={styles.linkLabel}>Privacy Policy</Text>
+          <Text style={styles.linkLabel}>{t("Privacy Policy")}</Text>
           <AppSymbolIcon
             name="arrow.up.right"
             size={14}
@@ -460,7 +493,7 @@ export default function ProfileScreen() {
         onPress={() => void handleSignOut()}
       >
         <Text style={styles.signOutText}>
-          {signingOut ? "Signing out…" : "Sign out"}
+          {signingOut ? t("Signing out…") : t("Sign out")}
         </Text>
       </Pressable>
 
@@ -474,7 +507,7 @@ export default function ProfileScreen() {
         onPress={confirmDeleteAccount}
       >
         <Text style={styles.deleteAccountText}>
-          {deleting ? "Deleting…" : "Delete account"}
+          {deleting ? t("Deleting…") : t("Delete account")}
         </Text>
       </Pressable>
       {feedbackOpen ? (

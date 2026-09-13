@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "A Shelvr a kamerádat használja, hogy lefotózhasd a későbbre mentendő dolgokat.",
+    "NSPhotoLibraryUsageDescription": "A Shelvr segítségével fotókat és képernyőképeket menthetsz a könyvtáradból a központodba, és rendet tehetsz a fotókönyvtáradban.",
+    "NSCalendarsUsageDescription": "A Shelvr a mentett dolgaidból eseményeket ad a naptáradhoz.",
+    "NSCalendarsFullAccessUsageDescription": "A Shelvr a mentett dolgaidból eseményeket ad a naptáradhoz."
+  }
+}

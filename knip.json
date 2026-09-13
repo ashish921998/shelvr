@@ -12,7 +12,8 @@
         "babel.config.js",
         "metro.config.js",
         "generateKeys.mjs",
-        "goldie/goldie.config.ts"
+        "goldie/goldie.config.ts",
+        "plugins/with-widget-localization.js"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
       "ignore": ["convex/_generated/**"]
@@ -21,6 +22,10 @@
       "entry": ["src/app/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"],
       "ignoreDependencies": ["tailwindcss"]
+    },
+    ".": {
+      "entry": ["tools/generate-localizations.mjs"],
+      "project": ["tools/**/*.mjs"]
     }
   }
 }

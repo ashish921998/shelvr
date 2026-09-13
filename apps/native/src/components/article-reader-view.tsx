@@ -1,27 +1,28 @@
-import { TagChip } from '@/components/tag-chip';
-import { ProductsSection } from '@/components/products-section';
-import { ItemSpaces } from '@/components/item-spaces';
-import { analytics } from '@/lib/analytics';
-import { displayHost } from '@/lib/url';
-import { SimilarGrid } from '@/components/similar-grid';
-import type { DetailItem } from '@/components/item-detail';
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import * as WebBrowser from 'expo-web-browser';
-import type { Id } from '@convex/_generated/dataModel';
-import { useState } from 'react';
+import { t, useAppLocale } from "@/lib/i18n";
+import { TagChip } from "@/components/tag-chip";
+import { ProductsSection } from "@/components/products-section";
+import { ItemSpaces } from "@/components/item-spaces";
+import { analytics } from "@/lib/analytics";
+import { displayHost } from "@/lib/url";
+import { SimilarGrid } from "@/components/similar-grid";
+import type { DetailItem } from "@/components/item-detail";
+import { Image } from "expo-image";
+import { Link } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import * as WebBrowser from "expo-web-browser";
+import type { Id } from "@convex/_generated/dataModel";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-type Space = { _id: Id<'spaces'>; name: string };
+type Space = { _id: Id<"spaces">; name: string };
 
 type Props = {
   item: DetailItem;
@@ -46,6 +47,7 @@ export function ArticleReaderView({
   heroUri,
   paragraphs,
 }: Props) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -53,11 +55,11 @@ export function ArticleReaderView({
   const compactTags = item.tags.slice(0, 2);
   const remainingTagCount = Math.max(item.tags.length - compactTags.length, 0);
   const compactTagLabel = [
-    compactTags.join(' · '),
-    remainingTagCount > 0 ? `+${remainingTagCount}` : '',
+    compactTags.join(" · "),
+    remainingTagCount > 0 ? `+${remainingTagCount}` : "",
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(" · ");
 
   const thumbnail = heroUri ? (
     <Image
@@ -67,23 +69,31 @@ export function ArticleReaderView({
     />
   ) : (
     <View style={styles.thumbnailFallback}>
-      <AppSymbolIcon name="link" size={22} tintColor={theme.colors.primaryText} />
+      <AppSymbolIcon
+        name="link"
+        size={22}
+        tintColor={theme.colors.primaryText}
+      />
     </View>
   );
 
   return (
     <ScrollView
-      testID={item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined}
+      testID={
+        item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
+      }
       contentInsetAdjustmentBehavior="never"
       style={[styles.container, { paddingTop: headerHeight + theme.gap(1.5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.body}>
-        {item.status === 'processing' ? (
+        {item.status === "processing" ? (
           <View style={styles.processingRow}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={styles.processingText}>Shelvr is reading this…</Text>
+            <Text style={styles.processingText}>
+              {t("Shelvr is reading this…")}
+            </Text>
           </View>
         ) : null}
 
@@ -101,17 +111,25 @@ export function ArticleReaderView({
               {item.url ? (
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel={`Open ${item.siteName ?? displayHost(item.url)}`}
+                  accessibilityLabel={t("Open %{site}", {
+                    site: item.siteName ?? displayHost(item.url),
+                  })}
                   hitSlop={6}
                   style={({ pressed }) => [
                     styles.source,
                     pressed && styles.pressed,
                   ]}
                   onPress={() => {
-                    void WebBrowser.openBrowserAsync(item.url!).then(() => analytics.itemAction(item, 'open_source')).catch(() => {});
+                    void WebBrowser.openBrowserAsync(item.url!)
+                      .then(() => analytics.itemAction(item, "open_source"))
+                      .catch(() => {});
                   }}
                 >
-                  <AppSymbolIcon name="safari" size={13} tintColor={theme.colors.muted} />
+                  <AppSymbolIcon
+                    name="safari"
+                    size={13}
+                    tintColor={theme.colors.muted}
+                  />
                   <Text numberOfLines={1} style={styles.sourceText}>
                     {item.siteName ?? displayHost(item.url)}
                   </Text>
@@ -122,7 +140,6 @@ export function ArticleReaderView({
                   />
                 </Pressable>
               ) : null}
-
             </View>
 
             {item.description ? (
@@ -134,7 +151,10 @@ export function ArticleReaderView({
             {item.tags.length > 0 ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${tagsExpanded ? 'Hide' : 'Show'} tags: ${item.tags.join(', ')}`}
+                accessibilityLabel={t(
+                  tagsExpanded ? "Hide tags: %{tags}" : "Show tags: %{tags}",
+                  { tags: item.tags.join(", ") },
+                )}
                 accessibilityState={{ expanded: tagsExpanded }}
                 hitSlop={6}
                 onPress={() => setTagsExpanded(!tagsExpanded)}
@@ -147,7 +167,7 @@ export function ArticleReaderView({
                   {compactTagLabel}
                 </Text>
                 <Text style={styles.tagsAction}>
-                  {tagsExpanded ? 'Hide' : 'Tags'}
+                  {tagsExpanded ? t("Hide") : t("Tags")}
                 </Text>
               </Pressable>
             ) : null}
@@ -162,7 +182,9 @@ export function ArticleReaderView({
           </View>
         ) : null}
 
-        {item.status === 'ready' ? <ItemSpaces itemId={item._id} spaces={spaces} /> : null}
+        {item.status === "ready" ? (
+          <ItemSpaces itemId={item._id} spaces={spaces} />
+        ) : null}
 
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
@@ -176,11 +198,11 @@ export function ArticleReaderView({
           ))}
         </View>
 
-        {item.status === 'ready' ? <ProductsSection item={item} /> : null}
+        {item.status === "ready" ? <ProductsSection item={item} /> : null}
 
         {similar && similar.length > 0 ? (
           <View style={styles.similarSection}>
-            <Text style={styles.similarTitle}>More like this</Text>
+            <Text style={styles.similarTitle}>{t("More like this")}</Text>
             <SimilarGrid items={similar} />
           </View>
         ) : null}
@@ -200,8 +222,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   summary: {
     minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1.5),
   },
   thumbnailFrame: {
@@ -209,26 +231,26 @@ const styles = StyleSheet.create((theme) => ({
     height: 72,
     flexShrink: 0,
     padding: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    backgroundColor: 'white',
+    borderCurve: "continuous",
+    backgroundColor: "white",
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
   thumbnailImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   thumbnailFallback: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
   },
   summaryCopy: {
@@ -237,16 +259,16 @@ const styles = StyleSheet.create((theme) => ({
     gap: 6,
   },
   sourceLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 6,
   },
   source: {
     minWidth: 0,
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
   },
   sourceText: {
@@ -264,9 +286,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   tagsTrigger: {
     minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
   tagsText: {
@@ -283,8 +305,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   expandedTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(0.75),
   },
   article: {
@@ -308,8 +330,8 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.7,
   },
   processingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1),
   },
   processingText: {

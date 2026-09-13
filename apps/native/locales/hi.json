@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr कैमरे का इस्तेमाल करता है ताकि आप बाद के लिए सहेजने वाली चीज़ें कैप्चर कर सकें।",
+    "NSPhotoLibraryUsageDescription": "Shelvr से आप लाइब्रेरी की फ़ोटो और स्क्रीनशॉट अपने केंद्र में सहेज सकते हैं और फ़ोटो लाइब्रेरी साफ़ कर सकते हैं।",
+    "NSCalendarsUsageDescription": "Shelvr आपकी सहेजी हुई चीज़ों से कैलेंडर में कार्यक्रम जोड़ता है।",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr आपकी सहेजी हुई चीज़ों से कैलेंडर में कार्यक्रम जोड़ता है।"
+  }
+}

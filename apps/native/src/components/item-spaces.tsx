@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { Link } from "expo-router";
 import type { Id } from "@convex/_generated/dataModel";
 import { Pressable, Text, View } from "react-native";
@@ -11,19 +12,22 @@ export function ItemSpaces({
   itemId: Id<"items">;
   spaces: { _id: Id<"spaces">; name: string }[];
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
   return (
     <View style={styles.row}>
       <Text style={styles.label} numberOfLines={2}>
         {spaces.length > 0
-          ? `In ${spaces.map((space) => space.name).join(", ")}`
-          : "In your inbox"}
+          ? t("In %{spaces}", {
+              spaces: spaces.map((space) => space.name).join(", "),
+            })
+          : t("In your inbox")}
       </Text>
       <Link href={{ pathname: "/manage-spaces", params: { itemId } }} asChild>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add to space"
+          accessibilityLabel={t("Add to space")}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
           <AppSymbolIcon
@@ -31,7 +35,7 @@ export function ItemSpaces({
             size={13}
             tintColor={theme.colors.primaryText}
           />
-          <Text style={styles.action}>Add to space</Text>
+          <Text style={styles.action}>{t("Add to space")}</Text>
         </Pressable>
       </Link>
     </View>

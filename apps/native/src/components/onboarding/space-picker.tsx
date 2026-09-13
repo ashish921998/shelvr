@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -23,7 +24,7 @@ const SPACE_PRESETS: Record<SaveKind, string[]> = {
   Articles: ["Articles", "Read later", "Long reads"],
   Recipes: ["Recipes", "Restaurants to try"],
   Products: ["Wishlist", "Gift ideas"],
-  "Home & decor": ["Home", "Decor ideas"],
+  "Home & decor": ["Home & decor", "Decor ideas"],
   Travel: ["Travel", "Trip ideas"],
   Fitness: ["Fitness", "Workouts"],
   Inspiration: ["Inspiration", "Ideas"],
@@ -42,14 +43,16 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
   const seen = new Set<string>();
   const candidates: string[] = [];
   for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
+    for (const preset of SPACE_PRESETS[kind] ?? []) {
+      const name = t(preset);
       if (!seen.has(name)) {
         seen.add(name);
         candidates.push(name);
       }
     }
   }
-  for (const name of GENERIC_PRESETS) {
+  for (const preset of GENERIC_PRESETS) {
+    const name = t(preset);
     if (!seen.has(name)) {
       seen.add(name);
       candidates.push(name);
@@ -75,6 +78,7 @@ export function SpacePickerStep({
   onToggle: (name: string) => void;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
   // Build the deduped candidate list: seeded presets from each Q2 answer, then
@@ -82,14 +86,16 @@ export function SpacePickerStep({
   const seen = new Set<string>();
   const candidates: string[] = [];
   for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
+    for (const preset of SPACE_PRESETS[kind] ?? []) {
+      const name = t(preset);
       if (!seen.has(name)) {
         seen.add(name);
         candidates.push(name);
       }
     }
   }
-  for (const name of GENERIC_PRESETS) {
+  for (const preset of GENERIC_PRESETS) {
+    const name = t(preset);
     if (!seen.has(name)) {
       seen.add(name);
       candidates.push(name);
@@ -113,13 +119,13 @@ export function SpacePickerStep({
         entering={FadeInDown.duration(400)}
         style={styles.headline}
       >
-        Pick your spaces.
+        {t("Pick your spaces.")}
       </Animated.Text>
       <Animated.Text
         entering={FadeInDown.delay(80).duration(400)}
         style={styles.support}
       >
-        Shelvr suggests saves for these spaces. Add or rename anytime.
+        {t("Shelvr suggests saves for these spaces. Add or rename anytime.")}
       </Animated.Text>
 
       <ScrollView
@@ -157,7 +163,7 @@ export function SpacePickerStep({
       </ScrollView>
 
       <CtaButton
-        label="Create my spaces"
+        label={t("Create my spaces")}
         onPress={onAdvance}
         disabled={!canAdvance}
       />

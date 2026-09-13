@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import {
   Tabs,
@@ -73,6 +74,7 @@ const TabButton = forwardRef<
 });
 
 export function AppTabs() {
+  useAppLocale();
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, 10);
   const contentBottomInset = dockBottom + TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
@@ -83,7 +85,7 @@ export function AppTabs() {
       <TabList style={[styles.dock, { bottom: dockBottom }]}>
         {tabs.map((tab) => (
           <TabTrigger key={tab.name} name={tab.name} href={tab.href} asChild>
-            <TabButton label={tab.label} icon={tab.icon} />
+            <TabButton label={t(tab.label)} icon={tab.icon} />
           </TabTrigger>
         ))}
       </TabList>

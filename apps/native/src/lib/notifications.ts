@@ -1,3 +1,4 @@
+import { t, currentLocale, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -69,7 +70,7 @@ function getNotificationTimezone(): string | undefined {
 async function prepareNotificationChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("weekly-shelf", {
-    name: "Weekly shelf",
+    name: t("Weekly shelf"),
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });
@@ -110,6 +111,7 @@ export function NotificationSessionProvider({
   children: ReactNode;
 }) {
   const { isAuthenticated } = useConvexAuth();
+  const locale = useAppLocale();
   const { signOut } = useAuthActions();
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
@@ -119,9 +121,11 @@ export function NotificationSessionProvider({
     () =>
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
-        saveToken: (token) =>
+        getLocale: currentLocale,
+        saveToken: (token, locale) =>
           registerDevice({
             token,
+            locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
             timezone: getNotificationTimezone(),
           }),
@@ -167,6 +171,15 @@ export function NotificationSessionProvider({
       tokenListener.remove();
     };
   }, [isAuthenticated, session]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void session
+      .register()
+      .catch((error) =>
+        analytics.captureError("notification_locale_sync_failed", error),
+      );
+  }, [locale, isAuthenticated, session]);
 
   return createElement(
     NotificationSessionContext,

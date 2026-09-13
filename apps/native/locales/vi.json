@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr dùng máy ảnh để bạn chụp những thứ muốn lưu lại cho sau này.",
+    "NSPhotoLibraryUsageDescription": "Shelvr cho phép lưu ảnh và ảnh chụp màn hình từ thư viện vào bộ sưu tập, đồng thời dọn dẹp thư viện ảnh.",
+    "NSCalendarsUsageDescription": "Shelvr thêm sự kiện vào lịch từ những nội dung bạn đã lưu.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr thêm sự kiện vào lịch từ những nội dung bạn đã lưu."
+  }
+}

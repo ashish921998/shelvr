@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "ನಂತರಕ್ಕಾಗಿ ಉಳಿಸಬೇಕಾದ ವಿಷಯಗಳನ್ನು ಸೆರೆಹಿಡಿಯಲು Shelvr ಕ್ಯಾಮೆರಾ ಬಳಸುತ್ತದೆ.",
+    "NSPhotoLibraryUsageDescription": "Shelvr ಲೈಬ್ರರಿಯ ಫೋಟೋ, ಸ್ಕ್ರೀನ್‌ಶಾಟ್‌ಗಳನ್ನು ನಿಮ್ಮ ಕೇಂದ್ರದಲ್ಲಿ ಉಳಿಸಲು ಹಾಗೂ ಫೋಟೋ ಲೈಬ್ರರಿ ಜೋಡಿಸಲು ನೆರವಾಗುತ್ತದೆ.",
+    "NSCalendarsUsageDescription": "Shelvr ನೀವು ಉಳಿಸಿದ ವಿಷಯಗಳಿಂದ ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಸೇರಿಸುತ್ತದೆ.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr ನೀವು ಉಳಿಸಿದ ವಿಷಯಗಳಿಂದ ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಕಾರ್ಯಕ್ರಮಗಳನ್ನು ಸೇರಿಸುತ್ತದೆ."
+  }
+}

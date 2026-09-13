@@ -1,21 +1,23 @@
-import { Stack } from 'expo-router';
-import { Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { Stack } from "expo-router";
+import { Text } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function TidyStackLayout() {
+  useAppLocale();
   return (
     <Stack
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
         headerTitleStyle: styles.title,
       }}
     >
       <Stack.Screen name="index" options={{ gestureEnabled: false }}>
         <Stack.Title asChild>
           <Text testID="tidy-screen-title" style={styles.title}>
-            tidy
+            {t("tidy")}
           </Text>
         </Stack.Title>
       </Stack.Screen>

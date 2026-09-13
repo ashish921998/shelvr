@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
 import { ProductsSection } from "@/components/products-section";
@@ -197,7 +198,7 @@ export const ItemDetail = memo(function ItemDetail({
     heroImage && isVideo && item.url ? (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Play on TikTok"
+        accessibilityLabel={t("Open %{site}", { site: "TikTok" })}
         onPress={() => {
           void WebBrowser.openBrowserAsync(item.url!)
             .then(() => analytics.itemAction(item, "open_source"))
@@ -290,6 +291,7 @@ function ItemDetailBody({
   heroUri: string | null | undefined;
   headerHeight: number;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   return (
     <View
@@ -415,7 +417,7 @@ function ItemDetailBody({
 
       {similar && similar.length > 0 ? (
         <View style={styles.similarSection}>
-          <Text style={styles.similarTitle}>More like this</Text>
+          <Text style={styles.similarTitle}>{t("More like this")}</Text>
           <SimilarGrid items={similar} />
         </View>
       ) : null}
@@ -468,12 +470,14 @@ const SAVE_STATE_NOTICE: Record<SaveState, string> = {
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {
   if (state === "gone" && type === "image") {
-    return "This photo is unavailable or empty. Please save it again.";
+    return t("This photo is unavailable or empty. Please save it again.");
   }
   if (state === "failed" && type !== "link") {
-    return `Shelvr couldn't read this ${type === "image" ? "photo" : "note"}.`;
+    return type === "image"
+      ? t("Shelvr couldn't read this photo.")
+      : t("Shelvr couldn't read this note.");
   }
-  return SAVE_STATE_NOTICE[state];
+  return t(SAVE_STATE_NOTICE[state]);
 }
 
 /**
@@ -484,6 +488,7 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
 function SaveStatusNotice({ item }: { item: DetailItem }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
   const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
@@ -509,7 +514,9 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
     return (
       <View style={styles.processingRow}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={styles.processingText}>Shelvr is reading this…</Text>
+        <Text style={styles.processingText}>
+          {t("Shelvr is reading this…")}
+        </Text>
       </View>
     );
   }
@@ -549,12 +556,17 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
                   // The server still sees this run as live. Usually a device
                   // clock running ahead of the backend's stale threshold.
                   Alert.alert(
-                    "Still working on it",
-                    "Give it a few more minutes. If it never finishes, the retry will appear again.",
+                    t("Still working on it"),
+                    t(
+                      "Give it a few more minutes. If it never finishes, the retry will appear again.",
+                    ),
                   );
                 }
               } catch {
-                Alert.alert("Couldn't retry", "Please try again in a moment.");
+                Alert.alert(
+                  t("Couldn't retry"),
+                  t("Please try again in a moment."),
+                );
               } finally {
                 setRetrying(false);
               }
@@ -572,7 +584,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
               tintColor={theme.colors.primaryText}
             />
           )}
-          <Text style={styles.chipLabel}>Try again</Text>
+          <Text style={styles.chipLabel}>{t("Try again")}</Text>
         </Pressable>
       )}
     </View>

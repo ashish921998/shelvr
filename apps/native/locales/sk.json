@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr používa fotoaparát, aby ste mohli zachytiť veci, ktoré si chcete uložiť na neskôr.",
+    "NSPhotoLibraryUsageDescription": "Shelvr umožňuje ukladať fotky a snímky obrazovky z knižnice na jedno miesto a upratovať knižnicu fotiek.",
+    "NSCalendarsUsageDescription": "Shelvr pridáva do kalendára udalosti z uložených vecí.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr pridáva do kalendára udalosti z uložených vecí."
+  }
+}

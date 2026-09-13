@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr menggunakan kamera supaya anda boleh merakam perkara untuk disimpan kemudian.",
+    "NSPhotoLibraryUsageDescription": "Shelvr membolehkan anda menyimpan foto dan tangkapan skrin daripada pustaka ke hab serta mengemaskan pustaka foto.",
+    "NSCalendarsUsageDescription": "Shelvr menambahkan acara pada kalendar daripada perkara yang anda simpan.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr menambahkan acara pada kalendar daripada perkara yang anda simpan."
+  }
+}

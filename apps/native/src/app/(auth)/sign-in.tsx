@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -20,6 +21,7 @@ import { StyleSheet } from "react-native-unistyles";
  * Anonymous is enabled on the deployment (AUTH_ENABLE_ANONYMOUS=true).
  */
 export default function Page() {
+  useAppLocale();
   const {
     signInWith: handleOAuth,
     pendingProvider: pending,
@@ -35,7 +37,7 @@ export default function Page() {
       <View style={styles.center}>
         <View style={styles.header}>
           <Text style={styles.title}>shelvr</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.subtitle}>{t("Sign in to continue")}</Text>
         </View>
 
         <View style={styles.buttons}>
@@ -69,7 +71,7 @@ export default function Page() {
               disabled={pending !== null}
             >
               <Text style={styles.appleFallbackButtonText}>
-                Continue with Apple
+                {t("Continue with Apple")}
               </Text>
             </Pressable>
           )}
@@ -82,7 +84,9 @@ export default function Page() {
             onPress={() => handleOAuth("google")}
             disabled={pending !== null}
           >
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
+            <Text style={styles.googleButtonText}>
+              {t("Continue with Google")}
+            </Text>
           </Pressable>
           {anonEnabled && (
             <Pressable
@@ -95,28 +99,40 @@ export default function Page() {
               onPress={() => handleOAuth("anonymous")}
               disabled={pending !== null}
             >
-              <Text style={styles.devButtonText}>Continue without account</Text>
+              <Text style={styles.devButtonText}>
+                {t("Continue without account")}
+              </Text>
             </Pressable>
           )}
         </View>
       </View>
 
       <Text style={styles.terms}>
-        By continuing you agree to our{" "}
-        <Text
-          style={styles.termsLink}
-          onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
-        >
-          Terms
-        </Text>{" "}
-        and acknowledge our{" "}
-        <Text
-          style={styles.termsLink}
-          onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
-        >
-          Privacy Policy
-        </Text>
-        .
+        {t(
+          "By continuing, you agree to our %{terms} and acknowledge our %{privacy}.",
+          {
+            terms: "\uE000",
+            privacy: "\uE001",
+          },
+        )
+          .split(/(\uE000|\uE001)/)
+          .map((part, index) => {
+            if (part !== "\uE000" && part !== "\uE001") return part;
+            const isTerms = part === "\uE000";
+            return (
+              <Text
+                key={index}
+                style={styles.termsLink}
+                onPress={() =>
+                  void Linking.openURL(
+                    isTerms ? LEGAL_URLS.terms : LEGAL_URLS.privacy,
+                  )
+                }
+              >
+                {t(isTerms ? "Terms" : "Privacy Policy")}
+              </Text>
+            );
+          })}
       </Text>
 
       {lastError !== null && (

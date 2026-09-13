@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
@@ -79,7 +80,7 @@ const FAILURE_LABELS: Record<
 
 function failureLabel(item: FeedItem): string | undefined {
   if (item.status !== "failed") return;
-  return FAILURE_LABELS[item.failureReason ?? "error"][item.type];
+  return t(FAILURE_LABELS[item.failureReason ?? "error"][item.type]);
 }
 
 // Describes which list a card belongs to, so the detail screen can rebuild the
@@ -124,18 +125,22 @@ function cardMenuActions({
 }): ActionMenuItem[] {
   if (isSuggested) {
     return [
-      { label: "Add to space", onPress: accept },
-      { label: "Dismiss suggestion", destructive: true, onPress: dismiss },
+      { label: t("Add to space"), onPress: accept },
+      { label: t("Dismiss suggestion"), destructive: true, onPress: dismiss },
     ];
   }
   const actions: ActionMenuItem[] = [];
   if (hasUrl) {
-    actions.push({ label: "Share", onPress: share });
+    actions.push({ label: t("Share"), onPress: share });
   }
   if (isReady) {
-    actions.push({ label: "Change spaces", onPress: changeSpaces });
+    actions.push({ label: t("Change spaces"), onPress: changeSpaces });
   }
-  actions.push({ label: "Delete", destructive: true, onPress: confirmDelete });
+  actions.push({
+    label: t("Delete"),
+    destructive: true,
+    onPress: confirmDelete,
+  });
   return actions;
 }
 
@@ -211,6 +216,7 @@ function CardCaption({
   menuActions: ActionMenuItem[];
   theme: UnistylesTheme;
 }) {
+  useAppLocale();
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
@@ -231,8 +237,8 @@ function CardCaption({
         ) : null}
       </View>
       <ActionMenu
-        label="Save actions"
-        title="Save actions"
+        label={t("Save actions")}
+        title={t("Save actions")}
         actions={menuActions}
         style={styles.menuButton}
       >
@@ -285,6 +291,7 @@ export const ItemCard = memo(function ItemCard({
   item: FeedItem;
   source?: ItemSource;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const router = useRouter();
@@ -341,12 +348,12 @@ export const ItemCard = memo(function ItemCard({
 
   const confirmDelete = () => {
     Alert.alert(
-      "Delete this save?",
-      "This removes it from Shelvr and every space. This can\u2019t be undone.",
+      t("Delete this save?"),
+      t("This removes it from Shelvr and every space. This can’t be undone."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("Delete"),
           style: "destructive",
           onPress: () => deleteItem({ id: item._id }),
         },
@@ -425,14 +432,14 @@ export const ItemCard = memo(function ItemCard({
         <Link.Menu>
           {isSuggested && (
             <Link.MenuAction
-              title="Add to space"
+              title={t("Add to space")}
               icon="plus"
               onPress={accept}
             />
           )}
           {isSuggested && (
             <Link.MenuAction
-              title="Dismiss suggestion"
+              title={t("Dismiss suggestion")}
               icon="xmark"
               destructive
               onPress={dismiss}
@@ -440,21 +447,21 @@ export const ItemCard = memo(function ItemCard({
           )}
           {!isSuggested && item.url ? (
             <Link.MenuAction
-              title="Share"
+              title={t("Share")}
               icon="square.and.arrow.up"
               onPress={share}
             />
           ) : null}
           {!isSuggested && item.status === "ready" ? (
             <Link.MenuAction
-              title="Change spaces"
+              title={t("Change spaces")}
               icon="tray.and.arrow.up"
               onPress={changeSpaces}
             />
           ) : null}
           {!isSuggested && (
             <Link.MenuAction
-              title="Delete"
+              title={t("Delete")}
               icon="trash"
               destructive
               onPress={confirmDelete}

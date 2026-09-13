@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr fa servir la càmera perquè capturis coses que vulguis desar per a més tard.",
+    "NSPhotoLibraryUsageDescription": "Shelvr permet desar fotos i captures de pantalla de la fototeca a la biblioteca i endreçar les fotos.",
+    "NSCalendarsUsageDescription": "Shelvr afegeix esdeveniments al calendari a partir dels continguts que has desat.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr afegeix esdeveniments al calendari a partir dels continguts que has desat."
+  }
+}
