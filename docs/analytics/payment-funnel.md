@@ -26,6 +26,7 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
   - The ask is durably one-per-account, enforced by a server row (`cancelSurveys` table): existence = asked, first recorded outcome wins. This holds across devices and reinstalls; the client fails closed (never asks when it cannot verify the ask is unspent).
   - `cancel_survey_shown` fires when the card actually renders — the ask is consumed at that moment, never at detection time.
   - If renewal resumes (`subscription_uncancelled`) while the card is up, the next foreground check takes it down silently.
+
 - `$screen`: Expo Router route templates, retaining `[id]` placeholders. No route parameters, saved URLs, or OAuth codes. Automatic screen/touch capture is disabled to avoid duplicate or content-bearing events.
 
 Client identity is the same Convex user ID passed to RevenueCat. PostHog identify merges the anonymous onboarding identity. Purchase events timestamp `purchased_at_ms`; the four cancellation lifecycle events timestamp `event_timestamp_ms` — both are the event's own moment, not webhook arrival time. Delivery retries preserve event UUID and time. A transactional receipt ledger deduplicates RevenueCat IDs independently of subscription ordering, so a late purchase remains measurable even if a later entitlement event arrived first. Missing/deleted users are ignored.
@@ -60,6 +61,15 @@ All four live on the [Onboarding and payment conversion dashboard](https://us.po
 4. **Canceller behavior — saves before cancel (per person)** — HogQL: CTE join of cancellers to their pre-cancellation saves. [insight 11832831](https://us.posthog.com/project/546847/insights/11832831)
 
 All four are lazy-computed: open each tile once after events start flowing to confirm rendering and the two HogQL queries. Until the backend deploy and the rebuilt binary ship, expect empty charts — check event arrival before reading empties as zero.
+
+## Cancellation flow decisions
+
+Recorded 13 September 2026 from RevenueCat's cancellation-flow guidance, Apple telemetry boundaries, and the simulator walkthrough that found the Customer Center shipped with no cancel path. Do not reverse these without the data named below.
+
+- **The survey is next-visit, not at-cancel.** The ask happens in a calm later session on Home, never inside the cancel flow. An at-cancel prompt catches only in-app cancellers (no survey can follow a user into iOS Settings), collects rushed tap-through answers, and its responses land in RevenueCat instead of this funnel. The card covers both cancel paths with one vocabulary, once per account.
+- **Customer Center: cancel path ON, RevenueCat's built-in exit survey OFF.** The management path is a RevenueCat-dashboard launch requirement — without it, users cannot cancel in-app at all and must dig through iOS Settings. RC's exit survey stays off because an in-app canceller is indistinguishable from a Settings canceller (`willRenew=false` + TRIAL is identical in CustomerInfo), so running both surveys asks in-app cancellers twice with no way to suppress the second ask.
+- **Apple sends no cancel reasons.** An empty `cancel_reason` is Apple's normal state, not a bug; the `unknown` category is the expected iOS mode. The only source of a stated reason on iOS is this survey (or an out-of-band channel like email).
+- **The `trial_cancelled` → `cancel_survey_shown` drop-off is the never-return rate** — cancellers who do not open the app again during the trial window. No in-app survey (ours or RC's) can reach them; only email/push win-back can, which additionally requires enabling `$process_person_profile` on the cancellation events (kept off for cost). Roadmap order: measure this drop-off first, add win-back email or Apple win-back offers (iOS 18+) only if the rate justifies it, and reason-keyed offers (`too_expensive` → targeted offer) only with response volume.
 
 For failure recordings, open **Paywall attempt to actual payment**, click the dropped-off people at the payment step, then inspect their matching recordings. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
 
