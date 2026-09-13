@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "తర్వాత కోసం భద్రపరచాలనుకున్న వాటి ఫోటోలు తీయడానికి Shelvr మీ కెమెరాను వాడుతుంది.",
-    "NSPhotoLibraryUsageDescription": "లైబ్రరీలోని ఫోటోలు, స్క్రీన్‌షాట్‌లను మీ కేంద్రంలో భద్రపరచడానికి, ఫోటో లైబ్రరీని సర్దడానికి Shelvr వీలు కల్పిస్తుంది.",
-    "NSCalendarsUsageDescription": "భద్రపరిచిన విషయాల నుంచి Shelvr మీ క్యాలెండర్‌లో ఈవెంట్‌లను చేరుస్తుంది.",
-    "NSCalendarsFullAccessUsageDescription": "భద్రపరిచిన విషయాల నుంచి Shelvr మీ క్యాలెండర్‌లో ఈవెంట్‌లను చేరుస్తుంది."
-  }
-}

@@ -1,5 +1,10 @@
 import notificationTranslations from "../../convex/model/notificationTranslations.json";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolveLocale } from "./i18n-core";
+import {
+  notificationLocale,
+  digestCopy,
+} from "../../convex/model/notificationDelivery";
 import { describe, expect, it } from "vitest";
 import config from "../../localization.config.json";
 import en from "@/locales/en.json";
@@ -15,11 +20,29 @@ const atoms = (text: string) =>
   ).sort();
 
 describe("shipped localization resources", () => {
-  it("covers all 50 store locales with 47 complete app catalogs", () => {
-    expect(Object.keys(config.storeLocales)).toHaveLength(50);
-    expect(locales).toHaveLength(47);
+  it("covers the selected 39 store locales with 36 complete app catalogs", () => {
+    expect(Object.keys(config.storeLocales)).toHaveLength(39);
+    expect(locales).toHaveLength(36);
     expect(Object.keys(catalogs).sort()).toEqual(locales);
+    expect(Object.keys(notificationTranslations).sort()).toEqual(locales);
+    for (const directory of ["../locales/", "../../locales/"]) {
+      const files = readdirSync(new URL(directory, import.meta.url))
+        .filter((file) => file.endsWith(".json"))
+        .map((file) => file.slice(0, -5))
+        .sort();
+      expect(files).toEqual(locales);
+    }
   });
+
+  it.each(["bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te", "ur"])(
+    "uses English for excluded %s app and notification preferences",
+    (locale) => {
+      expect(resolveLocale([`${locale}-IN`, "en-IN"])).toBe("en");
+      expect(resolveLocale([`${locale}-IN`])).toBe("en");
+      expect(notificationLocale(locale)).toBe("en");
+      expect(digestCopy(locale, 3)).toEqual(digestCopy("en", 3));
+    },
+  );
 
   it.each(locales)("%s preserves the complete source contract", (locale) => {
     const messages = JSON.parse(

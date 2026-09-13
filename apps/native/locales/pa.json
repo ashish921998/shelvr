@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr ਕੈਮਰਾ ਵਰਤਦਾ ਹੈ ਤਾਂ ਜੋ ਤੁਸੀਂ ਬਾਅਦ ਲਈ ਸੰਭਾਲਣ ਵਾਲੀਆਂ ਚੀਜ਼ਾਂ ਕੈਪਚਰ ਕਰ ਸਕੋ।",
-    "NSPhotoLibraryUsageDescription": "Shelvr ਨਾਲ ਲਾਇਬ੍ਰੇਰੀ ਦੀਆਂ ਫ਼ੋਟੋਆਂ ਅਤੇ ਸਕ੍ਰੀਨਸ਼ਾਟ ਆਪਣੇ ਕੇਂਦਰ ਵਿੱਚ ਸੰਭਾਲ ਸਕਦੇ ਹੋ ਅਤੇ ਫ਼ੋਟੋ ਲਾਇਬ੍ਰੇਰੀ ਸਾਫ਼ ਕਰ ਸਕਦੇ ਹੋ।",
-    "NSCalendarsUsageDescription": "Shelvr ਤੁਹਾਡੀਆਂ ਸੰਭਾਲੀਆਂ ਚੀਜ਼ਾਂ ਤੋਂ ਕੈਲੰਡਰ ਵਿੱਚ ਸਮਾਗਮ ਜੋੜਦਾ ਹੈ।",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr ਤੁਹਾਡੀਆਂ ਸੰਭਾਲੀਆਂ ਚੀਜ਼ਾਂ ਤੋਂ ਕੈਲੰਡਰ ਵਿੱਚ ਸਮਾਗਮ ਜੋੜਦਾ ਹੈ।"
-  }
-}

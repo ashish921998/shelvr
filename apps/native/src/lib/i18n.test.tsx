@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t, useAppLocale, localizeError, formattingLocale } from "./i18n";
 import { resolveLocale, translate } from "./i18n-core";
+import { formatItemDate } from "./date";
 import de from "@/locales/de.json";
 import ja from "@/locales/ja.json";
 
@@ -127,6 +128,13 @@ describe("device language resolution", () => {
 });
 
 describe("translated copy", () => {
+  it("uses English text and dates with Indian number formatting for a Hindi device", () => {
+    changeLanguage("hi-IN");
+    expect(t("Search")).toBe("Search");
+    expect(formattingLocale()).toBe("en-IN");
+    expect(t("Saves: %{count}", { count: 1234567 })).toBe("Saves: 12,34,567");
+    expect(formatItemDate(Date.UTC(2026, 8, 13, 12))).toContain("Sep");
+  });
   it("preserves regional number formatting when markets share translations", () => {
     changeLanguage("en-IN");
     expect(formattingLocale()).toBe("en-IN");

@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr کیمرہ استعمال کرتا ہے تاکہ آپ بعد کے لیے محفوظ کرنے والی چیزوں کی تصویر لے سکیں۔",
-    "NSPhotoLibraryUsageDescription": "Shelvr سے آپ لائبریری کی تصاویر اور اسکرین شاٹ اپنے مرکز میں محفوظ اور تصاویر کی لائبریری صاف کر سکتے ہیں۔",
-    "NSCalendarsUsageDescription": "Shelvr آپ کی محفوظ چیزوں سے کیلنڈر میں واقعات شامل کرتا ہے۔",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr آپ کی محفوظ چیزوں سے کیلنڈر میں واقعات شامل کرتا ہے۔"
-  }
-}

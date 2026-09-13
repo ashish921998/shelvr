@@ -1,9 +1,12 @@
 # Native app localization
 
-The locale contract is `apps/native/localization.config.json`: 50 App Store locale
-codes map to 47 bundled app catalogs (the four English markets share English).
+The locale contract is `apps/native/localization.config.json`: 39 App Store locale
+codes map to 36 bundled app catalogs (the four English markets share English).
 This is the supported set, not a claim to cover every language in the world.
-English is the fallback for unsupported device preferences.
+English is the fallback for unsupported device preferences. India uses English;
+Bengali, Gujarati, Hindi, Kannada, Malayalam, Marathi, Odia, Punjabi, Tamil, Telugu
+and Urdu catalogs are intentionally excluded. English (India) keeps regional
+number/date formatting.
 
 `expo-localization` reads the ordered device/per-app language preferences. Each
 translated component calls `useAppLocale()` to subscribe to changes; `t()` reads

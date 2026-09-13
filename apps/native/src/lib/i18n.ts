@@ -12,16 +12,24 @@ export function currentLocale(): string {
 }
 
 export function formattingLocale(): string {
+  const selected = currentLocale();
+  let fallback = selected;
   for (const locale of getLocales()) {
     try {
-      return Intl.getCanonicalLocales(
+      const canonical = Intl.getCanonicalLocales(
         locale.languageTag.replaceAll("_", "-"),
       )[0];
+      const [language, ...subtags] = canonical.split(/-[ux]-/i)[0].split("-");
+      const normalizedLanguage = language === "no" ? "nb" : language;
+      if (normalizedLanguage === selected.split("-")[0]) return canonical;
+      // Keep the region while using English month names for unsupported languages.
+      const region = subtags.find((part) => /^[A-Z]{2}$|^\d{3}$/.test(part));
+      if (fallback === "en" && region) fallback = `en-${region}`;
     } catch {
       continue;
     }
   }
-  return "en";
+  return fallback;
 }
 
 /** Read at call time so alerts and callbacks never capture a stale language. */

@@ -10,12 +10,6 @@
             "value": "المحفوظات الأخيرة"
           }
         },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "সম্প্রতি সংরক্ষিত"
-          }
-        },
         "ca": {
           "stringUnit": {
             "state": "translated",
@@ -82,22 +76,10 @@
             "value": "Enregistrements récents"
           }
         },
-        "gu": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "તાજેતરમાં સાચવેલું"
-          }
-        },
         "he": {
           "stringUnit": {
             "state": "translated",
             "value": "פריטים שנשמרו לאחרונה"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हाल में सहेजी गई चीज़ें"
           }
         },
         "hr": {
@@ -130,28 +112,10 @@
             "value": "最近の保存"
           }
         },
-        "kn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ಇತ್ತೀಚೆಗೆ ಉಳಿಸಿದವು"
-          }
-        },
         "ko": {
           "stringUnit": {
             "state": "translated",
             "value": "최근 저장 항목"
-          }
-        },
-        "ml": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "അടുത്തിടെ സൂക്ഷിച്ചവ"
-          }
-        },
-        "mr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "अलीकडे जतन केलेले"
           }
         },
         "ms": {
@@ -170,18 +134,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Recent opgeslagen"
-          }
-        },
-        "or": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ସମ୍ପ୍ରତି ସଂରକ୍ଷିତ"
-          }
-        },
-        "pa": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ਹਾਲ ਹੀ ਵਿੱਚ ਸੰਭਾਲੀਆਂ"
           }
         },
         "pl": {
@@ -232,18 +184,6 @@
             "value": "Nyligen sparat"
           }
         },
-        "ta": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "சமீபத்திய சேமிப்புகள்"
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఇటీవల భద్రపరిచినవి"
-          }
-        },
         "th": {
           "stringUnit": {
             "state": "translated",
@@ -260,12 +200,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Нещодавні збереження"
-          }
-        },
-        "ur": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "حال ہی میں محفوظ"
           }
         },
         "vi": {
@@ -295,12 +229,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "آخر محفوظاتك في لمحة."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "আপনার সাম্প্রতিক সংরক্ষিত জিনিস, এক নজরে।"
           }
         },
         "ca": {
@@ -369,22 +297,10 @@
             "value": "Vos derniers contenus, en un coup d'œil."
           }
         },
-        "gu": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "તમારી નવી સાચવેલી વસ્તુઓ, એક નજરમાં."
-          }
-        },
         "he": {
           "stringUnit": {
             "state": "translated",
             "value": "הפריטים האחרונים שלך, במבט אחד."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आपकी नई सहेजी हुई चीज़ें, एक नज़र में।"
           }
         },
         "hr": {
@@ -417,28 +333,10 @@
             "value": "最近保存したものをひと目で確認。"
           }
         },
-        "kn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ನಿಮ್ಮ ಹೊಸ ಉಳಿಸಿದವು, ಒಂದೇ ನೋಟದಲ್ಲಿ."
-          }
-        },
         "ko": {
           "stringUnit": {
             "state": "translated",
             "value": "최근 저장한 항목을 한눈에 보세요."
-          }
-        },
-        "ml": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ഏറ്റവും പുതിയ സൂക്ഷിച്ചവ ഒറ്റനോട്ടത്തിൽ."
-          }
-        },
-        "mr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "तुमच्या नव्याने जतन केलेल्या गोष्टी, एका नजरेत."
           }
         },
         "ms": {
@@ -457,18 +355,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Je nieuwste inhoud in één oogopslag."
-          }
-        },
-        "or": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ଆପଣଙ୍କ ନୂଆ ସଂରକ୍ଷିତ ବିଷୟ ଏକ ନଜରରେ।"
-          }
-        },
-        "pa": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ਤੁਹਾਡੀਆਂ ਨਵੀਆਂ ਸੰਭਾਲੀਆਂ ਚੀਜ਼ਾਂ, ਇੱਕ ਨਜ਼ਰ ਵਿੱਚ।"
           }
         },
         "pl": {
@@ -519,18 +405,6 @@
             "value": "Ditt senaste innehåll i en överblick."
           }
         },
-        "ta": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "உங்கள் புதிய சேமிப்புகள், ஒரே பார்வையில்."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మీ తాజా భద్రపరిచిన అంశాలు, ఒక చూపులో."
-          }
-        },
         "th": {
           "stringUnit": {
             "state": "translated",
@@ -547,12 +421,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ваші найновіші збереження одним поглядом."
-          }
-        },
-        "ur": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "آپ کی تازہ محفوظ چیزیں، ایک نظر میں۔"
           }
         },
         "vi": {

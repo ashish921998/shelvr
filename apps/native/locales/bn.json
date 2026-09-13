@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "পরে দেখার জন্য রাখতে চান এমন জিনিসের ছবি তুলতে Shelvr আপনার ক্যামেরা ব্যবহার করে।",
-    "NSPhotoLibraryUsageDescription": "Shelvr দিয়ে লাইব্রেরির ছবি ও স্ক্রিনশট নিজের কেন্দ্রে রাখতে এবং ছবির লাইব্রেরি গোছাতে পারেন।",
-    "NSCalendarsUsageDescription": "Shelvr আপনার সংরক্ষিত জিনিস থেকে ক্যালেন্ডারে অনুষ্ঠান যোগ করে।",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr আপনার সংরক্ষিত জিনিস থেকে ক্যালেন্ডারে অনুষ্ঠান যোগ করে।"
-  }
-}
