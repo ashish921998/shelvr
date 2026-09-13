@@ -84,8 +84,12 @@ brand rather than English instructional copy.
 
 RevenueCat owns the actual purchase sheet and Customer Center copy. Their remotely
 configured localizations and App Store product metadata are separate from the
-bundled fallback/paywall/profile UI. Check that configuration before advertising
-complete end-to-end translated purchase flows. Weekly push copy is generated into `convex/model/notificationTranslations.json`
+bundled fallback/paywall/profile UI. The SDK is configured with the resolved app
+locale, and `overridePreferredLocale()` refreshes it before every paywall or
+Customer Center presentation. A failed sync is reported and follows the existing
+unavailable/fallback path. This changes UI language only; prices and currency
+remain store-provided. Check the remote configuration and sandbox purchase flow
+before advertising complete end-to-end translated purchases. Weekly push copy is generated into `convex/model/notificationTranslations.json`
 from the same catalog. Device registration accepts an optional locale; older clients
 continue to work, and previously registered devices without a locale retain the
 legacy English payload. A language change updates the same token without
@@ -109,6 +113,9 @@ before release, prioritizing onboarding, purchase/account text, permission promp
 notification copy and screenshot headings. Review handoff CSVs and screenshot
 planning assets belong in `shelvr-notes/store-assets/localization/`.
 
-This PR does not upload localized App Store metadata or screenshots, verify remote
-RevenueCat purchase copy, or complete a native archive/device QA pass. Keep those
-release steps explicit; a JavaScript bundle export is not a signed native build.
+Store listing text has been staged separately in the approved App Store 1.0.3
+draft. RevenueCat paywall translations are saved as an unpublished draft; Customer
+Center already has populated base-language translations for the launch languages.
+Publication, native-speaker review, localized screenshots, sandbox purchases and
+native archive/device QA remain release steps. A JavaScript bundle export is not
+a signed native build.
