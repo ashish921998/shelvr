@@ -48,6 +48,10 @@ export const capturePayment = internalAction({
             payment_kind: payment.payment_kind,
             country_code: payment.country_code,
             revenue_usd: payment.revenue_usd,
+            // Cancellation events only; dropped from the body when absent,
+            // so purchase payloads are unchanged.
+            cancel_reason: payment.cancel_reason,
+            cancel_category: payment.cancel_category,
           },
         }),
       });

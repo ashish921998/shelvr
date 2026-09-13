@@ -12,6 +12,10 @@ import {
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from '@/lib/paywall-result';
+import {
+  classifyTrialCancellation,
+  type TrialCancellationState,
+} from '@/lib/trial-cancellation';
 import { REVENUECAT_API_KEY } from '@/lib/revenuecat-api-key';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -414,6 +418,33 @@ export async function presentCustomerCenter(): Promise<boolean> {
 }
 
 export type RestorePurchasesOutcome = 'restored' | 'none' | 'unavailable';
+
+// ---------------------------------------------------------------------------
+// Trial cancellation detection (next-visit cancel survey)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the signed-in user's trial-cancellation state from RevenueCat. Same
+ * identity-sync gate as the other RC reads, so the answer is always for the
+ * logged-in Convex user (a stale anonymous CustomerInfo can never trigger
+ * the survey). Classification lives in `trial-cancellation.ts`.
+ */
+export async function readRcTrialCancellation(): Promise<TrialCancellationState> {
+  if (!(await awaitRcSyncReady())) return 'unknown';
+  const rc = getPurchases();
+  if (!rc) return 'unknown';
+  try {
+    const info = await rc.getCustomerInfo();
+    return classifyTrialCancellation(
+      Object.values(info.entitlements.active).map((entitlement) => ({
+        periodType: entitlement.periodType,
+        willRenew: entitlement.willRenew,
+      })),
+    );
+  } catch {
+    return 'unknown';
+  }
+}
 
 /**
  * Restore App Store purchases for the signed-in RevenueCat identity. This is a

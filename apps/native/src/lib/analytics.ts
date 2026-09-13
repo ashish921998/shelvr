@@ -29,6 +29,13 @@ export type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
+/** Bounded reason ids for the next-visit cancel survey (lib/cancel-survey.ts). */
+export type CancelSurveyReason =
+  | "too_expensive"
+  | "not_useful_enough"
+  | "missing_feature"
+  | "other";
+
 export type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
@@ -119,6 +126,16 @@ export type AnalyticsEventProperties = {
   onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
+  // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
+  // never free text. A response is stated intent, NOT proof of cancellation —
+  // only the server-side webhook events (trial_cancelled, …) count as
+  // cancellations; funnels must never divide by survey responses.
+  cancel_survey_shown: Record<string, never>;
+  cancel_survey_dismissed: Record<string, never>;
+  cancel_survey_submitted: {
+    reason: CancelSurveyReason;
+    survey_source: "next_visit_card";
+  };
 };
 
 export type AnalyticsEvent = keyof AnalyticsEventProperties;
