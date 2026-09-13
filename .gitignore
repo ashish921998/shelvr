@@ -90,7 +90,11 @@ apps/native/store-assets/
 assets/marketing/
 assets/product-hunt/
 
-# Design-sync tooling (scripts plus its own node_modules) and the compiled
-# component bundle it produces. Both regenerate on the next sync.
+# Claude Design sync: staged converter, its node_modules, compiled bundle, and
+# machine state. All regenerate on the next sync; the rest of .design-sync/
+# (config, notes, previews) is committed.
 .ds-sync/
 ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
