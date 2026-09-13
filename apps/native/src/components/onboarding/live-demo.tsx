@@ -590,8 +590,6 @@ export function LiveDemoStep({
   );
 }
 
-/** Inline sign-in for the demo save: the link waits while the user
- * authenticates, so onboarding state never leaves this step. */
 function DemoAuthView({
   pendingProvider,
   lastError,

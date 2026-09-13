@@ -965,7 +965,6 @@ async function analyzeLinkItem(
   return { result: object, page, linkRead: read };
 }
 
-/** Classify a stored image from its bytes, sent to the model as a file part. */
 async function analyzeImageItem(
   ctx: ActionCtx,
   item: Doc<"items">,
@@ -1004,7 +1003,6 @@ async function analyzeImageItem(
   return { result: object };
 }
 
-/** Classify a plain-text note. */
 async function analyzeNoteItem(
   item: Doc<"items">,
   spacesBlock: string,
@@ -1047,7 +1045,6 @@ function spaceNameIds(
   return ids;
 }
 
-/** Convex action runtime context, used by the processItem pipeline helpers. */
 type ActionCtx = GenericActionCtx<DataModel>;
 
 /**

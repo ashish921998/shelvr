@@ -269,9 +269,6 @@ export const ItemDetail = memo(function ItemDetail({
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
-/** The scroll body under the hero: identity, intents, content, and related
- * saves. Split from ItemDetail so each render tree stays under the lint
- * complexity budget. */
 function ItemDetailBody({
   item,
   detail,
@@ -298,8 +295,6 @@ function ItemDetailBody({
     <View
       style={[
         styles.body,
-        // Without a hero to sit under, the text needs to clear the notch and
-        // the floating controls.
         { paddingTop: heroUri ? theme.gap(5) : headerHeight + theme.gap(5) },
       ]}
     >
@@ -369,8 +364,6 @@ function ItemDetailBody({
       ) : null}
 
       {item.url && !detail.content ? (
-        // No article body came back, so the address itself is the content —
-        // show it as a real, tappable row instead of a sparse gap.
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"

@@ -7,11 +7,6 @@ type ServerLogFields = Record<
   string | number | boolean | null | undefined
 >;
 
-/**
- * Emit one JSON line per event from server code (route handlers, server
- * actions). A fixed `{ level, event, environment, ...fields }` shape lets
- * the log drain filter and alert on `event` instead of parsing prose.
- */
 export function serverLog(
   level: ServerLogLevel,
   event: string,

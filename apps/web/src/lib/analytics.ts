@@ -12,13 +12,6 @@ function safeExceptionValue(message: string): string {
     .replace(/\bhttps?:\/\/\S+/gi, "[url]");
 }
 
-/**
- * Report a client render failure to PostHog error tracking. The event is
- * grouped by the `$exception_list` entry: its type is the error class and its
- * value is the message scrubbed of emails and URLs, since a message can
- * interpolate user input (a waitlist email, a query param). The marketing
- * site has no stack worth sending.
- */
 export function captureWebException(
   error: unknown,
   properties: AnalyticsProperties = {},

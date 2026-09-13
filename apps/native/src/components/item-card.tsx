@@ -103,9 +103,6 @@ function clampRatio(ratio: number | undefined, fallback: number) {
   return Math.min(Math.max(value, 0.5), 2);
 }
 
-// In-card action menu shown by CardCaption's overflow control. The iOS
-// long-press menu in ItemCard repeats the same actions as literal
-// Link.MenuAction children.
 function cardMenuActions({
   isSuggested,
   hasUrl,
@@ -142,10 +139,6 @@ function cardMenuActions({
   return actions;
 }
 
-// The card face: a framed image or video poster when one exists, otherwise
-// the text face (title/note/failure/host), so a failed or text save still
-// renders a usable tile. Theme comes from the single useUnistyles call in the
-// card root — one hook instance per row, not three.
 type UnistylesTheme = ReturnType<typeof useUnistyles>["theme"];
 
 function CardMedia({
@@ -158,7 +151,6 @@ function CardMedia({
   theme: UnistylesTheme;
 }) {
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  // Video saves get a 9:16 poster with a play badge and the creator handle.
   const isVideo = item.type === "link" && isTikTokUrl(item.url);
   if (imageUri) {
     return (
@@ -254,10 +246,6 @@ function CardCaption({
   );
 }
 
-// One corner slot for the transient states: a spinner while the pipeline
-// runs, a warning once it has failed. Mounted only for those states (the
-// mount site owns the guard), and both theme and motion come from the card
-// root so a grid of cards registers one hook of each, not a handful.
 function CardStatusCorner({
   item,
   theme,
@@ -297,8 +285,6 @@ export const ItemCard = memo(function ItemCard({
   item: FeedItem;
   source?: ItemSource;
 }) {
-  // One theme and one reduced-motion instance per card; subcomponents take
-  // them as props instead of registering their own.
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const router = useRouter();

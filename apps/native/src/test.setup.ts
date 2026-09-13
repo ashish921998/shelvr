@@ -1,8 +1,5 @@
-// Unmounts the React trees @testing-library renders so a component leaked by
-// one test can't satisfy or pollute the next. The library only wires this up
-// automatically under vitest `globals: true`, which this suite doesn't use.
-// The dynamic import keeps non-DOM environments (plain Node, edge runtime)
-// from loading react-dom at all.
+// Testing Library only auto-cleans under vitest `globals: true`. Dynamic
+// import so Node and edge-runtime suites never load react-dom.
 import { afterEach } from "vitest";
 
 afterEach(async () => {

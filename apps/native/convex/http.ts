@@ -123,12 +123,6 @@ http.route({
   }),
 });
 
-/**
- * Liveness/readiness probe for uptime monitors (Convex dashboard, PostHog
- * health checks, an external pinger). Unauthenticated and payload-free: 200
- * means the deployment answered and reached its database, 503 means the
- * database read failed. No env vars, no secrets, no user data.
- */
 http.route({
   path: "/health",
   method: "GET",

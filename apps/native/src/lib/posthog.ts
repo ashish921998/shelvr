@@ -17,11 +17,6 @@ const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 // `before_send` hook below extends it to SDK-autocaptured crashes.
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
-// Exception autocapture bypasses analytics.captureError, so the policy is
-// applied at the SDK boundary instead: every `$exception` message becomes the
-// error class unless it is a known fixed string. Stack traces still ship
-// (frames hold locations, not interpolated values), and no event is dropped.
-// The event is mutated in place, which the send hook contract permits.
 function sanitizeExceptionValue(value: unknown, fallback: unknown): unknown {
   return typeof value === "string" && SAFE_ERROR_MESSAGES.has(value)
     ? value
@@ -87,9 +82,6 @@ export const posthog =
             console: [],
           },
         },
-        // Runs for every event the SDK sends, autocaptured or not, so the
-        // message allowlist cannot be bypassed by a crash path. The SDK can
-        // also hand the hook a null event; it passes straight through.
         // eslint-disable-next-line @typescript-eslint/naming-convention -- the SDK's option key is fixed snake_case
         before_send: (event) => {
           if (event !== null) redactExceptionProperties(event.properties);

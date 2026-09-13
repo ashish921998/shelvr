@@ -15,8 +15,6 @@ export default defineConfig({
     },
   },
   test: {
-    // Runs for every test file; the setup file self-gates on jsdom so the
-    // edge-runtime and plain-Node suites never load react-dom.
     setupFiles: ["./src/test.setup.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "convex/**/*.test.ts"],
     coverage: {

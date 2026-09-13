@@ -140,16 +140,6 @@ function capture<Event extends AnalyticsEvent>(
   }
 }
 
-// The message allowlist lives in lib/posthog.ts so handled errors
-// (captureError below) and SDK-autocaptured crashes share one policy.
-
-/**
- * Report a handled failure to error tracking. `event` is a stable
- * snake_case discriminator (e.g. "share_save_failed") so PostHog issues stay
- * filterable by call site. The console output stays for development, where
- * PostHog is usually unconfigured; console autocapture is off in the SDK
- * config, so nothing double-reports.
- */
 function captureError(
   event: string,
   error: unknown,

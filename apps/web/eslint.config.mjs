@@ -50,9 +50,8 @@ export default defineConfig([
           leadingUnderscore: "allow",
         },
       ],
-      // Complexity limits — decompose instead of raising them.
-      // max-lines-per-function is intentionally not set: long JSX and long
-      // tests are common and low-risk; these four cover the real signal.
+      // max-lines-per-function is unset: long JSX and long tests are common
+      // here and lower-risk than branchy logic.
       "complexity": ["error", 30],
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],

@@ -56,11 +56,8 @@ module.exports = defineConfig([
           leadingUnderscore: "allow",
         },
       ],
-      // Complexity limits — decompose instead of raising them. Cyclomatic 30
-      // and 50 statements leave headroom for flat validation-style code
-      // while catching pipeline and component sprawl.
-      // max-lines-per-function is intentionally not set: long JSX and long
-      // tests are common and low-risk; these four cover the real signal.
+      // max-lines-per-function is unset: long JSX and long tests are common
+      // here and lower-risk than branchy logic.
       complexity: ["error", 30],
       "max-statements": ["error", 50],
       "max-depth": ["error", 4],

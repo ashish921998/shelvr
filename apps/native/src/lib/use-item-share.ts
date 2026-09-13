@@ -5,9 +5,6 @@ import * as Sharing from "expo-sharing";
 import { useCallback } from "react";
 import { Share } from "react-native";
 
-/** Share the active detail page: a note shares its text, a link shares its
- * URL, and an image/sticker shares the picture itself (expo-sharing needs a
- * local file, so the remote image is cached first). */
 export function useItemShare(activeItem: DetailItem | undefined) {
   return useCallback(async () => {
     if (!activeItem) return;
@@ -46,7 +43,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         shareSheetOnly = true;
       }
     } catch {
-      // User cancelled the sheet, or the download/share failed — nothing to do.
+      // Dismissed or failed share is not a completed action.
     }
 
     if (shared) {
