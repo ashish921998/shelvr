@@ -64,7 +64,10 @@ describe("cancelSurvey", () => {
     const t = newConvexTest();
     const user = t.withIdentity({ subject: "survey-user|session-1" });
 
-    await user.mutation(api.cancelSurvey.respond, { outcome: "dismissed" });
+    const result = await user.mutation(api.cancelSurvey.respond, {
+      outcome: "dismissed",
+    });
+    expect(result).toEqual({ accepted: true });
 
     const rows = await t.run(async (ctx) =>
       await ctx.db.query("cancelSurveys").collect(),

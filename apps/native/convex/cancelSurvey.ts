@@ -75,7 +75,7 @@ export const respond = mutation({
       ),
     ),
   },
-  returns: v.null(),
+  returns: v.object({ accepted: v.boolean() }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const existing = await findSurveyRow(ctx, userId);
@@ -88,14 +88,17 @@ export const respond = mutation({
         ...(args.reason !== undefined ? { reason: args.reason } : {}),
         respondedAt: now,
       });
-      return null;
+      return { accepted: true };
     }
-    if (existing.outcome !== undefined) return null;
+    // First outcome wins: a late (or cross-device) response is told it lost,
+    // so the client can keep PostHog in lockstep with this row — one
+    // submission event per account, never conflicting reasons.
+    if (existing.outcome !== undefined) return { accepted: false };
     await ctx.db.patch(existing._id, {
       outcome: args.outcome,
       ...(args.reason !== undefined ? { reason: args.reason } : {}),
       respondedAt: now,
     });
-    return null;
+    return { accepted: true };
   },
 });

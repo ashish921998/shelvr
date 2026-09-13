@@ -74,12 +74,14 @@ export function useCancelSurvey(): {
     // this effect re-runs and the check proceeds.
     if (surveyStatus === undefined) return;
     if (!cancelSurveyAnalytics.isAvailable()) return;
-    episodeChecked.current = true;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const attempt = async () => {
       const state = await readRcTrialCancellation();
+      // Interrupted (left Home mid-read): the episode is NOT consumed — the
+      // flag below is only set on a completed check, so returning Home
+      // retries detection in the same foreground session.
       if (cancelled) return;
       // Never compete with a paywall sheet for the moment — including one
       // that opened during the read. Poll until it clears rather than
@@ -88,6 +90,9 @@ export function useCancelSurvey(): {
         timer = setTimeout(() => void attempt(), PAYWALL_RECHECK_MS);
         return;
       }
+      // Completed: the episode is spent only now, never at effect start —
+      // an interrupted attempt must not block a retry.
+      episodeChecked.current = true;
       if (state === 'cancelled' && !surveyStatus.asked) {
         setVisible(true);
       } else if (state === 'none') {
@@ -118,15 +123,17 @@ export function useCancelSurvey(): {
   }, [userId, markShown]);
 
   // One response ever per mount: two rapid taps (or a tap racing dismiss)
-  // must not emit duplicate `cancel_survey_submitted` events — the server
-  // keeps only the first outcome, so analytics must match it.
+  // must not emit duplicate `cancel_survey_submitted` events. Capture is
+  // gated on the server's verdict too — two devices can race the same ask,
+  // and only the response this row accepted may reach PostHog.
   const responded = useRef(false);
   const submit = useCallback(
     (reason: CancelSurveyReason) => {
       if (!userId || responded.current) return;
       responded.current = true;
-      cancelSurveyAnalytics.submitted(reason);
-      void respond({ outcome: 'submitted', reason });
+      void respond({ outcome: 'submitted', reason }).then((result) => {
+        if (result.accepted) cancelSurveyAnalytics.submitted(reason);
+      });
       setVisible(false);
     },
     [userId, respond],
@@ -135,8 +142,9 @@ export function useCancelSurvey(): {
   const dismiss = useCallback(() => {
     if (!userId || responded.current) return;
     responded.current = true;
-    cancelSurveyAnalytics.dismissed();
-    void respond({ outcome: 'dismissed' });
+    void respond({ outcome: 'dismissed' }).then((result) => {
+      if (result.accepted) cancelSurveyAnalytics.dismissed();
+    });
     setVisible(false);
   }, [userId, respond]);
 

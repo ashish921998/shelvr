@@ -91,10 +91,11 @@ const mock = vi.hoisted(() => ({
   segments: ["(app)", "(tabs)", "(home)"],
   user: { _id: "user-1" } as { _id: string } | null | undefined,
   rcState: "cancelled" as "cancelled" | "none" | "unknown",
+  rcGate: null as Promise<void> | null,
   surveyStatus: { asked: false } as { asked: boolean } | undefined,
   paywallPending: false,
   markShown: vi.fn(),
-  respond: vi.fn(),
+  respond: vi.fn(async () => ({ accepted: true })),
   capture: vi.fn(),
   // useMutation call counter — see the convex/react mock below.
   mutationCalls: 0,
@@ -113,7 +114,10 @@ vi.mock("react-native", () => ({
 vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
 vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
 vi.mock("@/lib/entitlement", () => ({
-  readRcTrialCancellation: vi.fn(async () => mock.rcState),
+  readRcTrialCancellation: vi.fn(async () => {
+    if (mock.rcGate) await mock.rcGate;
+    return mock.rcState;
+  }),
   isPaywallPending: () => mock.paywallPending,
 }));
 vi.mock("@/lib/feedback", () => ({ isHomeRootRoute: () => mock.segments[2] === "(home)" }));
@@ -162,6 +166,7 @@ beforeEach(() => {
   mock.segments = ["(app)", "(tabs)", "(home)"];
   mock.user = { _id: "user-1" };
   mock.rcState = "cancelled";
+  mock.rcGate = null;
   mock.surveyStatus = { asked: false };
   mock.paywallPending = false;
   mock.mutationCalls = 0;
@@ -251,6 +256,7 @@ describe("useCancelSurvey", () => {
     react.mount(() => useCancelSurvey());
     await flush();
     latest().submit("too_expensive");
+    await flush(); // capture is gated on the server's accepted verdict
     expect(mock.respond).toHaveBeenCalledWith({
       outcome: "submitted",
       reason: "too_expensive",
@@ -266,8 +272,48 @@ describe("useCancelSurvey", () => {
     react.mount(() => useCancelSurvey());
     await flush();
     latest().dismiss();
+    await flush();
     expect(mock.respond).toHaveBeenCalledWith({ outcome: "dismissed" });
     expect(latest().visible).toBe(false);
+  });
+
+  it("captures nothing when another device already answered the ask", async () => {
+    mock.respond.mockResolvedValueOnce({ accepted: false });
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().submit("too_expensive");
+    await flush();
+
+    expect(mock.respond).toHaveBeenCalledTimes(1);
+    expect(
+      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted"),
+    ).toHaveLength(0);
+    expect(latest().visible).toBe(false);
+  });
+
+  it("retries detection when the user leaves Home mid-read and returns", async () => {
+    let release!: () => void;
+    mock.rcGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    react.mount(() => useCancelSurvey());
+    await flush(); // first read is gated in flight
+    expect(latest().visible).toBe(false);
+
+    // Navigate away mid-read: the attempt is cancelled and must not consume
+    // the foreground episode.
+    mock.segments = ["(app)", "(tabs)", "(search)"];
+    react.rerender();
+    release();
+    await flush(); // stale read resolves into the void
+
+    mock.segments = ["(app)", "(tabs)", "(home)"];
+    react.rerender();
+    await flush(); // a fresh, complete read in the same session
+
+    const { readRcTrialCancellation } = await import("@/lib/entitlement");
+    expect(vi.mocked(readRcTrialCancellation)).toHaveBeenCalledTimes(2);
+    expect(latest().visible).toBe(true);
   });
 
   it("waits out a paywall sheet instead of spending the ask under it", async () => {
@@ -303,6 +349,7 @@ describe("useCancelSurvey", () => {
     const survey = latest();
     survey.submit("too_expensive");
     survey.submit("other"); // second tap lands before the re-render hides the card
+    await flush();
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
     expect(
