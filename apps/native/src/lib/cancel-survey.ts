@@ -1,18 +1,21 @@
-import { createMMKV } from 'react-native-mmkv';
 import { analytics, type CancelSurveyReason } from '@/lib/analytics';
 import { isAnalyticsAvailable } from '@/lib/posthog';
 
 export type { CancelSurveyReason };
 
 /**
- * Next-visit cancel survey.
+ * Next-visit cancel survey — client boundary.
  *
  * Shown once per account on the Home root when RevenueCat reports the user's
  * trial is cancelled but still inside its window (`willRenew === false`,
- * period `TRIAL` — see lib/trial-cancellation.ts). This is the only
- * stated-reason channel in v1; it deliberately fires on the next app visit
- * rather than at the cancel moment, because nothing in-app can intercept
- * Apple's cancel sheet.
+ * period `TRIAL` — see lib/trial-cancellation.ts). It deliberately fires on
+ * the next Home visit after a cancellation rather than at the cancel moment,
+ * because nothing in-app can intercept Apple's cancel sheet.
+ *
+ * Once-per-account is enforced server-side (convex/cancelSurvey.ts): the row
+ * is the durable record across devices and reinstalls, and useCancelSurvey
+ * fails closed — no card when the ask cannot be verified as unspent. There is
+ * deliberately no local persistence here.
  *
  * Privacy rules, mirroring lib/feedback.ts:
  * - Events carry bounded reason ids only — never free text, URLs, or content.
@@ -33,78 +36,6 @@ export function isCancelSurveyReason(
   return (CANCEL_SURVEY_REASONS as readonly string[]).includes(value);
 }
 
-export type CancelSurveyState = {
-  /** The card has already appeared for this account — ask once, ever. */
-  asked: boolean;
-  askedAt: number | null;
-  submitted: boolean;
-};
-
-export function emptyCancelSurveyState(): CancelSurveyState {
-  return { asked: false, askedAt: null, submitted: false };
-}
-
-export function parseCancelSurveyState(
-  raw: string | undefined,
-): CancelSurveyState {
-  const fallback = emptyCancelSurveyState();
-  if (!raw) return fallback;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return fallback;
-  const record = parsed as Record<string, unknown>;
-  return {
-    asked: record.asked === true,
-    askedAt:
-      typeof record.askedAt === 'number' && record.askedAt > 0
-        ? record.askedAt
-        : null,
-    submitted: record.submitted === true,
-  };
-}
-
-/** The card may appear only before its one ask — dismissal ends it forever. */
-export function canShowCancelSurvey(state: CancelSurveyState): boolean {
-  return !state.asked && !state.submitted;
-}
-
-// --- persistence ------------------------------------------------------------
-
-const store = createMMKV({ id: 'cancel-survey' });
-
-const stateKey = (userId: string) => `cancel.survey.${userId}`;
-
-export function readCancelSurveyState(userId: string): CancelSurveyState {
-  return parseCancelSurveyState(store.getString(stateKey(userId)));
-}
-
-export function writeCancelSurveyState(
-  userId: string,
-  state: CancelSurveyState,
-): void {
-  store.set(stateKey(userId), JSON.stringify(state));
-}
-
-/** Called when the card is displayed — the ask is spent even if dismissed. */
-export function markCancelSurveyShown(userId: string): void {
-  writeCancelSurveyState(userId, {
-    ...readCancelSurveyState(userId),
-    asked: true,
-    askedAt: Date.now(),
-  });
-}
-
-export function markCancelSurveySubmitted(userId: string): void {
-  writeCancelSurveyState(userId, {
-    ...readCancelSurveyState(userId),
-    submitted: true,
-  });
-}
-
 // --- analytics boundary -----------------------------------------------------
 
 export const cancelSurveyAnalytics = {
@@ -112,6 +43,7 @@ export const cancelSurveyAnalytics = {
     return isAnalyticsAvailable();
   },
 
+  /** Fires when the card actually renders, not when cancellation is detected. */
   shown(): void {
     analytics.capture('cancel_survey_shown');
   },

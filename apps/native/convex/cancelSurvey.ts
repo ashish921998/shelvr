@@ -1,0 +1,101 @@
+import { v } from "convex/values";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { requireUserId } from "./model/auth";
+
+/**
+ * Durable state for the next-visit cancel survey (the client boundary is
+ * apps/native/src/lib/cancel-survey.ts).
+ *
+ * The row enforces the analytics assumption "at most one response per
+ * person": existence of a row is the ask, and the first recorded outcome
+ * wins. Local device state cannot guarantee this across installs or devices.
+ *
+ * The ask is consumed only when the card actually renders on screen — the
+ * client calls `markShown` from the card's mount, never at detection time,
+ * so closing the app on a loading screen leaves the ask unspent.
+ *
+ * All functions derive the user from the session (never arguments), and a
+ * response is never proof of cancellation: only the RevenueCat webhook
+ * events count as cancellations (docs/analytics/payment-funnel.md).
+ */
+
+async function findSurveyRow(ctx: QueryCtx | MutationCtx, userId: string) {
+  return await ctx.db
+    .query("cancelSurveys")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+}
+
+/** Reactive gate for the client: has this account already been asked? */
+export const getStatus = query({
+  args: {},
+  returns: v.object({ asked: v.boolean() }),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const row = await findSurveyRow(ctx, userId);
+    return { asked: row !== null };
+  },
+});
+
+/**
+ * Consume the ask durably. Idempotent — a second call (relaunch, another
+ * device racing the same moment) is a no-op, so the account is spent exactly
+ * once no matter how many installations race.
+ */
+export const markShown = mutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    if (await findSurveyRow(ctx, userId)) return null;
+    await ctx.db.insert("cancelSurveys", {
+      userId,
+      askedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * Record how the ask ended. First response wins: once `outcome` is set, a
+ * later call (stale device, reinstall) is ignored. Lenient about ordering —
+ * a response may arrive before `markShown` lands (e.g. an offline queue
+ * flushes out of order) and creates the row itself.
+ */
+export const respond = mutation({
+  args: {
+    outcome: v.union(v.literal("submitted"), v.literal("dismissed")),
+    reason: v.optional(
+      v.union(
+        v.literal("too_expensive"),
+        v.literal("not_useful_enough"),
+        v.literal("missing_feature"),
+        v.literal("other"),
+      ),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const existing = await findSurveyRow(ctx, userId);
+    const now = Date.now();
+    if (existing === null) {
+      await ctx.db.insert("cancelSurveys", {
+        userId,
+        askedAt: now,
+        outcome: args.outcome,
+        ...(args.reason !== undefined ? { reason: args.reason } : {}),
+        respondedAt: now,
+      });
+      return null;
+    }
+    if (existing.outcome !== undefined) return null;
+    await ctx.db.patch(existing._id, {
+      outcome: args.outcome,
+      ...(args.reason !== undefined ? { reason: args.reason } : {}),
+      respondedAt: now,
+    });
+    return null;
+  },
+});

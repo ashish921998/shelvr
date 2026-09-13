@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { InlineCard } from '@/components/ui/inline-card';
@@ -15,17 +16,25 @@ const REASON_LABELS: Record<CancelSurveyReason, string> = {
 
 /**
  * The one-time cancel-survey card shown on Home after a trial cancellation is
- * detected (auto-renew off, trial still active). Purely presentational; state
- * and analytics live in useCancelSurvey. Tapping a reason submits it — no
- * separate send step, no free text anywhere.
+ * detected (auto-renew off, trial still active). Presentational apart from
+ * one signal: `onPresented` fires on mount, because the ask is consumed only
+ * when the card actually renders — never when cancellation is merely
+ * detected. State and analytics live in useCancelSurvey. Tapping a reason
+ * submits it — no separate send step, no free text anywhere.
  */
 export function CancelSurveyCard({
   onSubmit,
   onDismiss,
+  onPresented,
 }: {
   onSubmit: (reason: CancelSurveyReason) => void;
   onDismiss: () => void;
+  onPresented: () => void;
 }) {
+  useEffect(() => {
+    onPresented();
+  }, [onPresented]);
+
   return (
     <InlineCard
       testID="cancel-survey-card"

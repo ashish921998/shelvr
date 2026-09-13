@@ -240,6 +240,29 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
+  // row is the durable, cross-install record: its existence is the ask, and
+  // the first recorded outcome wins. Local (MMKV) state can never enforce
+  // once-per-account across devices or reinstalls — only this row can.
+  cancelSurveys: defineTable({
+    userId: v.string(),
+    askedAt: v.number(),
+    outcome: v.optional(
+      v.union(v.literal("submitted"), v.literal("dismissed")),
+    ),
+    // Bounded reason id from the client survey (never free text); mirrors
+    // CancelSurveyReason in apps/native/src/lib/analytics.ts.
+    reason: v.optional(
+      v.union(
+        v.literal("too_expensive"),
+        v.literal("not_useful_enough"),
+        v.literal("missing_feature"),
+        v.literal("other"),
+      ),
+    ),
+    respondedAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
+
   // One Expo push token per device. A token row moves to a different account
   // only after its current owner disables it (the client revokes every stored
   // token before sign-out); an enabled row owned by someone else is never

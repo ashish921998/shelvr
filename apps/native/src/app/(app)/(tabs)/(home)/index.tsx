@@ -24,6 +24,7 @@ export default function HomeScreen() {
   // the Home moment when both prompts are eligible.
   const cancelSurveyCard = cancelSurvey.visible ? (
     <CancelSurveyCard
+      onPresented={cancelSurvey.presented}
       onSubmit={cancelSurvey.submit}
       onDismiss={cancelSurvey.dismiss}
     />
