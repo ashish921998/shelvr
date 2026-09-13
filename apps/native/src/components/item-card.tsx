@@ -224,7 +224,6 @@ function CardCaption({
   menuActions: ActionMenuItem[];
   theme: UnistylesTheme;
 }) {
-  useAppLocale();
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>

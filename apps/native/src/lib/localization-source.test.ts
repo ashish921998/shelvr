@@ -8,8 +8,29 @@ const brands = new Set(["Shelvr", "shelvr", "Shelvr Pro", "Pro", "TikTok"]);
 const visibleProperty =
   /^(title|label|message|text|placeholder|headline|support)$|(?:Label|Hint|Title)$/;
 
+function alertReceivers(source: ts.SourceFile): Set<string> {
+  const receivers = new Set<string>();
+  for (const statement of source.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== "react-native"
+    )
+      continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const binding of bindings.elements) {
+        if ((binding.propertyName ?? binding.name).text === "Alert")
+          receivers.add(binding.name.text);
+      }
+    }
+  }
+  return receivers;
+}
+
 function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const alerts = alertReceivers(source);
   const issues: string[] = [];
   const record = (node: ts.Node, message: string) => {
     const line =
@@ -42,6 +63,15 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
     // Non-literal keys are constrained by t()'s generated MessageKey type.
     // This also checks arrays/maps and required interpolation parameters in tsc.
   };
+  const checkAlertButtons = (node: ts.Node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name)) &&
+      node.name.text === "text"
+    )
+      checkVisible(node.initializer, true);
+    ts.forEachChild(node, checkAlertButtons);
+  };
   const visit = (node: ts.Node) => {
     if (
       ts.isJsxText(node) &&
@@ -71,8 +101,14 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
     if (ts.isCallExpression(node)) {
       if (node.expression.getText(source) === "t" && node.arguments[0])
         checkKey(node.arguments[0]);
-      if (node.expression.getText(source) === "Alert.alert")
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === "alert" &&
+        alerts.has(node.expression.expression.getText(source))
+      ) {
         node.arguments.slice(0, 2).forEach((arg) => checkVisible(arg));
+        if (node.arguments[2]) checkAlertButtons(node.arguments[2]);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -85,7 +121,10 @@ it.each([
   '<Stack.Screen options={{ title: "spaces" }} />',
   '<Text>{count === 1 ? "1 deleted" : t("tidy.deletedCount", { count })}</Text>',
   '<Failure retryLabel={failed ? "Retry" : "Done"} />',
-  'Alert.alert("Could not save", "Try again.")',
+  'import { Alert } from "react-native"; Alert.alert("Could not save", "Try again.")',
+  'import { Alert } from "react-native"; Alert.alert(t("common.save"), undefined, [{ text: "Retry" }])',
+  'import { Alert as NativeAlert } from "react-native"; NativeAlert.alert(t("common.save"), undefined, [{ text: failed ? "Retry" : "Done" }])',
+  'import { Alert } from "react-native"; Alert.alert(t("common.save"), undefined, [{ "text": `Cancel` }])',
   "const label = t(`missing.key`);",
 ])("detects untranslated regression: %s", (source) => {
   expect(untranslatedLiterals(source).length).toBeGreaterThan(0);
@@ -96,6 +135,26 @@ it("allows translated copy, user content and stable technical identities", () =>
     untranslatedLiterals(
       '<Text>{item.title}</Text>; <Button testID="save" label={t("common.save")} />',
     ),
+  ).toEqual([]);
+});
+
+it("checks Alert buttons without treating technical text mappings as copy", () => {
+  expect(
+    untranslatedLiterals(`
+      import { Alert } from "react-native";
+      Alert.alert(t("common.save"), undefined, [
+        { text: t("common.cancel") },
+        { text: "common.save" },
+        { text: item.title },
+      ]);
+      const icons = { message: "message", text: "text" };
+    `),
+  ).toEqual([]);
+  expect(
+    untranslatedLiterals(`
+      import { Alert } from "monitoring";
+      Alert.alert("internal event", "internal detail", [{ text: "internal value" }]);
+    `),
   ).toEqual([]);
 });
 
