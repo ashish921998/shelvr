@@ -457,7 +457,7 @@ export default function ShareScreen() {
     return (
       <Centered
         phaseKey="checking-entitlement"
-        label={t("Checking subscription…")}
+        label={t("pro.checking")}
         spinner
         theme={theme}
       />
@@ -470,16 +470,16 @@ export default function ShareScreen() {
   if (phase.kind === "locked") {
     return (
       <PhaseSurface key="locked" phaseKey="locked">
-        <Text style={styles.title(theme)}>{t("Unlock Shelvr Pro")}</Text>
-        <Text style={styles.subtitle(theme)}>
-          {t(
-            "Saving shared content is a Pro feature. View Shelvr Pro plans to save it to your hub.",
-          )}
-        </Text>
+        <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
+        <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
         <View style={styles.actions}>
-          <Button label={t("Cancel")} theme={theme} onPress={() => abandon()} />
           <Button
-            label={t("Unlock Pro")}
+            label={t("common.cancel")}
+            theme={theme}
+            onPress={() => abandon()}
+          />
+          <Button
+            label={t("pro.unlock")}
             theme={theme}
             primary
             onPress={() => {
@@ -498,7 +498,7 @@ export default function ShareScreen() {
     return (
       <Centered
         phaseKey="resolving"
-        label={t("Reading shared content…")}
+        label={t("share.reading")}
         spinner
         theme={theme}
       />
@@ -508,9 +508,9 @@ export default function ShareScreen() {
     return (
       <ErrorActions
         phaseKey="nothing-resolved"
-        title={t("Nothing to save")}
+        title={t("share.empty")}
         theme={theme}
-        retryLabel="Done"
+        retryLabel={t("common.done")}
         onRetry={abandon}
         single
       />
@@ -521,7 +521,7 @@ export default function ShareScreen() {
     return (
       <Centered
         phaseKey="saving"
-        label={t("Saved %{saved} of %{total}…", { saved, total })}
+        label={t("share.progress", { saved, total })}
         spinner
         theme={theme}
       />
@@ -539,17 +539,15 @@ export default function ShareScreen() {
     // word the subtitle from the count rather than assuming at least one failed.
     const failedWording =
       failed === 0
-        ? t("Some items are still pending.")
-        : failed === 1
-          ? t("One item couldn’t be saved.")
-          : t("Items not saved: %{count}", { count: failed });
+        ? t("share.pending")
+        : t("share.failureCount", { count: failed });
     return (
       <PhaseSurface key="partial" phaseKey="partial">
         <Text style={styles.title(theme)}>
-          {t("Saved %{saved} of %{total}", { saved, total })}
+          {t("share.savedCount", { saved, total })}
         </Text>
         <Text style={styles.subtitle(theme)}>
-          {failedWording} {t("You can retry, or keep what saved.")}
+          {failedWording} {t("share.retryHelp")}
         </Text>
         <ScrollView
           style={styles.list}
@@ -565,18 +563,18 @@ export default function ShareScreen() {
         </ScrollView>
         <View style={styles.actions}>
           <Button
-            label={t("Cancel")}
+            label={t("common.cancel")}
             theme={theme}
             onPress={() => completeSession(phase.session)}
           />
           <Button
-            label={t("Continue with saved")}
+            label={t("share.continueSaved")}
             theme={theme}
             onPress={() => completeSession(phase.session)}
           />
           {hasRetryable ? (
             <Button
-              label={t("Retry failed")}
+              label={t("capture.retryFailed")}
               theme={theme}
               primary
               onPress={() => {
@@ -597,11 +595,11 @@ export default function ShareScreen() {
     return (
       <ErrorActions
         phaseKey="clear-failed"
-        title={t("Saved, but couldn’t finish")}
+        title={t("share.finishFailed")}
         theme={theme}
-        cancelLabel="Cancel"
+        cancelLabel={t("common.cancel")}
         onCancel={abandon}
-        retryLabel="Try again"
+        retryLabel={t("common.tryAgain")}
         onRetry={() => completeSession(phase.session)}
       />
     );
@@ -610,7 +608,7 @@ export default function ShareScreen() {
   return (
     <Centered
       phaseKey="complete"
-      label={t("Saved to Shelvr")}
+      label={t("share.success")}
       spinner
       theme={theme}
     />

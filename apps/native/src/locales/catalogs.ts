@@ -9,7 +9,10 @@ import ja from "./ja.json";
 import ko from "./ko.json";
 import ptBR from "./pt-BR.json";
 
-export const catalogs: Record<string, Record<string, string>> = {
+export const catalogs: Record<
+  string,
+  Record<string, string | Record<string, string>>
+> = {
   de: de,
   en: en,
   es: es,

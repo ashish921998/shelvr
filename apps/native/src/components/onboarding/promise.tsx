@@ -14,38 +14,32 @@ export function PromiseStep({ onAdvance }: { onAdvance: () => void }) {
     <View style={styles.wrap}>
       <Animated.View entering={FadeInDown.duration(500)} style={styles.hero}>
         <Wordmark size={44} />
-        <Text style={styles.slogan}>{t("Save it for later.")}</Text>
+        <Text style={styles.slogan}>{t("brand.tagline")}</Text>
       </Animated.View>
 
       <View style={styles.features}>
         <FeatureRow
           delay={150}
           icon="square.grid.2x2"
-          title={t("One warm shelf")}
-          message={t(
-            "Links, photos, notes — everything lands in one calm masonry feed.",
-          )}
+          title={t("onboarding.feedTitle")}
+          message={t("onboarding.feedBody")}
         />
         <FeatureRow
           delay={280}
           icon="sparkles"
-          title={t("Shelvr tags it for you")}
-          message={t(
-            "Every save is read, titled, and tagged, then filed into your spaces.",
-          )}
+          title={t("onboarding.tagsTitle")}
+          message={t("onboarding.tagsBody")}
         />
         <FeatureRow
           delay={410}
           icon="doc.text"
-          title={t("Read it right here")}
-          message={t(
-            "Saved articles open in a clean, quiet reader — no tabs, no clutter.",
-          )}
+          title={t("onboarding.readerTitle")}
+          message={t("onboarding.readerBody")}
         />
       </View>
 
       <Animated.View entering={FadeInDown.delay(540).duration(400)}>
-        <CtaButton label={t("Get started")} onPress={onAdvance} />
+        <CtaButton label={t("onboarding.getStarted")} onPress={onAdvance} />
       </Animated.View>
     </View>
   );

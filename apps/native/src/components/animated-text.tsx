@@ -192,14 +192,67 @@ export function AnimatedText({
     typeof flat.color === "string" ? flat.color : theme.colors.foreground;
   const font = useFont(FONT, fontSize);
 
+  const nativeText =
+    needsNativeText(text) ||
+    Boolean(font?.getGlyphIDs(text).some((glyph) => glyph === 0));
+  // Native text shapes joined scripts, bidi, combining marks and emoji as runs.
+  if (!font || nativeText) {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <RNText
+          style={[
+            style,
+            { maxWidth: width },
+            nativeText && { fontFamily: undefined },
+          ]}
+          numberOfLines={truncate ? 1 : undefined}
+        >
+          {text}
+        </RNText>
+      </View>
+    );
+  }
+  return (
+    <GlyphText
+      text={text}
+      font={font}
+      fontSize={fontSize}
+      color={color}
+      containerStyle={containerStyle}
+      width={width}
+      height={height}
+      staggerMs={staggerMs}
+      blurMax={blurMax}
+      truncate={truncate}
+    />
+  );
+}
+
+// Unmount the glyph reconciliation state when native shaping takes over.
+// Returning to Latin text starts a fresh animation without stale exit glyphs.
+function GlyphText({
+  text,
+  font,
+  fontSize,
+  color,
+  containerStyle,
+  width,
+  height,
+  staggerMs,
+  blurMax,
+  truncate,
+}: Omit<Required<AnimatedTextProps>, "style" | "containerStyle"> & {
+  containerStyle?: StyleProp<ViewStyle>;
+  font: SkFont;
+  fontSize: number;
+  color: string;
+}) {
   const baselineY = height / 2 + fontSize * 0.34;
 
   const seenRef = useRef<Map<string, Cell>>(new Map());
   const [cells, setCells] = useState<Cell[]>([]);
 
   useEffect(() => {
-    if (!font || needsNativeText(text)) return;
-
     let displayText = text;
     if (truncate) {
       const chars = [...text];
@@ -262,20 +315,6 @@ export function AnimatedText({
       ),
     [],
   );
-
-  // Native text shapes joined scripts, bidi, combining marks and emoji as runs.
-  if (!font || needsNativeText(text)) {
-    return (
-      <View style={[styles.container, containerStyle]}>
-        <RNText
-          style={[style, { maxWidth: width, fontFamily: undefined }]}
-          numberOfLines={truncate ? 1 : undefined}
-        >
-          {text}
-        </RNText>
-      </View>
-    );
-  }
 
   return (
     <View

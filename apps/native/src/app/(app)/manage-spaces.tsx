@@ -105,10 +105,7 @@ export default function ManageSpacesScreen() {
         values.set(spaceId, previous);
         return { itemId: id, values };
       });
-      Alert.alert(
-        t("Couldn't change space"),
-        t("Your previous choice is still saved. Please try again."),
-      );
+      Alert.alert(t("spaces.changeFailed"), t("spaces.changeFailedBody"));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -126,25 +123,20 @@ export default function ManageSpacesScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>{t("Spaces")}</Text>
-      <Text style={styles.subheading}>
-        {t("Choose where this save lives.")}
-      </Text>
-      <Text style={styles.subheading}>
-        {t("Removed saves stay out of that Space unless you add them again.")}
-      </Text>
+      <Text style={styles.heading}>{t("navigation.spaces")}</Text>
+      <Text style={styles.subheading}>{t("spaces.membershipHelp")}</Text>
+      <Text style={styles.subheading}>{t("spaces.dismissedHelp")}</Text>
 
       {lastChange?.itemId === id ? (
         <View style={styles.undoRow} accessibilityLiveRegion="polite">
           <Text style={styles.rowLabel}>
-            {t(
-              lastChange.added ? "Added to %{space}" : "Removed from %{space}",
-              { space: lastChange.name },
-            )}
+            {t(lastChange.added ? "spaces.addedTo" : "spaces.removedFrom", {
+              space: lastChange.name,
+            })}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t("Undo space change")}
+            accessibilityLabel={t("spaces.undoChange")}
             accessibilityState={{ disabled: busy }}
             disabled={busy}
             style={styles.undoButton}
@@ -152,7 +144,7 @@ export default function ManageSpacesScreen() {
               void toggle(lastChange.spaceId, !lastChange.added, true)
             }
           >
-            <Text style={styles.undoText}>{t("Undo")}</Text>
+            <Text style={styles.undoText}>{t("common.undo")}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -161,13 +153,11 @@ export default function ManageSpacesScreen() {
         <ActivityIndicator style={styles.spinner} />
       ) : item === null ? (
         <EmptyState
-          title={t("Unavailable")}
-          message={t("This save is unavailable.")}
+          title={t("common.unavailable")}
+          message={t("item.unavailable")}
         />
       ) : spaces.length === 0 ? (
-        <Text style={styles.empty}>
-          {t("No spaces yet — create one from the Spaces tab.")}
-        </Text>
+        <Text style={styles.empty}>{t("spaces.noneAvailable")}</Text>
       ) : (
         <View style={styles.list}>
           {spaces.map((space) => (

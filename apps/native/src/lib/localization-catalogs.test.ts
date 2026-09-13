@@ -1,4 +1,15 @@
+import {
+  de,
+  en as english,
+  es,
+  fr,
+  ja,
+  ko,
+  pt,
+} from "make-plural/pluralCategories";
 import notificationTranslations from "../../convex/model/notificationTranslations.json";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolveLocale } from "./i18n-core";
 import {
@@ -80,39 +91,61 @@ describe("shipped localization resources", () => {
         new URL(`../locales/${locale}.json`, import.meta.url),
         "utf8",
       ),
-    ) as Record<string, string>;
+    ) as Record<string, string | Record<string, string>>;
     expect(Object.keys(messages).sort()).toEqual(Object.keys(en).sort());
-    const notificationCopy: Record<string, { title: string; body: string }> =
-      notificationTranslations;
+    const notificationCopy: Record<
+      string,
+      { title: string; body: Record<string, string> }
+    > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
-      title: messages["Your weekly shelf"],
-      body: messages["Saves waiting for you: %{count}"],
+      title: messages["digest.title"],
+      body: messages["digest.waitingCount"],
     });
-    const navigation = ["Home", "Spaces", "Tidy", "Map", "Search"].map(
-      (key) => messages[key],
-    );
+    const navigation = [
+      "navigation.home",
+      "navigation.spaces",
+      "navigation.tidy",
+      "navigation.map",
+      "navigation.search",
+    ].map((key) => messages[key]);
     expect(
       new Set(navigation).size,
       `${locale}: distinct navigation labels`,
     ).toBe(5);
     for (const [key, source] of Object.entries(en)) {
       const translated = messages[key];
-      expect(typeof translated, `${locale}: ${key}`).toBe("string");
-      expect(translated.trim(), `${locale}: empty ${key}`).not.toBe("");
-      expect(
-        placeholders(translated),
-        `${locale}: placeholders in ${key}`,
-      ).toEqual(placeholders(source));
-      for (const atom of atoms(source)) {
-        // Some languages append grammatical suffixes to an unchanged brand.
-        expect(translated, `${locale}: protected atom in ${key}`).toContain(
-          atom,
+      expect(typeof translated).toBe(typeof source);
+      const reference = typeof source === "string" ? source : source.other;
+      if (typeof translated === "object") {
+        const categories: Record<string, { cardinal: readonly string[] }> = {
+          de,
+          en: english,
+          es,
+          fr,
+          ja,
+          ko,
+          pt,
+        };
+        expect(Object.keys(translated).sort()).toEqual(
+          [...categories[locale.split("-")[0]].cardinal].sort(),
         );
       }
-      if (locale !== "en" && source.split(/\s+/).length >= 4) {
-        expect(translated, `${locale}: untranslated sentence ${key}`).not.toBe(
-          source,
-        );
+      const variants =
+        typeof translated === "string"
+          ? [translated]
+          : Object.values(translated);
+      for (const variant of variants) {
+        expect(variant.trim(), `${locale}: empty ${key}`).not.toBe("");
+        expect(
+          placeholders(variant),
+          `${locale}: placeholders in ${key}`,
+        ).toEqual(placeholders(reference));
+        for (const atom of atoms(reference))
+          expect(variant, `${locale}: protected atom in ${key}`).toContain(
+            atom,
+          );
+        if (locale !== "en" && reference.split(/\s+/).length >= 4)
+          expect(variant, `${locale}: untranslated ${key}`).not.toBe(reference);
       }
     }
   });
@@ -124,14 +157,15 @@ describe("shipped localization resources", () => {
         "utf8",
       ),
     );
-    for (const key of ["Recent Saves", "Your latest saves, at a glance."]) {
-      expect(Object.keys(widget.strings[key].localizations).sort()).toEqual(
-        locales,
-      );
+    for (const key of ["widget.title", "widget.description"] as const) {
+      const nativeKey = en[key];
+      expect(
+        Object.keys(widget.strings[nativeKey].localizations).sort(),
+      ).toEqual(locales);
       for (const locale of locales) {
-        expect(widget.strings[key].localizations[locale].stringUnit.value).toBe(
-          catalogs[locale][key],
-        );
+        expect(
+          widget.strings[nativeKey].localizations[locale].stringUnit.value,
+        ).toBe(catalogs[locale][key]);
       }
     }
   });
@@ -147,21 +181,29 @@ describe("shipped localization resources", () => {
         ),
       );
       expect(native.ios.NSCameraUsageDescription).toBe(
-        messages[
-          "Shelvr uses your camera so you can capture things you want to save for later."
-        ],
+        messages["permissions.cameraUsage"],
       );
       expect(native.ios.NSPhotoLibraryUsageDescription).toBe(
-        messages[
-          "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library."
-        ],
+        messages["permissions.photosUsage"],
       );
       expect(native.ios.NSCalendarsFullAccessUsageDescription).toBe(
-        messages[
-          "Shelvr adds events to your calendar from things you've saved."
-        ],
+        messages["permissions.calendarUsage"],
       );
       expect(native.ios.CFBundleDisplayName).toBeUndefined();
     },
   );
+});
+
+it("commits reproducible catalogs, message types and native resources", () => {
+  const root = new URL("../../../../", import.meta.url);
+  expect(() =>
+    execFileSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL("tools/generate-localizations.mjs", root)),
+        "--check",
+      ],
+      { cwd: fileURLToPath(root), stdio: "pipe" },
+    ),
+  ).not.toThrow();
 });

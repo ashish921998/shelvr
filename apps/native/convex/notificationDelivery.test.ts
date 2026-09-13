@@ -78,13 +78,50 @@ describe("durable digest delivery", () => {
       payloads.find((p: { to: string }) => p.to === "token-a"),
     ).toMatchObject({
       title: translations.ja.title,
-      body: translations.ja.body.replace("%{count}", "1"),
+      body: translations.ja.body.other.replace("%{formattedCount}", "1"),
     });
     expect(
       payloads.find((p: { to: string }) => p.to === "token-b"),
     ).toMatchObject({
       title: "Your weekly shelf is ready",
       body: "1 saved things are waiting on your weekly shelf.",
+    });
+  });
+
+  it("keeps Japanese copy on a resend after a nonterminal receipt error", async () => {
+    const { t, digestId, advance, digest } = await seed();
+    await t.run(async (ctx) => {
+      const device = await ctx.db
+        .query("notificationDevices")
+        .withIndex("by_token", (q) => q.eq("token", "token-a"))
+        .unique();
+      await ctx.db.patch(device!._id, { locale: "ja" });
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
+      .mockResolvedValueOnce(
+        json({
+          "ticket-a": {
+            status: "error",
+            details: { error: "MessageRateExceeded" },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-retry" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const retried = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(retried[0]).toMatchObject({
+      title: translations.ja.title,
+      body: translations.ja.body.other.replace("%{formattedCount}", "1"),
+    });
+    expect((await digest())?.deliveryRecipients?.[0]).toMatchObject({
+      locale: "ja",
+      state: "receipt",
     });
   });
 

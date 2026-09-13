@@ -46,37 +46,30 @@ export default function SpaceScreen() {
 
   // `undefined` = loading (nothing cached yet); `null` = not found.
   if (space === undefined) {
-    return <ScreenLoader label={t("Opening space")} />;
+    return <ScreenLoader label={t("loading.space")} />;
   }
 
   if (space === null) {
     return (
       <View style={styles.loading}>
-        <EmptyState
-          title={t("Gone")}
-          message={t("This space no longer exists.")}
-        />
+        <EmptyState title={t("item.goneTitle")} message={t("spaces.gone")} />
       </View>
     );
   }
 
   const confirmDelete = () => {
-    Alert.alert(
-      t("Delete space?"),
-      t("Your saves stay in Home — only the shelf goes away."),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        {
-          text: t("Delete"),
-          style: "destructive",
-          onPress: async () => {
-            router.back();
-            await deleteSpace({ id: space._id });
-            analytics.capture("space_deleted");
-          },
+    Alert.alert(t("spaces.deleteTitle"), t("spaces.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: async () => {
+          router.back();
+          await deleteSpace({ id: space._id });
+          analytics.capture("space_deleted");
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const addAll = () => {
@@ -114,7 +107,7 @@ export default function SpaceScreen() {
                   <View style={styles.headerActions}>
                     <HeaderIconButton
                       icon="plus"
-                      label={t("Add to space")}
+                      label={t("spaces.addItem")}
                       onPress={() =>
                         router.push({
                           pathname: "/add",
@@ -124,11 +117,11 @@ export default function SpaceScreen() {
                     />
                     <HeaderActionMenu
                       icon="ellipsis"
-                      label={t("Space actions")}
+                      label={t("spaces.actions")}
                       title={space.name}
                       actions={[
                         {
-                          label: t("Edit space"),
+                          label: t("spaces.editTitle"),
                           onPress: () =>
                             router.push({
                               pathname: "/new-space",
@@ -136,7 +129,7 @@ export default function SpaceScreen() {
                             }),
                         },
                         {
-                          label: t("Delete space"),
+                          label: t("spaces.delete"),
                           destructive: true,
                           onPress: confirmDelete,
                         },
@@ -167,7 +160,7 @@ export default function SpaceScreen() {
               router.push({ pathname: "/add", params: { spaceId: id } })
             }
           >
-            {t("Add")}
+            {t("common.add")}
           </Stack.Toolbar.Button>
           <Stack.Toolbar.Menu icon="ellipsis">
             <Stack.Toolbar.MenuAction
@@ -176,14 +169,14 @@ export default function SpaceScreen() {
                 router.push({ pathname: "/new-space", params: { id } })
               }
             >
-              {t("Edit space")}
+              {t("spaces.editTitle")}
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
               icon="trash"
               destructive
               onPress={confirmDelete}
             >
-              {t("Delete space")}
+              {t("spaces.delete")}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
@@ -213,24 +206,22 @@ export default function SpaceScreen() {
                   tintColor={theme.colors.primaryText}
                 />
                 <Text style={styles.suggestionsText}>
-                  {t("Suggestions: %{count}", { count: suggestionCount })}
+                  {t("spaces.suggestionCount", { count: suggestionCount })}
                 </Text>
                 <Pressable
                   onPress={addAll}
                   hitSlop={8}
                   style={({ pressed }) => pressed && { opacity: 0.7 }}
                 >
-                  <Text style={styles.addAllText}>{t("Add all")}</Text>
+                  <Text style={styles.addAllText}>{t("spaces.addAll")}</Text>
                 </Pressable>
               </Animated.View>
             ) : undefined
           }
           ListEmptyComponent={
             <EmptyState
-              title={t("Nothing here yet")}
-              message={t(
-                "Shelvr is looking for saves that fit this space —\nor add your own with the + above.",
-              )}
+              title={t("spaces.emptyTitle")}
+              message={t("spaces.emptyBody")}
             />
           }
         />

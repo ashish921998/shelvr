@@ -36,33 +36,31 @@ export default function DigestScreen() {
     return (
       <View style={styles.empty}>
         <EmptyState
-          title={t("Couldn’t load your weekly shelf")}
-          message={t("Check your connection and try opening it again.")}
+          title={t("digest.loadFailed")}
+          message={t("digest.retryHelp")}
         />
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace("/")}
           style={[styles.button, styles.errorButton]}
         >
-          <Text style={styles.buttonText}>{t("Back to library")}</Text>
+          <Text style={styles.buttonText}>{t("capture.backToLibrary")}</Text>
         </Pressable>
       </View>
     );
   }
 
   if (digest === undefined) {
-    return <ScreenLoader label={t("Opening your weekly shelf")} />;
+    return <ScreenLoader label={t("loading.digest")} />;
   }
 
   if (digest === null || digest.items.length === 0) {
     return (
       <View style={styles.empty}>
-        <Stack.Screen options={{ title: t("Weekly shelf") }} />
+        <Stack.Screen options={{ title: t("notifications.weeklyShelf") }} />
         <EmptyState
-          title={t("Nothing waiting")}
-          message={t(
-            "Your weekly shelf will appear here when you have a few unopened saves.",
-          )}
+          title={t("digest.emptyTitle")}
+          message={t("digest.emptyBody")}
         />
       </View>
     );
@@ -79,19 +77,17 @@ export default function DigestScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: t("Weekly shelf") }} />
+      <Stack.Screen options={{ title: t("notifications.weeklyShelf") }} />
       <MasonryFeed
         items={digest.items}
         numColumns={2}
         source={{ from: "home" }}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.eyebrow}>
-              {t("A FEW SAVES WORTH REVISITING")}
-            </Text>
-            <Text style={styles.title}>{t("Your weekly shelf")}</Text>
+            <Text style={styles.eyebrow}>{t("digest.eyebrow")}</Text>
+            <Text style={styles.title}>{t("digest.title")}</Text>
             <Text style={styles.subtitle}>
-              {t("Saves waiting for you: %{count}", {
+              {t("digest.waitingCount", {
                 count: digest.itemCount,
               })}
             </Text>
@@ -103,7 +99,7 @@ export default function DigestScreen() {
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Text style={styles.buttonText}>{t("Open next")}</Text>
+              <Text style={styles.buttonText}>{t("digest.openNext")}</Text>
             </Pressable>
           </View>
         }

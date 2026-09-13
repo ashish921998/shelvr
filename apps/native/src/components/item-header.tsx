@@ -15,7 +15,7 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
     item?.title ||
     item?.note ||
     displayHost(item?.url) ||
-    (item?.type === "image" ? t("Saved photo") : t("Untitled"));
+    (item?.type === "image" ? t("item.savedPhoto") : t("item.untitled"));
 
   const when =
     item?.type === "image" && item?.capturedAt

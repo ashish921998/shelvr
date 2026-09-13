@@ -56,15 +56,15 @@ function widgetTitle(item: FeedItem): string {
   if (item.title) return item.title;
   if (item.type === "note" && item.note)
     return item.note.split("\n")[0].slice(0, 80);
-  if (item.type === "link") return displayHost(item.url) || t("Link");
-  return t("Saved item");
+  if (item.type === "link") return displayHost(item.url) || t("item.link");
+  return t("item.savedItem");
 }
 
 function widgetSubtitle(item: FeedItem): string {
   if (item.type === "link")
-    return item.siteName || displayHost(item.url) || t("Link");
-  if (item.type === "note") return t("Note");
-  return t("Photo");
+    return item.siteName || displayHost(item.url) || t("item.link");
+  if (item.type === "note") return t("item.note");
+  return t("item.photo");
 }
 
 async function syncWidget(items: FeedItem[]) {
@@ -101,8 +101,8 @@ async function syncWidget(items: FeedItem[]) {
 
   RecentSavesWidget.updateSnapshot({
     items: widgetItems,
-    emptyTitle: t("Nothing saved yet"),
-    emptyHint: t("Tap + to save a link, photo, or note"),
+    emptyTitle: t("widget.emptyTitle"),
+    emptyHint: t("widget.emptyBody"),
   });
 
   // Drop thumbnails for items that left the widget so the shared container

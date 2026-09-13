@@ -24,7 +24,7 @@ export default function AppLayout() {
   useResumePendingShare();
 
   if (isLoading) {
-    return <ScreenLoader label={t("Opening Shelvr")} />;
+    return <ScreenLoader label={t("loading.app")} />;
   }
 
   // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen
@@ -58,14 +58,14 @@ export default function AppLayout() {
           <Stack.Screen
             name="digest/[id]"
             options={{
-              title: t("Weekly shelf"),
+              title: t("notifications.weeklyShelf"),
               headerBackButtonDisplayMode: "minimal",
               headerBackVisible: true,
               headerLeft: ({ canGoBack }) =>
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("Back to library")}
+                    label={t("capture.backToLibrary")}
                     onPress={() => router.replace("/")}
                   />
                 ),

@@ -31,7 +31,7 @@ export function useFindLinks(item: SearchableItem | undefined) {
     try {
       if (await guard()) await search({ id: item._id });
     } catch {
-      Alert.alert(t("Couldn't search"), t("Please try again in a moment."));
+      Alert.alert(t("errors.searchTitle"), t("errors.retrySoon"));
     } finally {
       inFlight.current = false;
       setFinding(false);

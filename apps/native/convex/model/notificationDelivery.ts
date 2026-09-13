@@ -1,5 +1,6 @@
 import { v, type Infer } from "convex/values";
 import translations from "./notificationTranslations.json";
+import { pluralRules } from "./localization";
 
 const fields = {
   token: v.string(),
@@ -37,6 +38,7 @@ export function recipientError(recipient: Recipient, error: string): Recipient {
   ].includes(error);
   return {
     token: recipient.token,
+    locale: recipient.locale,
     state: terminal ? "failed" : "pending",
     error,
   };
@@ -56,14 +58,16 @@ export function digestCopy(locale: string | undefined, count: number) {
       title: "Your weekly shelf is ready",
       body: `${count} saved things are waiting on your weekly shelf.`,
     };
-  const catalogs: Record<string, { title: string; body: string }> =
-    translations;
+  const catalogs: Record<
+    string,
+    { title: string; body: Record<string, string> }
+  > = translations;
   const selected = notificationLocale(locale) ?? "en";
   const copy = catalogs[selected];
   return {
     title: copy.title,
-    body: copy.body.replace(
-      "%{count}",
+    body: copy.body[pluralRules[selected](count)].replace(
+      "%{formattedCount}",
       new Intl.NumberFormat(selected).format(count),
     ),
   };

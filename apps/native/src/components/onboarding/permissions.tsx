@@ -18,18 +18,14 @@ export function PermissionsStep({ onAdvance }: { onAdvance: () => void }) {
         entering={FadeInDown.duration(400)}
         style={styles.headline}
       >
-        {t("Access when you need it.")}
+        {t("permissions.title")}
       </Animated.Text>
 
       <Animated.View
         entering={FadeInDown.delay(120).duration(400)}
         style={styles.list}
       >
-        <Text style={styles.hint}>
-          {t(
-            "Shelvr only asks for permissions when you use the matching feature.",
-          )}
-        </Text>
+        <Text style={styles.hint}>{t("permissions.help")}</Text>
         <View style={styles.row}>
           <AppSymbolIcon
             name="camera"
@@ -37,10 +33,8 @@ export function PermissionsStep({ onAdvance }: { onAdvance: () => void }) {
             tintColor={theme.colors.primaryText}
           />
           <View style={styles.copy}>
-            <Text style={styles.label}>{t("Camera")}</Text>
-            <Text style={styles.detail}>
-              {t("When you capture something to save.")}
-            </Text>
+            <Text style={styles.label}>{t("capture.camera")}</Text>
+            <Text style={styles.detail}>{t("permissions.cameraContext")}</Text>
           </View>
         </View>
         <View style={styles.row}>
@@ -50,15 +44,13 @@ export function PermissionsStep({ onAdvance }: { onAdvance: () => void }) {
             tintColor={theme.colors.primaryText}
           />
           <View style={styles.copy}>
-            <Text style={styles.label}>{t("Photo Library")}</Text>
-            <Text style={styles.detail}>
-              {t("When you import a photo or run Tidy.")}
-            </Text>
+            <Text style={styles.label}>{t("permissions.photoLibrary")}</Text>
+            <Text style={styles.detail}>{t("permissions.photosContext")}</Text>
           </View>
         </View>
       </Animated.View>
 
-      <CtaButton label={t("Continue")} onPress={onAdvance} />
+      <CtaButton label={t("common.continue")} onPress={onAdvance} />
     </View>
   );
 }

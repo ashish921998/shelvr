@@ -58,14 +58,14 @@ export default function HomeStackLayout() {
                 headerLeft: () => (
                   <HeaderIconButton
                     icon="person.fill"
-                    label={t("Profile")}
+                    label={t("navigation.profile")}
                     onPress={tap("/profile")}
                   />
                 ),
                 headerRight: () => (
                   <HeaderIconButton
                     icon="plus"
-                    label={t("Add save")}
+                    label={t("capture.add")}
                     onPress={guardedTap("/add")}
                   />
                 ),
@@ -83,7 +83,7 @@ export default function HomeStackLayout() {
               tintColor={labelColor}
               onPress={tap("/profile")}
             >
-              {t("Profile")}
+              {t("navigation.profile")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         ) : null}
@@ -94,7 +94,7 @@ export default function HomeStackLayout() {
               tintColor={labelColor}
               onPress={guardedTap("/add")}
             >
-              {t("Add")}
+              {t("common.add")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         ) : null}

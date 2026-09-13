@@ -150,22 +150,22 @@ export const TidyHints: FC = () => {
       <Tint direction="save" color={theme.colors.primary} />
       <View style={styles.topRow}>
         <Badge
-          direction="keep"
-          label={t("Keep")}
-          icon="checkmark"
-          accentColor={KEEP_ACCENT}
-        />
-        <Badge
           direction="delete"
-          label={t("Delete")}
+          label={t("common.delete")}
           icon="trash"
           accentColor={theme.colors.danger}
+        />
+        <Badge
+          direction="keep"
+          label={t("tidy.keep")}
+          icon="checkmark"
+          accentColor={KEEP_ACCENT}
         />
       </View>
       <View style={styles.bottomRow}>
         <Badge
           direction="save"
-          label={t("Save to Shelvr")}
+          label={t("tidy.save")}
           icon="arrow.up"
           accentColor={theme.colors.primary}
         />

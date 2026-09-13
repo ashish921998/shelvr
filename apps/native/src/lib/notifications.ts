@@ -70,7 +70,7 @@ function getNotificationTimezone(): string | undefined {
 async function prepareNotificationChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("weekly-shelf", {
-    name: t("Weekly shelf"),
+    name: t("notifications.weeklyShelf"),
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });

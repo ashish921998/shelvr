@@ -113,6 +113,7 @@ export const claim = internalMutation({
       digest.deliveryRecipients ??
       devices.map((device) => ({
         token: device.token,
+        locale: device.locale,
         state: "pending" as const,
       }))
     ).map((recipient): Recipient => {
@@ -122,6 +123,7 @@ export const claim = internalMutation({
       ) {
         return {
           token: recipient.token,
+          locale: recipient.locale,
           state: "failed",
           error: "device_unavailable",
         };
@@ -262,6 +264,7 @@ export const send = internalAction({
           if (result.status === "ok") {
             return {
               token: recipient.token,
+              locale: recipient.locale,
               state: "delivered",
               ticketId: recipient.ticketId,
             };
@@ -302,6 +305,7 @@ export const send = internalAction({
           if (result.status === "ok" && result.id) {
             return {
               token: recipient.token,
+              locale: recipient.locale,
               state: "receipt",
               ticketId: result.id,
             };

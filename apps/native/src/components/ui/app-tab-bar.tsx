@@ -16,26 +16,31 @@ const tabs = [
   {
     name: "(home)",
     href: "/(app)/(tabs)/(home)",
-    label: "Home",
+    label: "navigation.home",
     icon: "square.grid.2x2",
   },
   {
     name: "(spaces)",
     href: "/(app)/(tabs)/(spaces)",
-    label: "Spaces",
+    label: "navigation.spaces",
     icon: "rectangle.stack",
   },
   {
     name: "(tidy)",
     href: "/(app)/(tabs)/(tidy)",
-    label: "Tidy",
+    label: "navigation.tidy",
     icon: "photo.stack",
   },
-  { name: "(map)", href: "/(app)/(tabs)/(map)", label: "Map", icon: "map" },
+  {
+    name: "(map)",
+    href: "/(app)/(tabs)/(map)",
+    label: "navigation.map",
+    icon: "map",
+  },
   {
     name: "(search)",
     href: "/(app)/(tabs)/(search)",
-    label: "Search",
+    label: "navigation.search",
     icon: "magnifyingglass",
   },
 ] as const;

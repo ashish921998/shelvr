@@ -99,7 +99,7 @@ export function FeedbackModal({
         <Pressable
           style={styles.backdropPress}
           onPress={onClose}
-          accessibilityLabel={t("Close feedback")}
+          accessibilityLabel={t("feedback.close")}
         />
         <View style={styles.sheet}>
           <ScrollView
@@ -107,23 +107,25 @@ export function FeedbackModal({
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.title} accessibilityRole="header">
-              {t("Send feedback")}
+              {t("feedback.open")}
             </Text>
 
             {phase === "queued" ? (
               <>
-                <Text style={styles.body}>{t("Thanks for the feedback!")}</Text>
+                <Text style={styles.body}>{t("feedback.thanks")}</Text>
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("Done")}
+                    accessibilityLabel={t("common.done")}
                     style={({ pressed }) => [
                       styles.primaryButton,
                       pressed && { opacity: 0.7 },
                     ]}
                     onPress={onClose}
                   >
-                    <Text style={styles.primaryButtonText}>{t("Done")}</Text>
+                    <Text style={styles.primaryButtonText}>
+                      {t("common.done")}
+                    </Text>
                   </Pressable>
                 </View>
               </>
@@ -131,20 +133,19 @@ export function FeedbackModal({
               <>
                 <Text style={styles.body}>
                   {available
-                    ? t("Feedback couldn’t be sent just now.")
-                    : t("Feedback is unavailable right now.")}{" "}
-                  {t("You can reach us directly instead:")}
+                    ? t("feedback.sendFailedContact")
+                    : t("feedback.unavailableContact")}
                 </Text>
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel={t("Email support")}
+                  accessibilityLabel={t("support.email")}
                   style={({ pressed }) => [
                     styles.supportRow,
                     pressed && { opacity: 0.7 },
                   ]}
                   onPress={openSupport}
                 >
-                  <Text style={styles.supportText}>{t("Contact Support")}</Text>
+                  <Text style={styles.supportText}>{t("support.contact")}</Text>
                   <AppSymbolIcon
                     name="arrow.up.right"
                     size={14}
@@ -155,7 +156,7 @@ export function FeedbackModal({
                   <View style={styles.buttonRow}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={t("Close")}
+                      accessibilityLabel={t("common.close")}
                       style={({ pressed }) => [
                         styles.secondaryButton,
                         pressed && { opacity: 0.7 },
@@ -163,7 +164,7 @@ export function FeedbackModal({
                       onPress={onClose}
                     >
                       <Text style={styles.secondaryButtonText}>
-                        {t("Close")}
+                        {t("common.close")}
                       </Text>
                     </Pressable>
                   </View>
@@ -171,15 +172,13 @@ export function FeedbackModal({
               </>
             ) : (
               <>
-                <Text style={styles.body}>
-                  {t("What were you trying to do, and what got in your way?")}
-                </Text>
+                <Text style={styles.body}>{t("feedback.prompt")}</Text>
                 <TextInput
-                  accessibilityLabel={t("Feedback message")}
+                  accessibilityLabel={t("feedback.messageLabel")}
                   style={styles.input}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder={t("Your feedback…")}
+                  placeholder={t("feedback.placeholder")}
                   placeholderTextColor={theme.colors.faint}
                   multiline
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
@@ -192,7 +191,7 @@ export function FeedbackModal({
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("Cancel feedback")}
+                    accessibilityLabel={t("feedback.cancel")}
                     style={({ pressed }) => [
                       styles.secondaryButton,
                       pressed && { opacity: 0.7 },
@@ -201,12 +200,12 @@ export function FeedbackModal({
                     onPress={onClose}
                   >
                     <Text style={styles.secondaryButtonText}>
-                      {t("Cancel")}
+                      {t("common.cancel")}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("Send feedback")}
+                    accessibilityLabel={t("feedback.open")}
                     accessibilityState={{ disabled: !canSend }}
                     style={({ pressed }) => [
                       styles.primaryButton,
@@ -217,7 +216,7 @@ export function FeedbackModal({
                     onPress={() => void send()}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {sending ? t("Sending…") : t("Send")}
+                      {sending ? t("feedback.sending") : t("feedback.send")}
                     </Text>
                   </Pressable>
                 </View>

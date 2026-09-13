@@ -35,7 +35,7 @@ export default function SearchScreen() {
     <View style={styles.container}>
       {Platform.OS === "ios" ? (
         <Stack.SearchBar
-          placeholder={t("Search your saves")}
+          placeholder={t("search.placeholder")}
           autoCapitalize="none"
           hideWhenScrolling={false}
           onChangeText={(e) => setSearch(e.nativeEvent.text)}
@@ -51,7 +51,7 @@ export default function SearchScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder={t("Search your saves")}
+            placeholder={t("search.placeholder")}
             placeholderTextColor={theme.colors.muted}
             autoCapitalize="none"
             autoCorrect={false}
@@ -62,15 +62,13 @@ export default function SearchScreen() {
       )}
       {query.length === 0 ? (
         <EmptyState
-          title={t("Find anything")}
-          message={t(
-            "Search goes through titles, tags, and\ndescriptions Shelvr wrote for your saves.",
-          )}
+          title={t("search.emptyTitle")}
+          message={t("search.emptyBody")}
         />
       ) : results && results.length === 0 ? (
         <EmptyState
-          title={t("Nothing yet")}
-          message={t("No saves match “%{query}”.", { query })}
+          title={t("search.noResultsTitle")}
+          message={t("search.noResults", { query })}
         />
       ) : (
         <MasonryFeed

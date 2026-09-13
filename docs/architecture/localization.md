@@ -21,15 +21,30 @@ locales and enables RTL layout only when the active catalog set includes an RTL
 language. These changes require a fresh native binary before OTA updates can
 reach installs with the new fingerprint.
 
-`src/locales/en.json` is the source catalog. Its full English strings are lookup
-keys. The i18n-js separator is a reserved control character, so ordinary periods
-in sentences are not interpreted as nested keys. Interpolation uses `%{name}`.
-Use a complete sentence with named values; never concatenate translated fragments
-around counts. Count labels use number-neutral wording and values are formatted
-with `Intl.NumberFormat`. Dates and numbers preserve the full device/per-app region
-tag even when several regions share a translation catalog.
+`src/locales/en.json` is the source catalog. Stable semantic identifiers such as
+`spaces.saveCount` are lookup keys; English copy is a value and can change without
+renaming a key. The runtime expands these identifiers into the normal i18n-js
+namespace tree. The generator emits `src/locales/message-types.ts` from English:
+`t()` accepts only known keys and requires their named interpolation parameters.
+Arrays and maps of dynamic UI keys must use `TextMessageKey` or literal types;
+never cast an arbitrary string into a key.
 
-Translate interface copy and preset names at creation time. Saved titles, tags,
+Use complete sentences with named `%{values}`; never concatenate translated
+fragments around counts. Plural messages contain the CLDR cardinal categories
+required by their locale (`one`/`other`, plus `many` where applicable; Japanese
+and Korean use `other`). App and notification delivery share the `make-plural`
+rules in `convex/model/localization.ts`, without requiring `Intl.PluralRules`
+on Hermes. Pass numeric `count` to `t()`; use `%{formattedCount}` inside every
+plural variant so selection uses the number and interpolation uses regional
+number formatting. Other numbers are formatted automatically. Dates and numbers
+preserve the full device/per-app region, including English (India).
+
+`localizeError()` has an explicit mapping for recognized legacy backend errors.
+That boundary stays independent of editable English UI copy. Unknown server
+messages use a generic translated fallback and never expose server details.
+
+Translate interface copy when rendering. Onboarding stores stable preset identities
+through language changes and resolves names when passing the creation payload. Saved titles, tags,
 notes, album names, and space names are user-owned and must be passed as values,
 not translation keys. Onboarding survey answers retain stable identifiers.
 Shelvr, Shelvr Pro, product names, URLs and support addresses stay unchanged.
@@ -45,13 +60,19 @@ The generator validates full key and placeholder parity before changing any
 outputs, then emits the static Metro catalog imports and iOS permission resources
 under `apps/native/locales/`. Do not hand-edit these generated outputs. Native
 permission prompts use the same translations as the app catalog. Catalog tests
-check completeness, protected brand names, untranslated sentences and resources.
+check completeness, CLDR categories, protected brand names, untranslated sentences
+and resources. A generator `--check` run in the tests verifies committed generated
+outputs are reproducible. Source checks inspect visible JSX text, custom label
+props, navigation option titles and alert copy. These checks complement typed keys;
+they do not prove that every user-facing string or translation is correct.
 The localization tests cover Hermes without `Intl.Locale`, ordered preferences,
 supported regional variants, number formatting, callback freshness and draft
 preservation.
 
-Native text renders non-ASCII header content instead of the per-character Skia
-morph, preserving shaping, bidi, combining marks and font fallback. Navigation
+Native text renders joining scripts, combining marks, emoji and glyphs missing
+from the display font. Covered Latin text and ordinary punctuation retain the
+Skia morph. The glyph component unmounts when native shaping takes over, so it
+cannot animate stale letters when the next title switches back to Latin. Navigation
 chevrons follow RTL; photo-swipe hint positions remain tied to the recognizer's
 physical X axis. The widget receives translated fallback text in its snapshot,
 and refreshes when app language changes. Its gallery name and description use
@@ -77,3 +98,17 @@ vibe-aso screenshot workflow uses real app captures, localized headings, script
 fonts and fit checks. Existing source designs must be checked against the current
 app before publication; screenshots with English UI inside a translated heading
 must not be described as fully localized app captures.
+
+## Review and release status
+
+The launch catalogs are AI-generated drafts with automated contract checks and AI
+copy corrections. Native-speaker review is still outstanding. Passing tests is
+not evidence of idiomatic language, correct terminology, or visual fit on a device.
+Review the nine app catalogs in their screen context and the twelve store locales
+before release, prioritizing onboarding, purchase/account text, permission prompts,
+notification copy and screenshot headings. Review handoff CSVs and screenshot
+planning assets belong in `shelvr-notes/store-assets/localization/`.
+
+This PR does not upload localized App Store metadata or screenshots, verify remote
+RevenueCat purchase copy, or complete a native archive/device QA pass. Keep those
+release steps explicit; a JavaScript bundle export is not a signed native build.

@@ -1,3 +1,4 @@
+import type { TextMessageKey } from "@/locales/message-types";
 import { createMMKV } from "react-native-mmkv";
 
 /**
@@ -20,11 +21,11 @@ export const APPEARANCE_MODES = [
 
 export type AppearanceMode = (typeof APPEARANCE_MODES)[number];
 
-export const APPEARANCE_LABELS: Record<AppearanceMode, string> = {
-  system: "System",
-  light: "Light",
-  darkWarm: "Warm dark",
-  darkNeutral: "Dark (neutral)",
+export const APPEARANCE_LABELS: Record<AppearanceMode, TextMessageKey> = {
+  system: "appearance.system",
+  light: "appearance.light",
+  darkWarm: "appearance.warmDark",
+  darkNeutral: "appearance.neutralDark",
 };
 
 export type AppThemeName = "light" | "dark" | "darkNeutral";

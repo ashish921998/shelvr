@@ -17,7 +17,7 @@ export default function TidyStackLayout() {
       <Stack.Screen name="index" options={{ gestureEnabled: false }}>
         <Stack.Title asChild>
           <Text testID="tidy-screen-title" style={styles.title}>
-            {t("tidy")}
+            {t("navigation.tidyHeader")}
           </Text>
         </Stack.Title>
       </Stack.Screen>

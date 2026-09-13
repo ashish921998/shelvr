@@ -23,17 +23,15 @@ export default function HomeScreen() {
   const busySaving = useBusySaving(items);
 
   if (items === undefined) {
-    return <ScreenLoader label={t("Warming your shelf")} />;
+    return <ScreenLoader label={t("loading.home")} />;
   }
 
   if (items.length === 0) {
     return (
       <View style={styles.container}>
         <EmptyState
-          title={t("Save it for later")}
-          message={t(
-            "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it.",
-          )}
+          title={t("home.emptyTitle")}
+          message={t("home.emptyBody")}
         />
       </View>
     );

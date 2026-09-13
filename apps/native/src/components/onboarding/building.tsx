@@ -10,15 +10,17 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const MIN_DURATION_MS = 1800;
 
 const ROTATING_LINES = [
-  "Warming the shelves",
-  "Teaching Shelvr your taste",
-  "Sorting your saves",
-];
+  "onboarding.warming",
+  "onboarding.learning",
+  "onboarding.sorting",
+] as const;
 
 export function BuildingStep({ onDone }: { onDone: () => void }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const [line, setLine] = useState(ROTATING_LINES[0]);
+  const [line, setLine] = useState<(typeof ROTATING_LINES)[number]>(
+    ROTATING_LINES[0],
+  );
 
   // Rotate the status copy on an interval — gives the beat motion independent
   // of how fast the mutations resolve.

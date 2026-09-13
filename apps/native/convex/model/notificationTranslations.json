@@ -1,38 +1,68 @@
 {
   "de": {
     "title": "Dein Wochenregal",
-    "body": "Inhalte, die auf dich warten: %{count}"
+    "body": {
+      "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",
+      "other": "%{formattedCount} gespeicherte Inhalte warten auf dich"
+    }
   },
   "en": {
     "title": "Your weekly shelf",
-    "body": "Saves waiting for you: %{count}"
+    "body": {
+      "one": "%{formattedCount} save waiting for you",
+      "other": "%{formattedCount} saves waiting for you"
+    }
   },
   "es": {
     "title": "Tu estantería semanal",
-    "body": "Contenidos que te esperan: %{count}"
+    "body": {
+      "one": "%{formattedCount} contenido guardado te espera",
+      "many": "%{formattedCount} contenidos guardados te esperan",
+      "other": "%{formattedCount} contenidos guardados te esperan"
+    }
   },
   "es-MX": {
     "title": "Tu estantería semanal",
-    "body": "Contenidos que te esperan: %{count}"
+    "body": {
+      "one": "%{formattedCount} contenido guardado te espera",
+      "many": "%{formattedCount} contenidos guardados te esperan",
+      "other": "%{formattedCount} contenidos guardados te esperan"
+    }
   },
   "fr": {
     "title": "Votre étagère hebdomadaire",
-    "body": "Contenus qui vous attendent : %{count}"
+    "body": {
+      "one": "%{formattedCount} contenu enregistré vous attend",
+      "many": "%{formattedCount} contenus enregistrés vous attendent",
+      "other": "%{formattedCount} contenus enregistrés vous attendent"
+    }
   },
   "fr-CA": {
     "title": "Votre étagère hebdomadaire",
-    "body": "Contenus qui vous attendent : %{count}"
+    "body": {
+      "one": "%{formattedCount} contenu enregistré vous attend",
+      "many": "%{formattedCount} contenus enregistrés vous attendent",
+      "other": "%{formattedCount} contenus enregistrés vous attendent"
+    }
   },
   "ja": {
     "title": "あなたの今週のシェルフ",
-    "body": "あなたを待っている保存項目：%{count}"
+    "body": {
+      "other": "%{formattedCount}件の保存項目があなたを待っています"
+    }
   },
   "ko": {
     "title": "내 주간 책장",
-    "body": "기다리는 저장 항목: %{count}"
+    "body": {
+      "other": "저장 항목 %{formattedCount}개가 기다리고 있어요"
+    }
   },
   "pt-BR": {
     "title": "Sua estante semanal",
-    "body": "Conteúdos esperando por você: %{count}"
+    "body": {
+      "one": "%{formattedCount} conteúdo salvo esperando por você",
+      "many": "%{formattedCount} conteúdos salvos esperando por você",
+      "other": "%{formattedCount} conteúdos salvos esperando por você"
+    }
   }
 }

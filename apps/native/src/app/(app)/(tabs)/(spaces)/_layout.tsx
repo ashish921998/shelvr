@@ -43,12 +43,12 @@ export default function SpacesStackLayout() {
         options={
           Platform.OS === "android"
             ? {
-                title: "spaces",
+                title: t("navigation.spacesHeader"),
                 headerTitleStyle: styles.title,
                 headerRight: () => (
                   <HeaderIconButton
                     icon="plus"
-                    label={t("New space")}
+                    label={t("spaces.newTitle")}
                     onPress={newSpace}
                   />
                 ),
@@ -58,7 +58,7 @@ export default function SpacesStackLayout() {
       >
         {Platform.OS === "ios" ? (
           <Stack.Title asChild>
-            <Text style={styles.title}>{t("spaces")}</Text>
+            <Text style={styles.title}>{t("navigation.spacesHeader")}</Text>
           </Stack.Title>
         ) : null}
         {Platform.OS === "ios" ? (
@@ -68,7 +68,7 @@ export default function SpacesStackLayout() {
               tintColor={labelColor}
               onPress={newSpace}
             >
-              {t("New space")}
+              {t("spaces.newTitle")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         ) : null}

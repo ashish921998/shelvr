@@ -23,11 +23,7 @@ export default function PaywallScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <Text style={styles.title}>Shelvr Pro</Text>
-      <Text style={styles.message}>
-        {t(
-          "We couldn’t load subscription options right now. Check your connection and try again. If you already purchased Pro, restore after the paywall loads, or manage your plan in Profile.",
-        )}
-      </Text>
+      <Text style={styles.message}>{t("pro.loadFailed")}</Text>
       <Pressable
         style={({ pressed }) => [styles.button, pressed && { opacity: 0.8 }]}
         onPress={() => {
@@ -41,27 +37,27 @@ export default function PaywallScreen() {
           })();
         }}
       >
-        <Text style={styles.buttonText}>{t("Try again")}</Text>
+        <Text style={styles.buttonText}>{t("common.tryAgain")}</Text>
       </Pressable>
       <Pressable
         style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
         onPress={() => router.back()}
       >
-        <Text style={styles.secondaryText}>{t("Not now")}</Text>
+        <Text style={styles.secondaryText}>{t("common.notNow")}</Text>
       </Pressable>
       <Text style={styles.legal}>
         <Text
           style={styles.legalLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
         >
-          {t("Terms")}
+          {t("legal.termsShort")}
         </Text>
         {" · "}
         <Text
           style={styles.legalLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
         >
-          {t("Privacy")}
+          {t("legal.privacyShort")}
         </Text>
       </Text>
     </SafeAreaView>

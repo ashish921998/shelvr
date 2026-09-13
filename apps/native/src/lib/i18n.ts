@@ -1,5 +1,9 @@
 import { getLocales, useLocales } from "expo-localization";
-import en from "@/locales/en.json";
+import type {
+  MessageArgs,
+  MessageKey,
+  TextMessageKey,
+} from "@/locales/message-types";
 import { resolveLocale, translate } from "./i18n-core";
 
 /** Subscribe each translated screen to device/per-app language changes. */
@@ -33,29 +37,34 @@ export function formattingLocale(): string {
 }
 
 /** Read at call time so alerts and callbacks never capture a stale language. */
-export function t(
-  source: string,
-  values?: Record<string, string | number>,
+export function t<K extends MessageKey>(
+  key: K,
+  ...[values]: MessageArgs<K>
 ): string {
-  const locale = currentLocale();
-  const formattedValues = Object.fromEntries(
-    Object.entries(values ?? {}).map(([key, value]) => [
-      key,
-      typeof value === "number"
-        ? new Intl.NumberFormat(formattingLocale()).format(value)
-        : value,
-    ]),
-  );
-  return translate(locale, source, formattedValues);
+  return translate(currentLocale(), key, values, formattingLocale());
 }
+
+// Legacy backend error messages are an explicit boundary, independent of the
+// editable English UI catalog. Unknown details never reach the interface.
+const ERROR_MESSAGES: Record<string, TextMessageKey> = {
+  "This photo is too large to read. Save a smaller copy (under 14 MB).":
+    "errors.photoTooLarge",
+  "This photo is empty. Please save it again.": "errors.photoEmpty",
+  "Photo limit reached (1,000). Delete some photos to save more.":
+    "errors.photoLimit",
+  "Give the space a name.": "errors.spaceNameEmpty",
+  "Space names can be up to 60 characters.": "errors.spaceNameTooLong",
+  "This photo is unavailable or empty. Please save it again.":
+    "errors.photoUnavailable",
+};
 
 export function localizeError(
   message: unknown,
-  fallback = "Save failed. Please try again.",
+  fallback: TextMessageKey = "errors.saveFallback",
 ): string {
-  return t(
-    typeof message === "string" && Object.hasOwn(en, message)
-      ? message
-      : fallback,
-  );
+  const key =
+    typeof message === "string" && Object.hasOwn(ERROR_MESSAGES, message)
+      ? ERROR_MESSAGES[message]
+      : fallback;
+  return t(key);
 }

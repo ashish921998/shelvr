@@ -18,33 +18,31 @@ export function FeedbackInvitation({
   return (
     <View style={styles.card} testID="feedback-invitation">
       <Text style={styles.title} accessibilityRole="header">
-        {t("How’s Shelvr so far?")}
+        {t("feedback.invitationTitle")}
       </Text>
-      <Text style={styles.body}>
-        {t("Tell us what’s working and what could be better.")}
-      </Text>
+      <Text style={styles.body}>{t("feedback.invitationBody")}</Text>
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("Send feedback")}
+          accessibilityLabel={t("feedback.open")}
           style={({ pressed }) => [
             styles.primaryButton,
             pressed && { opacity: 0.7 },
           ]}
           onPress={onSendFeedback}
         >
-          <Text style={styles.primaryButtonText}>{t("Send feedback")}</Text>
+          <Text style={styles.primaryButtonText}>{t("feedback.open")}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("Dismiss feedback invitation")}
+          accessibilityLabel={t("feedback.dismissInvitation")}
           style={({ pressed }) => [
             styles.secondaryButton,
             pressed && { opacity: 0.7 },
           ]}
           onPress={onDismiss}
         >
-          <Text style={styles.secondaryButtonText}>{t("Not now")}</Text>
+          <Text style={styles.secondaryButtonText}>{t("common.notNow")}</Text>
         </Pressable>
       </View>
     </View>

@@ -28,11 +28,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
   if (item.productsStatus === "unavailable") {
     return (
       <View style={styles.findLinksRow}>
-        <Text style={styles.chipLabel}>
-          {t(
-            "This photo can't be used for product search. Save a smaller, valid copy.",
-          )}
-        </Text>
+        <Text style={styles.chipLabel}>{t("errors.productPhoto")}</Text>
       </View>
     );
   }
@@ -42,7 +38,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
       <View style={styles.findLinksRow}>
         <View style={styles.chip}>
           <ActivityIndicator size="small" color={theme.colors.primaryText} />
-          <Text style={styles.chipLabel}>{t("Finding links…")}</Text>
+          <Text style={styles.chipLabel}>{t("products.finding")}</Text>
         </View>
       </View>
     );
@@ -51,7 +47,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
   if (products && products.length > 0) {
     return (
       <View style={styles.productsSection}>
-        <Text style={styles.productsTitle}>{t("Shop")}</Text>
+        <Text style={styles.productsTitle}>{t("products.shop")}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -127,8 +123,8 @@ export function ProductsSection({ item }: { item: DetailItem }) {
         )}
         <Text style={styles.chipLabel}>
           {item.productsStatus === "failed"
-            ? t("Find links — try again")
-            : t("No matches — search again")}
+            ? t("products.retry")
+            : t("products.noMatches")}
         </Text>
       </Pressable>
     </View>

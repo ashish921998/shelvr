@@ -287,7 +287,7 @@ function ItemScreenContent() {
         setAccepted(membership);
       }
     } catch {
-      Alert.alert(t("Couldn't add to space"), t("Please try again."));
+      Alert.alert(t("spaces.addFailed"), t("errors.pleaseRetry"));
     } finally {
       decisionPending.current = false;
       setDecisionBusy(false);
@@ -310,10 +310,7 @@ function ItemScreenContent() {
       }
       setAccepted(null);
     } catch {
-      Alert.alert(
-        t("Couldn't undo"),
-        t("The save is still in this Space. Please try again."),
-      );
+      Alert.alert(t("spaces.undoFailed"), t("spaces.undoFailedBody"));
     } finally {
       decisionPending.current = false;
       setDecisionBusy(false);
@@ -365,24 +362,18 @@ function ItemScreenContent() {
       } else if (router.canGoBack()) router.back();
       else router.replace("/");
     } catch {
-      Alert.alert(
-        t("Couldn't delete save"),
-        t("Please try again in a moment."),
-      );
+      Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
     }
   }, [activeItem, items, deleteItem, router]);
 
   if (items === undefined) {
-    return <ScreenLoader label={t("Opening save")} />;
+    return <ScreenLoader label={t("loading.item")} />;
   }
 
   if (items.length === 0) {
     return (
       <View style={styles.loading}>
-        <EmptyState
-          title={t("Gone")}
-          message={t("This save no longer exists.")}
-        />
+        <EmptyState title={t("item.goneTitle")} message={t("item.goneBody")} />
       </View>
     );
   }
@@ -398,29 +389,29 @@ function ItemScreenContent() {
                 headerRight: () => (
                   <HeaderActionMenu
                     icon="ellipsis"
-                    label={t("Save actions")}
+                    label={t("item.actions")}
                     title={
-                      activeItem?.title ?? activeItem?.note ?? t("Save actions")
+                      activeItem?.title ?? activeItem?.note ?? t("item.actions")
                     }
                     actions={[
                       ...(activeItem?.status === "ready"
-                        ? [{ label: t("Add to space"), onPress: openSpaces }]
+                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
                         : []),
-                      { label: t("Share"), onPress: shareActive },
+                      { label: t("common.share"), onPress: shareActive },
                       ...(activeItem?.url
-                        ? [{ label: t("Copy link"), onPress: copyLink }]
+                        ? [{ label: t("item.copyLink"), onPress: copyLink }]
                         : []),
                       ...(activeItem?.status === "ready"
                         ? [
                             {
-                              label: t("Find links"),
+                              label: t("products.findLinks"),
                               onPress: onFindLinks,
                               disabled: searchDisabled,
                             },
                           ]
                         : []),
                       {
-                        label: t("Delete"),
+                        label: t("common.delete"),
                         destructive: true,
                         onPress: onDelete,
                       },
@@ -442,18 +433,18 @@ function ItemScreenContent() {
                 icon="rectangle.stack"
                 onPress={openSpaces}
               >
-                {t("Add to space")}
+                {t("spaces.addItem")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
               icon="square.and.arrow.up"
               onPress={shareActive}
             >
-              {t("Share")}
+              {t("common.share")}
             </Stack.Toolbar.MenuAction>
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
-                {t("Copy link")}
+                {t("item.copyLink")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             {activeItem?.status === "ready" ? (
@@ -462,7 +453,7 @@ function ItemScreenContent() {
                 onPress={onFindLinks}
                 disabled={searchDisabled}
               >
-                {t("Find links")}
+                {t("products.findLinks")}
               </Stack.Toolbar.MenuAction>
             ) : null}
             <Stack.Toolbar.MenuAction
@@ -470,7 +461,7 @@ function ItemScreenContent() {
               destructive
               onPress={onDelete}
             >
-              {t("Delete")}
+              {t("common.delete")}
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
         </Stack.Toolbar>
@@ -515,7 +506,7 @@ function ItemScreenContent() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.surface }}
             >
-              <Text style={styles.dismissText}>{t("Dismiss")}</Text>
+              <Text style={styles.dismissText}>{t("common.dismiss")}</Text>
             </GlassView>
           </Pressable>
           <Pressable
@@ -535,7 +526,7 @@ function ItemScreenContent() {
                 size={15}
                 tintColor={theme.colors.primaryForeground}
               />
-              <Text style={styles.acceptText}>{t("Add to space")}</Text>
+              <Text style={styles.acceptText}>{t("spaces.addItem")}</Text>
             </GlassView>
           </Pressable>
         </Animated.View>
@@ -554,16 +545,16 @@ function ItemScreenContent() {
           accessibilityLiveRegion="polite"
         >
           <Text style={styles.acceptedLabel} numberOfLines={2}>
-            {t("Added to %{space}", { space: spaceQ.data?.name ?? "" })}
+            {t("spaces.addedTo", { space: spaceQ.data?.name ?? "" })}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t("Undo add to space")}
+            accessibilityLabel={t("spaces.undoAdd")}
             disabled={decisionBusy}
             onPress={undoAccept}
             style={styles.undoButton}
           >
-            <Text style={styles.undoText}>{t("Undo")}</Text>
+            <Text style={styles.undoText}>{t("common.undo")}</Text>
           </Pressable>
         </View>
       ) : null}

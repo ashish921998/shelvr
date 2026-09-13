@@ -150,10 +150,10 @@ function CoverStack({
           </View>
           <Text style={styles.emptyLabel}>
             {itemCount > 0
-              ? t("Saves: %{count}", { count: itemCount })
+              ? t("spaces.saveCount", { count: itemCount })
               : suggestionCount > 0
-                ? t("Suggestions: %{count}", { count: suggestionCount })
-                : t("Add first save")}
+                ? t("spaces.suggestionCount", { count: suggestionCount })
+                : t("spaces.addFirst")}
           </Text>
         </View>
       )}
@@ -182,32 +182,26 @@ export default function SpacesScreen() {
   const deleteSpace = useMutation(api.spaces.deleteSpace);
 
   const confirmDelete = (id: Id<"spaces">) => {
-    Alert.alert(
-      t("Delete space?"),
-      t("Your saves stay in Home — only the shelf goes away."),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        {
-          text: t("Delete"),
-          style: "destructive",
-          onPress: () => deleteSpace({ id }),
-        },
-      ],
-    );
+    Alert.alert(t("spaces.deleteTitle"), t("spaces.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => deleteSpace({ id }),
+      },
+    ]);
   };
 
   if (spaces === undefined) {
-    return <ScreenLoader label={t("Opening your spaces")} />;
+    return <ScreenLoader label={t("loading.spaces")} />;
   }
 
   if (spaces.length === 0) {
     return (
       <View style={styles.container}>
         <EmptyState
-          title={t("Make a space")}
-          message={t(
-            "Spaces are shelves for a theme — design inspiration,\nrecipes, gift ideas. Shelvr suggests saves that fit;\nyou choose what sticks.",
-          )}
+          title={t("spaces.listEmptyTitle")}
+          message={t("spaces.listEmptyBody")}
         />
       </View>
     );
@@ -256,11 +250,11 @@ export default function SpacesScreen() {
                         {space.name}
                       </Text>
                       <ActionMenu
-                        label={t("Space actions")}
-                        title={t("Space actions")}
+                        label={t("spaces.actions")}
+                        title={t("spaces.actions")}
                         actions={[
                           {
-                            label: t("Delete"),
+                            label: t("common.delete"),
                             destructive: true,
                             onPress: () => confirmDelete(space._id),
                           },
@@ -279,7 +273,7 @@ export default function SpacesScreen() {
                 <Link.Preview />
                 <Link.Menu>
                   <Link.MenuAction
-                    title={t("Delete")}
+                    title={t("common.delete")}
                     icon="trash"
                     destructive
                     onPress={() => confirmDelete(space._id)}

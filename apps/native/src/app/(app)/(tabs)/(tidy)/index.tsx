@@ -176,7 +176,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
                   ? () => (
                       <HeaderIconButton
                         icon="arrow.uturn.backward"
-                        label={t("Undo")}
+                        label={t("common.undo")}
                         onPress={handleUndo}
                       />
                     )
@@ -186,7 +186,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
                     {pendingDeleteCount > 0 ? (
                       <HeaderIconButton
                         icon="trash"
-                        label={t("Delete reviewed photos")}
+                        label={t("tidy.confirmDelete")}
                         badge={pendingDeleteCount}
                         onPress={commitDeletes}
                       />
@@ -195,10 +195,10 @@ const TidyDeckView: FC<DeckViewProps> = ({
                       icon="photo.on.rectangle.angled"
                       label={
                         limitedAccess
-                          ? t("Choose photo album. Limited photo access.")
-                          : t("Choose photo album")
+                          ? t("albums.chooseLimited")
+                          : t("albums.choose")
                       }
-                      title={t("Photo source")}
+                      title={t("albums.source")}
                       actions={[
                         ...sources.map((source) => ({
                           id: source.id,
@@ -212,7 +212,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
                           ? [
                               {
                                 id: "manage-photo-access",
-                                label: t("Manage photo access…"),
+                                label: t("albums.manageAccessAction"),
                                 onPress: () => Linking.openSettings(),
                               },
                             ]
@@ -235,7 +235,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
             hidden={!canUndo}
             onPress={handleUndo}
           >
-            {t("Undo")}
+            {t("common.undo")}
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       ) : null}
@@ -246,7 +246,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
             hidden={pendingDeleteCount === 0}
             onPress={commitDeletes}
           >
-            <Stack.Toolbar.Label>{t("Delete")}</Stack.Toolbar.Label>
+            <Stack.Toolbar.Label>{t("common.delete")}</Stack.Toolbar.Label>
             {pendingDeleteCount > 0 && (
               <Stack.Toolbar.Badge>
                 {String(pendingDeleteCount)}
@@ -268,7 +268,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
                 icon="gearshape"
                 onPress={() => Linking.openSettings()}
               >
-                {t("Manage Photo Access")}
+                {t("albums.manageAccessTitle")}
               </Stack.Toolbar.MenuAction>
             ) : null}
           </Stack.Toolbar.Menu>
@@ -314,33 +314,23 @@ const PermissionGate: FC<{
 
   return (
     <View style={styles.gate}>
-      <EmptyState
-        title={t("Tidy your camera roll")}
-        message={t(
-          "Swipe through your photos one by one.\nKeep them, delete them, or save them into Shelvr.",
-        )}
-      />
+      <EmptyState title={t("tidy.introTitle")} message={t("tidy.introBody")} />
       <Pressable style={styles.gateButton} onPress={handlePress}>
         <Text style={styles.gateButtonText}>
           {permission.canAskAgain
-            ? t("Allow photo access")
-            : t("Open Settings")}
+            ? t("permissions.allowPhotos")
+            : t("permissions.openSettings")}
         </Text>
       </Pressable>
     </View>
   );
 };
 
-const Loading: FC = () => <ScreenLoader label={t("Opening Tidy")} />;
+const Loading: FC = () => <ScreenLoader label={t("loading.tidy")} />;
 
 /** Pro gate shown to lapsed users on the Tidy tab. */
 const ProGate: FC = () => (
-  <ProGateView
-    title={t("Tidy is a Pro feature")}
-    message={t(
-      "Sweep through your photo library and clear out the clutter. View Shelvr Pro plans to unlock Tidy and every other Pro feature.",
-    )}
-  />
+  <ProGateView title={t("tidy.proTitle")} message={t("tidy.proBody")} />
 );
 
 const styles = StyleSheet.create((theme, rt) => ({

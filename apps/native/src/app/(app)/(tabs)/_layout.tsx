@@ -20,7 +20,9 @@ export default function TabsLayout() {
               selected: "square.grid.2x2.fill",
             }}
           />
-          <NativeTabs.Trigger.Label>{t("Home")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>
+            {t("navigation.home")}
+          </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(spaces)">
           <NativeTabs.Trigger.Icon
@@ -29,22 +31,30 @@ export default function TabsLayout() {
               selected: "rectangle.stack.fill",
             }}
           />
-          <NativeTabs.Trigger.Label>{t("Spaces")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>
+            {t("navigation.spaces")}
+          </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(tidy)">
           <NativeTabs.Trigger.Icon
             sf={{ default: "photo.stack", selected: "photo.stack.fill" }}
           />
-          <NativeTabs.Trigger.Label>{t("Tidy")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>
+            {t("navigation.tidy")}
+          </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(map)">
           <NativeTabs.Trigger.Icon
             sf={{ default: "map", selected: "map.fill" }}
           />
-          <NativeTabs.Trigger.Label>{t("Map")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>
+            {t("navigation.map")}
+          </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="(search)" role="search">
-          <NativeTabs.Trigger.Label>{t("Search")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>
+            {t("navigation.search")}
+          </NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
       </NativeTabs>
     );

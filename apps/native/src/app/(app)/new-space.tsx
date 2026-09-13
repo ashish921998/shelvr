@@ -62,7 +62,7 @@ export default function NewSpaceScreen() {
 
   // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {
-    return <ScreenLoader label={t("Opening space")} />;
+    return <ScreenLoader label={t("loading.space")} />;
   }
 
   // The space is gone, inaccessible, or the link is stale. This guard is the
@@ -72,7 +72,7 @@ export default function NewSpaceScreen() {
   if (editing && (isError || space === null)) {
     return (
       <View style={styles.loading}>
-        <Text>{t("This space is no longer available.")}</Text>
+        <Text>{t("spaces.unavailable")}</Text>
       </View>
     );
   }
@@ -145,10 +145,10 @@ function SpaceForm(props: SpaceFormProps) {
       // A ConvexError carries the server's user-facing sentence in `data`;
       // anything else is redacted to "Server Error" in production.
       Alert.alert(
-        editing ? t("Could not save space") : t("Could not create space"),
+        editing ? t("spaces.saveFailed") : t("spaces.createFailed"),
         error instanceof ConvexError && typeof error.data === "string"
-          ? localizeError(error.data, "Something went wrong. Try again.")
-          : t("Something went wrong. Try again."),
+          ? localizeError(error.data, "errors.tryAgain")
+          : t("errors.tryAgain"),
       );
       setSaving(false);
     }
@@ -161,17 +161,13 @@ function SpaceForm(props: SpaceFormProps) {
       contentContainerStyle={styles.content}
     >
       <Text style={styles.heading}>
-        {editing ? t("Edit space") : t("New space")}
+        {editing ? t("spaces.editTitle") : t("spaces.newTitle")}
       </Text>
-      <Text style={styles.subheading}>
-        {t(
-          "Give it a title — Shelvr will suggest a few of your saves that fit. You choose what sticks.",
-        )}
-      </Text>
+      <Text style={styles.subheading}>{t("spaces.editorHelp")}</Text>
 
       <TextInput
         style={styles.nameInput}
-        placeholder={t("Apartment shopping list")}
+        placeholder={t("spaces.titlePlaceholder")}
         placeholderTextColor={theme.colors.faint}
         value={name}
         onChangeText={setName}
@@ -181,10 +177,8 @@ function SpaceForm(props: SpaceFormProps) {
 
       <View style={styles.dynamicRow}>
         <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>{t("Dynamic")}</Text>
-          <Text style={styles.dynamicHint}>
-            {t("Shelvr keeps suggesting things that fit")}
-          </Text>
+          <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
+          <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
         </View>
         <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
       </View>
@@ -219,7 +213,7 @@ function SpaceForm(props: SpaceFormProps) {
               />
             ) : (
               <Text style={styles.saveButtonText}>
-                {editing ? t("Save changes") : t("Create space")}
+                {editing ? t("common.saveChanges") : t("spaces.create")}
               </Text>
             )}
           </Animated.View>

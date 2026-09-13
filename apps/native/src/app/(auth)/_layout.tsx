@@ -8,7 +8,7 @@ export default function AuthRoutesLayout() {
   const { isLoading, isAuthenticated } = useConvexAuth();
 
   if (isLoading) {
-    return <ScreenLoader label={t("Signing in")} />;
+    return <ScreenLoader label={t("account.signingIn")} />;
   }
 
   if (isAuthenticated) {

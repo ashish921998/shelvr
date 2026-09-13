@@ -1,4 +1,5 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -57,7 +58,7 @@ export function SurveyStep<T extends string>({
             const active = selected.includes(option);
             return (
               <Pressable
-                key={t(option)}
+                key={option}
                 onPress={() => onToggle(option)}
                 style={({ pressed }) => [
                   styles.chip,
@@ -68,7 +69,7 @@ export function SurveyStep<T extends string>({
                 <Text
                   style={[styles.chipLabel, active && styles.chipLabelActive]}
                 >
-                  {t(option)}
+                  {onboardingLabel(option)}
                 </Text>
                 {active && (
                   <Text style={[styles.check, { color: theme.colors.primary }]}>

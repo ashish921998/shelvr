@@ -19,15 +19,15 @@ export function ItemSpaces({
     <View style={styles.row}>
       <Text style={styles.label} numberOfLines={2}>
         {spaces.length > 0
-          ? t("In %{spaces}", {
+          ? t("item.inSpaces", {
               spaces: spaces.map((space) => space.name).join(", "),
             })
-          : t("In your inbox")}
+          : t("item.inbox")}
       </Text>
       <Link href={{ pathname: "/manage-spaces", params: { itemId } }} asChild>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("Add to space")}
+          accessibilityLabel={t("spaces.addItem")}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
           <AppSymbolIcon
@@ -35,7 +35,7 @@ export function ItemSpaces({
             size={13}
             tintColor={theme.colors.primaryText}
           />
-          <Text style={styles.action}>{t("Add to space")}</Text>
+          <Text style={styles.action}>{t("spaces.addItem")}</Text>
         </Pressable>
       </Link>
     </View>

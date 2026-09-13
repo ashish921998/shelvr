@@ -1,3 +1,4 @@
+import { onboardingLabel } from "@/lib/onboarding-labels";
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -35,7 +36,7 @@ const SPACE_PRESETS: Record<SaveKind, string[]> = {
 const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
 
 /**
- * Derive the deduped preset space names from Q2 answers, preserving first-seen
+ * Derive the deduped stable preset identities from Q2 answers, preserving first-seen
  * order. Exported so the onboarding orchestrator can pre-select these when the
  * user reaches the spaces step.
  */
@@ -44,7 +45,7 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
   const candidates: string[] = [];
   for (const kind of answers) {
     for (const preset of SPACE_PRESETS[kind] ?? []) {
-      const name = t(preset);
+      const name = preset;
       if (!seen.has(name)) {
         seen.add(name);
         candidates.push(name);
@@ -52,7 +53,7 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
     }
   }
   for (const preset of GENERIC_PRESETS) {
-    const name = t(preset);
+    const name = preset;
     if (!seen.has(name)) {
       seen.add(name);
       candidates.push(name);
@@ -81,26 +82,8 @@ export function SpacePickerStep({
   useAppLocale();
   const { theme } = useUnistyles();
 
-  // Build the deduped candidate list: seeded presets from each Q2 answer, then
-  // generics, preserving first-seen order.
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  for (const kind of answers) {
-    for (const preset of SPACE_PRESETS[kind] ?? []) {
-      const name = t(preset);
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
-      }
-    }
-  }
-  for (const preset of GENERIC_PRESETS) {
-    const name = t(preset);
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
-    }
-  }
+  const candidates = getSpacePresets(answers);
+  const seen = new Set(candidates);
 
   // Anything pre-selected that isn't a known preset (e.g. carried over from an
   // earlier render) still shows so the user can deselect it.
@@ -119,13 +102,13 @@ export function SpacePickerStep({
         entering={FadeInDown.duration(400)}
         style={styles.headline}
       >
-        {t("Pick your spaces.")}
+        {t("onboarding.spacesTitle")}
       </Animated.Text>
       <Animated.Text
         entering={FadeInDown.delay(80).duration(400)}
         style={styles.support}
       >
-        {t("Shelvr suggests saves for these spaces. Add or rename anytime.")}
+        {t("onboarding.spacesHelp")}
       </Animated.Text>
 
       <ScrollView
@@ -149,7 +132,7 @@ export function SpacePickerStep({
                 <Text
                   style={[styles.chipLabel, active && styles.chipLabelActive]}
                 >
-                  {name}
+                  {onboardingLabel(name)}
                 </Text>
                 {active && (
                   <Text style={[styles.check, { color: theme.colors.primary }]}>
@@ -163,7 +146,7 @@ export function SpacePickerStep({
       </ScrollView>
 
       <CtaButton
-        label={t("Create my spaces")}
+        label={t("onboarding.createSpaces")}
         onPress={onAdvance}
         disabled={!canAdvance}
       />

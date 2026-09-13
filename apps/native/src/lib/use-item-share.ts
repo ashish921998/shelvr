@@ -39,7 +39,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         await Sharing.shareAsync(file.uri, {
           mimeType: activeItem.isSticker ? "image/png" : "image/jpeg",
           UTI: activeItem.isSticker ? "public.png" : "public.jpeg",
-          dialogTitle: activeItem.title ?? t("Share"),
+          dialogTitle: activeItem.title ?? t("common.share"),
         });
         shared = true;
         shareSheetOnly = true;

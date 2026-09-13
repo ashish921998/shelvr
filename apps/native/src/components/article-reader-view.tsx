@@ -1,4 +1,4 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
 import { ItemSpaces } from "@/components/item-spaces";
@@ -56,7 +56,9 @@ export function ArticleReaderView({
   const remainingTagCount = Math.max(item.tags.length - compactTags.length, 0);
   const compactTagLabel = [
     compactTags.join(" · "),
-    remainingTagCount > 0 ? `+${remainingTagCount}` : "",
+    remainingTagCount > 0
+      ? `+${new Intl.NumberFormat(formattingLocale()).format(remainingTagCount)}`
+      : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -91,9 +93,7 @@ export function ArticleReaderView({
         {item.status === "processing" ? (
           <View style={styles.processingRow}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={styles.processingText}>
-              {t("Shelvr is reading this…")}
-            </Text>
+            <Text style={styles.processingText}>{t("item.reading")}</Text>
           </View>
         ) : null}
 
@@ -111,7 +111,7 @@ export function ArticleReaderView({
               {item.url ? (
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel={t("Open %{site}", {
+                  accessibilityLabel={t("item.openSite", {
                     site: item.siteName ?? displayHost(item.url),
                   })}
                   hitSlop={6}
@@ -152,7 +152,7 @@ export function ArticleReaderView({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t(
-                  tagsExpanded ? "Hide tags: %{tags}" : "Show tags: %{tags}",
+                  tagsExpanded ? "item.hideTags" : "item.showTags",
                   { tags: item.tags.join(", ") },
                 )}
                 accessibilityState={{ expanded: tagsExpanded }}
@@ -167,7 +167,7 @@ export function ArticleReaderView({
                   {compactTagLabel}
                 </Text>
                 <Text style={styles.tagsAction}>
-                  {tagsExpanded ? t("Hide") : t("Tags")}
+                  {tagsExpanded ? t("common.hide") : t("item.tags")}
                 </Text>
               </Pressable>
             ) : null}
@@ -202,7 +202,7 @@ export function ArticleReaderView({
 
         {similar && similar.length > 0 ? (
           <View style={styles.similarSection}>
-            <Text style={styles.similarTitle}>{t("More like this")}</Text>
+            <Text style={styles.similarTitle}>{t("item.similar")}</Text>
             <SimilarGrid items={similar} />
           </View>
         ) : null}

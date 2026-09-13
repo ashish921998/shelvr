@@ -47,7 +47,7 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
   const title =
     item.title ??
     item.note ??
-    (item.url ? displayHost(item.url) : t("Untitled item"));
+    (item.url ? displayHost(item.url) : t("item.untitledItem"));
 
   return (
     <Link href={{ pathname: "/item/[id]", params: { id: item._id } }} asChild>

@@ -1,3 +1,4 @@
+import { translate } from "@/lib/i18n-core";
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -88,7 +89,7 @@ function fitCamera(items: Located[]) {
 }
 
 export default function MapScreen() {
-  useAppLocale();
+  const locale = useAppLocale();
   const router = useRouter();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // Only photos with coordinates, already filtered server-side, so the map
@@ -102,12 +103,12 @@ export default function MapScreen() {
     () =>
       (items ?? []).map((i) => ({
         id: i._id,
-        title: i.title ?? t("Saved photo"),
+        title: i.title ?? translate(locale, "item.savedPhoto"),
         latitude: i.latitude,
         longitude: i.longitude,
         imageUrl: i.imageUrl,
       })),
-    [items],
+    [items, locale],
   );
 
   // Marker icons must be native image refs, not sources, so each item's photo
@@ -138,36 +139,24 @@ export default function MapScreen() {
   );
 
   if (entitlementLoading) {
-    return <ScreenLoader label={t("Opening your map")} />;
+    return <ScreenLoader label={t("loading.map")} />;
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
   // paywall instead of seeing the map. ProGate's default CTA already presents
   // the paywall, so no guard wrapper is needed.
   if (!entitled) {
-    return (
-      <ProGateView
-        title={t("Map is a Pro feature")}
-        message={t(
-          "See every saved photo by location with a Shelvr Pro subscription.",
-        )}
-      />
-    );
+    return <ProGateView title={t("map.proTitle")} message={t("map.proBody")} />;
   }
 
   if (items === undefined) {
-    return <ScreenLoader label={t("Loading saved places")} />;
+    return <ScreenLoader label={t("loading.places")} />;
   }
 
   if (located.length === 0) {
     return (
       <View style={styles.container}>
-        <EmptyState
-          title={t("Nothing on the map yet")}
-          message={t(
-            "Photos you save keep the place they were taken.\nNew saves with location data will show up here.",
-          )}
-        />
+        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
       </View>
     );
   }

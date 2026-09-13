@@ -21,7 +21,7 @@ type Props = {
 export function ProGate({
   title,
   message,
-  ctaLabel = t("View Pro plans"),
+  ctaLabel = t("pro.viewPlans"),
   onPress,
 }: Props) {
   useAppLocale();

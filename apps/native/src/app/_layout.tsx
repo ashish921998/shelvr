@@ -126,9 +126,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
   return (
     <View style={errorBoundaryStyles.container}>
-      <Text style={errorBoundaryStyles.title}>{t("Something went wrong")}</Text>
+      <Text style={errorBoundaryStyles.title}>
+        {t("errors.unexpectedTitle")}
+      </Text>
       <Text style={errorBoundaryStyles.message}>
-        {t("Shelvr hit an unexpected error. Your saves are safe.")}
+        {t("errors.unexpectedBody")}
       </Text>
       <Pressable
         accessibilityRole="button"
@@ -138,7 +140,9 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           pressed && errorBoundaryStyles.retryPressed,
         ]}
       >
-        <Text style={errorBoundaryStyles.retryLabel}>{t("Try again")}</Text>
+        <Text style={errorBoundaryStyles.retryLabel}>
+          {t("common.tryAgain")}
+        </Text>
       </Pressable>
     </View>
   );

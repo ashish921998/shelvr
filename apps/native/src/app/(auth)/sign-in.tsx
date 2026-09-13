@@ -37,7 +37,7 @@ export default function Page() {
       <View style={styles.center}>
         <View style={styles.header}>
           <Text style={styles.title}>shelvr</Text>
-          <Text style={styles.subtitle}>{t("Sign in to continue")}</Text>
+          <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
         </View>
 
         <View style={styles.buttons}>
@@ -71,7 +71,7 @@ export default function Page() {
               disabled={pending !== null}
             >
               <Text style={styles.appleFallbackButtonText}>
-                {t("Continue with Apple")}
+                {t("account.apple")}
               </Text>
             </Pressable>
           )}
@@ -84,9 +84,7 @@ export default function Page() {
             onPress={() => handleOAuth("google")}
             disabled={pending !== null}
           >
-            <Text style={styles.googleButtonText}>
-              {t("Continue with Google")}
-            </Text>
+            <Text style={styles.googleButtonText}>{t("account.google")}</Text>
           </Pressable>
           {anonEnabled && (
             <Pressable
@@ -99,22 +97,17 @@ export default function Page() {
               onPress={() => handleOAuth("anonymous")}
               disabled={pending !== null}
             >
-              <Text style={styles.devButtonText}>
-                {t("Continue without account")}
-              </Text>
+              <Text style={styles.devButtonText}>{t("account.anonymous")}</Text>
             </Pressable>
           )}
         </View>
       </View>
 
       <Text style={styles.terms}>
-        {t(
-          "By continuing, you agree to our %{terms} and acknowledge our %{privacy}.",
-          {
-            terms: "\uE000",
-            privacy: "\uE001",
-          },
-        )
+        {t("legal.consent", {
+          terms: "\uE000",
+          privacy: "\uE001",
+        })
           .split(/(\uE000|\uE001)/)
           .map((part, index) => {
             if (part !== "\uE000" && part !== "\uE001") return part;
@@ -129,7 +122,7 @@ export default function Page() {
                   )
                 }
               >
-                {t(isTerms ? "Terms" : "Privacy Policy")}
+                {t(isTerms ? "legal.termsShort" : "legal.privacy")}
               </Text>
             );
           })}

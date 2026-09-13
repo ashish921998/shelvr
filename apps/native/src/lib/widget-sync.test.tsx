@@ -170,9 +170,9 @@ describe("RecentSavesWidgetSync", () => {
     rerender(<RecentSavesWidgetSync />);
     await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
     expect(fsx.snapshots[1]).toMatchObject({
-      emptyTitle: ja["Nothing saved yet"],
-      emptyHint: ja["Tap + to save a link, photo, or note"],
-      items: [{ title: "Home", subtitle: ja.Note }],
+      emptyTitle: ja["widget.emptyTitle"],
+      emptyHint: ja["widget.emptyBody"],
+      items: [{ title: "Home", subtitle: ja["item.note"] }],
     });
   });
 

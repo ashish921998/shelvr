@@ -84,7 +84,7 @@ describe("device language resolution", () => {
       useAppLocale();
       return (
         <>
-          <span>{t("Search")}</span>
+          <span>{t("navigation.search")}</span>
           <input aria-label="draft" defaultValue="My private draft" />
         </>
       );
@@ -94,31 +94,31 @@ describe("device language resolution", () => {
     fireEvent.change(input, { target: { value: "Keep my edits" } });
     expect(screen.getByText("Search")).toBeTruthy();
     changeLanguage("de-DE");
-    expect(screen.getByText(de.Search)).toBeTruthy();
+    expect(screen.getByText(de["navigation.search"])).toBeTruthy();
     expect((input as HTMLInputElement).value).toBe("Keep my edits");
     changeLanguage("ja-JP");
-    expect(screen.getByText(ja.Search)).toBeTruthy();
+    expect(screen.getByText(ja["navigation.search"])).toBeTruthy();
   });
 
   it("uses the current language for an already-created callback", () => {
-    const alertTitle = () => t("Try again");
+    const alertTitle = () => t("common.tryAgain");
     changeLanguage("ja-JP");
-    expect(alertTitle()).toBe(ja["Try again"]);
+    expect(alertTitle()).toBe(ja["common.tryAgain"]);
   });
 });
 
 describe("translated copy", () => {
   it("uses English text and dates with Indian number formatting for a Hindi device", () => {
     changeLanguage("hi-IN");
-    expect(t("Search")).toBe("Search");
+    expect(t("navigation.search")).toBe("Search");
     expect(formattingLocale()).toBe("en-IN");
-    expect(t("Saves: %{count}", { count: 1234567 })).toBe("Saves: 12,34,567");
+    expect(t("spaces.saveCount", { count: 1234567 })).toBe("12,34,567 saves");
     expect(formatItemDate(Date.UTC(2026, 8, 13, 12))).toContain("Sep");
   });
   it("preserves regional number formatting when markets share translations", () => {
     changeLanguage("en-IN");
     expect(formattingLocale()).toBe("en-IN");
-    expect(t("Saves: %{count}", { count: 1234567 })).toContain("12,34,567");
+    expect(t("spaces.saveCount", { count: 1234567 })).toContain("12,34,567");
     changeLanguage("invalid_tag!");
     expect(formattingLocale()).toBe("en");
   });
@@ -126,41 +126,79 @@ describe("translated copy", () => {
   it("translates recognized failures and keeps unknown server details out of the UI", () => {
     changeLanguage("ja-JP");
     expect(localizeError("Give the space a name.")).toBe(
-      ja["Give the space a name."],
+      ja["errors.spaceNameEmpty"],
     );
     expect(
       localizeError("Unexpected server detail at https://private.invalid"),
-    ).toBe(ja["Save failed. Please try again."]);
-    expect(localizeError(undefined)).toBe(ja["Save failed. Please try again."]);
+    ).toBe(ja["errors.saveFallback"]);
+    expect(localizeError(undefined)).toBe(ja["errors.saveFallback"]);
   });
 
-  it("preserves names, URLs, and punctuation-containing lookup keys", () => {
-    expect(translate("de", "Save it for later.")).toBe(
-      de["Save it for later."],
-    );
-    expect(translate("de", "User's unrecognized private title")).toBe(
-      "User's unrecognized private title",
-    );
-    expect(translate("ja", "Added to %{space}", { space: "Home" })).toContain(
+  it("preserves user names and URLs as values with semantic lookup keys", () => {
+    expect(translate("de", "brand.tagline")).toBe(de["brand.tagline"]);
+    expect(translate("ja", "spaces.addedTo", { space: "Home" })).toContain(
       "Home",
     );
     expect(
-      translate("ja", "Open %{site}", { site: "https://example.test/a?b=c" }),
+      translate("ja", "item.openSite", { site: "https://example.test/a?b=c" }),
     ).toContain("https://example.test/a?b=c");
   });
   it("formats counts for the app language without an English plural suffix", () => {
     changeLanguage("de-DE");
-    expect(t("Saves: %{count}", { count: 1234 })).toContain("1.234");
-    expect(t("Saves: %{count}", { count: 0 })).not.toContain("%{");
+    expect(t("spaces.saveCount", { count: 1234 })).toContain("1.234");
+    expect(t("spaces.saveCount", { count: 0 })).not.toContain("%{");
   });
   it("keeps both legal links available for any sentence ordering", () => {
-    const sentence = t(
-      "By continuing, you agree to our %{terms} and acknowledge our %{privacy}.",
-      { terms: "\uE000", privacy: "\uE001" },
-    );
+    const sentence = t("legal.consent", { terms: "\uE000", privacy: "\uE001" });
     expect(sentence.match(/[\uE000\uE001]/g)?.sort()).toEqual([
       "\uE000",
       "\uE001",
     ]);
   });
+});
+
+it("selects CLDR plurals with numeric counts and regionally formatted interpolation", () => {
+  expect(translate("en", "spaces.saveCount", { count: 0 })).toBe("0 saves");
+  expect(translate("en", "spaces.saveCount", { count: 1 })).toBe("1 save");
+  expect(translate("en", "spaces.saveCount", { count: 2 })).toBe("2 saves");
+  expect(translate("en", "spaces.saveCount", { count: 1.5 })).toBe("1.5 saves");
+  expect(translate("de", "spaces.saveCount", { count: 1234 })).toContain(
+    "1.234",
+  );
+  expect(translate("ja", "spaces.saveCount", { count: 1 })).not.toContain(
+    "[missing",
+  );
+  expect(() => translate("en", "spaces.saveCount", { count: "1" })).toThrow(
+    "numeric count",
+  );
+});
+
+it("rejects unchecked dynamic keys and missing values at compile time", () => {
+  const compileOnly = (key: string) => {
+    // @ts-expect-error Arbitrary strings must not become translation keys.
+    t(key);
+    // @ts-expect-error A renamed or missing key must fail before shipping.
+    t("common.notARealKey");
+    // @ts-expect-error Count messages require a numeric count.
+    t("spaces.saveCount");
+    // @ts-expect-error Formatting happens after plural selection.
+    t("spaces.saveCount", { count: "1,000" });
+    // @ts-expect-error Interpolation requires the named parameter.
+    t("spaces.addedTo", {});
+  };
+  expect(compileOnly).toBeTypeOf("function");
+});
+
+it("keeps actionable photo failures while suppressing unknown server details", () => {
+  changeLanguage("fr-FR");
+  const message = t("capture.partialFailure", {
+    saved: 1,
+    total: 2,
+    reason: localizeError(
+      "Photo limit reached (1,000). Delete some photos to save more.",
+    ),
+  });
+  expect(message).toContain("1 000");
+  expect(message).not.toContain("%{");
+  expect(localizeError("toString")).toBe(t("errors.saveFallback"));
 });

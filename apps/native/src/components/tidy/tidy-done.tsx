@@ -30,28 +30,26 @@ export const TidyDone: FC<Props> = ({
 }) => {
   useAppLocale();
   const summary = [
-    t("Kept: %{count}", { count: counts.kept }),
-    t("Saved to Shelvr: %{count}", { count: counts.saved }),
-    pendingDeleteCount + counts.deleted === 1
-      ? "1 deleted"
-      : t("Deleted: %{count}", { count: pendingDeleteCount + counts.deleted }),
+    t("tidy.keptCount", { count: counts.kept }),
+    t("tidy.savedCount", { count: counts.saved }),
+    t("tidy.deletedCount", { count: pendingDeleteCount + counts.deleted }),
   ].join("  ·  ");
 
   return (
     <Animated.View entering={FadeIn.duration(250)} style={styles.container}>
       <Text style={styles.title}>
-        {empty ? t("All tidied") : t("Batch tidied")}
+        {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
       </Text>
       <Text style={styles.summary}>
         {empty
-          ? t("Nothing left to sort in %{source}. Pick another source above.", {
+          ? t("tidy.emptyBody", {
               source: sourceTitle,
             })
           : summary}
       </Text>
       {pendingDeleteCount > 0 && (
         <Text style={styles.note}>
-          {t("Deletions to confirm: %{count}", { count: pendingDeleteCount })}
+          {t("tidy.pendingDeleteCount", { count: pendingDeleteCount })}
         </Text>
       )}
       {!empty && (
@@ -63,7 +61,7 @@ export const TidyDone: FC<Props> = ({
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.buttonText}>{t("Keep going")}</Text>
+            <Text style={styles.buttonText}>{t("tidy.continue")}</Text>
           )}
         </Pressable>
       )}

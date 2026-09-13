@@ -15,7 +15,7 @@ export default function SearchStackLayout() {
     >
       <Stack.Screen name="index">
         <Stack.Title asChild>
-          <Text style={styles.title}>{t("search")}</Text>
+          <Text style={styles.title}>{t("navigation.searchHeader")}</Text>
         </Stack.Title>
       </Stack.Screen>
     </Stack>

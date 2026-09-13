@@ -1,3 +1,4 @@
+import { onboardingLabel } from "@/lib/onboarding-labels";
 import { t, useAppLocale } from "@/lib/i18n";
 import { BuildingStep } from "@/components/onboarding/building";
 import { LiveDemoStep } from "@/components/onboarding/live-demo";
@@ -207,7 +208,7 @@ export default function OnboardingScreen() {
       $set: { save_pileup: q1, save_types: q2 },
     });
     recordCurrentStep();
-    setPendingSpaces(spaces);
+    setPendingSpaces(spaces.map(onboardingLabel));
     completeOnboarding();
   };
 
@@ -239,24 +240,24 @@ export default function OnboardingScreen() {
 
           {step === STEPS.surveyQ1 && (
             <SurveyStep
-              headline={t("Where do your saves pile up today?")}
-              support={t("Be honest — we've seen worse.")}
+              headline={t("onboarding.pileupQuestion")}
+              support={t("onboarding.pileupHelp")}
               options={Q1_OPTIONS}
               selected={q1}
               onToggle={toggle(setQ1)}
-              ctaLabel={t("Continue")}
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
 
           {step === STEPS.surveyQ2 && (
             <SurveyStep
-              headline={t("What do you save most?")}
-              support={t("This shapes your shelf.")}
+              headline={t("onboarding.kindQuestion")}
+              support={t("onboarding.kindHelp")}
               options={Q2_OPTIONS}
               selected={q2}
               onToggle={toggle(setQ2)}
-              ctaLabel={t("Continue")}
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
@@ -290,7 +291,7 @@ export default function OnboardingScreen() {
 
           {step === STEPS.ready && (
             <ReadyStep
-              spaceNames={spaces}
+              spaceNames={spaces.map(onboardingLabel)}
               demoItem={demoItem}
               onFinish={finish}
             />

@@ -1,4 +1,4 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { parseExifDate } from "@/lib/date";
 import { resolvePickedImageLocation } from "@/lib/picked-image-location";
 import {
@@ -108,14 +108,15 @@ export default function CameraScreen() {
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        t("Could not save all images"),
-        t("%{saved} of %{total} saved. Retry the failed images?", {
+        t("errors.batchSaveTitle"),
+        t("capture.partialFailure", {
+          reason: localizeError(failed[0].message),
           saved: savedCount,
           total: results.length,
         }),
         [
           {
-            text: t("Retry failed"),
+            text: t("capture.retryFailed"),
             onPress: () => {
               void runImageRequests(
                 failed.map((r) => ({
@@ -125,12 +126,12 @@ export default function CameraScreen() {
               );
             },
           },
-          { text: t("Done"), onPress: () => router.back() },
+          { text: t("common.done"), onPress: () => router.back() },
         ],
       );
       setBusy(false);
     } catch {
-      Alert.alert(t("Could not save"), t("Uploading failed. Try again."));
+      Alert.alert(t("errors.saveTitle"), t("errors.upload"));
       setBusy(false);
     }
   };
@@ -178,24 +179,21 @@ export default function CameraScreen() {
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
       Alert.alert(
-        t("Capture failed"),
-        t("Could not save that photo. Try again."),
+        t("errors.captureTitle"),
+        localizeError(result.message, "errors.savePhoto"),
         [
           {
-            text: t("Retry"),
+            text: t("common.retry"),
             onPress: () => {
               void saveSingle(failed);
             },
           },
-          { text: t("Cancel"), onPress: () => setBusy(false) },
+          { text: t("common.cancel"), onPress: () => setBusy(false) },
         ],
       );
       setBusy(false);
     } catch {
-      Alert.alert(
-        t("Capture failed"),
-        t("Could not save that photo. Try again."),
-      );
+      Alert.alert(t("errors.captureTitle"), t("errors.savePhoto"));
       setBusy(false);
     }
   };
@@ -214,10 +212,7 @@ export default function CameraScreen() {
       if (mode === "sticker") {
         const sticker = await liftSubject(uri);
         if (!sticker.hasSubject) {
-          Alert.alert(
-            t("No subject found"),
-            t("Point the camera at a clear subject and try again."),
-          );
+          Alert.alert(t("capture.noSubjectTitle"), t("capture.noSubjectBody"));
           setBusy(false);
           return;
         }
@@ -235,10 +230,7 @@ export default function CameraScreen() {
       }
       await saveSingle(request);
     } catch {
-      Alert.alert(
-        t("Capture failed"),
-        t("Could not take that photo. Try again."),
-      );
+      Alert.alert(t("errors.captureTitle"), t("errors.takePhoto"));
       setBusy(false);
     }
   };
@@ -255,7 +247,7 @@ export default function CameraScreen() {
       {action}
       <Pressable style={styles.fallbackButton} onPress={pickFromLibrary}>
         <Text style={styles.fallbackButtonText}>
-          {t("Pick from library instead")}
+          {t("capture.pickFromLibrary")}
         </Text>
       </Pressable>
     </View>
@@ -271,7 +263,7 @@ export default function CameraScreen() {
         onPress={requestPermission}
       >
         <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>
-          {t("Allow camera")}
+          {t("permissions.allowCamera")}
         </Text>
       </Pressable>,
     );
@@ -333,12 +325,12 @@ export default function CameraScreen() {
             >
               <Pressable hitSlop={10} onPress={() => switchMode("photo")}>
                 <Animated.Text style={[styles.modeLabel, photoLabelStyle]}>
-                  {t("PHOTO")}
+                  {t("capture.photoMode")}
                 </Animated.Text>
               </Pressable>
               <Pressable hitSlop={10} onPress={() => switchMode("sticker")}>
                 <Animated.Text style={[styles.modeLabel, stickerLabelStyle]}>
-                  {t("STICKER")}
+                  {t("capture.stickerMode")}
                 </Animated.Text>
               </Pressable>
             </View>

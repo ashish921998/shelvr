@@ -2,7 +2,11 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { ActivityIndicator, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export function ScreenLoader({ label = t("Loading") }: { label?: string }) {
+export function ScreenLoader({
+  label = t("common.loading"),
+}: {
+  label?: string;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   return (

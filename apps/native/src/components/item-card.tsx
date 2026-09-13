@@ -1,3 +1,4 @@
+import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
@@ -59,22 +60,22 @@ export type FeedItem = {
 
 const FAILURE_LABELS: Record<
   NonNullable<FeedItem["failureReason"]>,
-  Record<FeedItem["type"], string>
+  Record<FeedItem["type"], TextMessageKey>
 > = {
   image_too_large: {
-    image: "Photo too large",
-    link: "Photo too large",
-    note: "Photo too large",
+    image: "errors.photoTooLargeTitle",
+    link: "errors.photoTooLargeTitle",
+    note: "errors.photoTooLargeTitle",
   },
   not_found: {
-    image: "Photo unavailable",
-    link: "Page not found",
-    note: "Page not found",
+    image: "errors.photoUnavailableTitle",
+    link: "errors.pageNotFoundTitle",
+    note: "errors.pageNotFoundTitle",
   },
   error: {
-    image: "Couldn't read photo",
-    link: "Couldn't be saved",
-    note: "Couldn't be saved",
+    image: "errors.readPhotoTitle",
+    link: "errors.itemFailedTitle",
+    note: "errors.itemFailedTitle",
   },
 };
 
@@ -125,19 +126,26 @@ function cardMenuActions({
 }): ActionMenuItem[] {
   if (isSuggested) {
     return [
-      { label: t("Add to space"), onPress: accept },
-      { label: t("Dismiss suggestion"), destructive: true, onPress: dismiss },
+      { label: t("spaces.addItem"), onPress: accept },
+      {
+        label: t("spaces.dismissSuggestion"),
+        destructive: true,
+        onPress: dismiss,
+      },
     ];
   }
   const actions: ActionMenuItem[] = [];
   if (hasUrl) {
-    actions.push({ label: t("Share"), onPress: share });
+    actions.push({ label: t("common.share"), onPress: share });
   }
   if (isReady) {
-    actions.push({ label: t("Change spaces"), onPress: changeSpaces });
+    actions.push({
+      label: t("spaces.changeMembership"),
+      onPress: changeSpaces,
+    });
   }
   actions.push({
-    label: t("Delete"),
+    label: t("common.delete"),
     destructive: true,
     onPress: confirmDelete,
   });
@@ -237,8 +245,8 @@ function CardCaption({
         ) : null}
       </View>
       <ActionMenu
-        label={t("Save actions")}
-        title={t("Save actions")}
+        label={t("item.actions")}
+        title={t("item.actions")}
         actions={menuActions}
         style={styles.menuButton}
       >
@@ -347,18 +355,14 @@ export const ItemCard = memo(function ItemCard({
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      t("Delete this save?"),
-      t("This removes it from Shelvr and every space. This can’t be undone."),
-      [
-        { text: t("Cancel"), style: "cancel" },
-        {
-          text: t("Delete"),
-          style: "destructive",
-          onPress: () => deleteItem({ id: item._id }),
-        },
-      ],
-    );
+    Alert.alert(t("item.deleteTitle"), t("item.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => deleteItem({ id: item._id }),
+      },
+    ]);
   };
 
   const menuActions = cardMenuActions({
@@ -432,14 +436,14 @@ export const ItemCard = memo(function ItemCard({
         <Link.Menu>
           {isSuggested && (
             <Link.MenuAction
-              title={t("Add to space")}
+              title={t("spaces.addItem")}
               icon="plus"
               onPress={accept}
             />
           )}
           {isSuggested && (
             <Link.MenuAction
-              title={t("Dismiss suggestion")}
+              title={t("spaces.dismissSuggestion")}
               icon="xmark"
               destructive
               onPress={dismiss}
@@ -447,21 +451,21 @@ export const ItemCard = memo(function ItemCard({
           )}
           {!isSuggested && item.url ? (
             <Link.MenuAction
-              title={t("Share")}
+              title={t("common.share")}
               icon="square.and.arrow.up"
               onPress={share}
             />
           ) : null}
           {!isSuggested && item.status === "ready" ? (
             <Link.MenuAction
-              title={t("Change spaces")}
+              title={t("spaces.changeMembership")}
               icon="tray.and.arrow.up"
               onPress={changeSpaces}
             />
           ) : null}
           {!isSuggested && (
             <Link.MenuAction
-              title={t("Delete")}
+              title={t("common.delete")}
               icon="trash"
               destructive
               onPress={confirmDelete}

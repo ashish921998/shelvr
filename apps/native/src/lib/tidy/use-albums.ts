@@ -15,7 +15,7 @@ export type TidySource = {
 
 const ALL_PHOTOS: TidySource = {
   id: ALL_PHOTOS_ID,
-  title: "All Photos",
+  title: "", // The whole-library label is resolved per locale below.
   album: null,
 };
 
@@ -67,7 +67,7 @@ export function useAlbums(enabled: boolean): TidySource[] {
     () =>
       sources.map((source) =>
         source.id === ALL_PHOTOS_ID
-          ? { ...source, title: translate(locale, "All Photos") }
+          ? { ...source, title: translate(locale, "albums.allPhotos") }
           : source,
       ),
     [sources, locale],
