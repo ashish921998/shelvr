@@ -9,6 +9,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import ipaddr from "ipaddr.js";
+import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 
 export const CONSENT_VERSION = "shelvr-waitlist-v1";
@@ -451,7 +452,12 @@ async function persistResendSync(
     // the email it can echo) stays out of both the database and the logs.
     const { category, status } = classifyResendError(error);
     const step = error instanceof ResendResponseError ? error.step : undefined;
-    console.error("Waitlist Resend sync failed", { category, status, step });
+    logEvent("error", "waitlist_resend_sync_failed", {
+      category,
+      status,
+      step,
+      attempt: attempts + 1,
+    });
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id,
       status: "failed",

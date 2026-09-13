@@ -1,16 +1,19 @@
-import { EmptyState } from '@/components/empty-state';
-import { MasonryFeed } from '@/components/masonry-feed';
-import { CancelSurveyCard } from '@/components/cancel-survey/cancel-survey-card';
-import { FeedbackInvitation } from '@/components/feedback/feedback-invitation';
-import { FeedbackModal } from '@/components/feedback/feedback-modal';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { useHomeFeed } from '@/lib/home-feed';
-import { useBusySaving, useFeedbackInvitation } from '@/lib/feedback-invitation';
-import { useCancelSurvey } from '@/lib/use-cancel-survey';
-import { useReviewPrompt } from '@/lib/review-prompt';
-import { ProgressiveBlurHeader } from 'progressive-blur';
-import { View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { EmptyState } from "@/components/empty-state";
+import { MasonryFeed } from "@/components/masonry-feed";
+import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
+import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
+import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { useHomeFeed } from "@/lib/home-feed";
+import {
+  useBusySaving,
+  useFeedbackInvitation,
+} from "@/lib/feedback-invitation";
+import { useCancelSurvey } from "@/lib/use-cancel-survey";
+import { useReviewPrompt } from "@/lib/review-prompt";
+import { ProgressiveBlurHeader } from "progressive-blur";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function HomeScreen() {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
@@ -35,9 +38,7 @@ export default function HomeScreen() {
   ) : null;
 
   if (items === undefined) {
-    return (
-      <ScreenLoader label="Warming your shelf" />
-    );
+    return <ScreenLoader label="Warming your shelf" />;
   }
 
   if (items.length === 0) {
@@ -45,7 +46,9 @@ export default function HomeScreen() {
       <View style={styles.container}>
         <EmptyState
           title="Save it for later"
-          message={'Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it.'}
+          message={
+            "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it."
+          }
         />
         {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
@@ -58,14 +61,15 @@ export default function HomeScreen() {
       <MasonryFeed
         items={items}
         numColumns={2}
-        source={{ from: 'home' }}
+        source={{ from: "home" }}
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS and the invitation scrolls with the content. The
         // cancel survey claims the slot when both are eligible.
         ListHeaderComponent={
-          cancelSurveyCard ?? (feedback.invitationVisible && !busySaving ? (
+          cancelSurveyCard ??
+          (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
               onSendFeedback={feedback.openFeedbackFromInvitation}
               onDismiss={feedback.dismissInvitation}
@@ -75,10 +79,7 @@ export default function HomeScreen() {
       />
       <ProgressiveBlurHeader />
       {feedback.modalOpen ? (
-        <FeedbackModal
-          surface="home"
-          onClose={feedback.closeFeedback}
-        />
+        <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}
     </View>
   );
@@ -87,6 +88,5 @@ export default function HomeScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-
   },
 }));

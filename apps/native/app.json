@@ -212,13 +212,8 @@
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": [
-              "image/*",
-              "text/*"
-            ],
-            "multipleShareMimeTypes": [
-              "image/*"
-            ]
+            "singleShareMimeTypes": ["image/*", "text/*"],
+            "multipleShareMimeTypes": ["image/*"]
           }
         }
       ],

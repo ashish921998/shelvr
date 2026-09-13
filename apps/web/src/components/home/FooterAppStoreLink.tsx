@@ -1,10 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { APP_STORE_URL } from "@/lib/app-store";
+import { APP_STORE_URL } from "@/lib/appStore";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 
-export default function FooterAppStoreLink({ children }: { children: ReactNode }) {
+export default function FooterAppStoreLink({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <a
       href={APP_STORE_URL}

@@ -178,37 +178,47 @@ describe("stored photo processing", () => {
     });
   });
 
-  it.each(["image", "link", "note"] as const)("bounds %s prompt space data including JSON escapes and multibyte text", async (type) => {
-    const t = newConvexTest();
-    const { itemId } = await photo(t);
-    if (type !== "image") {
-      await t.run((ctx) => ctx.db.patch(itemId, {
-        type, url: type === "link" ? "https://example.com/article" : undefined,
-        note: type === "note" ? "A saved note" : undefined,
-      }));
-    }
-    if (type === "link") {
-      vi.spyOn(safeFetchModule, "safeFetch").mockResolvedValue({ ok: false, code: "fetch_failed" });
-      vi.spyOn(console, "warn").mockImplementation(() => {});
-    }
-    await t.run(async (ctx) => {
-      for (let i = 0; i < 100; i++)
-        await ctx.db.insert("spaces", {
-          userId: "photo-user",
-          dynamic: true,
-          name: `Space ${i}`,
-          description: "\u0000😀".repeat(10000),
+  it.each(["image", "link", "note"] as const)(
+    "bounds %s prompt space data including JSON escapes and multibyte text",
+    async (type) => {
+      const t = newConvexTest();
+      const { itemId } = await photo(t);
+      if (type !== "image") {
+        await t.run((ctx) =>
+          ctx.db.patch(itemId, {
+            type,
+            url: type === "link" ? "https://example.com/article" : undefined,
+            note: type === "note" ? "A saved note" : undefined,
+          }),
+        );
+      }
+      if (type === "link") {
+        vi.spyOn(safeFetchModule, "safeFetch").mockResolvedValue({
+          ok: false,
+          code: "fetch_failed",
         });
-    });
-    await t.action(internal.ai.processItem, { itemId });
-    const call = generateObject.mock.calls[0][0];
-    const prompt = type === "image" ? call.messages[0].content[0].text : call.prompt;
-    expect(
-      new TextEncoder().encode(JSON.stringify(prompt)).byteLength,
-    ).toBeLessThan(70 * 1024);
-    expect(prompt).toContain('"Space 0"');
-    expect(prompt).not.toContain('"Space 99"');
-  });
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+      }
+      await t.run(async (ctx) => {
+        for (let i = 0; i < 100; i++)
+          await ctx.db.insert("spaces", {
+            userId: "photo-user",
+            dynamic: true,
+            name: `Space ${i}`,
+            description: "\u0000😀".repeat(10000),
+          });
+      });
+      await t.action(internal.ai.processItem, { itemId });
+      const call = generateObject.mock.calls[0][0];
+      const prompt =
+        type === "image" ? call.messages[0].content[0].text : call.prompt;
+      expect(
+        new TextEncoder().encode(JSON.stringify(prompt)).byteLength,
+      ).toBeLessThan(70 * 1024);
+      expect(prompt).toContain('"Space 0"');
+      expect(prompt).not.toContain('"Space 99"');
+    },
+  );
 
   it("makes missing product-search photos terminal without an action error", async () => {
     const t = newConvexTest();

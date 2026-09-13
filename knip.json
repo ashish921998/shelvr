@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "apps/native": {
+      "entry": [
+        "index.ts",
+        "src/app/**/*.{ts,tsx}",
+        "src/widgets/recent-saves-widget.tsx",
+        "src/lib/revenuecat-api-key*.ts",
+        "convex/**/*.ts",
+        "modules/*/index.{ts,tsx}",
+        "babel.config.js",
+        "metro.config.js",
+        "generateKeys.mjs",
+        "goldie/goldie.config.ts"
+      ],
+      "project": ["**/*.{js,mjs,ts,tsx}"],
+      "ignore": ["convex/_generated/**"]
+    },
+    "apps/web": {
+      "entry": ["src/app/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["tailwindcss"]
+    }
+  }
+}

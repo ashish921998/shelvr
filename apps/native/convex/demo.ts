@@ -9,13 +9,13 @@ import { demoError } from "./model/demoErrors";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import { isTerminalFailure } from "./model/itemFields";
 import { insertMembership } from "./model/memberships";
+import { validateSpaceName } from "./model/spaceName";
 import { rateLimiter } from "./model/rateLimiter";
 
 // User-facing failures are thrown via `demoError(code)` (model/demoErrors.ts):
 // a ConvexError with structured data the client branches on. A plain Error's
 // message is redacted to "Server Error" in production.
 
-const MAX_SPACE_NAME_LENGTH = 60;
 /** Total retry cap for the demo item, on top of the demoRetry rate limiter's cooldown. */
 export const MAX_DEMO_RETRIES = 5;
 
@@ -26,13 +26,16 @@ const demoStatusValidator = v.union(
 );
 
 /** The optional space the user picked for this link; omitted means "just my shelf". */
-function validateDestination(spaceName: string | undefined): string | undefined {
+function validateDestination(
+  spaceName: string | undefined,
+): string | undefined {
   if (spaceName === undefined) return undefined;
-  const name = spaceName.trim();
-  if (name === "" || name.length > MAX_SPACE_NAME_LENGTH) {
+  try {
+    return validateSpaceName(spaceName);
+  } catch {
+    // Same rule as createSpace, but the demo client branches on codes.
     throw demoError("invalid_space_name");
   }
-  return name;
 }
 
 /** Same idempotency key as createSpace (trimmed name), but not Pro-gated and
@@ -44,7 +47,9 @@ async function findOrCreateDynamicSpace(
 ): Promise<Id<"spaces">> {
   const existing = await ctx.db
     .query("spaces")
-    .withIndex("by_user_and_name", (q) => q.eq("userId", userId).eq("name", name))
+    .withIndex("by_user_and_name", (q) =>
+      q.eq("userId", userId).eq("name", name),
+    )
     .first();
   if (existing !== null) {
     return existing._id;

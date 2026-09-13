@@ -27,26 +27,33 @@ export type DemoErrorData = { code: DemoErrorCode; message: string };
 export const DEMO_ERROR_MESSAGES: Record<DemoErrorCode, string> = {
   demo_used: "Demo save already used",
   no_demo: "No demo save",
-  terminal_failure: "This page could not be found; retrying would not change the result",
+  terminal_failure:
+    "This page could not be found; retrying would not change the result",
   too_many_retries: "Too many retries",
   invalid_space_name: "Invalid space name",
 };
 
 export function demoError(code: DemoErrorCode): ConvexError<DemoErrorData> {
-  return new ConvexError<DemoErrorData>({ code, message: DEMO_ERROR_MESSAGES[code] });
+  return new ConvexError<DemoErrorData>({
+    code,
+    message: DEMO_ERROR_MESSAGES[code],
+  });
 }
 
 function errorData(error: unknown): Record<string, unknown> | null {
   if (!(error instanceof ConvexError)) return null;
   const data: unknown = error.data;
-  return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
+  return typeof data === "object" && data !== null
+    ? (data as Record<string, unknown>)
+    : null;
 }
 
 /** The demo error code carried by a thrown value, or null for anything else
  * (a redacted server error, a network failure, a rate limit…). */
 export function demoErrorCode(error: unknown): DemoErrorCode | null {
   const code = errorData(error)?.code;
-  return typeof code === "string" && (DEMO_ERROR_CODES as readonly string[]).includes(code)
+  return typeof code === "string" &&
+    (DEMO_ERROR_CODES as readonly string[]).includes(code)
     ? (code as DemoErrorCode)
     : null;
 }

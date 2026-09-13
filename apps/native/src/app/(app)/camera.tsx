@@ -1,62 +1,66 @@
-import { parseExifDate } from '@/lib/date';
-import { resolvePickedImageLocation } from '@/lib/picked-image-location';
-import { type ImageSaveRequest, reportSaveFailures, useSaveImages } from '@/lib/use-save-image';
-import type { Id } from '@convex/_generated/dataModel';
-import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { parseExifDate } from "@/lib/date";
+import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import {
+  type ImageSaveRequest,
+  reportSaveFailures,
+  useSaveImages,
+} from "@/lib/use-save-image";
+import type { Id } from "@convex/_generated/dataModel";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StyleSheet } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
 import {
   Camera,
   useCameraDevice,
   useCameraPermission,
   usePhotoOutput,
-} from 'react-native-vision-camera';
-import { isAvailable as stickerLiftAvailable, liftSubject } from 'subject-lift';
+} from "react-native-vision-camera";
+import { isAvailable as stickerLiftAvailable, liftSubject } from "subject-lift";
 
-type CaptureMode = 'photo' | 'sticker';
+type CaptureMode = "photo" | "sticker";
 
 // The accent color matches theme.colors.primary (identical in both themes).
-const ACCENT = '#e6a23c';
-const INACTIVE = 'rgba(255,255,255,0.55)';
+const ACCENT = "#e6a23c";
+const INACTIVE = "rgba(255,255,255,0.55)";
 
 export default function CameraScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   // Opened from a space's add flow: captures are pre-pinned to that space.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
-  const pinnedSpace = { spaceId: spaceId as Id<'spaces'> | undefined };
+  const pinnedSpace = { spaceId: spaceId as Id<"spaces"> | undefined };
   const { hasPermission, requestPermission } = useCameraPermission();
-  const [position, setPosition] = useState<'back' | 'front'>('back');
+  const [position, setPosition] = useState<"back" | "front">("back");
   const device = useCameraDevice(position);
   const photoOutput = usePhotoOutput();
   const saveImages = useSaveImages();
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<CaptureMode>('photo');
+  const [mode, setMode] = useState<CaptureMode>("photo");
 
   // Slides the active-label highlight between Photo (0) and Sticker (1).
   const progress = useSharedValue(0);
   useEffect(() => {
-    progress.value = withTiming(mode === 'sticker' ? 1 : 0, { duration: 200 });
+    progress.value = withTiming(mode === "sticker" ? 1 : 0, { duration: 200 });
   }, [mode, progress]);
 
   const switchMode = useCallback((next: CaptureMode) => {
-    if (next === 'sticker' && !stickerLiftAvailable) return;
+    if (next === "sticker" && !stickerLiftAvailable) return;
     setMode((current) => {
-      if (current !== next && process.env.EXPO_OS === 'ios') {
+      if (current !== next && process.env.EXPO_OS === "ios") {
         Haptics.selectionAsync();
       }
       return next;
@@ -70,9 +74,9 @@ export default function CameraScreen() {
       Gesture.Pan()
         .activeOffsetX([-20, 20])
         .onEnd((event) => {
-          'worklet';
-          if (event.translationX < -40) runOnJS(switchMode)('sticker');
-          else if (event.translationX > 40) runOnJS(switchMode)('photo');
+          "worklet";
+          if (event.translationX < -40) runOnJS(switchMode)("sticker");
+          else if (event.translationX > 40) runOnJS(switchMode)("photo");
         }),
     [switchMode],
   );
@@ -94,7 +98,7 @@ export default function CameraScreen() {
     setBusy(true);
     try {
       const results = await saveImages(requests, pinnedSpace);
-      const failed = results.filter((r) => r.status === 'failed');
+      const failed = results.filter((r) => r.status === "failed");
       if (failed.length === 0) {
         router.back();
         return;
@@ -102,30 +106,33 @@ export default function CameraScreen() {
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        'Could not save all images',
+        "Could not save all images",
         `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
         [
           {
-            text: 'Retry failed',
+            text: "Retry failed",
             onPress: () => {
               void runImageRequests(
-                failed.map((r) => ({ image: r.image, operationId: r.operationId })),
+                failed.map((r) => ({
+                  image: r.image,
+                  operationId: r.operationId,
+                })),
               );
             },
           },
-          { text: 'Done', onPress: () => router.back() },
+          { text: "Done", onPress: () => router.back() },
         ],
       );
       setBusy(false);
     } catch {
-      Alert.alert('Could not save', 'Uploading failed. Try again.');
+      Alert.alert("Could not save", "Uploading failed. Try again.");
       setBusy(false);
     }
   };
 
   const pickFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
+      mediaTypes: "images",
       allowsMultipleSelection: true,
       selectionLimit: 10,
       quality: 0.8,
@@ -156,8 +163,8 @@ export default function CameraScreen() {
     setBusy(true);
     try {
       const [result] = await saveImages([request], pinnedSpace);
-      if (result.status === 'saved') {
-        analytics.capture('photo_captured', { capture_mode: mode });
+      if (result.status === "saved") {
+        analytics.capture("photo_captured", { capture_mode: mode });
         router.back();
         return;
       }
@@ -165,22 +172,18 @@ export default function CameraScreen() {
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
-      Alert.alert(
-        'Capture failed',
-        `${result.message} Try again.`,
-        [
-          {
-            text: 'Retry',
-            onPress: () => {
-              void saveSingle(failed);
-            },
+      Alert.alert("Capture failed", `${result.message} Try again.`, [
+        {
+          text: "Retry",
+          onPress: () => {
+            void saveSingle(failed);
           },
-          { text: 'Cancel', onPress: () => setBusy(false) },
-        ],
-      );
+        },
+        { text: "Cancel", onPress: () => setBusy(false) },
+      ]);
       setBusy(false);
     } catch {
-      Alert.alert('Capture failed', 'Could not save that photo. Try again.');
+      Alert.alert("Capture failed", "Could not save that photo. Try again.");
       setBusy(false);
     }
   };
@@ -189,19 +192,19 @@ export default function CameraScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      if (process.env.EXPO_OS === 'ios') {
+      if (process.env.EXPO_OS === "ios") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       const photoFile = await photoOutput.capturePhotoToFile({}, {});
       const uri = `file://${photoFile.filePath}`;
 
       let request: ImageSaveRequest;
-      if (mode === 'sticker') {
+      if (mode === "sticker") {
         const sticker = await liftSubject(uri);
         if (!sticker.hasSubject) {
           Alert.alert(
-            'No subject found',
-            'Point the camera at a clear subject and try again.',
+            "No subject found",
+            "Point the camera at a clear subject and try again.",
           );
           setBusy(false);
           return;
@@ -211,7 +214,7 @@ export default function CameraScreen() {
             uri: sticker.uri,
             width: sticker.width,
             height: sticker.height,
-            mimeType: 'image/png',
+            mimeType: "image/png",
             isSticker: true,
           },
         };
@@ -220,12 +223,16 @@ export default function CameraScreen() {
       }
       await saveSingle(request);
     } catch {
-      Alert.alert('Capture failed', 'Could not take that photo. Try again.');
+      Alert.alert("Capture failed", "Could not take that photo. Try again.");
       setBusy(false);
     }
   };
 
-  const renderFallback = (title: string, message: string, action?: React.ReactNode) => (
+  const renderFallback = (
+    title: string,
+    message: string,
+    action?: React.ReactNode,
+  ) => (
     <View style={styles.fallback}>
       <AppSymbolIcon name="camera" size={40} tintColor="#8d8271" />
       <Text style={styles.fallbackTitle}>{title}</Text>
@@ -240,16 +247,21 @@ export default function CameraScreen() {
   let body: React.ReactNode;
   if (!hasPermission) {
     body = renderFallback(
-      'Camera access needed',
-      'Shelvr uses the camera to capture things you want to keep.',
-      <Pressable style={[styles.fallbackButton, styles.fallbackPrimary]} onPress={requestPermission}>
-        <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>Allow camera</Text>
+      "Camera access needed",
+      "Shelvr uses the camera to capture things you want to keep.",
+      <Pressable
+        style={[styles.fallbackButton, styles.fallbackPrimary]}
+        onPress={requestPermission}
+      >
+        <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>
+          Allow camera
+        </Text>
       </Pressable>,
     );
   } else if (device == null) {
     body = renderFallback(
-      'No camera here',
-      'This device has no camera (hello, Simulator).',
+      "No camera here",
+      "This device has no camera (hello, Simulator).",
     );
   } else {
     body = (
@@ -273,12 +285,19 @@ export default function CameraScreen() {
 
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
         <Pressable style={styles.roundButton} onPress={() => router.back()}>
-          <AppSymbolIcon name="xmark" size={17} tintColor="#fff" weight="semibold" />
+          <AppSymbolIcon
+            name="xmark"
+            size={17}
+            tintColor="#fff"
+            weight="semibold"
+          />
         </Pressable>
         {showControls ? (
           <Pressable
             style={styles.roundButton}
-            onPress={() => setPosition((p) => (p === 'back' ? 'front' : 'back'))}
+            onPress={() =>
+              setPosition((p) => (p === "back" ? "front" : "back"))
+            }
           >
             <AppSymbolIcon
               name="arrow.triangle.2.circlepath.camera"
@@ -292,13 +311,15 @@ export default function CameraScreen() {
       {showControls ? (
         <>
           {stickerLiftAvailable ? (
-            <View style={[styles.modeSelector, { bottom: insets.bottom + 118 }]}>
-              <Pressable hitSlop={10} onPress={() => switchMode('photo')}>
+            <View
+              style={[styles.modeSelector, { bottom: insets.bottom + 118 }]}
+            >
+              <Pressable hitSlop={10} onPress={() => switchMode("photo")}>
                 <Animated.Text style={[styles.modeLabel, photoLabelStyle]}>
                   PHOTO
                 </Animated.Text>
               </Pressable>
-              <Pressable hitSlop={10} onPress={() => switchMode('sticker')}>
+              <Pressable hitSlop={10} onPress={() => switchMode("sticker")}>
                 <Animated.Text style={[styles.modeLabel, stickerLabelStyle]}>
                   STICKER
                 </Animated.Text>
@@ -307,8 +328,16 @@ export default function CameraScreen() {
           ) : null}
 
           <View style={[styles.bottomBar, { bottom: insets.bottom + 24 }]}>
-            <Pressable style={styles.libraryButton} onPress={pickFromLibrary} disabled={busy}>
-              <AppSymbolIcon name="photo.on.rectangle" size={20} tintColor="#fff" />
+            <Pressable
+              style={styles.libraryButton}
+              onPress={pickFromLibrary}
+              disabled={busy}
+            >
+              <AppSymbolIcon
+                name="photo.on.rectangle"
+                size={20}
+                tintColor="#fff"
+              />
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
               {busy ? (
@@ -328,7 +357,7 @@ export default function CameraScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
   },
   preview: {
     flex: 1,
@@ -337,27 +366,27 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   topBar: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   roundButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modeSelector: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(3),
   },
   modeLabel: {
@@ -366,29 +395,29 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 1.5,
   },
   bottomBar: {
-    position: 'absolute',
+    position: "absolute",
     left: 32,
     right: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   libraryButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   shutter: {
     width: 74,
     height: 74,
     borderRadius: 37,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
   },
   shutterInner: {
     width: 62,
@@ -396,33 +425,33 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 31,
     borderWidth: 3,
     borderColor: theme.colors.primary,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   fallback: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: theme.gap(4),
     gap: theme.gap(1.5),
-    backgroundColor: '#12100c',
+    backgroundColor: "#12100c",
   },
   fallbackTitle: {
     fontFamily: theme.fonts.display,
     fontSize: 22,
-    color: '#f4eddd',
+    color: "#f4eddd",
   },
   fallbackMessage: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     lineHeight: 21,
-    color: '#a2977f',
-    textAlign: 'center',
+    color: "#a2977f",
+    textAlign: "center",
   },
   fallbackButton: {
     paddingVertical: theme.gap(1.25),
     paddingHorizontal: theme.gap(2.5),
     borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   fallbackPrimary: {
     backgroundColor: theme.colors.primary,
@@ -433,6 +462,6 @@ const styles = StyleSheet.create((theme) => ({
   fallbackButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: '#f4eddd',
+    color: "#f4eddd",
   },
 }));

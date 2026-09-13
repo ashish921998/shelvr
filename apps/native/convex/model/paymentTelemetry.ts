@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 
+import { readPositiveNumber, readRecord, readString } from "./revenuecat";
+
 export const paymentTelemetryValidator = v.object({
   eventId: v.string(),
   userId: v.string(),
@@ -30,6 +32,68 @@ export const paymentTelemetryValidator = v.object({
     ),
   ),
 });
+
+// RevenueCat webhook payloads are untyped JSON, so every field passes through
+// the shared guards from model/revenuecat.ts before it reaches the telemetry
+// row. Keeping one copy of the guards prevents the two parsers from
+// drifting apart.
+
+function parseEnvironment(
+  value: unknown,
+): "production" | "sandbox" | undefined {
+  if (value === "PRODUCTION") return "production";
+  if (value === "SANDBOX") return "sandbox";
+  return undefined;
+}
+
+// Event types that represent revenue; every other webhook type is lifecycle
+// noise the telemetry must not count.
+const PAID_EVENT_TYPES = [
+  "INITIAL_PURCHASE",
+  "RENEWAL",
+  "NON_RENEWING_PURCHASE",
+];
+
+type PaymentClassification = {
+  event: "trial_started" | "payment_succeeded";
+  payment_kind: string;
+  revenue_usd?: number;
+};
+
+/** Classify an event as a trial start or a paid purchase. Returns undefined
+ * for lifecycle events, trial-priced renewals, and price-less purchases. */
+function classifyPayment(
+  data: Record<string, unknown>,
+): PaymentClassification | undefined {
+  const type = typeof data.type === "string" ? data.type : "";
+  const periodType =
+    typeof data.period_type === "string" ? data.period_type : "";
+  if (type === "INITIAL_PURCHASE" && periodType === "TRIAL") {
+    return { event: "trial_started", payment_kind: "trial" };
+  }
+  if (
+    periodType === "TRIAL" ||
+    periodType === "PROMOTIONAL" ||
+    !PAID_EVENT_TYPES.includes(type)
+  ) {
+    return;
+  }
+  const revenueUsd = readPositiveNumber(data.price);
+  if (revenueUsd === undefined) return;
+  const paymentKind =
+    type === "RENEWAL"
+      ? data.is_trial_conversion === true
+        ? "trial_conversion"
+        : "renewal"
+      : type === "NON_RENEWING_PURCHASE"
+        ? "one_time"
+        : "initial";
+  return {
+    event: "payment_succeeded",
+    payment_kind: paymentKind,
+    revenue_usd: revenueUsd,
+  };
+}
 
 export type CancelCategory =
   | "voluntary"
@@ -97,105 +161,66 @@ function lifecyclePayment(
 }
 
 export function parsePaymentTelemetry(body: unknown) {
-  if (!body || typeof body !== "object" || !("event" in body)) return;
-  const event = body.event;
-  if (!event || typeof event !== "object") return;
-  const data: Record<string, unknown> = Object.fromEntries(
-    Object.entries(event),
-  );
-  const {
-    id,
-    app_user_id,
-    product_id,
-    environment,
-    type,
-    period_type,
-    price,
-    purchased_at_ms,
-    event_timestamp_ms,
-    cancel_reason,
-  } = data;
-  if (
-    typeof id !== "string" ||
-    !id ||
-    typeof app_user_id !== "string" ||
-    !app_user_id ||
-    typeof product_id !== "string" ||
-    !product_id ||
-    (environment !== "PRODUCTION" && environment !== "SANDBOX") ||
-    data.is_family_share === true ||
-    period_type === "PROMOTIONAL"
-  )
-    return;
+  const payload = readRecord(body);
+  const event = readRecord(payload?.event);
+  if (!payload || !event) return;
+  const data: Record<string, unknown> = { ...event };
+  const eventId = readString(data.id);
+  const userId = readString(data.app_user_id);
+  const productId = readString(data.product_id);
+  const environment = parseEnvironment(data.environment);
+  if (!eventId || !userId || !productId || !environment) return;
+  if (data.is_family_share === true) return;
+  if (data.period_type === "PROMOTIONAL") return;
 
-  const storeEnvironment =
-    environment === "PRODUCTION" ? ("production" as const) : ("sandbox" as const);
-  const lifecycle = lifecyclePayment(type, period_type);
+  const lifecycle = lifecyclePayment(data.type, data.period_type);
 
   // Lifecycle events timestamp the lifecycle moment (`event_timestamp_ms`);
   // purchases keep `purchased_at_ms` per the existing contract.
-  const timestamp = lifecycle ? event_timestamp_ms : purchased_at_ms;
-  if (
-    typeof timestamp !== "number" ||
-    !Number.isFinite(timestamp) ||
-    timestamp <= 0
-  )
-    return;
+  const timestamp = readPositiveNumber(
+    lifecycle ? data.event_timestamp_ms : data.purchased_at_ms,
+  );
+  if (!timestamp) return;
 
   if (lifecycle) {
     const cancelled =
       lifecycle.event === "trial_cancelled" ||
       lifecycle.event === "subscription_cancelled";
     return {
-      eventId: id,
-      userId: app_user_id,
+      eventId,
+      userId,
       event: lifecycle.event,
       timestamp,
-      environment: storeEnvironment,
-      product_id,
+      environment,
+      product_id: productId,
       payment_kind: lifecycle.payment_kind,
       ...(typeof data.country_code === "string"
         ? { country_code: data.country_code }
         : {}),
       ...(cancelled
         ? {
-            cancel_category: cancelCategory(cancel_reason),
-            ...(typeof cancel_reason === "string" && cancel_reason
-              ? { cancel_reason }
+            cancel_category: cancelCategory(data.cancel_reason),
+            ...(typeof data.cancel_reason === "string" && data.cancel_reason
+              ? { cancel_reason: data.cancel_reason }
               : {}),
           }
         : {}),
     };
   }
 
-  const trial = type === "INITIAL_PURCHASE" && period_type === "TRIAL";
-  const paid =
-    ["INITIAL_PURCHASE", "RENEWAL", "NON_RENEWING_PURCHASE"].includes(
-      String(type),
-    ) &&
-    period_type !== "TRIAL" &&
-    typeof price === "number" &&
-    Number.isFinite(price) &&
-    price > 0;
-  if (!trial && !paid) return;
-
+  const paid = classifyPayment(data);
+  if (!paid) return;
   return {
-    eventId: id,
-    userId: app_user_id,
-    event: trial ? ("trial_started" as const) : ("payment_succeeded" as const),
-    timestamp: purchased_at_ms as number,
-    environment: storeEnvironment,
-    product_id,
-    payment_kind: trial
-      ? "trial"
-      : type === "RENEWAL"
-        ? data.is_trial_conversion === true
-          ? "trial_conversion"
-          : "renewal"
-        : type === "NON_RENEWING_PURCHASE"
-          ? "one_time"
-          : "initial",
-    ...(paid ? { revenue_usd: price as number } : {}),
+    eventId,
+    userId,
+    event: paid.event,
+    timestamp,
+    environment,
+    product_id: productId,
+    payment_kind: paid.payment_kind,
+    ...(paid.revenue_usd !== undefined
+      ? { revenue_usd: paid.revenue_usd }
+      : {}),
     ...(typeof data.country_code === "string"
       ? { country_code: data.country_code }
       : {}),

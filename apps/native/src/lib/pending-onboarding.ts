@@ -1,5 +1,5 @@
-import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as Crypto from "expo-crypto";
+import * as SecureStore from "expo-secure-store";
 
 // Persisted store for onboarding state that must survive leaving the screen
 // (the demo step's inline OAuth) or an app kill: the picked library
@@ -9,7 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 // does kill backgrounded apps). Clears use setItem('') because SecureStore's
 // delete is async-only; getters treat empty as "not set".
 
-const PENDING_KEY = 'shelvr.pending.onboarding';
+const PENDING_KEY = "shelvr.pending.onboarding";
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
@@ -33,7 +33,7 @@ type PendingRecord = {
 };
 
 /** What onboarding.tsx restores on mount. */
-export type OnboardingProgress = {
+type OnboardingProgress = {
   q1: string[];
   q2: string[];
   spaces: string[];
@@ -64,38 +64,40 @@ function createOperationId(): string {
 
 function readPendingRecord(): PendingRecord | null {
   const raw = SecureStore.getItem(PENDING_KEY);
-  if (raw === null || raw === '') return null;
+  if (raw === null || raw === "") return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return null;
+    if (typeof parsed !== "object" || parsed === null) return null;
     const record = parsed as Partial<PendingRecord>;
     const stringArray = (value: unknown): string[] | null =>
-      Array.isArray(value) && value.every((v): v is string => typeof v === 'string')
+      Array.isArray(value) &&
+      value.every((v): v is string => typeof v === "string")
         ? value
         : null;
     const spaces = stringArray(record.spaces);
     const q1 = stringArray(record.q1) ?? [];
     const q2 = stringArray(record.q2) ?? [];
-    const step = typeof record.step === 'number' ? record.step : null;
+    const step = typeof record.step === "number" ? record.step : null;
     const demo =
       record.demo !== null &&
-      typeof record.demo === 'object' &&
-      typeof record.demo.url === 'string' &&
-      (record.demo.destination === null || typeof record.demo.destination === 'string')
+      typeof record.demo === "object" &&
+      typeof record.demo.url === "string" &&
+      (record.demo.destination === null ||
+        typeof record.demo.destination === "string")
         ? record.demo
         : null;
     if (
-      typeof record.operationId !== 'string' ||
-      record.operationId === '' ||
+      typeof record.operationId !== "string" ||
+      record.operationId === "" ||
       spaces === null ||
-      (record.demoUrl !== null && typeof record.demoUrl !== 'string')
+      (record.demoUrl !== null && typeof record.demoUrl !== "string")
     ) {
       return null;
     }
     return {
       operationId: record.operationId,
       spaces,
-      demoUrl: record.demoUrl === '' ? null : record.demoUrl,
+      demoUrl: record.demoUrl === "" ? null : record.demoUrl,
       q1,
       q2,
       step,
@@ -107,14 +109,25 @@ function readPendingRecord(): PendingRecord | null {
 }
 
 function writePendingRecord(record: PendingRecord | null) {
-  SecureStore.setItem(PENDING_KEY, record === null ? '' : JSON.stringify(record));
+  SecureStore.setItem(
+    PENDING_KEY,
+    record === null ? "" : JSON.stringify(record),
+  );
 }
 
 function ensureOperationId(): string {
   const existing = readPendingRecord();
   if (existing !== null) return existing.operationId;
   const operationId = createOperationId();
-  writePendingRecord({ operationId, spaces: [], demoUrl: null, q1: [], q2: [], step: null, demo: null });
+  writePendingRecord({
+    operationId,
+    spaces: [],
+    demoUrl: null,
+    q1: [],
+    q2: [],
+    step: null,
+    demo: null,
+  });
   return operationId;
 }
 
@@ -130,7 +143,7 @@ function writePendingSpaces(
   const operationId =
     spaces.length > 0 && refreshOperationId && !existing?.demoUrl
       ? createOperationId()
-      : existing?.operationId ?? createOperationId();
+      : (existing?.operationId ?? createOperationId());
   writePendingRecord({
     operationId,
     spaces,
@@ -234,7 +247,9 @@ export function setPendingDemo(demo: PendingDemo | null) {
 
 export function hasPending(): boolean {
   const record = readPendingRecord();
-  return record !== null && (record.spaces.length > 0 || record.demoUrl !== null);
+  return (
+    record !== null && (record.spaces.length > 0 || record.demoUrl !== null)
+  );
 }
 
 export function clearPending() {

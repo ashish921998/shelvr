@@ -115,7 +115,10 @@ describe("run fencing in processItem", () => {
     ).resolves.toBeNull();
 
     const item = await t.run((ctx) => ctx.db.get(itemId));
-    expect(item).toMatchObject({ status: "processing", processingRunId: "run-new" });
+    expect(item).toMatchObject({
+      status: "processing",
+      processingRunId: "run-new",
+    });
     expect(item?.title).toBeUndefined();
     // No steering jobs were queued for a result nobody will see.
     const scheduled = await t.run((ctx) =>
@@ -130,7 +133,9 @@ describe("run fencing in processItem", () => {
     // the outcome event, not only the status write.
     vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
     vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 200 }));
-    generateObject.mockRejectedValue(new DOMException("deadline", "TimeoutError"));
+    generateObject.mockRejectedValue(
+      new DOMException("deadline", "TimeoutError"),
+    );
     const t = newConvexTest();
     const itemId = await note(t, "run-new");
 

@@ -8,14 +8,21 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
-import { LIST_PAGE_MAX, PROCESSING_STALE_MS, RECENT_ITEMS_MAX, STALE_IMPORT_CUTOFF_MS } from "./items";
-import { MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
+import {
+  LIST_PAGE_MAX,
+  PROCESSING_STALE_MS,
+  RECENT_ITEMS_MAX,
+  STALE_IMPORT_CUTOFF_MS,
+} from "./items";
+import {
+  MAX_PHOTOS_PER_ACCOUNT,
+  PHOTO_LIMIT_MESSAGE,
+} from "./model/imagePolicy";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
 // Used as the shared param type for helpers that drive either a base or
 // identity-scoped test backend.
 type TestCtx = TestConvexForDataModel<DataModel>;
-
 
 // A representative operation id (UUID-shaped, within the 8–200 char bound).
 const OP_ID = "image:11111111-1111-4111-8111-111111111111";
@@ -86,6 +93,18 @@ describe("listItems (installed builds)", () => {
     const mine = await ta.query(api.items.listItems, {});
     expect(mine.map((item) => item._id)).toEqual([...aIds].reverse());
   });
+
+  it("searchItems keeps the article body on the row those builds open from", async () => {
+    const t = await as("feed-user");
+    const [id] = await seedFeed(t, "feed-user", 1);
+
+    const results = await t.query(api.items.searchItems, { query: "save" });
+    expect(results.map((item) => item._id)).toEqual([id]);
+    // The pre-pagination detail screen renders `content` straight off this
+    // row; without it, search → open shows a link with no article.
+    expect(results[0].content).toContain("Article body 0");
+    expect(results[0]).toHaveProperty("imageUrl");
+  });
 });
 
 describe("listItemsPage", () => {
@@ -103,7 +122,9 @@ describe("listItemsPage", () => {
     const second = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 2, cursor: first.continueCursor },
     });
-    expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(2, 4));
+    expect(second.page.map((item) => item._id)).toEqual(
+      newestFirst.slice(2, 4),
+    );
     expect(second.isDone).toBe(false);
 
     const third = await t.query(api.items.listItemsPage, {
@@ -121,13 +142,17 @@ describe("listItemsPage", () => {
     const first = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 100_000, cursor: null },
     });
-    expect(first.page.map((item) => item._id)).toEqual(newestFirst.slice(0, LIST_PAGE_MAX));
+    expect(first.page.map((item) => item._id)).toEqual(
+      newestFirst.slice(0, LIST_PAGE_MAX),
+    );
     expect(first.isDone).toBe(false);
 
     const second = await t.query(api.items.listItemsPage, {
       paginationOpts: { numItems: 100_000, cursor: first.continueCursor },
     });
-    expect(second.page.map((item) => item._id)).toEqual(newestFirst.slice(LIST_PAGE_MAX));
+    expect(second.page.map((item) => item._id)).toEqual(
+      newestFirst.slice(LIST_PAGE_MAX),
+    );
     expect(second.isDone).toBe(true);
   });
 
@@ -141,7 +166,13 @@ describe("listItemsPage", () => {
     expect(page).toHaveLength(1);
     const row = page[0];
     expect(row._id).toBe(id);
-    for (const dropped of ["content", "searchText", "products", "productsStatus", "userId"]) {
+    for (const dropped of [
+      "content",
+      "searchText",
+      "products",
+      "productsStatus",
+      "userId",
+    ]) {
       expect(row).not.toHaveProperty(dropped);
     }
     // What the card and the detail pager's first paint still need.
@@ -185,7 +216,9 @@ describe("listItemsPage", () => {
   it("rejects unauthenticated callers", async () => {
     const t = newConvexTest();
     await expect(
-      t.query(api.items.listItemsPage, { paginationOpts: { numItems: 10, cursor: null } }),
+      t.query(api.items.listItemsPage, {
+        paginationOpts: { numItems: 10, cursor: null },
+      }),
     ).rejects.toThrow("Not authenticated");
   });
 });
@@ -194,7 +227,9 @@ describe("listRecentItems", () => {
   it("returns the newest ready items up to the limit, skipping unready ones", async () => {
     const t = await as("recent-user");
     const older = await seedFeed(t, "recent-user", 3);
-    const pending = await seedFeed(t, "recent-user", 1, { status: "processing" });
+    const pending = await seedFeed(t, "recent-user", 1, {
+      status: "processing",
+    });
     const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
 
     const recent = await t.query(api.items.listRecentItems, { limit: 2 });
@@ -212,7 +247,11 @@ describe("listRecentItems", () => {
     await seedFeed(t, "recent-user", 30, { status: "processing" });
 
     const recent = await t.query(api.items.listRecentItems, { limit: 5 });
-    expect(recent.map((item) => item._id)).toEqual([ready[2], ready[1], ready[0]]);
+    expect(recent.map((item) => item._id)).toEqual([
+      ready[2],
+      ready[1],
+      ready[0],
+    ]);
   });
 
   it("finds a ready item behind any number of newer failed ones", async () => {
@@ -234,7 +273,9 @@ describe("listRecentItems", () => {
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
     // A non-positive or fractional limit still yields at least one item.
-    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(1);
+    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(
+      1,
+    );
   });
 });
 
@@ -273,7 +314,13 @@ describe("listLocatedItems", () => {
 
     const markers = await t.query(api.items.listLocatedItems, {});
     expect(markers).toEqual([
-      { _id: located, title: "Belém Tower", latitude: 38.6916, longitude: -9.216, imageUrl: null },
+      {
+        _id: located,
+        title: "Belém Tower",
+        latitude: 38.6916,
+        longitude: -9.216,
+        imageUrl: null,
+      },
     ]);
     expect(markers.map((m) => m._id)).not.toContain(unlocated);
   });
@@ -283,40 +330,77 @@ describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const t = await as("telemetry-user");
     const itemId = await t.mutation(api.items.createNoteItem, {
-      text: "Private note", operationId: "note:telemetry-1", analyticsSessionId: "save-session",
+      text: "Private note",
+      operationId: "note:telemetry-1",
+      analyticsSessionId: "save-session",
     });
     const retry = await t.mutation(api.items.createNoteItem, {
-      text: "Private note", operationId: "note:telemetry-1", analyticsSessionId: "later-session",
+      text: "Private note",
+      operationId: "note:telemetry-1",
+      analyticsSessionId: "later-session",
     });
     expect(retry).toBe(itemId);
     const { item, jobs } = await t.run(async (ctx) => ({
       item: await ctx.db.get(itemId),
       jobs: await ctx.db.system.query("_scheduled_functions").collect(),
     }));
-    const telemetry = jobs.filter((job) => job.name === "analytics:captureSave");
+    const telemetry = jobs.filter(
+      (job) => job.name === "analytics:captureSave",
+    );
     expect(telemetry).toHaveLength(1);
-    expect(telemetry[0].args).toEqual([{
-      itemId, userId: "telemetry-user", itemType: "note", savedAt: item?._creationTime, sessionId: "save-session",
-    }]);
+    expect(telemetry[0].args).toEqual([
+      {
+        itemId,
+        userId: "telemetry-user",
+        itemType: "note",
+        savedAt: item?._creationTime,
+        sessionId: "save-session",
+      },
+    ]);
   });
 
   it("tracks link and image saves while remaining compatible with old clients", async () => {
     const t = await as("telemetry-user");
-    const linkId = await t.mutation(api.items.createLinkItem, { url: "https://example.com" });
+    const linkId = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com",
+    });
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     const storageId = await storeBlob(t);
-    await t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId });
-    const imageId = await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID, analyticsSessionId: "image-session" });
-    await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID, analyticsSessionId: "retry-session" });
-    const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
-    const telemetry = jobs.filter((job) => job.name === "analytics:captureSave");
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId,
+    });
+    const imageId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+      analyticsSessionId: "image-session",
+    });
+    await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+      analyticsSessionId: "retry-session",
+    });
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const telemetry = jobs.filter(
+      (job) => job.name === "analytics:captureSave",
+    );
     expect(telemetry).toHaveLength(2);
-    expect(telemetry.map((job) => job.args[0])).toEqual(expect.arrayContaining([
-      expect.objectContaining({ itemId: linkId, itemType: "link" }),
-      // The 4-byte blob from storeBlob; photo_count is the account total after this save.
-      expect.objectContaining({ itemId: imageId, itemType: "image", sessionId: "image-session", photoCount: 1, storedBytes: 4 }),
-    ]));
-    expect(telemetry.find((job) => job.args[0].itemType === "link")?.args[0]).not.toHaveProperty("photoCount");
+    expect(telemetry.map((job) => job.args[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemId: linkId, itemType: "link" }),
+        // The 4-byte blob from storeBlob; photo_count is the account total after this save.
+        expect.objectContaining({
+          itemId: imageId,
+          itemType: "image",
+          sessionId: "image-session",
+          photoCount: 1,
+          storedBytes: 4,
+        }),
+      ]),
+    );
+    expect(
+      telemetry.find((job) => job.args[0].itemType === "link")?.args[0],
+    ).not.toHaveProperty("photoCount");
   });
 });
 
@@ -382,11 +466,22 @@ describe("photo quota", () => {
         });
       }
       // Links and notes never count.
-      await ctx.db.insert("items", { userId: "user-a", type: "link", status: "ready", tags: [], searchText: "" });
+      await ctx.db.insert("items", {
+        userId: "user-a",
+        type: "link",
+        status: "ready",
+        tags: [],
+        searchText: "",
+      });
     });
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
-    await t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId: await storeBlob(t) });
-    const lastId = await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID });
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId: await storeBlob(t),
+    });
+    const lastId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+    });
     expect(await t.query(api.items.photoUsage, {})).toEqual({
       count: MAX_PHOTOS_PER_ACCOUNT,
       limit: MAX_PHOTOS_PER_ACCOUNT,
@@ -396,12 +491,17 @@ describe("photo quota", () => {
       t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 }),
     ).rejects.toThrow(PHOTO_LIMIT_MESSAGE);
     // A completed operation still returns its item to a full account.
-    expect(await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID })).toBe(lastId);
+    expect(
+      await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+    ).toBe(lastId);
 
     await t.mutation(api.items.deleteItem, { id: lastId });
-    expect((await t.query(api.items.photoUsage, {})).count).toBe(MAX_PHOTOS_PER_ACCOUNT - 1);
+    expect((await t.query(api.items.photoUsage, {})).count).toBe(
+      MAX_PHOTOS_PER_ACCOUNT - 1,
+    );
     expect(
-      (await t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 })).kind,
+      (await t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 }))
+        .kind,
     ).toBe("upload");
   });
 });
@@ -1901,7 +2001,9 @@ describe("failed saves and retry", () => {
         failureReason,
       });
       expect(
-        await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+        await t.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        ),
       ).toHaveLength(0);
       // A legitimate retry still succeeds after the terminal attempts.
       await t.run((ctx) => ctx.db.patch(id, { failureReason: "error" }));
@@ -1991,7 +2093,9 @@ describe("photo rejection before classification", () => {
       await expect(
         t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
       ).rejects.toThrow("no attached upload");
-      expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(0);
+      expect(
+        await t.run((ctx) => ctx.db.query("items").collect()),
+      ).toHaveLength(0);
 
       const valid = await storeBlob(t);
       await t.mutation(api.items.attachImageUpload, {
@@ -2022,7 +2126,9 @@ describe("photo rejection before classification", () => {
     await expect(
       t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
     ).rejects.toThrow("too large");
-    expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(0);
+    expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(
+      0,
+    );
   });
 
   it("does not charge or queue product-search retries for missing photos", async () => {
@@ -2043,11 +2149,17 @@ describe("photo rejection before classification", () => {
       productsStatus: "unavailable",
     });
     expect(
-      await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      ),
     ).toHaveLength(0);
 
     await t.run((ctx) =>
-      ctx.db.patch(id, { type: "note", note: "chair", productsStatus: undefined }),
+      ctx.db.patch(id, {
+        type: "note",
+        note: "chair",
+        productsStatus: undefined,
+      }),
     );
     await t.mutation(api.items.findLinks, { id });
     expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
@@ -2071,7 +2183,10 @@ describe("photo rejection before classification", () => {
     });
     await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
     await expect(
-      t.mutation(api.items.attachImageUpload, { operationId: OP_ID, storageId }),
+      t.mutation(api.items.attachImageUpload, {
+        operationId: OP_ID,
+        storageId,
+      }),
     ).rejects.toThrow("already in use");
     expect(
       await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
@@ -2136,7 +2251,9 @@ describe("stale processing runs", () => {
 
   it("stamps a run id and start time on every path that starts processing", async () => {
     const t = await as("run-stamp");
-    const noteId = await t.mutation(api.items.createNoteItem, { text: "a note" });
+    const noteId = await t.mutation(api.items.createNoteItem, {
+      text: "a note",
+    });
     const note = await t.run((ctx) => ctx.db.get(noteId));
     expect(note).toMatchObject({
       status: "processing",
@@ -2145,7 +2262,10 @@ describe("stale processing runs", () => {
     expect(typeof note?.processingRunId).toBe("string");
     // The scheduled action carries the same run id it must finalize under.
     const [job] = await scheduledJobs(t, "ai:processItem");
-    expect(job.args[0]).toEqual({ itemId: noteId, runId: note?.processingRunId });
+    expect(job.args[0]).toEqual({
+      itemId: noteId,
+      runId: note?.processingRunId,
+    });
 
     // A retry mints a NEW run so the old action is fenced out.
     await t.run((ctx) =>
@@ -2164,26 +2284,42 @@ describe("stale processing runs", () => {
 
   it("sweeps stale processing items and leaves fresh ones alone", async () => {
     const t = newConvexTest();
-    const legacyStale = await processingLink(t, "sweep", STALE_AGE, { legacy: true });
-    const legacyFresh = await processingLink(t, "sweep", FRESH_AGE, { legacy: true });
+    const legacyStale = await processingLink(t, "sweep", STALE_AGE, {
+      legacy: true,
+    });
+    const legacyFresh = await processingLink(t, "sweep", FRESH_AGE, {
+      legacy: true,
+    });
     const stale = await processingLink(t, "sweep", STALE_AGE);
     const fresh = await processingLink(t, "sweep", FRESH_AGE);
 
-    const result = await t.mutation(internal.items.failStaleProcessingItems, {});
+    const result = await t.mutation(
+      internal.items.failStaleProcessingItems,
+      {},
+    );
     // Both legacy rows sort into the range (undefined precedes every number);
     // only the stale one is failed, so scanned counts 3 and failed counts 2.
     expect(result).toEqual({ failed: 2, scanned: 3 });
 
-    const byId = async (id: Id<"items">) => await t.run((ctx) => ctx.db.get(id));
-    expect(await byId(stale)).toMatchObject({ status: "failed", failureReason: "error" });
-    expect(await byId(legacyStale)).toMatchObject({ status: "failed", failureReason: "error" });
+    const byId = async (id: Id<"items">) =>
+      await t.run((ctx) => ctx.db.get(id));
+    expect(await byId(stale)).toMatchObject({
+      status: "failed",
+      failureReason: "error",
+    });
+    expect(await byId(legacyStale)).toMatchObject({
+      status: "failed",
+      failureReason: "error",
+    });
     expect(await byId(fresh)).toMatchObject({ status: "processing" });
     expect(await byId(legacyFresh)).toMatchObject({ status: "processing" });
     // The stale row keeps its run id: if the presumed-dead action does finish,
     // its finalize still owns the row and may repair the item.
     expect((await byId(stale))?.processingRunId).toBeDefined();
     // A partial page does not chain.
-    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(0);
+    expect(
+      await scheduledJobs(t, "items:failStaleProcessingItems"),
+    ).toHaveLength(0);
   });
 
   it("chains another sweep only when a full page made progress", async () => {
@@ -2195,14 +2331,23 @@ describe("stale processing runs", () => {
 
     const first = await t.mutation(internal.items.failStaleProcessingItems, {});
     expect(first).toEqual({ failed: 100, scanned: 100 });
-    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(1);
+    expect(
+      await scheduledJobs(t, "items:failStaleProcessingItems"),
+    ).toHaveLength(1);
 
     // The chained run (executed directly here; the scheduler is frozen) picks
     // up the remainder and, with a partial page, stops.
-    const second = await t.mutation(internal.items.failStaleProcessingItems, {});
+    const second = await t.mutation(
+      internal.items.failStaleProcessingItems,
+      {},
+    );
     expect(second).toEqual({ failed: 1, scanned: 1 });
-    expect(await t.run((ctx) => ctx.db.get(extra))).toMatchObject({ status: "failed" });
-    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(1);
+    expect(await t.run((ctx) => ctx.db.get(extra))).toMatchObject({
+      status: "failed",
+    });
+    expect(
+      await scheduledJobs(t, "items:failStaleProcessingItems"),
+    ).toHaveLength(1);
   });
 
   it("does not loop on a full page of legacy rows that are not yet stale", async () => {
@@ -2213,9 +2358,14 @@ describe("stale processing runs", () => {
     for (let i = 0; i < 100; i++) {
       await processingLink(t, "sweep-legacy", FRESH_AGE, { legacy: true });
     }
-    const result = await t.mutation(internal.items.failStaleProcessingItems, {});
+    const result = await t.mutation(
+      internal.items.failStaleProcessingItems,
+      {},
+    );
     expect(result).toEqual({ failed: 0, scanned: 100 });
-    expect(await scheduledJobs(t, "items:failStaleProcessingItems")).toHaveLength(0);
+    expect(
+      await scheduledJobs(t, "items:failStaleProcessingItems"),
+    ).toHaveLength(0);
   });
 
   it("finalizeItem and failItem are no-ops for a superseded run", async () => {
@@ -2281,10 +2431,14 @@ describe("stale processing runs", () => {
   });
 
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
-    const t = newConvexTest().withIdentity({ subject: "retry-stale|session-1" });
+    const t = newConvexTest().withIdentity({
+      subject: "retry-stale|session-1",
+    });
     // The legacy row is created first so its `_creationTime` can be back-dated
     // past the Pro row `as` would otherwise insert at "now".
-    const legacyStale = await processingLink(t, "retry-stale", STALE_AGE, { legacy: true });
+    const legacyStale = await processingLink(t, "retry-stale", STALE_AGE, {
+      legacy: true,
+    });
     await t.run((ctx) =>
       ctx.db.insert("subscriptions", {
         userId: "retry-stale",
@@ -2302,7 +2456,10 @@ describe("stale processing runs", () => {
 
     expect(await t.mutation(api.items.reprocessItem, { id: stale })).toBe(true);
     const retried = await t.run((ctx) => ctx.db.get(stale));
-    expect(retried).toMatchObject({ status: "processing", processingStartedAt: Date.now() });
+    expect(retried).toMatchObject({
+      status: "processing",
+      processingStartedAt: Date.now(),
+    });
     expect(retried?.processingRunId).not.toBe(before.stale?.processingRunId);
 
     await t.mutation(api.items.reprocessItem, { id: legacyStale });
@@ -2313,13 +2470,15 @@ describe("stale processing runs", () => {
     // Fresh: its action may still finish, so nothing changes and no job queues.
     // The false return is what lets a client with a fast clock tell the user
     // instead of going quiet.
-    expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(false);
+    expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(
+      false,
+    );
     expect(await t.run((ctx) => ctx.db.get(fresh))).toEqual(before.fresh);
 
     const jobs = await scheduledJobs(t, "ai:processItem");
-    expect(jobs.map((j) => (j.args[0] as { itemId: Id<"items"> }).itemId).sort()).toEqual(
-      [stale, legacyStale].sort(),
-    );
+    expect(
+      jobs.map((j) => (j.args[0] as { itemId: Id<"items"> }).itemId).sort(),
+    ).toEqual([stale, legacyStale].sort());
   });
 
   it("listReadyItemsInternal returns `limit` ready items despite many failed ones", async () => {
@@ -2362,6 +2521,10 @@ describe("stale processing runs", () => {
       limit: 5,
     });
     expect(items).toHaveLength(5);
-    expect(items.every((item) => item.status === "ready" && item.userId === "ready-list")).toBe(true);
+    expect(
+      items.every(
+        (item) => item.status === "ready" && item.userId === "ready-list",
+      ),
+    ).toBe(true);
   });
 });
