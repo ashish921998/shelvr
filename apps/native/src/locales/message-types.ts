@@ -54,6 +54,10 @@ export type MessageParams = {
   "item.article": undefined;
   "capture.photos": undefined;
   "capture.camera": undefined;
+  "capture.cameraAccessTitle": undefined;
+  "capture.cameraAccessBody": undefined;
+  "capture.noCameraTitle": undefined;
+  "capture.noCameraBody": undefined;
   "errors.upload": undefined;
   "errors.captureTitle": undefined;
   "common.retry": undefined;

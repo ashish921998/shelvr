@@ -99,6 +99,8 @@ function untranslatedLiterals(text: string, file = "example.tsx"): string[] {
     )
       checkVisible(node.initializer, true);
     if (ts.isCallExpression(node)) {
+      if (node.expression.getText(source) === "renderFallback")
+        node.arguments.slice(0, 2).forEach((arg) => checkVisible(arg));
       if (node.expression.getText(source) === "t" && node.arguments[0])
         checkKey(node.arguments[0]);
       if (
@@ -126,6 +128,8 @@ it.each([
   'import { Alert as NativeAlert } from "react-native"; NativeAlert.alert(t("common.save"), undefined, [{ text: failed ? "Retry" : "Done" }])',
   'import { Alert } from "react-native"; Alert.alert(t("common.save"), undefined, [{ "text": `Cancel` }])',
   "const label = t(`missing.key`);",
+  'renderFallback("Camera access needed", t("capture.cameraAccessBody"), permissionButton)',
+  'renderFallback(t("capture.noCameraTitle"), "This device has no camera (hello, Simulator).")',
 ])("detects untranslated regression: %s", (source) => {
   expect(untranslatedLiterals(source).length).toBeGreaterThan(0);
 });
@@ -134,6 +138,11 @@ it("allows translated copy, user content and stable technical identities", () =>
   expect(
     untranslatedLiterals(
       '<Text>{item.title}</Text>; <Button testID="save" label={t("common.save")} />',
+    ),
+  ).toEqual([]);
+  expect(
+    untranslatedLiterals(
+      'renderFallback(t("capture.cameraAccessTitle"), t("capture.cameraAccessBody"), permissionButton)',
     ),
   ).toEqual([]);
 });

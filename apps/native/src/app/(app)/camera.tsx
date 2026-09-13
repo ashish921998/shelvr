@@ -256,8 +256,8 @@ export default function CameraScreen() {
   let body: React.ReactNode;
   if (!hasPermission) {
     body = renderFallback(
-      "Camera access needed",
-      "Shelvr uses the camera to capture things you want to keep.",
+      t("capture.cameraAccessTitle"),
+      t("capture.cameraAccessBody"),
       <Pressable
         style={[styles.fallbackButton, styles.fallbackPrimary]}
         onPress={requestPermission}
@@ -269,8 +269,8 @@ export default function CameraScreen() {
     );
   } else if (device == null) {
     body = renderFallback(
-      "No camera here",
-      "This device has no camera (hello, Simulator).",
+      t("capture.noCameraTitle"),
+      t("capture.noCameraBody"),
     );
   } else {
     body = (
