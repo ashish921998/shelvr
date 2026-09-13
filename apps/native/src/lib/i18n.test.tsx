@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t, useAppLocale, localizeError, formattingLocale } from "./i18n";
-import { resolveLocale, translate } from "./i18n-core";
+import { canonicalizeTag, resolveLocale, translate } from "./i18n-core";
 import { formatItemDate } from "./date";
 import de from "@/locales/de.json";
 import ja from "@/locales/ja.json";
@@ -43,6 +43,16 @@ beforeEach(() => {
 });
 
 describe("device language resolution", () => {
+  it("shares canonicalization while preserving formatting extensions", () => {
+    expect(canonicalizeTag("fr_ca_u_nu_latn")).toEqual({
+      canonical: "fr-CA-u-nu-latn",
+      baseName: "fr-CA",
+    });
+    expect(canonicalizeTag("invalid_tag!")).toBeUndefined();
+    changeLanguage("fr_ca_u_nu_latn");
+    expect(resolveLocale([device.tag])).toBe("fr-CA");
+    expect(formattingLocale()).toBe("fr-CA-u-nu-latn");
+  });
   it("works on Hermes without Intl.Locale", () => {
     const constructor = vi.spyOn(Intl, "Locale").mockImplementation(() => {
       throw new Error("Intl.Locale is unavailable");
@@ -108,6 +118,32 @@ describe("device language resolution", () => {
 });
 
 describe("translated copy", () => {
+  it("creates number formatters only for numeric values and reuses them by locale", () => {
+    const numberFormat = Intl.NumberFormat;
+    const constructor = vi
+      .spyOn(Intl, "NumberFormat")
+      .mockImplementation(function (locales, options) {
+        return new numberFormat(locales, options);
+      });
+    try {
+      translate("en", "navigation.search", {}, "en-NZ-u-nu-latn");
+      translate("en", "spaces.addedTo", { space: "Home" }, "en-NZ-u-nu-latn");
+      expect(constructor).not.toHaveBeenCalled();
+      expect(
+        translate("en", "spaces.saveCount", { count: 1234 }, "en-NZ-u-nu-latn"),
+      ).toBe("1,234 saves");
+      expect(
+        translate("en", "spaces.saveCount", { count: 2345 }, "en-NZ-u-nu-latn"),
+      ).toBe("2,345 saves");
+      expect(constructor).toHaveBeenCalledTimes(1);
+      expect(
+        translate("en", "spaces.saveCount", { count: 2345 }, "de-LI-u-nu-latn"),
+      ).toBe(`${new numberFormat("de-LI-u-nu-latn").format(2345)} saves`);
+      expect(constructor).toHaveBeenCalledTimes(2);
+    } finally {
+      constructor.mockRestore();
+    }
+  });
   it("uses English text and dates with Indian number formatting for a Hindi device", () => {
     changeLanguage("hi-IN");
     expect(t("navigation.search")).toBe("Search");

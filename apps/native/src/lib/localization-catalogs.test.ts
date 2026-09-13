@@ -8,9 +8,21 @@ import {
   pt,
 } from "make-plural/pluralCategories";
 import notificationTranslations from "../../convex/model/notificationTranslations.json";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readFileSync, readdirSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveLocale } from "./i18n-core";
 import {
   notificationLocale,
@@ -19,9 +31,11 @@ import {
 import { describe, expect, it } from "vitest";
 import config from "../../localization.config.json";
 import en from "@/locales/en.json";
-import { catalogs } from "@/locales/catalogs";
+import { catalogs, isSupportedLocale } from "@/locales/catalogs";
 
-const locales = [...new Set(Object.values(config.storeLocales))].sort();
+const locales = [...new Set(Object.values(config.storeLocales))]
+  .filter(isSupportedLocale)
+  .sort();
 const placeholders = (text: string) => (text.match(/%\{[^}]+\}/g) ?? []).sort();
 const atoms = (text: string) =>
   (
@@ -206,4 +220,45 @@ it("commits reproducible catalogs, message types and native resources", () => {
       { cwd: fileURLToPath(root), stdio: "pipe" },
     ),
   ).not.toThrow();
+});
+
+it.each([
+  "%{formattedCount} saves, %{formattedCount} waiting",
+  "Saved things are waiting",
+  "%{formattedCount} saves in %{space}",
+])("rejects unsupported digest placeholders before writing: %s", (body) => {
+  const root = fileURLToPath(new URL("../../../../", import.meta.url));
+  const fixture = mkdtempSync(join(tmpdir(), "shelvr-localization-"));
+  try {
+    mkdirSync(join(fixture, "tools"));
+    mkdirSync(join(fixture, "apps/native/src/locales"), { recursive: true });
+    symlinkSync(join(root, "node_modules"), join(fixture, "node_modules"));
+    copyFileSync(
+      join(root, "tools/generate-localizations.mjs"),
+      join(fixture, "tools/generate-localizations.mjs"),
+    );
+    writeFileSync(
+      join(fixture, "apps/native/localization.config.json"),
+      JSON.stringify({ storeLocales: { "en-US": "en" } }),
+    );
+    writeFileSync(
+      join(fixture, "apps/native/src/locales/en.json"),
+      JSON.stringify({
+        ...en,
+        "digest.waitingCount": { one: body, other: body },
+      }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [join(fixture, "tools/generate-localizations.mjs")],
+      { encoding: "utf8" },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "digest.waitingCount must contain exactly one %{formattedCount} placeholder and no others",
+    );
+    expect(existsSync(join(fixture, "apps/native/locales"))).toBe(false);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });

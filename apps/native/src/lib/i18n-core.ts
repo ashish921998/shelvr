@@ -1,7 +1,11 @@
 import { I18n } from "i18n-js";
 import type { MessageKey } from "@/locales/message-types";
 import { pluralRules } from "@convex/model/localization";
-import { catalogs } from "@/locales/catalogs";
+import {
+  catalogs,
+  isSupportedLocale,
+  type SupportedLocale,
+} from "@/locales/catalogs";
 
 // Catalog files use stable namespace.message identifiers. Expand them into
 // i18n-js's normal namespace tree; English punctuation is only ever a value.
@@ -26,27 +30,45 @@ for (const [locale, rule] of Object.entries(pluralRules)) {
   i18n.pluralization.register(locale, (_i18n, count) => [rule(Number(count))]);
 }
 
-/** Follow ordered preferences, resolving only to catalogs included in this build. */
-export function resolveLocale(languageTags: readonly string[]): string {
-  for (const tag of languageTags) {
-    const normalized = tag.replaceAll("_", "-");
-    let canonical: string;
-    try {
-      canonical = Intl.getCanonicalLocales(normalized)[0];
-    } catch {
-      continue;
-    }
+export function canonicalizeTag(tag: string) {
+  try {
+    const canonical = Intl.getCanonicalLocales(tag.replaceAll("_", "-"))[0];
     // Hermes supports canonicalization but does not guarantee Intl.Locale.
-    const baseName = canonical.split(/-[ux]-/i)[0];
+    return { canonical, baseName: canonical.split(/-[ux]-/i)[0] };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Follow ordered preferences, resolving only to catalogs included in this build. */
+export function resolveLocale(
+  languageTags: readonly string[],
+): SupportedLocale {
+  for (const tag of languageTags) {
+    const normalized = canonicalizeTag(tag);
+    if (!normalized) continue;
+    const { baseName } = normalized;
     const language = baseName.split("-")[0];
-    if (Object.hasOwn(catalogs, baseName)) return baseName;
-    if (Object.hasOwn(catalogs, language)) return language;
-    const regionalFallback = Object.keys(catalogs).find((key) =>
-      key.startsWith(`${language}-`),
-    );
+    if (isSupportedLocale(baseName)) return baseName;
+    if (isSupportedLocale(language)) return language;
+    const regionalFallback = Object.keys(catalogs)
+      .filter(isSupportedLocale)
+      .find((key) => key.startsWith(`${language}-`));
     if (regionalFallback) return regionalFallback;
   }
   return "en";
+}
+
+const numberFormatters = new Map<string, Intl.NumberFormat>();
+function formatNumber(locale: string, value: number): string {
+  let formatter = numberFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale);
+    // Device tags may include arbitrary region/numbering extensions.
+    if (numberFormatters.size >= 32) numberFormatters.clear();
+    numberFormatters.set(locale, formatter);
+  }
+  return formatter.format(value);
 }
 
 export function translate(
@@ -55,11 +77,10 @@ export function translate(
   values: Record<string, string | number> = {},
   numberLocale = locale,
 ): string {
-  const formatter = new Intl.NumberFormat(numberLocale);
   const formatted = Object.fromEntries(
     Object.entries(values).map(([name, value]) => [
       name,
-      typeof value === "number" ? formatter.format(value) : value,
+      typeof value === "number" ? formatNumber(numberLocale, value) : value,
     ]),
   );
   const message = catalogs.en[key];
@@ -69,7 +90,7 @@ export function translate(
     }
     // Selection must receive a number, even when interpolation uses regional
     // grouping such as 1.234 or 12,34,567.
-    formatted.formattedCount = formatter.format(values.count);
+    formatted.formattedCount = formatNumber(numberLocale, values.count);
     return i18n.t(key, { ...formatted, count: values.count, locale });
   }
   return i18n.t(key, { ...formatted, locale });

@@ -29,6 +29,12 @@ namespace tree. The generator emits `src/locales/message-types.ts` from English:
 Arrays and maps of dynamic UI keys must use `TextMessageKey` or literal types;
 never cast an arbitrary string into a key.
 
+The generated catalog registry also declares `SupportedLocale`. The resolver and
+app locale hooks return that union, and RevenueCat's exhaustive mapping must be
+updated when a new app catalog is added. Number formatters are created only for
+numeric interpolation and reused in a bounded cache keyed by the full formatting
+locale, including numbering extensions.
+
 Use complete sentences with named `%{values}`; never concatenate translated
 fragments around counts. Plural messages contain the CLDR cardinal categories
 required by their locale (`one`/`other`, plus `many` where applicable; Japanese
@@ -68,6 +74,11 @@ they do not prove that every user-facing string or translation is correct.
 The localization tests cover Hermes without `Intl.Locale`, ordered preferences,
 supported regional variants, number formatting, callback freshness and draft
 preservation.
+
+Notification delivery interpolates exactly one `%{formattedCount}` value. The
+generator rejects digest variants with missing, repeated or additional placeholders
+before writing any resources; richer notification templates require updating that
+delivery contract first.
 
 Native text renders joining scripts, combining marks, emoji and glyphs missing
 from the display font. Covered Latin text and ordinary punctuation retain the

@@ -45,18 +45,16 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
   const candidates: string[] = [];
   for (const kind of answers) {
     for (const preset of SPACE_PRESETS[kind] ?? []) {
-      const name = preset;
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
+      if (!seen.has(preset)) {
+        seen.add(preset);
+        candidates.push(preset);
       }
     }
   }
   for (const preset of GENERIC_PRESETS) {
-    const name = preset;
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
+    if (!seen.has(preset)) {
+      seen.add(preset);
+      candidates.push(preset);
     }
   }
   return candidates;

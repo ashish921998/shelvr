@@ -14,6 +14,8 @@ beforeEach(() => {
 });
 
 it.each([
+  ["en-GB", "en-US"],
+  ["es-ES", "es-ES"],
   ["fr-FR", "fr-FR"],
   ["fr-CA", "fr-CA"],
   ["de-AT", "de-DE"],

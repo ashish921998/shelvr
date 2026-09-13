@@ -4,34 +4,30 @@ import type {
   MessageKey,
   TextMessageKey,
 } from "@/locales/message-types";
-import { resolveLocale, translate } from "./i18n-core";
+import type { SupportedLocale } from "@/locales/catalogs";
+import { canonicalizeTag, resolveLocale, translate } from "./i18n-core";
 
 /** Subscribe each translated screen to device/per-app language changes. */
-export function useAppLocale(): string {
+export function useAppLocale(): SupportedLocale {
   return resolveLocale(useLocales().map((locale) => locale.languageTag));
 }
 
-export function currentLocale(): string {
+export function currentLocale(): SupportedLocale {
   return resolveLocale(getLocales().map((locale) => locale.languageTag));
 }
 
 export function formattingLocale(): string {
   const selected = currentLocale();
-  let fallback = selected;
+  let fallback: string = selected;
   for (const locale of getLocales()) {
-    try {
-      const canonical = Intl.getCanonicalLocales(
-        locale.languageTag.replaceAll("_", "-"),
-      )[0];
-      const [language, ...subtags] = canonical.split(/-[ux]-/i)[0].split("-");
-      const normalizedLanguage = language === "no" ? "nb" : language;
-      if (normalizedLanguage === selected.split("-")[0]) return canonical;
-      // Keep the region while using English month names for unsupported languages.
-      const region = subtags.find((part) => /^[A-Z]{2}$|^\d{3}$/.test(part));
-      if (fallback === "en" && region) fallback = `en-${region}`;
-    } catch {
-      continue;
-    }
+    const normalized = canonicalizeTag(locale.languageTag);
+    if (!normalized) continue;
+    const { canonical, baseName } = normalized;
+    const [language, ...subtags] = baseName.split("-");
+    if (language === selected.split("-")[0]) return canonical;
+    // Keep the region while using English month names for unsupported languages.
+    const region = subtags.find((part) => /^[A-Z]{2}$|^\d{3}$/.test(part));
+    if (fallback === "en" && region) fallback = `en-${region}`;
   }
   return fallback;
 }

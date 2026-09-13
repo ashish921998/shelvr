@@ -9,8 +9,19 @@ import ja from "./ja.json";
 import ko from "./ko.json";
 import ptBR from "./pt-BR.json";
 
+export type SupportedLocale =
+  | "de"
+  | "en"
+  | "es"
+  | "es-MX"
+  | "fr"
+  | "fr-CA"
+  | "ja"
+  | "ko"
+  | "pt-BR";
+
 export const catalogs: Record<
-  string,
+  SupportedLocale,
   Record<string, string | Record<string, string>>
 > = {
   de: de,
@@ -23,3 +34,7 @@ export const catalogs: Record<
   ko: ko,
   "pt-BR": ptBR,
 };
+
+export function isSupportedLocale(locale: string): locale is SupportedLocale {
+  return Object.hasOwn(catalogs, locale);
+}
