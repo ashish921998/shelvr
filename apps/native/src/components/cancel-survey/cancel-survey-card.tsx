@@ -1,18 +1,12 @@
-import { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
-import { InlineCard } from '@/components/ui/inline-card';
+import { useEffect } from "react";
+import { Pressable, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { InlineCard } from "@/components/ui/inline-card";
 import {
+  CANCEL_REASON_LABELS,
   CANCEL_SURVEY_REASONS,
   type CancelSurveyReason,
-} from '@/lib/cancel-survey';
-
-const REASON_LABELS: Record<CancelSurveyReason, string> = {
-  too_expensive: 'Too expensive',
-  not_useful_enough: 'Not useful enough',
-  missing_feature: 'Missing a feature',
-  other: 'Something else',
-};
+} from "@/lib/cancel-survey";
 
 /**
  * The one-time cancel-survey card shown on Home after a trial cancellation is
@@ -46,14 +40,16 @@ export function CancelSurveyCard({
           <Pressable
             key={reason}
             accessibilityRole="button"
-            accessibilityLabel={`Cancel reason: ${REASON_LABELS[reason]}`}
+            accessibilityLabel={`Cancel reason: ${CANCEL_REASON_LABELS[reason]}`}
             style={({ pressed }) => [
               styles.option,
               pressed && { opacity: 0.7 },
             ]}
             onPress={() => onSubmit(reason)}
           >
-            <Text style={styles.optionText}>{REASON_LABELS[reason]}</Text>
+            <Text style={styles.optionText}>
+              {CANCEL_REASON_LABELS[reason]}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -77,12 +73,12 @@ const styles = StyleSheet.create((theme) => ({
   option: {
     minHeight: 44,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingHorizontal: theme.gap(2),
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    alignItems: "flex-start",
+    justifyContent: "center",
   },
   optionText: {
     fontFamily: theme.fonts.medium,
@@ -91,8 +87,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   skip: {
     minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   skipText: {
     fontFamily: theme.fonts.medium,

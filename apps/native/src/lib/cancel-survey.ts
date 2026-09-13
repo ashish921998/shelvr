@@ -1,5 +1,5 @@
-import { analytics, type CancelSurveyReason } from '@/lib/analytics';
-import { isAnalyticsAvailable } from '@/lib/posthog';
+import { analytics, type CancelSurveyReason } from "@/lib/analytics";
+import { isAnalyticsAvailable } from "@/lib/posthog";
 
 export type { CancelSurveyReason };
 
@@ -24,11 +24,21 @@ export type { CancelSurveyReason };
  */
 
 export const CANCEL_SURVEY_REASONS: readonly CancelSurveyReason[] = [
-  'too_expensive',
-  'not_useful_enough',
-  'missing_feature',
-  'other',
+  "too_expensive",
+  "not_useful_enough",
+  "missing_feature",
+  "other",
 ];
+
+/** id → display label. Lives beside the ids (not in the card) so the
+ * analytics vocabulary survives copy changes — docs/analytics/payment-funnel.md
+ * points here. */
+export const CANCEL_REASON_LABELS: Record<CancelSurveyReason, string> = {
+  too_expensive: "Too expensive",
+  not_useful_enough: "Not useful enough",
+  missing_feature: "Missing a feature",
+  other: "Something else",
+};
 
 export function isCancelSurveyReason(
   value: string,
@@ -45,17 +55,17 @@ export const cancelSurveyAnalytics = {
 
   /** Fires when the card actually renders, not when cancellation is detected. */
   shown(): void {
-    analytics.capture('cancel_survey_shown');
+    analytics.capture("cancel_survey_shown");
   },
 
   dismissed(): void {
-    analytics.capture('cancel_survey_dismissed');
+    analytics.capture("cancel_survey_dismissed");
   },
 
   submitted(reason: CancelSurveyReason): void {
-    analytics.capture('cancel_survey_submitted', {
+    analytics.capture("cancel_survey_submitted", {
       reason,
-      survey_source: 'next_visit_card',
+      survey_source: "next_visit_card",
     });
   },
 };

@@ -176,9 +176,15 @@ export function useCancelSurvey(): {
     (reason: CancelSurveyReason) => {
       if (!userId || responded.current) return;
       responded.current = true;
-      void respond({ outcome: "submitted", reason }).then((result) => {
-        if (result.accepted) cancelSurveyAnalytics.submitted(reason);
-      });
+      void respond({ outcome: "submitted", reason })
+        .then((result) => {
+          if (result.accepted) cancelSurveyAnalytics.submitted(reason);
+        })
+        .catch(() => {
+          // A definitively failed respond loses the answer (same failure
+          // mode markShown handles below): the card is already down, so
+          // just keep the rejection off the console.
+        });
       setVisible(false);
     },
     [userId, respond],
@@ -187,9 +193,11 @@ export function useCancelSurvey(): {
   const dismiss = useCallback(() => {
     if (!userId || responded.current) return;
     responded.current = true;
-    void respond({ outcome: "dismissed" }).then((result) => {
-      if (result.accepted) cancelSurveyAnalytics.dismissed();
-    });
+    void respond({ outcome: "dismissed" })
+      .then((result) => {
+        if (result.accepted) cancelSurveyAnalytics.dismissed();
+      })
+      .catch(() => {});
     setVisible(false);
   }, [userId, respond]);
 
