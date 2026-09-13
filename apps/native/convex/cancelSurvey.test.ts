@@ -24,12 +24,14 @@ describe("cancelSurvey", () => {
     });
   });
 
-  it("markShown is idempotent — the ask is consumed exactly once", async () => {
+  it("markShown is idempotent — the ask is consumed exactly once, and the loser is told so", async () => {
     const t = newConvexTest();
     const user = t.withIdentity({ subject: "survey-user|session-1" });
 
-    await user.mutation(api.cancelSurvey.markShown, {});
-    await user.mutation(api.cancelSurvey.markShown, {});
+    const first = await user.mutation(api.cancelSurvey.markShown, {});
+    const second = await user.mutation(api.cancelSurvey.markShown, {});
+    expect(first).toEqual({ accepted: true });
+    expect(second).toEqual({ accepted: false });
 
     const rowsFor = () =>
       t.run(async (ctx) => await ctx.db.query("cancelSurveys").collect());
@@ -49,8 +51,8 @@ describe("cancelSurvey", () => {
     // A stale device (or reinstall) tries to answer again.
     await user.mutation(api.cancelSurvey.respond, { outcome: "dismissed" });
 
-    const rows = await t.run(async (ctx) =>
-      await ctx.db.query("cancelSurveys").collect(),
+    const rows = await t.run(
+      async (ctx) => await ctx.db.query("cancelSurveys").collect(),
     );
     expect(rows.length).toBe(1);
     expect(rows[0]).toMatchObject({
@@ -69,8 +71,8 @@ describe("cancelSurvey", () => {
     });
     expect(result).toEqual({ accepted: true });
 
-    const rows = await t.run(async (ctx) =>
-      await ctx.db.query("cancelSurveys").collect(),
+    const rows = await t.run(
+      async (ctx) => await ctx.db.query("cancelSurveys").collect(),
     );
     expect(rows.length).toBe(1);
     expect(rows[0]).toMatchObject({
@@ -94,8 +96,8 @@ describe("cancelSurvey", () => {
       reason: "other",
     });
 
-    const rows = await t.run(async (ctx) =>
-      await ctx.db.query("cancelSurveys").collect(),
+    const rows = await t.run(
+      async (ctx) => await ctx.db.query("cancelSurveys").collect(),
     );
     expect(rows.length).toBe(2);
     const userRow = rows.find((row) => row.userId === "survey-user");
@@ -104,7 +106,10 @@ describe("cancelSurvey", () => {
     // untouched (no outcome yet).
     expect(userRow).toBeDefined();
     expect(userRow?.outcome).toBeUndefined();
-    expect(strangerRow).toMatchObject({ outcome: "submitted", reason: "other" });
+    expect(strangerRow).toMatchObject({
+      outcome: "submitted",
+      reason: "other",
+    });
   });
 
   it("bounds the reason to the survey's ids — free text is rejected", async () => {

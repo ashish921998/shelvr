@@ -29,15 +29,26 @@ const react = vi.hoisted(() => {
     rendering = false;
     return result;
   };
-  const depsChanged = (prev: unknown[] | undefined, next: unknown[] | undefined) =>
-    !prev || !next || prev.length !== next.length || prev.some((value, i) => !Object.is(value, next[i]));
+  const depsChanged = (
+    prev: unknown[] | undefined,
+    next: unknown[] | undefined,
+  ) =>
+    !prev ||
+    !next ||
+    prev.length !== next.length ||
+    prev.some((value, i) => !Object.is(value, next[i]));
 
   return {
     useState<T>(initial: T | (() => T)) {
       const i = cursor++;
-      if (!(i in slots)) slots[i] = typeof initial === "function" ? (initial as () => T)() : initial;
+      if (!(i in slots))
+        slots[i] =
+          typeof initial === "function" ? (initial as () => T)() : initial;
       const set = (next: T | ((prev: T) => T)) => {
-        const value = typeof next === "function" ? (next as (prev: T) => T)(slots[i] as T) : next;
+        const value =
+          typeof next === "function"
+            ? (next as (prev: T) => T)(slots[i] as T)
+            : next;
         if (Object.is(value, slots[i])) return;
         slots[i] = value;
         if (rendering) dirty = true;
@@ -94,7 +105,7 @@ const mock = vi.hoisted(() => ({
   rcGate: null as Promise<void> | null,
   surveyStatus: { asked: false } as { asked: boolean } | undefined,
   paywallPending: false,
-  markShown: vi.fn(),
+  markShown: vi.fn(async () => ({ accepted: true })),
   respond: vi.fn(async () => ({ accepted: true })),
   capture: vi.fn(),
   // useMutation call counter — see the convex/react mock below.
@@ -112,7 +123,9 @@ vi.mock("react-native", () => ({
   },
 }));
 vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
-vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: mock.user }),
+}));
 vi.mock("@/lib/entitlement", () => ({
   readRcTrialCancellation: vi.fn(async () => {
     if (mock.rcGate) await mock.rcGate;
@@ -120,7 +133,9 @@ vi.mock("@/lib/entitlement", () => ({
   }),
   isPaywallPending: () => mock.paywallPending,
 }));
-vi.mock("@/lib/feedback", () => ({ isHomeRootRoute: () => mock.segments[2] === "(home)" }));
+vi.mock("@/lib/feedback", () => ({
+  isHomeRootRoute: () => mock.segments[2] === "(home)",
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
 vi.mock("@/lib/posthog", () => ({ isAnalyticsAvailable: () => true }));
 vi.mock("convex/react", () => ({
@@ -193,6 +208,7 @@ describe("useCancelSurvey", () => {
     react.mount(() => useCancelSurvey());
     await flush();
     latest().presented();
+    await flush(); // shown fires on the server's accepted verdict
 
     expect(mock.markShown).toHaveBeenCalledWith({});
     expect(mock.capture).toHaveBeenCalledWith("cancel_survey_shown");
@@ -286,7 +302,9 @@ describe("useCancelSurvey", () => {
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
     expect(
-      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted"),
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_submitted",
+      ),
     ).toHaveLength(0);
     expect(latest().visible).toBe(false);
   });
@@ -336,11 +354,60 @@ describe("useCancelSurvey", () => {
     const survey = latest();
     survey.presented(); // e.g. empty-feed → feed branch switch remounts it
     survey.presented();
+    await flush(); // shown fires on the server's accepted verdict
 
     expect(mock.markShown).toHaveBeenCalledTimes(1);
     expect(
-      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_shown"),
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
     ).toHaveLength(1);
+  });
+
+  it("takes the card down and emits nothing when another device won the ask", async () => {
+    mock.markShown.mockResolvedValueOnce({ accepted: false });
+    react.mount(() => useCancelSurvey());
+    await flush();
+    expect(latest().visible).toBe(true);
+
+    latest().presented();
+    await flush(); // the loser's verdict lands
+
+    expect(mock.markShown).toHaveBeenCalledTimes(1);
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
+    ).toHaveLength(0);
+    expect(latest().visible).toBe(false);
+  });
+
+  it("hides the card when the status row turns asked while the verdict is in flight", async () => {
+    let release!: (value: { accepted: boolean }) => void;
+    mock.markShown.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().presented();
+
+    // Another device's markShown lands first: the reactive row flips to
+    // asked while our own verdict is still pending — the card's premise is
+    // gone either way and it must come down.
+    mock.surveyStatus = { asked: true };
+    latest();
+    expect(latest().visible).toBe(false);
+
+    release({ accepted: false });
+    await flush();
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
+    ).toHaveLength(0);
+    expect(latest().visible).toBe(false);
   });
 
   it("double-tapping a reason submits exactly once", async () => {
@@ -353,7 +420,9 @@ describe("useCancelSurvey", () => {
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
     expect(
-      mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted"),
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_submitted",
+      ),
     ).toHaveLength(1);
     expect(latest().visible).toBe(false);
   });

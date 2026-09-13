@@ -39,21 +39,23 @@ export const getStatus = query({
 });
 
 /**
- * Consume the ask durably. Idempotent — a second call (relaunch, another
- * device racing the same moment) is a no-op, so the account is spent exactly
- * once no matter how many installations race.
+ * Consume the ask durably. Returns whether THIS call won the race: a second
+ * call (relaunch, another device racing the same moment) is a no-op and is
+ * told it lost, so the client can keep PostHog in lockstep with this row —
+ * one shown event per account, and a losing card comes down. The account is
+ * spent exactly once no matter how many installations race.
  */
 export const markShown = mutation({
   args: {},
-  returns: v.null(),
+  returns: v.object({ accepted: v.boolean() }),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
-    if (await findSurveyRow(ctx, userId)) return null;
+    if (await findSurveyRow(ctx, userId)) return { accepted: false };
     await ctx.db.insert("cancelSurveys", {
       userId,
       askedAt: Date.now(),
     });
-    return null;
+    return { accepted: true };
   },
 });
 

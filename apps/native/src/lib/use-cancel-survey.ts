@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { useSegments } from 'expo-router';
-import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useMutation } from 'convex/react';
-import { useQuery } from '@tanstack/react-query';
-import { useCurrentUser } from '@/lib/current-user';
-import { isHomeRootRoute } from '@/lib/feedback';
-import { isPaywallPending, readRcTrialCancellation } from '@/lib/entitlement';
-import { cancelSurveyAnalytics, type CancelSurveyReason } from '@/lib/cancel-survey';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
+import { useSegments } from "expo-router";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useMutation } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/lib/current-user";
+import { isHomeRootRoute } from "@/lib/feedback";
+import { isPaywallPending, readRcTrialCancellation } from "@/lib/entitlement";
+import {
+  cancelSurveyAnalytics,
+  type CancelSurveyReason,
+} from "@/lib/cancel-survey";
 
 /** Poll interval while a paywall sheet has the moment (feedback-invitation
  * uses the same cadence). */
@@ -26,6 +29,9 @@ const PAYWALL_RECHECK_MS = 2000;
  * The ask is durably one-per-account (convex/cancelSurvey.ts). The server
  * row is the authority across devices and reinstalls; the hook fails closed
  * and never asks while the row's state is unknown (still loading) or asked.
+ * When the row turns asked while the card is up — another device won the
+ * same moment — the card comes down and emits no analytics: only the
+ * markShown call that consumed the ask may count a `shown`.
  *
  * The ask is consumed only when the card actually renders (`presented`),
  * never at detection time — closing the app on Home's loading screen leaves
@@ -49,13 +55,13 @@ export function useCancelSurvey(): {
   const respond = useMutation(api.cancelSurvey.respond);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', setAppState);
+    const subscription = AppState.addEventListener("change", setAppState);
     return () => subscription.remove();
   }, []);
 
   // Fail closed: `undefined` (still loading / offline) never shows the card.
   const { data: surveyStatus } = useQuery(
-    convexQuery(api.cancelSurvey.getStatus, userId ? {} : 'skip'),
+    convexQuery(api.cancelSurvey.getStatus, userId ? {} : "skip"),
   );
 
   const [visible, setVisible] = useState(false);
@@ -64,11 +70,26 @@ export function useCancelSurvey(): {
   // A background→active transition opens a new episode: the next effect run
   // on Home may check RevenueCat again.
   useEffect(() => {
-    if (appState !== 'active') episodeChecked.current = false;
+    if (appState !== "active") episodeChecked.current = false;
   }, [appState]);
 
+  // Whether THIS device's markShown consumed the account's ask. Undefined
+  // until the mutation's verdict lands (it may be queued while offline).
+  const askWon = useRef<boolean | undefined>(undefined);
+
+  // The server row is the authority across devices: a second device can
+  // still hold the card up from a stale `asked: false` read, and once the
+  // detection episode is spent (above) nothing else would clear it. When the
+  // row reports asked and this device did not win the ask, take the card
+  // down. `undefined` (verdict in flight) also loses: without a win to cite,
+  // a card that outlives its premise must not stay up.
   useEffect(() => {
-    if (!home || appState !== 'active' || !userId) return;
+    if (surveyStatus === undefined) return;
+    if (surveyStatus.asked && askWon.current !== true) setVisible(false);
+  }, [surveyStatus]);
+
+  useEffect(() => {
+    if (!home || appState !== "active" || !userId) return;
     if (episodeChecked.current) return;
     // Wait for the server gate without spending the episode: when it lands,
     // this effect re-runs and the check proceeds.
@@ -93,9 +114,9 @@ export function useCancelSurvey(): {
       // Completed: the episode is spent only now, never at effect start —
       // an interrupted attempt must not block a retry.
       episodeChecked.current = true;
-      if (state === 'cancelled' && !surveyStatus.asked) {
+      if (state === "cancelled" && !surveyStatus.asked) {
         setVisible(true);
-      } else if (state === 'none') {
+      } else if (state === "none") {
         // Renewal resumed: the card's premise no longer holds.
         setVisible(false);
       }
@@ -117,9 +138,18 @@ export function useCancelSurvey(): {
     if (!userId || presentedFor.current === userId) return;
     presentedFor.current = userId;
     // Only now is the ask spent — the card is on screen. Fire-and-forget:
-    // the Convex client queues and retries the mutation if offline.
-    cancelSurveyAnalytics.shown();
-    void markShown({});
+    // the Convex client queues and retries the mutation if offline. The
+    // verdict arbitrates the cross-device race: only the call that consumed
+    // the ask may emit `shown`; a loser (another device got there first)
+    // takes its card down and stays silent.
+    void markShown({}).then((result) => {
+      askWon.current = result.accepted;
+      if (result.accepted) {
+        cancelSurveyAnalytics.shown();
+      } else {
+        setVisible(false);
+      }
+    });
   }, [userId, markShown]);
 
   // One response ever per mount: two rapid taps (or a tap racing dismiss)
@@ -131,7 +161,7 @@ export function useCancelSurvey(): {
     (reason: CancelSurveyReason) => {
       if (!userId || responded.current) return;
       responded.current = true;
-      void respond({ outcome: 'submitted', reason }).then((result) => {
+      void respond({ outcome: "submitted", reason }).then((result) => {
         if (result.accepted) cancelSurveyAnalytics.submitted(reason);
       });
       setVisible(false);
@@ -142,7 +172,7 @@ export function useCancelSurvey(): {
   const dismiss = useCallback(() => {
     if (!userId || responded.current) return;
     responded.current = true;
-    void respond({ outcome: 'dismissed' }).then((result) => {
+    void respond({ outcome: "dismissed" }).then((result) => {
       if (result.accepted) cancelSurveyAnalytics.dismissed();
     });
     setVisible(false);
