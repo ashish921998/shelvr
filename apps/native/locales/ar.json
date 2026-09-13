@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "يستخدم Shelvr الكاميرا لتلتقط ما تريد حفظه لوقت لاحق.",
-    "NSPhotoLibraryUsageDescription": "يتيح لك Shelvr حفظ الصور ولقطات الشاشة من مكتبتك في مركزك، وترتيب مكتبة صورك.",
-    "NSCalendarsUsageDescription": "يضيف Shelvr أحداثًا إلى تقويمك من الأشياء التي حفظتها.",
-    "NSCalendarsFullAccessUsageDescription": "يضيف Shelvr أحداثًا إلى تقويمك من الأشياء التي حفظتها."
-  }
-}

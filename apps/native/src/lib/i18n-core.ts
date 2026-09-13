@@ -8,7 +8,7 @@ const i18n = new I18n(catalogs, {
   defaultSeparator: "\u0001",
 });
 
-/** Follow the ordered preferences; preserve Chinese scripts and regional variants. */
+/** Follow ordered preferences, resolving only to catalogs included in this build. */
 export function resolveLocale(languageTags: readonly string[]): string {
   for (const tag of languageTags) {
     const normalized = tag.replaceAll("_", "-");
@@ -20,20 +20,13 @@ export function resolveLocale(languageTags: readonly string[]): string {
     }
     // Hermes supports canonicalization but does not guarantee Intl.Locale.
     const baseName = canonical.split(/-[ux]-/i)[0];
-    const [languageCode, ...subtags] = baseName.split("-");
-    const region = subtags.find((part) => /^[A-Z]{2}$|^\d{3}$/.test(part));
-    const exact = Object.keys(catalogs).find((key) => key === baseName);
-    if (exact) return exact;
-    if (languageCode === "zh") {
-      if (subtags.includes("Hans")) return "zh-Hans";
-      return subtags.includes("Hant") ||
-        ["TW", "HK", "MO"].includes(region ?? "")
-        ? "zh-Hant"
-        : "zh-Hans";
-    }
-    const language = languageCode === "no" ? "nb" : languageCode;
-    if (language in catalogs) return language;
-    if (language === "pt") return region === "PT" ? "pt-PT" : "pt-BR";
+    const language = baseName.split("-")[0];
+    if (Object.hasOwn(catalogs, baseName)) return baseName;
+    if (Object.hasOwn(catalogs, language)) return language;
+    const regionalFallback = Object.keys(catalogs).find((key) =>
+      key.startsWith(`${language}-`),
+    );
+    if (regionalFallback) return regionalFallback;
   }
   return "en";
 }

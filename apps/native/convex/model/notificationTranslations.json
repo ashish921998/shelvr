@@ -1,27 +1,7 @@
 {
-  "ar": {
-    "title": "رفك الأسبوعي",
-    "body": "محفوظات تنتظرك: %{count}"
-  },
-  "ca": {
-    "title": "El teu prestatge setmanal",
-    "body": "Continguts que t'esperen: %{count}"
-  },
-  "cs": {
-    "title": "Vaše týdenní knihovna",
-    "body": "Čekající uložené položky: %{count}"
-  },
-  "da": {
-    "title": "Din ugehylde",
-    "body": "Indhold, der venter på dig: %{count}"
-  },
   "de": {
     "title": "Dein Wochenregal",
     "body": "Inhalte, die auf dich warten: %{count}"
-  },
-  "el": {
-    "title": "Το εβδομαδιαίο ράφι σου",
-    "body": "Αποθηκεύσεις που σε περιμένουν: %{count}"
   },
   "en": {
     "title": "Your weekly shelf",
@@ -35,10 +15,6 @@
     "title": "Tu estantería semanal",
     "body": "Contenidos que te esperan: %{count}"
   },
-  "fi": {
-    "title": "Viikkohyllysi",
-    "body": "Sinua odottavat tallennukset: %{count}"
-  },
   "fr": {
     "title": "Votre étagère hebdomadaire",
     "body": "Contenus qui vous attendent : %{count}"
@@ -46,26 +22,6 @@
   "fr-CA": {
     "title": "Votre étagère hebdomadaire",
     "body": "Contenus qui vous attendent : %{count}"
-  },
-  "he": {
-    "title": "המדף השבועי שלך",
-    "body": "פריטים שמורים שמחכים לך: %{count}"
-  },
-  "hr": {
-    "title": "Vaša tjedna polica",
-    "body": "Stavke koje vas čekaju: %{count}"
-  },
-  "hu": {
-    "title": "A heti polcod",
-    "body": "Rád váró mentések: %{count}"
-  },
-  "id": {
-    "title": "Rak mingguan Anda",
-    "body": "Simpanan yang menunggu Anda: %{count}"
-  },
-  "it": {
-    "title": "Il tuo scaffale settimanale",
-    "body": "Contenuti che ti aspettano: %{count}"
   },
   "ja": {
     "title": "あなたの今週のシェルフ",
@@ -75,72 +31,8 @@
     "title": "내 주간 책장",
     "body": "기다리는 저장 항목: %{count}"
   },
-  "ms": {
-    "title": "Rak mingguan anda",
-    "body": "Simpanan menunggu anda: %{count}"
-  },
-  "nb": {
-    "title": "Ukehyllen din",
-    "body": "Innhold som venter på deg: %{count}"
-  },
-  "nl": {
-    "title": "Je weekplank",
-    "body": "Inhoud die op je wacht: %{count}"
-  },
-  "pl": {
-    "title": "Twoja półka tygodnia",
-    "body": "Czekające zapisane rzeczy: %{count}"
-  },
   "pt-BR": {
     "title": "Sua estante semanal",
     "body": "Conteúdos esperando por você: %{count}"
-  },
-  "pt-PT": {
-    "title": "Sua estante semanal",
-    "body": "Conteúdos à sua espera: %{count}"
-  },
-  "ro": {
-    "title": "Raftul tău săptămânal",
-    "body": "Salvări care te așteaptă: %{count}"
-  },
-  "ru": {
-    "title": "Ваша еженедельная полка",
-    "body": "Материалы, которые вас ждут: %{count}"
-  },
-  "sk": {
-    "title": "Vaša týždenná polica",
-    "body": "Čakajúce uložené položky: %{count}"
-  },
-  "sl": {
-    "title": "Vaša tedenska polica",
-    "body": "Elementi, ki čakajo na vas: %{count}"
-  },
-  "sv": {
-    "title": "Din veckohylla",
-    "body": "Innehåll som väntar på dig: %{count}"
-  },
-  "th": {
-    "title": "ชั้นประจำสัปดาห์ของคุณ",
-    "body": "รายการที่บันทึกซึ่งรอคุณอยู่: %{count}"
-  },
-  "tr": {
-    "title": "Haftalık rafınız",
-    "body": "Sizi bekleyen kayıtlar: %{count}"
-  },
-  "uk": {
-    "title": "Ваша щотижнева полиця",
-    "body": "Збереження, що чекають на вас: %{count}"
-  },
-  "vi": {
-    "title": "Kệ hằng tuần của bạn",
-    "body": "Mục đã lưu đang đợi bạn: %{count}"
-  },
-  "zh-Hans": {
-    "title": "你的每周精选",
-    "body": "等你查看的保存内容：%{count}"
-  },
-  "zh-Hant": {
-    "title": "你的每週精選",
-    "body": "等你檢視的儲存內容：%{count}"
   }
 }

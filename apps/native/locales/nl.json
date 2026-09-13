@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr gebruikt je camera om dingen vast te leggen die je voor later wilt bewaren.",
-    "NSPhotoLibraryUsageDescription": "Met Shelvr sla je foto's en schermafbeeldingen op in je bibliotheek en ruim je je fotobibliotheek op.",
-    "NSCalendarsUsageDescription": "Shelvr voegt afspraken toe aan je agenda vanuit je opgeslagen inhoud.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr voegt afspraken toe aan je agenda vanuit je opgeslagen inhoud."
-  }
-}

@@ -4,40 +4,10 @@
     "Recent Saves": {
       "extractionState": "manual",
       "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "المحفوظات الأخيرة"
-          }
-        },
-        "ca": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Desats recents"
-          }
-        },
-        "cs": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nedávno uložené"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Senest gemt"
-          }
-        },
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Zuletzt gespeichert"
-          }
-        },
-        "el": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Πρόσφατες αποθηκεύσεις"
           }
         },
         "en": {
@@ -58,12 +28,6 @@
             "value": "Guardados recientes"
           }
         },
-        "fi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Viimeisimmät tallennukset"
-          }
-        },
         "fr": {
           "stringUnit": {
             "state": "translated",
@@ -74,36 +38,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Enregistrements récents"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "פריטים שנשמרו לאחרונה"
-          }
-        },
-        "hr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nedavno spremljeno"
-          }
-        },
-        "hu": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Legutóbbi mentések"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpanan Terbaru"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvati di recente"
           }
         },
         "ja": {
@@ -118,106 +52,10 @@
             "value": "최근 저장 항목"
           }
         },
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpanan Terkini"
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nylig lagret"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recent opgeslagen"
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ostatnio zapisane"
-          }
-        },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Salvos recentes"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guardados recentes"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvări recente"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Недавно сохранённое"
-          }
-        },
-        "sk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nedávno uložené"
-          }
-        },
-        "sl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nedavno shranjeno"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nyligen sparat"
-          }
-        },
-        "th": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "รายการที่บันทึกล่าสุด"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Son Kayıtlar"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нещодавні збереження"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mục lưu gần đây"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近保存"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近儲存"
           }
         }
       }
@@ -225,40 +63,10 @@
     "Your latest saves, at a glance.": {
       "extractionState": "manual",
       "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "آخر محفوظاتك في لمحة."
-          }
-        },
-        "ca": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Els teus últims continguts d'un cop d'ull."
-          }
-        },
-        "cs": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vaše nejnovější položky přehledně."
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dit seneste indhold på et øjeblik."
-          }
-        },
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Deine neuesten Inhalte auf einen Blick."
-          }
-        },
-        "el": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Οι τελευταίες αποθηκεύσεις σου με μια ματιά."
           }
         },
         "en": {
@@ -279,12 +87,6 @@
             "value": "Tus últimos contenidos de un vistazo."
           }
         },
-        "fi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uusimmat tallennuksesi yhdellä silmäyksellä."
-          }
-        },
         "fr": {
           "stringUnit": {
             "state": "translated",
@@ -295,36 +97,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vos derniers contenus, en un coup d'œil."
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "הפריטים האחרונים שלך, במבט אחד."
-          }
-        },
-        "hr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vaše najnovije stavke, na prvi pogled."
-          }
-        },
-        "hu": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A legújabb mentéseid egy pillantással."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpanan terbaru Anda, sekilas."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I tuoi ultimi contenuti a colpo d'occhio."
           }
         },
         "ja": {
@@ -339,106 +111,10 @@
             "value": "최근 저장한 항목을 한눈에 보세요."
           }
         },
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpanan terkini anda, sepintas lalu."
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Det nyeste innholdet ditt med et øyekast."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Je nieuwste inhoud in één oogopslag."
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Twoje najnowsze rzeczy w skrócie."
-          }
-        },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Seus últimos conteúdos em um relance."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Os seus conteúdos mais recentes, num relance."
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cele mai noi salvări, dintr-o privire."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ваши последние материалы с первого взгляда."
-          }
-        },
-        "sk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vaše najnovšie položky prehľadne."
-          }
-        },
-        "sl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vaši najnovejši elementi na prvi pogled."
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ditt senaste innehåll i en överblick."
-          }
-        },
-        "th": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ดูรายการล่าสุดของคุณได้ในพริบตา"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En son kayıtlarınız bir bakışta."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ваші найновіші збереження одним поглядом."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Xem nhanh những mục mới lưu nhất."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一眼查看最近保存的内容。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一眼檢視最近儲存的內容。"
           }
         }
       }

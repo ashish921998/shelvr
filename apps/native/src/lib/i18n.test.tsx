@@ -12,26 +12,6 @@ const device = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
 }));
 
-vi.mock("@/locales/catalogs", async () => {
-  const en = (await import("@/locales/en.json")).default;
-  const de = (await import("@/locales/de.json")).default;
-  const ja = (await import("@/locales/ja.json")).default;
-  return {
-    catalogs: {
-      en,
-      de,
-      ja,
-      "zh-Hans": en,
-      "zh-Hant": en,
-      "pt-BR": en,
-      "pt-PT": en,
-      nb: en,
-      fr: en,
-      "fr-CA": en,
-      ar: en,
-    },
-  };
-});
 vi.mock("expo-localization", async () => {
   const { useSyncExternalStore } = await import("react");
   return {
@@ -69,7 +49,7 @@ describe("device language resolution", () => {
     });
     try {
       expect(resolveLocale(["de-AT"])).toBe("de");
-      expect(resolveLocale(["zh-TW"])).toBe("zh-Hant");
+      expect(resolveLocale(["zh-TW", "ja-JP"])).toBe("ja");
       changeLanguage("en-IN");
       expect(formattingLocale()).toBe("en-IN");
       expect(constructor).not.toHaveBeenCalled();
@@ -82,14 +62,14 @@ describe("device language resolution", () => {
     [["de-AT"], "de"],
     [["en-AU"], "en"],
     [["fr-CA"], "fr-CA"],
-    [["zh-TW"], "zh-Hant"],
-    [["zh-HK"], "zh-Hant"],
-    [["zh-CN"], "zh-Hans"],
-    [["zh-Hans-TW"], "zh-Hans"],
-    [["zh-Hant-CN"], "zh-Hant"],
-    [["pt-PT"], "pt-PT"],
+    [["zh-TW"], "en"],
+    [["zh-HK"], "en"],
+    [["zh-CN"], "en"],
+    [["zh-Hans-TW"], "en"],
+    [["zh-Hant-CN"], "en"],
+    [["pt-PT"], "pt-BR"],
     [["pt-AO"], "pt-BR"],
-    [["no-NO"], "nb"],
+    [["no-NO"], "en"],
     [["fr_CA"], "fr-CA"],
     [["not_a_language_tag", "ja-JP"], "ja"],
     [["zz-ZZ", "de-DE"], "de"],

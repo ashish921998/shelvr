@@ -20,9 +20,19 @@ const atoms = (text: string) =>
   ).sort();
 
 describe("shipped localization resources", () => {
-  it("covers the selected 39 store locales with 36 complete app catalogs", () => {
-    expect(Object.keys(config.storeLocales)).toHaveLength(39);
-    expect(locales).toHaveLength(36);
+  it("covers the selected 12 store locales with nine complete app catalogs", () => {
+    expect(Object.keys(config.storeLocales)).toHaveLength(12);
+    expect(locales).toEqual([
+      "de",
+      "en",
+      "es",
+      "es-MX",
+      "fr",
+      "fr-CA",
+      "ja",
+      "ko",
+      "pt-BR",
+    ]);
     expect(Object.keys(catalogs).sort()).toEqual(locales);
     expect(Object.keys(notificationTranslations).sort()).toEqual(locales);
     for (const directory of ["../locales/", "../../locales/"]) {
@@ -32,6 +42,26 @@ describe("shipped localization resources", () => {
         .sort();
       expect(files).toEqual(locales);
     }
+  });
+
+  it.each([
+    "ar-SA",
+    "he-IL",
+    "zh-TW",
+    "zh-CN",
+    "no-NO",
+    "ru-RU",
+    "it-IT",
+    "th-TH",
+    "nl-NL",
+  ])("uses the next supported preference for deferred %s", (tag) => {
+    expect(resolveLocale([tag])).toBe("en");
+    expect(resolveLocale([tag, "de-DE"])).toBe("de");
+  });
+
+  it("uses the Brazilian catalog for other Portuguese regions", () => {
+    expect(resolveLocale(["pt-PT"])).toBe("pt-BR");
+    expect(resolveLocale(["pt"])).toBe("pt-BR");
   });
 
   it.each(["bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te", "ur"])(

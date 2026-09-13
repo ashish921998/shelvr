@@ -1,9 +1,13 @@
 # Native app localization
 
-The locale contract is `apps/native/localization.config.json`: 39 App Store locale
-codes map to 36 bundled app catalogs (the four English markets share English).
-This is the supported set, not a claim to cover every language in the world.
-English is the fallback for unsupported device preferences. India uses English;
+The locale contract is `apps/native/localization.config.json`: 12 App Store locale
+codes map to nine bundled app catalogs (the four English markets share English).
+The launch set is English, Japanese, Korean, French (France/Canada), German,
+Spanish (Spain/Mexico), and Brazilian Portuguese. Other languages are deferred.
+English is the fallback for unsupported device preferences. Regional preferences
+use an available catalog in that language: for example, pt-PT uses pt-BR.
+
+India uses English;
 Bengali, Gujarati, Hindi, Kannada, Malayalam, Marathi, Odia, Punjabi, Tamil, Telugu
 and Urdu catalogs are intentionally excluded. English (India) keeps regional
 number/date formatting.
@@ -13,8 +17,9 @@ translated component calls `useAppLocale()` to subscribe to changes; `t()` reads
 the current locale when invoked so callbacks and alerts cannot retain an old
 language. No language-change remount discards an unsaved draft. System settings
 provide the per-app language picker. Expo's config plugin declares supported
-locales and RTL support; these changes require a fresh native binary before OTA
-updates can reach installs with the new fingerprint.
+locales and enables RTL layout only when the active catalog set includes an RTL
+language. These changes require a fresh native binary before OTA updates can
+reach installs with the new fingerprint.
 
 `src/locales/en.json` is the source catalog. Its full English strings are lookup
 keys. The i18n-js separator is a reserved control character, so ordinary periods
@@ -41,8 +46,9 @@ outputs, then emits the static Metro catalog imports and iOS permission resource
 under `apps/native/locales/`. Do not hand-edit these generated outputs. Native
 permission prompts use the same translations as the app catalog. Catalog tests
 check completeness, protected brand names, untranslated sentences and resources.
-The localization tests cover Hermes without `Intl.Locale`, ordered preferences, Chinese scripts, regional
-variants, number formatting, callback freshness and draft preservation.
+The localization tests cover Hermes without `Intl.Locale`, ordered preferences,
+supported regional variants, number formatting, callback freshness and draft
+preservation.
 
 Native text renders non-ASCII header content instead of the per-character Skia
 morph, preserving shaping, bidi, combining marks and font fallback. Navigation

@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr bruker kameraet slik at du kan ta bilder av ting du vil lagre til senere.",
-    "NSPhotoLibraryUsageDescription": "Med Shelvr kan du lagre bilder og skjermbilder i biblioteket ditt og rydde i bildebiblioteket.",
-    "NSCalendarsUsageDescription": "Shelvr legger til hendelser i kalenderen fra innhold du har lagret.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr legger til hendelser i kalenderen fra innhold du har lagret."
-  }
-}

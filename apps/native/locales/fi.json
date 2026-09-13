@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr käyttää kameraasi, jotta voit kuvata asioita tallennettavaksi myöhempää varten.",
-    "NSPhotoLibraryUsageDescription": "Shelvrillä voit tallentaa kuvia ja näyttökuvia kirjastoosi sekä siivota kuvakirjastosi.",
-    "NSCalendarsUsageDescription": "Shelvr lisää kalenteriisi tapahtumia tallentamasi sisällön perusteella.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr lisää kalenteriisi tapahtumia tallentamasi sisällön perusteella."
-  }
-}

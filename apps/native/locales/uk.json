@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr використовує камеру, щоб ви могли знімати речі, які хочете зберегти на потім.",
-    "NSPhotoLibraryUsageDescription": "Shelvr дозволяє зберігати фото та знімки екрана з фототеки в одному місці й наводити лад у фототеці.",
-    "NSCalendarsUsageDescription": "Shelvr додає до календаря події зі збережених речей.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr додає до календаря події зі збережених речей."
-  }
-}

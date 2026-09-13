@@ -3,6 +3,9 @@ const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
 ].sort();
+const supportsRTL = supportedLocales.some((locale) =>
+  ["ar", "he", "ur"].includes(locale.split("-")[0]),
+);
 
 const BASE_ID = "app.shelvr.save";
 
@@ -146,7 +149,7 @@ module.exports = ({ config }) => ({
   plugins: [
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
-    ["expo-localization", { supportedLocales, supportsRTL: true }],
+    ["expo-localization", { supportedLocales, supportsRTL }],
     // Keep the static plugins from app.json — an inline array here would
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),

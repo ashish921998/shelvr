@@ -1,8 +1,0 @@
-{
-  "ios": {
-    "NSCameraUsageDescription": "Shelvr, daha sonra saklamak istediğiniz şeyleri çekebilmeniz için kameranızı kullanır.",
-    "NSPhotoLibraryUsageDescription": "Shelvr, kitaplığınızdaki fotoğraf ve ekran görüntülerini merkezinize kaydetmenizi ve fotoğraf kitaplığınızı düzenlemenizi sağlar.",
-    "NSCalendarsUsageDescription": "Shelvr, kaydettiklerinizden takviminize etkinlik ekler.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr, kaydettiklerinizden takviminize etkinlik ekler."
-  }
-}
