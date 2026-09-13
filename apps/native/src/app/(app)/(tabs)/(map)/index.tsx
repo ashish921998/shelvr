@@ -1,21 +1,21 @@
-import { EmptyState } from '@/components/empty-state';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { ProGate as ProGateView } from '@/components/pro-gate';
-import { useEntitlement } from '@/lib/entitlement';
-import { api } from '@convex/_generated/api';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { ClipOp, Skia } from '@shopify/react-native-skia';
-import type { SharedRefType } from 'expo';
-import { Image } from 'expo-image';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { EmptyState } from "@/components/empty-state";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { ProGate as ProGateView } from "@/components/pro-gate";
+import { useEntitlement } from "@/lib/entitlement";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { ClipOp, Skia } from "@shopify/react-native-skia";
+import type { SharedRefType } from "expo";
+import { Image } from "expo-image";
+import { AppleMaps, GoogleMaps } from "expo-maps";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 // The accent color matches theme.colors.primary (identical in both themes).
-const ACCENT = '#e6a23c';
+const ACCENT = "#e6a23c";
 
 // Apple Maps stretches an annotation icon into a fixed 50x50pt frame, so
 // thumbnails are pre-composited to a square: the photo aspect-fit (contained)
@@ -23,9 +23,7 @@ const ACCENT = '#e6a23c';
 const THUMB_SIZE = 150;
 const THUMB_RADIUS = 24;
 
-async function makeThumb(
-  url: string,
-): Promise<SharedRefType<'image'> | null> {
+async function makeThumb(url: string): Promise<SharedRefType<"image"> | null> {
   const data = await Skia.Data.fromURI(url);
   const source = Skia.Image.MakeImageFromEncoded(data);
   if (!source) return null;
@@ -102,7 +100,7 @@ export default function MapScreen() {
     () =>
       (items ?? []).map((i) => ({
         id: i._id,
-        title: i.title ?? 'Saved photo',
+        title: i.title ?? "Saved photo",
         latitude: i.latitude,
         longitude: i.longitude,
         imageUrl: i.imageUrl,
@@ -113,9 +111,9 @@ export default function MapScreen() {
   // Marker icons must be native image refs, not sources, so each item's photo
   // is loaded imperatively (useImage is a hook and can't run per-item).
   const requested = useRef(new Set<string>());
-  const [thumbs, setThumbs] = useState<
-    Record<string, SharedRefType<'image'>>
-  >({});
+  const [thumbs, setThumbs] = useState<Record<string, SharedRefType<"image">>>(
+    {},
+  );
 
   useEffect(() => {
     for (const item of located) {
@@ -138,9 +136,7 @@ export default function MapScreen() {
   );
 
   if (entitlementLoading) {
-    return (
-      <ScreenLoader label="Opening your map" />
-    );
+    return <ScreenLoader label="Opening your map" />;
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
@@ -156,9 +152,7 @@ export default function MapScreen() {
   }
 
   if (items === undefined) {
-    return (
-      <ScreenLoader label="Loading saved places" />
-    );
+    return <ScreenLoader label="Loading saved places" />;
   }
 
   if (located.length === 0) {
@@ -167,7 +161,7 @@ export default function MapScreen() {
         <EmptyState
           title="Nothing on the map yet"
           message={
-            'Photos you save keep the place they were taken.\nNew saves with location data will show up here.'
+            "Photos you save keep the place they were taken.\nNew saves with location data will show up here."
           }
         />
       </View>
@@ -176,13 +170,13 @@ export default function MapScreen() {
 
   const openItem = (id: string | undefined) => {
     if (!id) return;
-    router.push({ pathname: '/item/[id]', params: { id } });
+    router.push({ pathname: "/item/[id]", params: { id } });
   };
 
   const withThumb = located.filter((item) => thumbs[item.id]);
   const withoutThumb = located.filter((item) => !thumbs[item.id]);
 
-  if (process.env.EXPO_OS === 'ios') {
+  if (process.env.EXPO_OS === "ios") {
     return (
       <AppleMaps.View
         style={styles.container}
@@ -196,7 +190,7 @@ export default function MapScreen() {
           id: item.id,
           coordinates: { latitude: item.latitude, longitude: item.longitude },
           title: item.title,
-          systemImage: 'photo.fill',
+          systemImage: "photo.fill",
           tintColor: ACCENT,
         }))}
         onAnnotationClick={(annotation) => openItem(annotation.id)}
@@ -227,8 +221,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
 }));

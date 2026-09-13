@@ -3,7 +3,10 @@
 // without a renderer: useState/useRef keep values by call order, useEffect
 // diffs deps and runs cleanups, and a setState outside a render re-renders.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readInvitationState, setNativeReviewAttemptInFlight } from "./feedback";
+import {
+  readInvitationState,
+  setNativeReviewAttemptInFlight,
+} from "./feedback";
 import { useFeedbackInvitation } from "./feedback-invitation";
 import { useReviewPrompt } from "./review-prompt";
 
@@ -29,15 +32,26 @@ const react = vi.hoisted(() => {
     rendering = false;
     return result;
   };
-  const depsChanged = (prev: unknown[] | undefined, next: unknown[] | undefined) =>
-    !prev || !next || prev.length !== next.length || prev.some((value, i) => !Object.is(value, next[i]));
+  const depsChanged = (
+    prev: unknown[] | undefined,
+    next: unknown[] | undefined,
+  ) =>
+    !prev ||
+    !next ||
+    prev.length !== next.length ||
+    prev.some((value, i) => !Object.is(value, next[i]));
 
   return {
     useState<T>(initial: T | (() => T)) {
       const i = cursor++;
-      if (!(i in slots)) slots[i] = typeof initial === "function" ? (initial as () => T)() : initial;
+      if (!(i in slots))
+        slots[i] =
+          typeof initial === "function" ? (initial as () => T)() : initial;
       const set = (next: T | ((prev: T) => T)) => {
-        const value = typeof next === "function" ? (next as (prev: T) => T)(slots[i] as T) : next;
+        const value =
+          typeof next === "function"
+            ? (next as (prev: T) => T)(slots[i] as T)
+            : next;
         if (Object.is(value, slots[i])) return;
         slots[i] = value;
         if (rendering) dirty = true;
@@ -96,7 +110,12 @@ const mock = vi.hoisted(() => ({
   markNativeReviewPrompted: vi.fn(),
   secure: new Map<string, string>(),
   kv: new Map<string, string>(),
-  posthog: { optedOut: false, isDisabled: false, capture: vi.fn(), flush: vi.fn(async () => undefined) },
+  posthog: {
+    optedOut: false,
+    isDisabled: false,
+    capture: vi.fn(),
+    flush: vi.fn(async () => undefined),
+  },
 }));
 vi.mock("react-native", () => ({
   AppState: Object.assign(mock.appState, {
@@ -104,8 +123,12 @@ vi.mock("react-native", () => ({
   }),
 }));
 vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
-vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
-vi.mock("@/lib/entitlement", () => ({ isPaywallPending: () => mock.paywallPending }));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: mock.user }),
+}));
+vi.mock("@/lib/entitlement", () => ({
+  isPaywallPending: () => mock.paywallPending,
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
 vi.mock("@/lib/posthog", () => ({ posthog: mock.posthog }));
 vi.mock("expo-constants", () => ({
@@ -132,7 +155,9 @@ vi.mock("@/lib/feedback", async (importOriginal) => ({
   markNativeReviewPrompted: mock.markNativeReviewPrompted,
 }));
 
-const item = (overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {}) => ({
+const item = (
+  overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {},
+) => ({
   status: "ready" as const,
   ...overrides,
 });
@@ -204,7 +229,10 @@ describe("useFeedbackInvitation", () => {
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(true);
     expect(readInvitationState("user-1").shownCount).toBe(1);
-    expect(mock.capture).toHaveBeenCalledWith("feedback_invitation_shown", { surface: "home", ready_count: 3 });
+    expect(mock.capture).toHaveBeenCalledWith("feedback_invitation_shown", {
+      surface: "home",
+      ready_count: 3,
+    });
   });
 
   it("waits out a pending native review check so both prompts cannot appear together", () => {
@@ -251,9 +279,12 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).toHaveBeenCalledOnce();
     expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
     expect(mock.markNativeReviewPrompted).toHaveBeenCalledOnce();
-    expect(mock.capture).toHaveBeenCalledWith("review_prompted", { ready_count: 3 });
-    expect(mock.markNativeReviewPrompted.mock.invocationCallOrder[0])
-      .toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
+    expect(mock.capture).toHaveBeenCalledWith("review_prompted", {
+      ready_count: 3,
+    });
+    expect(
+      mock.markNativeReviewPrompted.mock.invocationCallOrder[0],
+    ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
   });
 
   it("records nothing when a guard fails after hasAction() resolves, and retries later", async () => {

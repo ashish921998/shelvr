@@ -1,23 +1,27 @@
-import { AnimatedText } from '@/components/animated-text';
+import { AnimatedText } from "@/components/animated-text";
 import {
   BottomSheet,
   BottomSheetView,
   type BottomSheetMethods,
-} from '@expo/ui/community/bottom-sheet';
-import { parseExifDate } from '@/lib/date';
-import { resolvePickedImageLocation } from '@/lib/picked-image-location';
-import { usePaywallGuard } from '@/lib/entitlement';
-import { type ImageSaveRequest, reportSaveFailures, useSaveImages } from '@/lib/use-save-image';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useMutation } from 'convex/react';
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
-import { HeaderIconButton } from '@/components/ui/header-icon-button';
-import { useCallback, useEffect, useRef, useState } from 'react';
+} from "@expo/ui/community/bottom-sheet";
+import { parseExifDate } from "@/lib/date";
+import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import { usePaywallGuard } from "@/lib/entitlement";
+import {
+  type ImageSaveRequest,
+  reportSaveFailures,
+  useSaveImages,
+} from "@/lib/use-save-image";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -26,12 +30,12 @@ import {
   TextInput,
   View,
   type LayoutChangeEvent,
-} from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
+} from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
 
-type Mode = 'menu' | 'note' | 'article';
-type AndroidDismissAction = { type: 'camera'; spaceId?: Id<'spaces'> } | null;
+type Mode = "menu" | "note" | "article";
+type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
 
 function ActionButton({
   icon,
@@ -52,7 +56,11 @@ function ActionButton({
       style={[styles.action, disabled && { opacity: 0.4 }]}
     >
       <View style={styles.actionIcon}>
-        <AppSymbolIcon name={icon} size={40} tintColor={theme.colors.foreground} />
+        <AppSymbolIcon
+          name={icon}
+          size={40}
+          tintColor={theme.colors.foreground}
+        />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
@@ -80,7 +88,11 @@ function AndroidAddHeader({
   return (
     <View style={styles.androidHeader}>
       {isComposer ? (
-        <HeaderIconButton icon="chevron.left" label="Back to save options" onPress={back} />
+        <HeaderIconButton
+          icon="chevron.left"
+          label="Back to save options"
+          onPress={back}
+        />
       ) : (
         <View style={styles.androidHeaderSpacer} />
       )}
@@ -95,7 +107,12 @@ function AndroidAddHeader({
         ) : null}
       </View>
       {isComposer ? (
-        <HeaderIconButton icon="checkmark" label="Save" disabled={!canSave} onPress={save} />
+        <HeaderIconButton
+          icon="checkmark"
+          label="Save"
+          disabled={!canSave}
+          onPress={save}
+        />
       ) : (
         <View style={styles.androidHeaderSpacer} />
       )}
@@ -105,30 +122,30 @@ function AndroidAddHeader({
 
 type AddContentProps = {
   close: () => void;
-  openCamera: (spaceId?: Id<'spaces'>) => void;
+  openCamera: (spaceId?: Id<"spaces">) => void;
 };
 
 function AddContent({ close, openCamera }: AddContentProps) {
   const { theme } = useUnistyles();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
-  const pinnedSpaceId = spaceId as Id<'spaces'> | undefined;
-  const [mode, setMode] = useState<Mode>('menu');
+  const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
+  const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } = usePaywallGuard('add');
+  const { guard, loading: entitlementLoading } = usePaywallGuard("add");
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
   // Prefill the article field with a link already on the clipboard.
   useEffect(() => {
-    if (mode !== 'article') return;
+    if (mode !== "article") return;
     let active = true;
     Clipboard.getUrlAsync().then((url) => {
       if (active && url) setValue((current) => current || url);
@@ -139,14 +156,14 @@ function AddContent({ close, openCamera }: AddContentProps) {
   }, [mode]);
 
   const success = () => {
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     close();
   };
 
   const openComposer = (next: Mode) => {
-    setValue('');
+    setValue("");
     setMode(next);
   };
 
@@ -154,15 +171,23 @@ function AddContent({ close, openCamera }: AddContentProps) {
     if (!canSave) return;
     setSaving(true);
     try {
-      if (mode === 'article') {
-        await createLinkItem({ url: trimmed, spaceId: pinnedSpaceId, analyticsSessionId: analytics.sessionId() });
+      if (mode === "article") {
+        await createLinkItem({
+          url: trimmed,
+          spaceId: pinnedSpaceId,
+          analyticsSessionId: analytics.sessionId(),
+        });
       } else {
-        await createNoteItem({ text: trimmed, spaceId: pinnedSpaceId, analyticsSessionId: analytics.sessionId() });
+        await createNoteItem({
+          text: trimmed,
+          spaceId: pinnedSpaceId,
+          analyticsSessionId: analytics.sessionId(),
+        });
       }
-      analytics.capture(mode === 'article' ? 'article_saved' : 'note_saved');
+      analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
     } catch {
-      Alert.alert('Could not save', 'Something went wrong. Try again.');
+      Alert.alert("Could not save", "Something went wrong. Try again.");
       setSaving(false);
     }
   };
@@ -178,41 +203,47 @@ function AddContent({ close, openCamera }: AddContentProps) {
     setSaving(true);
     try {
       const results = await saveImages(requests, { spaceId: pinnedSpaceId });
-      const failed = results.filter((r) => r.status === 'failed');
+      const failed = results.filter((r) => r.status === "failed");
       if (failed.length === 0) {
-        analytics.capture('images_saved', { image_count: results.length });
+        analytics.capture("images_saved", { image_count: results.length });
         success();
         return;
       }
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        'Could not save all images',
+        "Could not save all images",
         `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
         [
           {
-            text: 'Retry failed',
+            text: "Retry failed",
             onPress: () => {
               void runImageRequests(
                 // Reuse each failed operation id on retry — never mint fresh ones.
-                failed.map((r) => ({ image: r.image, operationId: r.operationId })),
+                failed.map((r) => ({
+                  image: r.image,
+                  operationId: r.operationId,
+                })),
               );
             },
           },
-          { text: 'Done', onPress: close },
+          { text: "Done", onPress: close },
         ],
       );
       setSaving(false);
     } catch (err) {
-      console.error('Image upload failed:', err);
-      Alert.alert('Could not save', 'Uploading those images failed. Try again.');
+      analytics.captureError("image_upload_failed", err);
+      Alert.alert(
+        "Could not save",
+        "Uploading those images failed. Try again.",
+      );
       setSaving(false);
     }
   };
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
+      mediaTypes: "images",
       allowsMultipleSelection: true,
       selectionLimit: 10,
       quality: 0.8,
@@ -235,42 +266,46 @@ function AddContent({ close, openCamera }: AddContentProps) {
     );
   };
 
-  const isComposer = mode === 'note' || mode === 'article';
-  const isArticle = mode === 'article';
-  const title = isArticle ? 'Save an article' : mode === 'note' ? 'New note' : 'Save something';
+  const isComposer = mode === "note" || mode === "article";
+  const isArticle = mode === "article";
+  const title = isArticle
+    ? "Save an article"
+    : mode === "note"
+      ? "New note"
+      : "Save something";
 
   return (
     <View style={styles.content}>
       <Stack.Screen
         options={{
-          headerShown: Platform.OS !== 'android',
+          headerShown: Platform.OS !== "android",
           headerTransparent: false,
           headerStyle: { backgroundColor: theme.colors.background },
         }}
       />
       {/* Each platform mounts exactly one persistent title so changes cascade
           between "Save something" / "New note" / "Save an article". */}
-      {Platform.OS === 'ios' ? (
+      {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} />
         </Stack.Title>
       ) : null}
-      {Platform.OS === 'android' ? (
+      {Platform.OS === "android" ? (
         <AndroidAddHeader
           title={title}
           isComposer={isComposer}
           canSave={canSave}
-          back={() => setMode('menu')}
+          back={() => setMode("menu")}
           save={save}
         />
       ) : null}
-      {isComposer && Platform.OS === 'ios' ? (
+      {isComposer && Platform.OS === "ios" ? (
         <>
           <Stack.Toolbar placement="left">
             <Stack.Toolbar.Button
               icon="chevron.left"
               tintColor={theme.colors.primary}
-              onPress={() => setMode('menu')}
+              onPress={() => setMode("menu")}
             >
               Back
             </Stack.Toolbar.Button>
@@ -292,14 +327,14 @@ function AddContent({ close, openCamera }: AddContentProps) {
           style={isArticle ? styles.articleInput : styles.noteInput}
           value={value}
           onChangeText={setValue}
-          placeholder={isArticle ? 'Paste or type a link…' : 'Jot a note…'}
+          placeholder={isArticle ? "Paste or type a link…" : "Jot a note…"}
           placeholderTextColor={theme.colors.muted}
           autoFocus
           multiline={!isArticle}
-          autoCapitalize={isArticle ? 'none' : 'sentences'}
+          autoCapitalize={isArticle ? "none" : "sentences"}
           autoCorrect={!isArticle}
-          keyboardType={isArticle ? 'url' : 'default'}
-          returnKeyType={isArticle ? 'done' : 'default'}
+          keyboardType={isArticle ? "url" : "default"}
+          returnKeyType={isArticle ? "done" : "default"}
           onSubmitEditing={isArticle ? save : undefined}
           editable={!saving}
         />
@@ -308,13 +343,13 @@ function AddContent({ close, openCamera }: AddContentProps) {
           <ActionButton
             icon="square.and.pencil"
             label="Note"
-            onPress={() => guard(() => openComposer('note'))}
+            onPress={() => guard(() => openComposer("note"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="link"
             label="Article"
-            onPress={() => guard(() => openComposer('article'))}
+            onPress={() => guard(() => openComposer("article"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
@@ -349,16 +384,16 @@ function AndroidAddSheet() {
     sheetRef.current?.close();
   }, []);
 
-  const openCamera = useCallback((spaceId?: Id<'spaces'>) => {
-    dismissActionRef.current = { type: 'camera', spaceId };
+  const openCamera = useCallback((spaceId?: Id<"spaces">) => {
+    dismissActionRef.current = { type: "camera", spaceId };
     sheetRef.current?.close();
   }, []);
 
   const finishDismiss = useCallback(() => {
     const action = dismissActionRef.current;
-    if (action?.type === 'camera') {
+    if (action?.type === "camera") {
       router.replace({
-        pathname: '/camera',
+        pathname: "/camera",
         params: action.spaceId ? { spaceId: action.spaceId } : {},
       });
       return;
@@ -385,7 +420,7 @@ function AndroidAddSheet() {
 export default function AddScreen() {
   const router = useRouter();
 
-  if (Platform.OS === 'android') {
+  if (Platform.OS === "android") {
     return <AndroidAddSheet />;
   }
 
@@ -395,7 +430,7 @@ export default function AddScreen() {
       openCamera={(spaceId) => {
         router.back();
         router.push({
-          pathname: '/camera',
+          pathname: "/camera",
           params: spaceId ? { spaceId } : {},
         });
       }}
@@ -416,9 +451,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   androidHeader: {
     minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   androidHeaderTitle: {
     fontFamily: theme.fonts.display,
@@ -433,25 +468,25 @@ const styles = StyleSheet.create((theme) => ({
     height: 40,
   },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: theme.gap(2),
   },
   action: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: theme.gap(0.75),
     minWidth: 64,
   },
   actionIcon: {
     padding: theme.gap(1),
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionLabel: {
     fontFamily: theme.fonts.medium,
     fontSize: 12,
     color: theme.colors.foreground,
-    textAlign: 'center',
+    textAlign: "center",
   },
   noteInput: {
     fontFamily: theme.fonts.regular,
@@ -460,11 +495,11 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 120,
     padding: theme.gap(1.5),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   articleInput: {
     fontFamily: theme.fonts.regular,
@@ -472,7 +507,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     padding: theme.gap(1.5),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,

@@ -1,7 +1,7 @@
-import Constants from 'expo-constants';
-import { createMMKV } from 'react-native-mmkv';
-import { analytics } from '@/lib/analytics';
-import { posthog } from '@/lib/posthog';
+import Constants from "expo-constants";
+import { createMMKV } from "react-native-mmkv";
+import { analytics } from "@/lib/analytics";
+import { posthog } from "@/lib/posthog";
 
 /**
  * Lightweight in-app feedback.
@@ -16,14 +16,14 @@ import { posthog } from '@/lib/posthog';
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
 export const FEEDBACK_READY_SAVE_THRESHOLD = 3;
 export const FEEDBACK_MAX_INVITATIONS_PER_ACCOUNT = 2;
-export const FEEDBACK_INVITATION_RETRY_MS = 14 * 24 * 60 * 60 * 1000;
+const FEEDBACK_INVITATION_RETRY_MS = 14 * 24 * 60 * 60 * 1000;
 /** How long a native review prompt claims the moment it triggers. */
 export const FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS = 90_000;
 
-export type FeedbackSurface = 'home' | 'profile';
+export type FeedbackSurface = "home" | "profile";
 
 export type FeedbackFeedItem = {
-  status: 'processing' | 'ready' | 'failed';
+  status: "processing" | "ready" | "failed";
   fixtureKey?: string;
 };
 
@@ -34,9 +34,8 @@ export type FeedbackFeedItem = {
  * count, and saves still processing or failed don't either.
  */
 export function countEligibleSaves(items: FeedbackFeedItem[]): number {
-  return items.filter(
-    (item) => item.status === 'ready' && !item.fixtureKey,
-  ).length;
+  return items.filter((item) => item.status === "ready" && !item.fixtureKey)
+    .length;
 }
 
 export type FeedbackInvitationState = {
@@ -58,7 +57,7 @@ export function withReadyCount(
   return { ...state, readyCount: Math.max(state.readyCount, feedCount) };
 }
 
-export type InvitationGate = {
+type InvitationGate = {
   now: number;
   reviewPromptedAt: number | null;
 };
@@ -101,18 +100,19 @@ export function parseInvitationState(
   } catch {
     return fallback;
   }
-  if (typeof parsed !== 'object' || parsed === null) return fallback;
+  if (typeof parsed !== "object" || parsed === null) return fallback;
   const record = parsed as Record<string, unknown>;
   return {
     readyCount:
-      typeof record.readyCount === 'number' && record.readyCount > 0
+      typeof record.readyCount === "number" && record.readyCount > 0
         ? Math.floor(record.readyCount)
         : 0,
     shownCount:
-      typeof record.shownCount === 'number' && record.shownCount > 0
+      typeof record.shownCount === "number" && record.shownCount > 0
         ? Math.floor(record.shownCount)
         : 0,
-    lastShownAt: typeof record.lastShownAt === 'number' ? record.lastShownAt : null,
+    lastShownAt:
+      typeof record.lastShownAt === "number" ? record.lastShownAt : null,
     submitted: record.submitted === true,
   };
 }
@@ -151,15 +151,15 @@ export function isNativeReviewAttemptInFlight(): boolean {
 export function isHomeRootRoute(segments: readonly string[]): boolean {
   return (
     segments.length === 3 &&
-    segments[0] === '(app)' &&
-    segments[1] === '(tabs)' &&
-    segments[2] === '(home)'
+    segments[0] === "(app)" &&
+    segments[1] === "(tabs)" &&
+    segments[2] === "(home)"
   );
 }
 
 // --- persistence ------------------------------------------------------------
 
-const store = createMMKV({ id: 'feedback' });
+const store = createMMKV({ id: "feedback" });
 
 const invitationKey = (userId: string) => `feedback.invitation.${userId}`;
 
@@ -187,7 +187,7 @@ export function sanitizeFeedbackMessage(raw: string): string {
 
 // --- analytics boundary -----------------------------------------------------
 
-export type FeedbackSubmitResult = 'queued' | 'unavailable' | 'failed';
+type FeedbackSubmitResult = "queued" | "unavailable" | "failed";
 
 export const feedbackAnalytics = {
   isAvailable(): boolean {
@@ -195,15 +195,18 @@ export const feedbackAnalytics = {
   },
 
   invitationShown(surface: FeedbackSurface, readyCount: number): void {
-    analytics.capture('feedback_invitation_shown', { surface, ready_count: readyCount });
+    analytics.capture("feedback_invitation_shown", {
+      surface,
+      ready_count: readyCount,
+    });
   },
 
   invitationDismissed(surface: FeedbackSurface): void {
-    analytics.capture('feedback_invitation_dismissed', { surface });
+    analytics.capture("feedback_invitation_dismissed", { surface });
   },
 
   feedbackOpened(surface: FeedbackSurface): void {
-    analytics.capture('feedback_opened', { surface });
+    analytics.capture("feedback_opened", { surface });
   },
 
   /**
@@ -215,19 +218,20 @@ export const feedbackAnalytics = {
     surface: FeedbackSurface,
     message: string,
   ): Promise<FeedbackSubmitResult> {
-    if (!posthog || posthog.isDisabled || posthog.optedOut) return 'unavailable';
+    if (!posthog || posthog.isDisabled || posthog.optedOut)
+      return "unavailable";
     const sanitized = sanitizeFeedbackMessage(message);
-    if (!sanitized) return 'failed';
+    if (!sanitized) return "failed";
     try {
-      posthog.capture('feedback_submitted', {
+      posthog.capture("feedback_submitted", {
         surface,
         message: sanitized,
         char_count: sanitized.length,
-        environment: Constants.expoConfig?.extra?.variant ?? 'development',
+        environment: Constants.expoConfig?.extra?.variant ?? "development",
         analytics_version: 1,
       });
     } catch {
-      return 'failed';
+      return "failed";
     }
     // Flush so feedback leaves the device promptly; a failed flush still
     // leaves the event queued for the next batch.
@@ -236,6 +240,6 @@ export const feedbackAnalytics = {
     } catch {
       // Queued locally regardless.
     }
-    return 'queued';
+    return "queued";
   },
 };

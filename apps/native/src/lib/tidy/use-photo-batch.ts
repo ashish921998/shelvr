@@ -1,9 +1,15 @@
-import { AssetField, MediaType, Query, type Album, type AssetMetadata } from 'expo-media-library';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AssetField,
+  MediaType,
+  Query,
+  type Album,
+  type AssetMetadata,
+} from "expo-media-library";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isReviewed } from './storage';
+import { isReviewed } from "./storage";
 
-export const BATCH_SIZE = 24;
+const BATCH_SIZE = 24;
 
 /** Photos read per media-store query while filling a batch. */
 const PAGE_SIZE = 48;

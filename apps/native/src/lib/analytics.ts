@@ -1,4 +1,4 @@
-import { posthog } from "@/lib/posthog";
+import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -15,7 +15,7 @@ type ItemProperties = {
   item_age_ms: number;
 };
 
-export type ItemAction =
+type ItemAction =
   | "copy"
   | "share"
   | "share_sheet_opened"
@@ -29,7 +29,7 @@ export type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-export type AnalyticsEventProperties = {
+type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
     step_id: string;
@@ -121,7 +121,7 @@ export type AnalyticsEventProperties = {
   review_prompted: { ready_count: number };
 };
 
-export type AnalyticsEvent = keyof AnalyticsEventProperties;
+type AnalyticsEvent = keyof AnalyticsEventProperties;
 
 function capture<Event extends AnalyticsEvent>(
   event: Event,
@@ -137,6 +137,34 @@ function capture<Event extends AnalyticsEvent>(
     });
   } catch {
     // Analytics must never change the outcome of a product action.
+  }
+}
+
+function captureError(
+  event: string,
+  error: unknown,
+  properties: Record<string, string | number | boolean> = {},
+): void {
+  console.error(event, error);
+  if (!posthog) return;
+
+  try {
+    const original = error instanceof Error ? error : new Error(typeof error);
+    const reported =
+      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+        ? original
+        : Object.assign(new Error(original.name), {
+            name: original.name,
+            stack: original.stack,
+          });
+    posthog.captureException(reported, {
+      ...properties,
+      error_event: event,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Error reporting must never mask or replace the original failure.
   }
 }
 
@@ -210,6 +238,7 @@ function screen(route: string): void {
 
 export const analytics = {
   capture,
+  captureError,
   identify,
   reset,
   sessionId,

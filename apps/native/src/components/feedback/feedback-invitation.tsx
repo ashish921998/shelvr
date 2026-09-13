@@ -1,5 +1,5 @@
-import { Text, Pressable, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Text, Pressable, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 /**
  * The dismissible inline feedback invitation shown on Home once per account
@@ -51,9 +51,9 @@ export function FeedbackInvitation({
 
 const styles = StyleSheet.create((theme) => ({
   card: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -74,8 +74,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.muted,
   },
   buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "flex-end",
     gap: theme.gap(1),
     marginTop: theme.gap(0.5),
   },
@@ -83,10 +83,10 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 44,
     paddingHorizontal: theme.gap(2),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonText: {
     fontFamily: theme.fonts.bold,
@@ -97,9 +97,9 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 44,
     paddingHorizontal: theme.gap(2),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonText: {
     fontFamily: theme.fonts.medium,

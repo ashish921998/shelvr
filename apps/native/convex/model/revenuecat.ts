@@ -131,14 +131,24 @@ function parseDate(value: unknown): number {
   return date;
 }
 
-function readString(value: unknown): string | undefined {
+// Shared guards for untyped RevenueCat webhook payloads; paymentTelemetry.ts
+// reuses them so the two parsers cannot drift apart.
+export function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function readRecord(value: unknown): Record<string, unknown> | undefined {
+export function readRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+}
+
+/** A finite number strictly greater than zero (prices, millisecond stamps). */
+export function readPositiveNumber(value: unknown): number | undefined {
+  const number = readNumber(value);
+  return number !== undefined && number > 0 ? number : undefined;
 }
 
 function readNumber(value: unknown): number | undefined {

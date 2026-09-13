@@ -1,8 +1,8 @@
-import { FlashList } from '@shopify/flash-list';
-import { Link } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { ItemCard, type FeedItem, type ItemSource } from './item-card';
+import { FlashList } from "@shopify/flash-list";
+import { Link } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { ItemCard, type FeedItem, type ItemSource } from "./item-card";
 
 type Props = {
   items: FeedItem[];
@@ -26,8 +26,8 @@ export function MasonryFeed({
   firstItemZoomTarget,
   onEndReached,
   loadingMore,
-  ListEmptyComponent,
-  ListHeaderComponent,
+  ListEmptyComponent: listEmptyComponent,
+  ListHeaderComponent: listHeaderComponent,
 }: Props) {
   const { theme } = useUnistyles();
   return (
@@ -55,8 +55,8 @@ export function MasonryFeed({
       }}
       onEndReached={onEndReached}
       onEndReachedThreshold={1}
-      ListEmptyComponent={ListEmptyComponent}
-      ListHeaderComponent={ListHeaderComponent}
+      ListEmptyComponent={listEmptyComponent}
+      ListHeaderComponent={listHeaderComponent}
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.footer}>
@@ -71,6 +71,6 @@ export function MasonryFeed({
 const styles = StyleSheet.create((theme) => ({
   footer: {
     paddingVertical: theme.gap(2),
-    alignItems: 'center',
+    alignItems: "center",
   },
 }));

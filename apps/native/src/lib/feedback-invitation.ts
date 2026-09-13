@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
-import { useSegments } from 'expo-router';
-import { useCurrentUser } from '@/lib/current-user';
-import { isPaywallPending } from '@/lib/entitlement';
+import { useCallback, useEffect, useState } from "react";
+import { AppState } from "react-native";
+import { useSegments } from "expo-router";
+import { useCurrentUser } from "@/lib/current-user";
+import { isPaywallPending } from "@/lib/entitlement";
 import {
   canShowInvitation,
   countEligibleSaves,
@@ -15,7 +15,7 @@ import {
   withReadyCount,
   writeInvitationState,
   type FeedbackFeedItem,
-} from '@/lib/feedback';
+} from "@/lib/feedback";
 
 /** Minimum settle time before showing, and the poll interval while a paywall is up. */
 const INVITATION_RECHECK_MS = 2000;
@@ -30,7 +30,7 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
   const [formUser, setFormUser] = useState<string | null>(null);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', setAppState);
+    const subscription = AppState.addEventListener("change", setAppState);
     return () => subscription.remove();
   }, []);
 
@@ -39,19 +39,33 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
   if (busy && invitedUser !== null) setInvitedUser(null);
 
   useEffect(() => {
-    if (!home || busy || appState !== 'active' || !items || !userId || formUser) return;
+    if (!home || busy || appState !== "active" || !items || !userId || formUser)
+      return;
     if (!feedbackAnalytics.isAvailable()) return;
-    const state = withReadyCount(readInvitationState(userId), countEligibleSaves(items));
+    const state = withReadyCount(
+      readInvitationState(userId),
+      countEligibleSaves(items),
+    );
     writeInvitationState(userId, state);
 
     const reviewAt = lastNativeReviewPromptAt();
-    const delay = Math.max(INVITATION_RECHECK_MS, reviewAt === null ? 0
-      : reviewAt + FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS - Date.now());
-    if (!canShowInvitation(state, { now: Date.now() + delay, reviewPromptedAt: reviewAt })) return;
+    const delay = Math.max(
+      INVITATION_RECHECK_MS,
+      reviewAt === null
+        ? 0
+        : reviewAt + FEEDBACK_REVIEW_PROMPT_COOLDOWN_MS - Date.now(),
+    );
+    if (
+      !canShowInvitation(state, {
+        now: Date.now() + delay,
+        reviewPromptedAt: reviewAt,
+      })
+    )
+      return;
 
     let timer: ReturnType<typeof setTimeout>;
     const attempt = () => {
-      if (AppState.currentState !== 'active') return;
+      if (AppState.currentState !== "active") return;
       // Neither the paywall nor a pending native review check has a reactive
       // signal, so keep checking until they clear rather than dropping an
       // invitation nothing would re-trigger. The review check marks its
@@ -63,11 +77,19 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
       if (!feedbackAnalytics.isAvailable()) return;
       const current = readInvitationState(userId);
       const now = Date.now();
-      if (!canShowInvitation(current, { now, reviewPromptedAt: lastNativeReviewPromptAt() })) return;
+      if (
+        !canShowInvitation(current, {
+          now,
+          reviewPromptedAt: lastNativeReviewPromptAt(),
+        })
+      )
+        return;
       writeInvitationState(userId, {
-        ...current, shownCount: current.shownCount + 1, lastShownAt: now,
+        ...current,
+        shownCount: current.shownCount + 1,
+        lastShownAt: now,
       });
-      feedbackAnalytics.invitationShown('home', current.readyCount);
+      feedbackAnalytics.invitationShown("home", current.readyCount);
       setInvitedUser(userId);
     };
     timer = setTimeout(attempt, delay);
@@ -80,13 +102,18 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
     setFormUser(userId);
   }, [userId]);
   const dismissInvitation = useCallback(() => {
-    feedbackAnalytics.invitationDismissed('home');
+    feedbackAnalytics.invitationDismissed("home");
     setInvitedUser(null);
   }, []);
   const closeFeedback = useCallback(() => setFormUser(null), []);
 
   return {
-    invitationVisible: !!userId && invitedUser === userId && home && !busy && appState === 'active',
+    invitationVisible:
+      !!userId &&
+      invitedUser === userId &&
+      home &&
+      !busy &&
+      appState === "active",
     openFeedbackFromInvitation,
     dismissInvitation,
     modalOpen: !!userId && formUser === userId && home,
@@ -95,5 +122,5 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
 }
 
 export function useBusySaving(items: FeedbackFeedItem[] | undefined): boolean {
-  return items?.some((item) => item.status === 'processing') ?? false;
+  return items?.some((item) => item.status === "processing") ?? false;
 }

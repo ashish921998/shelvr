@@ -123,7 +123,9 @@ describe("deleteCurrentUserAccount", () => {
             .collect()
         ).length,
       ).toBe(2);
-      expect(await ctx.db.system.get("_storage", seeded.storageId)).not.toBeNull();
+      expect(
+        await ctx.db.system.get("_storage", seeded.storageId),
+      ).not.toBeNull();
       expect(
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
       ).not.toBeNull();
@@ -249,7 +251,9 @@ describe("deleteCurrentUserAccount", () => {
         .withIndex("by_user", (q) => q.eq("userId", "user-b"))
         .collect();
       expect(spaces).toHaveLength(1);
-      expect(await ctx.db.system.get("_storage", bSeeded.storageId)).not.toBeNull();
+      expect(
+        await ctx.db.system.get("_storage", bSeeded.storageId),
+      ).not.toBeNull();
       const sub = await ctx.db
         .query("subscriptions")
         .withIndex("by_user", (q) => q.eq("userId", "user-b"))

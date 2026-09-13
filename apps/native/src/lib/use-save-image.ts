@@ -2,18 +2,18 @@ import {
   IMAGE_TOO_LARGE_MESSAGE,
   imageSizeError,
   PHOTO_LIMIT_MESSAGE,
-} from '@convex/model/imagePolicy';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
-import type { FunctionReturnType } from 'convex/server';
-import * as Crypto from 'expo-crypto';
-import { File } from 'expo-file-system';
-import { fetch as expoFetch } from 'expo/fetch';
-import { useCallback } from 'react';
-import { analytics, type ImageSaveFailureReason } from '@/lib/analytics';
-import { normalizeImage } from '@/lib/normalize-image';
+} from "@convex/model/imagePolicy";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
+import type { FunctionReturnType } from "convex/server";
+import * as Crypto from "expo-crypto";
+import { File } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
+import { useCallback } from "react";
+import { analytics, type ImageSaveFailureReason } from "@/lib/analytics";
+import { normalizeImage } from "@/lib/normalize-image";
 
 export type LocalImage = {
   uri: string;
@@ -41,20 +41,25 @@ export type ImageSaveRequest = {
   operationId?: string;
 };
 
-export type ImageSaveStage = 'begin' | 'normalize' | 'upload' | 'attach' | 'finalize';
+export type ImageSaveStage =
+  | "begin"
+  | "normalize"
+  | "upload"
+  | "attach"
+  | "finalize";
 
 /** A settled per-image outcome. A failure is data, not a rejected promise, so
  * one image failing can never erase its siblings' success information. A caller
  * retries only `failed` results, passing their existing operationId back. */
 export type ImageSaveResult =
   | {
-      status: 'saved';
+      status: "saved";
       operationId: string;
       image: LocalImage;
-      itemId: Id<'items'>;
+      itemId: Id<"items">;
     }
   | {
-      status: 'failed';
+      status: "failed";
       operationId: string;
       image: LocalImage;
       stage: ImageSaveStage;
@@ -65,17 +70,19 @@ export type ImageSaveResult =
  * so the orchestration is unit-testable with fakes and so `useSaveImages` can
  * bind it to the Convex `useMutation` hooks. */
 export type SaveImageDeps = {
-  begin: (operationId: string) => Promise<
-    | { kind: 'upload'; uploadUrl: string }
-    | { kind: 'complete'; itemId: Id<'items'> }
+  begin: (
+    operationId: string,
+  ) => Promise<
+    | { kind: "upload"; uploadUrl: string }
+    | { kind: "complete"; itemId: Id<"items"> }
   >;
   /** Re-encodes the file before upload; its output feeds both the upload and
    * the stored aspect ratio. */
   normalize: (image: LocalImage) => Promise<LocalImage>;
-  upload: (image: LocalImage, uploadUrl: string) => Promise<Id<'_storage'>>;
+  upload: (image: LocalImage, uploadUrl: string) => Promise<Id<"_storage">>;
   attach: (
     operationId: string,
-    storageId: Id<'_storage'>,
+    storageId: Id<"_storage">,
   ) => Promise<FunctionReturnType<typeof api.items.attachImageUpload>>;
   finalize: (input: {
     operationId: string;
@@ -84,16 +91,16 @@ export type SaveImageDeps = {
     capturedAt?: number;
     latitude?: number;
     longitude?: number;
-    spaceId?: Id<'spaces'>;
-  }) => Promise<Id<'items'>>;
+    spaceId?: Id<"spaces">;
+  }) => Promise<Id<"items">>;
 };
 
 /** Buckets a failed result for analytics. The server messages are constants
  * with no ids or URLs, so sanitizeMessage passes them through unchanged. */
 export function saveFailureReason(message: string): ImageSaveFailureReason {
-  if (message === PHOTO_LIMIT_MESSAGE) return 'photo_limit';
-  if (message === IMAGE_TOO_LARGE_MESSAGE) return 'too_large';
-  return 'other';
+  if (message === PHOTO_LIMIT_MESSAGE) return "photo_limit";
+  if (message === IMAGE_TOO_LARGE_MESSAGE) return "too_large";
+  return "other";
 }
 
 /** One `images_save_failed` event per distinct reason in a batch, so a mixed
@@ -101,12 +108,15 @@ export function saveFailureReason(message: string): ImageSaveFailureReason {
 export function reportSaveFailures(results: ImageSaveResult[]): void {
   const counts = new Map<ImageSaveFailureReason, number>();
   for (const result of results) {
-    if (result.status !== 'failed') continue;
+    if (result.status !== "failed") continue;
     const reason = saveFailureReason(result.message);
     counts.set(reason, (counts.get(reason) ?? 0) + 1);
   }
-  for (const [reason, image_count] of counts) {
-    analytics.capture('images_save_failed', { reason, image_count });
+  for (const [reason, imageCount] of counts) {
+    analytics.capture("images_save_failed", {
+      reason,
+      image_count: imageCount,
+    });
   }
 }
 
@@ -122,7 +132,7 @@ function sanitizeMessage(error: unknown, stage: ImageSaveStage): string {
   // A ConvexError carries the server's user-facing sentence in `data`; its
   // `message` is the prefixed transport string, and production redacts a plain
   // Error's message to "Server Error" entirely.
-  if (error instanceof ConvexError && typeof error.data === 'string') {
+  if (error instanceof ConvexError && typeof error.data === "string") {
     return error.data;
   }
   if (error instanceof Error && error.message) {
@@ -130,8 +140,8 @@ function sanitizeMessage(error: unknown, stage: ImageSaveStage): string {
     // error. Real Convex ids are long unbroken lowercase-alphanumeric tokens
     // (~32 chars, no separators), which no natural-language word reaches.
     const cleaned = error.message
-      .replace(/https?:\/\/\S+/gi, '<url>')
-      .replace(/\b[a-z0-9]{25,}\b/g, '<id>')
+      .replace(/https?:\/\/\S+/gi, "<url>")
+      .replace(/\b[a-z0-9]{25,}\b/g, "<id>")
       .slice(0, 200);
     return cleaned || `Could not complete (${stage})`;
   }
@@ -152,7 +162,7 @@ export const MAX_CONCURRENT_SAVES = 3;
 export async function saveImageOperations(
   requests: ImageSaveRequest[],
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<'spaces'> },
+  options?: { spaceId?: Id<"spaces"> },
 ): Promise<ImageSaveResult[]> {
   const results: ImageSaveResult[] = new Array(requests.length);
   let next = 0;
@@ -163,7 +173,10 @@ export async function saveImageOperations(
     }
   };
   await Promise.all(
-    Array.from({ length: Math.min(MAX_CONCURRENT_SAVES, requests.length) }, worker),
+    Array.from(
+      { length: Math.min(MAX_CONCURRENT_SAVES, requests.length) },
+      worker,
+    ),
   );
   return results;
 }
@@ -171,10 +184,10 @@ export async function saveImageOperations(
 async function saveImageOperation(
   request: ImageSaveRequest,
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<'spaces'> },
+  options?: { spaceId?: Id<"spaces"> },
 ): Promise<ImageSaveResult> {
   const image = request.image;
-  let stage: ImageSaveStage = 'begin';
+  let stage: ImageSaveStage = "begin";
   // Minted inside the try: if id generation itself throws, that image must
   // settle as a failed result like any other error.
   let operationId = request.operationId;
@@ -183,19 +196,19 @@ async function saveImageOperation(
     // must also get a fresh id on retry.
     operationId = operationId || generateOperationId();
     const began = await deps.begin(operationId);
-    if (began.kind === 'complete') {
+    if (began.kind === "complete") {
       // Already finalized server-side (a previous attempt landed); skip the
       // upload entirely and report the existing item.
-      return { status: 'saved', operationId, image, itemId: began.itemId };
+      return { status: "saved", operationId, image, itemId: began.itemId };
     }
 
-    stage = 'normalize';
+    stage = "normalize";
     const stored = await deps.normalize(image);
 
-    stage = 'upload';
+    stage = "upload";
     const uploadedStorageId = await deps.upload(stored, began.uploadUrl);
 
-    stage = 'attach';
+    stage = "attach";
     // Attach records the uploaded storage id on the pending operation (and,
     // for a racing retry that already attached a different id, discards this
     // redundant upload server-side). finalize reads the canonical id back
@@ -203,7 +216,7 @@ async function saveImageOperation(
     const attached = await deps.attach(operationId, uploadedStorageId);
     if (attached.error) throw new Error(attached.error);
 
-    stage = 'finalize';
+    stage = "finalize";
     const aspectRatio =
       stored.width && stored.height ? stored.width / stored.height : undefined;
     const itemId = await deps.finalize({
@@ -215,13 +228,13 @@ async function saveImageOperation(
       longitude: image.longitude,
       spaceId: options?.spaceId,
     });
-    return { status: 'saved', operationId, image, itemId };
+    return { status: "saved", operationId, image, itemId };
   } catch (error) {
     return {
-      status: 'failed',
+      status: "failed",
       // Only undefined if minting itself threw; the placeholder keeps the
       // result shape intact and a retry of it simply mints a fresh id.
-      operationId: operationId ?? '',
+      operationId: operationId ?? "",
       image,
       stage,
       message: sanitizeMessage(error, stage),
@@ -242,7 +255,7 @@ export function useSaveImages() {
   return useCallback(
     async (
       requests: ImageSaveRequest[],
-      options?: { spaceId?: Id<'spaces'> },
+      options?: { spaceId?: Id<"spaces"> },
     ): Promise<ImageSaveResult[]> => {
       const deps: SaveImageDeps = {
         begin: (operationId) => beginImageImport({ operationId }),
@@ -252,20 +265,27 @@ export function useSaveImages() {
           const error = imageSizeError(file.size);
           if (error) throw new Error(error);
           const result = await expoFetch(uploadUrl, {
-            method: 'POST',
-            headers: image.mimeType?.startsWith('image/') ? { 'Content-Type': image.mimeType } : {},
+            method: "POST",
+            headers: image.mimeType?.startsWith("image/")
+              ? { "Content-Type": image.mimeType }
+              : {},
             body: file,
           });
           if (!result.ok) {
             throw new Error(`Upload failed (${result.status})`);
           }
           const { storageId } = (await result.json()) as {
-            storageId: Id<'_storage'>;
+            storageId: Id<"_storage">;
           };
           return storageId;
         },
-        attach: (operationId, storageId) => attachImageUpload({ operationId, storageId }),
-        finalize: (input) => finalizeImageImport({ ...input, analyticsSessionId: analytics.sessionId() }),
+        attach: (operationId, storageId) =>
+          attachImageUpload({ operationId, storageId }),
+        finalize: (input) =>
+          finalizeImageImport({
+            ...input,
+            analyticsSessionId: analytics.sessionId(),
+          }),
       };
       return await saveImageOperations(requests, deps, options);
     },

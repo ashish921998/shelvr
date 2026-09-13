@@ -1,38 +1,82 @@
-import { EmptyState } from '@/components/empty-state';
-import { HeaderActionMenu } from '@/components/ui/header-icon-button';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { ItemDetail, type DetailItem } from '@/components/item-detail';
-import { ItemHeader } from '@/components/item-header';
-import { convexQuery } from '@convex-dev/react-query';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { FlashList, type FlashListRef, type ViewToken } from '@shopify/flash-list';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import * as Clipboard from 'expo-clipboard';
-import { File, Paths } from 'expo-file-system';
-import { GlassView } from '@/components/glass';
-import * as Haptics from 'expo-haptics';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EmptyState } from "@/components/empty-state";
+import { HeaderActionMenu } from "@/components/ui/header-icon-button";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { ItemDetail, type DetailItem } from "@/components/item-detail";
+import { ItemHeader } from "@/components/item-header";
+import { convexQuery } from "@convex-dev/react-query";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import {
+  FlashList,
+  type FlashListRef,
+  type ViewToken,
+} from "@shopify/flash-list";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import * as Clipboard from "expo-clipboard";
+import { GlassView } from "@/components/glass";
+import * as Haptics from "expo-haptics";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Platform,
   Pressable,
-  Share,
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
-import * as Sharing from 'expo-sharing';
-import { AppSymbolIcon } from '@/components/symbol';
-import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
-import { useFindLinks } from '@/lib/use-find-links';
-import { useHomeFeed } from '@/lib/home-feed';
-import { useItemOpen } from '@/lib/use-item-open';
+} from "react-native";
+import { AppSymbolIcon } from "@/components/symbol";
+import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
+import { useFindLinks } from "@/lib/use-find-links";
+import { useHomeFeed } from "@/lib/home-feed";
+import { useItemOpen } from "@/lib/use-item-open";
+import { useItemShare } from "@/lib/use-item-share";
+
+// Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
+// React Query still subscribes through the Convex adapter, and an invalid
+// arg (e.g. an empty-string id) throws ArgumentValidationError on every
+// socket reconnect, which the server answers by closing the WebSocket.
+function spaceQueryArg(
+  from?: string,
+  spaceId?: string,
+): "skip" | { id: Id<"spaces"> } {
+  return from === "space" && spaceId ? { id: spaceId as Id<"spaces"> } : "skip";
+}
+
+function searchQueryArg(from?: string, q?: string): "skip" | { query: string } {
+  return from === "search" && q ? { query: q } : "skip";
+}
+
+// The undo notice shows only while the accepted item is really a member of
+// this space — the accept may have raced a swipe away or an unmount.
+function acceptedNoticeVisible(
+  accepted: { itemId: Id<"items">; spaceId: Id<"spaces"> } | null,
+  activeItem: DetailItem | undefined,
+  isSuggested: boolean,
+  space: { items: { _id: string }[]; name: string } | null | undefined,
+): boolean {
+  return Boolean(
+    !isSuggested &&
+    accepted?.itemId === activeItem?._id &&
+    space?.items.some((item) => item._id === accepted?.itemId),
+  );
+}
+
+// The pager shows the feed's loaded pages, so swiping toward their end must
+// fetch the next one just as scrolling the feed does; otherwise a swipe that
+// started on page one stops at its last item.
+function pagerEndReached(
+  items: DetailItem[] | undefined,
+  homeFeed: ReturnType<typeof useHomeFeed>,
+): (() => void) | undefined {
+  return items === homeFeed.items && homeFeed.canLoadMore
+    ? homeFeed.loadMore
+    : undefined;
+}
 
 export default function ItemScreen() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
@@ -50,7 +94,10 @@ export default function ItemScreen() {
   const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
   const dismissSuggestion = useMutation(api.spaces.dismissSuggestion);
   const undoAcceptSuggestion = useMutation(api.spaces.undoAcceptSuggestion);
-  const [accepted, setAccepted] = useState<{ itemId: Id<'items'>; spaceId: Id<'spaces'> } | null>(null);
+  const [accepted, setAccepted] = useState<{
+    itemId: Id<"items">;
+    spaceId: Id<"spaces">;
+  } | null>(null);
   const decisionPending = useRef(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
   const listRef = useRef<FlashListRef<DetailItem>>(null);
@@ -66,30 +113,27 @@ export default function ItemScreen() {
   // socket reconnect, which the server answers by closing the WebSocket.
   const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
-    convexQuery(
-      api.spaces.getSpace,
-      from === 'space' && spaceId ? { id: spaceId as Id<'spaces'> } : 'skip',
-    ),
+    convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
   );
   const searchQ = useQuery(
-    convexQuery(api.items.searchItems, from === 'search' && q ? { query: q } : 'skip'),
+    convexQuery(api.items.searchItems, searchQueryArg(from, q)),
   );
 
   // A single-item fallback for deep links (no source) or a stale list that no
   // longer contains this id.
   const { data: single } = useQuery(
-    convexQuery(api.items.getItem, { id: id as Id<'items'> }),
+    convexQuery(api.items.getItem, { id: id as Id<"items"> }),
   );
 
   // Mirror the space screen's feed order exactly (suggestions first, then
   // saved) so swiping pages through what the user saw in the grid.
   const list = useMemo<DetailItem[] | undefined>(() => {
-    if (from === 'space') {
+    if (from === "space") {
       return spaceQ.data
         ? [...spaceQ.data.suggestions, ...spaceQ.data.items]
         : undefined;
     }
-    if (from === 'search') return searchQ.data;
+    if (from === "search") return searchQ.data;
     return homeFeed.items;
   }, [from, spaceQ.data, searchQ.data, homeFeed.items]);
 
@@ -114,11 +158,7 @@ export default function ItemScreen() {
     [startIndex, list, single],
   );
 
-  // The pager shows the feed's loaded pages, so swiping toward their end must
-  // fetch the next one just as scrolling the feed does; otherwise a swipe that
-  // started on page one stops at its last item.
-  const onEndReached =
-    items === homeFeed.items && homeFeed.canLoadMore ? homeFeed.loadMore : undefined;
+  const onEndReached = pagerEndReached(items, homeFeed);
 
   // The id the screen was pushed with owns the Apple-zoom target; captured once
   // so swiping (which rewrites the `id` param) never re-pairs the transition.
@@ -175,100 +215,73 @@ export default function ItemScreen() {
   // List rows are card-shaped (no article body, no shopping status), so the
   // toolbar reads those from getItem. `single` follows the debounced `id`
   // param and can lag a swipe, hence the identity check.
-  const activeFull = single && single._id === activeItem?._id ? single : undefined;
+  const activeFull =
+    single && single._id === activeItem?._id ? single : undefined;
 
-  const markOpened = useCallback(({ itemId }: { itemId: string }) =>
-    markItemOpened({ itemId: itemId as Id<'items'> }), [markItemOpened]);
-  useItemOpen(activeItem, from ?? 'direct', markOpened);
+  const markOpened = useCallback(
+    ({ itemId }: { itemId: string }) =>
+      markItemOpened({ itemId: itemId as Id<"items"> }),
+    [markItemOpened],
+  );
+  useItemOpen(activeItem, from ?? "direct", markOpened);
 
   // A link shares its URL; a saved image/sticker shares the picture itself.
-  // `expo-sharing` needs a local file, so the remote image is cached first.
-  const shareActive = useCallback(async () => {
-    if (!activeItem) return;
-
-    let shared = false;
-    let shareSheetOnly = false;
-    try {
-      if (activeItem.type === 'note') {
-        const message = activeItem.note ?? activeFull?.content ?? activeItem.description ?? activeItem.title;
-        if (!message) return;
-        const result = await Share.share({ message });
-        shared = result.action !== Share.dismissedAction;
-      } else if (!activeItem.imageUrl) {
-        if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
-        shared = result.action !== Share.dismissedAction;
-      } else if (!(await Sharing.isAvailableAsync())) {
-        if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
-        shared = result.action !== Share.dismissedAction;
-      } else {
-        const ext = activeItem.isSticker ? 'png' : 'jpg';
-        const file = new File(Paths.cache, `${activeItem._id}.${ext}`);
-        if (file.exists) file.delete();
-        await File.downloadFileAsync(activeItem.imageUrl, file);
-        await Sharing.shareAsync(file.uri, {
-          mimeType: activeItem.isSticker ? 'image/png' : 'image/jpeg',
-          UTI: activeItem.isSticker ? 'public.png' : 'public.jpeg',
-          dialogTitle: activeItem.title ?? 'Share',
-        });
-        shared = true;
-        shareSheetOnly = true;
-      }
-    } catch {
-      // User cancelled the sheet, or the download/share failed — nothing to do.
-    }
-
-    if (shared) {
-      analytics.capture('item_shared');
-      analytics.itemAction(activeItem, shareSheetOnly ? 'share_sheet_opened' : 'share');
-    }
-  }, [activeItem, activeFull]);
+  // Prefers the full getItem row when it has caught up, so link saves can use
+  // the extracted article content a card row does not carry.
+  const shareActive = useItemShare(activeFull ?? activeItem);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
     await Clipboard.setStringAsync(activeItem.url);
-    analytics.capture('item_link_copied');
-    analytics.itemAction(activeItem, 'copy');
-    if (process.env.EXPO_OS === 'ios') {
+    analytics.capture("item_link_copied");
+    analytics.itemAction(activeItem, "copy");
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [activeItem]);
 
-  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(activeFull ?? activeItem);
+  const { findLinks: onFindLinks, disabled: searchDisabled } = useFindLinks(
+    activeFull ?? activeItem,
+  );
 
   // Same picker the inline control opens, so membership behavior (and the
   // formSheet presentation) is identical whichever entry point is used.
   const openSpaces = useCallback(() => {
     if (!activeItem) return;
-    router.push({ pathname: '/manage-spaces', params: { itemId: activeItem._id } });
+    router.push({
+      pathname: "/manage-spaces",
+      params: { itemId: activeItem._id },
+    });
   }, [activeItem, router]);
 
   // Suggested items (opened from a space) trade the normal footer for an
   // Add / Dismiss decision bar. Accepting keeps the page open — the bar just
   // drops away as the suggestion becomes a real membership.
   const activeIsSuggested =
-    from === 'space' &&
+    from === "space" &&
     !!spaceId &&
     !!activeId &&
-    suggestedIds.has(activeId as Id<'items'>);
+    suggestedIds.has(activeId as Id<"items">);
 
   const onAccept = useCallback(async () => {
     if (!spaceId || !activeId || decisionPending.current) return;
     decisionPending.current = true;
     setDecisionBusy(true);
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    const membership = { itemId: activeId as Id<'items'>, spaceId: spaceId as Id<'spaces'> };
+    const membership = {
+      itemId: activeId as Id<"items">,
+      spaceId: spaceId as Id<"spaces">,
+    };
     try {
       const changed = await acceptSuggestion(membership);
       if (changed) {
-        analytics.capture('suggestion_accepted');
+        analytics.capture("suggestion_accepted");
         setAccepted(membership);
       }
     } catch {
-      Alert.alert("Couldn't add to space", 'Please try again.');
+      Alert.alert("Couldn't add to space", "Please try again.");
     } finally {
       decisionPending.current = false;
       setDecisionBusy(false);
@@ -282,13 +295,19 @@ export default function ItemScreen() {
     try {
       const changed = await undoAcceptSuggestion(accepted);
       if (changed) {
-        analytics.capture('item_space_membership_changed', {
-          item_id: accepted.itemId, space_id: accepted.spaceId, membership_added: false, undone: true,
+        analytics.capture("item_space_membership_changed", {
+          item_id: accepted.itemId,
+          space_id: accepted.spaceId,
+          membership_added: false,
+          undone: true,
         });
       }
       setAccepted(null);
     } catch {
-      Alert.alert("Couldn't undo", 'The save is still in this Space. Please try again.');
+      Alert.alert(
+        "Couldn't undo",
+        "The save is still in this Space. Please try again.",
+      );
     } finally {
       decisionPending.current = false;
       setDecisionBusy(false);
@@ -304,9 +323,12 @@ export default function ItemScreen() {
     // mirroring delete, so the pager never lands on a vanished page.
     const idx = items.findIndex((i) => i._id === activeId);
     const neighbor = items[idx + 1] ?? items[idx - 1];
-    const dismissedId = activeId as Id<'items'>;
+    const dismissedId = activeId as Id<"items">;
     if (neighbor) {
-      listRef.current?.scrollToIndex({ index: items.indexOf(neighbor), animated: true });
+      listRef.current?.scrollToIndex({
+        index: items.indexOf(neighbor),
+        animated: true,
+      });
       setActiveId(neighbor._id);
       router.setParams({ id: neighbor._id });
     } else {
@@ -314,9 +336,9 @@ export default function ItemScreen() {
     }
     const changed = await dismissSuggestion({
       itemId: dismissedId,
-      spaceId: spaceId as Id<'spaces'>,
+      spaceId: spaceId as Id<"spaces">,
     });
-    if (changed) analytics.capture('suggestion_dismissed');
+    if (changed) analytics.capture("suggestion_dismissed");
   }, [spaceId, activeId, items, dismissSuggestion, router]);
 
   const onDelete = useCallback(async () => {
@@ -326,22 +348,23 @@ export default function ItemScreen() {
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
-      analytics.capture('item_deleted', { item_type: activeItem.type });
+      analytics.capture("item_deleted", { item_type: activeItem.type });
       if (neighbor) {
         setActiveId(neighbor._id);
         router.setParams({ id: neighbor._id });
-        listRef.current?.scrollToIndex({ index: Math.min(idx, items.length - 2), animated: true });
+        listRef.current?.scrollToIndex({
+          index: Math.min(idx, items.length - 2),
+          animated: true,
+        });
       } else if (router.canGoBack()) router.back();
-      else router.replace('/');
+      else router.replace("/");
     } catch {
-      Alert.alert("Couldn't delete save", 'Please try again in a moment.');
+      Alert.alert("Couldn't delete save", "Please try again in a moment.");
     }
   }, [activeItem, items, deleteItem, router]);
 
   if (items === undefined) {
-    return (
-      <ScreenLoader label="Opening save" />
-    );
+    return <ScreenLoader label="Opening save" />;
   }
 
   if (items.length === 0) {
@@ -357,24 +380,34 @@ export default function ItemScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerBackButtonDisplayMode: 'minimal',
-          ...(Platform.OS === 'android'
+          headerBackButtonDisplayMode: "minimal",
+          ...(Platform.OS === "android"
             ? {
                 headerRight: () => (
                   <HeaderActionMenu
                     icon="ellipsis"
                     label="Save actions"
-                    title={activeItem?.title ?? activeItem?.note ?? 'Save actions'}
+                    title={
+                      activeItem?.title ?? activeItem?.note ?? "Save actions"
+                    }
                     actions={[
-                      ...(activeItem?.status === 'ready'
-                        ? [{ label: 'Add to space', onPress: openSpaces }]
+                      ...(activeItem?.status === "ready"
+                        ? [{ label: "Add to space", onPress: openSpaces }]
                         : []),
-                      { label: 'Share', onPress: shareActive },
-                      ...(activeItem?.url ? [{ label: 'Copy link', onPress: copyLink }] : []),
-                      ...(activeItem?.status === 'ready'
-                        ? [{ label: 'Find links', onPress: onFindLinks, disabled: searchDisabled }]
+                      { label: "Share", onPress: shareActive },
+                      ...(activeItem?.url
+                        ? [{ label: "Copy link", onPress: copyLink }]
                         : []),
-                      { label: 'Delete', destructive: true, onPress: onDelete },
+                      ...(activeItem?.status === "ready"
+                        ? [
+                            {
+                              label: "Find links",
+                              onPress: onFindLinks,
+                              disabled: searchDisabled,
+                            },
+                          ]
+                        : []),
+                      { label: "Delete", destructive: true, onPress: onDelete },
                     ]}
                   />
                 ),
@@ -385,32 +418,47 @@ export default function ItemScreen() {
       <Stack.Title asChild>
         <ItemHeader item={activeItem} />
       </Stack.Title>
-      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Menu icon="ellipsis">
-          {activeItem?.status === 'ready' ? (
-            <Stack.Toolbar.MenuAction icon="rectangle.stack" onPress={openSpaces}>
-              Add to space
+      {Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu icon="ellipsis">
+            {activeItem?.status === "ready" ? (
+              <Stack.Toolbar.MenuAction
+                icon="rectangle.stack"
+                onPress={openSpaces}
+              >
+                Add to space
+              </Stack.Toolbar.MenuAction>
+            ) : null}
+            <Stack.Toolbar.MenuAction
+              icon="square.and.arrow.up"
+              onPress={shareActive}
+            >
+              Share
             </Stack.Toolbar.MenuAction>
-          ) : null}
-          <Stack.Toolbar.MenuAction icon="square.and.arrow.up" onPress={shareActive}>
-            Share
-          </Stack.Toolbar.MenuAction>
-          {activeItem?.url ? (
-            <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
-              Copy link
+            {activeItem?.url ? (
+              <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
+                Copy link
+              </Stack.Toolbar.MenuAction>
+            ) : null}
+            {activeItem?.status === "ready" ? (
+              <Stack.Toolbar.MenuAction
+                icon="bag"
+                onPress={onFindLinks}
+                disabled={searchDisabled}
+              >
+                Find links
+              </Stack.Toolbar.MenuAction>
+            ) : null}
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={onDelete}
+            >
+              Delete
             </Stack.Toolbar.MenuAction>
-          ) : null}
-          {activeItem?.status === 'ready' ? (
-            <Stack.Toolbar.MenuAction icon="bag" onPress={onFindLinks} disabled={searchDisabled}>
-              Find links
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-          <Stack.Toolbar.MenuAction icon="trash" destructive onPress={onDelete}>
-            Delete
-          </Stack.Toolbar.MenuAction>
-        </Stack.Toolbar.Menu>
-      </Stack.Toolbar> : null}
-
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      ) : null}
 
       <FlashList
         ref={listRef}
@@ -435,9 +483,16 @@ export default function ItemScreen() {
         <Animated.View
           entering={SlideInDown.duration(250)}
           exiting={FadeOutDown.duration(200)}
-          style={[styles.decisionBar, { bottom: insets.bottom + theme.gap(1.5) }]}
+          style={[
+            styles.decisionBar,
+            { bottom: insets.bottom + theme.gap(1.5) },
+          ]}
         >
-          <Pressable onPress={onDismiss} disabled={decisionBusy} style={styles.dismissWrap}>
+          <Pressable
+            onPress={onDismiss}
+            disabled={decisionBusy}
+            style={styles.dismissWrap}
+          >
             <GlassView
               glassEffectStyle="regular"
               isInteractive
@@ -447,7 +502,11 @@ export default function ItemScreen() {
               <Text style={styles.dismissText}>Dismiss</Text>
             </GlassView>
           </Pressable>
-          <Pressable onPress={onAccept} disabled={decisionBusy} style={styles.acceptWrap}>
+          <Pressable
+            onPress={onAccept}
+            disabled={decisionBusy}
+            style={styles.acceptWrap}
+          >
             <GlassView
               glassEffectStyle="regular"
               isInteractive
@@ -455,16 +514,39 @@ export default function ItemScreen() {
               style={styles.decisionButton}
               fallbackStyle={{ backgroundColor: theme.colors.primary }}
             >
-              <AppSymbolIcon name="sparkles" size={15} tintColor={theme.colors.primaryForeground} />
+              <AppSymbolIcon
+                name="sparkles"
+                size={15}
+                tintColor={theme.colors.primaryForeground}
+              />
               <Text style={styles.acceptText}>Add to space</Text>
             </GlassView>
           </Pressable>
         </Animated.View>
       ) : null}
-      {!activeIsSuggested && accepted?.itemId === activeItem?._id && spaceQ.data?.items.some((item) => item._id === accepted?.itemId) ? (
-        <View style={[styles.acceptedNotice, { bottom: insets.bottom + theme.gap(1.5) }]} accessibilityLiveRegion="polite">
-          <Text style={styles.acceptedLabel} numberOfLines={2}>Added to {spaceQ.data?.name ?? 'space'}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Undo add to space" disabled={decisionBusy} onPress={undoAccept} style={styles.undoButton}>
+      {acceptedNoticeVisible(
+        accepted,
+        activeItem,
+        activeIsSuggested,
+        spaceQ.data,
+      ) ? (
+        <View
+          style={[
+            styles.acceptedNotice,
+            { bottom: insets.bottom + theme.gap(1.5) },
+          ]}
+          accessibilityLiveRegion="polite"
+        >
+          <Text style={styles.acceptedLabel} numberOfLines={2}>
+            Added to {spaceQ.data?.name ?? "space"}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Undo add to space"
+            disabled={decisionBusy}
+            onPress={undoAccept}
+            style={styles.undoButton}
+          >
             <Text style={styles.undoText}>Undo</Text>
           </Pressable>
         </View>
@@ -475,29 +557,50 @@ export default function ItemScreen() {
 
 const styles = StyleSheet.create((theme) => ({
   acceptedNotice: {
-    position: 'absolute', left: theme.gap(2), right: theme.gap(2),
-    flexDirection: 'row', alignItems: 'center', gap: theme.gap(1),
-    paddingHorizontal: theme.gap(1.5), backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
+    position: "absolute",
+    left: theme.gap(2),
+    right: theme.gap(2),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  acceptedLabel: { flex: 1, fontFamily: theme.fonts.medium, fontSize: 14, color: theme.colors.foreground },
-  undoButton: { minHeight: 44, minWidth: 60, alignItems: 'center', justifyContent: 'center' },
-  undoText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.primaryText },
+  acceptedLabel: {
+    flex: 1,
+    fontFamily: theme.fonts.medium,
+    fontSize: 14,
+    color: theme.colors.foreground,
+  },
+  undoButton: {
+    minHeight: 44,
+    minWidth: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  undoText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 14,
+    color: theme.colors.primaryText,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
   decisionBar: {
-    position: 'absolute',
+    position: "absolute",
     left: theme.gap(2),
     right: theme.gap(2),
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.gap(1),
   },
   dismissWrap: {
@@ -509,14 +612,14 @@ const styles = StyleSheet.create((theme) => ({
   // Shared glass surface for both decision buttons. No backgroundColor/border —
   // the liquid glass provides the material; the CTA sets it via tintColor.
   decisionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(0.75),
     paddingVertical: theme.gap(1.75),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
+    borderCurve: "continuous",
+    overflow: "hidden",
   },
   dismissText: {
     fontFamily: theme.fonts.bold,

@@ -8,7 +8,9 @@ import { ConvexError, type Value } from "convex/values";
 import { MAX_DEMO_RETRIES } from "./demo";
 import { DEMO_ERROR_MESSAGES, demoErrorCode } from "./model/demoErrors";
 
-type TestCtx = TestConvexForDataModel<import("./_generated/dataModel").DataModel>;
+type TestCtx = TestConvexForDataModel<
+  import("./_generated/dataModel").DataModel
+>;
 type TestBackend = ReturnType<typeof newConvexTest>;
 
 // One backend per test, then per-user identity accessors on it — so tests that
@@ -63,7 +65,10 @@ describe("onboarding demo allowance", () => {
     // scheduled action was handed the same one.
     expect(item?.processingRunId).toBeDefined();
     expect(item?.processingStartedAt).toBeDefined();
-    expect(runs[0].args[0]).toMatchObject({ itemId, runId: item?.processingRunId });
+    expect(runs[0].args[0]).toMatchObject({
+      itemId,
+      runId: item?.processingRunId,
+    });
   });
 
   it("is idempotent: a repeat — even with a different URL — returns the same item and never re-schedules processing", async () => {
@@ -224,9 +229,10 @@ describe("onboarding demo allowance", () => {
     await t.mutation(api.items.deleteItem, { id: itemId });
     // ConvexError, not Error: production redacts a plain Error's message to
     // "Server Error", so the client can only branch on `data`.
-    const error = await t
-      .mutation(api.demo.createDemoItem, { url: URL })
-      .then(() => null, (e: unknown) => e);
+    const error = await t.mutation(api.demo.createDemoItem, { url: URL }).then(
+      () => null,
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConvexError);
     expect((error as ConvexError<Value>).data).toEqual({
       code: "demo_used",
@@ -239,7 +245,10 @@ describe("onboarding demo allowance", () => {
     const t = await asUser(newConvexTest(), "spaces-user");
     const error = await t
       .mutation(api.demo.createDemoItem, { url: URL, spaceName: "   " })
-      .then(() => null, (e: unknown) => e);
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
     expect(demoErrorCode(error)).toBe("invalid_space_name");
   });
 
@@ -262,7 +271,9 @@ describe("onboarding demo allowance", () => {
     const jobs = await t.run((ctx) =>
       ctx.db.system.query("_scheduled_functions").collect(),
     );
-    const telemetry = jobs.filter((job) => job.name === "analytics:captureSave");
+    const telemetry = jobs.filter(
+      (job) => job.name === "analytics:captureSave",
+    );
     expect(telemetry).toHaveLength(1);
     expect(telemetry[0].args[0]).toMatchObject({
       itemId,
@@ -296,7 +307,10 @@ describe("retryDemoItem", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     const latest = jobs.filter((job) => job.name === "ai:processItem").at(-1);
-    expect(latest?.args[0]).toMatchObject({ itemId, runId: item?.processingRunId });
+    expect(latest?.args[0]).toMatchObject({
+      itemId,
+      runId: item?.processingRunId,
+    });
 
     await t.run(async (ctx) => {
       const items = await ctx.db
@@ -327,9 +341,10 @@ describe("retryDemoItem", () => {
 
   it("requires the caller to own a demo and is unavailable without one", async () => {
     const t = await asUser(newConvexTest(), "no-demo-user");
-    const error = await t
-      .mutation(api.demo.retryDemoItem, {})
-      .then(() => null, (e: unknown) => e);
+    const error = await t.mutation(api.demo.retryDemoItem, {}).then(
+      () => null,
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConvexError);
     expect(demoErrorCode(error)).toBe("no_demo");
   });
@@ -339,12 +354,16 @@ describe("retryDemoItem", () => {
     const t = await asUser(backend, "demo-user");
     const { itemId } = await t.mutation(api.demo.createDemoItem, { url: URL });
     await backend.run(async (ctx) => {
-      await ctx.db.patch(itemId, { status: "failed", failureReason: "not_found" });
+      await ctx.db.patch(itemId, {
+        status: "failed",
+        failureReason: "not_found",
+      });
     });
 
-    const error = await t
-      .mutation(api.demo.retryDemoItem, {})
-      .then(() => null, (e: unknown) => e);
+    const error = await t.mutation(api.demo.retryDemoItem, {}).then(
+      () => null,
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConvexError);
     expect((error as ConvexError<Value>).data).toEqual({
       code: "terminal_failure",
@@ -354,21 +373,29 @@ describe("retryDemoItem", () => {
     await backend.run(async (ctx) => {
       // Nothing changed: still failed, still terminal, no run scheduled.
       const item = await ctx.db.get(itemId);
-      expect(item).toMatchObject({ status: "failed", failureReason: "not_found" });
+      expect(item).toMatchObject({
+        status: "failed",
+        failureReason: "not_found",
+      });
       const demo = await ctx.db
         .query("onboardingDemos")
         .withIndex("by_user", (q) => q.eq("userId", "demo-user"))
         .unique();
       expect(demo?.retryCount ?? 0).toBe(0);
       const jobs = await ctx.db.system.query("_scheduled_functions").collect();
-      expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(1);
+      expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(
+        1,
+      );
     });
 
     // The bucket was not drawn from: a following retryable failure still gets
     // the full capacity (3) before the limiter refuses.
     for (let i = 0; i < 3; i++) {
       await backend.run(async (ctx) => {
-        await ctx.db.patch(itemId, { status: "failed", failureReason: "error" });
+        await ctx.db.patch(itemId, {
+          status: "failed",
+          failureReason: "error",
+        });
       });
       const retry = await t.mutation(api.demo.retryDemoItem, {});
       expect(retry.scheduled).toBe(true);
@@ -408,9 +435,10 @@ describe("retryDemoItem", () => {
         .unique();
       await ctx.db.patch(demo!._id, { retryCount: MAX_DEMO_RETRIES });
     });
-    const error = await t
-      .mutation(api.demo.retryDemoItem, {})
-      .then(() => null, (e: unknown) => e);
+    const error = await t.mutation(api.demo.retryDemoItem, {}).then(
+      () => null,
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConvexError);
     expect(demoErrorCode(error)).toBe("too_many_retries");
     await backend.run(async (ctx) => {

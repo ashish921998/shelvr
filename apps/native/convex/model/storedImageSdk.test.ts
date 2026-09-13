@@ -10,8 +10,18 @@ const heic = Uint8Array.from([
 
 describe("stored image MIME type through the real AI SDK", () => {
   it.each([
-    { name: "HEIC with stored MIME metadata", bytes: heic, mediaType: "image/heic", expectedType: "image/heic" },
-    { name: "PNG without MIME metadata", bytes: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]), mediaType: "image", expectedType: "image/png" },
+    {
+      name: "HEIC with stored MIME metadata",
+      bytes: heic,
+      mediaType: "image/heic",
+      expectedType: "image/heic",
+    },
+    {
+      name: "PNG without MIME metadata",
+      bytes: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      mediaType: "image",
+      expectedType: "image/png",
+    },
   ])("sends $name to Google", async ({ bytes, mediaType, expectedType }) => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(

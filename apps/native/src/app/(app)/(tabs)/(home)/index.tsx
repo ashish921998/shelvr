@@ -1,14 +1,17 @@
-import { EmptyState } from '@/components/empty-state';
-import { MasonryFeed } from '@/components/masonry-feed';
-import { FeedbackInvitation } from '@/components/feedback/feedback-invitation';
-import { FeedbackModal } from '@/components/feedback/feedback-modal';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { useHomeFeed } from '@/lib/home-feed';
-import { useBusySaving, useFeedbackInvitation } from '@/lib/feedback-invitation';
-import { useReviewPrompt } from '@/lib/review-prompt';
-import { ProgressiveBlurHeader } from 'progressive-blur';
-import { View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { EmptyState } from "@/components/empty-state";
+import { MasonryFeed } from "@/components/masonry-feed";
+import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
+import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { useHomeFeed } from "@/lib/home-feed";
+import {
+  useBusySaving,
+  useFeedbackInvitation,
+} from "@/lib/feedback-invitation";
+import { useReviewPrompt } from "@/lib/review-prompt";
+import { ProgressiveBlurHeader } from "progressive-blur";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function HomeScreen() {
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
@@ -18,9 +21,7 @@ export default function HomeScreen() {
   const busySaving = useBusySaving(items);
 
   if (items === undefined) {
-    return (
-      <ScreenLoader label="Warming your shelf" />
-    );
+    return <ScreenLoader label="Warming your shelf" />;
   }
 
   if (items.length === 0) {
@@ -28,7 +29,9 @@ export default function HomeScreen() {
       <View style={styles.container}>
         <EmptyState
           title="Save it for later"
-          message={'Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it.'}
+          message={
+            "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it."
+          }
         />
       </View>
     );
@@ -39,7 +42,7 @@ export default function HomeScreen() {
       <MasonryFeed
         items={items}
         numColumns={2}
-        source={{ from: 'home' }}
+        source={{ from: "home" }}
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
@@ -55,10 +58,7 @@ export default function HomeScreen() {
       />
       <ProgressiveBlurHeader />
       {feedback.modalOpen ? (
-        <FeedbackModal
-          surface="home"
-          onClose={feedback.closeFeedback}
-        />
+        <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}
     </View>
   );
@@ -67,6 +67,5 @@ export default function HomeScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-
   },
 }));

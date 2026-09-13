@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Manual trigger so a run can be requested even when the pull_request
+  # event is not delivered to Actions.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,8 +41,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm run lint
+
       - name: Typecheck
         run: pnpm turbo run typecheck
 
-      - name: Test
-        run: pnpm --filter native-app test
+      - name: Dead code
+        run: pnpm run knip
+
+      - name: Security audit
+        run: pnpm run audit
+
+      - name: Version drift
+        run: pnpm run syncpack:lint
+
+      - name: Test coverage
+        run: pnpm run coverage

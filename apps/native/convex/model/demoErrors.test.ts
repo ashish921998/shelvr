@@ -1,7 +1,12 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 
-import { DEMO_ERROR_MESSAGES, demoError, demoErrorCode, isRateLimitedError } from "./demoErrors";
+import {
+  DEMO_ERROR_MESSAGES,
+  demoError,
+  demoErrorCode,
+  isRateLimitedError,
+} from "./demoErrors";
 
 describe("demo error classification", () => {
   it("round-trips a code through the ConvexError data the client receives", () => {
@@ -18,7 +23,9 @@ describe("demo error classification", () => {
     // What production hands the client for a plain server Error.
     expect(demoErrorCode(new Error("Server Error"))).toBeNull();
     expect(demoErrorCode(new ConvexError("Photo limit reached"))).toBeNull();
-    expect(demoErrorCode(new ConvexError({ code: "not_a_demo_code" }))).toBeNull();
+    expect(
+      demoErrorCode(new ConvexError({ code: "not_a_demo_code" })),
+    ).toBeNull();
     expect(demoErrorCode(undefined)).toBeNull();
     expect(demoErrorCode("Demo save already used")).toBeNull();
   });
@@ -26,7 +33,11 @@ describe("demo error classification", () => {
   it("recognises the rate limiter's structured error and nothing else", () => {
     expect(
       isRateLimitedError(
-        new ConvexError({ kind: "RateLimited", name: "demoRetry", retryAfter: 1000 }),
+        new ConvexError({
+          kind: "RateLimited",
+          name: "demoRetry",
+          retryAfter: 1000,
+        }),
       ),
     ).toBe(true);
     expect(isRateLimitedError(demoError("too_many_retries"))).toBe(false);

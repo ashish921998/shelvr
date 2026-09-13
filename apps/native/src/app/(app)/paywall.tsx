@@ -9,17 +9,17 @@
  * truth for current offerings. Restore Purchases is available via the native
  * paywall and Customer Center once the SDK is reachable again.
  */
-import { openPaywall, waitForSheetTransition } from '@/lib/entitlement';
-import { LEGAL_URLS } from '@/lib/legal';
-import { useRouter } from 'expo-router';
-import { Linking, Pressable, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet } from 'react-native-unistyles';
+import { openPaywall, waitForSheetTransition } from "@/lib/entitlement";
+import { LEGAL_URLS } from "@/lib/legal";
+import { useRouter } from "expo-router";
+import { Linking, Pressable, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function PaywallScreen() {
   const router = useRouter();
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <Text style={styles.title}>Shelvr Pro</Text>
       <Text style={styles.message}>
         We couldn’t load subscription options right now. Check your connection
@@ -35,7 +35,7 @@ export default function PaywallScreen() {
             // paywall while the dismissal is still animating, which would
             // map to 'unavailable' and bounce right back here.
             await waitForSheetTransition();
-            await openPaywall(router, 'retry');
+            await openPaywall(router, "retry");
           })();
         }}
       >
@@ -54,7 +54,7 @@ export default function PaywallScreen() {
         >
           Terms
         </Text>
-        {' · '}
+        {" · "}
         <Text
           style={styles.legalLink}
           onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
@@ -70,8 +70,8 @@ const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: theme.gap(4),
     gap: theme.gap(2),
   },
@@ -85,12 +85,12 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 22,
     color: theme.colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
   },
   button: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     paddingVertical: theme.gap(1.75),
     paddingHorizontal: theme.gap(4),
     marginTop: theme.gap(1),
@@ -118,6 +118,6 @@ const styles = StyleSheet.create((theme) => ({
   legalLink: {
     fontFamily: theme.fonts.medium,
     color: theme.colors.muted,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
 }));
