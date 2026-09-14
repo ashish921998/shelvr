@@ -1299,7 +1299,8 @@ export const NOTE_REFRESH_DELAY_MS = 20_000;
  * classifier's and survives later classification; an empty title hands naming
  * back to the classifier. A text change on a ready note re-classifies it
  * quietly after NOTE_REFRESH_DELAY_MS, so search and space suggestions follow
- * the new words without the note ever showing as processing.
+ * the new words without the note ever showing as processing. The refresh keeps
+ * the title the note already has, so only an untitled note is renamed.
  */
 export const updateNoteItem = mutation({
   args: {
@@ -1582,6 +1583,10 @@ export const finalizeItem = internalMutation({
     // passes it.
     runId: v.optional(v.string()),
     title: v.string(),
+    // An edited note's quiet refresh: a title the note already has stays, so
+    // re-classifying new words doesn't rename the note on every edit. A note
+    // with no title (its typed title was just cleared) still takes this one.
+    keepTitle: v.optional(v.boolean()),
     description: v.string(),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -1613,10 +1618,11 @@ export const finalizeItem = internalMutation({
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
-    // A title the owner typed outranks the classifier's; the rest of the
-    // classification still lands.
+    // A title the owner typed outranks the classifier's, and so does the one a
+    // refreshed note already has; the rest of the classification still lands.
     const title =
-      item.titleSource === "user" && item.title !== undefined
+      (item.titleSource === "user" || args.keepTitle === true) &&
+      item.title !== undefined
         ? item.title
         : args.title;
     const searchText = buildSearchText({

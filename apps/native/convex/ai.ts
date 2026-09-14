@@ -1277,6 +1277,7 @@ export const processItem = internalAction({
         itemId: args.itemId,
         runId: args.runId,
         title: result.title,
+        keepTitle: args.refresh === true,
         description: result.description,
         tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
         content: item.type === "link" ? page?.content : undefined,
