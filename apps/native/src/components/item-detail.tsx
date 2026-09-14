@@ -300,7 +300,13 @@ function ItemDetailBody({
         <Text selectable style={styles.paragraph}>
           {detail.note}
         </Text>
+        <IntentsRow item={item} intents={intents} />
+        {item.description ? (
+          <Text style={styles.description}>{item.description}</Text>
+        ) : null}
+        <TagsRow tags={item.tags} />
         {spaces.length > 0 ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? <ProductsSection item={detail} /> : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
@@ -346,31 +352,7 @@ function ItemDetailBody({
         </View>
       ) : null}
 
-      {intents.length > 0 ? (
-        <View style={styles.intentsRow}>
-          {intents.map((intent, index) => (
-            <IntentChip
-              key={`${intent.kind}-${index}`}
-              kind={intent.kind}
-              label={intent.label}
-              onPress={() => {
-                void runIntent(intent.kind, intent.value)
-                  .then(() => {
-                    analytics.itemAction(
-                      item,
-                      intent.kind === "open_url"
-                        ? "open_source"
-                        : intent.kind === "add_event"
-                          ? "calendar_sheet_opened"
-                          : intent.kind,
-                    );
-                  })
-                  .catch(() => {});
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
+      <IntentsRow item={item} intents={intents} />
 
       {item.description ? (
         <Text style={styles.description}>{item.description}</Text>
@@ -400,13 +382,7 @@ function ItemDetailBody({
         </Text>
       ) : null}
 
-      {item.tags.length > 0 ? (
-        <View style={styles.chipsRow}>
-          {item.tags.map((tag) => (
-            <TagChip key={tag} label={tag} />
-          ))}
-        </View>
-      ) : null}
+      <TagsRow tags={item.tags} />
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
@@ -426,6 +402,53 @@ function ItemDetailBody({
           <SimilarGrid items={similar} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** The item's suggested actions (add to calendar, open a link, …) as chips. */
+function IntentsRow({
+  item,
+  intents,
+}: {
+  item: DetailItem;
+  intents: ItemIntent[];
+}) {
+  if (intents.length === 0) return null;
+  return (
+    <View style={styles.intentsRow}>
+      {intents.map((intent, index) => (
+        <IntentChip
+          key={`${intent.kind}-${index}`}
+          kind={intent.kind}
+          label={intent.label}
+          onPress={() => {
+            void runIntent(intent.kind, intent.value)
+              .then(() => {
+                analytics.itemAction(
+                  item,
+                  intent.kind === "open_url"
+                    ? "open_source"
+                    : intent.kind === "add_event"
+                      ? "calendar_sheet_opened"
+                      : intent.kind,
+                );
+              })
+              .catch(() => {});
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function TagsRow({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <View style={styles.chipsRow}>
+      {tags.map((tag) => (
+        <TagChip key={tag} label={tag} />
+      ))}
     </View>
   );
 }
