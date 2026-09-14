@@ -5,9 +5,10 @@ const MAX_IMAGE_MIB = 14;
 export const MAX_STORED_IMAGE_BYTES = MAX_IMAGE_MIB * 1024 * 1024;
 export const MAX_SPACE_PROMPT_BYTES = 64 * 1024;
 export const IMAGE_TOO_LARGE_MESSAGE = `This photo is too large to read. Save a smaller copy (under ${MAX_IMAGE_MIB} MB).`;
+export const IMAGE_EMPTY_MESSAGE = "This photo is empty. Please save it again.";
 
 export function imageSizeError(size: number): string | undefined {
-  if (size === 0) return "This photo is empty. Please save it again.";
+  if (size === 0) return IMAGE_EMPTY_MESSAGE;
   if (size > MAX_STORED_IMAGE_BYTES) return IMAGE_TOO_LARGE_MESSAGE;
 }
 

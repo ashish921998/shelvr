@@ -3,10 +3,10 @@ import {
   imageSizeError,
   PHOTO_LIMIT_MESSAGE,
 } from "@convex/model/imagePolicy";
+import { saveErrorCode, type SaveErrorCode } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import * as Crypto from "expo-crypto";
 import { File } from "expo-file-system";
@@ -14,6 +14,7 @@ import { fetch as expoFetch } from "expo/fetch";
 import { useCallback } from "react";
 import { analytics, type ImageSaveFailureReason } from "@/lib/analytics";
 import { normalizeImage } from "@/lib/normalize-image";
+import { userSafeMessage } from "@/lib/user-safe-message";
 
 export type LocalImage = {
   uri: string;
@@ -64,6 +65,10 @@ export type ImageSaveResult =
       image: LocalImage;
       stage: ImageSaveStage;
       message: string;
+      /** Set when the server refused with a structured code. Absent for a
+       * client-side failure and for a server that still throws bare sentences,
+       * which `saveFailureReason` then buckets by message. */
+      code?: SaveErrorCode;
     };
 
 /** The four backend ops the orchestration drives. Kept as a dependency object
@@ -95,9 +100,24 @@ export type SaveImageDeps = {
   }) => Promise<Id<"items">>;
 };
 
-/** Buckets a failed result for analytics. The server messages are constants
- * with no ids or URLs, so sanitizeMessage passes them through unchanged. */
-export function saveFailureReason(message: string): ImageSaveFailureReason {
+const REASON_BY_CODE: Record<SaveErrorCode, ImageSaveFailureReason> = {
+  photo_limit: "photo_limit",
+  image_too_large: "too_large",
+  // Neither has its own bucket; the paywall route is what a pro_required
+  // failure is actually measured by (`paywall_requested`).
+  image_empty: "other",
+  pro_required: "other",
+};
+
+/** Buckets a failed result for analytics. Prefers the structured code, so a
+ * copy edit on the server cannot re-bucket every installed client. The message
+ * comparison is the fallback for a server that still throws bare sentences and
+ * for the client-side size check; delete it once no such server is live. */
+export function saveFailureReason(
+  message: string,
+  code?: SaveErrorCode,
+): ImageSaveFailureReason {
+  if (code) return REASON_BY_CODE[code];
   if (message === PHOTO_LIMIT_MESSAGE) return "photo_limit";
   if (message === IMAGE_TOO_LARGE_MESSAGE) return "too_large";
   return "other";
@@ -109,7 +129,7 @@ export function reportSaveFailures(results: ImageSaveResult[]): void {
   const counts = new Map<ImageSaveFailureReason, number>();
   for (const result of results) {
     if (result.status !== "failed") continue;
-    const reason = saveFailureReason(result.message);
+    const reason = saveFailureReason(result.message, result.code);
     counts.set(reason, (counts.get(reason) ?? 0) + 1);
   }
   for (const [reason, imageCount] of counts) {
@@ -124,28 +144,6 @@ export function reportSaveFailures(results: ImageSaveResult[]): void {
  * as the stable, unique portion. */
 function generateOperationId(): string {
   return `image:${Crypto.randomUUID()}`;
-}
-
-/** Maps an unknown thrown value to a short, user-safe message. Never surfaces
- * upload URLs, storage ids, or backend stack traces to the UI. */
-function sanitizeMessage(error: unknown, stage: ImageSaveStage): string {
-  // A ConvexError carries the server's user-facing sentence in `data`; its
-  // `message` is the prefixed transport string, and production redacts a plain
-  // Error's message to "Server Error" entirely.
-  if (error instanceof ConvexError && typeof error.data === "string") {
-    return error.data;
-  }
-  if (error instanceof Error && error.message) {
-    // Strip anything that looks like a URL or id leaked through a thrown
-    // error. Real Convex ids are long unbroken lowercase-alphanumeric tokens
-    // (~32 chars, no separators), which no natural-language word reaches.
-    const cleaned = error.message
-      .replace(/https?:\/\/\S+/gi, "<url>")
-      .replace(/\b[a-z0-9]{25,}\b/g, "<id>")
-      .slice(0, 200);
-    return cleaned || `Could not complete (${stage})`;
-  }
-  return `Could not complete (${stage})`;
 }
 
 /** Normalizing decodes the full original; ten 12MP photos at once is enough
@@ -237,7 +235,8 @@ async function saveImageOperation(
       operationId: operationId ?? "",
       image,
       stage,
-      message: sanitizeMessage(error, stage),
+      message: userSafeMessage(error, `Could not complete (${stage})`),
+      code: saveErrorCode(error) ?? undefined,
     };
   }
 }
