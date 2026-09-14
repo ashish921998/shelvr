@@ -298,7 +298,7 @@
   "navigation.searchHeader": "search",
   "search.placeholder": "Search your saves",
   "search.emptyTitle": "Find anything",
-  "search.emptyBody": "Search goes through your notes, plus the titles, tags,\nand descriptions Shelvr wrote for your saves.",
+  "search.emptyBody": "Search goes through your notes and the\ntitles, tags, and descriptions Shelvr wrote.",
   "search.noResultsTitle": "Nothing yet",
   "navigation.spacesHeader": "spaces",
   "spaces.addFirst": "Add first save",

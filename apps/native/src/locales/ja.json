@@ -300,7 +300,7 @@
   "navigation.searchHeader": "検索",
   "search.placeholder": "保存した項目を検索",
   "search.emptyTitle": "何でも見つかる",
-  "search.emptyBody": "メモの本文と、Shelvrが付けたタイトル、タグ、\n説明から保存した項目を検索します。",
+  "search.emptyBody": "メモの本文と、Shelvrが付けたタイトル、\nタグ、説明を検索します。",
   "search.noResultsTitle": "まだありません",
   "navigation.spacesHeader": "スペース",
   "spaces.addFirst": "最初の項目を保存",
