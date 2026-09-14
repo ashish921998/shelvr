@@ -256,6 +256,50 @@ describe("classification after an edit", () => {
     expect(note?.searchText).toContain("oat milk");
   });
 
+  it("keeps the classifier title a note already has on a refresh", async () => {
+    const t = newConvexTest();
+    const id = await readyNote(t, "steady", { processingRunId: "run-refresh" });
+
+    const outcome = await t.mutation(internal.items.finalizeItem, {
+      itemId: id,
+      runId: "run-refresh",
+      title: "Dairy restock plan",
+      keepTitle: true,
+      description: "A longer shopping note",
+      tags: ["errands"],
+      status: "ready",
+    });
+
+    expect(outcome).toBe("applied");
+    expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
+      title: "Grocery reminder",
+      description: "A longer shopping note",
+      tags: ["errands"],
+    });
+  });
+
+  it("names an untitled note on a refresh", async () => {
+    const t = newConvexTest();
+    const id = await readyNote(t, "cleared", {
+      title: undefined,
+      processingRunId: "run-refresh",
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId: id,
+      runId: "run-refresh",
+      title: "Dairy restock plan",
+      keepTitle: true,
+      description: "A shopping note",
+      tags: ["groceries"],
+      status: "ready",
+    });
+
+    const note = await t.run((ctx) => ctx.db.get(id));
+    expect(note?.title).toBe("Dairy restock plan");
+    expect(note?.searchText).toContain("dairy restock plan");
+  });
+
   it("lets only the latest edit's run claim a refresh", async () => {
     const t = newConvexTest();
     const id = await readyNote(t, "claimer", { processingRunId: "run-latest" });
