@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/components/item-card";
 import { displayHost } from "@/lib/url";
 import { api } from "@convex/_generated/api";
@@ -55,15 +56,15 @@ function widgetTitle(item: FeedItem): string {
   if (item.title) return item.title;
   if (item.type === "note" && item.note)
     return item.note.split("\n")[0].slice(0, 80);
-  if (item.type === "link") return displayHost(item.url) || "Link";
-  return "Saved item";
+  if (item.type === "link") return displayHost(item.url) || t("item.link");
+  return t("item.savedItem");
 }
 
 function widgetSubtitle(item: FeedItem): string {
   if (item.type === "link")
-    return item.siteName || displayHost(item.url) || "Link";
-  if (item.type === "note") return "Note";
-  return "Photo";
+    return item.siteName || displayHost(item.url) || t("item.link");
+  if (item.type === "note") return t("item.note");
+  return t("item.photo");
 }
 
 async function syncWidget(items: FeedItem[]) {
@@ -98,7 +99,11 @@ async function syncWidget(items: FeedItem[]) {
     }),
   );
 
-  RecentSavesWidget.updateSnapshot({ items: widgetItems });
+  RecentSavesWidget.updateSnapshot({
+    items: widgetItems,
+    emptyTitle: t("widget.emptyTitle"),
+    emptyHint: t("widget.emptyBody"),
+  });
 
   // Drop thumbnails for items that left the widget so the shared container
   // doesn't grow forever. Run after updateSnapshot so the old snapshot's
@@ -129,6 +134,7 @@ let syncChain: Promise<void> = Promise.resolve();
  * never re-sends the whole feed here.
  */
 export function RecentSavesWidgetSync() {
+  const locale = useAppLocale();
   const { data: recent } = useQuery(
     convexQuery(api.items.listRecentItems, { limit: WIDGET_ITEM_COUNT }),
   );
@@ -137,12 +143,14 @@ export function RecentSavesWidgetSync() {
   useEffect(() => {
     if (Platform.OS !== "ios" || recent === undefined) return;
     // Only re-sync when something the widget shows actually changed.
-    const key = recent
-      .map(
-        (item) =>
-          `${item._id}:${item.title ?? ""}:${item.imageUrl ?? item.heroImageUrl ?? ""}`,
-      )
-      .join("|");
+    const key =
+      locale +
+      recent
+        .map(
+          (item) =>
+            `${item._id}:${item.title ?? ""}:${item.imageUrl ?? item.heroImageUrl ?? ""}`,
+        )
+        .join("|");
     if (key === lastKey.current) return;
     lastKey.current = key;
 
@@ -152,7 +160,7 @@ export function RecentSavesWidgetSync() {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [recent]);
+  }, [recent, locale]);
 
   return null;
 }

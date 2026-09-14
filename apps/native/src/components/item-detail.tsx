@@ -1,5 +1,6 @@
+import type { TextMessageKey } from "@/locales/message-types";
+import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
-import { IMAGE_TOO_LARGE_MESSAGE } from "@convex/model/imagePolicy";
 import { ProductsSection } from "@/components/products-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
@@ -119,6 +120,7 @@ export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
 }: Props) {
+  useAppLocale();
   const headerHeight = useAppHeaderHeight();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
@@ -197,7 +199,7 @@ export const ItemDetail = memo(function ItemDetail({
     heroImage && isVideo && item.url ? (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Play on TikTok"
+        accessibilityLabel={t("item.openSite", { site: "TikTok" })}
         onPress={() => {
           void WebBrowser.openBrowserAsync(item.url!)
             .then(() => analytics.itemAction(item, "open_source"))
@@ -290,6 +292,7 @@ function ItemDetailBody({
   heroUri: string | null | undefined;
   headerHeight: number;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   return (
     <View
@@ -415,7 +418,7 @@ function ItemDetailBody({
 
       {similar && similar.length > 0 ? (
         <View style={styles.similarSection}>
-          <Text style={styles.similarTitle}>More like this</Text>
+          <Text style={styles.similarTitle}>{t("item.similar")}</Text>
           <SimilarGrid items={similar} />
         </View>
       ) : null}
@@ -456,24 +459,23 @@ function saveState(item: DetailItem, now: number): SaveState | null {
   return item.enrichment === "no_article" ? "no_article" : null;
 }
 
-const SAVE_STATE_NOTICE: Record<SaveState, string> = {
-  image_too_large: IMAGE_TOO_LARGE_MESSAGE,
-  gone: "This page is gone — it was deleted, or the link was wrong.",
-  failed: "Shelvr couldn't read this page.",
-  stalled: "This is taking longer than it should.",
-  partial:
-    "Saved from the link alone — the page wouldn't load, so these details are a guess.",
-  no_article: "This page has no readable article — saved as a plain link.",
+const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
+  image_too_large: "errors.photoTooLarge",
+  gone: "item.pageGone",
+  failed: "item.pageFailed",
+  stalled: "item.stalled",
+  partial: "item.partial",
+  no_article: "item.noArticle",
 };
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {
   if (state === "gone" && type === "image") {
-    return "This photo is unavailable or empty. Please save it again.";
+    return t("errors.photoUnavailable");
   }
   if (state === "failed" && type !== "link") {
-    return `Shelvr couldn't read this ${type === "image" ? "photo" : "note"}.`;
+    return type === "image" ? t("item.photoFailed") : t("item.noteFailed");
   }
-  return SAVE_STATE_NOTICE[state];
+  return t(SAVE_STATE_NOTICE[state]);
 }
 
 /**
@@ -484,6 +486,7 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
 function SaveStatusNotice({ item }: { item: DetailItem }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
   const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
@@ -509,7 +512,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
     return (
       <View style={styles.processingRow}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={styles.processingText}>Shelvr is reading this…</Text>
+        <Text style={styles.processingText}>{t("item.reading")}</Text>
       </View>
     );
   }
@@ -548,13 +551,10 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
                 if (!scheduled) {
                   // The server still sees this run as live. Usually a device
                   // clock running ahead of the backend's stale threshold.
-                  Alert.alert(
-                    "Still working on it",
-                    "Give it a few more minutes. If it never finishes, the retry will appear again.",
-                  );
+                  Alert.alert(t("item.stillWorking"), t("item.retryLater"));
                 }
               } catch {
-                Alert.alert("Couldn't retry", "Please try again in a moment.");
+                Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
               } finally {
                 setRetrying(false);
               }
@@ -572,7 +572,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
               tintColor={theme.colors.primaryText}
             />
           )}
-          <Text style={styles.chipLabel}>Try again</Text>
+          <Text style={styles.chipLabel}>{t("common.tryAgain")}</Text>
         </Pressable>
       )}
     </View>

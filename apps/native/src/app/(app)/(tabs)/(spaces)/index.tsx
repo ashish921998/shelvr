@@ -1,20 +1,21 @@
-import { ActionMenu } from '@/components/ui/action-menu';
-import { EmptyState } from '@/components/empty-state';
-import { SuggestedBadge } from '@/components/suggested-badge';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { convexQuery } from '@convex-dev/react-query';
-import { FlashList } from '@shopify/flash-list';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { AppSymbolIcon } from '@/components/symbol';
-import { ProgressiveBlurHeader } from 'progressive-blur';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { EmptyState } from "@/components/empty-state";
+import { SuggestedBadge } from "@/components/suggested-badge";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { convexQuery } from "@convex-dev/react-query";
+import { FlashList } from "@shopify/flash-list";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { Image } from "expo-image";
+import { Link } from "expo-router";
+import { AppSymbolIcon } from "@/components/symbol";
+import { ProgressiveBlurHeader } from "progressive-blur";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured. Mirrors item-card so covers match the feed.
@@ -47,7 +48,7 @@ const COVER_SCALE = 0.82;
 // Centering + size for a card that fills COVER_SCALE of the stack area. The free
 // space on each axis is (1 - scale); half of it is the offset that centers it.
 const CARD_POSITION = {
-  position: 'absolute' as const,
+  position: "absolute" as const,
   left: `${((1 - COVER_SCALE) / 2) * 100}%` as const,
   top: `${((1 - COVER_SCALE) / 2) * 100}%` as const,
   width: `${COVER_SCALE * 100}%` as const,
@@ -80,9 +81,10 @@ function CoverStack({
   itemCount: number;
   suggestionCount: number;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? clampRatio(cover.aspectRatio, cover.type === 'link' ? OG_RATIO : 1)
+    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1)
     : 1;
   const position = CARD_POSITION;
 
@@ -100,7 +102,9 @@ function CoverStack({
               transform: [
                 { translateX: back.tx },
                 { translateY: back.ty },
-                { rotate: `${back.rot + seededUnit(`${seed}-b${i}`) * 1.5}deg` },
+                {
+                  rotate: `${back.rot + seededUnit(`${seed}-b${i}`) * 1.5}deg`,
+                },
               ],
             },
           ]}
@@ -115,7 +119,11 @@ function CoverStack({
             { transform: [{ rotate: `${seededUnit(`${seed}-top`) * 2}deg` }] },
           ]}
         >
-          <Image source={{ uri: cover.url }} style={styles.coverImage} contentFit="cover" />
+          <Image
+            source={{ uri: cover.url }}
+            style={styles.coverImage}
+            contentFit="cover"
+          />
           {/* A pile fronted by a not-yet-accepted pick wears the sparkle. */}
           {cover.suggested ? (
             <View style={styles.coverBadge}>
@@ -142,10 +150,10 @@ function CoverStack({
           </View>
           <Text style={styles.emptyLabel}>
             {itemCount > 0
-              ? `${itemCount} ${itemCount === 1 ? 'save' : 'saves'}`
+              ? t("spaces.saveCount", { count: itemCount })
               : suggestionCount > 0
-                ? `${suggestionCount} ${suggestionCount === 1 ? 'suggestion' : 'suggestions'}`
-                : 'Add first save'}
+                ? t("spaces.suggestionCount", { count: suggestionCount })
+                : t("spaces.addFirst")}
           </Text>
         </View>
       )}
@@ -156,37 +164,44 @@ function CoverStack({
 function emptySpaceIcon(name: string) {
   // Best-effort English heuristic; names outside these hints use the generic stack.
   const normalized = name.toLowerCase();
-  if (normalized.includes('wish') || normalized.includes('gift')) return 'heart';
-  if (normalized.includes('video') || normalized.includes('watch')) return 'play.rectangle';
-  if (normalized.includes('read') || normalized.includes('article')) return 'doc.text';
-  if (normalized.includes('inspiration') || normalized.includes('idea')) return 'sparkles';
-  return 'rectangle.stack';
+  if (normalized.includes("wish") || normalized.includes("gift"))
+    return "heart";
+  if (normalized.includes("video") || normalized.includes("watch"))
+    return "play.rectangle";
+  if (normalized.includes("read") || normalized.includes("article"))
+    return "doc.text";
+  if (normalized.includes("inspiration") || normalized.includes("idea"))
+    return "sparkles";
+  return "rectangle.stack";
 }
 
 export default function SpacesScreen() {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
   const deleteSpace = useMutation(api.spaces.deleteSpace);
 
-  const confirmDelete = (id: Id<'spaces'>) => {
-    Alert.alert('Delete space?', 'Your saves stay in Home — only the shelf goes away.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteSpace({ id }) },
+  const confirmDelete = (id: Id<"spaces">) => {
+    Alert.alert(t("spaces.deleteTitle"), t("spaces.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => deleteSpace({ id }),
+      },
     ]);
   };
 
   if (spaces === undefined) {
-    return (
-      <ScreenLoader label="Opening your spaces" />
-    );
+    return <ScreenLoader label={t("loading.spaces")} />;
   }
 
   if (spaces.length === 0) {
     return (
       <View style={styles.container}>
         <EmptyState
-          title="Make a space"
-          message={'Spaces are shelves for a theme — design inspiration,\nrecipes, gift ideas. Shelvr suggests saves that fit;\nyou choose what sticks.'}
+          title={t("spaces.listEmptyTitle")}
+          message={t("spaces.listEmptyBody")}
         />
       </View>
     );
@@ -216,7 +231,11 @@ export default function SpacesScreen() {
                 <Link.Trigger withAppleZoom>
                   {/* The whole card is the pressable that routes to the space. */}
                   <Pressable
-                    testID={space.fixtureKey ? `fixture-space-${space.fixtureKey}` : undefined}
+                    testID={
+                      space.fixtureKey
+                        ? `fixture-space-${space.fixtureKey}`
+                        : undefined
+                    }
                     style={({ pressed }) => pressed && styles.pressed}
                   >
                     <CoverStack
@@ -231,18 +250,22 @@ export default function SpacesScreen() {
                         {space.name}
                       </Text>
                       <ActionMenu
-                        label="Space actions"
-                        title="Space actions"
+                        label={t("spaces.actions")}
+                        title={t("spaces.actions")}
                         actions={[
                           {
-                            label: 'Delete',
+                            label: t("common.delete"),
                             destructive: true,
                             onPress: () => confirmDelete(space._id),
                           },
                         ]}
                         style={styles.menuButton}
                       >
-                        <AppSymbolIcon name="ellipsis" size={15} tintColor={theme.colors.foreground} />
+                        <AppSymbolIcon
+                          name="ellipsis"
+                          size={15}
+                          tintColor={theme.colors.foreground}
+                        />
                       </ActionMenu>
                     </View>
                   </Pressable>
@@ -250,7 +273,7 @@ export default function SpacesScreen() {
                 <Link.Preview />
                 <Link.Menu>
                   <Link.MenuAction
-                    title="Delete"
+                    title={t("common.delete")}
                     icon="trash"
                     destructive
                     onPress={() => confirmDelete(space._id)}
@@ -261,7 +284,7 @@ export default function SpacesScreen() {
           );
         }}
       />
-      {Platform.OS === 'ios' ? <ProgressiveBlurHeader /> : null}
+      {Platform.OS === "ios" ? <ProgressiveBlurHeader /> : null}
     </View>
   );
 }
@@ -285,40 +308,40 @@ const styles = StyleSheet.create((theme) => ({
   // Square area the pile is centered within. Kept square so every cell is the
   // same height and the 2-column grid stays tidy regardless of cover shape.
   stack: {
-    width: '100%',
+    width: "100%",
     aspectRatio: 1,
   },
   // Shared frame for all three cards: same radius/shadow so the pile reads as
   // one photo restacked. width/height/position/transform come from CoverStack.
   card: {
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     boxShadow: `0 6px 14px rgba(0,0,0,0.22), inset 0 0 0 1px ${theme.colors.imageBorder}`,
   },
   // The cover: a white matte with a little padding around the photo, matching the
   // home feed's item frame so a save looks the same fanned into a space.
   coverFrame: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     padding: theme.gap(0.5),
     zIndex: 3,
   },
   coverBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
   },
   coverImage: {
     flex: 1,
     borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     // White (not surfaceMuted) so a transparent die-cut sticker cover shows white
     // behind it, matching the matte instead of a grey block.
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
   },
   // The blank cards behind — same white stock as the cover matte so the pile
   // reads as a stack of identical cards.
   cardBlank: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     zIndex: 1,
   },
   cardEmptyBack: {
@@ -329,8 +352,8 @@ const styles = StyleSheet.create((theme) => ({
   // A new space gets an intentional cover until its first saved item becomes
   // the thumbnail. Avoid a blank white card, which reads as a loading failure.
   cardEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(1),
     backgroundColor: theme.colors.primarySoft,
     borderWidth: 1,
@@ -340,8 +363,8 @@ const styles = StyleSheet.create((theme) => ({
   emptyIconWell: {
     width: 50,
     height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 25,
     backgroundColor: theme.colors.surface,
   },
@@ -352,8 +375,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Name + ellipsis row below the pile, mirroring the home feed's caption.
   caption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(0.5),
     paddingHorizontal: theme.gap(0.5),
     paddingTop: theme.gap(1),
@@ -368,8 +391,8 @@ const styles = StyleSheet.create((theme) => ({
   menuButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 20,
   },
 }));

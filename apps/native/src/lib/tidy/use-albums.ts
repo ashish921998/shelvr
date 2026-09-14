@@ -1,7 +1,9 @@
-import { Album } from 'expo-media-library';
-import { useEffect, useState } from 'react';
+import { translate } from "../i18n-core";
+import { useAppLocale } from "@/lib/i18n";
+import { Album } from "expo-media-library";
+import { useEffect, useMemo, useState } from "react";
 
-export const ALL_PHOTOS_ID = '__all__';
+export const ALL_PHOTOS_ID = "__all__";
 
 export type TidySource = {
   /** ALL_PHOTOS_ID for the whole library, otherwise the album id. */
@@ -11,7 +13,11 @@ export type TidySource = {
   album: Album | null;
 };
 
-const ALL_PHOTOS: TidySource = { id: ALL_PHOTOS_ID, title: 'All Photos', album: null };
+const ALL_PHOTOS: TidySource = {
+  id: ALL_PHOTOS_ID,
+  title: "", // The whole-library label is resolved per locale below.
+  album: null,
+};
 
 /**
  * Lists the photo sources the user can tidy: the whole library plus each
@@ -19,6 +25,7 @@ const ALL_PHOTOS: TidySource = { id: ALL_PHOTOS_ID, title: 'All Photos', album: 
  * switching sources still hides photos triaged elsewhere.
  */
 export function useAlbums(enabled: boolean): TidySource[] {
+  const locale = useAppLocale();
   const [sources, setSources] = useState<TidySource[]>([ALL_PHOTOS]);
 
   useEffect(() => {
@@ -38,7 +45,7 @@ export function useAlbums(enabled: boolean): TidySource[] {
           })),
         );
         const named = settled.flatMap((result) =>
-          result.status === 'fulfilled' ? [result.value] : [],
+          result.status === "fulfilled" ? [result.value] : [],
         );
         if (!cancelled) {
           const sorted = named
@@ -47,7 +54,7 @@ export function useAlbums(enabled: boolean): TidySource[] {
           setSources([ALL_PHOTOS, ...sorted]);
         }
       } catch (error) {
-        console.warn('Tidy: failed to load albums', error);
+        console.warn("Tidy: failed to load albums", error);
       }
     })();
 
@@ -56,5 +63,13 @@ export function useAlbums(enabled: boolean): TidySource[] {
     };
   }, [enabled]);
 
-  return sources;
+  return useMemo(
+    () =>
+      sources.map((source) =>
+        source.id === ALL_PHOTOS_ID
+          ? { ...source, title: translate(locale, "albums.allPhotos") }
+          : source,
+      ),
+    [sources, locale],
+  );
 }

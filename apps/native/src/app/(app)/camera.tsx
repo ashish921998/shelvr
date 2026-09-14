@@ -1,3 +1,4 @@
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { parseExifDate } from "@/lib/date";
 import { resolvePickedImageLocation } from "@/lib/picked-image-location";
 import {
@@ -38,6 +39,7 @@ const ACCENT = "#e6a23c";
 const INACTIVE = "rgba(255,255,255,0.55)";
 
 export default function CameraScreen() {
+  useAppLocale();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   // Opened from a space's add flow: captures are pre-pinned to that space.
@@ -106,11 +108,15 @@ export default function CameraScreen() {
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        "Could not save all images",
-        `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
+        t("errors.batchSaveTitle"),
+        t("capture.partialFailure", {
+          reason: localizeError(failed[0].message),
+          saved: savedCount,
+          total: results.length,
+        }),
         [
           {
-            text: "Retry failed",
+            text: t("capture.retryFailed"),
             onPress: () => {
               void runImageRequests(
                 failed.map((r) => ({
@@ -120,12 +126,12 @@ export default function CameraScreen() {
               );
             },
           },
-          { text: "Done", onPress: () => router.back() },
+          { text: t("common.done"), onPress: () => router.back() },
         ],
       );
       setBusy(false);
     } catch {
-      Alert.alert("Could not save", "Uploading failed. Try again.");
+      Alert.alert(t("errors.saveTitle"), t("errors.upload"));
       setBusy(false);
     }
   };
@@ -172,18 +178,22 @@ export default function CameraScreen() {
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
-      Alert.alert("Capture failed", `${result.message} Try again.`, [
-        {
-          text: "Retry",
-          onPress: () => {
-            void saveSingle(failed);
+      Alert.alert(
+        t("errors.captureTitle"),
+        localizeError(result.message, "errors.savePhoto"),
+        [
+          {
+            text: t("common.retry"),
+            onPress: () => {
+              void saveSingle(failed);
+            },
           },
-        },
-        { text: "Cancel", onPress: () => setBusy(false) },
-      ]);
+          { text: t("common.cancel"), onPress: () => setBusy(false) },
+        ],
+      );
       setBusy(false);
     } catch {
-      Alert.alert("Capture failed", "Could not save that photo. Try again.");
+      Alert.alert(t("errors.captureTitle"), t("errors.savePhoto"));
       setBusy(false);
     }
   };
@@ -202,10 +212,7 @@ export default function CameraScreen() {
       if (mode === "sticker") {
         const sticker = await liftSubject(uri);
         if (!sticker.hasSubject) {
-          Alert.alert(
-            "No subject found",
-            "Point the camera at a clear subject and try again.",
-          );
+          Alert.alert(t("capture.noSubjectTitle"), t("capture.noSubjectBody"));
           setBusy(false);
           return;
         }
@@ -223,7 +230,7 @@ export default function CameraScreen() {
       }
       await saveSingle(request);
     } catch {
-      Alert.alert("Capture failed", "Could not take that photo. Try again.");
+      Alert.alert(t("errors.captureTitle"), t("errors.takePhoto"));
       setBusy(false);
     }
   };
@@ -239,7 +246,9 @@ export default function CameraScreen() {
       <Text style={styles.fallbackMessage}>{message}</Text>
       {action}
       <Pressable style={styles.fallbackButton} onPress={pickFromLibrary}>
-        <Text style={styles.fallbackButtonText}>Pick from library instead</Text>
+        <Text style={styles.fallbackButtonText}>
+          {t("capture.pickFromLibrary")}
+        </Text>
       </Pressable>
     </View>
   );
@@ -247,21 +256,21 @@ export default function CameraScreen() {
   let body: React.ReactNode;
   if (!hasPermission) {
     body = renderFallback(
-      "Camera access needed",
-      "Shelvr uses the camera to capture things you want to keep.",
+      t("capture.cameraAccessTitle"),
+      t("capture.cameraAccessBody"),
       <Pressable
         style={[styles.fallbackButton, styles.fallbackPrimary]}
         onPress={requestPermission}
       >
         <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>
-          Allow camera
+          {t("permissions.allowCamera")}
         </Text>
       </Pressable>,
     );
   } else if (device == null) {
     body = renderFallback(
-      "No camera here",
-      "This device has no camera (hello, Simulator).",
+      t("capture.noCameraTitle"),
+      t("capture.noCameraBody"),
     );
   } else {
     body = (
@@ -316,12 +325,12 @@ export default function CameraScreen() {
             >
               <Pressable hitSlop={10} onPress={() => switchMode("photo")}>
                 <Animated.Text style={[styles.modeLabel, photoLabelStyle]}>
-                  PHOTO
+                  {t("capture.photoMode")}
                 </Animated.Text>
               </Pressable>
               <Pressable hitSlop={10} onPress={() => switchMode("sticker")}>
                 <Animated.Text style={[styles.modeLabel, stickerLabelStyle]}>
-                  STICKER
+                  {t("capture.stickerMode")}
                 </Animated.Text>
               </Pressable>
             </View>

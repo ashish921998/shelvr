@@ -42,10 +42,10 @@ describe("sanitizeAppearanceMode", () => {
     for (const mode of APPEARANCE_MODES) {
       expect(APPEARANCE_LABELS[mode]).toBeTruthy();
     }
-    expect(APPEARANCE_LABELS.system).toBe("System");
-    expect(APPEARANCE_LABELS.light).toBe("Light");
-    expect(APPEARANCE_LABELS.darkWarm).toBe("Warm dark");
-    expect(APPEARANCE_LABELS.darkNeutral).toBe("Dark (neutral)");
+    expect(APPEARANCE_LABELS.system).toBe("appearance.system");
+    expect(APPEARANCE_LABELS.light).toBe("appearance.light");
+    expect(APPEARANCE_LABELS.darkWarm).toBe("appearance.warmDark");
+    expect(APPEARANCE_LABELS.darkNeutral).toBe("appearance.neutralDark");
   });
 });
 

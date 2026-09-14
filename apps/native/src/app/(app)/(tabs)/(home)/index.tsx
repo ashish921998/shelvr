@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
@@ -16,6 +17,7 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export default function HomeScreen() {
+  useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   useReviewPrompt(items);
 
@@ -38,17 +40,15 @@ export default function HomeScreen() {
   ) : null;
 
   if (items === undefined) {
-    return <ScreenLoader label="Warming your shelf" />;
+    return <ScreenLoader label={t("loading.home")} />;
   }
 
   if (items.length === 0) {
     return (
       <View style={styles.container}>
         <EmptyState
-          title="Save it for later"
-          message={
-            "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it."
-          }
+          title={t("home.emptyTitle")}
+          message={t("home.emptyBody")}
         />
         {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}

@@ -4,7 +4,7 @@ import {
   type SFSymbol,
   type SymbolViewProps,
 } from "expo-symbols";
-import { Platform } from "react-native";
+import { I18nManager, Platform } from "react-native";
 
 /**
  * Maps SF Symbol names used throughout the app to their Material Symbols
@@ -114,7 +114,13 @@ export function AppSymbolIcon({
 }) {
   return (
     <SymbolView
-      name={resolveSymbolName(name)}
+      name={resolveSymbolName(
+        I18nManager.isRTL && name === "chevron.left"
+          ? "chevron.right"
+          : I18nManager.isRTL && name === "chevron.right"
+            ? "chevron.left"
+            : name,
+      )}
       size={size}
       tintColor={tintColor}
       weight={weight}

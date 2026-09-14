@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -13,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { StyleSheet } from "react-native-unistyles";
 
 export default function DigestScreen() {
+  useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: digest, isError } = useQuery(
@@ -34,31 +36,31 @@ export default function DigestScreen() {
     return (
       <View style={styles.empty}>
         <EmptyState
-          title="Couldn’t load your weekly shelf"
-          message="Check your connection and try opening it again."
+          title={t("digest.loadFailed")}
+          message={t("digest.retryHelp")}
         />
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace("/")}
           style={[styles.button, styles.errorButton]}
         >
-          <Text style={styles.buttonText}>Back to library</Text>
+          <Text style={styles.buttonText}>{t("capture.backToLibrary")}</Text>
         </Pressable>
       </View>
     );
   }
 
   if (digest === undefined) {
-    return <ScreenLoader label="Opening your weekly shelf" />;
+    return <ScreenLoader label={t("loading.digest")} />;
   }
 
   if (digest === null || digest.items.length === 0) {
     return (
       <View style={styles.empty}>
-        <Stack.Screen options={{ title: "Weekly shelf" }} />
+        <Stack.Screen options={{ title: t("notifications.weeklyShelf") }} />
         <EmptyState
-          title="Nothing waiting"
-          message="Your weekly shelf will appear here when you have a few unopened saves."
+          title={t("digest.emptyTitle")}
+          message={t("digest.emptyBody")}
         />
       </View>
     );
@@ -75,18 +77,19 @@ export default function DigestScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Weekly shelf" }} />
+      <Stack.Screen options={{ title: t("notifications.weeklyShelf") }} />
       <MasonryFeed
         items={digest.items}
         numColumns={2}
         source={{ from: "home" }}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.eyebrow}>A FEW SAVES WORTH REVISITING</Text>
-            <Text style={styles.title}>Your weekly shelf</Text>
+            <Text style={styles.eyebrow}>{t("digest.eyebrow")}</Text>
+            <Text style={styles.title}>{t("digest.title")}</Text>
             <Text style={styles.subtitle}>
-              {digest.itemCount} unopened{" "}
-              {digest.itemCount === 1 ? "save" : "saves"} are waiting for you.
+              {t("digest.waitingCount", {
+                count: digest.itemCount,
+              })}
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -96,7 +99,7 @@ export default function DigestScreen() {
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Text style={styles.buttonText}>Open next</Text>
+              <Text style={styles.buttonText}>{t("digest.openNext")}</Text>
             </Pressable>
           </View>
         }

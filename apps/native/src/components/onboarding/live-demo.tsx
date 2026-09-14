@@ -1,3 +1,6 @@
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import type { TextMessageKey } from "@/locales/message-types";
+import { t, useAppLocale } from "@/lib/i18n";
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { analytics } from "@/lib/analytics";
 import {
@@ -44,13 +47,13 @@ import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 // Curated sample links — each is a real, classifiable page that exercises the
 // pipeline end to end (fetch → readability → tag → file). Kept generic so they
 // work regardless of which spaces the user just created.
-const SAMPLE_LINKS: { label: string; url: string }[] = [
+const SAMPLE_LINKS: { label: TextMessageKey; url: string }[] = [
   {
-    label: "A recipe",
+    label: "demo.sampleRecipe",
     url: "https://www.bbcgoodfood.com/recipes/classic-lasagne",
   },
-  { label: "A long read", url: "https://www.paulgraham.com/ds.html" },
-  { label: "A product", url: "https://www.apple.com/airpods-pro/" },
+  { label: "demo.sampleArticle", url: "https://www.paulgraham.com/ds.html" },
+  { label: "demo.sampleProduct", url: "https://www.apple.com/airpods-pro/" },
 ];
 
 const TIMEOUT_MS = 15_000;
@@ -63,7 +66,7 @@ export function LiveDemoStep({
   onReady,
   onAdvance,
 }: {
-  /** Library categories picked earlier in onboarding — offered as destination
+  /** Stable preset identities picked earlier in onboarding — offered as destination
    * OPTIONS only. The user's explicit single choice is what files the save. */
   selectedSpaces: string[];
   /** A demo captured before an earlier sign-in; resumes it exactly once. */
@@ -71,6 +74,7 @@ export function LiveDemoStep({
   onReady: (item: FeedItem) => void;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { isAuthenticated } = useConvexAuth();
   const createDemoItem = useMutation(api.demo.createDemoItem);
@@ -92,7 +96,7 @@ export function LiveDemoStep({
   // component hands off to the auth view.
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<TextMessageKey | null>(null);
   const [phase, setPhase] = useState<DemoPhase>("input");
   // Set 15s into a processing run; the user — never a timer — decides between
   // keep waiting and continue. The live subscription keeps running either way.
@@ -158,11 +162,7 @@ export function LiveDemoStep({
     if (itemId === null || phase !== "processing") return;
     if (itemQuery.isError || (itemQuery.isSuccess && item === null)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setError(
-        itemQuery.isError
-          ? "Could not load your save. Check your connection and try again."
-          : "This save is no longer on your shelf.",
-      );
+      setError(itemQuery.isError ? "demo.loadFailed" : "demo.saveGone");
       setPhase("input");
     }
   }, [itemId, phase, item, itemQuery.isError, itemQuery.isSuccess]);
@@ -186,7 +186,11 @@ export function LiveDemoStep({
       setError(null);
       setUrl(trimmed);
       const chosenDestination =
-        destinationOverride !== undefined ? destinationOverride : destination;
+        destinationOverride !== undefined
+          ? destinationOverride
+          : destination === null
+            ? null
+            : onboardingLabel(destination);
       const request = { url: trimmed, destination: chosenDestination };
       setPendingDemo(request);
 
@@ -224,11 +228,7 @@ export function LiveDemoStep({
         analytics.capture("onboarding_demo_result", {
           outcome: used ? "already_used" : "error",
         });
-        setError(
-          used
-            ? "Your demo save was already used. Tap Skip for now to see your shelf."
-            : "Could not save that link. Try another, or skip.",
-        );
+        setError(used ? "demo.alreadyUsed" : "demo.saveFailed");
         setPhase("input");
       } finally {
         inFlightRef.current = false;
@@ -275,12 +275,12 @@ export function LiveDemoStep({
       const code = demoErrorCode(err);
       setError(
         code === "terminal_failure"
-          ? "That page could not be found, so a retry would not help. The link stays on your shelf — you can move on."
+          ? "demo.notFoundRetry"
           : code === "too_many_retries"
-            ? "This one keeps failing. It stays on your shelf — you can move on."
+            ? "demo.repeatedFailure"
             : isRateLimitedError(err)
-              ? "That failed a few times. Try again later, or skip for now."
-              : "Could not retry right now. Try again, or skip.",
+              ? "demo.tryLater"
+              : "demo.retryFailed",
       );
     } finally {
       inFlightRef.current = false;
@@ -294,8 +294,11 @@ export function LiveDemoStep({
   };
 
   const destinationOptions: { label: string; value: string | null }[] = [
-    { label: "Just my shelf", value: null },
-    ...selectedSpaces.map((name) => ({ label: name, value: name })),
+    { label: t("demo.justShelf"), value: null },
+    ...selectedSpaces.map((name) => ({
+      label: onboardingLabel(name),
+      value: name,
+    })),
   ];
 
   // ---- Auth state: inline sign-in so the demo save can be real -----------
@@ -320,13 +323,13 @@ export function LiveDemoStep({
           entering={FadeInDown.duration(400)}
           style={styles.headline}
         >
-          Filed.
+          {t("demo.filed")}
         </Animated.Text>
         <Animated.Text
           entering={FadeInDown.delay(60).duration(400)}
           style={styles.support}
         >
-          That&apos;s Shelvr. Every save gets a title, tags, and a home.
+          {t("demo.filedHelp")}
         </Animated.Text>
 
         <Animated.View
@@ -339,7 +342,7 @@ export function LiveDemoStep({
 
         <View
           style={styles.destinationChips}
-          accessibilityLabel="Labels for your save"
+          accessibilityLabel={t("demo.labels")}
         >
           {item?.tags.map((tag) => (
             <View key={tag} style={styles.destinationChip}>
@@ -348,9 +351,7 @@ export function LiveDemoStep({
           ))}
         </View>
         {item?.enrichment === "partial" ? (
-          <Text style={styles.support}>
-            Saved the link. This page did not allow a full preview.
-          </Text>
+          <Text style={styles.support}>{t("demo.partial")}</Text>
         ) : null}
 
         {savedSpaces.length > 0 ? (
@@ -358,9 +359,7 @@ export function LiveDemoStep({
             entering={FadeInDown.delay(180).duration(400)}
             style={styles.destination}
           >
-            <Text style={styles.destinationLabel}>
-              You chose where this goes — filed into:
-            </Text>
+            <Text style={styles.destinationLabel}>{t("demo.spaceChosen")}</Text>
             <View style={styles.destinationChips}>
               {savedSpaces.map((name) => (
                 <View key={name} style={styles.destinationChip}>
@@ -370,18 +369,16 @@ export function LiveDemoStep({
             </View>
           </Animated.View>
         ) : (
-          <Text style={styles.destinationLabel}>Saved to your inbox.</Text>
+          <Text style={styles.destinationLabel}>{t("demo.inbox")}</Text>
         )}
 
         {reused ? (
-          <Text style={styles.reuseNote}>
-            That&apos;s your one demo save, already on your shelf.
-          </Text>
+          <Text style={styles.reuseNote}>{t("demo.usedHelp")}</Text>
         ) : null}
 
         <View style={styles.footer}>
           <Pressable style={styles.skipRow} onPress={advance}>
-            <Text style={styles.continueText}>Continue</Text>
+            <Text style={styles.continueText}>{t("common.continue")}</Text>
             <AppSymbolIcon
               name="chevron.right"
               size={14}
@@ -401,14 +398,12 @@ export function LiveDemoStep({
     const terminal = isTerminalFailure(item?.failureReason);
     return (
       <View style={styles.wrap}>
-        <Text style={styles.headline}>Your link is saved.</Text>
+        <Text style={styles.headline}>{t("demo.linkSaved")}</Text>
         <Text style={styles.support}>
-          {terminal
-            ? "That page could not be found, so there is nothing more to read from it. The link stays on your shelf."
-            : "Shelvr couldn't finish processing it right now. Retry, or find it on your shelf either way."}
+          {terminal ? t("demo.notFoundHelp") : t("demo.processingFailed")}
         </Text>
 
-        {error !== null && <Text style={styles.error}>{error}</Text>}
+        {error !== null && <Text style={styles.error}>{t(error)}</Text>}
 
         <View style={styles.footer}>
           {terminal ? null : (
@@ -424,12 +419,12 @@ export function LiveDemoStep({
               {submitting ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
-                <Text style={styles.submitText}>Retry</Text>
+                <Text style={styles.submitText}>{t("common.retry")}</Text>
               )}
             </Pressable>
           )}
           <Pressable onPress={advance}>
-            <Text style={styles.skipText}>Continue</Text>
+            <Text style={styles.skipText}>{t("common.continue")}</Text>
           </Pressable>
         </View>
       </View>
@@ -440,22 +435,18 @@ export function LiveDemoStep({
   if (phase === "processing") {
     return (
       <View style={styles.wrap}>
-        <Text style={styles.headline}>Watch Shelvr file a save.</Text>
-        <Text style={styles.support}>
-          Reading the page, pulling a title, picking tags…
-        </Text>
+        <Text style={styles.headline}>{t("demo.title")}</Text>
+        <Text style={styles.support}>{t("demo.reading")}</Text>
 
         <View style={styles.processingCard}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.processingLine}>Classifying your save…</Text>
+          <Text style={styles.processingLine}>{t("demo.classifying")}</Text>
         </View>
 
         <View style={styles.footer}>
           {timedOut ? (
             <>
-              <Text style={styles.support}>
-                Taking longer than usual. It will land on your shelf either way.
-              </Text>
+              <Text style={styles.support}>{t("demo.slow")}</Text>
               <View style={styles.timeoutRow}>
                 <Pressable
                   onPress={() => setDeadlineNonce((nonce) => nonce + 1)}
@@ -464,7 +455,9 @@ export function LiveDemoStep({
                     pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Text style={styles.continueText}>Keep waiting</Text>
+                  <Text style={styles.continueText}>
+                    {t("demo.keepWaiting")}
+                  </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -474,15 +467,15 @@ export function LiveDemoStep({
                     advance();
                   }}
                 >
-                  <Text style={styles.skipText}>Continue without waiting</Text>
+                  <Text style={styles.skipText}>
+                    {t("demo.continueWaiting")}
+                  </Text>
                 </Pressable>
               </View>
             </>
           ) : (
             <Pressable onPress={advance}>
-              <Text style={styles.skipText}>
-                Still working — it&apos;ll be on your shelf
-              </Text>
+              <Text style={styles.skipText}>{t("demo.stillWorking")}</Text>
             </Pressable>
           )}
         </View>
@@ -493,30 +486,30 @@ export function LiveDemoStep({
   // ---- Input state: paste field, destination, sample links ---------------
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>Watch Shelvr file a save.</Text>
-      <Text style={styles.support}>Paste a link, or try one of ours.</Text>
+      <Text style={styles.headline}>{t("demo.title")}</Text>
+      <Text style={styles.support}>{t("demo.pasteHelp")}</Text>
 
       <View style={styles.inputRow}>
         <TextInput
           value={url}
           onChangeText={setUrl}
-          placeholder="Paste a URL"
+          placeholder={t("demo.pastePlaceholder")}
           placeholderTextColor={theme.colors.faint}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
           returnKeyType="go"
-          accessibilityLabel="Link to save"
+          accessibilityLabel={t("demo.linkLabel")}
           style={styles.input}
           onSubmitEditing={() => void submit(url)}
         />
         <Pressable onPress={() => void paste()} style={styles.pasteBtn}>
-          <Text style={styles.pasteText}>Paste</Text>
+          <Text style={styles.pasteText}>{t("common.paste")}</Text>
         </Pressable>
       </View>
 
       <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>Save this link to</Text>
+        <Text style={styles.samplesLabel}>{t("demo.destination")}</Text>
         <View style={styles.sampleRow}>
           {destinationOptions.map((option) => (
             <Pressable
@@ -543,10 +536,10 @@ export function LiveDemoStep({
         </View>
       </View>
 
-      {error !== null && <Text style={styles.error}>{error}</Text>}
+      {error !== null && <Text style={styles.error}>{t(error)}</Text>}
 
       <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>Try one:</Text>
+        <Text style={styles.samplesLabel}>{t("demo.samples")}</Text>
         <View style={styles.sampleRow}>
           {SAMPLE_LINKS.map((s) => (
             <Pressable
@@ -558,7 +551,7 @@ export function LiveDemoStep({
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <Text style={styles.sampleLabel}>{s.label}</Text>
+              <Text style={styles.sampleLabel}>{t(s.label)}</Text>
             </Pressable>
           ))}
         </View>
@@ -573,7 +566,7 @@ export function LiveDemoStep({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={styles.submitText}>Save it</Text>
+            <Text style={styles.submitText}>{t("demo.save")}</Text>
           </Pressable>
         )}
         <Pressable
@@ -583,7 +576,7 @@ export function LiveDemoStep({
             advance();
           }}
         >
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={styles.skipText}>{t("demo.skip")}</Text>
         </Pressable>
       </View>
     </View>
@@ -601,18 +594,15 @@ function DemoAuthView({
   onSignIn: (provider: OAuthProvider) => void;
   onBack: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>Sign in to save it for real.</Text>
-      <Text style={styles.support}>
-        Your link is waiting — sign in and Shelvr will file it on your shelf.
-      </Text>
+      <Text style={styles.headline}>{t("demo.signInTitle")}</Text>
+      <Text style={styles.support}>{t("demo.signInHelp")}</Text>
 
       {pendingProvider === null && lastError !== null && (
-        <Text style={styles.error}>
-          Sign-in didn&apos;t finish. Try again, or go back.
-        </Text>
+        <Text style={styles.error}>{t("demo.signInFailed")}</Text>
       )}
 
       <View style={styles.authButtons}>
@@ -630,7 +620,7 @@ function DemoAuthView({
             <Text
               style={[styles.authBtnText, { color: theme.colors.background }]}
             >
-              Continue with Apple
+              {t("account.apple")}
             </Text>
           </Pressable>
         ) : null}
@@ -643,16 +633,16 @@ function DemoAuthView({
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Text style={styles.authBtnText}>Continue with Google</Text>
+          <Text style={styles.authBtnText}>{t("account.google")}</Text>
         </Pressable>
         {__DEV__ &&
           process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" && (
             <Pressable onPress={() => onSignIn("anonymous")}>
-              <Text style={styles.skipText}>Continue without account</Text>
+              <Text style={styles.skipText}>{t("account.anonymous")}</Text>
             </Pressable>
           )}
         <Pressable onPress={onBack}>
-          <Text style={styles.skipText}>Back</Text>
+          <Text style={styles.skipText}>{t("common.back")}</Text>
         </Pressable>
       </View>
     </View>

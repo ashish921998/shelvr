@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { Text, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { InlineCard } from "@/components/ui/inline-card";
@@ -14,34 +15,35 @@ export function FeedbackInvitation({
   onSendFeedback: () => void;
   onDismiss: () => void;
 }) {
+  useAppLocale();
   return (
     <InlineCard
       testID="feedback-invitation"
-      title="How’s Shelvr so far?"
-      body="Tell us what’s working and what could be better."
+      title={t("feedback.invitationTitle")}
+      body={t("feedback.invitationBody")}
     >
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Send feedback"
+          accessibilityLabel={t("feedback.open")}
           style={({ pressed }) => [
             styles.primaryButton,
             pressed && { opacity: 0.7 },
           ]}
           onPress={onSendFeedback}
         >
-          <Text style={styles.primaryButtonText}>Send feedback</Text>
+          <Text style={styles.primaryButtonText}>{t("feedback.open")}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Dismiss feedback invitation"
+          accessibilityLabel={t("feedback.dismissInvitation")}
           style={({ pressed }) => [
             styles.secondaryButton,
             pressed && { opacity: 0.7 },
           ]}
           onPress={onDismiss}
         >
-          <Text style={styles.secondaryButtonText}>Not now</Text>
+          <Text style={styles.secondaryButtonText}>{t("common.notNow")}</Text>
         </Pressable>
       </View>
     </InlineCard>

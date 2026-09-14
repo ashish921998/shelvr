@@ -30,16 +30,6 @@ export const CANCEL_SURVEY_REASONS: readonly CancelSurveyReason[] = [
   "other",
 ];
 
-/** id → display label. Lives beside the ids (not in the card) so the
- * analytics vocabulary survives copy changes — docs/analytics/payment-funnel.md
- * points here. */
-export const CANCEL_REASON_LABELS: Record<CancelSurveyReason, string> = {
-  too_expensive: "Too expensive",
-  not_useful_enough: "Not useful enough",
-  missing_feature: "Missing a feature",
-  other: "Something else",
-};
-
 export function isCancelSurveyReason(
   value: string,
 ): value is CancelSurveyReason {

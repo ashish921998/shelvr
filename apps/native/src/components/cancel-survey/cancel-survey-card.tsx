@@ -1,9 +1,9 @@
 import { useEffect } from "react";
+import { t, useAppLocale } from "@/lib/i18n";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { InlineCard } from "@/components/ui/inline-card";
 import {
-  CANCEL_REASON_LABELS,
   CANCEL_SURVEY_REASONS,
   type CancelSurveyReason,
 } from "@/lib/cancel-survey";
@@ -25,6 +25,13 @@ export function CancelSurveyCard({
   onDismiss: () => void;
   onPresented: () => void;
 }) {
+  useAppLocale();
+  const labels = {
+    too_expensive: t("cancelSurvey.tooExpensive"),
+    not_useful_enough: t("cancelSurvey.notUseful"),
+    missing_feature: t("cancelSurvey.missingFeature"),
+    other: t("cancelSurvey.other"),
+  };
   useEffect(() => {
     onPresented();
   }, [onPresented]);
@@ -32,34 +39,32 @@ export function CancelSurveyCard({
   return (
     <InlineCard
       testID="cancel-survey-card"
-      title="What made you cancel?"
-      body="Your trial is still active, but auto-renew is off. One tap helps us understand — it won’t change anything about your subscription."
+      title={t("cancelSurvey.title")}
+      body={t("cancelSurvey.body")}
     >
       <View style={styles.options}>
         {CANCEL_SURVEY_REASONS.map((reason) => (
           <Pressable
             key={reason}
             accessibilityRole="button"
-            accessibilityLabel={`Cancel reason: ${CANCEL_REASON_LABELS[reason]}`}
+            accessibilityLabel={labels[reason]}
             style={({ pressed }) => [
               styles.option,
               pressed && { opacity: 0.7 },
             ]}
             onPress={() => onSubmit(reason)}
           >
-            <Text style={styles.optionText}>
-              {CANCEL_REASON_LABELS[reason]}
-            </Text>
+            <Text style={styles.optionText}>{labels[reason]}</Text>
           </Pressable>
         ))}
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Skip cancel survey"
+        accessibilityLabel={t("cancelSurvey.skipLabel")}
         style={({ pressed }) => [styles.skip, pressed && { opacity: 0.7 }]}
         onPress={onDismiss}
       >
-        <Text style={styles.skipText}>Skip</Text>
+        <Text style={styles.skipText}>{t("cancelSurvey.skip")}</Text>
       </Pressable>
     </InlineCard>
   );

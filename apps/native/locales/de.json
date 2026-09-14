@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Shelvr nutzt deine Kamera, damit du Dinge aufnehmen kannst, die du für später speichern möchtest.",
+    "NSPhotoLibraryUsageDescription": "Mit Shelvr kannst du Fotos und Bildschirmfotos aus deiner Mediathek in deiner Bibliothek speichern und deine Fotomediathek aufräumen.",
+    "NSCalendarsUsageDescription": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu.",
+    "NSCalendarsFullAccessUsageDescription": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu."
+  }
+}

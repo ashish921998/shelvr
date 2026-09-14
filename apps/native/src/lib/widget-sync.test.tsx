@@ -11,9 +11,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { File } from "expo-file-system";
 
 import { RecentSavesWidgetSync } from "./widget-sync";
+import ja from "@/locales/ja.json";
 
 const fsx = vi.hoisted(() => ({
   platformOs: "ios",
+  locale: "en-US",
   nativeModulePresent: true,
   failImages: false,
   failSnapshot: false,
@@ -140,8 +142,14 @@ function renderSync(items: Item[] | undefined) {
   return render(<RecentSavesWidgetSync />);
 }
 
+vi.mock("expo-localization", () => ({
+  getLocales: () => [{ languageTag: fsx.locale }],
+  useLocales: () => [{ languageTag: fsx.locale }],
+}));
+
 beforeEach(() => {
   fsx.platformOs = "ios";
+  fsx.locale = "en-US";
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
   fsx.failSnapshot = false;
@@ -155,6 +163,19 @@ beforeEach(() => {
 });
 
 describe("RecentSavesWidgetSync", () => {
+  it("refreshes localized widget copy without changing saved titles", async () => {
+    const { rerender } = renderSync([{ ...note, title: "Home" }]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    fsx.locale = "ja-JP";
+    rerender(<RecentSavesWidgetSync />);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+    expect(fsx.snapshots[1]).toMatchObject({
+      emptyTitle: ja["widget.emptyTitle"],
+      emptyHint: ja["widget.emptyBody"],
+      items: [{ title: "Home", subtitle: ja["item.note"] }],
+    });
+  });
+
   it("stays idle without data or off iOS", async () => {
     renderSync(undefined);
     fsx.platformOs = "android";

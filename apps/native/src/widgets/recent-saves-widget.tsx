@@ -33,6 +33,8 @@ type WidgetSaveItem = {
 
 type RecentSavesWidgetProps = {
   items: WidgetSaveItem[];
+  emptyTitle?: string;
+  emptyHint?: string;
 };
 
 // Everything (palette, helpers) lives inside the component: the `'widget'`
@@ -82,10 +84,10 @@ const RecentSavesWidget = (
             foregroundStyle(c.foreground),
           ]}
         >
-          Nothing saved yet
+          {props.emptyTitle ?? "Shelvr"}
         </Text>
         <Text modifiers={[font({ size: 10 }), foregroundStyle(c.muted)]}>
-          Tap + to save a link, photo, or note
+          {props.emptyHint ?? ""}
         </Text>
       </VStack>
     );

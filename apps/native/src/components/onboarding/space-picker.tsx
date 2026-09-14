@@ -1,3 +1,5 @@
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -23,7 +25,7 @@ const SPACE_PRESETS: Record<SaveKind, string[]> = {
   Articles: ["Articles", "Read later", "Long reads"],
   Recipes: ["Recipes", "Restaurants to try"],
   Products: ["Wishlist", "Gift ideas"],
-  "Home & decor": ["Home", "Decor ideas"],
+  "Home & decor": ["Home & decor", "Decor ideas"],
   Travel: ["Travel", "Trip ideas"],
   Fitness: ["Fitness", "Workouts"],
   Inspiration: ["Inspiration", "Ideas"],
@@ -34,7 +36,7 @@ const SPACE_PRESETS: Record<SaveKind, string[]> = {
 const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
 
 /**
- * Derive the deduped preset space names from Q2 answers, preserving first-seen
+ * Derive the deduped stable preset identities from Q2 answers, preserving first-seen
  * order. Exported so the onboarding orchestrator can pre-select these when the
  * user reaches the spaces step.
  */
@@ -42,17 +44,17 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
   const seen = new Set<string>();
   const candidates: string[] = [];
   for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
+    for (const preset of SPACE_PRESETS[kind] ?? []) {
+      if (!seen.has(preset)) {
+        seen.add(preset);
+        candidates.push(preset);
       }
     }
   }
-  for (const name of GENERIC_PRESETS) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
+  for (const preset of GENERIC_PRESETS) {
+    if (!seen.has(preset)) {
+      seen.add(preset);
+      candidates.push(preset);
     }
   }
   return candidates;
@@ -75,26 +77,11 @@ export function SpacePickerStep({
   onToggle: (name: string) => void;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
-  // Build the deduped candidate list: seeded presets from each Q2 answer, then
-  // generics, preserving first-seen order.
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
-      }
-    }
-  }
-  for (const name of GENERIC_PRESETS) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
-    }
-  }
+  const candidates = getSpacePresets(answers);
+  const seen = new Set(candidates);
 
   // Anything pre-selected that isn't a known preset (e.g. carried over from an
   // earlier render) still shows so the user can deselect it.
@@ -113,13 +100,13 @@ export function SpacePickerStep({
         entering={FadeInDown.duration(400)}
         style={styles.headline}
       >
-        Pick your spaces.
+        {t("onboarding.spacesTitle")}
       </Animated.Text>
       <Animated.Text
         entering={FadeInDown.delay(80).duration(400)}
         style={styles.support}
       >
-        Shelvr suggests saves for these spaces. Add or rename anytime.
+        {t("onboarding.spacesHelp")}
       </Animated.Text>
 
       <ScrollView
@@ -143,7 +130,7 @@ export function SpacePickerStep({
                 <Text
                   style={[styles.chipLabel, active && styles.chipLabelActive]}
                 >
-                  {name}
+                  {onboardingLabel(name)}
                 </Text>
                 {active && (
                   <Text style={[styles.check, { color: theme.colors.primary }]}>
@@ -157,7 +144,7 @@ export function SpacePickerStep({
       </ScrollView>
 
       <CtaButton
-        label="Create my spaces"
+        label={t("onboarding.createSpaces")}
         onPress={onAdvance}
         disabled={!canAdvance}
       />

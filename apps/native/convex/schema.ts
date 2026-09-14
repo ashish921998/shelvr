@@ -282,6 +282,7 @@ export default defineSchema({
   // scanning a user's disabled rows.
   notificationDevices: defineTable({
     userId: v.string(),
+    locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
     enabled: v.boolean(),

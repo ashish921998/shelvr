@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { OnboardingProvider } from "@/lib/onboarding";
 import { analytics } from "@/lib/analytics";
 import { useEntitlementSync } from "@/lib/entitlement";
@@ -118,15 +119,18 @@ function NotificationSetup() {
  * default screen. Nested routes without their own boundary land here.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useAppLocale();
   useEffect(() => {
     analytics.captureError("render_error", error);
   }, [error]);
 
   return (
     <View style={errorBoundaryStyles.container}>
-      <Text style={errorBoundaryStyles.title}>Something went wrong</Text>
+      <Text style={errorBoundaryStyles.title}>
+        {t("errors.unexpectedTitle")}
+      </Text>
       <Text style={errorBoundaryStyles.message}>
-        Shelvr hit an unexpected error. Your saves are safe.
+        {t("errors.unexpectedBody")}
       </Text>
       <Pressable
         accessibilityRole="button"
@@ -136,7 +140,9 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           pressed && errorBoundaryStyles.retryPressed,
         ]}
       >
-        <Text style={errorBoundaryStyles.retryLabel}>Try again</Text>
+        <Text style={errorBoundaryStyles.retryLabel}>
+          {t("common.tryAgain")}
+        </Text>
       </Pressable>
     </View>
   );

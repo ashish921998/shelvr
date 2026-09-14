@@ -28,6 +28,39 @@ async function seedItem(
 }
 
 describe("weekly shelf notifications", () => {
+  it("updates only the caller's device locale and accepts older clients", async () => {
+    const t = newConvexTest();
+    const owner = t.withIdentity({ subject: "user-a|session-1" });
+    const attacker = t.withIdentity({ subject: "user-b|session-2" });
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+    });
+    const device = () =>
+      t.run((ctx) => ctx.db.query("notificationDevices").unique());
+    expect((await device())?.locale).toBeUndefined();
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      locale: "ja",
+    });
+    expect((await device())?.locale).toBe("ja");
+    await expect(
+      attacker.mutation(api.notifications.registerDevice, {
+        token: "token-a",
+        platform: "ios",
+        locale: "de",
+      }),
+    ).rejects.toThrow();
+    expect((await device())?.locale).toBe("ja");
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      locale: "__proto__",
+    });
+    expect((await device())?.locale).toBe("en");
+  });
+
   it.each([NaN, Infinity, -Infinity, -1e100, Number.MAX_SAFE_INTEGER, 1.5])(
     "rejects invalid nextDigestAt %s without changing preferences",
     async (nextDigestAt) => {

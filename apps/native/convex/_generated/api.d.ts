@@ -27,6 +27,7 @@ import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_imagePolicy from "../model/imagePolicy.js";
 import type * as model_itemFields from "../model/itemFields.js";
+import type * as model_localization from "../model/localization.js";
 import type * as model_log from "../model/log.js";
 import type * as model_memberships from "../model/memberships.js";
 import type * as model_notificationDelivery from "../model/notificationDelivery.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "model/externalUrl": typeof model_externalUrl;
   "model/imagePolicy": typeof model_imagePolicy;
   "model/itemFields": typeof model_itemFields;
+  "model/localization": typeof model_localization;
   "model/log": typeof model_log;
   "model/memberships": typeof model_memberships;
   "model/notificationDelivery": typeof model_notificationDelivery;
