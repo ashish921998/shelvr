@@ -21,6 +21,11 @@ import { isTikTokUrl } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS } from "./model/itemFields";
 import { logEvent } from "./model/log";
+import {
+  deliverPostHogEvent,
+  newDeliveryId,
+  scheduleCaptureRetry,
+} from "./model/posthogCapture";
 import { readStoredImage, StoredImageError } from "./model/storedImage";
 
 // Call Google directly (no Vercel AI Gateway). The default `google` provider
@@ -91,52 +96,94 @@ type CategorizationOutcome =
   | "rejected"
   | "failed";
 
-/** No item ids, URLs, content, or user identifiers leave Convex. */
-async function captureCategorizationTelemetry(args: {
+// One classification outcome is one row in the AI health dashboard, so a
+// transient PostHog failure retries rather than dropping the row.
+const MAX_CATEGORIZATION_ATTEMPTS = 3;
+
+const categorizationTelemetryArgs = {
+  outcome: v.union(
+    v.literal("succeeded"),
+    v.literal("partial"),
+    v.literal("not_found"),
+    v.literal("rejected"),
+    v.literal("failed"),
+  ),
+  itemType: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
+  durationMs: v.number(),
+  errorCategory: v.optional(v.string()),
+  deliveryId: v.optional(v.string()),
+  attempt: v.optional(v.number()),
+};
+
+type CategorizationTelemetry = {
   outcome: CategorizationOutcome;
   itemType: "image" | "link" | "note";
   durationMs: number;
   errorCategory?: string;
-}): Promise<void> {
-  try {
-    const projectToken = env.POSTHOG_PROJECT_TOKEN;
-    if (!projectToken) return;
-    const host = (env.POSTHOG_HOST ?? "https://us.i.posthog.com").replace(
-      /\/$/,
-      "",
-    );
-    const response = await fetch(`${host}/capture/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(3000),
-      body: JSON.stringify({
-        api_key: projectToken,
-        event: `ai_categorization_${args.outcome}`,
-        properties: {
-          distinct_id: "shelvr-convex-ai",
-          $process_person_profile: false,
-          service: "convex-ai",
-          environment: env.OBSERVABILITY_ENV ?? "development",
-          provider: "google",
-          model: MODEL_NAME,
-          item_type: args.itemType,
-          outcome: args.outcome,
-          duration_ms: args.durationMs,
-          ...(args.errorCategory !== undefined
-            ? { error_category: args.errorCategory }
-            : {}),
-        },
-      }),
+  deliveryId?: string;
+  attempt?: number;
+};
+
+/** No item ids, URLs, content, or user identifiers leave Convex. */
+async function captureCategorizationTelemetry(
+  ctx: GenericActionCtx<DataModel>,
+  args: CategorizationTelemetry,
+): Promise<void> {
+  const deliveryId = args.deliveryId ?? newDeliveryId();
+  const delivery = await deliverPostHogEvent({
+    event: `ai_categorization_${args.outcome}`,
+    distinctId: "shelvr-convex-ai",
+    deliveryId,
+    properties: {
+      $process_person_profile: false,
+      service: "convex-ai",
+      provider: "google",
+      model: MODEL_NAME,
+      item_type: args.itemType,
+      outcome: args.outcome,
+      duration_ms: args.durationMs,
+      ...(args.errorCategory !== undefined
+        ? { error_category: args.errorCategory }
+        : {}),
+    },
+  });
+  if (delivery.status === "delivered" || delivery.status === "unconfigured") {
+    return;
+  }
+  if (delivery.status === "rejected") {
+    logEvent("warn", "ai_observability_delivery_failed", {
+      status: delivery.httpStatus,
     });
-    if (!response.ok) {
-      logEvent("warn", "ai_observability_delivery_failed", {
-        status: response.status,
-      });
-    }
-  } catch {
-    logEvent("warn", "ai_observability_delivery_failed");
+    return;
+  }
+  const attempt = args.attempt ?? 0;
+  const retried = await scheduleCaptureRetry(
+    attempt,
+    MAX_CATEGORIZATION_ATTEMPTS,
+    (delayMs, nextAttempt) =>
+      ctx.scheduler.runAfter(
+        delayMs,
+        internal.ai.retryCategorizationTelemetry,
+        { ...args, deliveryId, attempt: nextAttempt },
+      ),
+  );
+  if (!retried) {
+    logEvent("warn", "ai_observability_delivery_failed", {
+      status: delivery.httpStatus,
+    });
   }
 }
+
+/** Schedulable target for the retry above; the first attempt still runs inline
+ * with the classification that produced it. */
+export const retryCategorizationTelemetry = internalAction({
+  args: categorizationTelemetryArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await captureCategorizationTelemetry(ctx, args);
+    return null;
+  },
+});
 
 const SYSTEM_PROMPT =
   "You are the classifier for Shelvr, a save-it-for-later app. Titles must be short and " +
@@ -1070,7 +1117,7 @@ async function failItemAndRecordOutcome(
   });
   // Same fence as finalize: a superseded run's outcome is nobody's.
   if (run.itemType !== undefined && failed === "applied") {
-    await captureCategorizationTelemetry({
+    await captureCategorizationTelemetry(ctx, {
       outcome: outcome.telemetry,
       itemType: run.itemType,
       durationMs: Date.now() - run.startedAt,
@@ -1250,7 +1297,7 @@ export const processItem = internalAction({
           spaceId,
         });
       }
-      await captureCategorizationTelemetry({
+      await captureCategorizationTelemetry(ctx, {
         outcome: linkRead?.status === "unreadable" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
