@@ -153,9 +153,10 @@ function lifecyclePayment(
     return { event: "trial_expired", payment_kind: "trial_lapsed" };
   }
   if (type === "UNCANCELLATION") {
-    return periodType === "TRIAL"
-      ? { event: "subscription_uncancelled", payment_kind: "trial" }
-      : { event: "subscription_uncancelled", payment_kind: "subscription" };
+    return {
+      event: "subscription_uncancelled",
+      payment_kind: periodType === "TRIAL" ? "trial" : "subscription",
+    };
   }
   return undefined;
 }
