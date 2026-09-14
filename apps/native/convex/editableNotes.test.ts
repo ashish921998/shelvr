@@ -8,7 +8,7 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { NOTE_REFRESH_DELAY_MS } from "./items";
-import { MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
+import { MAX_ITEM_TITLE_CHARS, MAX_NOTE_TEXT_CHARS } from "./model/itemFields";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 type ItemFields = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
@@ -155,7 +155,7 @@ describe("updateNoteItem", () => {
     expect(await refreshJobs(t)).toHaveLength(1);
   });
 
-  it("rejects other users' notes, other item types, empty text and long titles", async () => {
+  it("rejects other users' notes, other item types, empty or long text and long titles", async () => {
     const base = newConvexTest();
     const owner = await proUser(base, "owner");
     const intruder = await proUser(base, "intruder");
@@ -192,6 +192,13 @@ describe("updateNoteItem", () => {
         text: "   ",
       }),
     ).rejects.toThrow("Note text is empty");
+    await expect(
+      owner.mutation(api.items.updateNoteItem, {
+        id,
+        title: "",
+        text: "x".repeat(MAX_NOTE_TEXT_CHARS + 1),
+      }),
+    ).rejects.toThrow("Note text is too long");
     await expect(
       owner.mutation(api.items.updateNoteItem, {
         id,

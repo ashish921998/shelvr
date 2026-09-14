@@ -31,6 +31,7 @@ import {
   isStaleProcessing,
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
+  MAX_NOTE_TEXT_CHARS,
   PROCESSING_STALE_MS,
 } from "./model/itemFields";
 import {
@@ -1316,6 +1317,9 @@ export const updateNoteItem = mutation({
     }
     if (args.text.trim() === "") {
       throw new Error("Note text is empty");
+    }
+    if (args.text.length > MAX_NOTE_TEXT_CHARS) {
+      throw new Error("Note text is too long");
     }
     const typedTitle = args.title.trim();
     if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {

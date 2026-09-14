@@ -93,3 +93,8 @@ export function isStaleProcessing(
 /** Longest title a user can type for a save. The client's title field shares
  * it, so the server never has to reject what the field allowed. */
 export const MAX_ITEM_TITLE_CHARS = 200;
+
+/** Longest note text a user can save by editing. Counted in UTF-16 units, so
+ * the UTF-8 bytes stay under 300 KB and the item document stays far below
+ * Convex's 1 MiB limit alongside its other fields. */
+export const MAX_NOTE_TEXT_CHARS = 100_000;
