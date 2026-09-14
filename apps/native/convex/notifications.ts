@@ -1,4 +1,4 @@
-import { notificationLocale } from "./model/notificationDelivery";
+import { notificationLocale } from "./model/notificationFields";
 import { v } from "convex/values";
 import {
   internalAction,

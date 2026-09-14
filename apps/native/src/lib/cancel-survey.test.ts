@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CANCEL_SURVEY_REASONS, cancelSurveyAnalytics } from "./cancel-survey";
+import { cancelSurveyReasonValidator } from "@convex/model/cancelSurveyFields";
 
 const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
@@ -34,12 +35,22 @@ describe("cancelSurveyAnalytics", () => {
     );
   });
 
+  // The ids are an analytics contract (PostHog groups cancel_survey_submitted
+  // on them) and a server contract (the respond mutation rejects anything the
+  // validator does not list). Pin both: the literal list catches a rename, the
+  // validator comparison catches the tuple and the union drifting apart.
   it("every reason id is a valid CancelSurveyReason", () => {
     expect(CANCEL_SURVEY_REASONS).toEqual([
       "too_expensive",
       "not_useful_enough",
       "missing_feature",
       "other",
+    ]);
+  });
+
+  it("the reason tuple and the Convex validator list the same ids in order", () => {
+    expect(cancelSurveyReasonValidator.members.map((m) => m.value)).toEqual([
+      ...CANCEL_SURVEY_REASONS,
     ]);
   });
 });

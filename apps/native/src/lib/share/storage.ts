@@ -372,17 +372,6 @@ export function deleteSession(
   store.remove(SESSION_KEY);
 }
 
-/** True if every entry in the session is in a terminal (saved/failed/
- * unsupported) state, i.e. there is nothing left to attempt. */
-export function allEntriesSettled(session: ShareSession): boolean {
-  return session.entries.every(
-    (e) =>
-      e.status === "saved" ||
-      e.status === "failed" ||
-      e.status === "unsupported",
-  );
-}
-
 /** The entries the processor should (re)attempt: those still pending or failed.
  * Saved and unsupported entries are excluded — successes are never re-saved. */
 export function entriesToProcess(session: ShareSession): ShareEntry[] {

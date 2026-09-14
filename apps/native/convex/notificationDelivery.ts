@@ -7,7 +7,7 @@ import {
   digestCopy,
   recipientError,
   type Recipient,
-} from "./model/notificationDelivery";
+} from "./model/notificationFields";
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;

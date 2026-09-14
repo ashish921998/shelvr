@@ -4,7 +4,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  allEntriesSettled,
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
@@ -282,7 +281,7 @@ describe("updateEntry", () => {
   });
 });
 
-describe("entriesToProcess / allEntriesSettled", () => {
+describe("entriesToProcess", () => {
   it("selects only pending and failed entries", () => {
     const store = memoryStore();
     reconcileSession(store, USER, [payload("a"), payload("b"), payload("c")], id);
@@ -294,14 +293,14 @@ describe("entriesToProcess / allEntriesSettled", () => {
     expect(toProcess.map((e) => e.index)).toEqual([1, 2]);
   });
 
-  it("reports settled only when nothing is pending or failed", () => {
+  it("is empty once nothing is pending or failed", () => {
     const store = memoryStore();
     reconcileSession(store, USER, [payload("a"), payload("b")], id);
-    expect(allEntriesSettled(loadSession(store)!)).toBe(false);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(2);
     updateEntry(store, 0, { status: "saved" });
-    expect(allEntriesSettled(loadSession(store)!)).toBe(false);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(1);
     updateEntry(store, 1, { status: "unsupported" });
-    expect(allEntriesSettled(loadSession(store)!)).toBe(true);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(0);
   });
 });
 

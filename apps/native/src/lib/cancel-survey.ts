@@ -1,5 +1,10 @@
-import { analytics, type CancelSurveyReason } from "@/lib/analytics";
+import { analytics } from "@/lib/analytics";
+import {
+  CANCEL_SURVEY_REASONS,
+  type CancelSurveyReason,
+} from "@convex/model/cancelSurveyFields";
 
+export { CANCEL_SURVEY_REASONS };
 export type { CancelSurveyReason };
 
 /**
@@ -20,14 +25,11 @@ export type { CancelSurveyReason };
  * - Events carry bounded reason ids only — never free text, URLs, or content.
  * - A submitted reason is stated intent, not proof of cancellation. Only the
  *   server-side webhook events (`trial_cancelled`, …) count as cancellations.
+ *
+ * The reason ids themselves live in convex/model/cancelSurveyFields.ts, next to
+ * the validator the `respond` mutation enforces; they are re-exported here so
+ * the card and its analytics keep importing one client-side boundary.
  */
-
-export const CANCEL_SURVEY_REASONS: readonly CancelSurveyReason[] = [
-  "too_expensive",
-  "not_useful_enough",
-  "missing_feature",
-  "other",
-];
 
 // --- analytics boundary -----------------------------------------------------
 
