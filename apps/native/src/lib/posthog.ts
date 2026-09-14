@@ -10,6 +10,19 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
 
 const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 
+// Distributed builds report crashes; local development does not. A dev machine
+// crash on an unmerged branch would otherwise open an error issue next to
+// production traffic under the shared project token. Fail closed like replay: a
+// missing `extra` reads as "development" everywhere, so it never turns capture
+// on.
+const EXCEPTION_AUTOCAPTURE_VARIANTS = new Set<unknown>([
+  "production",
+  "preview",
+]);
+const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
+  Constants.expoConfig?.extra?.variant,
+);
+
 // Convex validation and network failures can interpolate user content (saved
 // URLs, note text) into Error.message, so only messages known to be fixed
 // strings ever cross the wire; the class name and stack always ship.
@@ -77,8 +90,8 @@ export const posthog =
         // autocapture" remote config.
         errorTracking: {
           autocapture: {
-            uncaughtExceptions: true,
-            unhandledRejections: true,
+            uncaughtExceptions: captureExceptions,
+            unhandledRejections: captureExceptions,
             console: [],
           },
         },

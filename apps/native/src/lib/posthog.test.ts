@@ -145,3 +145,15 @@ describe("posthog before_send", () => {
     expect(SAFE_ERROR_MESSAGES.has("Network request failed")).toBe(true);
   });
 });
+
+describe("posthog exception autocapture gate", () => {
+  it("stays off on a development build", () => {
+    // The module is mocked with variant "development", so a local dev crash
+    // never opens an error issue next to production traffic.
+    const options = posthogCtor.options as {
+      errorTracking: { autocapture: Record<string, unknown> };
+    };
+    expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(false);
+    expect(options.errorTracking.autocapture.unhandledRejections).toBe(false);
+  });
+});
