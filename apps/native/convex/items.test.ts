@@ -15,9 +15,12 @@ import {
   STALE_IMPORT_CUTOFF_MS,
 } from "./items";
 import {
+  IMAGE_EMPTY_MESSAGE,
+  IMAGE_TOO_LARGE_MESSAGE,
   MAX_PHOTOS_PER_ACCOUNT,
   PHOTO_LIMIT_MESSAGE,
 } from "./model/imagePolicy";
+import { saveErrorCode, type SaveErrorCode } from "./model/saveErrors";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
 // Used as the shared param type for helpers that drive either a base or
@@ -451,6 +454,26 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   });
 }
 
+/** Asserts a refusal carries BOTH halves of the save-error contract: the code
+ * the current client routes on, and the sentence an already-installed bundle
+ * still matches in `localizeError`'s `ERROR_MESSAGES` table. A copy edit would
+ * silently downgrade old clients to the generic fallback, so the message is
+ * pinned here as well as in `model/saveErrors.test.ts`. */
+async function expectSaveRefusal(
+  call: Promise<unknown>,
+  code: SaveErrorCode,
+  message: string,
+): Promise<void> {
+  const error = await call.then(
+    () => {
+      throw new Error(`expected a ${code} refusal, but the call resolved`);
+    },
+    (thrown: unknown) => thrown,
+  );
+  expect(saveErrorCode(error)).toBe(code);
+  expect((error as { data: { message: string } }).data.message).toBe(message);
+}
+
 describe("photo quota", () => {
   it("refuses a new photo at the cap, reports usage, and frees the slot on delete", async () => {
     const t = await as("user-a");
@@ -487,9 +510,11 @@ describe("photo quota", () => {
       limit: MAX_PHOTOS_PER_ACCOUNT,
     });
 
-    await expect(
+    await expectSaveRefusal(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 }),
-    ).rejects.toThrow(PHOTO_LIMIT_MESSAGE);
+      "photo_limit",
+      PHOTO_LIMIT_MESSAGE,
+    );
     // A completed operation still returns its item to a full account.
     expect(
       await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
@@ -1474,15 +1499,23 @@ describe("Pro entitlement gate", () => {
   it("blocks saves for a user with no subscription", async () => {
     const t = newConvexTest().withIdentity({ subject: "no-sub" });
 
-    await expect(
+    // Both halves of the contract: the code the client routes to the paywall
+    // on, and the unchanged sentence an already-installed bundle still sees.
+    await expectSaveRefusal(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
-    ).rejects.toThrow(/Pro required/);
-    await expect(
+      "pro_required",
+      "Pro required",
+    );
+    await expectSaveRefusal(
       t.mutation(api.items.createNoteItem, { text: "hi" }),
-    ).rejects.toThrow(/Pro required/);
-    await expect(
+      "pro_required",
+      "Pro required",
+    );
+    await expectSaveRefusal(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
-    ).rejects.toThrow(/Pro required/);
+      "pro_required",
+      "Pro required",
+    );
   });
 
   it("blocks a lapsed user from retrying a pending image import", async () => {
@@ -2108,28 +2141,40 @@ describe("photo rejection before classification", () => {
     },
   );
 
-  it("blocks legacy oversized pending uploads at finalization", async () => {
-    const t = await as("legacy-oversized");
-    await t.run(async (ctx) => {
-      const storageId = await ctx.storage.store(
-        new Blob([new Uint8Array(OVERSIZED)]),
-      );
-      await ctx.db.insert("itemOperations", {
-        userId: "legacy-oversized",
-        operationId: OP_ID,
-        kind: "image",
-        status: "pending",
-        storageId,
-        updatedAt: Date.now(),
+  it.each([
+    {
+      size: OVERSIZED,
+      code: "image_too_large",
+      message: IMAGE_TOO_LARGE_MESSAGE,
+    },
+    { size: 0, code: "image_empty", message: IMAGE_EMPTY_MESSAGE },
+  ] as const)(
+    "blocks legacy $code pending uploads at finalization",
+    async ({ size, code, message }) => {
+      const t = await as(`legacy-${code}`);
+      await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array(size)]),
+        );
+        await ctx.db.insert("itemOperations", {
+          userId: `legacy-${code}`,
+          operationId: OP_ID,
+          kind: "image",
+          status: "pending",
+          storageId,
+          updatedAt: Date.now(),
+        });
       });
-    });
-    await expect(
-      t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
-    ).rejects.toThrow("too large");
-    expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(
-      0,
-    );
-  });
+      await expectSaveRefusal(
+        t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+        code,
+        message,
+      );
+      expect(
+        await t.run((ctx) => ctx.db.query("items").collect()),
+      ).toHaveLength(0);
+    },
+  );
 
   it("does not charge or queue product-search retries for missing photos", async () => {
     const t = await as("missing-product-photo");
