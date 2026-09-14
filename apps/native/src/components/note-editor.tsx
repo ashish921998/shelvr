@@ -4,7 +4,10 @@ import { openPaywall } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { pendingNoteEdit, type NoteDraft } from "@/lib/note-edit";
 import { api } from "@convex/_generated/api";
-import { MAX_ITEM_TITLE_CHARS } from "@convex/model/itemFields";
+import {
+  MAX_ITEM_TITLE_CHARS,
+  MAX_NOTE_TEXT_CHARS,
+} from "@convex/model/itemFields";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
@@ -100,6 +103,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
         ref={textInput}
         value={draft.text}
         onChangeText={(text) => setDraft((current) => ({ ...current, text }))}
+        maxLength={MAX_NOTE_TEXT_CHARS}
         placeholder={t("capture.notePlaceholder")}
         placeholderTextColor={theme.colors.muted}
         accessibilityLabel={t("item.noteTextLabel")}
