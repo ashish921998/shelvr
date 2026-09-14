@@ -6,6 +6,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useMutation } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
+import { analytics } from "@/lib/analytics";
 import { isHomeRootRoute } from "@/lib/feedback";
 import { isPaywallPending, readRcTrialCancellation } from "@/lib/entitlement";
 import {
@@ -51,6 +52,11 @@ export function useCancelSurvey(): {
 } {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
+  const currentUserId = useRef(userId);
+  useEffect(() => {
+    currentUserId.current = userId;
+    return () => { currentUserId.current = undefined; };
+  }, [userId]);
   const home = isHomeRootRoute(useSegments());
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -150,6 +156,7 @@ export function useCancelSurvey(): {
     // takes its card down and stays silent.
     void markShown({})
       .then((result) => {
+        if (currentUserId.current !== userId) return;
         askWon.current = result.accepted;
         if (result.accepted) {
           cancelSurveyAnalytics.shown();
@@ -157,12 +164,11 @@ export function useCancelSurvey(): {
           setVisible(false);
         }
       })
-      .catch(() => {
-        // A failed verdict never committed (Convex resolves a mutation
-        // exactly once), so the ask is unspent — but this mount cannot cite
-        // a win either. Take the card down; a later mount re-asks while the
-        // row still says unasked.
-        askWon.current = false;
+      .catch((error: unknown) => {
+        if (currentUserId.current !== userId) return;
+        analytics.captureError("cancel_survey_claim_failed", error);
+        presentedFor.current = null;
+        askWon.current = undefined;
         setVisible(false);
       });
   }, [userId, markShown]);
@@ -178,12 +184,15 @@ export function useCancelSurvey(): {
       responded.current = true;
       void respond({ outcome: "submitted", reason })
         .then((result) => {
+          if (currentUserId.current !== userId) return;
           if (result.accepted) cancelSurveyAnalytics.submitted(reason);
+          setVisible(false);
         })
-        .catch(() => {
-          // A definitively failed respond loses the answer (same failure
-          // mode markShown handles below): the card is already down, so
-          // just keep the rejection off the console.
+        .catch((error: unknown) => {
+          if (currentUserId.current !== userId) return;
+          analytics.captureError("cancel_survey_response_failed", error);
+          responded.current = false;
+          setVisible(true);
         });
       setVisible(false);
     },
@@ -195,9 +204,16 @@ export function useCancelSurvey(): {
     responded.current = true;
     void respond({ outcome: "dismissed" })
       .then((result) => {
+        if (currentUserId.current !== userId) return;
         if (result.accepted) cancelSurveyAnalytics.dismissed();
+        setVisible(false);
       })
-      .catch(() => {});
+      .catch((error: unknown) => {
+        if (currentUserId.current !== userId) return;
+        analytics.captureError("cancel_survey_response_failed", error);
+        responded.current = false;
+        setVisible(true);
+      });
     setVisible(false);
   }, [userId, respond]);
 

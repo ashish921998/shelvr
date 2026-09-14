@@ -136,7 +136,7 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("@/lib/feedback", () => ({
   isHomeRootRoute: () => mock.segments[2] === "(home)",
 }));
-vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
+vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture, captureError: vi.fn() } }));
 vi.mock("@/lib/posthog", () => ({ isAnalyticsAvailable: () => true }));
 vi.mock("convex/react", () => ({
   // A dynamic import inside a vi.mock factory resolves to a different
@@ -453,6 +453,54 @@ describe("useCancelSurvey", () => {
         ([name]) => name === "cancel_survey_shown",
       ),
     ).toHaveLength(0);
+  });
+
+  it("retries a failed claim on the next foreground visit", async () => {
+    mock.markShown.mockRejectedValueOnce(new Error("claim failed"));
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().presented();
+    await flush();
+    expect(latest().visible).toBe(false);
+    await roundTrip();
+    expect(latest().visible).toBe(true);
+    latest().presented();
+    await flush();
+    expect(mock.markShown).toHaveBeenCalledTimes(2);
+    expect(mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_shown")).toHaveLength(1);
+  });
+
+  it.each(["submit", "dismiss"] as const)("restores the card after failed %s and allows retry", async (action) => {
+    mock.respond.mockRejectedValueOnce(new Error("response failed"));
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().presented();
+    await flush();
+    mock.surveyStatus = { asked: true };
+    latest();
+    if (action === "submit") latest().submit("other");
+    else latest().dismiss();
+    await flush();
+    expect(latest().visible).toBe(true);
+    expect(mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted" || name === "cancel_survey_dismissed")).toHaveLength(0);
+    latest().submit("other");
+    await flush();
+    expect(mock.respond).toHaveBeenCalledTimes(2);
+    expect(latest().visible).toBe(false);
+  });
+
+  it("does not restore a failed response for a different account", async () => {
+    let reject!: (error: Error) => void;
+    mock.respond.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    react.mount(() => useCancelSurvey());
+    await flush();
+    latest().submit("other");
+    mock.user = { _id: "user-2" };
+    mock.surveyStatus = { asked: true };
+    latest();
+    reject(new Error("response failed"));
+    await flush();
+    expect(latest().visible).toBe(false);
   });
 
   it("double-tapping a reason submits exactly once", async () => {
