@@ -2,7 +2,10 @@ import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { cancelSurveyReasonValidator } from "./model/cancelSurveyFields";
+import {
+  cancelSurveyOutcomeValidator,
+  cancelSurveyReasonValidator,
+} from "./model/cancelSurveyFields";
 
 /**
  * Durable state for the next-visit cancel survey (the client boundary is
@@ -68,7 +71,7 @@ export const markShown = mutation({
  */
 export const respond = mutation({
   args: {
-    outcome: v.union(v.literal("submitted"), v.literal("dismissed")),
+    outcome: cancelSurveyOutcomeValidator,
     reason: v.optional(cancelSurveyReasonValidator),
   },
   returns: v.object({ accepted: v.boolean() }),

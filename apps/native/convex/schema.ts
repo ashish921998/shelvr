@@ -7,7 +7,10 @@ import {
   failureReasonValidator,
   intentValidator,
 } from "./model/itemFields";
-import { cancelSurveyReasonValidator } from "./model/cancelSurveyFields";
+import {
+  cancelSurveyOutcomeValidator,
+  cancelSurveyReasonValidator,
+} from "./model/cancelSurveyFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -259,9 +262,7 @@ export default defineSchema({
   cancelSurveys: defineTable({
     userId: v.string(),
     askedAt: v.number(),
-    outcome: v.optional(
-      v.union(v.literal("submitted"), v.literal("dismissed")),
-    ),
+    outcome: v.optional(cancelSurveyOutcomeValidator),
     // Bounded reason id from the client survey (never free text); mirrored
     // by CancelSurveyReason in apps/native/src/lib/analytics.ts.
     reason: v.optional(cancelSurveyReasonValidator),
