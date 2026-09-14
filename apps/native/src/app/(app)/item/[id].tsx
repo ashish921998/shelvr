@@ -401,7 +401,8 @@ function ItemScreenContent() {
                       ...(activeItem?.url
                         ? [{ label: t("item.copyLink"), onPress: copyLink }]
                         : []),
-                      ...(activeItem?.status === "ready"
+                      ...(activeItem?.status === "ready" &&
+                      activeItem.type !== "note"
                         ? [
                             {
                               label: t("products.findLinks"),
@@ -447,7 +448,7 @@ function ItemScreenContent() {
                 {t("item.copyLink")}
               </Stack.Toolbar.MenuAction>
             ) : null}
-            {activeItem?.status === "ready" ? (
+            {activeItem?.status === "ready" && activeItem.type !== "note" ? (
               <Stack.Toolbar.MenuAction
                 icon="bag"
                 onPress={onFindLinks}

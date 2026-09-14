@@ -26,7 +26,8 @@ type ItemAction =
   | "call"
   | "email"
   | "message"
-  | "calendar_sheet_opened";
+  | "calendar_sheet_opened"
+  | "note_edited";
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 

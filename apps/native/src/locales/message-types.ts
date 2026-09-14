@@ -376,6 +376,9 @@ export type MessageParams = {
   "item.inSpaces": { spaces: string };
   "item.photoFailed": undefined;
   "item.noteFailed": undefined;
+  "item.noteTitlePlaceholder": undefined;
+  "item.noteTitleLabel": undefined;
+  "item.noteTextLabel": undefined;
   "capture.partialFailure": { saved: number; total: number; reason: string };
   "pro.restoredBody": { store: string };
   "pro.notFoundBody": { store: string };
