@@ -1,100 +1,16 @@
 // Tests for the hook that decides when the cancel-survey card may appear.
-// Effect-only hook, driven by the same slot-indexed React stand-in used by
-// feedback-hooks.test.ts: useState/useRef keep values by call order,
-// useEffect diffs deps and runs cleanups, and a setState outside a render
-// re-renders. The AppState mock records listeners so tests can simulate
-// backgrounding and returning from iPhone Settings / Customer Center.
+// Effect-only hook, driven by the shared slot-indexed React stand-in (see
+// src/test/react-stand-in.ts). The AppState mock records listeners so tests
+// can simulate backgrounding and returning from iPhone Settings / Customer
+// Center.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCancelSurvey } from "./use-cancel-survey";
+import { reactStandIn as react } from "../test/react-stand-in";
 
-const react = vi.hoisted(() => {
-  type EffectSlot = { deps?: unknown[]; cleanup?: () => void };
-  let slots: unknown[] = [];
-  let effectSlots: EffectSlot[] = [];
-  let cursor = 0;
-  let hook: (() => unknown) | undefined;
-  let rendering = false;
-  let dirty = false;
-  const pending: (() => void)[] = [];
-
-  const render = (): unknown => {
-    let result: unknown;
-    rendering = true;
-    do {
-      dirty = false;
-      cursor = 0;
-      result = hook?.();
-      while (pending.length) pending.shift()!();
-    } while (dirty);
-    rendering = false;
-    return result;
-  };
-  const depsChanged = (
-    prev: unknown[] | undefined,
-    next: unknown[] | undefined,
-  ) =>
-    !prev ||
-    !next ||
-    prev.length !== next.length ||
-    prev.some((value, i) => !Object.is(value, next[i]));
-
-  return {
-    useState<T>(initial: T | (() => T)) {
-      const i = cursor++;
-      if (!(i in slots))
-        slots[i] =
-          typeof initial === "function" ? (initial as () => T)() : initial;
-      const set = (next: T | ((prev: T) => T)) => {
-        const value =
-          typeof next === "function"
-            ? (next as (prev: T) => T)(slots[i] as T)
-            : next;
-        if (Object.is(value, slots[i])) return;
-        slots[i] = value;
-        if (rendering) dirty = true;
-        else render();
-      };
-      return [slots[i] as T, set] as const;
-    },
-    useRef<T>(initial: T) {
-      const i = cursor++;
-      if (!(i in slots)) slots[i] = { current: initial };
-      return slots[i] as { current: T };
-    },
-    useCallback<T>(callback: T) {
-      return callback;
-    },
-    useEffect(effect: () => void | (() => void), deps?: unknown[]) {
-      const i = cursor++;
-      const prev = slots[i] as EffectSlot | undefined;
-      if (prev && !depsChanged(prev.deps, deps)) return;
-      const slot: EffectSlot = { deps };
-      slots[i] = slot;
-      effectSlots.push(slot);
-      pending.push(() => {
-        prev?.cleanup?.();
-        const cleanup = effect();
-        if (typeof cleanup === "function") slot.cleanup = cleanup;
-      });
-    },
-    mount<T>(run: () => T): T {
-      slots = [];
-      effectSlots = [];
-      hook = run;
-      return render() as T;
-    },
-    rerender<T>(): T {
-      return render() as T;
-    },
-    unmount() {
-      for (const slot of effectSlots) slot.cleanup?.();
-      slots = [];
-      effectSlots = [];
-      hook = undefined;
-    },
-  };
+vi.mock("react", async () => {
+  const { reactStandIn } = await import("../test/react-stand-in");
+  return reactStandIn;
 });
-vi.mock("react", () => react);
 
 const mock = vi.hoisted(() => ({
   appState: "active" as string,
@@ -201,7 +117,7 @@ describe("useCancelSurvey", () => {
     await flush();
 
     expect(latest().visible).toBe(true);
-    // Detection alone must not consume the ask (P2b).
+    // Detection alone must not consume the ask.
     expect(mock.markShown).not.toHaveBeenCalled();
     expect(mock.capture).not.toHaveBeenCalledWith("cancel_survey_shown");
   });
