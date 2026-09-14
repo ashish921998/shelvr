@@ -17,7 +17,8 @@
         "plugins/with-widget-localization.js"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
-      "ignore": ["convex/_generated/**"]
+      "ignore": ["convex/_generated/**"],
+      "ignoreDependencies": ["@rnrepo/build-tools"]
     },
     "apps/web": {
       "entry": ["src/app/**/*.{ts,tsx}"],

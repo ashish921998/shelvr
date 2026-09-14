@@ -153,6 +153,8 @@ module.exports = ({ config }) => ({
     // Keep the static plugins from app.json — an inline array here would
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),
+    // Fetch prebuilt native artifacts for supported React Native libraries.
+    "@rnrepo/expo-config-plugin",
     [
       "expo-build-properties",
       {
