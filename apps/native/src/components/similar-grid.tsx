@@ -1,9 +1,10 @@
-import type { DetailItem } from '@/components/item-detail';
-import { displayHost } from '@/lib/url';
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import type { DetailItem } from "@/components/item-detail";
+import { displayHost } from "@/lib/url";
+import { Image } from "expo-image";
+import { Link } from "expo-router";
+import { Pressable, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 // A static two-column masonry for the similar-items strip. The parent page
 // already scrolls, so a nested virtualized list would be invalid. Keeping this
@@ -14,7 +15,7 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
   const heights = [0, 0];
   for (const item of items) {
     const ratio = Math.min(
-      Math.max(item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1), 0.5),
+      Math.max(item.aspectRatio ?? (item.type === "link" ? 1.91 : 1), 0.5),
       2,
     );
     const column = heights[0] <= heights[1] ? 0 : 1;
@@ -37,15 +38,19 @@ export function SimilarGrid({ items }: { items: DetailItem[] }) {
 }
 
 function SimilarItemCard({ item }: { item: DetailItem }) {
+  useAppLocale();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const aspectRatio = Math.min(
-    Math.max(item.aspectRatio ?? (item.type === 'link' ? 1.91 : 1), 0.5),
+    Math.max(item.aspectRatio ?? (item.type === "link" ? 1.91 : 1), 0.5),
     2,
   );
-  const title = item.title ?? item.note ?? (item.url ? displayHost(item.url) : 'Untitled item');
+  const title =
+    item.title ??
+    item.note ??
+    (item.url ? displayHost(item.url) : t("item.untitledItem"));
 
   return (
-    <Link href={{ pathname: '/item/[id]', params: { id: item._id } }} asChild>
+    <Link href={{ pathname: "/item/[id]", params: { id: item._id } }} asChild>
       <Pressable
         style={({ pressed }) => [
           styles.similarCard,
@@ -70,7 +75,12 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
             </View>
           )
         ) : (
-          <View style={[styles.similarTextFace, item.type === 'note' && styles.similarNoteFace]}>
+          <View
+            style={[
+              styles.similarTextFace,
+              item.type === "note" && styles.similarNoteFace,
+            ]}
+          >
             <Text style={styles.similarTextFaceTitle} numberOfLines={4}>
               {title}
             </Text>
@@ -86,8 +96,8 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
 
 const styles = StyleSheet.create((theme) => ({
   similarGrid: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginHorizontal: -4,
   },
   similarColumn: {
@@ -98,41 +108,41 @@ const styles = StyleSheet.create((theme) => ({
   },
   similarCard: {
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
+    borderCurve: "continuous",
+    overflow: "hidden",
   },
   similarCardSticker: {
-    overflow: 'visible',
+    overflow: "visible",
   },
   similarCardPressed: {
     opacity: 0.85,
   },
   similarImageFrame: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: theme.gap(0.5),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
   similarImage: {
-    width: '100%',
+    width: "100%",
     borderRadius: theme.radius.sm,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   similarSticker: {
-    width: '100%',
-    shadowColor: '#000',
+    width: "100%",
+    shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
   similarTextFace: {
     minHeight: 96,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: theme.gap(1.5),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
   },
   similarNoteFace: {

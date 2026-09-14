@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { t, useAppLocale } from "@/lib/i18n";
+import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Linking,
@@ -9,19 +10,19 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { AppSymbolIcon } from '@/components/symbol';
-import { useCurrentUser } from '@/lib/current-user';
+} from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { AppSymbolIcon } from "@/components/symbol";
+import { useCurrentUser } from "@/lib/current-user";
 import {
   FEEDBACK_MESSAGE_MAX_LENGTH,
   feedbackAnalytics,
   markFeedbackSubmitted,
   type FeedbackSurface,
-} from '@/lib/feedback';
-import { SUPPORT_URL } from '@/lib/legal';
+} from "@/lib/feedback";
+import { SUPPORT_URL } from "@/lib/legal";
 
-type Phase = 'compose' | 'queued' | 'error';
+type Phase = "compose" | "queued" | "error";
 
 /**
  * The one feedback form, reused by the Home invitation and the permanent
@@ -38,12 +39,13 @@ export function FeedbackModal({
   surface: FeedbackSurface;
   onClose: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
-  const [phase, setPhase] = useState<Phase>('compose');
+  const [phase, setPhase] = useState<Phase>("compose");
   const openedRef = useRef(false);
 
   const analyticsAvailable = feedbackAnalytics.isAvailable();
@@ -67,15 +69,15 @@ export function FeedbackModal({
     sendingRef.current = true;
     setSending(true);
     const result = await feedbackAnalytics.submitFeedback(surface, trimmed);
-    if (result === 'queued') {
+    if (result === "queued") {
       markFeedbackSubmitted(user._id);
     }
     setSending(false);
     sendingRef.current = false;
     // 'unavailable' is honest too: without analytics there is nothing to
     // queue, so the form offers the support channel instead of pretending.
-    if (result === 'queued') setPhase('queued');
-    else setPhase('error');
+    if (result === "queued") setPhase("queued");
+    else setPhase("error");
   };
 
   const openSupport = () => {
@@ -91,56 +93,59 @@ export function FeedbackModal({
       accessibilityViewIsModal
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.backdrop}
       >
-        <Pressable style={styles.backdropPress} onPress={onClose} accessibilityLabel="Close feedback" />
+        <Pressable
+          style={styles.backdropPress}
+          onPress={onClose}
+          accessibilityLabel={t("feedback.close")}
+        />
         <View style={styles.sheet}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.title} accessibilityRole="header">
-              Send feedback
+              {t("feedback.open")}
             </Text>
 
-            {phase === 'queued' ? (
+            {phase === "queued" ? (
               <>
-                <Text style={styles.body}>
-                  Thanks for the feedback!
-                </Text>
+                <Text style={styles.body}>{t("feedback.thanks")}</Text>
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Done"
+                    accessibilityLabel={t("common.done")}
                     style={({ pressed }) => [
                       styles.primaryButton,
                       pressed && { opacity: 0.7 },
                     ]}
                     onPress={onClose}
                   >
-                    <Text style={styles.primaryButtonText}>Done</Text>
+                    <Text style={styles.primaryButtonText}>
+                      {t("common.done")}
+                    </Text>
                   </Pressable>
                 </View>
               </>
-            ) : phase === 'error' || !available ? (
+            ) : phase === "error" || !available ? (
               <>
                 <Text style={styles.body}>
                   {available
-                    ? 'Feedback couldn’t be sent just now.'
-                    : 'Feedback is unavailable right now.'}{' '}
-                  You can reach us directly instead:
+                    ? t("feedback.sendFailedContact")
+                    : t("feedback.unavailableContact")}
                 </Text>
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel="Email support"
+                  accessibilityLabel={t("support.email")}
                   style={({ pressed }) => [
                     styles.supportRow,
                     pressed && { opacity: 0.7 },
                   ]}
                   onPress={openSupport}
                 >
-                  <Text style={styles.supportText}>Contact Support</Text>
+                  <Text style={styles.supportText}>{t("support.contact")}</Text>
                   <AppSymbolIcon
                     name="arrow.up.right"
                     size={14}
@@ -151,29 +156,29 @@ export function FeedbackModal({
                   <View style={styles.buttonRow}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Close"
+                      accessibilityLabel={t("common.close")}
                       style={({ pressed }) => [
                         styles.secondaryButton,
                         pressed && { opacity: 0.7 },
                       ]}
                       onPress={onClose}
                     >
-                      <Text style={styles.secondaryButtonText}>Close</Text>
+                      <Text style={styles.secondaryButtonText}>
+                        {t("common.close")}
+                      </Text>
                     </Pressable>
                   </View>
                 ) : null}
               </>
             ) : (
               <>
-                <Text style={styles.body}>
-                  What were you trying to do, and what got in your way?
-                </Text>
+                <Text style={styles.body}>{t("feedback.prompt")}</Text>
                 <TextInput
-                  accessibilityLabel="Feedback message"
+                  accessibilityLabel={t("feedback.messageLabel")}
                   style={styles.input}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="Your feedback…"
+                  placeholder={t("feedback.placeholder")}
                   placeholderTextColor={theme.colors.faint}
                   multiline
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
@@ -186,7 +191,7 @@ export function FeedbackModal({
                 <View style={styles.buttonRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Cancel feedback"
+                    accessibilityLabel={t("feedback.cancel")}
                     style={({ pressed }) => [
                       styles.secondaryButton,
                       pressed && { opacity: 0.7 },
@@ -194,11 +199,13 @@ export function FeedbackModal({
                     disabled={sending}
                     onPress={onClose}
                   >
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                    <Text style={styles.secondaryButtonText}>
+                      {t("common.cancel")}
+                    </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Send feedback"
+                    accessibilityLabel={t("feedback.open")}
                     accessibilityState={{ disabled: !canSend }}
                     style={({ pressed }) => [
                       styles.primaryButton,
@@ -209,7 +216,7 @@ export function FeedbackModal({
                     onPress={() => void send()}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {sending ? 'Sending…' : 'Send'}
+                      {sending ? t("feedback.sending") : t("feedback.send")}
                     </Text>
                   </Pressable>
                 </View>
@@ -226,7 +233,7 @@ const styles = StyleSheet.create((theme) => ({
   backdrop: {
     flex: 1,
     backgroundColor: theme.colors.overlay,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   backdropPress: {
     flex: 1,
@@ -235,11 +242,11 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingBottom: theme.gap(3),
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   scrollContent: {
     padding: theme.gap(3),
@@ -259,10 +266,10 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: theme.gap(1),
   },
   input: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     minHeight: 120,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceMuted,
@@ -271,17 +278,17 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 20,
     padding: theme.gap(1.5),
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   counter: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     fontFamily: theme.fonts.regular,
     fontSize: 12,
     color: theme.colors.faint,
   },
   buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "flex-end",
     gap: theme.gap(1),
     marginTop: theme.gap(1),
   },
@@ -289,10 +296,10 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 44,
     paddingHorizontal: theme.gap(3),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonText: {
     fontFamily: theme.fonts.bold,
@@ -303,11 +310,11 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 44,
     paddingHorizontal: theme.gap(3),
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonText: {
     fontFamily: theme.fonts.bold,
@@ -315,12 +322,12 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   supportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     minHeight: 44,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceMuted,

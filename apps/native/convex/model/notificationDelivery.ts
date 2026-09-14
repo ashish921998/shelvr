@@ -1,6 +1,12 @@
 import { v, type Infer } from "convex/values";
+import translations from "./notificationTranslations.json";
+import { pluralRules } from "./localization";
 
-const fields = { token: v.string(), error: v.optional(v.string()) };
+const fields = {
+  token: v.string(),
+  error: v.optional(v.string()),
+  locale: v.optional(v.string()),
+};
 
 export const recipientValidator = v.union(
   v.object({
@@ -32,7 +38,37 @@ export function recipientError(recipient: Recipient, error: string): Recipient {
   ].includes(error);
   return {
     token: recipient.token,
+    locale: recipient.locale,
     state: terminal ? "failed" : "pending",
     error,
+  };
+}
+
+export function notificationLocale(
+  locale: string | undefined,
+): string | undefined {
+  if (locale === undefined) return undefined;
+  return Object.hasOwn(translations, locale) ? locale : "en";
+}
+
+export function digestCopy(locale: string | undefined, count: number) {
+  // Keep the established payload for devices registered by older clients.
+  if (locale === undefined)
+    return {
+      title: "Your weekly shelf is ready",
+      body: `${count} saved things are waiting on your weekly shelf.`,
+    };
+  const catalogs: Record<
+    string,
+    { title: string; body: Record<string, string> }
+  > = translations;
+  const selected = notificationLocale(locale) ?? "en";
+  const copy = catalogs[selected];
+  return {
+    title: copy.title,
+    body: copy.body[pluralRules[selected](count)].replace(
+      "%{formattedCount}",
+      new Intl.NumberFormat(selected).format(count),
+    ),
   };
 }

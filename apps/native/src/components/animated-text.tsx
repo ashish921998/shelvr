@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { needsNativeText } from "@/lib/text-shaping";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Text as RNText,
   StyleSheet as RNStyleSheet,
@@ -6,7 +7,7 @@ import {
   type StyleProp,
   type TextStyle,
   type ViewStyle,
-} from 'react-native';
+} from "react-native";
 import {
   BlurMask,
   Canvas,
@@ -14,15 +15,15 @@ import {
   Text as SkiaText,
   useFont,
   type SkFont,
-} from '@shopify/react-native-skia';
+} from "@shopify/react-native-skia";
 import {
   useDerivedValue,
   useSharedValue,
   withDelay,
   withSpring,
   withTiming,
-} from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // A character-diffing text morph rendered through Skia so each glyph can carry a
 // real Gaussian blur. When `text` changes, characters shared with the previous
@@ -30,7 +31,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 // removed characters animate out (up + right, shrink, blur, fade) and added
 // characters animate in (rise from below, grow, sharpen, fade) — each staggered.
 
-const FONT = require('../../assets/fonts/ExposureTrial-0.otf');
+const FONT = require("../../assets/fonts/ExposureTrial-0.otf");
 
 const STAGGER_MS = 25; // per-character delay
 const ENTER_DELAY_MS = 120; // lead so exiting letters clear before new ones arrive
@@ -67,7 +68,7 @@ type Cell = {
   x: number; // absolute left within the canvas
   width: number;
   index: number; // position used for stagger
-  phase: 'present' | 'exit';
+  phase: "present" | "exit";
 };
 
 type CharGlyphProps = {
@@ -109,13 +110,18 @@ const CharGlyph = memo(function CharGlyph({
       firstX.current = false;
       return;
     }
-    gx.set(withDelay(GLIDE_DELAY_MS, withTiming(cell.x, { duration: GLIDE_DURATION })));
+    gx.set(
+      withDelay(
+        GLIDE_DELAY_MS,
+        withTiming(cell.x, { duration: GLIDE_DURATION }),
+      ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cell.x]);
 
   // Exit: continue up + right, shrink, blur and fade, then drop the cell.
   useEffect(() => {
-    if (cell.phase === 'present') {
+    if (cell.phase === "present") {
       const delay = ENTER_DELAY_MS + cell.index * staggerMs;
       tx.set(withTiming(0, { duration: MOVE_DURATION }));
       ty.set(withDelay(delay, withSpring(0)));
@@ -126,11 +132,16 @@ const CharGlyph = memo(function CharGlyph({
     }
     const delay = cell.index * staggerMs;
     ty.set(withDelay(delay, withTiming(-EXIT_UP, { duration: EXIT_DURATION })));
-    tx.set(withDelay(delay, withTiming(EXIT_RIGHT, { duration: EXIT_DURATION })));
+    tx.set(
+      withDelay(delay, withTiming(EXIT_RIGHT, { duration: EXIT_DURATION })),
+    );
     sc.set(withDelay(delay, withTiming(SHRINK, { duration: EXIT_DURATION })));
     bl.set(withDelay(delay, withTiming(blurMax, { duration: EXIT_DURATION })));
     op.set(withDelay(delay, withTiming(0, { duration: EXIT_DURATION })));
-    const timer = setTimeout(() => onExited(cell.key), delay + EXIT_DURATION + 40);
+    const timer = setTimeout(
+      () => onExited(cell.key),
+      delay + EXIT_DURATION + 40,
+    );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cell.phase]);
@@ -151,7 +162,7 @@ const CharGlyph = memo(function CharGlyph({
   );
 });
 
-export type AnimatedTextProps = {
+type AnimatedTextProps = {
   text: string;
   style?: StyleProp<TextStyle>;
   containerStyle?: StyleProp<ViewStyle>;
@@ -175,30 +186,86 @@ export function AnimatedText({
 }: AnimatedTextProps) {
   const { theme } = useUnistyles();
   const flat = (RNStyleSheet.flatten(style) ?? {}) as TextStyle;
-  const fontSize = typeof flat.fontSize === 'number' ? flat.fontSize : DEFAULT_FONT_SIZE;
-  const color = typeof flat.color === 'string' ? flat.color : theme.colors.foreground;
+  const fontSize =
+    typeof flat.fontSize === "number" ? flat.fontSize : DEFAULT_FONT_SIZE;
+  const color =
+    typeof flat.color === "string" ? flat.color : theme.colors.foreground;
   const font = useFont(FONT, fontSize);
 
+  const nativeText =
+    needsNativeText(text) ||
+    Boolean(font?.getGlyphIDs(text).some((glyph) => glyph === 0));
+  // Native text shapes joined scripts, bidi, combining marks and emoji as runs.
+  if (!font || nativeText) {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <RNText
+          style={[
+            style,
+            { maxWidth: width },
+            nativeText && { fontFamily: undefined },
+          ]}
+          numberOfLines={truncate ? 1 : undefined}
+        >
+          {text}
+        </RNText>
+      </View>
+    );
+  }
+  return (
+    <GlyphText
+      text={text}
+      font={font}
+      fontSize={fontSize}
+      color={color}
+      containerStyle={containerStyle}
+      width={width}
+      height={height}
+      staggerMs={staggerMs}
+      blurMax={blurMax}
+      truncate={truncate}
+    />
+  );
+}
+
+// Unmount the glyph reconciliation state when native shaping takes over.
+// Returning to Latin text starts a fresh animation without stale exit glyphs.
+function GlyphText({
+  text,
+  font,
+  fontSize,
+  color,
+  containerStyle,
+  width,
+  height,
+  staggerMs,
+  blurMax,
+  truncate,
+}: Omit<Required<AnimatedTextProps>, "style" | "containerStyle"> & {
+  containerStyle?: StyleProp<ViewStyle>;
+  font: SkFont;
+  fontSize: number;
+  color: string;
+}) {
   const baselineY = height / 2 + fontSize * 0.34;
 
   const seenRef = useRef<Map<string, Cell>>(new Map());
   const [cells, setCells] = useState<Cell[]>([]);
 
   useEffect(() => {
-    if (!font) return;
-
     let displayText = text;
     if (truncate) {
       const chars = [...text];
       const widths = font.getGlyphWidths(font.getGlyphIDs(text));
       let totalWidth = widths.reduce((sum, value) => sum + value, 0);
       if (totalWidth > width) {
-        const ellipsisWidth = font.getGlyphWidths(font.getGlyphIDs('…'))[0] ?? 0;
+        const ellipsisWidth =
+          font.getGlyphWidths(font.getGlyphIDs("…"))[0] ?? 0;
         while (chars.length > 0 && totalWidth + ellipsisWidth > width) {
           chars.pop();
           totalWidth -= widths.pop() ?? 0;
         }
-        displayText = `${chars.join('')}…`;
+        displayText = `${chars.join("")}…`;
       }
     }
     const keyed = toKeyedChars(displayText);
@@ -212,7 +279,14 @@ export function AnimatedText({
     let cursor = originX;
     const present: Cell[] = keyed.map((k, index) => {
       const w = advances[index] ?? 0;
-      const cell: Cell = { key: k.key, char: k.char, x: cursor, width: w, index, phase: 'present' };
+      const cell: Cell = {
+        key: k.key,
+        char: k.char,
+        x: cursor,
+        width: w,
+        index,
+        phase: "present",
+      };
       cursor += w;
       return cell;
     });
@@ -220,7 +294,7 @@ export function AnimatedText({
     const presentKeys = new Set(present.map((c) => c.key));
     const exiting: Cell[] = [];
     seenRef.current.forEach((cell, key) => {
-      if (!presentKeys.has(key)) exiting.push({ ...cell, phase: 'exit' });
+      if (!presentKeys.has(key)) exiting.push({ ...cell, phase: "exit" });
     });
 
     const nextSeen = new Map<string, Cell>();
@@ -235,21 +309,19 @@ export function AnimatedText({
   }, [text, font, width, truncate]);
 
   const removeCell = useCallback(
-    (key: string) => setCells((prev) => prev.filter((c) => c.key !== key || c.phase !== 'exit')),
+    (key: string) =>
+      setCells((prev) =>
+        prev.filter((c) => c.key !== key || c.phase !== "exit"),
+      ),
     [],
   );
 
-  // Until the Skia font loads, fall back to plain text so the title still shows.
-  if (!font) {
-    return (
-      <View style={[styles.container, containerStyle]}>
-        <RNText style={style} numberOfLines={truncate ? 1 : undefined}>{text}</RNText>
-      </View>
-    );
-  }
-
   return (
-    <View style={[styles.container, containerStyle]} accessible accessibilityLabel={text}>
+    <View
+      style={[styles.container, containerStyle]}
+      accessible
+      accessibilityLabel={text}
+    >
       <Canvas style={{ width, height }}>
         {cells.map((cell) => (
           <CharGlyph
@@ -271,7 +343,7 @@ export function AnimatedText({
 
 const styles = StyleSheet.create(() => ({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 }));

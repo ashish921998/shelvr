@@ -4,13 +4,52 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test": "pnpm --filter native-app test",
+    "coverage": "pnpm --filter native-app test:coverage",
+    "knip": "knip --reporter compact",
+    "knip:dependencies": "knip --include dependencies,devDependencies,unlisted --reporter compact",
+    "syncpack:lint": "syncpack lint",
+    "audit": "pnpm audit --audit-level high",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run coverage && pnpm run knip && pnpm run syncpack:lint && pnpm run audit",
     "clean": "turbo run clean && rm -rf node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "prepare": "husky",
+    "localization:generate": "node tools/generate-localizations.mjs"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "knip": "^5.88.1",
+    "lint-staged": "^16.4.0",
+    "make-plural": "^7.5.0",
     "prettier": "3.8.3",
-    "turbo": "2.9.6"
+    "syncpack": "^15.3.3",
+    "turbo": "2.9.14"
+  },
+  "pnpm": {
+    "overrides": {
+      "shell-quote": "^1.10.0",
+      "@xmldom/xmldom": "^0.8.15",
+      "browserslist": "^4.28.7",
+      "form-data": "^4.0.6",
+      "fast-uri": "^3.1.6",
+      "js-yaml@>=4.0.0 <4.3.2": "^4.3.2",
+      "ws@>=7.0.0 <7.5.11": "^7.5.11",
+      "nanoid@<3.3.18": "^3.3.18",
+      "brace-expansion@<1.1.18": "1.1.18",
+      "brace-expansion@>=3.0.0 <5.0.9": "5.0.9",
+      "js-cookie": "^3.0.7"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-w3rx-r6r6-pgpr",
+        "GHSA-5p2g-fcmc-qvqq",
+        "GHSA-rv78-f8rc-xrxh",
+        "GHSA-wx67-qw84-cm4g",
+        "GHSA-w24r-5266-9c3c"
+      ]
+    }
   },
   "engines": {
     "node": ">=20.20.0"
@@ -19,10 +58,5 @@
     "apps/*"
   ],
   "packageManager": "pnpm@10.33.0",
-  "version": "1.0.0",
-  "dependencies": {
-    "expo": "~57.0.12",
-    "react": "19.2.3",
-    "react-native": "0.86.2"
-  }
+  "version": "1.0.0"
 }

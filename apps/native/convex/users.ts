@@ -49,6 +49,7 @@ export const getCurrentUser = query({
  *  - itemOperations (including pending upload storage)
  *  - onboardingDemos (the demo allowance row and its item reference)
  *  - subscriptions
+ *  - cancelSurveys (the one-time cancel-survey ask row)
  *  - Convex Auth sessions, refresh tokens, accounts, and the users row
  *
  * Apple/Google subscriptions are NOT cancelled here; the client must warn the
@@ -210,6 +211,15 @@ async function deleteUserOwnedDataBatch(
     .unique();
   if (sub !== null) {
     await ctx.db.delete(sub._id);
+  }
+
+  // The cancel-survey ask row is user-owned state; drain it with the rest.
+  const survey = await ctx.db
+    .query("cancelSurveys")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .unique();
+  if (survey !== null) {
+    await ctx.db.delete(survey._id);
   }
   return true;
 }

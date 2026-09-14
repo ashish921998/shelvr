@@ -1,12 +1,13 @@
-import { api } from '@convex/_generated/api';
-import { useAuthActions } from '@convex-dev/auth/react';
-import { useConvexAuth, useMutation } from 'convex/react';
-import Constants from 'expo-constants';
-import * as Localization from 'expo-localization';
-import * as Notifications from 'expo-notifications';
-import * as SecureStore from 'expo-secure-store';
-import { useRouter } from 'expo-router';
-import { Platform } from 'react-native';
+import { t, currentLocale, useAppLocale } from "@/lib/i18n";
+import { api } from "@convex/_generated/api";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth, useMutation } from "convex/react";
+import Constants from "expo-constants";
+import * as Localization from "expo-localization";
+import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
+import { useRouter } from "expo-router";
+import { Platform } from "react-native";
 import {
   createContext,
   createElement,
@@ -15,20 +16,20 @@ import {
   useMemo,
   useSyncExternalStore,
   type ReactNode,
-} from 'react';
-import { NotificationDeviceSession } from './notification-device-session';
-import { analytics } from './analytics';
+} from "react";
+import { NotificationDeviceSession } from "./notification-device-session";
+import { analytics } from "./analytics";
 
-const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? 'default').replace(/[^A-Za-z0-9._-]/g, '_')}`;
+const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
   read: async () => {
     const stored = await SecureStore.getItemAsync(tokenStorageKey);
     const tokens: unknown = stored ? JSON.parse(stored) : [];
     if (
       !Array.isArray(tokens) ||
-      !tokens.every((token): token is string => typeof token === 'string')
+      !tokens.every((token): token is string => typeof token === "string")
     ) {
-      throw new Error('Invalid saved notification tokens');
+      throw new Error("Invalid saved notification tokens");
     }
     return tokens;
   },
@@ -41,7 +42,7 @@ const NotificationSessionContext =
 
 export function useNotificationSession() {
   const session = use(NotificationSessionContext);
-  if (!session) throw new Error('NotificationSessionProvider is required');
+  if (!session) throw new Error("NotificationSessionProvider is required");
   const operation = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -59,7 +60,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export function getNotificationTimezone(): string | undefined {
+function getNotificationTimezone(): string | undefined {
   return (
     Localization.getCalendars()[0]?.timeZone ??
     Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -67,15 +68,15 @@ export function getNotificationTimezone(): string | undefined {
 }
 
 async function prepareNotificationChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('weekly-shelf', {
-    name: 'Weekly shelf',
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync("weekly-shelf", {
+    name: t("notifications.weeklyShelf"),
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });
 }
 
-export async function getExpoPushToken(
+async function getExpoPushToken(
   requestPermission: boolean,
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<string | null> {
@@ -110,6 +111,7 @@ export function NotificationSessionProvider({
   children: ReactNode;
 }) {
   const { isAuthenticated } = useConvexAuth();
+  const locale = useAppLocale();
   const { signOut } = useAuthActions();
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
@@ -119,10 +121,12 @@ export function NotificationSessionProvider({
     () =>
       new NotificationDeviceSession(tokenStore, {
         getToken: getExpoPushToken,
-        saveToken: (token) =>
+        getLocale: currentLocale,
+        saveToken: (token, locale) =>
           registerDevice({
             token,
-            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+            locale,
+            platform: Platform.OS === "ios" ? "ios" : "android",
             timezone: getNotificationTimezone(),
           }),
         revokeToken: (token) => unregisterDevice({ token }),
@@ -135,7 +139,7 @@ export function NotificationSessionProvider({
         deleteAccount: () => deleteAccount({}),
         resetAnalytics: analytics.reset,
         reportError: (error) =>
-          console.error('Notification session cleanup failed', error),
+          analytics.captureError("notification_session_cleanup_failed", error),
       }),
     [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
   );
@@ -152,7 +156,7 @@ export function NotificationSessionProvider({
       try {
         await session.register(() => getExpoPushToken(false, devicePushToken));
       } catch (error) {
-        console.error('Notification registration failed', error);
+        analytics.captureError("notification_registration_failed", error);
       }
     };
 
@@ -168,6 +172,15 @@ export function NotificationSessionProvider({
     };
   }, [isAuthenticated, session]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void session
+      .register()
+      .catch((error) =>
+        analytics.captureError("notification_locale_sync_failed", error),
+      );
+  }, [locale, isAuthenticated, session]);
+
   return createElement(
     NotificationSessionContext,
     { value: session },
@@ -181,7 +194,7 @@ function getNotificationUrl(
   const data = notification.request.content.data as
     | { url?: unknown }
     | undefined;
-  return typeof data?.url === 'string' ? data.url : null;
+  return typeof data?.url === "string" ? data.url : null;
 }
 
 export function useNotificationObserver(): void {

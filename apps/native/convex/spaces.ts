@@ -60,7 +60,11 @@ const BACKFILL_SCAN_LIMIT = 8000;
 const BACKFILL_READ_BUDGET = BACKFILL_SCAN_LIMIT + 1;
 
 /** A whole number at or above `min`, or `fallback` for anything else. */
-function knob(value: number | undefined, min: number, fallback: number): number {
+function knob(
+  value: number | undefined,
+  min: number,
+  fallback: number,
+): number {
   return value !== undefined && Number.isFinite(value) && value >= min
     ? Math.floor(value)
     : fallback;
@@ -659,9 +663,7 @@ export const backfillSpaceCounters = internalMutation({
     // One extra row tells us whether anything follows the batch.
     const candidates = await ctx.db
       .query("spaces")
-      .withIndex("by_id", (q) =>
-        after === null ? q : q.gt("_id", after),
-      )
+      .withIndex("by_id", (q) => (after === null ? q : q.gt("_id", after)))
       .take(batchSize + 1);
     const batch = candidates.slice(0, batchSize);
     let moreAfterBatch = candidates.length > batchSize;

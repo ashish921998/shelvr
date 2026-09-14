@@ -1,35 +1,39 @@
-import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
-import { usePermissions, type PermissionResponse } from 'expo-media-library';
-import { Stack, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState, type FC } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
+import { usePermissions, type PermissionResponse } from "expo-media-library";
+import { Stack, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState, type FC } from "react";
+import { Platform, Pressable, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
-import { EmptyState } from '@/components/empty-state';
-import { HeaderActionMenu, HeaderIconButton } from '@/components/ui/header-icon-button';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { ProGate as ProGateView } from '@/components/pro-gate';
-import { TidyDeck } from '@/components/tidy/tidy-deck';
-import { TidyDone } from '@/components/tidy/tidy-done';
-import { useEntitlement } from '@/lib/entitlement';
+import { EmptyState } from "@/components/empty-state";
+import {
+  HeaderActionMenu,
+  HeaderIconButton,
+} from "@/components/ui/header-icon-button";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { ProGate as ProGateView } from "@/components/pro-gate";
+import { TidyDeck } from "@/components/tidy/tidy-deck";
+import { TidyDone } from "@/components/tidy/tidy-done";
+import { useEntitlement } from "@/lib/entitlement";
 import {
   DeckAnimationProvider,
   useDeckAnimation,
-} from '@/lib/tidy/deck-animation';
-import { getSelectedAlbumId, setSelectedAlbumId } from '@/lib/tidy/storage';
+} from "@/lib/tidy/deck-animation";
+import { getSelectedAlbumId, setSelectedAlbumId } from "@/lib/tidy/storage";
 import {
   ALL_PHOTOS_ID,
   useAlbums,
   type TidySource,
-} from '@/lib/tidy/use-albums';
-import { usePhotoBatch, type TidyPhoto } from '@/lib/tidy/use-photo-batch';
-import { useTidyActions } from '@/lib/tidy/use-tidy-actions';
+} from "@/lib/tidy/use-albums";
+import { usePhotoBatch, type TidyPhoto } from "@/lib/tidy/use-photo-batch";
+import { useTidyActions } from "@/lib/tidy/use-tidy-actions";
 
 export default function TidyScreen() {
   const { entitled, loading: entitlementLoading } = useEntitlement();
   const [permission, requestPermission] = usePermissions({
-    granularPermissions: ['photo'],
+    granularPermissions: ["photo"],
   });
   const granted = permission?.granted ?? false;
 
@@ -88,7 +92,7 @@ export default function TidyScreen() {
         sources={sources}
         selectedId={source.id}
         selectSource={selectSource}
-        limitedAccess={permission.accessPrivileges === 'limited'}
+        limitedAccess={permission.accessPrivileges === "limited"}
         loadNextBatch={loadNextBatch}
         noteDeleted={noteDeleted}
       />
@@ -115,6 +119,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
   loadNextBatch,
   noteDeleted,
 }) => {
+  useAppLocale();
   const { undoIndex } = useDeckAnimation();
   const {
     topIndex,
@@ -140,7 +145,7 @@ const TidyDeckView: FC<DeckViewProps> = ({
   const handleUndo = () => {
     const index = undo();
     if (index === null) return;
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     undoIndex.set(index);
@@ -165,36 +170,52 @@ const TidyDeckView: FC<DeckViewProps> = ({
       <Stack.Screen
         options={{
           title: currentSource.title,
-          ...(Platform.OS === 'android'
+          ...(Platform.OS === "android"
             ? {
                 headerLeft: canUndo
-                  ? () => <HeaderIconButton icon="arrow.uturn.backward" label="Undo" onPress={handleUndo} />
+                  ? () => (
+                      <HeaderIconButton
+                        icon="arrow.uturn.backward"
+                        label={t("common.undo")}
+                        onPress={handleUndo}
+                      />
+                    )
                   : undefined,
                 headerRight: () => (
                   <View style={styles.headerActions}>
                     {pendingDeleteCount > 0 ? (
-                      <HeaderIconButton icon="trash" label="Delete reviewed photos" badge={pendingDeleteCount} onPress={commitDeletes} />
+                      <HeaderIconButton
+                        icon="trash"
+                        label={t("tidy.confirmDelete")}
+                        badge={pendingDeleteCount}
+                        onPress={commitDeletes}
+                      />
                     ) : null}
                     <HeaderActionMenu
                       icon="photo.on.rectangle.angled"
                       label={
                         limitedAccess
-                          ? 'Choose photo album. Limited photo access.'
-                          : 'Choose photo album'
+                          ? t("albums.chooseLimited")
+                          : t("albums.choose")
                       }
-                      title="Photo source"
+                      title={t("albums.source")}
                       actions={[
                         ...sources.map((source) => ({
                           id: source.id,
-                          label: source.id === selectedId ? `${source.title} ✓` : source.title,
+                          label:
+                            source.id === selectedId
+                              ? `${source.title} ✓`
+                              : source.title,
                           onPress: () => selectSource(source.id),
                         })),
                         ...(limitedAccess
-                          ? [{
-                              id: 'manage-photo-access',
-                              label: 'Manage photo access…',
-                              onPress: () => Linking.openSettings(),
-                            }]
+                          ? [
+                              {
+                                id: "manage-photo-access",
+                                label: t("albums.manageAccessAction"),
+                                onPress: () => Linking.openSettings(),
+                              },
+                            ]
                           : []),
                       ]}
                     />
@@ -207,48 +228,52 @@ const TidyDeckView: FC<DeckViewProps> = ({
 
       {/* Native header controls (note 3): undo on the left, delete on the
           right with a live count badge. */}
-      {Platform.OS === 'ios' ? <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button
-          icon="arrow.uturn.backward"
-          hidden={!canUndo}
-          onPress={handleUndo}
-        >
-          Undo
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar> : null}
-      {Platform.OS === 'ios' ? <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon="trash"
-          hidden={pendingDeleteCount === 0}
-          onPress={commitDeletes}
-        >
-          <Stack.Toolbar.Label>Delete</Stack.Toolbar.Label>
-          {pendingDeleteCount > 0 && (
-            <Stack.Toolbar.Badge>
-              {String(pendingDeleteCount)}
-            </Stack.Toolbar.Badge>
-          )}
-        </Stack.Toolbar.Button>
-        <Stack.Toolbar.Menu icon="photo.on.rectangle.angled">
-          {sources.map((s) => (
-            <Stack.Toolbar.MenuAction
-              key={s.id}
-              isOn={s.id === selectedId}
-              onPress={() => selectSource(s.id)}
-            >
-              {s.title}
-            </Stack.Toolbar.MenuAction>
-          ))}
-          {limitedAccess ? (
-            <Stack.Toolbar.MenuAction
-              icon="gearshape"
-              onPress={() => Linking.openSettings()}
-            >
-              Manage Photo Access
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-        </Stack.Toolbar.Menu>
-      </Stack.Toolbar> : null}
+      {Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button
+            icon="arrow.uturn.backward"
+            hidden={!canUndo}
+            onPress={handleUndo}
+          >
+            {t("common.undo")}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      ) : null}
+      {Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="trash"
+            hidden={pendingDeleteCount === 0}
+            onPress={commitDeletes}
+          >
+            <Stack.Toolbar.Label>{t("common.delete")}</Stack.Toolbar.Label>
+            {pendingDeleteCount > 0 && (
+              <Stack.Toolbar.Badge>
+                {String(pendingDeleteCount)}
+              </Stack.Toolbar.Badge>
+            )}
+          </Stack.Toolbar.Button>
+          <Stack.Toolbar.Menu icon="photo.on.rectangle.angled">
+            {sources.map((s) => (
+              <Stack.Toolbar.MenuAction
+                key={s.id}
+                isOn={s.id === selectedId}
+                onPress={() => selectSource(s.id)}
+              >
+                {s.title}
+              </Stack.Toolbar.MenuAction>
+            ))}
+            {limitedAccess ? (
+              <Stack.Toolbar.MenuAction
+                icon="gearshape"
+                onPress={() => Linking.openSettings()}
+              >
+                {t("albums.manageAccessTitle")}
+              </Stack.Toolbar.MenuAction>
+            ) : null}
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      ) : null}
 
       {/* Centered progress counter (note 2). */}
       <View style={styles.progressRow}>
@@ -278,6 +303,7 @@ const PermissionGate: FC<{
   permission: PermissionResponse;
   requestPermission: () => Promise<PermissionResponse>;
 }> = ({ permission, requestPermission }) => {
+  useAppLocale();
   const handlePress = () => {
     if (permission.canAskAgain) {
       requestPermission();
@@ -288,29 +314,23 @@ const PermissionGate: FC<{
 
   return (
     <View style={styles.gate}>
-      <EmptyState
-        title="Tidy your camera roll"
-        message={
-          'Swipe through your photos one by one.\nKeep them, delete them, or save them into Shelvr.'
-        }
-      />
+      <EmptyState title={t("tidy.introTitle")} message={t("tidy.introBody")} />
       <Pressable style={styles.gateButton} onPress={handlePress}>
         <Text style={styles.gateButtonText}>
-          {permission.canAskAgain ? 'Allow photo access' : 'Open Settings'}
+          {permission.canAskAgain
+            ? t("permissions.allowPhotos")
+            : t("permissions.openSettings")}
         </Text>
       </Pressable>
     </View>
   );
 };
 
-const Loading: FC = () => <ScreenLoader label="Opening Tidy" />;
+const Loading: FC = () => <ScreenLoader label={t("loading.tidy")} />;
 
 /** Pro gate shown to lapsed users on the Tidy tab. */
 const ProGate: FC = () => (
-  <ProGateView
-    title="Tidy is a Pro feature"
-    message="Sweep through your photo library and clear out the clutter. View Shelvr Pro plans to unlock Tidy and every other Pro feature."
-  />
+  <ProGateView title={t("tidy.proTitle")} message={t("tidy.proBody")} />
 );
 
 const styles = StyleSheet.create((theme, rt) => ({
@@ -319,12 +339,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.gap(1),
   },
   progressRow: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingTop: rt.insets.top + theme.gap(6),
     paddingBottom: theme.gap(1),
   },
@@ -345,17 +365,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: theme.gap(6),
   },
   gateButton: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: theme.gap(6),
     paddingHorizontal: theme.gap(3),
     paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
   },
   gateButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: 'white',
+    color: "white",
   },
 }));

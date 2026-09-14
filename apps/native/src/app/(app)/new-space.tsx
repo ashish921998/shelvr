@@ -1,16 +1,17 @@
-import { AnimatedSwitch } from '@/components/ui/animated-switch';
-import { ScreenLoader } from '@/components/ui/screen-loader';
-import { usePaywallGuard } from '@/lib/entitlement';
-import { api } from '@convex/_generated/api';
-import type { Doc, Id } from '@convex/_generated/dataModel';
-import { MAX_SPACE_NAME_LENGTH } from '@convex/model/spaceName';
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
-import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
+import { AnimatedSwitch } from "@/components/ui/animated-switch";
+import { ScreenLoader } from "@/components/ui/screen-loader";
+import { usePaywallGuard } from "@/lib/entitlement";
+import { api } from "@convex/_generated/api";
+import type { Doc, Id } from "@convex/_generated/dataModel";
+import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
+import * as Haptics from "expo-haptics";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,16 +20,16 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
+} from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
   Keyframe,
   useReducedMotion,
-} from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
-import { EASE_OUT } from '@/lib/motion';
+} from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
+import { EASE_OUT } from "@/lib/motion";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: 0.97 }] },
@@ -42,20 +43,26 @@ const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(100).easing(EASE_OUT);
 // is keyed by the loaded space so its `useState` initializers seed once from
 // the server value and a cached query refresh never overwrites in-flight edits.
 export default function NewSpaceScreen() {
+  useAppLocale();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = id !== undefined;
 
   // 'skip' (not `enabled`) keeps create mode from subscribing with an empty
   // id — see item/[id].tsx for why `enabled` is not enough here.
-  const { data: space, isLoading, isError } = useQuery(
-    convexQuery(api.spaces.getSpace, editing ? { id: id as Id<'spaces'> } : 'skip'),
+  const {
+    data: space,
+    isLoading,
+    isError,
+  } = useQuery(
+    convexQuery(
+      api.spaces.getSpace,
+      editing ? { id: id as Id<"spaces"> } : "skip",
+    ),
   );
 
   // Edit mode waits for the space to arrive; create mode renders immediately.
   if (editing && isLoading) {
-    return (
-      <ScreenLoader label="Opening space" />
-    );
+    return <ScreenLoader label={t("loading.space")} />;
   }
 
   // The space is gone, inaccessible, or the link is stale. This guard is the
@@ -65,7 +72,7 @@ export default function NewSpaceScreen() {
   if (editing && (isError || space === null)) {
     return (
       <View style={styles.loading}>
-        <Text>This space is no longer available.</Text>
+        <Text>{t("spaces.unavailable")}</Text>
       </View>
     );
   }
@@ -76,17 +83,16 @@ export default function NewSpaceScreen() {
   return <SpaceForm key="new" mode="create" />;
 }
 
-type Space = Pick<Doc<'spaces'>, '_id' | 'name' | 'dynamic'>;
+type Space = Pick<Doc<"spaces">, "_id" | "name" | "dynamic">;
 
 // A discriminated union makes the two modes impossible to confuse: in edit
 // mode `space` is guaranteed present, so `save` switches on `mode` and the
 // create branch is structurally unreachable from edit mode.
-type SpaceFormProps =
-  | { mode: 'create' }
-  | { mode: 'edit'; space: Space };
+type SpaceFormProps = { mode: "create" } | { mode: "edit"; space: Space };
 
 function SpaceForm(props: SpaceFormProps) {
-  const editing = props.mode === 'edit';
+  useAppLocale();
+  const editing = props.mode === "edit";
   const router = useRouter();
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
@@ -95,16 +101,18 @@ function SpaceForm(props: SpaceFormProps) {
   // Creating a space and enabling dynamic are Pro — route to the paywall if
   // not entitled. Editing a name or turning dynamic off stays open to lapsed
   // users (managing existing data).
-  const { guard } = usePaywallGuard('new_space');
+  const { guard } = usePaywallGuard("new_space");
 
   // Seeded once per (keyed) mount: a fresh create starts dynamic on; an edit
   // starts from the loaded space. A query refresh remounts via key only if the
   // id changes, so user typing is never overwritten.
-  const [name, setName] = useState(props.mode === 'edit' ? props.space.name : '');
+  const [name, setName] = useState(
+    props.mode === "edit" ? props.space.name : "",
+  );
   // Dynamic is the marquee behavior — on by default for a new space; an edit
   // mirrors the server, treating a legacy status-less space as off.
   const [dynamic, setDynamic] = useState(
-    props.mode === 'edit' ? props.space.dynamic ?? false : true,
+    props.mode === "edit" ? (props.space.dynamic ?? false) : true,
   );
   const [saving, setSaving] = useState(false);
 
@@ -112,20 +120,24 @@ function SpaceForm(props: SpaceFormProps) {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
     // Creating any space is Pro; editing is Pro only when turning dynamic on.
-    const needsPro = props.mode === 'create' || (props.mode === 'edit' && dynamic && !(props.space.dynamic ?? false));
+    const needsPro =
+      props.mode === "create" ||
+      (props.mode === "edit" && dynamic && !(props.space.dynamic ?? false));
     if (needsPro) {
       const ok = await guard();
       if (!ok) return;
     }
     setSaving(true);
     try {
-      if (props.mode === 'edit') {
+      if (props.mode === "edit") {
         await updateSpace({ id: props.space._id, name: trimmed, dynamic });
       } else {
         await createSpace({ name: trimmed, dynamic });
       }
-      analytics.capture(editing ? 'space_updated' : 'space_created', { dynamic });
-      if (process.env.EXPO_OS === 'ios') {
+      analytics.capture(editing ? "space_updated" : "space_created", {
+        dynamic,
+      });
+      if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       router.back();
@@ -133,10 +145,10 @@ function SpaceForm(props: SpaceFormProps) {
       // A ConvexError carries the server's user-facing sentence in `data`;
       // anything else is redacted to "Server Error" in production.
       Alert.alert(
-        editing ? 'Could not save space' : 'Could not create space',
-        error instanceof ConvexError && typeof error.data === 'string'
-          ? error.data
-          : 'Something went wrong. Try again.',
+        editing ? t("spaces.saveFailed") : t("spaces.createFailed"),
+        error instanceof ConvexError && typeof error.data === "string"
+          ? localizeError(error.data, "errors.tryAgain")
+          : t("errors.tryAgain"),
       );
       setSaving(false);
     }
@@ -148,15 +160,14 @@ function SpaceForm(props: SpaceFormProps) {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.heading}>{editing ? 'Edit space' : 'New space'}</Text>
-      <Text style={styles.subheading}>
-        Give it a title — Shelvr will suggest a few of your saves that fit. You
-        choose what sticks.
+      <Text style={styles.heading}>
+        {editing ? t("spaces.editTitle") : t("spaces.newTitle")}
       </Text>
+      <Text style={styles.subheading}>{t("spaces.editorHelp")}</Text>
 
       <TextInput
         style={styles.nameInput}
-        placeholder="Apartment shopping list"
+        placeholder={t("spaces.titlePlaceholder")}
         placeholderTextColor={theme.colors.faint}
         value={name}
         onChangeText={setName}
@@ -166,10 +177,8 @@ function SpaceForm(props: SpaceFormProps) {
 
       <View style={styles.dynamicRow}>
         <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>Dynamic</Text>
-          <Text style={styles.dynamicHint}>
-            Shelvr keeps suggesting things that fit
-          </Text>
+          <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
+          <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
         </View>
         <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
       </View>
@@ -185,25 +194,26 @@ function SpaceForm(props: SpaceFormProps) {
       >
         <View style={styles.saveButtonContent}>
           <Animated.View
-            key={saving ? 'saving' : 'idle'}
+            key={saving ? "saving" : "idle"}
             entering={
               reducedMotion
                 ? SUBMIT_CONTENT_REDUCED_ENTER
                 : SUBMIT_CONTENT_ENTER
             }
             exiting={
-              reducedMotion
-                ? SUBMIT_CONTENT_REDUCED_EXIT
-                : SUBMIT_CONTENT_EXIT
+              reducedMotion ? SUBMIT_CONTENT_REDUCED_EXIT : SUBMIT_CONTENT_EXIT
             }
             collapsable={false}
             style={styles.saveButtonState}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={theme.colors.primaryForeground} />
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primaryForeground}
+              />
             ) : (
               <Text style={styles.saveButtonText}>
-                {editing ? 'Save changes' : 'Create space'}
+                {editing ? t("common.saveChanges") : t("spaces.create")}
               </Text>
             )}
           </Animated.View>
@@ -216,8 +226,8 @@ function SpaceForm(props: SpaceFormProps) {
 const styles = StyleSheet.create((theme) => ({
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     padding: theme.gap(2.5),
@@ -237,7 +247,7 @@ const styles = StyleSheet.create((theme) => ({
   nameInput: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.gap(1.5),
@@ -246,12 +256,12 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   dynamicRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1.5),
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: theme.gap(1.5),
@@ -274,18 +284,18 @@ const styles = StyleSheet.create((theme) => ({
   saveButton: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     paddingVertical: theme.gap(1.75),
-    alignItems: 'center',
+    alignItems: "center",
   },
   saveButtonContent: {
-    width: '100%',
+    width: "100%",
     height: 20,
   },
   saveButtonState: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   saveButtonText: {
     fontFamily: theme.fonts.bold,

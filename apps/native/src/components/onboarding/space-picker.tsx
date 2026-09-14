@@ -1,40 +1,42 @@
-import { CtaButton } from '@/components/onboarding/parts';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { t, useAppLocale } from "@/lib/i18n";
+import { CtaButton } from "@/components/onboarding/parts";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The closed set of Q2 ("What do you save most?") answers. The picker maps each
 // to one or more starter space names so a user who picked "Recipes" lands here
 // with "Recipes" and "Restaurants to try" already selected.
 export type SaveKind =
-  | 'Articles'
-  | 'Recipes'
-  | 'Products'
-  | 'Home & decor'
-  | 'Travel'
-  | 'Fitness'
-  | 'Inspiration'
-  | 'Videos';
+  | "Articles"
+  | "Recipes"
+  | "Products"
+  | "Home & decor"
+  | "Travel"
+  | "Fitness"
+  | "Inspiration"
+  | "Videos";
 
 // Static preset map — no backend, no config. Every Q2 answer seeds a focused
 // starter set; generic presets below catch everyone. Deduped at render time so
 // overlapping answers (e.g. Inspiration + Travel) don't double-list a space.
 const SPACE_PRESETS: Record<SaveKind, string[]> = {
-  Articles: ['Articles', 'Read later', 'Long reads'],
-  Recipes: ['Recipes', 'Restaurants to try'],
-  Products: ['Wishlist', 'Gift ideas'],
-  'Home & decor': ['Home', 'Decor ideas'],
-  Travel: ['Travel', 'Trip ideas'],
-  Fitness: ['Fitness', 'Workouts'],
-  Inspiration: ['Inspiration', 'Ideas'],
-  Videos: ['Videos', 'Watch later'],
+  Articles: ["Articles", "Read later", "Long reads"],
+  Recipes: ["Recipes", "Restaurants to try"],
+  Products: ["Wishlist", "Gift ideas"],
+  "Home & decor": ["Home & decor", "Decor ideas"],
+  Travel: ["Travel", "Trip ideas"],
+  Fitness: ["Fitness", "Workouts"],
+  Inspiration: ["Inspiration", "Ideas"],
+  Videos: ["Videos", "Watch later"],
 };
 
 // Always offered, regardless of Q2 — these are the universally useful shelves.
-const GENERIC_PRESETS = ['Read later', 'Inspiration', 'Wishlist'];
+const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
 
 /**
- * Derive the deduped preset space names from Q2 answers, preserving first-seen
+ * Derive the deduped stable preset identities from Q2 answers, preserving first-seen
  * order. Exported so the onboarding orchestrator can pre-select these when the
  * user reaches the spaces step.
  */
@@ -42,17 +44,17 @@ export function getSpacePresets(answers: SaveKind[]): string[] {
   const seen = new Set<string>();
   const candidates: string[] = [];
   for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
+    for (const preset of SPACE_PRESETS[kind] ?? []) {
+      if (!seen.has(preset)) {
+        seen.add(preset);
+        candidates.push(preset);
       }
     }
   }
-  for (const name of GENERIC_PRESETS) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
+  for (const preset of GENERIC_PRESETS) {
+    if (!seen.has(preset)) {
+      seen.add(preset);
+      candidates.push(preset);
     }
   }
   return candidates;
@@ -75,26 +77,11 @@ export function SpacePickerStep({
   onToggle: (name: string) => void;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
-  // Build the deduped candidate list: seeded presets from each Q2 answer, then
-  // generics, preserving first-seen order.
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  for (const kind of answers) {
-    for (const name of SPACE_PRESETS[kind] ?? []) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        candidates.push(name);
-      }
-    }
-  }
-  for (const name of GENERIC_PRESETS) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
-    }
-  }
+  const candidates = getSpacePresets(answers);
+  const seen = new Set(candidates);
 
   // Anything pre-selected that isn't a known preset (e.g. carried over from an
   // earlier render) still shows so the user can deselect it.
@@ -109,11 +96,17 @@ export function SpacePickerStep({
 
   return (
     <View style={styles.wrap}>
-      <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
-        Pick your spaces.
+      <Animated.Text
+        entering={FadeInDown.duration(400)}
+        style={styles.headline}
+      >
+        {t("onboarding.spacesTitle")}
       </Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={styles.support}>
-        Shelvr suggests saves for these spaces. Add or rename anytime.
+      <Animated.Text
+        entering={FadeInDown.delay(80).duration(400)}
+        style={styles.support}
+      >
+        {t("onboarding.spacesHelp")}
       </Animated.Text>
 
       <ScrollView
@@ -134,15 +127,27 @@ export function SpacePickerStep({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{name}</Text>
-                {active && <Text style={[styles.check, { color: theme.colors.primary }]}>✓</Text>}
+                <Text
+                  style={[styles.chipLabel, active && styles.chipLabelActive]}
+                >
+                  {onboardingLabel(name)}
+                </Text>
+                {active && (
+                  <Text style={[styles.check, { color: theme.colors.primary }]}>
+                    ✓
+                  </Text>
+                )}
               </Pressable>
             );
           })}
         </View>
       </ScrollView>
 
-      <CtaButton label="Create my spaces" onPress={onAdvance} disabled={!canAdvance} />
+      <CtaButton
+        label={t("onboarding.createSpaces")}
+        onPress={onAdvance}
+        disabled={!canAdvance}
+      />
     </View>
   );
 }
@@ -171,13 +176,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(1),
   },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(1),
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingVertical: theme.gap(1.25),
     paddingHorizontal: theme.gap(2),

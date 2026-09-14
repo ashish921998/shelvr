@@ -1,0 +1,68 @@
+{
+  "de": {
+    "title": "Dein Wochenregal",
+    "body": {
+      "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",
+      "other": "%{formattedCount} gespeicherte Inhalte warten auf dich"
+    }
+  },
+  "en": {
+    "title": "Your weekly shelf",
+    "body": {
+      "one": "%{formattedCount} save waiting for you",
+      "other": "%{formattedCount} saves waiting for you"
+    }
+  },
+  "es": {
+    "title": "Tu estantería semanal",
+    "body": {
+      "one": "%{formattedCount} contenido guardado te espera",
+      "many": "%{formattedCount} contenidos guardados te esperan",
+      "other": "%{formattedCount} contenidos guardados te esperan"
+    }
+  },
+  "es-MX": {
+    "title": "Tu estantería semanal",
+    "body": {
+      "one": "%{formattedCount} contenido guardado te espera",
+      "many": "%{formattedCount} contenidos guardados te esperan",
+      "other": "%{formattedCount} contenidos guardados te esperan"
+    }
+  },
+  "fr": {
+    "title": "Votre étagère hebdomadaire",
+    "body": {
+      "one": "%{formattedCount} contenu enregistré vous attend",
+      "many": "%{formattedCount} contenus enregistrés vous attendent",
+      "other": "%{formattedCount} contenus enregistrés vous attendent"
+    }
+  },
+  "fr-CA": {
+    "title": "Votre étagère hebdomadaire",
+    "body": {
+      "one": "%{formattedCount} contenu enregistré vous attend",
+      "many": "%{formattedCount} contenus enregistrés vous attendent",
+      "other": "%{formattedCount} contenus enregistrés vous attendent"
+    }
+  },
+  "ja": {
+    "title": "あなたの今週のシェルフ",
+    "body": {
+      "other": "%{formattedCount}件の保存項目があなたを待っています"
+    }
+  },
+  "ko": {
+    "title": "내 주간 책장",
+    "body": {
+      "other": "저장 항목 %{formattedCount}개가 기다리고 있어요"
+    }
+  },
+  "pt-BR": {
+    "title": "Sua estante semanal",
+    "body": {
+      "one": "%{formattedCount} conteúdo salvo esperando por você",
+      "many": "%{formattedCount} conteúdos salvos esperando por você",
+      "other": "%{formattedCount} conteúdos salvos esperando por você"
+    }
+  }
+}

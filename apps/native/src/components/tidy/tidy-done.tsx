@@ -1,9 +1,10 @@
-import { type FC } from 'react';
-import { ActivityIndicator, Pressable, Text } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { type FC } from "react";
+import { ActivityIndicator, Pressable, Text } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { StyleSheet } from "react-native-unistyles";
 
-import type { TidyCounts } from '@/lib/tidy/use-tidy-actions';
+import type { TidyCounts } from "@/lib/tidy/use-tidy-actions";
 
 type Props = {
   counts: TidyCounts;
@@ -27,33 +28,40 @@ export const TidyDone: FC<Props> = ({
   loading,
   onContinue,
 }) => {
+  useAppLocale();
   const summary = [
-    counts.kept === 1 ? '1 kept' : `${counts.kept} kept`,
-    counts.saved === 1 ? '1 saved to Shelvr' : `${counts.saved} saved to Shelvr`,
-    pendingDeleteCount + counts.deleted === 1
-      ? '1 deleted'
-      : `${pendingDeleteCount + counts.deleted} deleted`,
-  ].join('  ·  ');
+    t("tidy.keptCount", { count: counts.kept }),
+    t("tidy.savedCount", { count: counts.saved }),
+    t("tidy.deletedCount", { count: pendingDeleteCount + counts.deleted }),
+  ].join("  ·  ");
 
   return (
     <Animated.View entering={FadeIn.duration(250)} style={styles.container}>
-      <Text style={styles.title}>{empty ? 'All tidied' : 'Batch tidied'}</Text>
+      <Text style={styles.title}>
+        {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
+      </Text>
       <Text style={styles.summary}>
-        {empty ? `Nothing left to sort in ${sourceTitle}. Pick another source above.` : summary}
+        {empty
+          ? t("tidy.emptyBody", {
+              source: sourceTitle,
+            })
+          : summary}
       </Text>
       {pendingDeleteCount > 0 && (
         <Text style={styles.note}>
-          {pendingDeleteCount === 1
-            ? "You'll be asked to confirm 1 deletion."
-            : `You'll be asked to confirm ${pendingDeleteCount} deletions.`}
+          {t("tidy.pendingDeleteCount", { count: pendingDeleteCount })}
         </Text>
       )}
       {!empty && (
-        <Pressable style={styles.button} onPress={onContinue} disabled={loading}>
+        <Pressable
+          style={styles.button}
+          onPress={onContinue}
+          disabled={loading}
+        >
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.buttonText}>Keep going</Text>
+            <Text style={styles.buttonText}>{t("tidy.continue")}</Text>
           )}
         </Pressable>
       )}
@@ -64,8 +72,8 @@ export const TidyDone: FC<Props> = ({
 const styles = StyleSheet.create((theme) => ({
   container: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(4),
     backgroundColor: theme.colors.background,
@@ -79,27 +87,27 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     color: theme.colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
   },
   note: {
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     color: theme.colors.faint,
-    textAlign: 'center',
+    textAlign: "center",
   },
   button: {
     marginTop: theme.gap(2),
     minWidth: 160,
-    alignItems: 'center',
+    alignItems: "center",
     paddingHorizontal: theme.gap(3),
     paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
   },
   buttonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: 'white',
+    color: "white",
   },
 }));

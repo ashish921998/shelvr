@@ -1,0 +1,27 @@
+{
+  "defaultLocale": "en",
+  "brandLiterals": [
+    "Shelvr",
+    "Shelvr Pro",
+    "Pro",
+    "iPhone",
+    "iPad",
+    "Apple Watch",
+    "App Store",
+    "Google Play"
+  ],
+  "storeLocales": {
+    "de-DE": "de",
+    "en-AU": "en",
+    "en-CA": "en",
+    "en-GB": "en",
+    "en-US": "en",
+    "es-ES": "es",
+    "es-MX": "es-MX",
+    "fr-CA": "fr-CA",
+    "fr-FR": "fr",
+    "ja": "ja",
+    "ko": "ko",
+    "pt-BR": "pt-BR"
+  }
+}

@@ -1,19 +1,20 @@
-import { OnboardingProvider } from '@/lib/onboarding';
-import { analytics } from '@/lib/analytics';
-import { useEntitlementSync } from '@/lib/entitlement';
-import { useCurrentUser } from '@/lib/current-user';
-import { posthog } from '@/lib/posthog';
-import { ConvexAuthProvider, type TokenStorage } from '@convex-dev/auth/react';
+import { t, useAppLocale } from "@/lib/i18n";
+import { OnboardingProvider } from "@/lib/onboarding";
+import { analytics } from "@/lib/analytics";
+import { useEntitlementSync } from "@/lib/entitlement";
+import { useCurrentUser } from "@/lib/current-user";
+import { posthog } from "@/lib/posthog";
+import { ConvexAuthProvider, type TokenStorage } from "@convex-dev/auth/react";
 import {
   convex,
   persister,
   queryClient,
   restartConvexSubscription,
-} from '@/lib/query-client';
-import { observeAuthQueryErrors } from '@/lib/query-auth-recovery';
-import { useConvexAuth } from 'convex/react';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import * as SecureStore from 'expo-secure-store';
+} from "@/lib/query-client";
+import { observeAuthQueryErrors } from "@/lib/query-auth-recovery";
+import { useConvexAuth } from "convex/react";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import * as SecureStore from "expo-secure-store";
 import {
   DarkTheme,
   DefaultTheme,
@@ -22,18 +23,20 @@ import {
   usePathname,
   useRouter,
   useSegments,
-} from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import * as SystemUI from 'expo-system-ui';
-import { useEffect, useRef } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { PostHogProvider } from 'posthog-react-native';
-import { useUnistyles } from 'react-native-unistyles';
-import { isDarkThemeName } from '@/lib/appearance';
+  type ErrorBoundaryProps,
+} from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
+import { useEffect, useRef } from "react";
+import { Pressable, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { PostHogProvider } from "posthog-react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
   useNotificationObserver,
-} from '@/lib/notifications';
+} from "@/lib/notifications";
 
 // Convex Auth persists its JWT + refresh token client-side. In React Native we
 // must supply the storage ourselves — wrap Keychain-backed expo-secure-store
@@ -41,8 +44,8 @@ import {
 // keys to the Convex deployment so a development refresh token can never be
 // presented to production (or leave auth initialization stuck while testing).
 const authStorageNamespace = (
-  process.env.EXPO_PUBLIC_CONVEX_URL ?? 'default'
-).replace(/[^A-Za-z0-9._-]/g, '_');
+  process.env.EXPO_PUBLIC_CONVEX_URL ?? "default"
+).replace(/[^A-Za-z0-9._-]/g, "_");
 const authStorageKey = (key: string) => `${authStorageNamespace}_${key}`;
 
 const authStorage: TokenStorage = {
@@ -73,7 +76,7 @@ function PostHogIdentity() {
       if (!clearedUnauthenticatedUserCache.current) {
         clearedUnauthenticatedUserCache.current = true;
         queryClient.removeQueries({
-          predicate: (query) => query.queryKey[0] === 'convexQuery',
+          predicate: (query) => query.queryKey[0] === "convexQuery",
         });
       }
       return;
@@ -88,7 +91,7 @@ function PostHogIdentity() {
     }
 
     analytics.identify(user._id);
-    analytics.capture('auth_completed');
+    analytics.capture("auth_completed");
     identifiedUserId.current = user._id;
   }, [isAuthenticated, isFetching, user]);
 
@@ -98,9 +101,9 @@ function PostHogIdentity() {
 function PostHogScreenTracking() {
   // Route segments retain placeholders such as [id], excluding saved item IDs,
   // URLs and OAuth query parameters from the analytics screen name.
-  const route = useSegments().join('/');
+  const route = useSegments().join("/");
   useEffect(() => {
-    analytics.screen(route || 'index');
+    analytics.screen(route || "index");
   }, [route]);
   return null;
 }
@@ -108,6 +111,41 @@ function PostHogScreenTracking() {
 function NotificationSetup() {
   useNotificationObserver();
   return null;
+}
+
+/**
+ * Root render-crash boundary. Reports the exception to error tracking and
+ * offers a retry (which remounts the route tree) instead of Expo's bare
+ * default screen. Nested routes without their own boundary land here.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useAppLocale();
+  useEffect(() => {
+    analytics.captureError("render_error", error);
+  }, [error]);
+
+  return (
+    <View style={errorBoundaryStyles.container}>
+      <Text style={errorBoundaryStyles.title}>
+        {t("errors.unexpectedTitle")}
+      </Text>
+      <Text style={errorBoundaryStyles.message}>
+        {t("errors.unexpectedBody")}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void retry()}
+        style={({ pressed }) => [
+          errorBoundaryStyles.retry,
+          pressed && errorBoundaryStyles.retryPressed,
+        ]}
+      >
+        <Text style={errorBoundaryStyles.retryLabel}>
+          {t("common.tryAgain")}
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function NavThemeProvider({ children }: { children: React.ReactNode }) {
@@ -146,7 +184,8 @@ export default function RootLayout() {
   // Contrast with the active app theme (not the OS scheme); camera stays light
   // over the viewfinder.
   const appThemeIsDark = isDarkThemeName(rt.themeName);
-  const statusBarStyle = pathname === '/camera' || appThemeIsDark ? 'light' : 'dark';
+  const statusBarStyle =
+    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
@@ -177,13 +216,13 @@ export default function RootLayout() {
           persistOptions={{
             persister,
             maxAge: 1000 * 60 * 60 * 24,
-            buster: 'v2',
+            buster: "v2",
             // Restoring a user-scoped Convex query before auth initialization
             // both exposes stale account data and starts an unauthenticated
             // subscription. Keep persistence for non-Convex TanStack queries.
             dehydrateOptions: {
               shouldDehydrateQuery: (query) =>
-                query.queryKey[0] !== 'convexQuery',
+                query.queryKey[0] !== "convexQuery",
             },
           }}
         >
@@ -222,3 +261,40 @@ function ConvexErroredQueryHealer() {
   }, [isAuthenticated]);
   return null;
 }
+
+const errorBoundaryStyles = StyleSheet.create((theme, rt) => ({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.gap(4),
+    paddingBottom: rt.insets.bottom + theme.gap(2),
+    gap: theme.gap(1),
+  },
+  title: {
+    fontFamily: theme.fonts.display,
+    fontSize: 22,
+    color: theme.colors.foreground,
+  },
+  message: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    color: theme.colors.muted,
+    textAlign: "center",
+    lineHeight: 21,
+  },
+  retry: {
+    marginTop: theme.gap(2),
+    borderRadius: 24,
+    backgroundColor: theme.colors.foreground,
+    paddingHorizontal: theme.gap(3),
+    paddingVertical: theme.gap(1.5),
+  },
+  retryPressed: { opacity: 0.75 },
+  retryLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.background,
+  },
+}));
