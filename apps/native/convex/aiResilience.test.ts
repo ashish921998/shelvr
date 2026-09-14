@@ -103,6 +103,63 @@ describe("model call deadlines", () => {
   );
 });
 
+describe("categorization telemetry delivery", () => {
+  it("retries a transient capture failure with the same event UUID", async () => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const t = newConvexTest();
+    const itemId = await note(t, "run-1");
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(jobs).toHaveLength(1);
+    const first = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(first.event).toBe("ai_categorization_succeeded");
+    expect(first.uuid).toMatch(/^[0-9a-f-]{36}$/);
+    expect(jobs[0].args[0]).toMatchObject({
+      deliveryId: first.uuid,
+      attempt: 1,
+    });
+
+    await t.action(internal.ai.retryCategorizationTelemetry, jobs[0].args[0]);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual(first);
+  });
+
+  it("gives up after the attempt budget without faulting the action", async () => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "test-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("", { status: 503 })),
+    );
+    const t = newConvexTest();
+
+    await expect(
+      t.action(internal.ai.retryCategorizationTelemetry, {
+        outcome: "failed",
+        itemType: "note",
+        durationMs: 12,
+        deliveryId: "spent",
+        attempt: 3,
+      }),
+    ).resolves.toBeNull();
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(jobs).toHaveLength(0);
+    // A lost telemetry row is warned about, never paged as an action fault.
+    expect(console.error).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("run fencing in processItem", () => {
   it("discards a superseded run's result instead of overwriting the current run", async () => {
     const t = newConvexTest();
