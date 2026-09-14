@@ -161,6 +161,10 @@ export function AppTabs() {
   const insets = useSafeAreaInsets();
   const restingBottom = Math.max(insets.bottom, 10);
 
+  // The search text lives as long as the tabs, like the iOS Search screen's
+  // own state. Signing out unmounts them, so the next account starts empty.
+  useEffect(() => () => setTabSearchQuery(""), []);
+
   return (
     <Tabs style={styles.root} options={{ backBehavior: "history" }}>
       <TabSlot
@@ -221,6 +225,13 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   // 1 once the finger has travelled past SCRUB_SLOP since touching down.
   const scrubbing = useSharedValue(0);
   const touchStartX = useSharedValue(0);
+  // The pill scales and drifts under the finger, so a touch's view-relative
+  // x/y stop matching its resting layout. Where the resting pill sits on screen
+  // is recorded at touch down, and later points are measured from there.
+  const originX = useSharedValue(0);
+  const originY = useSharedValue(0);
+  // The finger driving the gesture; others are ignored. -1 when idle.
+  const touchId = useSharedValue(-1);
 
   useEffect(() => {
     morph.set(withSpring(searchFocused ? 1 : 0, MORPH_SPRING));
@@ -271,8 +282,11 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     .shouldCancelWhenOutside(false)
     .onTouchesDown((event, manager) => {
       const touch = event.changedTouches[0];
-      if (!touch) return;
+      if (!touch || touchId.get() !== -1) return;
       manager.activate();
+      touchId.set(touch.id);
+      originX.set(touch.absoluteX - touch.x);
+      originY.set(touch.absoluteY - touch.y);
       touchX.set(touch.x);
       touchY.set(touch.y);
       touchStartX.set(touch.x);
@@ -290,24 +304,30 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
       if (index >= 0) highlight.set(withSpring(index, SETTLE_SPRING));
     })
     .onTouchesMove((event) => {
-      const touch = event.changedTouches[0];
+      let touch = null;
+      for (let i = 0; i < event.changedTouches.length; i++) {
+        if (event.changedTouches[i].id === touchId.get()) {
+          touch = event.changedTouches[i];
+        }
+      }
       if (!touch) return;
-      touchX.set(touch.x);
-      touchY.set(touch.y);
+      const x = touch.absoluteX - originX.get();
+      const y = touch.absoluteY - originY.get();
+      touchX.set(x);
+      touchY.set(y);
       const width = morph.get() > 0.5 ? BAR_HEIGHT : pillWidth;
-      pullX.set(overflowPast(touch.x, width));
-      pullY.set(overflowPast(touch.y, BAR_HEIGHT));
+      pullX.set(overflowPast(x, width));
+      pullY.set(overflowPast(y, BAR_HEIGHT));
       if (morph.get() > 0.5) return;
       if (
         scrubbing.get() === 0 &&
-        Math.abs(touch.x - touchStartX.get()) > SCRUB_SLOP
+        Math.abs(x - touchStartX.get()) > SCRUB_SLOP
       ) {
         scrubbing.set(1);
       }
-      const withinRow =
-        touch.y >= -VERTICAL_SLOP && touch.y <= BAR_HEIGHT + VERTICAL_SLOP;
+      const withinRow = y >= -VERTICAL_SLOP && y <= BAR_HEIGHT + VERTICAL_SLOP;
       const index = withinRow
-        ? tabIndexAt(touch.x, pillWidth, PILL_TABS.length, PILL_INSET)
+        ? tabIndexAt(x, pillWidth, PILL_TABS.length, PILL_INSET)
         : -1;
       if (index === hovered.get()) return;
       hovered.set(index);
@@ -318,13 +338,18 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
         highlight.set(withSpring(focusedSlot.get(), SETTLE_SPRING));
       }
     })
-    .onTouchesUp((_event, manager) => {
-      manager.end();
+    .onTouchesUp((event, manager) => {
+      for (let i = 0; i < event.changedTouches.length; i++) {
+        if (event.changedTouches[i].id === touchId.get()) {
+          manager.end();
+        }
+      }
     })
     .onTouchesCancelled((_event, manager) => {
       manager.fail();
     })
     .onFinalize((_event, success) => {
+      touchId.set(-1);
       scrubbing.set(0);
       pressed.set(withSpring(0, PRESS_SPRING));
       glow.set(withTiming(0, { duration: 320 }));
@@ -419,7 +444,10 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
       pointerEvents="box-none"
       style={[
         styles.bar,
-        { bottom: keyboardVisible ? KEYBOARD_BOTTOM : restingBottom },
+        {
+          bottom:
+            keyboardVisible && searchFocused ? KEYBOARD_BOTTOM : restingBottom,
+        },
       ]}
     >
       {PILL_TABS.map((tab, index) => (
