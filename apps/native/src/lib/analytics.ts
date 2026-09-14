@@ -157,15 +157,22 @@ function capture<Event extends AnalyticsEvent>(
   }
 }
 
+const SAFE_ERROR_NAMES = new Set([
+  "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError",
+  "URIError", "EvalError", "AggregateError", "AbortError",
+]);
+
 function captureError(
   event: string,
   error: unknown,
   properties: Record<string, string | number | boolean> = {},
 ): void {
-  // The event id is the only field here: the raw error's message can carry
-  // user content, so it stays out of the log stream (the PostHog report
-  // below applies the same sanitization).
-  console.error(event);
+  // Custom names, messages, and stacks can contain user content. Only a
+  // known error type is safe for console diagnostics without PostHog.
+  const errorType = error instanceof Error
+    ? SAFE_ERROR_NAMES.has(error.name) ? error.name : "Error"
+    : "Unknown";
+  console.error(event, { error_type: errorType });
   if (!posthog) return;
 
   try {

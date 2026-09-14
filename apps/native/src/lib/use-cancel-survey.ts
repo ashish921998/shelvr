@@ -22,8 +22,9 @@ const PAYWALL_RECHECK_MS = 2000;
  * Drives the next-visit cancel survey card.
  *
  * Detection runs once per foreground episode while the user is on the Home
- * root, so cancelling in iPhone Settings or the Customer Center and
- * returning to Shelvr is caught on the spot — and a transient `unknown`
+ * root. Dismissing the in-app Customer Center sheet does not itself start
+ * a foreground episode; cancellation is checked on the next real episode.
+ * A transient `unknown`
  * (identity sync not ready, fetch failure) simply retries on the next
  * episode instead of burning the launch.
  *
