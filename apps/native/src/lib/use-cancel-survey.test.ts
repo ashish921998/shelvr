@@ -136,7 +136,9 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("@/lib/feedback", () => ({
   isHomeRootRoute: () => mock.segments[2] === "(home)",
 }));
-vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture, captureError: vi.fn() } }));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mock.capture, captureError: vi.fn() },
+}));
 vi.mock("@/lib/posthog", () => ({ isAnalyticsAvailable: () => true }));
 vi.mock("convex/react", () => ({
   // A dynamic import inside a vi.mock factory resolves to a different
@@ -382,62 +384,6 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("keeps the card up when the row turns asked while our own verdict is in flight, then counts the win", async () => {
-    let release!: (value: { accepted: boolean }) => void;
-    mock.markShown.mockReturnValueOnce(
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-    );
-    react.mount(() => useCancelSurvey());
-    await flush();
-    latest().presented();
-
-    // The asked flip can be this device's own markShown insert propagating
-    // through the live query before the mutation's resolution arrives. A
-    // pending claim is not a lost claim: the card must survive until this
-    // device's verdict lands, or the account's one ask is stranded.
-    mock.surveyStatus = { asked: true };
-    latest();
-    expect(latest().visible).toBe(true);
-
-    release({ accepted: true });
-    await flush();
-    expect(
-      mock.capture.mock.calls.filter(
-        ([name]) => name === "cancel_survey_shown",
-      ),
-    ).toHaveLength(1);
-    expect(latest().visible).toBe(true);
-  });
-
-  it("takes the card down when the in-flight verdict comes back rejected", async () => {
-    let release!: (value: { accepted: boolean }) => void;
-    mock.markShown.mockReturnValueOnce(
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-    );
-    react.mount(() => useCancelSurvey());
-    await flush();
-    latest().presented();
-
-    // Same asked flip as above, but this device lost the race. Pending
-    // keeps the card; the rejected verdict is what retires it — silently.
-    mock.surveyStatus = { asked: true };
-    latest();
-    expect(latest().visible).toBe(true);
-
-    release({ accepted: false });
-    await flush();
-    expect(
-      mock.capture.mock.calls.filter(
-        ([name]) => name === "cancel_survey_shown",
-      ),
-    ).toHaveLength(0);
-    expect(latest().visible).toBe(false);
-  });
-
   it("takes the card down when the markShown verdict fails outright", async () => {
     mock.markShown.mockRejectedValueOnce(new Error("convex unavailable"));
     react.mount(() => useCancelSurvey());
@@ -467,31 +413,48 @@ describe("useCancelSurvey", () => {
     latest().presented();
     await flush();
     expect(mock.markShown).toHaveBeenCalledTimes(2);
-    expect(mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_shown")).toHaveLength(1);
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_shown",
+      ),
+    ).toHaveLength(1);
   });
 
-  it.each(["submit", "dismiss"] as const)("restores the card after failed %s and allows retry", async (action) => {
-    mock.respond.mockRejectedValueOnce(new Error("response failed"));
-    react.mount(() => useCancelSurvey());
-    await flush();
-    latest().presented();
-    await flush();
-    mock.surveyStatus = { asked: true };
-    latest();
-    if (action === "submit") latest().submit("other");
-    else latest().dismiss();
-    await flush();
-    expect(latest().visible).toBe(true);
-    expect(mock.capture.mock.calls.filter(([name]) => name === "cancel_survey_submitted" || name === "cancel_survey_dismissed")).toHaveLength(0);
-    latest().submit("other");
-    await flush();
-    expect(mock.respond).toHaveBeenCalledTimes(2);
-    expect(latest().visible).toBe(false);
-  });
+  it.each(["submit", "dismiss"] as const)(
+    "restores the card after failed %s and allows retry",
+    async (action) => {
+      mock.respond.mockRejectedValueOnce(new Error("response failed"));
+      react.mount(() => useCancelSurvey());
+      await flush();
+      latest().presented();
+      await flush();
+      mock.surveyStatus = { asked: true };
+      latest();
+      if (action === "submit") latest().submit("other");
+      else latest().dismiss();
+      await flush();
+      expect(latest().visible).toBe(true);
+      expect(
+        mock.capture.mock.calls.filter(
+          ([name]) =>
+            name === "cancel_survey_submitted" ||
+            name === "cancel_survey_dismissed",
+        ),
+      ).toHaveLength(0);
+      latest().submit("other");
+      await flush();
+      expect(mock.respond).toHaveBeenCalledTimes(2);
+      expect(latest().visible).toBe(false);
+    },
+  );
 
   it("does not restore a failed response for a different account", async () => {
     let reject!: (error: Error) => void;
-    mock.respond.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    mock.respond.mockReturnValueOnce(
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
     react.mount(() => useCancelSurvey());
     await flush();
     latest().submit("other");

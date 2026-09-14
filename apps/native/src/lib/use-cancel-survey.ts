@@ -31,12 +31,10 @@ const PAYWALL_RECHECK_MS = 2000;
  * The ask is durably one-per-account (convex/cancelSurvey.ts). The server
  * row is the authority across devices and reinstalls; the hook fails closed
  * and never asks while the row's state is unknown (still loading) or asked.
- * When the row turns asked while the card is up, the card comes down as
- * soon as this device's own markShown verdict confirms it lost the race;
- * a verdict still in flight holds the card, because the asked flip may be
- * this device's own insert echoing back through the live query. A losing
- * card emits no analytics: only the markShown call that consumed the ask
- * may count a `shown`.
+ * The markShown verdict arbitrates alone: an accepted verdict emits `shown`
+ * and keeps the card up; a rejected one (another device consumed the ask
+ * first) takes it down without emitting anything — only the call that
+ * consumed the ask may count a `shown`.
  *
  * The ask is consumed only when the card actually renders (`presented`),
  * never at detection time — closing the app on Home's loading screen leaves
@@ -56,7 +54,9 @@ export function useCancelSurvey(): {
   const currentUserId = useRef(userId);
   useEffect(() => {
     currentUserId.current = userId;
-    return () => { currentUserId.current = undefined; };
+    return () => {
+      currentUserId.current = undefined;
+    };
   }, [userId]);
   const home = isHomeRootRoute(useSegments());
   const [appState, setAppState] = useState(AppState.currentState);
@@ -82,24 +82,6 @@ export function useCancelSurvey(): {
   useEffect(() => {
     if (appState !== "active") episodeChecked.current = false;
   }, [appState]);
-
-  // Whether THIS device's markShown consumed the account's ask. Undefined
-  // until the mutation's verdict lands (it may be queued while offline).
-  const askWon = useRef<boolean | undefined>(undefined);
-
-  // The server row is the authority across devices: a second device can
-  // still hold the card up from a stale `asked: false` read, and once the
-  // detection episode is spent (above) nothing else would clear it. When the
-  // row reports asked, take the card down — but only on a known loss. While
-  // this device's verdict is in flight, the asked flip may well be our own
-  // markShown insert propagating through the live query before the mutation
-  // resolves: hiding then would retire the winner's card and strand the
-  // account's one ask. The loser still comes down the moment its own
-  // rejected verdict lands (below).
-  useEffect(() => {
-    if (surveyStatus === undefined) return;
-    if (surveyStatus.asked && askWon.current === false) setVisible(false);
-  }, [surveyStatus]);
 
   useEffect(() => {
     if (!home || appState !== "active" || !userId) return;
@@ -158,7 +140,6 @@ export function useCancelSurvey(): {
     void markShown({})
       .then((result) => {
         if (currentUserId.current !== userId) return;
-        askWon.current = result.accepted;
         if (result.accepted) {
           cancelSurveyAnalytics.shown();
         } else {
@@ -169,7 +150,6 @@ export function useCancelSurvey(): {
         if (currentUserId.current !== userId) return;
         analytics.captureError("cancel_survey_claim_failed", error);
         presentedFor.current = null;
-        askWon.current = undefined;
         setVisible(false);
       });
   }, [userId, markShown]);
