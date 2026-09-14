@@ -24,7 +24,8 @@
       "extends": "development",
       "channel": "development",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "ANDROID_BUILD_ARCHS": "x86_64"
       },
       "ios": {
         "simulator": true,
