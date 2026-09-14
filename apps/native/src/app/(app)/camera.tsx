@@ -113,15 +113,23 @@ export default function CameraScreen() {
       }
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
-      if (failed.some((r) => r.code === "pro_required")) {
-        setBusy(false);
+      // A save refused for Pro means the entitlement lapsed after this screen
+      // was gated, so the paywall comes first. `busy` stays set until it
+      // resolves: presenting can wait on RevenueCat identity sync, and another
+      // capture underneath it would start overlapping batches. Any other
+      // failure in the same batch is still offered for retry afterwards.
+      const otherFailures = failed.filter((r) => r.code !== "pro_required");
+      if (otherFailures.length < failed.length) {
         await openPaywall(router, PAYWALL_PLACEMENT);
-        return;
+        if (otherFailures.length === 0) {
+          setBusy(false);
+          return;
+        }
       }
       Alert.alert(
         t("errors.batchSaveTitle"),
         t("capture.partialFailure", {
-          reason: localizeError(failed[0].message),
+          reason: localizeError(otherFailures[0].message),
           saved: savedCount,
           total: results.length,
         }),
