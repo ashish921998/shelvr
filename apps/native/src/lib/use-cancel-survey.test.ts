@@ -270,10 +270,10 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("submit records the outcome server-side and closes the card", async () => {
+  it("finish records the submitted outcome server-side and closes the card", async () => {
     react.mount(() => useCancelSurvey());
     await flush();
-    latest().submit("too_expensive");
+    latest().finish("submitted", "too_expensive");
     await flush(); // capture is gated on the server's accepted verdict
     expect(mock.respond).toHaveBeenCalledWith({
       outcome: "submitted",
@@ -286,10 +286,10 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("dismiss records the outcome server-side and closes the card", async () => {
+  it("finish records the dismissed outcome server-side and closes the card", async () => {
     react.mount(() => useCancelSurvey());
     await flush();
-    latest().dismiss();
+    latest().finish("dismissed");
     await flush();
     expect(mock.respond).toHaveBeenCalledWith({ outcome: "dismissed" });
     expect(latest().visible).toBe(false);
@@ -299,7 +299,7 @@ describe("useCancelSurvey", () => {
     mock.respond.mockResolvedValueOnce({ accepted: false });
     react.mount(() => useCancelSurvey());
     await flush();
-    latest().submit("too_expensive");
+    latest().finish("submitted", "too_expensive");
     await flush();
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
@@ -426,7 +426,7 @@ describe("useCancelSurvey", () => {
     await flush();
     latest().presented();
     await flush();
-    latest().submit("other");
+    latest().finish("submitted", "other");
     await flush();
 
     // A failed respond committed nothing: no analytics, and the card stays
@@ -444,7 +444,7 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(true);
     latest().presented();
     await flush();
-    latest().submit("other");
+    latest().finish("submitted", "other");
     await flush();
     expect(mock.respond).toHaveBeenCalledTimes(2);
     expect(mock.capture).toHaveBeenCalledWith("cancel_survey_submitted", {
@@ -457,8 +457,8 @@ describe("useCancelSurvey", () => {
     react.mount(() => useCancelSurvey());
     await flush();
     const survey = latest();
-    survey.submit("too_expensive");
-    survey.submit("other"); // second tap lands before the re-render hides the card
+    survey.finish("submitted", "too_expensive");
+    survey.finish("submitted", "other"); // second tap lands before the re-render hides the card
     await flush();
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
@@ -470,12 +470,12 @@ describe("useCancelSurvey", () => {
     expect(latest().visible).toBe(false);
   });
 
-  it("ignores a dismiss racing a submit", async () => {
+  it("ignores a dismissed outcome racing a submitted one", async () => {
     react.mount(() => useCancelSurvey());
     await flush();
     const survey = latest();
-    survey.submit("too_expensive");
-    survey.dismiss();
+    survey.finish("submitted", "too_expensive");
+    survey.finish("dismissed");
 
     expect(mock.respond).toHaveBeenCalledTimes(1);
     expect(mock.respond).toHaveBeenCalledWith({

@@ -46,8 +46,11 @@ export function useCancelSurvey(): {
   visible: boolean;
   /** Call when the card renders. Consumes the ask and emits `shown`. */
   presented: () => void;
-  submit: (reason: CancelSurveyReason) => void;
-  dismiss: () => void;
+  /** Record how the ask ended. The server's accepted verdict gates analytics. */
+  finish: {
+    (outcome: "submitted", reason: CancelSurveyReason): void;
+    (outcome: "dismissed"): void;
+  };
 } {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
@@ -117,14 +120,15 @@ export function useCancelSurvey(): {
     };
   }, [home, appState, userId, surveyStatus]);
 
-  // The ask is presented once per user per mount: a remount of the card
-  // (feed refresh, empty-feed ↔ feed branch switch) must not emit a second
+  // The ask is presented once per mount: a remount of the card (feed
+  // refresh, empty-feed ↔ feed branch switch) must not emit a second
   // `cancel_survey_shown` — the server markShown is idempotent, analytics
-  // is not.
-  const presentedFor = useRef<string | null>(null);
+  // is not. A plain boolean suffices: an identity change unmounts Home (the
+  // (app) layout redirects to sign-in), so this ref never outlives a user.
+  const askPresented = useRef(false);
   const presented = useCallback(() => {
-    if (!userId || presentedFor.current === userId) return;
-    presentedFor.current = userId;
+    if (!userId || askPresented.current) return;
+    askPresented.current = true;
     // Only now is the ask spent — the card is on screen. Fire-and-forget:
     // the Convex client queues and retries the mutation if offline. The
     // verdict arbitrates the cross-device race: only the call that consumed
@@ -140,23 +144,31 @@ export function useCancelSurvey(): {
       })
       .catch((error: unknown) => {
         analytics.captureError("cancel_survey_claim_failed", error);
-        presentedFor.current = null;
+        askPresented.current = false;
         setVisible(false);
       });
   }, [userId, markShown]);
 
   // One response ever per mount: two rapid taps (or a tap racing dismiss)
-  // must not emit duplicate `cancel_survey_submitted` events. Capture is
-  // gated on the server's verdict too — two devices can race the same ask,
-  // and only the response this row accepted may reach PostHog.
+  // must not emit duplicate events. Capture is gated on the server's verdict
+  // too — two devices can race the same ask, and only the response this row
+  // accepted may reach PostHog.
   const responded = useRef(false);
-  const submit = useCallback(
-    (reason: CancelSurveyReason) => {
+  const finish = useCallback(
+    (outcome: "submitted" | "dismissed", reason?: CancelSurveyReason) => {
       if (!userId || responded.current) return;
       responded.current = true;
-      void respond({ outcome: "submitted", reason })
+      void respond({
+        outcome,
+        ...(reason !== undefined ? { reason } : {}),
+      })
         .then((result) => {
-          if (result.accepted) cancelSurveyAnalytics.submitted(reason);
+          if (!result.accepted) return;
+          if (outcome === "submitted" && reason !== undefined) {
+            cancelSurveyAnalytics.submitted(reason);
+          } else if (outcome === "dismissed") {
+            cancelSurveyAnalytics.dismissed();
+          }
         })
         .catch((error: unknown) => {
           // A rejected respond committed nothing: leave the card down and
@@ -170,19 +182,5 @@ export function useCancelSurvey(): {
     [userId, respond],
   );
 
-  const dismiss = useCallback(() => {
-    if (!userId || responded.current) return;
-    responded.current = true;
-    void respond({ outcome: "dismissed" })
-      .then((result) => {
-        if (result.accepted) cancelSurveyAnalytics.dismissed();
-      })
-      .catch((error: unknown) => {
-        analytics.captureError("cancel_survey_response_failed", error);
-        responded.current = false;
-      });
-    setVisible(false);
-  }, [userId, respond]);
-
-  return { visible, presented, submit, dismiss };
+  return { visible, presented, finish };
 }
