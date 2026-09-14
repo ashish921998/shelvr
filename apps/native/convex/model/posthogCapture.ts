@@ -95,12 +95,15 @@ export async function deliverPostHogEvent(
 }
 
 /**
- * Schedule the next attempt at one event, or report that the budget is spent.
+ * Schedule the next attempt at one event, or report that the event is lost.
  *
  * The caller passes the scheduling call itself, so each capture keeps its own
  * internal action as the retry target (and its own argument shape) while the
  * schedule lives in one place. Returns false when `attempt` was the last one
- * allowed, leaving the caller to record the loss the way its event needs.
+ * allowed or the scheduler refused the call, leaving the caller to record the
+ * loss the way its event needs. It never throws: the first attempt at an event
+ * runs inline with the work that produced it (a classification, a save, a
+ * sign-up), and a telemetry hiccup must not fail that work.
  */
 export async function scheduleCaptureRetry(
   attempt: number,
@@ -108,6 +111,10 @@ export async function scheduleCaptureRetry(
   schedule: (delayMs: number, nextAttempt: number) => Promise<unknown>,
 ): Promise<boolean> {
   if (attempt >= maxAttempts) return false;
-  await schedule(RETRY_BASE_MS * 10 ** attempt, attempt + 1);
-  return true;
+  try {
+    await schedule(RETRY_BASE_MS * 10 ** attempt, attempt + 1);
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -150,4 +150,15 @@ describe("scheduleCaptureRetry", () => {
     expect(await scheduleCaptureRetry(4, 3, schedule)).toBe(false);
     expect(schedule).not.toHaveBeenCalled();
   });
+
+  it("reports the event lost rather than throwing when the scheduler refuses", async () => {
+    // The first attempt runs inline with a classification or a save; a
+    // scheduler outage must surface as a logged loss, never as that work
+    // failing after it already committed.
+    const schedule = vi
+      .fn()
+      .mockRejectedValue(new Error("scheduler unavailable"));
+    await expect(scheduleCaptureRetry(0, 3, schedule)).resolves.toBe(false);
+    expect(schedule).toHaveBeenCalledWith(1000, 1);
+  });
 });
