@@ -47,12 +47,21 @@ const raw = (value: string, shareType = "text"): RawSharePayload => ({
 const resolved = (
   value: string,
   contentType: ResolvedPayload["contentType"] = "text",
+  contentUri: string | null = null,
 ): ResolvedPayload => ({
   contentType,
   value,
-  contentUri: null,
+  contentUri,
   contentMimeType: null,
 });
+
+/** A natively resolved image. Its contentUri is something the raw fallback can
+ * never derive, so any assertion on it proves the resolved branch was taken. */
+const RESOLVED_IMAGE = resolved(
+  "file:///tmp/a.jpg",
+  "image",
+  "content://shared/a.jpg",
+);
 
 describe("hasRetryableEntries", () => {
   it("is true while an entry is pending or failed", () => {
@@ -117,15 +126,17 @@ describe("selectProcessorPayloads", () => {
   it("uses the resolved payloads when resolution succeeded and counts align", () => {
     const payloads = selectProcessorPayloads({
       resolutionError: null,
-      resolved: [resolved("https://a.example", "website")],
-      raw: [raw("https://a.example", "url")],
+      resolved: [RESOLVED_IMAGE],
+      raw: [raw("file:///tmp/a.jpg", "image")],
     });
 
+    // The fallback would leave contentUri null, so this fails if the resolved
+    // branch is ever dropped in favour of always re-deriving from raw.
     expect(payloads).toEqual([
       {
-        contentType: "website",
-        value: "https://a.example",
-        contentUri: null,
+        contentType: "image",
+        value: "file:///tmp/a.jpg",
+        contentUri: "content://shared/a.jpg",
         contentMimeType: null,
       },
     ]);
@@ -153,11 +164,14 @@ describe("selectProcessorPayloads", () => {
   it("falls back when the resolved results no longer align with the raw batch", () => {
     const payloads = selectProcessorPayloads({
       resolutionError: null,
-      resolved: [resolved("https://a.example", "website")],
-      raw: [raw("https://a.example", "url"), raw("note body")],
+      resolved: [RESOLVED_IMAGE],
+      raw: [raw("file:///tmp/a.jpg", "image"), raw("note body")],
     });
 
-    expect(payloads.map((p) => p.contentType)).toEqual(["website", "text"]);
+    expect(payloads.map((p) => p.contentType)).toEqual(["image", "text"]);
+    // Every payload came from raw: the resolved contentUri was discarded, not
+    // spliced in front of the fallback.
+    expect(payloads[0].contentUri).toBeNull();
   });
 
   it("leaves fallback images without a contentUri so they fail explicitly", () => {
