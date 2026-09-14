@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   # Never cancel a deploy halfway; queue the next one instead.
@@ -39,6 +40,12 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
+
+      - name: Verify CI for the selected commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./tools/verify-ci.cjs')({ github, context, core });
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -121,22 +128,15 @@ jobs:
           packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # With --environment production, app.config.js is resolved on EAS
-      # servers with that environment's variables — and the production-value
-      # guards in app.config.js only run during eas build. A missing variable
-      # would otherwise publish a broken update instead of failing here.
+      # Pull only OTA-readable variables. Secret values are unavailable to
+      # updates, so a declared name alone is not sufficient validation.
       - name: Verify the EAS production environment
         working-directory: apps/native
         run: |
-          vars="$(eas env:list --environment production --json)"
-          missing=0
-          for name in EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL; do
-            if ! printf '%s' "$vars" | grep -q "\"$name\""; then
-              echo "::error title=Missing EAS variable::$name is not set in the EAS production environment. Add it with 'eas env:set --name $name --value <value> --environment production' (or in the expo.dev dashboard) before publishing an OTA update."
-              missing=1
-            fi
-          done
-          exit "$missing"
+          ota_env="$(mktemp)"
+          trap 'rm -f "$ota_env"' EXIT
+          eas env:pull production --path "$ota_env" --non-interactive > /dev/null
+          node ../../tools/verify-ota-env.mjs "$ota_env"
 
       # internal-test builds point at the production backend, which is why
       # this job waits on the approved Convex deploy above.

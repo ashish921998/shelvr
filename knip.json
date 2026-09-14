@@ -25,8 +25,12 @@
       "ignoreDependencies": ["tailwindcss"]
     },
     ".": {
-      "entry": ["tools/generate-localizations.mjs"],
-      "project": ["tools/**/*.mjs"]
+      "entry": [
+        "tools/generate-localizations.mjs",
+        "tools/verify-ota-env.mjs",
+        "tools/release-guards.test.mjs"
+      ],
+      "project": ["tools/**/*.{mjs,cjs}"]
     }
   }
 }

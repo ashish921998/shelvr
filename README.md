@@ -217,13 +217,21 @@ pnpm --filter web-app build
 once store credentials are configured on EAS; Android submits also need the
 `EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret — the base64 of the Play API
 JSON key), mode `ota` publishes an EAS Update to the `production` channel.
+Both manual workflows require successful push CI for the selected `main`
+commit. Release deploys that commit's Convex backend before building or
+publishing, and shares Deploy's concurrency group to prevent interleaving.
+Release therefore also requires `CONVEX_DEPLOY_KEY`.
 
 **OTA publishes require the EAS `production` environment.** With
-`--environment production`, `app.config.js` is resolved on EAS servers with
-that environment's variables, and the production-value guards in
-`app.config.js` only run during `eas build`. Both workflows fail fast unless
-`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
-there (`eas env:set --name <name> --value <value> --environment production`).
+`--environment production`, updates use that environment's plaintext and
+sensitive variables; Secret values are unavailable. Both workflows pull the
+readable values into a temporary file and validate the production Convex
+deployment/site URLs and the iOS/Android RevenueCat public keys before
+publishing. Set them with `eas env:set --name <name> --value <value>
+--environment production --visibility sensitive`. The temporary file is
+deleted after validation, and validation errors never include values.
+Keep config-affecting variables such as `GOOGLE_MAPS_API_KEY` and `POSTHOG_*`
+readable to both builds and updates so their fingerprints agree.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native

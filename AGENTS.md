@@ -86,13 +86,15 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
   the `CONVEX_DEPLOY_KEY` and `EXPO_TOKEN` repo secrets.
 - `release.yml` is dispatched manually for EAS store builds (`--auto-submit`
   requires store credentials on EAS servers) or production-channel OTA.
-- Production OTA resolves `app.config.js` on EAS servers with the EAS
-  `production` environment's variables, and the production-value guards in
-  `app.config.js` only run during `eas build`. Both workflows therefore
-  verify that the EAS `production` environment declares
-  `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` before
-  publishing; set them with `eas env:set` (`--name`, `--value`,
-  `--environment production`).
+  Both manual workflows require successful main push CI for the selected
+  commit. Release deploys that commit's backend before the client and shares
+  Deploy's concurrency group; it also requires `CONVEX_DEPLOY_KEY`.
+- OTA uses EAS production's plaintext/sensitive variables, never Secret
+  values. Both workflows validate readable production Convex URLs and both
+  RevenueCat public SDK keys before publishing. Set them with `eas env:set`
+  (`--name`, `--value`, `--environment production`, `--visibility sensitive`).
+  Config-affecting variables must be readable to both builds and updates
+  to keep fingerprints consistent.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
   fingerprint (a native dependency added or removed, a native config change)
   makes new updates invisible to binaries built from the old fingerprint:
