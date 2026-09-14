@@ -7,7 +7,8 @@ import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
-import { MAX_ITEM_TITLE_CHARS, NOTE_REFRESH_DELAY_MS } from "./items";
+import { NOTE_REFRESH_DELAY_MS } from "./items";
+import { MAX_ITEM_TITLE_CHARS } from "./model/itemFields";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
 type ItemFields = Partial<Omit<Doc<"items">, "_id" | "_creationTime">>;
@@ -151,6 +152,7 @@ describe("updateNoteItem", () => {
     const note = await t.run((ctx) => ctx.db.get(id));
     expect(note?.title).toBeUndefined();
     expect(note?.titleSource).toBeUndefined();
+    expect(await refreshJobs(t)).toHaveLength(1);
   });
 
   it("rejects other users' notes, other item types, empty text and long titles", async () => {

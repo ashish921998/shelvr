@@ -30,6 +30,7 @@ import {
   intentValidator,
   isStaleProcessing,
   isTerminalFailure,
+  MAX_ITEM_TITLE_CHARS,
   PROCESSING_STALE_MS,
 } from "./model/itemFields";
 import {
@@ -1288,9 +1289,6 @@ export const createNoteItem = mutation({
   },
 });
 
-/** Longest title a user can type for a save. */
-export const MAX_ITEM_TITLE_CHARS = 200;
-
 /** Delay before an edited note is re-classified. Each edit in the window
  * supersedes the scheduled run, so a burst of typing costs one model call. */
 export const NOTE_REFRESH_DELAY_MS = 20_000;
@@ -1339,9 +1337,13 @@ export const updateNoteItem = mutation({
           ? undefined
           : item.title;
     // Only a ready note is refreshed: a first run still in flight reads the
-    // latest text when it finalizes, and a failed note has its own retry.
+    // latest text when it finalizes, and a failed note has its own retry. A
+    // cleared title is re-named by the same refresh.
     const refreshRunId =
-      textChanged && item.status === "ready" ? crypto.randomUUID() : undefined;
+      (textChanged || (titleChanged && typedTitle === "")) &&
+      item.status === "ready"
+        ? crypto.randomUUID()
+        : undefined;
     await ctx.db.patch(item._id, {
       note: args.text,
       title,
