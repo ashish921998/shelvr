@@ -20,6 +20,16 @@ import {
 const PAYWALL_RECHECK_MS = 2000;
 
 /**
+ * The response `finish` records. A submitted outcome carries its bounded
+ * reason; a dismissal stands alone — the correlation is structural, so
+ * submitting without a reason is unrepresentable, and the object matches
+ * the respond mutation's args shape as-is.
+ */
+type CancelSurveyResponse =
+  | { outcome: "submitted"; reason: CancelSurveyReason }
+  | { outcome: "dismissed" };
+
+/**
  * Drives the next-visit cancel survey card.
  *
  * Detection runs once per foreground episode while the user is on the Home
@@ -48,10 +58,7 @@ export function useCancelSurvey(): {
   /** Call when the card renders. Consumes the ask and emits `shown`. */
   presented: () => void;
   /** Record how the ask ended. The server's accepted verdict gates analytics. */
-  finish: {
-    (outcome: "submitted", reason: CancelSurveyReason): void;
-    (outcome: "dismissed"): void;
-  };
+  finish: (response: CancelSurveyResponse) => void;
 } {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
@@ -156,18 +163,15 @@ export function useCancelSurvey(): {
   // accepted may reach PostHog.
   const responded = useRef(false);
   const finish = useCallback(
-    (outcome: "submitted" | "dismissed", reason?: CancelSurveyReason) => {
+    (response: CancelSurveyResponse) => {
       if (!userId || responded.current) return;
       responded.current = true;
-      void respond({
-        outcome,
-        ...(reason !== undefined ? { reason } : {}),
-      })
+      void respond(response)
         .then((result) => {
           if (!result.accepted) return;
-          if (outcome === "submitted" && reason !== undefined) {
-            cancelSurveyAnalytics.submitted(reason);
-          } else if (outcome === "dismissed") {
+          if (response.outcome === "submitted") {
+            cancelSurveyAnalytics.submitted(response.reason);
+          } else {
             cancelSurveyAnalytics.dismissed();
           }
         })

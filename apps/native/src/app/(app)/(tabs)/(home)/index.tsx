@@ -34,8 +34,10 @@ export default function HomeScreen() {
   const cancelSurveyCard = cancelSurvey.visible ? (
     <CancelSurveyCard
       onPresented={cancelSurvey.presented}
-      onSubmit={(reason) => cancelSurvey.finish("submitted", reason)}
-      onDismiss={() => cancelSurvey.finish("dismissed")}
+      onSubmit={(reason) =>
+        cancelSurvey.finish({ outcome: "submitted", reason })
+      }
+      onDismiss={() => cancelSurvey.finish({ outcome: "dismissed" })}
     />
   ) : null;
 
