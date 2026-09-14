@@ -38,6 +38,9 @@ export default defineSchema({
       v.literal("failed"),
     ),
     title: v.optional(v.string()),
+    // "user" once the owner typed the title. Classification then leaves
+    // `title` alone; absent means any title is the classifier's.
+    titleSource: v.optional(v.literal("user")),
     description: v.optional(v.string()),
     url: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),

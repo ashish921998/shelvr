@@ -99,6 +99,7 @@ const itemFields = {
   type: itemTypeValidator,
   status: itemStatusValidator,
   title: v.optional(v.string()),
+  titleSource: v.optional(v.literal("user")),
   description: v.optional(v.string()),
   url: v.optional(v.string()),
   storageId: v.optional(v.id("_storage")),
@@ -213,13 +214,24 @@ export async function toItemCard(
   return card;
 }
 
+/** How much of a note's own text the search index carries. Notes are short;
+ * the cap keeps a pasted essay from bloating the index. */
+const MAX_SEARCH_NOTE_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
+  note?: string;
 }): string {
-  return [parts.title, parts.description, ...parts.tags, parts.siteName]
+  return [
+    parts.title,
+    parts.description,
+    ...parts.tags,
+    parts.siteName,
+    parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+  ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
     .toLowerCase();
@@ -1276,6 +1288,83 @@ export const createNoteItem = mutation({
   },
 });
 
+/** Longest title a user can type for a save. */
+export const MAX_ITEM_TITLE_CHARS = 200;
+
+/** Delay before an edited note is re-classified. Each edit in the window
+ * supersedes the scheduled run, so a burst of typing costs one model call. */
+export const NOTE_REFRESH_DELAY_MS = 20_000;
+
+/**
+ * The owner edits a note's text and title. A typed title replaces the
+ * classifier's and survives later classification; an empty title hands naming
+ * back to the classifier. A text change on a ready note re-classifies it
+ * quietly after NOTE_REFRESH_DELAY_MS, so search and space suggestions follow
+ * the new words without the note ever showing as processing.
+ */
+export const updateNoteItem = mutation({
+  args: {
+    id: v.id("items"),
+    title: v.string(),
+    text: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    const item = await ctx.db.get(args.id);
+    if (item === null || item.userId !== userId || item.type !== "note") {
+      throw new Error("Item not found");
+    }
+    if (args.text.trim() === "") {
+      throw new Error("Note text is empty");
+    }
+    const typedTitle = args.title.trim();
+    if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {
+      throw new Error("Title is too long");
+    }
+    const currentTypedTitle =
+      item.titleSource === "user" ? item.title : undefined;
+    const textChanged = args.text !== item.note;
+    const titleChanged = (typedTitle || undefined) !== currentTypedTitle;
+    if (!textChanged && !titleChanged) {
+      return null;
+    }
+    // Clearing a typed title leaves the note untitled until the classifier
+    // names it again; a classifier title stays until the user types one.
+    const title =
+      typedTitle !== ""
+        ? typedTitle
+        : item.titleSource === "user"
+          ? undefined
+          : item.title;
+    // Only a ready note is refreshed: a first run still in flight reads the
+    // latest text when it finalizes, and a failed note has its own retry.
+    const refreshRunId =
+      textChanged && item.status === "ready" ? crypto.randomUUID() : undefined;
+    await ctx.db.patch(item._id, {
+      note: args.text,
+      title,
+      titleSource: typedTitle !== "" ? "user" : undefined,
+      searchText: buildSearchText({
+        title,
+        description: item.description,
+        tags: item.tags,
+        note: args.text,
+      }),
+      ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
+    });
+    if (refreshRunId !== undefined) {
+      await ctx.scheduler.runAfter(
+        NOTE_REFRESH_DELAY_MS,
+        internal.ai.processItem,
+        { itemId: item._id, runId: refreshRunId, refresh: true },
+      );
+    }
+    return null;
+  },
+});
+
 /**
  * User-triggered product search ("Find links"). Explicit button = bounded
  * cost: one vision/text query + one SerpAPI call per press, never automatic.
@@ -1453,6 +1542,32 @@ function ownsRun(item: Doc<"items">, runId: string | undefined): boolean {
   return item.processingRunId === runId;
 }
 
+/**
+ * Gate for an edited note's quiet refresh (see updateNoteItem). Only the run
+ * the latest edit scheduled goes on to call the model, and it draws from the
+ * noteRefresh bucket without throwing: a refused refresh leaves the note as
+ * it is.
+ */
+export const claimNoteRefresh = internalMutation({
+  args: { itemId: v.id("items"), runId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.type !== "note" ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId)
+    ) {
+      return false;
+    }
+    const { ok } = await rateLimiter.limit(ctx, "noteRefresh", {
+      key: item.userId,
+    });
+    return ok;
+  },
+});
+
 export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -1492,14 +1607,21 @@ export const finalizeItem = internalMutation({
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
+    // A title the owner typed outranks the classifier's; the rest of the
+    // classification still lands.
+    const title =
+      item.titleSource === "user" && item.title !== undefined
+        ? item.title
+        : args.title;
     const searchText = buildSearchText({
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       siteName: args.siteName,
+      note: item.note,
     });
     await ctx.db.patch(args.itemId, {
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       content: args.content,

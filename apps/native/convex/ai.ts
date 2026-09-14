@@ -1065,6 +1065,9 @@ async function analyzeNoteItem(
     prompt: [
       "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
       spacesBlock,
+      ...(item.titleSource === "user" && item.title
+        ? [`The user titled this note: ${item.title}`]
+        : []),
       `Note:\n${item.note.slice(0, MAX_CONTENT_CHARS)}`,
       INTENTS_PROMPT_BLOCK,
     ].join("\n\n"),
@@ -1183,6 +1186,25 @@ async function handleProcessingFailure(
   return timedOut ? null : errorCategory;
 }
 
+/** Whether this run may go on. An edited note's quiet refresh (see
+ * updateNoteItem) must still own the item and win the refresh bucket; every
+ * other run always may. */
+async function refreshClaimed(
+  ctx: ActionCtx,
+  args: { itemId: Id<"items">; runId?: string; refresh?: boolean },
+): Promise<boolean> {
+  if (args.refresh !== true) {
+    return true;
+  }
+  if (args.runId === undefined) {
+    return false;
+  }
+  return await ctx.runMutation(internal.items.claimNoteRefresh, {
+    itemId: args.itemId,
+    runId: args.runId,
+  });
+}
+
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -1191,6 +1213,10 @@ export const processItem = internalAction({
     // this run cannot overwrite a newer one. Optional only so jobs scheduled
     // before run fencing shipped still validate.
     runId: v.optional(v.string()),
+    // Set by updateNoteItem to quietly re-classify an edited note. The run
+    // must still own the item and win the refresh bucket, and a failure leaves
+    // the ready note untouched.
+    refresh: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1205,6 +1231,9 @@ export const processItem = internalAction({
         return null;
       }
       itemType = item.type;
+      if (!(await refreshClaimed(ctx, args))) {
+        return null;
+      }
       // Only dynamic spaces are visible to the classifier: matches become
       // pending suggestions. Non-dynamic spaces never hear from the pipeline.
       const allSpaces = await ctx.runQuery(internal.spaces.listSpacesInternal, {
@@ -1283,6 +1312,11 @@ export const processItem = internalAction({
         });
       }
 
+      if (args.refresh === true) {
+        // An edited note: search and suggestions are updated. Steering and
+        // categorization telemetry already ran when the note was saved.
+        return null;
+      }
       // If the user filed this item straight into spaces while it was still
       // processing, run the purpose-steering pass now that it's classified.
       const savedSpaceIds = await ctx.runQuery(
@@ -1303,6 +1337,14 @@ export const processItem = internalAction({
         durationMs: Date.now() - startedAt,
       });
     } catch (error) {
+      if (args.refresh === true) {
+        // The note is already ready; keep it rather than fail it.
+        logEvent("warn", "note_refresh_failed", {
+          item_id: args.itemId,
+          error_category: summarizeError(error),
+        });
+        return null;
+      }
       const rethrowCategory = await handleProcessingFailure(ctx, args, error, {
         itemType,
         posterStorageId,
