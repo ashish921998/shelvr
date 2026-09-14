@@ -182,9 +182,7 @@ export function ArticleReaderView({
           </View>
         ) : null}
 
-        {item.status === "ready" ? (
-          <ItemSpaces itemId={item._id} spaces={spaces} />
-        ) : null}
+        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (

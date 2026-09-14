@@ -95,7 +95,7 @@ function useItemDetailData(item: DetailItem) {
   // upgrade slots in behind the same query). Only ready items have signal.
   const { data: similar } = useQuery({
     ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === "ready",
+    enabled: item.status === "ready" && item.type !== "note",
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
@@ -294,6 +294,18 @@ function ItemDetailBody({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  if (item.type === "note") {
+    return (
+      <View style={styles.body}>
+        <Text selectable style={styles.paragraph}>
+          {detail.note}
+        </Text>
+        {spaces.length > 0 ? <ItemSpaces spaces={spaces} /> : null}
+        <SaveStatusNotice item={detail} />
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -303,9 +315,7 @@ function ItemDetailBody({
     >
       <SaveStatusNotice item={item} />
 
-      {item.status === "ready" ? (
-        <ItemSpaces itemId={item._id} spaces={spaces} />
-      ) : null}
+      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
       {item.url ? (
         <View style={styles.titleContainer}>
@@ -399,12 +409,6 @@ function ItemDetailBody({
       ) : null}
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
-
-      {item.type === "note" && item.note ? (
-        <Text selectable style={styles.paragraph}>
-          {item.note}
-        </Text>
-      ) : null}
 
       {!isVideo && paragraphs.length > 0 ? (
         <View style={styles.article}>
