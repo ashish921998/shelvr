@@ -7,12 +7,13 @@ import {
 } from "@expo/ui/community/bottom-sheet";
 import { parseExifDate } from "@/lib/date";
 import { resolvePickedImageLocation } from "@/lib/picked-image-location";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
 import {
   type ImageSaveRequest,
   reportSaveFailures,
   useSaveImages,
 } from "@/lib/use-save-image";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -37,6 +38,10 @@ import { analytics } from "@/lib/analytics";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
+
+/** Shared by the up-front guard and by the server's `pro_required` refusal, so
+ * both land in the same paywall funnel. */
+const PAYWALL_PLACEMENT = "add";
 
 function ActionButton({
   icon,
@@ -131,6 +136,7 @@ type AddContentProps = {
 function AddContent({ close, openCamera }: AddContentProps) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const router = useRouter();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
   const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
@@ -142,7 +148,8 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } = usePaywallGuard("add");
+  const { guard, loading: entitlementLoading } =
+    usePaywallGuard(PAYWALL_PLACEMENT);
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -190,9 +197,15 @@ function AddContent({ close, openCamera }: AddContentProps) {
       }
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
-    } catch {
-      Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
+    } catch (error) {
       setSaving(false);
+      // Pro can lapse while the composer is open. The paywall is the only
+      // useful next step, so show it instead of a generic failure alert.
+      if (saveErrorCode(error) === "pro_required") {
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
+      Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
     }
   };
 
@@ -215,6 +228,11 @@ function AddContent({ close, openCamera }: AddContentProps) {
       }
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
+      if (failed.some((r) => r.code === "pro_required")) {
+        setSaving(false);
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
       Alert.alert(
         t("errors.batchSaveTitle"),
         t("capture.partialFailure", {

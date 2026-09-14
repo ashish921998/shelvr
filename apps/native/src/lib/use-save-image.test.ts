@@ -349,6 +349,26 @@ describe("saveImageOperations", () => {
     expect(await failWith(new Error("Upload failed (503)"))).toBe("other");
   });
 
+  it("buckets a structured refusal by its code, not by the sentence", async () => {
+    const { saveError } = await import("@convex/model/saveErrors");
+    const deps = makeDeps({ upload: async () => { throw saveError("photo_limit"); } });
+    const [result] = await saveImageOperations([{ image: img("a") }], deps);
+    const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
+    expect(failed.code).toBe("photo_limit");
+    // A server-side copy edit must not move the bucket.
+    expect(saveFailureReason("some reworded sentence", failed.code)).toBe("photo_limit");
+  });
+
+  it("carries pro_required through so the caller can open the paywall", async () => {
+    const { saveError } = await import("@convex/model/saveErrors");
+    const deps = makeDeps({ begin: async () => { throw saveError("pro_required"); } });
+    const [result] = await saveImageOperations([{ image: img("a") }], deps);
+    const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
+    expect(failed.code).toBe("pro_required");
+    // No bucket of its own: the paywall funnel is what measures this.
+    expect(saveFailureReason(failed.message, failed.code)).toBe("other");
+  });
+
   it("reports one images_save_failed event per reason in a mixed batch", async () => {
     const { ConvexError } = await import("convex/values");
     const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");

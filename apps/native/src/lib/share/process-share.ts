@@ -13,6 +13,7 @@
 //   - onEntrySettled callback emits progress after each entry settles.
 
 import { extractFirstUrl, isProbablyUrl } from '@/lib/url';
+import { userSafeMessage } from '@/lib/user-safe-message';
 import type { Id } from '@convex/_generated/dataModel';
 import type { ImageSaveResult, LocalImage } from '@/lib/use-save-image';
 import type {
@@ -317,20 +318,7 @@ async function processOne(
     return {
       kind,
       status: 'failed',
-      message: userSafeMessage(error),
+      message: userSafeMessage(error, 'Could not save this item'),
     };
   }
-}
-
-/** Maps a thrown value to a short, user-safe message, mirroring use-save-image's
- * sanitizer: never surfaces URLs, ids, or stack traces. */
-function userSafeMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    const cleaned = error.message
-      .replace(/https?:\/\/\S+/gi, '<url>')
-      .replace(/\b[a-z0-9]{25,}\b/g, '<id>')
-      .slice(0, 200);
-    return cleaned || 'Could not save this item';
-  }
-  return 'Could not save this item';
 }

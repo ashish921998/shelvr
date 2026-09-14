@@ -7,6 +7,7 @@ import {
   useSaveImages,
 } from "@/lib/use-save-image";
 import type { Id } from "@convex/_generated/dataModel";
+import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -37,6 +38,11 @@ type CaptureMode = "photo" | "sticker";
 // The accent color matches theme.colors.primary (identical in both themes).
 const ACCENT = "#e6a23c";
 const INACTIVE = "rgba(255,255,255,0.55)";
+
+/** This screen is only reachable through add.tsx's entitlement guard, so a
+ * `pro_required` refusal here means Pro lapsed mid-session. There is no client
+ * gate to fall back on — route straight to the paywall. */
+const PAYWALL_PLACEMENT = "camera";
 
 export default function CameraScreen() {
   useAppLocale();
@@ -107,6 +113,11 @@ export default function CameraScreen() {
       }
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
+      if (failed.some((r) => r.code === "pro_required")) {
+        setBusy(false);
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
       Alert.alert(
         t("errors.batchSaveTitle"),
         t("capture.partialFailure", {
@@ -175,6 +186,11 @@ export default function CameraScreen() {
         return;
       }
       reportSaveFailures([result]);
+      if (result.code === "pro_required") {
+        setBusy(false);
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };
