@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -11,6 +12,7 @@ import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
 export default function AppLayout() {
+  useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
@@ -22,7 +24,7 @@ export default function AppLayout() {
   useResumePendingShare();
 
   if (isLoading) {
-    return <ScreenLoader label="Opening Shelvr" />;
+    return <ScreenLoader label={t("loading.app")} />;
   }
 
   // Onboarding runs BEFORE sign-in. Only kick users to the sign-in screen
@@ -56,14 +58,14 @@ export default function AppLayout() {
           <Stack.Screen
             name="digest/[id]"
             options={{
-              title: "Weekly shelf",
+              title: t("notifications.weeklyShelf"),
               headerBackButtonDisplayMode: "minimal",
               headerBackVisible: true,
               headerLeft: ({ canGoBack }) =>
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label="Back to library"
+                    label={t("capture.backToLibrary")}
                     onPress={() => router.replace("/")}
                   />
                 ),

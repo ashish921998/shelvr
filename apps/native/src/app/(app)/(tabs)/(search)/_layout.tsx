@@ -1,19 +1,21 @@
-import { Stack } from 'expo-router';
-import { Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { t, useAppLocale } from "@/lib/i18n";
+import { Stack } from "expo-router";
+import { Text } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function SearchStackLayout() {
+  useAppLocale();
   return (
     <Stack
       screenOptions={{
         headerTransparent: true,
         headerShadowVisible: false,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
       }}
     >
       <Stack.Screen name="index">
         <Stack.Title asChild>
-          <Text style={styles.title}>search</Text>
+          <Text style={styles.title}>{t("navigation.searchHeader")}</Text>
         </Stack.Title>
       </Stack.Screen>
     </Stack>

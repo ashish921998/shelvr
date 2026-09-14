@@ -1,3 +1,4 @@
+import { notificationLocale } from "./model/notificationDelivery";
 import { v } from "convex/values";
 import {
   internalAction,
@@ -153,6 +154,7 @@ export const setPreferences = mutation({
 
 export const registerDevice = mutation({
   args: {
+    locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
     // Accepted for compatibility with installed clients; scheduling belongs to setPreferences.
@@ -168,6 +170,8 @@ export const registerDevice = mutation({
     }
     // Validate before any write so a bad zone cannot leave a half-registered device.
     const timezone = parseTimezoneInput(args.timezone);
+    const locale = notificationLocale(args.locale);
+    const languageFields = locale === undefined ? {} : { locale };
 
     const existingToken = await ctx.db
       .query("notificationDevices")
@@ -179,6 +183,7 @@ export const registerDevice = mutation({
         userId,
         token,
         platform: args.platform,
+        ...languageFields,
         enabled: true,
         lastSeenAt: now,
       });
@@ -189,6 +194,7 @@ export const registerDevice = mutation({
       await ctx.db.patch(existingToken._id, {
         userId,
         platform: args.platform,
+        ...languageFields,
         enabled: true,
         lastSeenAt: now,
       });

@@ -1,3 +1,4 @@
+import { revenueCatLocale, syncRevenueCatUILocale } from "./revenuecat-locale";
 import { api } from "@convex/_generated/api";
 import { isEntitled } from "@convex/model/entitlement";
 import { convexQuery } from "@convex-dev/react-query";
@@ -187,7 +188,11 @@ async function configureRevenueCat(appUserID: string): Promise<void> {
   const rc = getPurchases();
   if (!rc) return;
   if (!REVENUECAT_API_KEY) return;
-  await rc.configure({ apiKey: REVENUECAT_API_KEY, appUserID });
+  await rc.configure({
+    apiKey: REVENUECAT_API_KEY,
+    appUserID,
+    preferredUILocaleOverride: revenueCatLocale(),
+  });
   configured = true;
 }
 
@@ -329,6 +334,10 @@ async function presentPaywallImpl(
     failed("sdk_unavailable");
     return "unavailable";
   }
+  if (!(await syncRevenueCatUILocale(getPurchases()))) {
+    failed("locale_sync_failed");
+    return "unavailable";
+  }
   try {
     const result = await observePaywallPresentation(properties, () =>
       rcui.presentPaywall(),
@@ -400,6 +409,7 @@ export async function presentCustomerCenter(): Promise<boolean> {
 
   const rcui = getRCUI();
   if (!rcui || typeof rcui.presentCustomerCenter !== "function") return false;
+  if (!(await syncRevenueCatUILocale(getPurchases()))) return false;
   try {
     await rcui.presentCustomerCenter();
     return true;

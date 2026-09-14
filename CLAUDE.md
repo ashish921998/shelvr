@@ -149,6 +149,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 ### Native (`apps/native`)
 
+- UI localization uses `expo-localization` and i18n-js. Read
+  [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
+  update all catalogs and run `pnpm localization:generate` after translation changes.
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the

@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "O Shelvr usa sua câmera para capturar coisas que você quer guardar para depois.",
+    "NSPhotoLibraryUsageDescription": "O Shelvr permite salvar fotos e capturas de tela da fototeca na sua biblioteca e organizar suas fotos.",
+    "NSCalendarsUsageDescription": "O Shelvr adiciona eventos ao calendário a partir dos conteúdos que você salvou.",
+    "NSCalendarsFullAccessUsageDescription": "O Shelvr adiciona eventos ao calendário a partir dos conteúdos que você salvou."
+  }
+}

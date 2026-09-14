@@ -1,3 +1,5 @@
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { t, useAppLocale } from "@/lib/i18n";
 import { BuildingStep } from "@/components/onboarding/building";
 import { LiveDemoStep } from "@/components/onboarding/live-demo";
 import { PermissionsStep } from "@/components/onboarding/permissions";
@@ -95,6 +97,7 @@ const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
 const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
+  useAppLocale();
   const insets = useSafeAreaInsets();
   const { completeOnboarding } = useOnboarding();
 
@@ -205,7 +208,7 @@ export default function OnboardingScreen() {
       $set: { save_pileup: q1, save_types: q2 },
     });
     recordCurrentStep();
-    setPendingSpaces(spaces);
+    setPendingSpaces(spaces.map(onboardingLabel));
     completeOnboarding();
   };
 
@@ -237,24 +240,24 @@ export default function OnboardingScreen() {
 
           {step === STEPS.surveyQ1 && (
             <SurveyStep
-              headline="Where do your saves pile up today?"
-              support="Be honest — we've seen worse."
+              headline={t("onboarding.pileupQuestion")}
+              support={t("onboarding.pileupHelp")}
               options={Q1_OPTIONS}
               selected={q1}
               onToggle={toggle(setQ1)}
-              ctaLabel="Continue"
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
 
           {step === STEPS.surveyQ2 && (
             <SurveyStep
-              headline="What do you save most?"
-              support="This shapes your shelf."
+              headline={t("onboarding.kindQuestion")}
+              support={t("onboarding.kindHelp")}
               options={Q2_OPTIONS}
               selected={q2}
               onToggle={toggle(setQ2)}
-              ctaLabel="Continue"
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
@@ -288,7 +291,7 @@ export default function OnboardingScreen() {
 
           {step === STEPS.ready && (
             <ReadyStep
-              spaceNames={spaces}
+              spaceNames={spaces.map(onboardingLabel)}
               demoItem={demoItem}
               onFinish={finish}
             />

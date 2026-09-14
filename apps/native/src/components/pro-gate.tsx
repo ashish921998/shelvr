@@ -1,3 +1,4 @@
+import { t, useAppLocale } from "@/lib/i18n";
 import { openPaywall } from "@/lib/entitlement";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
@@ -20,9 +21,10 @@ type Props = {
 export function ProGate({
   title,
   message,
-  ctaLabel = "View Pro plans",
+  ctaLabel = t("pro.viewPlans"),
   onPress,
 }: Props) {
+  useAppLocale();
   const router = useRouter();
   const handlePress = onPress ?? (() => openPaywall(router, "pro_gate"));
   return (

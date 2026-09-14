@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { NotificationDeviceSession } from './notification-device-session';
+import { describe, expect, it, vi } from "vitest";
+import { NotificationDeviceSession } from "./notification-device-session";
 
 function deferred() {
   let resolve!: () => void;
@@ -9,13 +9,14 @@ function deferred() {
   return { promise, resolve };
 }
 
-function setup(initial: string[] = []) {
+function setup(initial: string[] = [], getLocale?: () => string) {
   let tokens = initial;
   const deps = {
+    getLocale,
     getToken: vi.fn(
-      async (_requestPermission: boolean): Promise<string | null> => 'token-a',
+      async (_requestPermission: boolean): Promise<string | null> => "token-a",
     ),
-    saveToken: vi.fn(async (_token: string) => {}),
+    saveToken: vi.fn(async (_token: string, _locale?: string) => {}),
     revokeToken: vi.fn(async (_token: string) => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
@@ -36,8 +37,38 @@ function setup(initial: string[] = []) {
   return { session, deps };
 }
 
-describe('notification device session', () => {
-  it('deduplicates overlapping boot and token-event registrations', async () => {
+describe("notification device session", () => {
+  it("updates a stable token when its language changes", async () => {
+    let locale = "en";
+    const { session, deps } = setup([], () => locale);
+    await session.register();
+    locale = "ja";
+    await session.register();
+    await session.register();
+    expect(deps.saveToken.mock.calls).toEqual([
+      ["token-a", "en"],
+      ["token-a", "ja"],
+    ]);
+  });
+
+  it("captures language with the registration while a server write is pending", async () => {
+    let locale = "de";
+    const { session, deps } = setup([], () => locale);
+    const writing = deferred();
+    deps.saveToken.mockImplementationOnce(async () => writing.promise);
+    const first = session.register();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    locale = "ja";
+    const second = session.register();
+    writing.resolve();
+    await Promise.all([first, second]);
+    expect(deps.saveToken.mock.calls).toEqual([
+      ["token-a", "de"],
+      ["token-a", "ja"],
+    ]);
+  });
+
+  it("deduplicates overlapping boot and token-event registrations", async () => {
     const { session, deps } = setup();
     const saving = deferred();
     const save = deps.saveToken.mockImplementation(() => saving.promise);
@@ -49,7 +80,7 @@ describe('notification device session', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
-  it('drains an in-flight write before revoking and ending authentication', async () => {
+  it("drains an in-flight write before revoking and ending authentication", async () => {
     const { session, deps } = setup();
     const saving = deferred();
     const started = deferred();
@@ -57,7 +88,7 @@ describe('notification device session', () => {
     deps.saveToken.mockImplementation(async () => {
       started.resolve();
       await saving.promise;
-      events.push('registered');
+      events.push("registered");
     });
     const registration = session.register();
     await started.promise;
@@ -65,19 +96,19 @@ describe('notification device session', () => {
       events.push(`revoked:${token}`);
     });
     deps.signOut.mockImplementation(async () => {
-      events.push('signed out');
+      events.push("signed out");
     });
     const logout = session.signOut();
-    const blocked = session.register(async () => 'token-b');
+    const blocked = session.register(async () => "token-b");
     saving.resolve();
     expect(await registration).toBe(false);
     await logout;
     expect(await blocked).toBe(false);
     expect(deps.saveToken).toHaveBeenCalledTimes(1);
-    expect(events).toEqual(['registered', 'revoked:token-a', 'signed out']);
+    expect(events).toEqual(["registered", "revoked:token-a", "signed out"]);
   });
 
-  it('does not let an old completion suppress a new account registration', async () => {
+  it("does not let an old completion suppress a new account registration", async () => {
     const { session, deps } = setup();
     const saving = deferred();
     const started = deferred();
@@ -96,14 +127,14 @@ describe('notification device session', () => {
     expect(deps.saveToken).toHaveBeenCalledTimes(2);
   });
 
-  it('does not write a token fetched after its auth session ends', async () => {
+  it("does not write a token fetched after its auth session ends", async () => {
     const { session, deps } = setup();
     const fetching = deferred();
     const started = deferred();
     const registration = session.register(async () => {
       started.resolve();
       await fetching.promise;
-      return 'token-a';
+      return "token-a";
     });
     await started.promise;
     session.stop();
@@ -112,21 +143,21 @@ describe('notification device session', () => {
     expect(deps.saveToken).not.toHaveBeenCalled();
   });
 
-  it('revokes persisted tokens after a restart and does not sign out if revocation fails', async () => {
-    const { session, deps } = setup(['token-a', 'token-old']);
+  it("revokes persisted tokens after a restart and does not sign out if revocation fails", async () => {
+    const { session, deps } = setup(["token-a", "token-old"]);
     const end = deps.signOut;
-    const revoke = deps.revokeToken.mockRejectedValueOnce(new Error('offline'));
-    await expect(session.signOut()).rejects.toThrow('offline');
+    const revoke = deps.revokeToken.mockRejectedValueOnce(new Error("offline"));
+    await expect(session.signOut()).rejects.toThrow("offline");
     expect(end).not.toHaveBeenCalled();
     await session.register();
-    expect(deps.saveToken).toHaveBeenCalledWith('token-a');
+    expect(deps.saveToken).toHaveBeenCalledWith("token-a");
     revoke.mockResolvedValue(undefined);
     await session.signOut();
-    expect(revoke).toHaveBeenCalledWith('token-old');
+    expect(revoke).toHaveBeenCalledWith("token-old");
     expect(end).toHaveBeenCalledTimes(1);
   });
 
-  it('owns permission, preference updates and mutual exclusion', async () => {
+  it("owns permission, preference updates and mutual exclusion", async () => {
     const { session, deps } = setup();
     deps.getToken.mockResolvedValueOnce(null);
     expect(await session.setWeeklyShelf(true)).toBe(false);
@@ -134,7 +165,7 @@ describe('notification device session', () => {
     const saving = deferred();
     deps.setWeeklyShelf.mockImplementationOnce(() => saving.promise);
     const update = session.setWeeklyShelf(true);
-    expect(session.getSnapshot()).toBe('preferences');
+    expect(session.getSnapshot()).toBe("preferences");
     await session.signOut();
     await session.deleteAccount();
     expect(deps.signOut).not.toHaveBeenCalled();
@@ -143,26 +174,26 @@ describe('notification device session', () => {
     expect(await update).toBe(true);
     expect(deps.getToken).toHaveBeenLastCalledWith(true);
     expect(deps.saveToken).toHaveBeenCalledBefore(deps.setWeeklyShelf);
-    expect(session.getSnapshot()).toBe('idle');
+    expect(session.getSnapshot()).toBe("idle");
     await session.setWeeklyShelf(false);
     expect(deps.setWeeklyShelf).toHaveBeenLastCalledWith(false);
     expect(deps.getToken).toHaveBeenCalledTimes(2);
   });
 
-  it('restores registration after failed account deletion without ending authentication', async () => {
-    const { session, deps } = setup(['token-a']);
-    deps.deleteAccount.mockRejectedValueOnce(new Error('offline'));
-    await expect(session.deleteAccount()).rejects.toThrow('offline');
+  it("restores registration after failed account deletion without ending authentication", async () => {
+    const { session, deps } = setup(["token-a"]);
+    deps.deleteAccount.mockRejectedValueOnce(new Error("offline"));
+    await expect(session.deleteAccount()).rejects.toThrow("offline");
     await session.register();
-    expect(deps.saveToken).toHaveBeenCalledWith('token-a');
+    expect(deps.saveToken).toHaveBeenCalledWith("token-a");
     expect(deps.signOut).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
-    expect(session.getSnapshot()).toBe('idle');
+    expect(session.getSnapshot()).toBe("idle");
   });
 
-  it('keeps successful deletion successful when local cleanup fails', async () => {
-    const { session, deps } = setup(['token-a']);
-    deps.signOut.mockRejectedValueOnce(new Error('local cleanup failed'));
+  it("keeps successful deletion successful when local cleanup fails", async () => {
+    const { session, deps } = setup(["token-a"]);
+    deps.signOut.mockRejectedValueOnce(new Error("local cleanup failed"));
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);

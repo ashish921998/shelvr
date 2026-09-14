@@ -1,3 +1,4 @@
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { AnimatedText } from "@/components/animated-text";
 import {
   BottomSheet,
@@ -80,6 +81,7 @@ function AndroidAddHeader({
   back: () => void;
   save: () => void;
 }) {
+  useAppLocale();
   const [titleWidth, setTitleWidth] = useState(0);
   const measureTitle = useCallback((event: LayoutChangeEvent) => {
     setTitleWidth(event.nativeEvent.layout.width);
@@ -90,7 +92,7 @@ function AndroidAddHeader({
       {isComposer ? (
         <HeaderIconButton
           icon="chevron.left"
-          label="Back to save options"
+          label={t("capture.backToOptions")}
           onPress={back}
         />
       ) : (
@@ -101,6 +103,7 @@ function AndroidAddHeader({
           <AnimatedText
             text={title}
             width={titleWidth}
+            truncate
             height={44}
             style={styles.androidHeaderTitle}
           />
@@ -109,7 +112,7 @@ function AndroidAddHeader({
       {isComposer ? (
         <HeaderIconButton
           icon="checkmark"
-          label="Save"
+          label={t("common.save")}
           disabled={!canSave}
           onPress={save}
         />
@@ -126,6 +129,7 @@ type AddContentProps = {
 };
 
 function AddContent({ close, openCamera }: AddContentProps) {
+  useAppLocale();
   const { theme } = useUnistyles();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
@@ -187,7 +191,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
     } catch {
-      Alert.alert("Could not save", "Something went wrong. Try again.");
+      Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
       setSaving(false);
     }
   };
@@ -212,11 +216,15 @@ function AddContent({ close, openCamera }: AddContentProps) {
       const savedCount = results.length - failed.length;
       reportSaveFailures(results);
       Alert.alert(
-        "Could not save all images",
-        `${savedCount} of ${results.length} saved. ${failed[0].message} Retry the failed images?`,
+        t("errors.batchSaveTitle"),
+        t("capture.partialFailure", {
+          reason: localizeError(failed[0].message),
+          saved: savedCount,
+          total: results.length,
+        }),
         [
           {
-            text: "Retry failed",
+            text: t("capture.retryFailed"),
             onPress: () => {
               void runImageRequests(
                 // Reuse each failed operation id on retry — never mint fresh ones.
@@ -227,16 +235,13 @@ function AddContent({ close, openCamera }: AddContentProps) {
               );
             },
           },
-          { text: "Done", onPress: close },
+          { text: t("common.done"), onPress: close },
         ],
       );
       setSaving(false);
     } catch (err) {
       analytics.captureError("image_upload_failed", err);
-      Alert.alert(
-        "Could not save",
-        "Uploading those images failed. Try again.",
-      );
+      Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
       setSaving(false);
     }
   };
@@ -269,10 +274,10 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const isComposer = mode === "note" || mode === "article";
   const isArticle = mode === "article";
   const title = isArticle
-    ? "Save an article"
+    ? t("capture.articleTitle")
     : mode === "note"
-      ? "New note"
-      : "Save something";
+      ? t("capture.noteTitle")
+      : t("capture.title");
 
   return (
     <View style={styles.content}>
@@ -287,7 +292,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
           between "Save something" / "New note" / "Save an article". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
-          <AnimatedText text={title} style={styles.heading} />
+          <AnimatedText text={title} style={styles.heading} truncate />
         </Stack.Title>
       ) : null}
       {Platform.OS === "android" ? (
@@ -307,7 +312,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
               tintColor={theme.colors.primary}
               onPress={() => setMode("menu")}
             >
-              Back
+              {t("common.back")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
           <Stack.Toolbar placement="right">
@@ -316,7 +321,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
               tintColor={canSave ? theme.colors.primary : theme.colors.muted}
               onPress={save}
             >
-              Save
+              {t("common.save")}
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         </>
@@ -327,7 +332,11 @@ function AddContent({ close, openCamera }: AddContentProps) {
           style={isArticle ? styles.articleInput : styles.noteInput}
           value={value}
           onChangeText={setValue}
-          placeholder={isArticle ? "Paste or type a link…" : "Jot a note…"}
+          placeholder={
+            isArticle
+              ? t("capture.linkPlaceholder")
+              : t("capture.notePlaceholder")
+          }
           placeholderTextColor={theme.colors.muted}
           autoFocus
           multiline={!isArticle}
@@ -342,25 +351,25 @@ function AddContent({ close, openCamera }: AddContentProps) {
         <View style={styles.actions}>
           <ActionButton
             icon="square.and.pencil"
-            label="Note"
+            label={t("item.note")}
             onPress={() => guard(() => openComposer("note"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="link"
-            label="Article"
+            label={t("item.article")}
             onPress={() => guard(() => openComposer("article"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="photo.on.rectangle"
-            label="Photos"
+            label={t("capture.photos")}
             onPress={() => guard(pickImages)}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
             icon="camera"
-            label="Camera"
+            label={t("capture.camera")}
             onPress={() =>
               guard(() => {
                 openCamera(pinnedSpaceId);
