@@ -1,4 +1,5 @@
 import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
+import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -29,12 +30,12 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-/** Bounded reason ids for the next-visit cancel survey (lib/cancel-survey.ts). */
-export type CancelSurveyReason =
-  | "too_expensive"
-  | "not_useful_enough"
-  | "missing_feature"
-  | "other";
+/**
+ * Bounded reason ids for the next-visit cancel survey (lib/cancel-survey.ts),
+ * re-exported from the Convex validator's tuple so the event property and the
+ * `respond` mutation's args can never disagree.
+ */
+export type { CancelSurveyReason };
 
 type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
@@ -158,8 +159,15 @@ function capture<Event extends AnalyticsEvent>(
 }
 
 const SAFE_ERROR_NAMES = new Set([
-  "Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError",
-  "URIError", "EvalError", "AggregateError", "AbortError",
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+  "AbortError",
 ]);
 
 function captureError(
@@ -169,9 +177,12 @@ function captureError(
 ): void {
   // Custom names, messages, and stacks can contain user content. Only a
   // known error type is safe for console diagnostics without PostHog.
-  const errorType = error instanceof Error
-    ? SAFE_ERROR_NAMES.has(error.name) ? error.name : "Error"
-    : "Unknown";
+  const errorType =
+    error instanceof Error
+      ? SAFE_ERROR_NAMES.has(error.name)
+        ? error.name
+        : "Error"
+      : "Unknown";
   console.error(event, { error_type: errorType });
   if (!posthog) return;
 

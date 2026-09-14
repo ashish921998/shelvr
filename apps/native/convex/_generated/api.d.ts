@@ -30,7 +30,7 @@ import type * as model_itemFields from "../model/itemFields.js";
 import type * as model_localization from "../model/localization.js";
 import type * as model_log from "../model/log.js";
 import type * as model_memberships from "../model/memberships.js";
-import type * as model_notificationDelivery from "../model/notificationDelivery.js";
+import type * as model_notificationFields from "../model/notificationFields.js";
 import type * as model_notificationSchedule from "../model/notificationSchedule.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
@@ -78,7 +78,7 @@ declare const fullApi: ApiFromModules<{
   "model/localization": typeof model_localization;
   "model/log": typeof model_log;
   "model/memberships": typeof model_memberships;
-  "model/notificationDelivery": typeof model_notificationDelivery;
+  "model/notificationFields": typeof model_notificationFields;
   "model/notificationSchedule": typeof model_notificationSchedule;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/rateLimiter": typeof model_rateLimiter;

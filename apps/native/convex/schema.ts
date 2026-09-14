@@ -1,7 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { recipientValidator } from "./model/notificationDelivery";
+import { recipientValidator } from "./model/notificationFields";
 import {
   enrichmentValidator,
   failureReasonValidator,
@@ -263,8 +263,9 @@ export default defineSchema({
     userId: v.string(),
     askedAt: v.number(),
     outcome: v.optional(cancelSurveyOutcomeValidator),
-    // Bounded reason id from the client survey (never free text); mirrored
-    // by CancelSurveyReason in apps/native/src/lib/analytics.ts.
+    // Bounded reason id from the client survey (never free text). The client's
+    // CancelSurveyReason derives from the same CANCEL_SURVEY_REASONS tuple this
+    // validator is built from, so the two cannot disagree.
     reason: v.optional(cancelSurveyReasonValidator),
     respondedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
