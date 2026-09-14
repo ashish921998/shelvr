@@ -420,50 +420,37 @@ describe("useCancelSurvey", () => {
     ).toHaveLength(1);
   });
 
-  it.each(["submit", "dismiss"] as const)(
-    "restores the card after failed %s and allows retry",
-    async (action) => {
-      mock.respond.mockRejectedValueOnce(new Error("response failed"));
-      react.mount(() => useCancelSurvey());
-      await flush();
-      latest().presented();
-      await flush();
-      mock.surveyStatus = { asked: true };
-      latest();
-      if (action === "submit") latest().submit("other");
-      else latest().dismiss();
-      await flush();
-      expect(latest().visible).toBe(true);
-      expect(
-        mock.capture.mock.calls.filter(
-          ([name]) =>
-            name === "cancel_survey_submitted" ||
-            name === "cancel_survey_dismissed",
-        ),
-      ).toHaveLength(0);
-      latest().submit("other");
-      await flush();
-      expect(mock.respond).toHaveBeenCalledTimes(2);
-      expect(latest().visible).toBe(false);
-    },
-  );
-
-  it("does not restore a failed response for a different account", async () => {
-    let reject!: (error: Error) => void;
-    mock.respond.mockReturnValueOnce(
-      new Promise((_resolve, fail) => {
-        reject = fail;
-      }),
-    );
+  it("leaves the card down when a respond fails, then re-asks on the next visit", async () => {
+    mock.respond.mockRejectedValueOnce(new Error("response failed"));
     react.mount(() => useCancelSurvey());
     await flush();
-    latest().submit("other");
-    mock.user = { _id: "user-2" };
-    mock.surveyStatus = { asked: true };
-    latest();
-    reject(new Error("response failed"));
+    latest().presented();
     await flush();
+    latest().submit("other");
+    await flush();
+
+    // A failed respond committed nothing: no analytics, and the card stays
+    // down for the rest of this episode — no immediate re-show.
     expect(latest().visible).toBe(false);
+    expect(
+      mock.capture.mock.calls.filter(
+        ([name]) => name === "cancel_survey_submitted",
+      ),
+    ).toHaveLength(0);
+
+    // The failed respond never wrote the row, so the next foreground visit
+    // re-detects and re-asks instead of stranding the survey.
+    await roundTrip();
+    expect(latest().visible).toBe(true);
+    latest().presented();
+    await flush();
+    latest().submit("other");
+    await flush();
+    expect(mock.respond).toHaveBeenCalledTimes(2);
+    expect(mock.capture).toHaveBeenCalledWith("cancel_survey_submitted", {
+      reason: "other",
+      survey_source: "next_visit_card",
+    });
   });
 
   it("double-tapping a reason submits exactly once", async () => {

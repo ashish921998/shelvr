@@ -51,13 +51,6 @@ export function useCancelSurvey(): {
 } {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
-  const currentUserId = useRef(userId);
-  useEffect(() => {
-    currentUserId.current = userId;
-    return () => {
-      currentUserId.current = undefined;
-    };
-  }, [userId]);
   const home = isHomeRootRoute(useSegments());
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -139,7 +132,6 @@ export function useCancelSurvey(): {
     // takes its card down and stays silent.
     void markShown({})
       .then((result) => {
-        if (currentUserId.current !== userId) return;
         if (result.accepted) {
           cancelSurveyAnalytics.shown();
         } else {
@@ -147,7 +139,6 @@ export function useCancelSurvey(): {
         }
       })
       .catch((error: unknown) => {
-        if (currentUserId.current !== userId) return;
         analytics.captureError("cancel_survey_claim_failed", error);
         presentedFor.current = null;
         setVisible(false);
@@ -165,15 +156,14 @@ export function useCancelSurvey(): {
       responded.current = true;
       void respond({ outcome: "submitted", reason })
         .then((result) => {
-          if (currentUserId.current !== userId) return;
           if (result.accepted) cancelSurveyAnalytics.submitted(reason);
-          setVisible(false);
         })
         .catch((error: unknown) => {
-          if (currentUserId.current !== userId) return;
+          // A rejected respond committed nothing: leave the card down and
+          // re-arm the one-response lock so the re-earned ask (re-detected
+          // on a later foreground episode) can still be answered.
           analytics.captureError("cancel_survey_response_failed", error);
           responded.current = false;
-          setVisible(true);
         });
       setVisible(false);
     },
@@ -185,15 +175,11 @@ export function useCancelSurvey(): {
     responded.current = true;
     void respond({ outcome: "dismissed" })
       .then((result) => {
-        if (currentUserId.current !== userId) return;
         if (result.accepted) cancelSurveyAnalytics.dismissed();
-        setVisible(false);
       })
       .catch((error: unknown) => {
-        if (currentUserId.current !== userId) return;
         analytics.captureError("cancel_survey_response_failed", error);
         responded.current = false;
-        setVisible(true);
       });
     setVisible(false);
   }, [userId, respond]);
