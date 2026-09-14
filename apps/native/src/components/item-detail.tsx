@@ -300,13 +300,7 @@ function ItemDetailBody({
         <Text selectable style={styles.paragraph}>
           {detail.note}
         </Text>
-        <IntentsRow item={item} intents={intents} />
-        {item.description ? (
-          <Text style={styles.description}>{item.description}</Text>
-        ) : null}
-        <TagsRow tags={item.tags} />
         {spaces.length > 0 ? <ItemSpaces spaces={spaces} /> : null}
-        {item.status === "ready" ? <ProductsSection item={detail} /> : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
