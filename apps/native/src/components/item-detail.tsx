@@ -4,6 +4,7 @@ import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
 import { SimilarGrid } from "@/components/similar-grid";
@@ -235,6 +236,11 @@ export const ItemDetail = memo(function ItemDetail({
     style: [styles.container, { paddingTop: headerHeight + theme.gap(5) }],
     contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
     showsVerticalScrollIndicator: false,
+    // Note pages are edited in place: keep the caret above the keyboard and
+    // let a drag down dismiss it.
+    automaticallyAdjustKeyboardInsets: true,
+    keyboardDismissMode: "interactive" as const,
+    keyboardShouldPersistTaps: "handled" as const,
   };
 
   if (bodyPending) {
@@ -263,7 +269,6 @@ export const ItemDetail = memo(function ItemDetail({
         isVideo={isVideo}
         intents={intents}
         heroUri={heroUri}
-        headerHeight={headerHeight}
       />
     </ScrollView>
   );
@@ -280,7 +285,6 @@ function ItemDetailBody({
   isVideo,
   intents,
   heroUri,
-  headerHeight,
 }: {
   item: DetailItem;
   detail: ReturnType<typeof useItemDetailData>["detail"];
@@ -290,16 +294,13 @@ function ItemDetailBody({
   isVideo: boolean;
   intents: ItemIntent[];
   heroUri: string | null | undefined;
-  headerHeight: number;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
   if (item.type === "note") {
     return (
-      <View style={[styles.body, { paddingTop: headerHeight + theme.gap(5) }]}>
-        <Text selectable style={styles.paragraph}>
-          {detail.note}
-        </Text>
+      <View style={styles.body}>
+        <NoteEditor key={item._id} item={detail} />
         {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
         <SaveStatusNotice item={detail} />
       </View>
@@ -310,7 +311,8 @@ function ItemDetailBody({
     <View
       style={[
         styles.body,
-        { paddingTop: heroUri ? theme.gap(5) : headerHeight + theme.gap(5) },
+        // The ScrollView already clears the header; only a hero needs a gap.
+        heroUri ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
       <SaveStatusNotice item={item} />

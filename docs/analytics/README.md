@@ -18,12 +18,12 @@ The app records behavior; this dashboard is for the product team. It does not ad
 
 ## Events
 
-| Event | Origin | Important fields |
-| --- | --- | --- |
-| `item_saved` | Convex, once per creation transaction | `item_id`, `item_type`, `saved_at`, `save_session_id` |
-| `item_opened` | Focused item pager / foreground return | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id` |
-| `item_action` | Item detail actions and feed sharing | Same item fields, `action`, SDK `$session_id` |
-| `item_space_membership_changed` | Space corrections and Undo | `item_id`, `space_id`, `membership_added`, `undone` |
+| Event                           | Origin                                                                                                  | Important fields                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `item_saved`                    | Convex, once per creation transaction                                                                   | `item_id`, `item_type`, `saved_at`, `save_session_id`                          |
+| `item_opened`                   | Focused item pager / foreground return                                                                  | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id` |
+| `item_action`                   | Item detail actions, feed sharing, and the first saved edit per note page visit (`action: note_edited`) | Same item fields, `action`, SDK `$session_id`                                  |
+| `item_space_membership_changed` | Space corrections and Undo                                                                              | `item_id`, `space_id`, `membership_added`, `undone`                            |
 
 All four include `environment` and `analytics_version`. These new events send identifiers and categorical metadata, not saved text, URLs, images, or Space names. Existing event contracts remain available.
 
