@@ -296,7 +296,7 @@ function ItemDetailBody({
   const { theme } = useUnistyles();
   if (item.type === "note") {
     return (
-      <View style={styles.body}>
+      <View style={[styles.body, { paddingTop: headerHeight + theme.gap(5) }]}>
         <Text selectable style={styles.paragraph}>
           {detail.note}
         </Text>
