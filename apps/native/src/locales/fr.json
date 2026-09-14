@@ -298,7 +298,7 @@
   "navigation.searchHeader": "recherche",
   "search.placeholder": "Rechercher dans vos contenus",
   "search.emptyTitle": "Retrouvez tout",
-  "search.emptyBody": "La recherche parcourt les titres, les étiquettes et\nles descriptions créées par Shelvr pour vos contenus.",
+  "search.emptyBody": "La recherche parcourt vos notes ainsi que les titres, les étiquettes\net les descriptions créées par Shelvr pour vos contenus.",
   "search.noResultsTitle": "Rien pour le moment",
   "navigation.spacesHeader": "collections",
   "spaces.addFirst": "Ajouter le premier contenu",

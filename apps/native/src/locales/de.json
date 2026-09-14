@@ -298,7 +298,7 @@
   "navigation.searchHeader": "suche",
   "search.placeholder": "Deine Inhalte durchsuchen",
   "search.emptyTitle": "Alles wiederfinden",
-  "search.emptyBody": "Die Suche durchsucht Titel, Schlagwörter und\nBeschreibungen, die Shelvr für deine Inhalte erstellt hat.",
+  "search.emptyBody": "Die Suche durchsucht deine Notizen sowie Titel, Schlagwörter\nund Beschreibungen, die Shelvr für deine Inhalte erstellt hat.",
   "search.noResultsTitle": "Noch nichts",
   "navigation.spacesHeader": "sammlungen",
   "spaces.addFirst": "Ersten Inhalt hinzufügen",
