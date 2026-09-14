@@ -5,10 +5,11 @@ import { v } from "convex/values";
  * `cancelSurvey.ts` (the `respond:` args), so the two spots cannot drift.
  * The bounded reason ids keep the row free of free text. This module has no
  * server-runtime imports, so the native app loads it as
- * `@convex/model/cancelSurveyFields`: `CancelSurveyReason` (src/lib/analytics.ts),
- * `CANCEL_SURVEY_REASONS` (src/lib/cancel-survey.ts) and the
- * `CancelSurveyResponse` union (src/lib/use-cancel-survey.ts) all derive from
- * the tuple below rather than restating the ids.
+ * `@convex/model/cancelSurveyFields`: the `cancel_survey_submitted` event
+ * property (src/lib/analytics.ts), `CANCEL_SURVEY_REASONS`
+ * (src/lib/cancel-survey.ts) and the `CancelSurveyResponse` union
+ * (src/lib/use-cancel-survey.ts) all derive from the tuple below rather than
+ * restating the ids.
  */
 
 // How the ask ended. First recorded outcome wins server-side; a submitted

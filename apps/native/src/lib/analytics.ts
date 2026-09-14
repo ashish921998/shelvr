@@ -30,13 +30,6 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-/**
- * Bounded reason ids for the next-visit cancel survey (lib/cancel-survey.ts),
- * re-exported from the Convex validator's tuple so the event property and the
- * `respond` mutation's args can never disagree.
- */
-export type { CancelSurveyReason };
-
 type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
