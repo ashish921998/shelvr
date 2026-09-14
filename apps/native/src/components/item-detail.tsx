@@ -304,7 +304,7 @@ function ItemDetailBody({
     return (
       <View style={[styles.body, { paddingTop: headerHeight + theme.gap(5) }]}>
         <NoteEditor key={item._id} item={detail} />
-        {spaces.length > 0 ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
