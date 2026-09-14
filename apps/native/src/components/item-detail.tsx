@@ -300,7 +300,7 @@ function ItemDetailBody({
         <Text selectable style={styles.paragraph}>
           {detail.note}
         </Text>
-        {spaces.length > 0 ? <ItemSpaces spaces={spaces} /> : null}
+        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
         <SaveStatusNotice item={detail} />
       </View>
     );
