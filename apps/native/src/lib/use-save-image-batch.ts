@@ -49,38 +49,55 @@ export type ImageBatchDeps = {
  * a retry — successful ones are never resubmitted — and each retry replays the
  * failed request's existing operation id so the backend `itemOperations` ledger
  * resumes that operation instead of starting a second one per image.
+ *
+ * `alreadySaved` carries the results that succeeded in earlier attempts at the
+ * same batch, so a retry still counts progress against the whole batch the
+ * user picked and the eventual all-saved callback sees every image, not just
+ * the ones the last retry submitted.
  */
 export async function runImageBatch(
   requests: ImageSaveRequest[],
   deps: ImageBatchDeps,
+  alreadySaved: ImageSaveResult[] = [],
 ): Promise<void> {
   if (requests.length === 0) {
-    deps.onAllSaved([]);
+    deps.onAllSaved(alreadySaved);
     return;
   }
   deps.setBusy(true);
   try {
     const results = await deps.saveImages(requests, { spaceId: deps.spaceId });
     const failed = results.filter((r) => r.status === "failed");
+    const savedSoFar = [
+      ...alreadySaved,
+      ...results.filter((r) => r.status === "saved"),
+    ];
     if (failed.length === 0) {
-      deps.onAllSaved(results);
+      deps.onAllSaved(savedSoFar);
       return;
     }
-    const savedCount = results.length - failed.length;
     reportSaveFailures(results);
-    // Takes precedence over the partial-failure alert: once Pro has lapsed,
-    // retrying cannot succeed, so the paywall is the only useful next step.
-    if (failed.some((r) => r.code === "pro_required")) {
-      deps.setBusy(false);
+    // A save refused for Pro means the entitlement lapsed after the host
+    // screen was gated, so the paywall comes first. Busy stays set until it
+    // resolves: presenting can wait on RevenueCat identity sync, and another
+    // capture underneath it would start overlapping batches. Any other failure
+    // in the same batch is still offered for retry afterwards; that retry
+    // carries every failed operation id, so a purchase made in the paywall
+    // lets the refused ones resume too.
+    const otherFailures = failed.filter((r) => r.code !== "pro_required");
+    if (otherFailures.length < failed.length) {
       await deps.openPaywall();
-      return;
+      if (otherFailures.length === 0) {
+        deps.setBusy(false);
+        return;
+      }
     }
     deps.alert(
       t("errors.batchSaveTitle"),
       t("capture.partialFailure", {
-        reason: localizeError(failed[0].message),
-        saved: savedCount,
-        total: results.length,
+        reason: localizeError(otherFailures[0].message),
+        saved: savedSoFar.length,
+        total: savedSoFar.length + failed.length,
       }),
       [
         {
@@ -93,6 +110,7 @@ export async function runImageBatch(
                 operationId: r.operationId,
               })),
               deps,
+              savedSoFar,
             );
           },
         },
