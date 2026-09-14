@@ -89,3 +89,7 @@ export function isStaleProcessing(
   const startedAt = item.processingStartedAt ?? item._creationTime;
   return startedAt < now - PROCESSING_STALE_MS;
 }
+
+/** Longest title a user can type for a save. The client's title field shares
+ * it, so the server never has to reject what the field allowed. */
+export const MAX_ITEM_TITLE_CHARS = 200;
