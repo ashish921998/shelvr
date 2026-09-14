@@ -221,6 +221,12 @@ Both manual workflows require successful push CI for the selected `main`
 commit. Release deploys that commit's Convex backend before building or
 publishing, and shares Deploy's concurrency group to prevent interleaving.
 Release therefore also requires `CONVEX_DEPLOY_KEY`.
+Non-main dispatches fail with a branch-selection error. Before queueing any
+build with iOS submission enabled, Release verifies that EAS has a submission
+API key assigned to the production bundle and Apple team. Configure it with
+`eas credentials --platform ios` under the production profile's App Store
+Connect / EAS Submit settings. This checks the assignment, not revocation
+or permissions on Apple's servers.
 
 **OTA publishes require the EAS `production` environment.** With
 `--environment production`, updates use that environment's plaintext and
@@ -230,8 +236,11 @@ deployment/site URLs and the iOS/Android RevenueCat public keys before
 publishing. Set them with `eas env:set --name <name> --value <value>
 --environment production --visibility sensitive`. The temporary file is
 deleted after validation, and validation errors never include values.
-Keep config-affecting variables such as `GOOGLE_MAPS_API_KEY` and `POSTHOG_*`
-readable to both builds and updates so their fingerprints agree.
+The verifier also requires readable, nonempty `GOOGLE_MAPS_API_KEY`,
+`POSTHOG_PROJECT_TOKEN`, and an HTTPS `POSTHOG_HOST`. Set these explicitly
+with plaintext or sensitive visibility in EAS production so builds and
+updates use the same config inputs. Both environment validation and OTA
+publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native

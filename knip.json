@@ -28,6 +28,7 @@
       "entry": [
         "tools/generate-localizations.mjs",
         "tools/verify-ota-env.mjs",
+        "tools/verify-ios-submit.mjs",
         "tools/release-guards.test.mjs"
       ],
       "project": ["tools/**/*.{mjs,cjs}"]

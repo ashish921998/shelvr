@@ -10,6 +10,15 @@ const requirements = {
     isOrigin(value, "https://amiable-setter-120.convex.site"),
   EXPO_PUBLIC_REVENUECAT_IOS_KEY: (value) => /^appl_\S+$/.test(value ?? ""),
   EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: (value) => /^goog_\S+$/.test(value ?? ""),
+  GOOGLE_MAPS_API_KEY: (value) => Boolean(value?.trim()),
+  POSTHOG_PROJECT_TOKEN: (value) => Boolean(value?.trim()),
+  POSTHOG_HOST: (value) => {
+    try {
+      return new URL(value).protocol === "https:";
+    } catch {
+      return false;
+    }
+  },
 };
 
 function isOrigin(value, origin) {

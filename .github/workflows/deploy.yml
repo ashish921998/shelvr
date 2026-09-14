@@ -19,10 +19,19 @@ permissions:
 
 concurrency:
   # Never cancel a deploy halfway; queue the next one instead.
-  group: deploy
+  group: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.run_id || 'deploy' }}
   cancel-in-progress: false
 
 jobs:
+  reject-non-main:
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject dispatch from a non-main ref
+        run: |
+          echo '::error::Deploy must be dispatched from main. Select main in the Run workflow branch selector.'
+          exit 1
+
   convex-production:
     name: Deploy Convex production
     if: |
@@ -132,6 +141,8 @@ jobs:
       # updates, so a declared name alone is not sufficient validation.
       - name: Verify the EAS production environment
         working-directory: apps/native
+        env:
+          APP_VARIANT: production
         run: |
           ota_env="$(mktemp)"
           trap 'rm -f "$ota_env"' EXIT

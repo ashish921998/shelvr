@@ -37,10 +37,19 @@ permissions:
 
 concurrency:
   # Serialize backend deploys and client publication with Deploy.
-  group: deploy
+  group: ${{ github.ref != 'refs/heads/main' && github.run_id || 'deploy' }}
   cancel-in-progress: false
 
 jobs:
+  reject-non-main:
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject dispatch from a non-main ref
+        run: |
+          echo '::error::Release must be dispatched from main. Select main in the Run workflow branch selector.'
+          exit 1
+
   release:
     name: ${{ inputs.mode == 'ota' && 'Publish production OTA' || 'Build' }}
     # Releases only ever ship from main. The production environment's
@@ -94,6 +103,8 @@ jobs:
       - name: Verify the EAS production environment
         if: inputs.mode == 'ota'
         working-directory: apps/native
+        env:
+          APP_VARIANT: production
         run: |
           ota_env="$(mktemp)"
           trap 'rm -f "$ota_env"' EXIT
@@ -114,6 +125,12 @@ jobs:
             exit 1
           fi
           echo "$EAS_GOOGLE_SERVICE_ACCOUNT_KEY" | base64 -d > apps/native/google-service-account-key.json
+
+      - name: Verify the iOS submission key on EAS
+        if: inputs.mode == 'build' && inputs.submit && inputs.platform != 'android'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node tools/verify-ios-submit.mjs
 
       # Ship the matching backend before either a store build or an OTA.
       # The shared concurrency group prevents Deploy from interleaving.

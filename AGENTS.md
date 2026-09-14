@@ -89,12 +89,15 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
   Both manual workflows require successful main push CI for the selected
   commit. Release deploys that commit's backend before the client and shares
   Deploy's concurrency group; it also requires `CONVEX_DEPLOY_KEY`.
+  Non-main dispatches fail explicitly. iOS submissions verify the EAS key
+  assignment for the production bundle and Apple team before queueing builds.
 - OTA uses EAS production's plaintext/sensitive variables, never Secret
   values. Both workflows validate readable production Convex URLs and both
   RevenueCat public SDK keys before publishing. Set them with `eas env:set`
   (`--name`, `--value`, `--environment production`, `--visibility sensitive`).
-  Config-affecting variables must be readable to both builds and updates
-  to keep fingerprints consistent.
+  The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
+  `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
+  consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
   fingerprint (a native dependency added or removed, a native config change)
   makes new updates invisible to binaries built from the old fingerprint:

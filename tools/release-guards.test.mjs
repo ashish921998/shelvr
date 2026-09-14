@@ -5,12 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import verifyCi from "./verify-ci.cjs";
+import { verifyIosSubmitCredentials } from "./ios-submit-credentials.mjs";
 
 const validEnv = {
   EXPO_PUBLIC_CONVEX_URL: "https://amiable-setter-120.convex.cloud",
   EXPO_PUBLIC_CONVEX_SITE_URL: "https://amiable-setter-120.convex.site",
   EXPO_PUBLIC_REVENUECAT_IOS_KEY: "appl_fixture",
   EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_fixture",
+  GOOGLE_MAPS_API_KEY: "maps_fixture",
+  POSTHOG_PROJECT_TOKEN: "posthog_fixture",
+  POSTHOG_HOST: "https://example.com",
 };
 
 function validateEnv(values) {
@@ -38,6 +42,90 @@ function validateEnv(values) {
 
 test("accepts valid OTA-readable production values", () => {
   assert.equal(validateEnv(validEnv).status, 0);
+});
+
+test("rejects Secret-visibility fingerprint inputs omitted by env:pull", () => {
+  for (const name of [
+    "GOOGLE_MAPS_API_KEY",
+    "POSTHOG_PROJECT_TOKEN",
+    "POSTHOG_HOST",
+  ]) {
+    const values = { ...validEnv };
+    delete values[name];
+    values[`# ${name}`] = "***** (secret)";
+    const result = validateEnv(values);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, new RegExp(name));
+  }
+});
+
+const iosCredential = {
+  appleAppIdentifier: { bundleIdentifier: "app.fixture" },
+  appleTeam: { appleTeamIdentifier: "fixture-team" },
+  appStoreConnectApiKeyForSubmissions: { id: "fixture-id" },
+};
+
+async function checkIosCredentials(credentials, options = {}) {
+  return verifyIosSubmitCredentials({
+    token: "fixture-token",
+    appId: "fixture-project",
+    bundleIdentifier: "app.fixture",
+    appleTeamId: "fixture-team",
+    fetchImpl: async (url, request) => {
+      assert.equal(url, "https://api.expo.dev/graphql");
+      const body = JSON.parse(request.body);
+      assert.deepEqual(body.variables, { appId: "fixture-project" });
+      assert.ok(!body.query.includes("keyP8"));
+      return {
+        ok: true,
+        json: async () => ({
+          data: { app: { byId: { iosAppCredentials: credentials } } },
+        }),
+      };
+    },
+    ...options,
+  });
+}
+
+test("accepts an EAS submission key assigned to the production app and team", async () => {
+  await checkIosCredentials([iosCredential]);
+});
+
+test("rejects missing iOS keys and keys assigned to other apps or teams", async () => {
+  for (const credentials of [
+    [],
+    undefined,
+    [{ ...iosCredential, appStoreConnectApiKeyForSubmissions: null }],
+    [
+      {
+        ...iosCredential,
+        appleAppIdentifier: { bundleIdentifier: "app.other" },
+      },
+    ],
+    [{ ...iosCredential, appleTeam: { appleTeamIdentifier: "another-team" } }],
+  ]) {
+    await assert.rejects(
+      checkIosCredentials(credentials),
+      /No iOS submission API key/,
+    );
+  }
+});
+
+test("fails closed on missing tokens and credential API failures", async () => {
+  await assert.rejects(checkIosCredentials([], { token: "" }), /EXPO_TOKEN/);
+  await assert.rejects(
+    checkIosCredentials([], { fetchImpl: async () => ({ ok: false }) }),
+    /Unable to verify/,
+  );
+  await assert.rejects(
+    checkIosCredentials([], {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({ errors: [{ message: "fixture" }] }),
+      }),
+    }),
+    /EAS rejected/,
+  );
 });
 
 for (const name of Object.keys(validEnv)) {
