@@ -2,6 +2,15 @@ import { v, type Infer } from "convex/values";
 import translations from "./notificationTranslations.json";
 import { pluralRules } from "./localization";
 
+/**
+ * The non-function half of weekly-shelf push: the per-recipient delivery-state
+ * validator `schema.ts` stores and `notificationDelivery.ts` advances, plus the
+ * localized title/body that goes into the notification payload. Named for the
+ * fields rather than the machine so it is not confused with
+ * `convex/notificationDelivery.ts`, which holds the claim/finish/recover
+ * Convex functions.
+ */
+
 const fields = {
   token: v.string(),
   error: v.optional(v.string()),
