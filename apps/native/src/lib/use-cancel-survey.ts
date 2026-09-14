@@ -35,9 +35,8 @@ type CancelSurveyResponse =
  * Detection runs once per foreground episode while the user is on the Home
  * root. Dismissing the in-app Customer Center sheet does not itself start
  * a foreground episode; cancellation is checked on the next real episode.
- * A transient `unknown`
- * (identity sync not ready, fetch failure) simply retries on the next
- * episode instead of burning the launch.
+ * A transient `unknown` (identity sync not ready, fetch failure) simply
+ * retries on the next episode instead of burning the launch.
  *
  * The ask is durably one-per-account (convex/cancelSurvey.ts). The server
  * row is the authority across devices and reinstalls; the hook fails closed
@@ -46,6 +45,11 @@ type CancelSurveyResponse =
  * and keeps the card up; a rejected one (another device consumed the ask
  * first) takes it down without emitting anything — only the call that
  * consumed the ask may count a `shown`.
+ *
+ * Failures never strand the ask: a failed markShown or respond logs via
+ * captureError, takes the card down for the rest of the episode, and leaves
+ * the row unwritten — so the next foreground episode re-detects the unspent
+ * ask and re-asks.
  *
  * The ask is consumed only when the card actually renders (`presented`),
  * never at detection time — closing the app on Home's loading screen leaves
