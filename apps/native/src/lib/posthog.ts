@@ -94,3 +94,10 @@ posthog?.register({
   environment: Constants.expoConfig?.extra?.variant ?? "development",
   analytics_version: 1,
 });
+
+/** True when the client analytics boundary may capture. The single canonical
+ * check — every analytics facade (feedback, cancel survey) delegates here
+ * instead of re-deriving availability from the client's state. */
+export function isAnalyticsAvailable(): boolean {
+  return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;
+}

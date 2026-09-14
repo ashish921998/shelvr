@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 import { createMMKV } from "react-native-mmkv";
 import { analytics } from "@/lib/analytics";
-import { posthog } from "@/lib/posthog";
+import { isAnalyticsAvailable, posthog } from "@/lib/posthog";
 
 /**
  * Lightweight in-app feedback.
@@ -191,7 +191,7 @@ type FeedbackSubmitResult = "queued" | "unavailable" | "failed";
 
 export const feedbackAnalytics = {
   isAvailable(): boolean {
-    return posthog !== undefined && !posthog.isDisabled && !posthog.optedOut;
+    return isAnalyticsAvailable();
   },
 
   invitationShown(surface: FeedbackSurface, readyCount: number): void {
@@ -218,8 +218,9 @@ export const feedbackAnalytics = {
     surface: FeedbackSurface,
     message: string,
   ): Promise<FeedbackSubmitResult> {
-    if (!posthog || posthog.isDisabled || posthog.optedOut)
-      return "unavailable";
+    // `!posthog` also narrows the client below; availability logic itself is
+    // the canonical check.
+    if (!posthog || !isAnalyticsAvailable()) return "unavailable";
     const sanitized = sanitizeFeedbackMessage(message);
     if (!sanitized) return "failed";
     try {

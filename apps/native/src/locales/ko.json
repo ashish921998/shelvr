@@ -425,5 +425,13 @@
   "errors.photoEmpty": "이 사진은 비어 있어요. 다시 저장해 주세요.",
   "errors.photoLimit": "사진 한도에 도달했어요 (1,000). 더 저장하려면 사진 일부를 삭제하세요.",
   "errors.spaceNameEmpty": "공간 이름을 입력하세요.",
-  "errors.spaceNameTooLong": "공간 이름은 최대 60자까지 입력할 수 있어요."
+  "errors.spaceNameTooLong": "공간 이름은 최대 60자까지 입력할 수 있어요.",
+  "cancelSurvey.title": "취소하신 이유가 무엇인가요?",
+  "cancelSurvey.body": "체험 기간은 아직 유효하지만 자동 갱신은 꺼져 있습니다. 답변은 서비스 개선에 도움이 되며 구독 상태는 변경되지 않습니다.",
+  "cancelSurvey.tooExpensive": "너무 비싸요",
+  "cancelSurvey.notUseful": "충분히 유용하지 않아요",
+  "cancelSurvey.missingFeature": "필요한 기능이 없어요",
+  "cancelSurvey.other": "기타",
+  "cancelSurvey.skipLabel": "취소 설문 건너뛰기",
+  "cancelSurvey.skip": "건너뛰기"
 }

@@ -411,6 +411,14 @@ export type MessageParams = {
   "errors.spaceNameTooLong": undefined;
   "feedback.sendFailedContact": undefined;
   "feedback.unavailableContact": undefined;
+  "cancelSurvey.title": undefined;
+  "cancelSurvey.body": undefined;
+  "cancelSurvey.tooExpensive": undefined;
+  "cancelSurvey.notUseful": undefined;
+  "cancelSurvey.missingFeature": undefined;
+  "cancelSurvey.other": undefined;
+  "cancelSurvey.skipLabel": undefined;
+  "cancelSurvey.skip": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

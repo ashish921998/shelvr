@@ -425,5 +425,13 @@
   "errors.photoEmpty": "この写真は空です。もう一度保存してください。",
   "errors.photoLimit": "写真の上限（1,000枚）に達しました。追加するには写真を削除してください。",
   "errors.spaceNameEmpty": "スペースに名前を付けてください。",
-  "errors.spaceNameTooLong": "スペース名は60文字以内にしてください。"
+  "errors.spaceNameTooLong": "スペース名は60文字以内にしてください。",
+  "cancelSurvey.title": "解約した理由を教えてください",
+  "cancelSurvey.body": "無料体験はまだ有効ですが、自動更新はオフになっています。回答はサービス改善に役立ちます。サブスクリプションの状態は変わりません。",
+  "cancelSurvey.tooExpensive": "料金が高い",
+  "cancelSurvey.notUseful": "あまり役に立たない",
+  "cancelSurvey.missingFeature": "必要な機能がない",
+  "cancelSurvey.other": "その他",
+  "cancelSurvey.skipLabel": "解約アンケートをスキップ",
+  "cancelSurvey.skip": "スキップ"
 }

@@ -5,6 +5,7 @@
       "entry": [
         "index.ts",
         "src/app/**/*.{ts,tsx}",
+        "src/**/*.test.{ts,tsx}",
         "src/widgets/recent-saves-widget.tsx",
         "src/lib/revenuecat-api-key*.ts",
         "convex/**/*.ts",

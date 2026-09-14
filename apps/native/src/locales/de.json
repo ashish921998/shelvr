@@ -433,5 +433,13 @@
   "errors.spaceNameEmpty": "Gib der Sammlung einen Namen.",
   "errors.spaceNameTooLong": "Sammlungsnamen dürfen bis zu 60 Zeichen lang sein.",
   "feedback.sendFailedContact": "Dein Feedback konnte gerade nicht gesendet werden. Du kannst uns stattdessen direkt erreichen:",
-  "feedback.unavailableContact": "Feedback ist gerade nicht verfügbar. Du kannst uns stattdessen direkt erreichen:"
+  "feedback.unavailableContact": "Feedback ist gerade nicht verfügbar. Du kannst uns stattdessen direkt erreichen:",
+  "cancelSurvey.title": "Warum hast du gekündigt?",
+  "cancelSurvey.body": "Deine Testphase ist noch aktiv, aber die automatische Verlängerung ist aus. Deine Antwort hilft uns und ändert nichts an deinem Abo.",
+  "cancelSurvey.tooExpensive": "Zu teuer",
+  "cancelSurvey.notUseful": "Nicht hilfreich genug",
+  "cancelSurvey.missingFeature": "Eine Funktion fehlt",
+  "cancelSurvey.other": "Etwas anderes",
+  "cancelSurvey.skipLabel": "Umfrage zur Kündigung überspringen",
+  "cancelSurvey.skip": "Überspringen"
 }

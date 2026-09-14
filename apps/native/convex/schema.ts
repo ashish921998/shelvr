@@ -7,6 +7,10 @@ import {
   failureReasonValidator,
   intentValidator,
 } from "./model/itemFields";
+import {
+  cancelSurveyOutcomeValidator,
+  cancelSurveyReasonValidator,
+} from "./model/cancelSurveyFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -249,6 +253,20 @@ export default defineSchema({
     // backward compatibility with rows created before this field existed.
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
+  // row is the durable, cross-install record: its existence is the ask, and
+  // the first recorded outcome wins. Local (MMKV) state can never enforce
+  // once-per-account across devices or reinstalls — only this row can.
+  cancelSurveys: defineTable({
+    userId: v.string(),
+    askedAt: v.number(),
+    outcome: v.optional(cancelSurveyOutcomeValidator),
+    // Bounded reason id from the client survey (never free text); mirrored
+    // by CancelSurveyReason in apps/native/src/lib/analytics.ts.
+    reason: v.optional(cancelSurveyReasonValidator),
+    respondedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   // One Expo push token per device. A token row moves to a different account

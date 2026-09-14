@@ -441,5 +441,13 @@
   "errors.spaceNameEmpty": "Dê um nome à coleção.",
   "errors.spaceNameTooLong": "Os nomes das coleções podem ter até 60 caracteres.",
   "feedback.sendFailedContact": "Não foi possível enviar os comentários agora. Você pode falar diretamente com a gente:",
-  "feedback.unavailableContact": "Os comentários estão indisponíveis no momento. Você pode falar diretamente com a gente:"
+  "feedback.unavailableContact": "Os comentários estão indisponíveis no momento. Você pode falar diretamente com a gente:",
+  "cancelSurvey.title": "Por que você cancelou?",
+  "cancelSurvey.body": "Seu período de teste ainda está ativo, mas a renovação automática está desativada. Sua resposta nos ajuda e não altera sua assinatura.",
+  "cancelSurvey.tooExpensive": "Muito caro",
+  "cancelSurvey.notUseful": "Não é útil o suficiente",
+  "cancelSurvey.missingFeature": "Falta um recurso",
+  "cancelSurvey.other": "Outro motivo",
+  "cancelSurvey.skipLabel": "Pular pesquisa de cancelamento",
+  "cancelSurvey.skip": "Pular"
 }

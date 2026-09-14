@@ -20,7 +20,14 @@ import {
 /** Minimum settle time before showing, and the poll interval while a paywall is up. */
 const INVITATION_RECHECK_MS = 2000;
 
-export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
+/** `defer` suspends new invitations without touching state — Home sets it
+ * while the cancel-survey card owns the Home moment, so the one-shot claim
+ * (shownCount + 14-day gate) is never burned for an invitation that is
+ * rendered behind the survey and never actually seen. */
+export function useFeedbackInvitation(
+  items: FeedbackFeedItem[] | undefined,
+  opts: { defer?: boolean } = {},
+) {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
   const home = isHomeRootRoute(useSegments());
@@ -39,7 +46,15 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
   if (busy && invitedUser !== null) setInvitedUser(null);
 
   useEffect(() => {
-    if (!home || busy || appState !== "active" || !items || !userId || formUser)
+    if (
+      !home ||
+      busy ||
+      appState !== "active" ||
+      !items ||
+      !userId ||
+      formUser ||
+      opts.defer
+    )
       return;
     if (!feedbackAnalytics.isAvailable()) return;
     const state = withReadyCount(
@@ -94,7 +109,7 @@ export function useFeedbackInvitation(items: FeedbackFeedItem[] | undefined) {
     };
     timer = setTimeout(attempt, delay);
     return () => clearTimeout(timer);
-  }, [items, userId, home, busy, appState, formUser]);
+  }, [items, userId, home, busy, appState, formUser, opts.defer]);
 
   const openFeedbackFromInvitation = useCallback(() => {
     if (!userId) return;

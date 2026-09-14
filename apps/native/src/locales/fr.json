@@ -441,5 +441,13 @@
   "errors.spaceNameEmpty": "Donnez un nom à la collection.",
   "errors.spaceNameTooLong": "Les noms de collection peuvent contenir jusqu’à 60 caractères.",
   "feedback.sendFailedContact": "Votre avis n’a pas pu être envoyé pour le moment. Vous pouvez nous contacter directement :",
-  "feedback.unavailableContact": "Les avis sont indisponibles pour le moment. Vous pouvez nous contacter directement :"
+  "feedback.unavailableContact": "Les avis sont indisponibles pour le moment. Vous pouvez nous contacter directement :",
+  "cancelSurvey.title": "Pourquoi avez-vous annulé ?",
+  "cancelSurvey.body": "Votre essai est toujours actif, mais le renouvellement automatique est désactivé. Votre réponse nous aide et ne change rien à votre abonnement.",
+  "cancelSurvey.tooExpensive": "Trop cher",
+  "cancelSurvey.notUseful": "Pas assez utile",
+  "cancelSurvey.missingFeature": "Il manque une fonctionnalité",
+  "cancelSurvey.other": "Autre raison",
+  "cancelSurvey.skipLabel": "Ignorer le questionnaire d’annulation",
+  "cancelSurvey.skip": "Ignorer"
 }

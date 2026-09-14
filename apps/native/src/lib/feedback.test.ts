@@ -25,7 +25,10 @@ const posthogMock = vi.hoisted(() => ({
   capture: vi.fn(),
   flush: vi.fn(async () => undefined),
 }));
-vi.mock("@/lib/posthog", () => ({ posthog: posthogMock }));
+vi.mock("@/lib/posthog", () => ({
+  posthog: posthogMock,
+  isAnalyticsAvailable: () => !posthogMock.isDisabled && !posthogMock.optedOut,
+}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));

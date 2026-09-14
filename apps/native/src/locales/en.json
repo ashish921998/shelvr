@@ -433,5 +433,13 @@
   "errors.spaceNameEmpty": "Give the space a name.",
   "errors.spaceNameTooLong": "Space names can be up to 60 characters.",
   "feedback.sendFailedContact": "Feedback couldn’t be sent just now. You can reach us directly instead:",
-  "feedback.unavailableContact": "Feedback is unavailable right now. You can reach us directly instead:"
+  "feedback.unavailableContact": "Feedback is unavailable right now. You can reach us directly instead:",
+  "cancelSurvey.title": "What made you cancel?",
+  "cancelSurvey.body": "Your trial is still active, but auto-renew is off. One tap helps us understand — it won’t change anything about your subscription.",
+  "cancelSurvey.tooExpensive": "Too expensive",
+  "cancelSurvey.notUseful": "Not useful enough",
+  "cancelSurvey.missingFeature": "Missing a feature",
+  "cancelSurvey.other": "Something else",
+  "cancelSurvey.skipLabel": "Skip cancellation survey",
+  "cancelSurvey.skip": "Skip"
 }

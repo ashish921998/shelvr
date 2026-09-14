@@ -13,6 +13,7 @@ import type * as ai from "../ai.js";
 import type * as analytics from "../analytics.js";
 import type * as appleProfile from "../appleProfile.js";
 import type * as auth from "../auth.js";
+import type * as cancelSurvey from "../cancelSurvey.js";
 import type * as crons from "../crons.js";
 import type * as demo from "../demo.js";
 import type * as devFixtures from "../devFixtures.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   appleProfile: typeof appleProfile;
   auth: typeof auth;
+  cancelSurvey: typeof cancelSurvey;
   crons: typeof crons;
   demo: typeof demo;
   devFixtures: typeof devFixtures;

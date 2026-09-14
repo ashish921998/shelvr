@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { Text, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { InlineCard } from "@/components/ui/inline-card";
 
 /**
  * The dismissible inline feedback invitation shown on Home once per account
@@ -16,11 +17,11 @@ export function FeedbackInvitation({
 }) {
   useAppLocale();
   return (
-    <View style={styles.card} testID="feedback-invitation">
-      <Text style={styles.title} accessibilityRole="header">
-        {t("feedback.invitationTitle")}
-      </Text>
-      <Text style={styles.body}>{t("feedback.invitationBody")}</Text>
+    <InlineCard
+      testID="feedback-invitation"
+      title={t("feedback.invitationTitle")}
+      body={t("feedback.invitationBody")}
+    >
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"
@@ -45,34 +46,11 @@ export function FeedbackInvitation({
           <Text style={styles.secondaryButtonText}>{t("common.notNow")}</Text>
         </Pressable>
       </View>
-    </View>
+    </InlineCard>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  card: {
-    alignSelf: "stretch",
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    padding: theme.gap(2),
-    gap: theme.gap(1),
-    marginHorizontal: theme.gap(2),
-    marginTop: theme.gap(1),
-  },
-  title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  body: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
-  },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "flex-end",

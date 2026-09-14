@@ -108,7 +108,9 @@ describe("captureError", () => {
   it("reports the class and stack but never a content-carrying message", () => {
     const error = new TypeError("Value: https://private.example/note text");
     analytics.captureError("share_save_failed", error, { entry_count: 2 });
-    expect(console.error).toHaveBeenCalledWith("share_save_failed", error);
+    // Console diagnostics retain a known type, never the raw error.
+    expect(console.error).toHaveBeenCalledWith("share_save_failed", { error_type: "TypeError" });
+    expect(console.error).not.toHaveBeenCalledWith("share_save_failed", error);
     expect(mock.captureException).toHaveBeenCalledTimes(1);
     const [reported, properties] = mock.captureException.mock.calls[0];
     expect(reported).toBeInstanceOf(Error);
@@ -130,6 +132,16 @@ describe("captureError", () => {
     const error = new Error("Network request failed");
     analytics.captureError("image_upload_failed", error);
     expect(mock.captureException.mock.calls[0][0]).toBe(error);
+  });
+
+  it("does not log custom error names or arbitrary thrown values", () => {
+    const error = new Error("private message");
+    error.name = "private customer name";
+    analytics.captureError("save_failed", error);
+    analytics.captureError("save_failed", { secret: "private value" });
+    expect(console.error).toHaveBeenNthCalledWith(1, "save_failed", { error_type: "Error" });
+    expect(console.error).toHaveBeenNthCalledWith(2, "save_failed", { error_type: "Unknown" });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private");
   });
 
   it("reduces non-Error throws to their type", () => {
