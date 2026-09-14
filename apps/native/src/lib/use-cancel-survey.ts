@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
+import { isAnalyticsAvailable } from "@/lib/posthog";
 import { isHomeRootRoute } from "@/lib/feedback";
 import { isPaywallPending, readRcTrialCancellation } from "@/lib/entitlement";
 import {
@@ -85,7 +86,7 @@ export function useCancelSurvey(): {
     // Wait for the server gate without spending the episode: when it lands,
     // this effect re-runs and the check proceeds.
     if (surveyStatus === undefined) return;
-    if (!cancelSurveyAnalytics.isAvailable()) return;
+    if (!isAnalyticsAvailable()) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

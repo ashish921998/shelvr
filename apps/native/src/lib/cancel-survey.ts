@@ -1,5 +1,4 @@
 import { analytics, type CancelSurveyReason } from "@/lib/analytics";
-import { isAnalyticsAvailable } from "@/lib/posthog";
 
 export type { CancelSurveyReason };
 
@@ -30,19 +29,9 @@ export const CANCEL_SURVEY_REASONS: readonly CancelSurveyReason[] = [
   "other",
 ];
 
-export function isCancelSurveyReason(
-  value: string,
-): value is CancelSurveyReason {
-  return (CANCEL_SURVEY_REASONS as readonly string[]).includes(value);
-}
-
 // --- analytics boundary -----------------------------------------------------
 
 export const cancelSurveyAnalytics = {
-  isAvailable(): boolean {
-    return isAnalyticsAvailable();
-  },
-
   /** Fires when the card actually renders, not when cancellation is detected. */
   shown(): void {
     analytics.capture("cancel_survey_shown");
