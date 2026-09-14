@@ -74,7 +74,7 @@ export default function HomeStackLayout() {
         }
       >
         <Stack.Title asChild>
-          <Wordmark />
+          <Wordmark size={26} />
         </Stack.Title>
         {Platform.OS === "ios" ? (
           <Stack.Toolbar placement="left">
