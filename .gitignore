@@ -89,3 +89,8 @@ tmp/
 apps/native/store-assets/
 assets/marketing/
 assets/product-hunt/
+
+# Design-sync tooling (scripts plus its own node_modules) and the compiled
+# component bundle it produces. Both regenerate on the next sync.
+.ds-sync/
+ds-bundle/
