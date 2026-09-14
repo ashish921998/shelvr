@@ -19,12 +19,9 @@ import {
  * uses the same cadence). */
 const PAYWALL_RECHECK_MS = 2000;
 
-/**
- * The response `finish` records. A submitted outcome carries its bounded
- * reason; a dismissal stands alone — the correlation is structural, so
- * submitting without a reason is unrepresentable, and the object matches
- * the respond mutation's args shape as-is.
- */
+/** The response `finish` records: a submission carries its bounded reason,
+ * a dismissal stands alone. The shape passes straight through to the
+ * respond mutation's args. */
 type CancelSurveyResponse =
   | { outcome: "submitted"; reason: CancelSurveyReason }
   | { outcome: "dismissed" };
