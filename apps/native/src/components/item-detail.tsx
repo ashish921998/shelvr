@@ -95,7 +95,7 @@ function useItemDetailData(item: DetailItem) {
   // upgrade slots in behind the same query). Only ready items have signal.
   const { data: similar } = useQuery({
     ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === "ready",
+    enabled: item.status === "ready" && item.type !== "note",
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
@@ -294,6 +294,18 @@ function ItemDetailBody({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  if (item.type === "note") {
+    return (
+      <View style={[styles.body, { paddingTop: headerHeight + theme.gap(5) }]}>
+        <Text selectable style={styles.paragraph}>
+          {detail.note}
+        </Text>
+        {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+        <SaveStatusNotice item={detail} />
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -303,9 +315,7 @@ function ItemDetailBody({
     >
       <SaveStatusNotice item={item} />
 
-      {item.status === "ready" ? (
-        <ItemSpaces itemId={item._id} spaces={spaces} />
-      ) : null}
+      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
       {item.url ? (
         <View style={styles.titleContainer}>
@@ -336,31 +346,7 @@ function ItemDetailBody({
         </View>
       ) : null}
 
-      {intents.length > 0 ? (
-        <View style={styles.intentsRow}>
-          {intents.map((intent, index) => (
-            <IntentChip
-              key={`${intent.kind}-${index}`}
-              kind={intent.kind}
-              label={intent.label}
-              onPress={() => {
-                void runIntent(intent.kind, intent.value)
-                  .then(() => {
-                    analytics.itemAction(
-                      item,
-                      intent.kind === "open_url"
-                        ? "open_source"
-                        : intent.kind === "add_event"
-                          ? "calendar_sheet_opened"
-                          : intent.kind,
-                    );
-                  })
-                  .catch(() => {});
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
+      <IntentsRow item={item} intents={intents} />
 
       {item.description ? (
         <Text style={styles.description}>{item.description}</Text>
@@ -390,21 +376,9 @@ function ItemDetailBody({
         </Text>
       ) : null}
 
-      {item.tags.length > 0 ? (
-        <View style={styles.chipsRow}>
-          {item.tags.map((tag) => (
-            <TagChip key={tag} label={tag} />
-          ))}
-        </View>
-      ) : null}
+      <TagsRow tags={item.tags} />
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
-
-      {item.type === "note" && item.note ? (
-        <Text selectable style={styles.paragraph}>
-          {item.note}
-        </Text>
-      ) : null}
 
       {!isVideo && paragraphs.length > 0 ? (
         <View style={styles.article}>
@@ -422,6 +396,53 @@ function ItemDetailBody({
           <SimilarGrid items={similar} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** The item's suggested actions (add to calendar, open a link, …) as chips. */
+function IntentsRow({
+  item,
+  intents,
+}: {
+  item: DetailItem;
+  intents: ItemIntent[];
+}) {
+  if (intents.length === 0) return null;
+  return (
+    <View style={styles.intentsRow}>
+      {intents.map((intent, index) => (
+        <IntentChip
+          key={`${intent.kind}-${index}`}
+          kind={intent.kind}
+          label={intent.label}
+          onPress={() => {
+            void runIntent(intent.kind, intent.value)
+              .then(() => {
+                analytics.itemAction(
+                  item,
+                  intent.kind === "open_url"
+                    ? "open_source"
+                    : intent.kind === "add_event"
+                      ? "calendar_sheet_opened"
+                      : intent.kind,
+                );
+              })
+              .catch(() => {});
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function TagsRow({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <View style={styles.chipsRow}>
+      {tags.map((tag) => (
+        <TagChip key={tag} label={tag} />
+      ))}
     </View>
   );
 }
