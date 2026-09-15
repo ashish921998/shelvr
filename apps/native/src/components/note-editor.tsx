@@ -49,7 +49,8 @@ export function NoteEditor({ item }: { item: DetailItem }) {
     const edits = { ...state.edits };
     if (
       state.title !== title &&
-      (edits.title?.saved || edits.title?.value.trim() === title)
+      edits.title?.saved &&
+      edits.title.value.trim() !== title
     )
       delete edits.title;
     if (
@@ -77,7 +78,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
             edit.title !== undefined &&
             edits.title?.value.trim() === edit.title
           )
-            edits.title = { value: edit.title, saved: true };
+            edits.title = { ...edits.title, saved: true };
           if (edit.text !== undefined && edits.text?.value === edit.text)
             edits.text = { value: edit.text, saved: true };
           return { ...current, edits };

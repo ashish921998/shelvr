@@ -248,3 +248,47 @@ it("follows remote updates after a successful no-op revert", async () => {
     (screen.getByLabelText("item.noteTextLabel") as HTMLTextAreaElement).value,
   ).toBe("Remote edit after acknowledgement");
 });
+
+it.each(["before", "after"])(
+  "preserves title spacing when the server echo arrives %s the save resolves",
+  async (echoOrder) => {
+    let acknowledge!: () => void;
+    mocks.update
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            acknowledge = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const { rerender } = render(<NoteEditor item={item} />);
+    const titleInput = screen.getByLabelText(
+      "item.noteTitleLabel",
+    ) as HTMLTextAreaElement;
+    fireEvent.change(titleInput, { target: { value: "New " } });
+    await pause();
+    expect(mocks.update).toHaveBeenLastCalledWith({
+      id: "note-1",
+      title: "New",
+    });
+    const savedItem = { ...item, titleSource: "user" as const, title: "New" };
+    if (echoOrder === "before") rerender(<NoteEditor item={savedItem} />);
+    expect(titleInput.value).toBe("New ");
+    await act(async () => {
+      acknowledge();
+    });
+    expect(titleInput.value).toBe("New ");
+    if (echoOrder === "after") rerender(<NoteEditor item={savedItem} />);
+    expect(titleInput.value).toBe("New ");
+    fireEvent.change(titleInput, {
+      target: { value: `${titleInput.value}title` },
+    });
+    await pause();
+    expect(mocks.update).toHaveBeenLastCalledWith({
+      id: "note-1",
+      title: "New title",
+    });
+    rerender(<NoteEditor item={{ ...savedItem, title: "Remote title" }} />);
+    expect(titleInput.value).toBe("Remote title");
+  },
+);
