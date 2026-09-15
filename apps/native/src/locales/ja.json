@@ -200,7 +200,9 @@
   "demo.justShelf": "シェルフのみ",
   "demo.savedHeadline": "保存しました。",
   "demo.firstSave": "はじめての1件です。",
-  "demo.shelfCount": "シェルフに1件",
+  "demo.shelfCount": {
+    "other": "シェルフに%{formattedCount}件"
+  },
   "demo.filedInto": "%{space}に整理しました",
   "demo.onShelf": "シェルフにあります",
   "demo.partial": "リンクを保存しました。このページは完全なプレビューを許可していません。",

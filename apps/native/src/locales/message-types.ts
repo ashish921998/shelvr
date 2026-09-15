@@ -199,7 +199,7 @@ export type MessageParams = {
   "demo.justShelf": undefined;
   "demo.savedHeadline": undefined;
   "demo.firstSave": undefined;
-  "demo.shelfCount": undefined;
+  "demo.shelfCount": { count: number };
   "demo.filedInto": { space: string };
   "demo.onShelf": undefined;
   "demo.partial": undefined;

@@ -21,6 +21,9 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({
+    theme: { colors: { border: "#e5e5e5", primary: "#ff5722" } },
+  }),
 }));
 vi.mock("react-native-reanimated", async () => {
   const { View, Text } = await import("react-native");
@@ -37,6 +40,12 @@ vi.mock("react-native-reanimated", async () => {
     Easing: { bezier: () => undefined },
     cubicBezier: () => undefined,
     useReducedMotion: () => false,
+    useSharedValue: (value: number) => ({ value }),
+    useAnimatedStyle: () => ({}),
+    interpolateColor: () => "#e5e5e5",
+    withSequence: (...steps: number[]) => steps[steps.length - 1],
+    withSpring: (value: number) => value,
+    withTiming: (value: number) => value,
   };
 });
 

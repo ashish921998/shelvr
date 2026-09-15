@@ -198,7 +198,11 @@
   "demo.justShelf": "Mon étagère uniquement",
   "demo.savedHeadline": "Enregistré.",
   "demo.firstSave": "Votre tout premier.",
-  "demo.shelfCount": "1 sur votre étagère",
+  "demo.shelfCount": {
+    "one": "%{formattedCount} sur votre étagère",
+    "many": "%{formattedCount} sur votre étagère",
+    "other": "%{formattedCount} sur votre étagère"
+  },
   "demo.filedInto": "Rangé dans %{space}",
   "demo.onShelf": "Sur votre étagère",
   "demo.partial": "Lien enregistré. Cette page n'autorise pas d'aperçu complet.",

@@ -200,7 +200,9 @@
   "demo.justShelf": "내 책장만",
   "demo.savedHeadline": "저장했어요.",
   "demo.firstSave": "첫 저장이에요.",
-  "demo.shelfCount": "책장에 1개",
+  "demo.shelfCount": {
+    "other": "책장에 %{formattedCount}개"
+  },
   "demo.filedInto": "%{space}에 정리됨",
   "demo.onShelf": "책장에 있어요",
   "demo.partial": "링크를 저장했어요. 이 페이지는 전체 미리보기를 허용하지 않았어요.",

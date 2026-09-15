@@ -198,7 +198,10 @@
   "demo.justShelf": "Just my shelf",
   "demo.savedHeadline": "Saved.",
   "demo.firstSave": "Your first one.",
-  "demo.shelfCount": "1 on your shelf",
+  "demo.shelfCount": {
+    "one": "%{formattedCount} on your shelf",
+    "other": "%{formattedCount} on your shelf"
+  },
   "demo.filedInto": "Filed into %{space}",
   "demo.onShelf": "On your shelf",
   "demo.partial": "Saved the link. This page did not allow a full preview.",

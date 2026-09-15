@@ -198,7 +198,11 @@
   "demo.justShelf": "Solo mi estantería",
   "demo.savedHeadline": "Guardado.",
   "demo.firstSave": "Tu primer contenido.",
-  "demo.shelfCount": "1 en tu estantería",
+  "demo.shelfCount": {
+    "one": "%{formattedCount} en tu estantería",
+    "many": "%{formattedCount} en tu estantería",
+    "other": "%{formattedCount} en tu estantería"
+  },
   "demo.filedInto": "Archivado en %{space}",
   "demo.onShelf": "En tu estantería",
   "demo.partial": "Enlace guardado. Esta página no permite una vista previa completa.",

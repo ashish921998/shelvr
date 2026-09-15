@@ -198,7 +198,11 @@
   "demo.justShelf": "Só minha estante",
   "demo.savedHeadline": "Salvo.",
   "demo.firstSave": "O seu primeiro.",
-  "demo.shelfCount": "1 na sua estante",
+  "demo.shelfCount": {
+    "one": "%{formattedCount} na sua estante",
+    "many": "%{formattedCount} na sua estante",
+    "other": "%{formattedCount} na sua estante"
+  },
   "demo.filedInto": "Organizado em %{space}",
   "demo.onShelf": "Na sua estante",
   "demo.partial": "Link salvo. Esta página não permitiu uma prévia completa.",

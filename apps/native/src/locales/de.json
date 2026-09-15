@@ -198,7 +198,10 @@
   "demo.justShelf": "Nur mein Regal",
   "demo.savedHeadline": "Gespeichert.",
   "demo.firstSave": "Dein erster Inhalt.",
-  "demo.shelfCount": "1 in deinem Regal",
+  "demo.shelfCount": {
+    "one": "%{formattedCount} in deinem Regal",
+    "other": "%{formattedCount} in deinem Regal"
+  },
   "demo.filedInto": "Eingeordnet in %{space}",
   "demo.onShelf": "In deinem Regal",
   "demo.partial": "Link gespeichert. Diese Seite erlaubt keine vollständige Vorschau.",

@@ -5,6 +5,7 @@ import type { FeedItem } from "@/components/item-card";
 import { CtaButton } from "@/components/onboarding/parts";
 import { RevealCard } from "@/components/onboarding/reveal-card";
 import { buildRevealPieces, type RevealPiece } from "@/lib/reveal-pieces";
+import { EASE_OUT, REDUCED_FADE_IN } from "@/lib/motion";
 import { analytics } from "@/lib/analytics";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -28,6 +29,7 @@ import {
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -35,7 +37,12 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
+  withSpring,
   withTiming,
+  type EntryAnimationsValues,
+  type ExitAnimationsValues,
+  type LayoutAnimation,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
@@ -77,6 +84,72 @@ const PIECE_DELAY_MS: Record<RevealPiece["kind"], number> = {
   tag: 180,
   space: 350,
   inbox: 350,
+};
+
+// The verdict lines rise rather than drop, so they read as the save settling
+// into place under the card instead of two more pieces falling in.
+const headlineEnter = (delayMs: number) => (): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 10 }] },
+    animations: {
+      opacity: withDelay(delayMs, withTiming(1, { duration: 260 })),
+      transform: [
+        {
+          translateY: withDelay(
+            delayMs,
+            withSpring(0, { damping: 18, stiffness: 180 }),
+          ),
+        },
+      ],
+    },
+  };
+};
+const HEADLINE_ENTER = headlineEnter(0);
+const HEADLINE_ENTER_STAGGERED = headlineEnter(80);
+
+const COUNT_ROLL_MS = 220;
+const COUNT_LINE_HEIGHT = 18;
+
+// Travel is the line's own measured height rather than a constant, so the roll
+// stays inside the clipped window at every accessibility text size.
+const COUNT_ENTER = (values: EntryAnimationsValues): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: {
+      opacity: 0,
+      transform: [{ translateY: values.targetHeight }],
+    },
+    animations: {
+      opacity: withTiming(1, { duration: COUNT_ROLL_MS, easing: EASE_OUT }),
+      transform: [
+        {
+          translateY: withTiming(0, {
+            duration: COUNT_ROLL_MS,
+            easing: EASE_OUT,
+          }),
+        },
+      ],
+    },
+  };
+};
+
+const COUNT_EXIT = (values: ExitAnimationsValues): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+    animations: {
+      opacity: withTiming(0, { duration: COUNT_ROLL_MS, easing: EASE_OUT }),
+      transform: [
+        {
+          translateY: withTiming(-values.currentHeight, {
+            duration: COUNT_ROLL_MS,
+            easing: EASE_OUT,
+          }),
+        },
+      ],
+    },
+  };
 };
 
 type DemoPhase = "input" | "auth" | "processing" | "reveal" | "failed";
@@ -599,7 +672,9 @@ function DemoRevealView({
       setRevealedCount(next);
       if (process.env.EXPO_OS !== "ios") return;
       if (next >= pieces.length) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // An impact rather than a success chime, so the last piece lands with
+        // the same weight as the card's settle bump.
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else {
         Haptics.selectionAsync();
       }
@@ -624,23 +699,20 @@ function DemoRevealView({
       {settled && (
         <View style={styles.verdict}>
           <Animated.Text
-            entering={FadeInDown.duration(400)}
+            entering={reducedMotion ? REDUCED_FADE_IN : HEADLINE_ENTER}
             style={styles.headline}
           >
             {t("demo.savedHeadline")}
           </Animated.Text>
           <Animated.Text
-            entering={FadeInDown.delay(80).duration(400)}
+            entering={
+              reducedMotion ? REDUCED_FADE_IN : HEADLINE_ENTER_STAGGERED
+            }
             style={styles.firstSave}
           >
             {t("demo.firstSave")}
           </Animated.Text>
-          <Animated.Text
-            entering={FadeInDown.delay(160).duration(400)}
-            style={styles.shelfCount}
-          >
-            {t("demo.shelfCount")}
-          </Animated.Text>
+          <RollingCount reducedMotion={reducedMotion} />
         </View>
       )}
 
@@ -661,6 +733,44 @@ function DemoRevealView({
           </Animated.View>
         )}
       </View>
+    </View>
+  );
+}
+
+// The shelf tally is a real count, not a literal one. It starts empty and turns
+// over once the verdict has landed, so the user watches their shelf gain the
+// save rather than being told it already has it.
+function RollingCount({ reducedMotion }: { reducedMotion: boolean }) {
+  useAppLocale();
+  const { fontScale } = useWindowDimensions();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (reducedMotion) return;
+    const id = setTimeout(() => setCount(1), 400);
+    return () => clearTimeout(id);
+  }, [reducedMotion]);
+
+  if (reducedMotion) {
+    return (
+      <View style={styles.countWindow}>
+        <Text style={styles.shelfCount}>
+          {t("demo.shelfCount", { count: 1 })}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View
+      style={[styles.countWindow, { height: COUNT_LINE_HEIGHT * fontScale }]}
+    >
+      <Animated.Text
+        key={count}
+        entering={COUNT_ENTER}
+        exiting={COUNT_EXIT}
+        style={[styles.shelfCount, styles.countLine]}
+      >
+        {t("demo.shelfCount", { count })}
+      </Animated.Text>
     </View>
   );
 }
@@ -866,8 +976,17 @@ const styles = StyleSheet.create((theme) => ({
   shelfCount: {
     fontFamily: theme.fonts.medium,
     fontSize: 14,
+    lineHeight: COUNT_LINE_HEIGHT,
     color: theme.colors.muted,
+  },
+  countWindow: {
     marginTop: theme.gap(0.75),
+    overflow: "hidden",
+  },
+  countLine: {
+    position: "absolute",
+    left: 0,
+    top: 0,
   },
   reuseNote: {
     fontFamily: theme.fonts.regular,

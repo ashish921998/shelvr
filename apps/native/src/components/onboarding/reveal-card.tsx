@@ -4,12 +4,20 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { EASE_OUT, REDUCED_FADE_IN } from "@/lib/motion";
 import { displayHost } from "@/lib/url";
 import { Image } from "expo-image";
+import { useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 import Animated, {
   FadeInDown,
+  interpolateColor,
+  useAnimatedStyle,
   useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+  type LayoutAnimation,
 } from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The onboarding reveal's own card. It deliberately does NOT reuse ItemCard:
 // the feed card is memoized, tappable and whole, while this one arrives in
@@ -21,6 +29,19 @@ import { StyleSheet } from "react-native-unistyles";
 const OG_RATIO = 1.91;
 
 const PIECE_ENTER = FadeInDown.duration(320).easing(EASE_OUT);
+
+// Chips are small and land late, so they pop from slightly under size rather
+// than travelling like the image and the title above them.
+const CHIP_ENTER = (): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.85 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 160 }),
+      transform: [{ scale: withSpring(1, { damping: 12, stiffness: 240 }) }],
+    },
+  };
+};
 
 function clampRatio(ratio: number | undefined): number {
   const value = ratio && !Number.isNaN(ratio) ? ratio : OG_RATIO;
@@ -37,8 +58,35 @@ export function RevealCard({
   revealedCount: number;
 }) {
   useAppLocale();
+  const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const enter = reducedMotion ? REDUCED_FADE_IN : PIECE_ENTER;
+  const chipEnter = reducedMotion ? REDUCED_FADE_IN : CHIP_ENTER;
+
+  // The last piece landing is the moment the save is done, so the whole card
+  // takes one soft bump and warms its border once, then never again.
+  const settled = pieces.length > 0 && revealedCount >= pieces.length;
+  const pulse = useSharedValue(1);
+  const glow = useSharedValue(0);
+  const thunked = useRef(false);
+  const restColor = theme.colors.border;
+  const warmColor = theme.colors.primary;
+  useEffect(() => {
+    if (!settled || reducedMotion || thunked.current) return;
+    thunked.current = true;
+    pulse.value = withSequence(
+      withSpring(1.02, { damping: 12, stiffness: 260 }),
+      withSpring(1, { damping: 14, stiffness: 200 }),
+    );
+    glow.value = withSequence(
+      withTiming(1, { duration: 220, easing: EASE_OUT }),
+      withTiming(0, { duration: 380, easing: EASE_OUT }),
+    );
+  }, [settled, reducedMotion, pulse, glow]);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+    borderColor: interpolateColor(glow.value, [0, 1], [restColor, warmColor]),
+  }));
 
   const shown = pieces.slice(0, revealedCount);
   const imageUri = item.heroImageUrl ?? item.imageUrl;
@@ -52,7 +100,7 @@ export function RevealCard({
   const siteLabel = item.siteName ?? host;
 
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, cardStyle]}>
       {imageUri && shown.some((piece) => piece.kind === "image") ? (
         <Animated.View entering={enter} style={styles.imageFrame}>
           <Image
@@ -86,7 +134,7 @@ export function RevealCard({
           {tags.map((tag, index) => (
             <Animated.View
               key={`${index}-${tag}`}
-              entering={enter}
+              entering={chipEnter}
               style={styles.tagChip}
             >
               <Text style={styles.tagLabel}>{tag}</Text>
@@ -96,19 +144,23 @@ export function RevealCard({
       ) : null}
 
       {destination ? (
-        <Animated.View entering={enter} style={styles.destinationRow}>
+        // The row itself is static so the chip's pop scales about the chip's
+        // own centre instead of the full-width row's.
+        <View style={styles.destinationRow}>
           {destination.kind === "space" ? (
-            <View style={styles.destinationChip}>
+            <Animated.View entering={chipEnter} style={styles.destinationChip}>
               <Text style={styles.destinationText}>
                 {t("demo.filedInto", { space: destination.name })}
               </Text>
-            </View>
+            </Animated.View>
           ) : (
-            <Text style={styles.shelfLine}>{t("demo.onShelf")}</Text>
+            <Animated.Text entering={enter} style={styles.shelfLine}>
+              {t("demo.onShelf")}
+            </Animated.Text>
           )}
-        </Animated.View>
+        </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 

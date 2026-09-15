@@ -209,6 +209,18 @@ it("selects CLDR plurals with numeric counts and regionally formatted interpolat
   );
 });
 
+it("reads both lines the onboarding shelf count rolls through", () => {
+  expect(translate("en", "demo.shelfCount", { count: 0 })).toBe(
+    "0 on your shelf",
+  );
+  expect(translate("en", "demo.shelfCount", { count: 1 })).toBe(
+    "1 on your shelf",
+  );
+  expect(translate("ja", "demo.shelfCount", { count: 1 })).toBe(
+    "シェルフに1件",
+  );
+});
+
 it("rejects unchecked dynamic keys and missing values at compile time", () => {
   const compileOnly = (key: string) => {
     // @ts-expect-error Arbitrary strings must not become translation keys.
