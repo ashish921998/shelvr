@@ -18,9 +18,10 @@ import {
   type TrialCancellationState,
 } from "@/lib/trial-cancellation";
 import { REVENUECAT_API_KEY } from "@/lib/revenuecat-api-key";
+import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { NativeModules } from "react-native";
+import { AppState, NativeModules } from "react-native";
 
 /**
  * Shelvr Pro entitlement.
@@ -51,7 +52,7 @@ import { NativeModules } from "react-native";
 /**
  * Builds a lazy accessor for a native module: returns the module's default
  * export once it's been confirmed linked (via one of `nativeNames` on
- * NativeModules), or `null` permanently if it isn't. The `require` lives in a
+ * NativeModules). Failed loads can be retried. The `require` lives in a
  * static thunk so Metro can statically discover and bundle it.
  */
 function makeLazyModule<T>(
@@ -65,13 +66,12 @@ function makeLazyModule<T>(
       (n) => NativeModules[n as keyof typeof NativeModules],
     );
     if (!linked) {
-      cached = null;
-      return cached;
+      return null;
     }
     try {
       cached = load().default;
     } catch {
-      cached = null;
+      return null;
     }
     return cached;
   };
@@ -183,15 +183,14 @@ let configured = false;
 
 /**
  * Configure the RevenueCat SDK with the platform-specific public key. Safe to
- * call repeatedly; only configures once. No-op if the key for this platform
- * isn't set (e.g. dev without RC configured) — entitlement then stays `none`
- * until a subscription row is written by the webhook.
+ * call repeatedly; only configures once. Missing configuration is reported
+ * by the identity sync observer and never marks the paywall ready.
  */
 async function configureRevenueCat(appUserID: string): Promise<void> {
   if (configured) return;
   const rc = getPurchases();
-  if (!rc) return;
-  if (!REVENUECAT_API_KEY) return;
+  if (!rc) throw new Error("revenuecat_module_unavailable");
+  if (!REVENUECAT_API_KEY) throw new Error("revenuecat_key_missing");
   await rc.configure({
     apiKey: REVENUECAT_API_KEY,
     appUserID,
@@ -220,29 +219,50 @@ export function useEntitlementSync(): void {
     if (sub === null) return;
 
     let cancelled = false;
-    // Serialize identity changes so an older in-flight logIn cannot finish
-    // after a newer one and leave the native SDK on the wrong account.
-    _rcIdentitySync = _rcIdentitySync
-      .catch(() => {})
-      .then(async () => {
-        if (cancelled || _rcTargetUserId !== sub) return;
-        await configureRevenueCat(sub);
-        if (cancelled || _rcTargetUserId !== sub) return;
-        const rc = getPurchases();
-        if (!rc) return;
-        await rc.logIn(sub);
-        if (!cancelled) markRcUserSynced(sub);
-      })
-      .catch(() => {
-        // Missing configuration or a failed login leaves this user unready;
-        // presentPaywall will time out and use the safe fallback route.
-      });
+    const observer = startRevenueCatIdentitySync({
+      sync: () => {
+        // Keep retries and account changes on the same serial queue.
+        const attempt = _rcIdentitySync.then(async () => {
+          if (cancelled || _rcTargetUserId !== sub) return;
+          await configureRevenueCat(sub);
+          if (cancelled || _rcTargetUserId !== sub) return;
+          const rc = getPurchases();
+          if (!rc) throw new Error("revenuecat_module_unavailable");
+          await rc.logIn(sub);
+        });
+        _rcIdentitySync = attempt.catch(() => {});
+        return attempt;
+      },
+      onReady: () => markRcUserSynced(sub),
+      onError: reportRevenueCatIdentityError,
+    });
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") observer.retry();
+    });
 
     return () => {
       cancelled = true;
+      observer.dispose();
+      subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
   }, [sub]);
+}
+
+function reportRevenueCatIdentityError(error: unknown) {
+  let reason = "revenuecat_identity_sync_failed";
+  if (
+    error instanceof Error &&
+    ["revenuecat_module_unavailable", "revenuecat_key_missing"].includes(
+      error.message,
+    )
+  ) {
+    reason = error.message;
+  } else if (error && typeof error === "object" && "code" in error) {
+    const code = String(error.code);
+    if (/^\d{1,3}$/.test(code)) reason = `revenuecat_error_${code}`;
+  }
+  analytics.captureError("purchase_identity_sync_failed", new Error(reason));
 }
 
 // ---------------------------------------------------------------------------
