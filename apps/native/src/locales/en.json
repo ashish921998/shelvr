@@ -329,6 +329,8 @@
   "item.stalled": "This is taking longer than it should.",
   "item.partial": "Saved from the link alone — the page wouldn't load, so these details are a guess.",
   "item.noArticle": "This page has no readable article — saved as a plain link.",
+  "recipe.ingredients": "Ingredients",
+  "recipe.steps": "Steps",
   "survey.xBookmarks": "X bookmarks",
   "survey.instagram": "Instagram saved",
   "survey.screenshots": "Screenshots",

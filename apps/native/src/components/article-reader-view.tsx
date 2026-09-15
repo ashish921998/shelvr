@@ -1,6 +1,7 @@
 import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
 import { analytics } from "@/lib/analytics";
 import { displayHost } from "@/lib/url";
@@ -184,17 +185,23 @@ export function ArticleReaderView({
 
         {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
-        <View style={styles.article}>
-          {paragraphs.map((paragraph, index) => (
-            <Text
-              selectable
-              key={index}
-              style={[styles.paragraph, index === 0 && styles.lede]}
-            >
-              {paragraph}
-            </Text>
-          ))}
-        </View>
+        {/* A recipe page replaces the article paragraphs: the classifier
+            already lifted the ingredients and steps out of the story. */}
+        {item.recipe ? (
+          <RecipeSection recipe={item.recipe} />
+        ) : (
+          <View style={styles.article}>
+            {paragraphs.map((paragraph, index) => (
+              <Text
+                selectable
+                key={index}
+                style={[styles.paragraph, index === 0 && styles.lede]}
+              >
+                {paragraph}
+              </Text>
+            ))}
+          </View>
+        )}
 
         {item.status === "ready" ? <ProductsSection item={item} /> : null}
 

@@ -329,6 +329,8 @@
   "item.stalled": "Das dauert länger als erwartet.",
   "item.partial": "Nur anhand des Links gespeichert — die Seite ließ sich nicht laden, daher sind diese Angaben geschätzt.",
   "item.noArticle": "Diese Seite enthält keinen lesbaren Artikel — als einfacher Link gespeichert.",
+  "recipe.ingredients": "Zutaten",
+  "recipe.steps": "Schritte",
   "survey.xBookmarks": "X-Lesezeichen",
   "survey.instagram": "Auf Instagram gespeichert",
   "survey.screenshots": "Bildschirmfotos",

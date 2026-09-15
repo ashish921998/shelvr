@@ -330,6 +330,8 @@ export type MessageParams = {
   "item.stalled": undefined;
   "item.partial": undefined;
   "item.noArticle": undefined;
+  "recipe.ingredients": undefined;
+  "recipe.steps": undefined;
   "survey.xBookmarks": undefined;
   "survey.instagram": undefined;
   "survey.screenshots": undefined;

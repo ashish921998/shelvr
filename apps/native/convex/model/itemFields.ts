@@ -45,6 +45,20 @@ export const failureReasonValidator = v.union(
   v.literal("image_too_large"),
 );
 
+// A structured recipe lifted out of a recipe page during classification
+// (link items only). Absent for every other save; the client keeps rendering
+// the plain article when absent. `servings` is a display string ("4 servings",
+// "12 cookies") because recipes quantify the yield in too many shapes for a
+// number field to be honest.
+export const recipeValidator = v.object({
+  name: v.optional(v.string()),
+  servings: v.optional(v.string()),
+  ingredients: v.array(v.string()),
+  steps: v.array(v.string()),
+});
+
+export type Recipe = Infer<typeof recipeValidator>;
+
 // How much of the item could be enriched. "partial" = classified from the URL
 // alone because the page body was unreadable (retryable); "no_article" = the
 // page loaded but no article body could be extracted (a landing page or docs

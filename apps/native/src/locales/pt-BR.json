@@ -329,6 +329,8 @@
   "item.stalled": "Isso está demorando mais que o esperado.",
   "item.partial": "Salvo apenas a partir do link — a página não carregou, então estes detalhes são estimativas.",
   "item.noArticle": "Esta página não tem um artigo legível — salva como um link simples.",
+  "recipe.ingredients": "Ingredientes",
+  "recipe.steps": "Modo de preparo",
   "survey.xBookmarks": "Favoritos do X",
   "survey.instagram": "Salvos do Instagram",
   "survey.screenshots": "Capturas de tela",

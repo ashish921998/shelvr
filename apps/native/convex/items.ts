@@ -33,6 +33,7 @@ import {
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
   PROCESSING_STALE_MS,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   imageSizeError,
@@ -113,6 +114,7 @@ const itemFields = {
   isSticker: v.optional(v.boolean()),
   tags: v.array(v.string()),
   content: v.optional(v.string()),
+  recipe: v.optional(recipeValidator),
   siteName: v.optional(v.string()),
   author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
@@ -186,6 +188,7 @@ const enrichedItemWithSpacesValidator = v.object({
 export const itemCardValidator = enrichedItemValidator.omit(
   "userId",
   "content",
+  "recipe",
   "searchText",
   "products",
   "productsStatus",
@@ -1745,6 +1748,7 @@ export const finalizeItem = internalMutation({
     description: v.string(),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
@@ -1792,6 +1796,7 @@ export const finalizeItem = internalMutation({
       description: args.description,
       tags: args.tags,
       content: args.content,
+      recipe: args.recipe,
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,

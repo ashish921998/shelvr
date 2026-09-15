@@ -5,6 +5,7 @@ import {
   extractBodyText,
   fetchXoEmbed,
   linkEnrichment,
+  sanitizeRecipe,
   storePoster,
 } from "./ai";
 
@@ -151,5 +152,56 @@ describe("linkEnrichment", () => {
 
   it("treats a page-less item (image/note) as fully enriched", () => {
     expect(linkEnrichment(undefined)).toBeUndefined();
+  });
+});
+
+describe("sanitizeRecipe", () => {
+  it("passes through a plausible recipe", () => {
+    expect(
+      sanitizeRecipe({
+        name: "Slow braised short ribs",
+        servings: "4 servings",
+        ingredients: ["3 lb short ribs", "2 cups beef stock"],
+        steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+      }),
+    ).toEqual({
+      name: "Slow braised short ribs",
+      servings: "4 servings",
+      ingredients: ["3 lb short ribs", "2 cups beef stock"],
+      steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+    });
+  });
+
+  it("rejects null and empty ingredient/step lists", () => {
+    expect(sanitizeRecipe(null)).toBeUndefined();
+    expect(sanitizeRecipe(undefined)).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: [], steps: ["Stir."] }),
+    ).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: ["Salt"], steps: [] }),
+    ).toBeUndefined();
+  });
+
+  it("trims lines, drops empties and duplicates, and caps counts", () => {
+    const ingredients = ["Salt", "", "  salt ", `x`.repeat(400)];
+    const steps = Array.from({ length: 80 }, (_, i) => `Step ${i + 1}`);
+    const recipe = sanitizeRecipe({ ingredients, steps });
+    expect(recipe).toBeDefined();
+    expect(recipe!.ingredients[0]).toBe("Salt");
+    // Dedupe collapses to "Salt" plus the trimmed long line; counts capped.
+    expect(recipe!.ingredients.length).toBeLessThanOrEqual(2);
+    expect(recipe!.ingredients.every((l) => l.length <= 300)).toBe(true);
+    expect(recipe!.steps.length).toBe(60);
+  });
+
+  it("drops blank name/servings after trimming", () => {
+    const recipe = sanitizeRecipe({
+      name: "   ",
+      servings: "  ",
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    expect(recipe).toEqual({ ingredients: ["Salt"], steps: ["Add salt."] });
   });
 });

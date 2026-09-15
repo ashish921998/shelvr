@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
 import { NoteEditor } from "@/components/note-editor";
@@ -50,7 +51,9 @@ type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 // from getSpace additionally carry `spaceIntents`: purpose-steered actions
 // scoped to that space's membership.
 export type DetailItem = CardRow &
-  Partial<Pick<FullRow, "content" | "products" | "productsStatus">> & {
+  Partial<
+    Pick<FullRow, "content" | "recipe" | "products" | "productsStatus">
+  > & {
     spaceIntents?: CardRow["intents"];
   };
 
@@ -382,7 +385,11 @@ function ItemDetailBody({
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
-      {!isVideo && paragraphs.length > 0 ? (
+      {/* A recipe page replaces the article paragraphs: the classifier already
+          lifted the ingredients and steps out of the story around them. */}
+      {!isVideo && detail.recipe ? (
+        <RecipeSection recipe={detail.recipe} />
+      ) : !isVideo && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>

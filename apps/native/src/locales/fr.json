@@ -329,6 +329,8 @@
   "item.stalled": "Cela prend plus de temps que prévu.",
   "item.partial": "Enregistré à partir du lien uniquement — la page n'a pas chargé, ces détails sont donc estimés.",
   "item.noArticle": "Cette page ne contient pas d'article lisible — enregistrée comme simple lien.",
+  "recipe.ingredients": "Ingrédients",
+  "recipe.steps": "Étapes",
   "survey.xBookmarks": "Signets X",
   "survey.instagram": "Enregistrements Instagram",
   "survey.screenshots": "Captures d'écran",

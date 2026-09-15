@@ -19,7 +19,7 @@ import {
 } from "./model/safeFetch";
 import { isTikTokUrl, isXTweetUrl } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS } from "./model/itemFields";
+import { INTENT_KINDS, type Recipe } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
   deliverPostHogEvent,
@@ -904,6 +904,26 @@ const itemAnalysisSchema = z.object({
     .describe(
       "0-5 pressable actions that would be genuinely useful for this item. Empty if none clearly apply; do not pad.",
     ),
+  recipe: z
+    .object({
+      name: z.string().optional().describe("The recipe's own name"),
+      servings: z
+        .string()
+        .optional()
+        .describe("Yield exactly as stated, e.g. '4 servings' or '12 cookies'"),
+      ingredients: z
+        .array(z.string())
+        .describe("Every ingredient line, quantities included, in page order"),
+      steps: z
+        .array(z.string())
+        .describe(
+          "Every instruction step, numbered or not in the source, in order, each one a complete instruction",
+        ),
+    })
+    .nullable()
+    .describe(
+      "If this page is a recipe, the complete ingredients and steps exactly as the page states them — the user wants the recipe itself, not the story around it. null for anything that is not a recipe.",
+    ),
 });
 
 type Intent = z.infer<typeof intentSchema>;
@@ -948,6 +968,68 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
       return true;
     })
     .slice(0, 5);
+}
+
+// Bounds for a model-proposed recipe. Line caps keep a runaway generation
+// from bloating the item document; count caps match what a real recipe has.
+const MAX_RECIPE_LINES = 60;
+const MAX_RECIPE_LINE_CHARS = 300;
+const MAX_RECIPE_NAME_CHARS = 120;
+const MAX_RECIPE_SERVINGS_CHARS = 60;
+
+/** Clean the model's proposed recipe before it's persisted: trim and cap
+ * every line, drop empties and duplicates, cap the counts, and reject the
+ * whole recipe when the ingredient or step lists come back empty (the model
+ * is probably guessing). A rejected recipe is simply omitted — never fails
+ * the whole finalize. */
+export function sanitizeRecipe(
+  raw:
+    | {
+        name?: string | undefined;
+        servings?: string | undefined;
+        ingredients: string[];
+        steps: string[];
+      }
+    | null
+    | undefined,
+): Recipe | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const clean = (lines: string[] | undefined): string[] => {
+    const seen = new Set<string>();
+    return (lines ?? [])
+      .map((line) => line.trim().slice(0, MAX_RECIPE_LINE_CHARS))
+      .filter((line) => line !== "")
+      .filter((line) => {
+        const key = line.toLowerCase();
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .slice(0, MAX_RECIPE_LINES);
+  };
+  const ingredients = clean(raw.ingredients);
+  const steps = clean(raw.steps);
+  if (ingredients.length === 0 || steps.length === 0) {
+    return undefined;
+  }
+  return {
+    ...(raw.name
+      ? { name: raw.name.trim().slice(0, MAX_RECIPE_NAME_CHARS) || undefined }
+      : {}),
+    ...(raw.servings
+      ? {
+          servings:
+            raw.servings.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS) ||
+            undefined,
+        }
+      : {}),
+    ingredients,
+    steps,
+  };
 }
 
 function spacesPromptBlock(
@@ -996,7 +1078,7 @@ function linkAnalysisPrompt(
   spacesBlock: string,
 ): string {
   return [
-    "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+    "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names. If the page is a recipe, also fill the recipe field with its complete ingredients and steps exactly as the page states them (null otherwise) — the user wants the recipe itself, not the blog story around it.",
     spacesBlock,
     `URL: ${item.url}`,
     page?.title ? `Page title: ${page.title}` : "",
@@ -1345,6 +1427,9 @@ export const processItem = internalAction({
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
         intents: sanitizeIntents(result.intents),
+        // Only links can be recipes; images and notes leave the field absent.
+        recipe:
+          item.type === "link" ? sanitizeRecipe(result.recipe) : undefined,
         enrichment: linkEnrichment(linkRead),
         status: "ready",
       });

@@ -2625,6 +2625,28 @@ describe("stale processing runs", () => {
     ).resolves.toBe("missing");
   });
 
+  it("finalizeItem persists a recipe extracted from a recipe page", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour", "2 eggs"],
+      steps: ["Whisk.", "Fry."],
+    };
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe,
+    });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
+  });
+
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
     const t = newConvexTest().withIdentity({
       subject: "retry-stale|session-1",
