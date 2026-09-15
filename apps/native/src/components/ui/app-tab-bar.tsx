@@ -10,6 +10,7 @@ import {
   withAlpha,
 } from "@/lib/tab-bar-motion";
 import { setTabSearchQuery, useTabSearchQuery } from "@/lib/tab-search-query";
+import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import * as Haptics from "expo-haptics";
 import {
   TabList,
@@ -21,6 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   Text,
@@ -139,23 +141,6 @@ function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
   trigger.triggerProps.onPress?.(undefined as unknown as GestureResponderEvent);
 }
 
-function useKeyboardVisible(): boolean {
-  const [visible, setVisible] = useState(Keyboard.isVisible);
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () =>
-      setVisible(true),
-    );
-    const hide = Keyboard.addListener("keyboardDidHide", () =>
-      setVisible(false),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-  return visible;
-}
-
 export function AppTabs() {
   useAppLocale();
   const insets = useSafeAreaInsets();
@@ -166,21 +151,27 @@ export function AppTabs() {
   useEffect(() => () => setTabSearchQuery(""), []);
 
   return (
-    <Tabs style={styles.root} options={{ backBehavior: "history" }}>
-      <TabSlot
-        style={[
-          styles.slot,
-          { paddingBottom: restingBottom + BAR_HEIGHT + CONTENT_GAP },
-        ]}
-      />
-      {/* Registers the routes with the navigator; FloatingTabBar draws them. */}
-      <TabList style={styles.routeRegistry}>
-        {[...PILL_TABS, SEARCH_TAB].map((tab) => (
-          <TabTrigger key={tab.name} name={tab.name} href={tab.href} />
-        ))}
-      </TabList>
-      <FloatingTabBar restingBottom={restingBottom} />
-    </Tabs>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior="height"
+      enabled={Platform.OS === "android"}
+    >
+      <Tabs style={styles.root} options={{ backBehavior: "history" }}>
+        <TabSlot
+          style={[
+            styles.slot,
+            { paddingBottom: restingBottom + BAR_HEIGHT + CONTENT_GAP },
+          ]}
+        />
+        {/* Registers the routes with the navigator; FloatingTabBar draws them. */}
+        <TabList style={styles.routeRegistry}>
+          {[...PILL_TABS, SEARCH_TAB].map((tab) => (
+            <TabTrigger key={tab.name} name={tab.name} href={tab.href} />
+          ))}
+        </TabList>
+        <FloatingTabBar restingBottom={restingBottom} />
+      </Tabs>
+    </KeyboardAvoidingView>
   );
 }
 
