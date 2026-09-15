@@ -1,9 +1,9 @@
-import { api } from '@convex/_generated/api';
-import { analytics } from '@/lib/analytics';
-import { useOnboarding } from '@/lib/onboarding';
-import { useConvexAuth, useMutation } from 'convex/react';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { api } from "@convex/_generated/api";
+import { analytics } from "@/lib/analytics";
+import { useOnboarding } from "@/lib/onboarding";
+import { useConvexAuth, useMutation } from "convex/react";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   clearLegacyDemoUrl,
   clearPending,
@@ -14,8 +14,12 @@ import {
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
   updatePendingSpaces,
-} from '@/lib/pending-onboarding';
-import { openPaywall, useEntitlement, waitForSheetTransition } from '@/lib/entitlement';
+} from "@/lib/pending-onboarding";
+import {
+  openPaywall,
+  useEntitlement,
+  waitForSheetTransition,
+} from "@/lib/entitlement";
 
 /**
  * After onboarding is finished and the user signs in, replay the deferred
@@ -80,7 +84,7 @@ export function useReplayOnboarding() {
         // purchase via the paywall route).
         if (!entitled) {
           await waitForSheetTransition();
-          const purchased = await openPaywall(router, 'onboarding');
+          const purchased = await openPaywall(router, "onboarding");
           if (purchased) {
             // The RevenueCat webhook may not have updated Convex yet. Keep
             // pending data and wait for the entitlement query to become true.
@@ -97,7 +101,7 @@ export function useReplayOnboarding() {
         );
         const failedSpaces = spaceResults
           .map((result, index) =>
-            result.status === 'rejected' ? spaces[index] : null,
+            result.status === "rejected" ? spaces[index] : null,
           )
           .filter((name): name is string => name !== null);
         // Persist only the failed work so a later replay retries it without

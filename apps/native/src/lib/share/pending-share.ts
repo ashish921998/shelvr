@@ -8,7 +8,7 @@
  * SecureStore or React Native.
  */
 
-export const PENDING_SHARE_KEY = 'shelvr.pending.share';
+export const PENDING_SHARE_KEY = "shelvr.pending.share";
 
 export interface PendingShareStore {
   getItem(key: string): string | null;
@@ -17,18 +17,18 @@ export interface PendingShareStore {
 
 /** Marks that a share is waiting to be resumed after onboarding/auth. */
 export function markPendingShareInStore(store: PendingShareStore): void {
-  store.setItem(PENDING_SHARE_KEY, '1');
+  store.setItem(PENDING_SHARE_KEY, "1");
 }
 
 /** True when a share was deferred and has not yet been consumed. */
 export function hasPendingShareInStore(store: PendingShareStore): boolean {
   const value = store.getItem(PENDING_SHARE_KEY);
-  return value === '1';
+  return value === "1";
 }
 
 /** Drops any pending share flag without resuming (e.g. user cancelled). */
 export function clearPendingShareInStore(store: PendingShareStore): void {
-  store.setItem(PENDING_SHARE_KEY, '');
+  store.setItem(PENDING_SHARE_KEY, "");
 }
 
 /**
@@ -40,25 +40,25 @@ export function clearPendingShareInStore(store: PendingShareStore): void {
  *   mark the share pending so finish() can resume it
  * - Onboarded but signed out → send the user to sign-in and mark pending
  */
-export type ShareRouteDecision =
-  | { action: 'open-share' }
-  | { action: 'defer-onboarding'; markPending: true }
-  | { action: 'defer-sign-in'; markPending: true; href: '/(auth)/sign-in' };
+type ShareRouteDecision =
+  | { action: "open-share" }
+  | { action: "defer-onboarding"; markPending: true }
+  | { action: "defer-sign-in"; markPending: true; href: "/(auth)/sign-in" };
 
 export function decideShareRoute(state: {
   onboarded: boolean;
   isAuthenticated: boolean;
 }): ShareRouteDecision {
   if (state.onboarded && state.isAuthenticated) {
-    return { action: 'open-share' };
+    return { action: "open-share" };
   }
   if (!state.onboarded) {
-    return { action: 'defer-onboarding', markPending: true };
+    return { action: "defer-onboarding", markPending: true };
   }
   return {
-    action: 'defer-sign-in',
+    action: "defer-sign-in",
     markPending: true,
-    href: '/(auth)/sign-in',
+    href: "/(auth)/sign-in",
   };
 }
 
@@ -69,6 +69,6 @@ export function decideShareRoute(state: {
  */
 export function decidePostAuthRoute(state: {
   hasPendingShare: boolean;
-}): '/' | '/share' {
-  return state.hasPendingShare ? '/share' : '/';
+}): "/" | "/share" {
+  return state.hasPendingShare ? "/share" : "/";
 }

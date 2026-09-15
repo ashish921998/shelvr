@@ -1,6 +1,14 @@
 import { ConvexError, v, type Infer } from "convex/values";
-import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
+import {
+  query,
+  mutation,
+  internalQuery,
+  internalMutation,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -22,9 +30,15 @@ import {
   intentValidator,
   isStaleProcessing,
   isTerminalFailure,
+  MAX_ITEM_TITLE_CHARS,
+  MAX_NOTE_TEXT_CHARS,
   PROCESSING_STALE_MS,
 } from "./model/itemFields";
-import { imageSizeError, MAX_PHOTOS_PER_ACCOUNT, PHOTO_LIMIT_MESSAGE } from "./model/imagePolicy";
+import {
+  imageSizeError,
+  MAX_PHOTOS_PER_ACCOUNT,
+  PHOTO_LIMIT_MESSAGE,
+} from "./model/imagePolicy";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -50,7 +64,11 @@ const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
 
-const itemTypeValidator = v.union(v.literal("image"), v.literal("link"), v.literal("note"));
+const itemTypeValidator = v.union(
+  v.literal("image"),
+  v.literal("link"),
+  v.literal("note"),
+);
 
 const itemStatusValidator = v.union(
   v.literal("processing"),
@@ -83,6 +101,7 @@ const itemFields = {
   type: itemTypeValidator,
   status: itemStatusValidator,
   title: v.optional(v.string()),
+  titleSource: v.optional(v.literal("user")),
   description: v.optional(v.string()),
   url: v.optional(v.string()),
   storageId: v.optional(v.id("_storage")),
@@ -174,11 +193,16 @@ export const itemCardValidator = enrichedItemValidator.omit(
 export type ItemCard = Infer<typeof itemCardValidator>;
 
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
-  const imageUrl = item.storageId ? await ctx.storage.getUrl(item.storageId) : null;
+  const imageUrl = item.storageId
+    ? await ctx.storage.getUrl(item.storageId)
+    : null;
   return { ...item, imageUrl };
 }
 
-export async function toItemCard(ctx: QueryCtx, item: Doc<"items">): Promise<ItemCard> {
+export async function toItemCard(
+  ctx: QueryCtx,
+  item: Doc<"items">,
+): Promise<ItemCard> {
   // Destructure rather than pick so the compiler flags a field that exists on
   // the document but is missing from the validator (or vice versa).
   const {
@@ -192,13 +216,24 @@ export async function toItemCard(ctx: QueryCtx, item: Doc<"items">): Promise<Ite
   return card;
 }
 
+/** How much of a note's own text the search index carries. Notes are short;
+ * the cap keeps a pasted essay from bloating the index. */
+const MAX_SEARCH_NOTE_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
+  note?: string;
 }): string {
-  return [parts.title, parts.description, ...parts.tags, parts.siteName]
+  return [
+    parts.title,
+    parts.description,
+    ...parts.tags,
+    parts.siteName,
+    parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+  ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
     .toLowerCase();
@@ -246,7 +281,10 @@ export const listItemsPage = query({
       .paginate({
         ...opts,
         numItems: Math.min(opts.numItems, LIST_PAGE_MAX),
-        maximumBytesRead: Math.min(opts.maximumBytesRead ?? Infinity, LIST_PAGE_MAX_BYTES),
+        maximumBytesRead: Math.min(
+          opts.maximumBytesRead ?? Infinity,
+          LIST_PAGE_MAX_BYTES,
+        ),
       });
     return {
       ...result,
@@ -264,10 +302,15 @@ export const listRecentItems = query({
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const limit = Math.min(Math.max(1, Math.floor(args.limit)), RECENT_ITEMS_MAX);
+    const limit = Math.min(
+      Math.max(1, Math.floor(args.limit)),
+      RECENT_ITEMS_MAX,
+    );
     const ready = await ctx.db
       .query("items")
-      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "ready"))
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )
       .order("desc")
       .take(limit);
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
@@ -292,7 +335,9 @@ export const listLocatedItems = query({
     const userId = await requireUserId(ctx);
     const photos = await ctx.db
       .query("items")
-      .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("type", "image"))
+      .withIndex("by_user_and_type", (q) =>
+        q.eq("userId", userId).eq("type", "image"),
+      )
       .order("desc")
       .take(MAX_PHOTOS_PER_ACCOUNT);
     const located = photos.filter(
@@ -305,7 +350,9 @@ export const listLocatedItems = query({
         title: item.title,
         latitude: item.latitude,
         longitude: item.longitude,
-        imageUrl: item.storageId ? await ctx.storage.getUrl(item.storageId) : null,
+        imageUrl: item.storageId
+          ? await ctx.storage.getUrl(item.storageId)
+          : null,
       })),
     );
   },
@@ -430,7 +477,9 @@ export const similarItems = query({
     }
     scored.sort((a, b) => b.score - a.score);
     return await Promise.all(
-      scored.slice(0, SIMILAR_LIMIT).map(({ item: match }) => toItemCard(ctx, match)),
+      scored
+        .slice(0, SIMILAR_LIMIT)
+        .map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });
@@ -512,7 +561,9 @@ async function loadItemOperation(
 ): Promise<Doc<"itemOperations"> | null> {
   const op = await ctx.db
     .query("itemOperations")
-    .withIndex("by_user_operation", (q) => q.eq("userId", userId).eq("operationId", operationId))
+    .withIndex("by_user_operation", (q) =>
+      q.eq("userId", userId).eq("operationId", operationId),
+    )
     .unique();
   if (op === null) {
     return null;
@@ -565,7 +616,9 @@ async function isStorageUnreferenced(
 async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
   const photos = await ctx.db
     .query("items")
-    .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("type", "image"))
+    .withIndex("by_user_and_type", (q) =>
+      q.eq("userId", userId).eq("type", "image"),
+    )
     .take(MAX_PHOTOS_PER_ACCOUNT);
   return photos.length;
 }
@@ -574,7 +627,10 @@ async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
  * inserts into it, so Convex's serializable OCC retries the loser, which then
  * sees the full count and throws. ConvexError, not Error: production redacts
  * plain Error messages to "Server Error", and this one is meant for the user. */
-async function requirePhotoQuota(ctx: MutationCtx, userId: string): Promise<number> {
+async function requirePhotoQuota(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<number> {
   const count = await countPhotos(ctx, userId);
   if (count >= MAX_PHOTOS_PER_ACCOUNT) {
     throw new ConvexError(PHOTO_LIMIT_MESSAGE);
@@ -587,7 +643,10 @@ export const photoUsage = query({
   returns: v.object({ count: v.number(), limit: v.number() }),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
-    return { count: await countPhotos(ctx, userId), limit: MAX_PHOTOS_PER_ACCOUNT };
+    return {
+      count: await countPhotos(ctx, userId),
+      limit: MAX_PHOTOS_PER_ACCOUNT,
+    };
   },
 });
 
@@ -611,7 +670,8 @@ function validateImageMetadata(args: {
     throw new Error("Invalid aspectRatio");
   }
   // Location is all-or-nothing: a lone latitude can't be plotted.
-  const hasLocation = args.latitude !== undefined && args.longitude !== undefined;
+  const hasLocation =
+    args.latitude !== undefined && args.longitude !== undefined;
   if (
     (args.latitude !== undefined || args.longitude !== undefined) &&
     (!hasLocation ||
@@ -680,7 +740,10 @@ export const beginImageImport = mutation({
       // some other item/operation still depends on — or one already deleted —
       // can't corrupt them or wedge this recycle path. Clearing itemId is
       // redundant for the no-itemId case but harmless.
-      if (op.storageId !== undefined && (await isStorageUnreferenced(ctx, op.storageId, op._id))) {
+      if (
+        op.storageId !== undefined &&
+        (await isStorageUnreferenced(ctx, op.storageId, op._id))
+      ) {
         await safeDeleteStorage(ctx, op.storageId);
       }
       await ctx.db.patch(op._id, {
@@ -713,7 +776,10 @@ export const attachImageUpload = mutation({
     operationId: v.string(),
     storageId: v.id("_storage"),
   },
-  returns: v.object({ storageId: v.id("_storage"), error: v.optional(v.string()) }),
+  returns: v.object({
+    storageId: v.id("_storage"),
+    error: v.optional(v.string()),
+  }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     await requireProEntitlement(ctx, userId);
@@ -724,7 +790,8 @@ export const attachImageUpload = mutation({
     // Skip the size check for completed ops and for a different already-attached
     // file; those paths return idempotently below.
     const validatesNewUpload =
-      op?.status !== "complete" && (!op?.storageId || op.storageId === args.storageId);
+      op?.status !== "complete" &&
+      (!op?.storageId || op.storageId === args.storageId);
     const metadata = validatesNewUpload
       ? await ctx.db.system.get("_storage", args.storageId)
       : null;
@@ -773,7 +840,10 @@ export const attachImageUpload = mutation({
       // otherwise it is referenced by nothing (no item, no ledger row) and the
       // pending-only cleanup cron would never reclaim it. The unreferenced
       // guard keeps a blob some other item/operation owns safe.
-      if (args.storageId !== op.storageId && (await isStorageUnreferenced(ctx, args.storageId))) {
+      if (
+        args.storageId !== op.storageId &&
+        (await isStorageUnreferenced(ctx, args.storageId))
+      ) {
         await safeDeleteStorage(ctx, args.storageId);
       }
       return { storageId: op.storageId ?? args.storageId };
@@ -966,7 +1036,10 @@ export const cleanupStaleImageImports = internalMutation({
       // destroy a live image — drop only the ledger row in that case. And a
       // blob already gone must not throw and wedge the sweep (this mutation is
       // transactional and re-reads the same oldest page every run).
-      if (op.storageId !== undefined && (await isStorageUnreferenced(ctx, op.storageId, op._id))) {
+      if (
+        op.storageId !== undefined &&
+        (await isStorageUnreferenced(ctx, op.storageId, op._id))
+      ) {
         await safeDeleteStorage(ctx, op.storageId);
       }
       await ctx.db.delete(op._id);
@@ -974,7 +1047,11 @@ export const cleanupStaleImageImports = internalMutation({
     // A full page means more stale rows likely remain; sweep again immediately
     // rather than waiting for the next cron tick.
     if (stale.length === CLEANUP_PAGE_SIZE) {
-      await ctx.scheduler.runAfter(0, internal.items.cleanupStaleImageImports, {});
+      await ctx.scheduler.runAfter(
+        0,
+        internal.items.cleanupStaleImageImports,
+        {},
+      );
     }
     return null;
   },
@@ -1036,7 +1113,14 @@ async function createItemWithOperation(
     // so a retry of an already-finished operation is never billed a token —
     // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId, options.analyticsSessionId);
+    const itemId = await insertLinkOrNote(
+      ctx,
+      userId,
+      kind,
+      payload,
+      options.spaceId,
+      options.analyticsSessionId,
+    );
     if (op === null) {
       await ctx.db.insert("itemOperations", {
         userId,
@@ -1062,7 +1146,14 @@ async function createItemWithOperation(
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-  return await insertLinkOrNote(ctx, userId, kind, payload, options.spaceId, options.analyticsSessionId);
+  return await insertLinkOrNote(
+    ctx,
+    userId,
+    kind,
+    payload,
+    options.spaceId,
+    options.analyticsSessionId,
+  );
 }
 
 /** Throws if a link/note payload is empty/invalid. Validation is shared by the
@@ -1074,7 +1165,11 @@ function validateLinkOrNotePayload(
   payload: { url: string } | { note: string },
 ): void {
   if (kind === "link") {
-    if (!("url" in payload) || typeof payload.url !== "string" || payload.url === "") {
+    if (
+      !("url" in payload) ||
+      typeof payload.url !== "string" ||
+      payload.url === ""
+    ) {
       throw new Error("Invalid URL");
     }
     return;
@@ -1159,7 +1254,11 @@ export const createLinkItem = mutation({
       userId,
       "link",
       { url },
-      { operationId: args.operationId, spaceId: args.spaceId, analyticsSessionId: args.analyticsSessionId },
+      {
+        operationId: args.operationId,
+        spaceId: args.spaceId,
+        analyticsSessionId: args.analyticsSessionId,
+      },
     );
   },
 });
@@ -1182,8 +1281,240 @@ export const createNoteItem = mutation({
       userId,
       "note",
       { note: args.text },
-      { operationId: args.operationId, spaceId: args.spaceId, analyticsSessionId: args.analyticsSessionId },
+      {
+        operationId: args.operationId,
+        spaceId: args.spaceId,
+        analyticsSessionId: args.analyticsSessionId,
+      },
     );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Bulk link import (X bookmarks)
+// ---------------------------------------------------------------------------
+
+/** Most URLs one importLinks call accepts. Each created link is one insert and
+ * two scheduled functions, so a batch stays well inside a transaction; the
+ * client pages through longer lists. */
+const MAX_IMPORT_BATCH = 50;
+
+/** Gap between successive processItem runs of one import, so hundreds of page
+ * fetches and classifications do not start at once. */
+export const IMPORT_STAGGER_MS = 1000;
+
+/** Cap on the client-supplied stagger offset. The bulkImport bucket holds 600
+ * tokens, so an honest import never passes this; a larger value would only
+ * push processing further into the future. */
+const MAX_IMPORT_STAGGER_OFFSET = 1000;
+
+const importLinksResultValidator = v.object({
+  created: v.number(),
+  // Already saved, or repeated earlier in this batch.
+  skipped: v.number(),
+  // Not a URL the save policy accepts.
+  invalid: v.number(),
+  // New, valid links left uncreated because the bulkImport bucket was empty.
+  notProcessed: v.number(),
+  rateLimited: v.boolean(),
+});
+
+/** Whether the user already saved this link. Every link save stores the
+ * normalized URL, so the index lookup is exact and finds a save of any age. */
+async function hasSavedLink(
+  ctx: QueryCtx,
+  userId: string,
+  url: string,
+): Promise<boolean> {
+  const match = await ctx.db
+    .query("items")
+    .withIndex("by_user_and_url", (q) => q.eq("userId", userId).eq("url", url))
+    .first();
+  return match !== null;
+}
+
+/**
+ * Bulk-import link URLs, such as X bookmarks. Each new link goes through the
+ * same pipeline as a single save. Links already saved and repeats within the
+ * batch are skipped for free, so pasting the same list again resumes an
+ * import that stopped at the rate limit.
+ *
+ * The batch draws one `bulkImport` token per link it would create, all or
+ * nothing. When the bucket cannot cover the batch, nothing is created and
+ * `rateLimited` tells the client to stop paging.
+ */
+export const importLinks = mutation({
+  args: {
+    urls: v.array(v.string()),
+    // Links earlier calls of this import created, so the processing stagger
+    // continues across batches instead of restarting at zero.
+    staggerOffset: v.optional(v.number()),
+  },
+  returns: importLinksResultValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    if (args.urls.length > MAX_IMPORT_BATCH) {
+      throw new ConvexError(
+        `Import accepts at most ${MAX_IMPORT_BATCH} URLs per call`,
+      );
+    }
+
+    let skipped = 0;
+    let invalid = 0;
+    const fresh: string[] = [];
+    for (const raw of args.urls) {
+      const trimmed = raw.trim();
+      if (trimmed === "") continue;
+      let url: string;
+      try {
+        url = normalizeExternalUrl(trimmed);
+      } catch {
+        invalid++;
+        continue;
+      }
+      if (fresh.includes(url) || (await hasSavedLink(ctx, userId, url))) {
+        skipped++;
+        continue;
+      }
+      fresh.push(url);
+    }
+    if (fresh.length === 0) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: 0,
+        rateLimited: false,
+      };
+    }
+
+    const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
+      key: userId,
+      count: fresh.length,
+    });
+    if (!ok) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: fresh.length,
+        rateLimited: true,
+      };
+    }
+
+    const offset = Number.isFinite(args.staggerOffset)
+      ? Math.min(
+          Math.max(Math.floor(args.staggerOffset ?? 0), 0),
+          MAX_IMPORT_STAGGER_OFFSET,
+        )
+      : 0;
+    for (const [index, url] of fresh.entries()) {
+      const run = beginProcessingRun();
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        ...run,
+        url,
+        tags: [],
+        searchText: "",
+      });
+      await ctx.scheduler.runAfter(
+        (offset + index) * IMPORT_STAGGER_MS,
+        internal.ai.processItem,
+        { itemId, runId: run.processingRunId },
+      );
+      await scheduleSaveTelemetry(ctx, itemId);
+    }
+    return {
+      created: fresh.length,
+      skipped,
+      invalid,
+      notProcessed: 0,
+      rateLimited: false,
+    };
+  },
+});
+
+/** Delay before an edited note is re-classified. Each edit in the window
+ * supersedes the scheduled run, so a burst of typing costs one model call. */
+export const NOTE_REFRESH_DELAY_MS = 20_000;
+
+/**
+ * The owner edits a note's text and title. A typed title replaces the
+ * classifier's and survives later classification; an empty title hands naming
+ * back to the classifier. A text change on a ready note re-classifies it
+ * quietly after NOTE_REFRESH_DELAY_MS, so search and space suggestions follow
+ * the new words without the note ever showing as processing. The refresh keeps
+ * the title the note already has, so only an untitled note is renamed.
+ */
+export const updateNoteItem = mutation({
+  args: {
+    id: v.id("items"),
+    title: v.string(),
+    text: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    const item = await ctx.db.get(args.id);
+    if (item === null || item.userId !== userId || item.type !== "note") {
+      throw new Error("Item not found");
+    }
+    if (args.text.trim() === "") {
+      throw new Error("Note text is empty");
+    }
+    if (args.text.length > MAX_NOTE_TEXT_CHARS) {
+      throw new Error("Note text is too long");
+    }
+    const typedTitle = args.title.trim();
+    if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {
+      throw new Error("Title is too long");
+    }
+    const currentTypedTitle =
+      item.titleSource === "user" ? item.title : undefined;
+    const textChanged = args.text !== item.note;
+    const titleChanged = (typedTitle || undefined) !== currentTypedTitle;
+    if (!textChanged && !titleChanged) {
+      return null;
+    }
+    // Clearing a typed title leaves the note untitled until the classifier
+    // names it again; a classifier title stays until the user types one.
+    const title =
+      typedTitle !== ""
+        ? typedTitle
+        : item.titleSource === "user"
+          ? undefined
+          : item.title;
+    // Only a ready note is refreshed: a first run still in flight reads the
+    // latest text when it finalizes, and a failed note has its own retry. A
+    // cleared title is re-named by the same refresh.
+    const refreshRunId =
+      (textChanged || (titleChanged && typedTitle === "")) &&
+      item.status === "ready"
+        ? crypto.randomUUID()
+        : undefined;
+    await ctx.db.patch(item._id, {
+      note: args.text,
+      title,
+      titleSource: typedTitle !== "" ? "user" : undefined,
+      searchText: buildSearchText({
+        title,
+        description: item.description,
+        tags: item.tags,
+        note: args.text,
+      }),
+      ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
+    });
+    if (refreshRunId !== undefined) {
+      await ctx.scheduler.runAfter(
+        NOTE_REFRESH_DELAY_MS,
+        internal.ai.processItem,
+        { itemId: item._id, runId: refreshRunId, refresh: true },
+      );
+    }
+    return null;
   },
 });
 
@@ -1201,11 +1532,17 @@ export const findLinks = mutation({
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
     }
-    if (item.status !== "ready" || item.productsStatus === "searching" || item.productsStatus === "unavailable") {
+    if (
+      item.status !== "ready" ||
+      item.productsStatus === "searching" ||
+      item.productsStatus === "unavailable"
+    ) {
       return null;
     }
     if (item.type === "image") {
-      const metadata = item.storageId ? await ctx.db.system.get("_storage", item.storageId) : null;
+      const metadata = item.storageId
+        ? await ctx.db.system.get("_storage", item.storageId)
+        : null;
       if (!metadata || imageSizeError(metadata.size)) {
         await ctx.db.patch(item._id, { productsStatus: "unavailable" });
         return null;
@@ -1358,6 +1695,32 @@ function ownsRun(item: Doc<"items">, runId: string | undefined): boolean {
   return item.processingRunId === runId;
 }
 
+/**
+ * Gate for an edited note's quiet refresh (see updateNoteItem). Only the run
+ * the latest edit scheduled goes on to call the model, and it draws from the
+ * noteRefresh bucket without throwing: a refused refresh leaves the note as
+ * it is.
+ */
+export const claimNoteRefresh = internalMutation({
+  args: { itemId: v.id("items"), runId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.type !== "note" ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId)
+    ) {
+      return false;
+    }
+    const { ok } = await rateLimiter.limit(ctx, "noteRefresh", {
+      key: item.userId,
+    });
+    return ok;
+  },
+});
+
 export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -1366,6 +1729,10 @@ export const finalizeItem = internalMutation({
     // passes it.
     runId: v.optional(v.string()),
     title: v.string(),
+    // An edited note's quiet refresh: a title the note already has stays, so
+    // re-classifying new words doesn't rename the note on every edit. A note
+    // with no title (its typed title was just cleared) still takes this one.
+    keepTitle: v.optional(v.boolean()),
     description: v.string(),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -1397,14 +1764,22 @@ export const finalizeItem = internalMutation({
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
+    // A title the owner typed outranks the classifier's, and so does the one a
+    // refreshed note already has; the rest of the classification still lands.
+    const title =
+      (item.titleSource === "user" || args.keepTitle === true) &&
+      item.title !== undefined
+        ? item.title
+        : args.title;
     const searchText = buildSearchText({
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       siteName: args.siteName,
+      note: item.note,
     });
     await ctx.db.patch(args.itemId, {
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       content: args.content,
@@ -1453,12 +1828,18 @@ export const deleteStorageIfUnreferenced = internalMutation({
 
 export const listImagesNeedingRatioInternal = internalQuery({
   args: {},
-  returns: v.array(v.object({ _id: v.id("items"), storageId: v.id("_storage") })),
+  returns: v.array(
+    v.object({ _id: v.id("items"), storageId: v.id("_storage") }),
+  ),
   handler: async (ctx) => {
     const items = await ctx.db.query("items").take(LIST_CAP);
     const out: { _id: Id<"items">; storageId: Id<"_storage"> }[] = [];
     for (const item of items) {
-      if (item.type === "image" && item.storageId !== undefined && item.aspectRatio === undefined) {
+      if (
+        item.type === "image" &&
+        item.storageId !== undefined &&
+        item.aspectRatio === undefined
+      ) {
         out.push({ _id: item._id, storageId: item.storageId });
       }
     }
@@ -1575,7 +1956,11 @@ export const failStaleProcessingItems = internalMutation({
       failed++;
     }
     if (candidates.length === STALE_PROCESSING_PAGE_SIZE && failed > 0) {
-      await ctx.scheduler.runAfter(0, internal.items.failStaleProcessingItems, {});
+      await ctx.scheduler.runAfter(
+        0,
+        internal.items.failStaleProcessingItems,
+        {},
+      );
     }
     return { failed, scanned: candidates.length };
   },
@@ -1619,7 +2004,11 @@ export const setSpacesForItem = internalMutation({
       }
       const space = await ctx.db.get(spaceId);
       // Only suggest into dynamic spaces that exist and belong to the owner.
-      if (space !== null && space.userId === item.userId && space.dynamic === true) {
+      if (
+        space !== null &&
+        space.userId === item.userId &&
+        space.dynamic === true
+      ) {
         await insertMembership(ctx, {
           userId: item.userId,
           spaceId,

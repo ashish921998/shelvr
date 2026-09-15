@@ -89,3 +89,12 @@ tmp/
 apps/native/store-assets/
 assets/marketing/
 assets/product-hunt/
+
+# Claude Design sync: staged converter, its node_modules, compiled bundle, and
+# machine state. All regenerate on the next sync; the rest of .design-sync/
+# (config, notes, previews) is committed.
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

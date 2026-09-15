@@ -1,4 +1,37 @@
-type AnalyticsProperties = Record<string, boolean | number | string>;
+type AnalyticsProperties = Record<
+  string,
+  boolean | number | string | unknown[]
+>;
+
+// Error messages can interpolate user input (a waitlist email, a query
+// param), so the grouped exception value keeps only fixed shapes: mail and
+// URL substrings are replaced before anything reaches PostHog.
+function safeExceptionValue(message: string): string {
+  return message
+    .replace(/\b[\w.+-]+@[\w.-]+\.\w+\b/g, "[email]")
+    .replace(/\bhttps?:\/\/\S+/gi, "[url]");
+}
+
+export function captureWebException(
+  error: unknown,
+  properties: AnalyticsProperties = {},
+) {
+  const type = error instanceof Error ? error.name : typeof error;
+  captureWebAnalyticsEvent("$exception", {
+    $exception_type: type,
+    $exception_level: "error",
+    $exception_list: [
+      {
+        type,
+        value:
+          error instanceof Error
+            ? safeExceptionValue(error.message)
+            : String(error),
+      },
+    ],
+    ...properties,
+  });
+}
 
 export function captureWebAnalyticsEvent(
   event: string,

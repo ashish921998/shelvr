@@ -123,10 +123,24 @@ describe("deleteCurrentUserAccount", () => {
             .collect()
         ).length,
       ).toBe(2);
-      expect(await ctx.db.system.get("_storage", seeded.storageId)).not.toBeNull();
+      expect(
+        await ctx.db.system.get("_storage", seeded.storageId),
+      ).not.toBeNull();
       expect(
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
       ).not.toBeNull();
+    });
+
+    // The one-time cancel-survey ask row is user-owned state; it must drain
+    // with the account too.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("cancelSurveys", {
+        userId,
+        askedAt: 1700000000000,
+        outcome: "submitted",
+        reason: "too_expensive",
+        respondedAt: 1700000000001,
+      });
     });
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -249,7 +263,9 @@ describe("deleteCurrentUserAccount", () => {
         .withIndex("by_user", (q) => q.eq("userId", "user-b"))
         .collect();
       expect(spaces).toHaveLength(1);
-      expect(await ctx.db.system.get("_storage", bSeeded.storageId)).not.toBeNull();
+      expect(
+        await ctx.db.system.get("_storage", bSeeded.storageId),
+      ).not.toBeNull();
       const sub = await ctx.db
         .query("subscriptions")
         .withIndex("by_user", (q) => q.eq("userId", "user-b"))

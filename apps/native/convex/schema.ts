@@ -1,12 +1,16 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { recipientValidator } from "./model/notificationDelivery";
+import { recipientValidator } from "./model/notificationFields";
 import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
 } from "./model/itemFields";
+import {
+  cancelSurveyOutcomeValidator,
+  cancelSurveyReasonValidator,
+} from "./model/cancelSurveyFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -17,7 +21,10 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
-  paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index('by_event', ['eventId']),
+  paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index(
+    "by_event",
+    ["eventId"],
+  ),
 
   items: defineTable({
     userId: v.string(),
@@ -31,6 +38,9 @@ export default defineSchema({
       v.literal("failed"),
     ),
     title: v.optional(v.string()),
+    // "user" once the owner typed the title. Classification then leaves
+    // `title` alone; absent means any title is the classifier's.
+    titleSource: v.optional(v.literal("user")),
     description: v.optional(v.string()),
     url: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
@@ -66,7 +76,12 @@ export default defineSchema({
       ),
     ),
     productsStatus: v.optional(
-      v.union(v.literal("searching"), v.literal("ready"), v.literal("failed"), v.literal("unavailable")),
+      v.union(
+        v.literal("searching"),
+        v.literal("ready"),
+        v.literal("failed"),
+        v.literal("unavailable"),
+      ),
     ),
     // Why processing failed, so the client can say something true instead of
     // rendering an item that looks stuck forever. Only set with
@@ -94,6 +109,9 @@ export default defineSchema({
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
     .index("by_user_and_type", ["userId", "type"])
+    // Bulk import skips links the user already saved. Link URLs are stored
+    // normalized, so an exact lookup finds a save of any age.
+    .index("by_user_and_url", ["userId", "url"])
     // Status-scoped reads for one user (e.g. the ready items a recommendation
     // pass samples) without over-reading and filtering in JS.
     .index("by_user_and_status", ["userId", "status"])
@@ -101,7 +119,10 @@ export default defineSchema({
     // run start. `undefined` sorts before every number, so pre-fencing rows
     // with no processingStartedAt land at the front of the range and are
     // judged by `_creationTime` instead.
-    .index("by_status_and_processingStartedAt", ["status", "processingStartedAt"])
+    .index("by_status_and_processingStartedAt", [
+      "status",
+      "processingStartedAt",
+    ])
     // Lets attachImageUpload confirm a client-supplied storage id is not
     // referenced by any completed item before deleting/adopting it, so a
     // malicious caller can't point attach at another user's storage object.
@@ -240,6 +261,21 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
+  // row is the durable, cross-install record: its existence is the ask, and
+  // the first recorded outcome wins. Local (MMKV) state can never enforce
+  // once-per-account across devices or reinstalls — only this row can.
+  cancelSurveys: defineTable({
+    userId: v.string(),
+    askedAt: v.number(),
+    outcome: v.optional(cancelSurveyOutcomeValidator),
+    // Bounded reason id from the client survey (never free text). The client's
+    // CancelSurveyReason derives from the same CANCEL_SURVEY_REASONS tuple this
+    // validator is built from, so the two cannot disagree.
+    reason: v.optional(cancelSurveyReasonValidator),
+    respondedAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
+
   // One Expo push token per device. A token row moves to a different account
   // only after its current owner disables it (the client revokes every stored
   // token before sign-out); an enabled row owned by someone else is never
@@ -248,6 +284,7 @@ export default defineSchema({
   // scanning a user's disabled rows.
   notificationDevices: defineTable({
     userId: v.string(),
+    locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
     enabled: v.boolean(),
@@ -267,7 +304,10 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_enabled_and_next_digest_at", ["weeklyShelfEnabled", "nextDigestAt"]),
+    .index("by_enabled_and_next_digest_at", [
+      "weeklyShelfEnabled",
+      "nextDigestAt",
+    ]),
 
   // Read state is separate from items so opening a save does not rewrite the
   // item row that is rendered throughout the feed.
@@ -290,7 +330,9 @@ export default defineSchema({
     createdAt: v.number(),
     deliveredAt: v.optional(v.number()),
     openedAt: v.optional(v.number()),
-    deliveryStatus: v.optional(v.union(v.literal("pending"), v.literal("complete"), v.literal("failed"))),
+    deliveryStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("complete"), v.literal("failed")),
+    ),
     deliveryNextAttemptAt: v.optional(v.number()),
     deliveryAttempts: v.optional(v.number()),
     deliveryRecipients: v.optional(v.array(recipientValidator)),
@@ -298,7 +340,10 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_week", ["userId", "weekStart"])
-    .index("by_delivery_status_and_attempt", ["deliveryStatus", "deliveryNextAttemptAt"]),
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
 
   // The pre-payment onboarding demo save. One row per user (the allowance is
   // server-enforced), pointing at the one real item the user saved during the

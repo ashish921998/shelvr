@@ -1,12 +1,22 @@
 "use node";
 
-import { randomUUID } from "node:crypto";
 import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { logEvent } from "./model/log";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
+import {
+  deliverPostHogEvent,
+  newDeliveryId,
+  scheduleCaptureRetry,
+} from "./model/posthogCapture";
 
-class PermanentPaymentDeliveryError extends Error {}
+// Revenue is the one signal worth surfacing when it cannot be delivered, so
+// payment capture keeps the longest budget and throws once it is spent.
+const MAX_PAYMENT_ATTEMPTS = 5;
+// A save is already committed by the time this runs; a lost event costs the
+// funnel one row, so it retries briefly and then warns.
+const MAX_SAVE_ATTEMPTS = 3;
 
 export const capturePayment = internalAction({
   args: {
@@ -16,59 +26,56 @@ export const capturePayment = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const deliveryId = args.deliveryId ?? randomUUID();
+    const deliveryId = args.deliveryId ?? newDeliveryId();
     const { payment } = args;
-    try {
-      if (!env.POSTHOG_PROJECT_TOKEN)
-        throw new Error("Payment analytics is not configured");
-      const host = (env.POSTHOG_HOST ?? "https://us.i.posthog.com").replace(
-        /\/$/,
-        "",
-      );
-      const response = await fetch(`${host}/capture/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(3000),
-        body: JSON.stringify({
-          api_key: env.POSTHOG_PROJECT_TOKEN,
-          event: payment.event,
-          uuid: deliveryId,
-          timestamp: new Date(payment.timestamp).toISOString(),
-          properties: {
-            distinct_id: payment.userId,
-            $process_person_profile: false,
-            environment:
-              env.OBSERVABILITY_ENV === "production"
-                ? payment.environment
-                : "development",
-            store_environment: payment.environment,
-            analytics_version: 1,
-            revenuecat_event_id: payment.eventId,
-            product_id: payment.product_id,
-            payment_kind: payment.payment_kind,
-            country_code: payment.country_code,
-            revenue_usd: payment.revenue_usd,
-          },
-        }),
-      });
-      if (response.ok) return null;
-      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-        throw new PermanentPaymentDeliveryError(`Payment analytics HTTP ${response.status}`);
-      }
-      throw new Error(`Payment analytics HTTP ${response.status}`);
-    } catch (error) {
-      if (error instanceof PermanentPaymentDeliveryError) throw error;
-      const attempt = args.attempt ?? 0;
-      if (attempt >= 5) throw error;
-      await ctx.scheduler.runAfter(
-        1000 * 10 ** attempt,
-        internal.analytics.capturePayment,
-        {
+    const delivery = await deliverPostHogEvent({
+      event: payment.event,
+      distinctId: payment.userId,
+      deliveryId,
+      timestamp: payment.timestamp,
+      properties: {
+        $process_person_profile: false,
+        // Production keeps the store's own environment so sandbox purchases
+        // stay separable there; every other deployment is development.
+        environment:
+          env.OBSERVABILITY_ENV === "production"
+            ? payment.environment
+            : "development",
+        store_environment: payment.environment,
+        analytics_version: 1,
+        revenuecat_event_id: payment.eventId,
+        product_id: payment.product_id,
+        payment_kind: payment.payment_kind,
+        country_code: payment.country_code,
+        revenue_usd: payment.revenue_usd,
+        // Cancellation events only; dropped from the body when absent,
+        // so purchase payloads are unchanged.
+        cancel_reason: payment.cancel_reason,
+        cancel_category: payment.cancel_category,
+      },
+    });
+    if (delivery.status === "delivered") return null;
+    if (delivery.status === "rejected") {
+      throw new Error(`Payment analytics HTTP ${delivery.httpStatus}`);
+    }
+    // A missing token is retried too: the deployment may still be mid-setup,
+    // and the event is worth holding onto until it is.
+    const attempt = args.attempt ?? 0;
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_PAYMENT_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(delayMs, internal.analytics.capturePayment, {
           ...args,
           deliveryId,
-          attempt: attempt + 1,
-        },
-      );
+          attempt: nextAttempt,
+        }),
+    );
+    if (!retried) {
+      throw delivery.status === "unconfigured"
+        ? new Error("Payment analytics is not configured")
+        : (delivery.error ??
+            new Error(`Payment analytics HTTP ${delivery.httpStatus}`));
     }
     return null;
   },
@@ -90,56 +97,46 @@ export const captureSave = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     if (!env.POSTHOG_PROJECT_TOKEN) return null;
-    const eventId = args.eventId ?? randomUUID();
-    try {
-      const host = (env.POSTHOG_HOST ?? "https://us.i.posthog.com").replace(
-        /\/$/,
-        "",
-      );
-      const response = await fetch(`${host}/capture/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(3000),
-        body: JSON.stringify({
-          api_key: env.POSTHOG_PROJECT_TOKEN,
-          event: "item_saved",
-          uuid: eventId,
-          timestamp: new Date(args.savedAt).toISOString(),
-          properties: {
-            distinct_id: args.userId,
-            $process_person_profile: false,
-            item_id: args.itemId,
-            item_type: args.itemType,
-            saved_at: args.savedAt,
-            save_session_id: args.sessionId,
-            photo_count: args.photoCount,
-            stored_bytes: args.storedBytes,
-            environment: env.OBSERVABILITY_ENV ?? "development",
-            analytics_version: 1,
-          },
-        }),
+    const eventId = args.eventId ?? newDeliveryId();
+    const delivery = await deliverPostHogEvent({
+      event: "item_saved",
+      distinctId: args.userId,
+      deliveryId: eventId,
+      timestamp: args.savedAt,
+      properties: {
+        $process_person_profile: false,
+        item_id: args.itemId,
+        item_type: args.itemType,
+        saved_at: args.savedAt,
+        save_session_id: args.sessionId,
+        photo_count: args.photoCount,
+        stored_bytes: args.storedBytes,
+        analytics_version: 1,
+      },
+    });
+    if (delivery.status === "delivered") return null;
+    if (delivery.status === "rejected") {
+      logEvent("warn", "save_telemetry_rejected", {
+        status: delivery.httpStatus,
       });
-      if (response.ok) return null;
-      if (response.status < 500 && response.status !== 429) {
-        console.warn("save_telemetry_rejected", response.status);
-        return null;
-      }
-    } catch {
-      // A delivery failure cannot affect the already committed save.
+      return null;
     }
+    // A delivery failure cannot affect the already committed save.
     const attempt = args.attempt ?? 0;
-    if (attempt < 3) {
-      await ctx.scheduler.runAfter(
-        1000 * 10 ** attempt,
-        internal.analytics.captureSave,
-        {
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_SAVE_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(delayMs, internal.analytics.captureSave, {
           ...args,
-          attempt: attempt + 1,
+          attempt: nextAttempt,
           eventId,
-        },
-      );
-    } else {
-      console.warn("save_telemetry_delivery_failed");
+        }),
+    );
+    if (!retried) {
+      logEvent("warn", "save_telemetry_delivery_failed", {
+        attempts: attempt + 1,
+      });
     }
     return null;
   },

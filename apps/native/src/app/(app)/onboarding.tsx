@@ -1,27 +1,29 @@
-import { BuildingStep } from '@/components/onboarding/building';
-import { LiveDemoStep } from '@/components/onboarding/live-demo';
-import { PermissionsStep } from '@/components/onboarding/permissions';
-import { PromiseStep } from '@/components/onboarding/promise';
-import { ReadyStep } from '@/components/onboarding/ready';
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { t, useAppLocale } from "@/lib/i18n";
+import { BuildingStep } from "@/components/onboarding/building";
+import { LiveDemoStep } from "@/components/onboarding/live-demo";
+import { PermissionsStep } from "@/components/onboarding/permissions";
+import { PromiseStep } from "@/components/onboarding/promise";
+import { ReadyStep } from "@/components/onboarding/ready";
 import {
   SpacePickerStep,
   type SaveKind,
   getSpacePresets,
-} from '@/components/onboarding/space-picker';
-import { SurveyStep } from '@/components/onboarding/survey';
-import type { FeedItem } from '@/components/item-card';
-import { useOnboarding } from '@/lib/onboarding';
+} from "@/components/onboarding/space-picker";
+import { SurveyStep } from "@/components/onboarding/survey";
+import type { FeedItem } from "@/components/item-card";
+import { useOnboarding } from "@/lib/onboarding";
 import {
   getOnboardingProgress,
   setOnboardingProgress,
   setPendingSpaces,
-} from '@/lib/pending-onboarding';
-import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StyleSheet } from 'react-native-unistyles';
-import { analytics } from '@/lib/analytics';
+} from "@/lib/pending-onboarding";
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
+import { analytics } from "@/lib/analytics";
 
 // Onboarding v2 — an 8-step quiz-funnel flow.
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
@@ -49,14 +51,14 @@ const STEPS = {
 type StepIndex = (typeof STEPS)[keyof typeof STEPS];
 
 const STEP_IDS = {
-  [STEPS.promise]: 'promise',
-  [STEPS.surveyQ1]: 'save_pileup',
-  [STEPS.surveyQ2]: 'save_types',
-  [STEPS.spaces]: 'spaces',
-  [STEPS.building]: 'building',
-  [STEPS.demo]: 'live_demo',
-  [STEPS.permissions]: 'permissions',
-  [STEPS.ready]: 'ready',
+  [STEPS.promise]: "promise",
+  [STEPS.surveyQ1]: "save_pileup",
+  [STEPS.surveyQ2]: "save_types",
+  [STEPS.spaces]: "spaces",
+  [STEPS.building]: "building",
+  [STEPS.demo]: "live_demo",
+  [STEPS.permissions]: "permissions",
+  [STEPS.ready]: "ready",
 } as const satisfies Record<(typeof STEPS)[keyof typeof STEPS], string>;
 
 function isStepIndex(value: number): value is StepIndex {
@@ -67,25 +69,25 @@ function isStepIndex(value: number): value is StepIndex {
 // it doesn't seed anything downstream. Kept here (not in the component) because
 // the copy is product-wide, not a presentation detail.
 const Q1_OPTIONS = [
-  'X bookmarks',
-  'Instagram saved',
-  'Screenshots',
-  'Notes app',
-  'Browser tabs',
-  'Everywhere',
+  "X bookmarks",
+  "Instagram saved",
+  "Screenshots",
+  "Notes app",
+  "Browser tabs",
+  "Everywhere",
 ] as const;
 
 // Q2 — "What do you save most?" Each answer is a SaveKind that seeds the space
 // picker presets, so the options here must stay in lockstep with that map.
 const Q2_OPTIONS: readonly SaveKind[] = [
-  'Articles',
-  'Recipes',
-  'Products',
-  'Home & decor',
-  'Travel',
-  'Fitness',
-  'Inspiration',
-  'Videos',
+  "Articles",
+  "Recipes",
+  "Products",
+  "Home & decor",
+  "Travel",
+  "Fitness",
+  "Inspiration",
+  "Videos",
 ];
 
 // The progress bar covers steps 2–7 (survey Q1 through permissions). Promise
@@ -95,6 +97,7 @@ const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
 const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
+  useAppLocale();
   const insets = useSafeAreaInsets();
   const { completeOnboarding } = useOnboarding();
 
@@ -115,7 +118,9 @@ export default function OnboardingScreen() {
   );
   const [q1, setQ1] = useState<string[]>(initialProgress.q1);
   const [q2, setQ2] = useState<SaveKind[]>(
-    initialProgress.q2.filter((value): value is SaveKind => Q2_OPTIONS.some((option) => option === value)),
+    initialProgress.q2.filter((value): value is SaveKind =>
+      Q2_OPTIONS.some((option) => option === value),
+    ),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
@@ -127,7 +132,8 @@ export default function OnboardingScreen() {
   // by the demo step if the user is already authenticated on arrival. Only
   // meaningful while the restored step IS the demo step; anything else is a
   // stale record from an interrupted advance, and finish() drops it.
-  const resumeDemo = initialProgress.step === STEPS.demo ? initialProgress.demo : null;
+  const resumeDemo =
+    initialProgress.step === STEPS.demo ? initialProgress.demo : null;
 
   // Keep the persisted record in lockstep with the visible flow.
   useEffect(() => {
@@ -138,7 +144,7 @@ export default function OnboardingScreen() {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
-    analytics.capture('onboarding_step_viewed', {
+    analytics.capture("onboarding_step_viewed", {
       step_id: STEP_IDS[step],
       step_index: step,
     });
@@ -147,7 +153,7 @@ export default function OnboardingScreen() {
   const recordCurrentStep = useCallback(() => {
     if (trackedStepsRef.current.has(step)) return;
 
-    analytics.capture('onboarding_step_completed', {
+    analytics.capture("onboarding_step_completed", {
       step_id: STEP_IDS[step],
       step_index: step,
       duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
@@ -191,10 +197,10 @@ export default function OnboardingScreen() {
   // replay hook owns both the entitled and paywall paths, so there is one
   // durable completion flow instead of two competing paywall presentations.
   const finish = () => {
-    if (process.env.EXPO_OS === 'ios') {
+    if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    analytics.capture('onboarding_completed', {
+    analytics.capture("onboarding_completed", {
       save_pileup: q1,
       save_types: q2,
       space_count: spaces.length,
@@ -202,7 +208,7 @@ export default function OnboardingScreen() {
       $set: { save_pileup: q1, save_types: q2 },
     });
     recordCurrentStep();
-    setPendingSpaces(spaces);
+    setPendingSpaces(spaces.map(onboardingLabel));
     completeOnboarding();
   };
 
@@ -236,24 +242,24 @@ export default function OnboardingScreen() {
 
           {step === STEPS.surveyQ1 && (
             <SurveyStep
-              headline="Where do your saves pile up today?"
-              support="Be honest — we've seen worse."
+              headline={t("onboarding.pileupQuestion")}
+              support={t("onboarding.pileupHelp")}
               options={Q1_OPTIONS}
               selected={q1}
               onToggle={toggle(setQ1)}
-              ctaLabel="Continue"
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
 
           {step === STEPS.surveyQ2 && (
             <SurveyStep
-              headline="What do you save most?"
-              support="This shapes your shelf."
+              headline={t("onboarding.kindQuestion")}
+              support={t("onboarding.kindHelp")}
               options={Q2_OPTIONS}
               selected={q2}
               onToggle={toggle(setQ2)}
-              ctaLabel="Continue"
+              ctaLabel={t("common.continue")}
               onAdvance={advance}
             />
           )}
@@ -287,7 +293,7 @@ export default function OnboardingScreen() {
 
           {step === STEPS.ready && (
             <ReadyStep
-              spaceNames={spaces}
+              spaceNames={spaces.map(onboardingLabel)}
               demoItem={demoItem}
               onFinish={finish}
             />
@@ -308,7 +314,7 @@ const styles = StyleSheet.create((theme) => ({
     height: 3,
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: theme.gap(2),
   },
   barHidden: {

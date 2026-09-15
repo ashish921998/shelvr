@@ -26,7 +26,9 @@ const demoStatusValidator = v.union(
 );
 
 /** The optional space the user picked for this link; omitted means "just my shelf". */
-function validateDestination(spaceName: string | undefined): string | undefined {
+function validateDestination(
+  spaceName: string | undefined,
+): string | undefined {
   if (spaceName === undefined) return undefined;
   try {
     return validateSpaceName(spaceName);
@@ -45,7 +47,9 @@ async function findOrCreateDynamicSpace(
 ): Promise<Id<"spaces">> {
   const existing = await ctx.db
     .query("spaces")
-    .withIndex("by_user_and_name", (q) => q.eq("userId", userId).eq("name", name))
+    .withIndex("by_user_and_name", (q) =>
+      q.eq("userId", userId).eq("name", name),
+    )
     .first();
   if (existing !== null) {
     return existing._id;

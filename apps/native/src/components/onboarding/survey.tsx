@@ -1,7 +1,9 @@
-import { CtaButton } from '@/components/onboarding/parts';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { onboardingLabel } from "@/lib/onboarding-labels";
+import { useAppLocale } from "@/lib/i18n";
+import { CtaButton } from "@/components/onboarding/parts";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Steps 2 and 3 — the two-question survey. One component, configured by props:
 // the question headline, a supportive sub-line, and the chip options. Selections
@@ -28,14 +30,21 @@ export function SurveyStep<T extends string>({
   ctaLabel: string;
   onAdvance: () => void;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
 
   return (
     <View style={styles.wrap}>
-      <Animated.Text entering={FadeInDown.duration(400)} style={styles.headline}>
+      <Animated.Text
+        entering={FadeInDown.duration(400)}
+        style={styles.headline}
+      >
         {headline}
       </Animated.Text>
-      <Animated.Text entering={FadeInDown.delay(80).duration(400)} style={styles.support}>
+      <Animated.Text
+        entering={FadeInDown.delay(80).duration(400)}
+        style={styles.support}
+      >
         {support}
       </Animated.Text>
 
@@ -57,11 +66,15 @@ export function SurveyStep<T extends string>({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-                  {option}
+                <Text
+                  style={[styles.chipLabel, active && styles.chipLabelActive]}
+                >
+                  {onboardingLabel(option)}
                 </Text>
                 {active && (
-                  <Text style={[styles.check, { color: theme.colors.primary }]}>✓</Text>
+                  <Text style={[styles.check, { color: theme.colors.primary }]}>
+                    ✓
+                  </Text>
                 )}
               </Pressable>
             );
@@ -98,13 +111,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(1),
   },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.gap(1),
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingVertical: theme.gap(1.25),
     paddingHorizontal: theme.gap(2),

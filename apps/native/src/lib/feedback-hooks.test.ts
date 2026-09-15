@@ -1,89 +1,19 @@
 // Tests for the two Home hooks that decide when to ask for feedback. They are
-// effect-only hooks, so a slot-indexed stand-in for React (below) drives them
-// without a renderer: useState/useRef keep values by call order, useEffect
-// diffs deps and runs cleanups, and a setState outside a render re-renders.
+// effect-only hooks, so the shared slot-indexed React stand-in (see
+// src/test/react-stand-in.ts) drives them without a renderer.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readInvitationState, setNativeReviewAttemptInFlight } from "./feedback";
+import {
+  readInvitationState,
+  setNativeReviewAttemptInFlight,
+} from "./feedback";
 import { useFeedbackInvitation } from "./feedback-invitation";
 import { useReviewPrompt } from "./review-prompt";
+import { reactStandIn as react } from "../test/react-stand-in";
 
-const react = vi.hoisted(() => {
-  type EffectSlot = { deps?: unknown[]; cleanup?: () => void };
-  let slots: unknown[] = [];
-  let effectSlots: EffectSlot[] = [];
-  let cursor = 0;
-  let hook: (() => unknown) | undefined;
-  let rendering = false;
-  let dirty = false;
-  const pending: (() => void)[] = [];
-
-  const render = (): unknown => {
-    let result: unknown;
-    rendering = true;
-    do {
-      dirty = false;
-      cursor = 0;
-      result = hook?.();
-      while (pending.length) pending.shift()!();
-    } while (dirty);
-    rendering = false;
-    return result;
-  };
-  const depsChanged = (prev: unknown[] | undefined, next: unknown[] | undefined) =>
-    !prev || !next || prev.length !== next.length || prev.some((value, i) => !Object.is(value, next[i]));
-
-  return {
-    useState<T>(initial: T | (() => T)) {
-      const i = cursor++;
-      if (!(i in slots)) slots[i] = typeof initial === "function" ? (initial as () => T)() : initial;
-      const set = (next: T | ((prev: T) => T)) => {
-        const value = typeof next === "function" ? (next as (prev: T) => T)(slots[i] as T) : next;
-        if (Object.is(value, slots[i])) return;
-        slots[i] = value;
-        if (rendering) dirty = true;
-        else render();
-      };
-      return [slots[i] as T, set] as const;
-    },
-    useRef<T>(initial: T) {
-      const i = cursor++;
-      if (!(i in slots)) slots[i] = { current: initial };
-      return slots[i] as { current: T };
-    },
-    useCallback<T>(callback: T) {
-      return callback;
-    },
-    useEffect(effect: () => void | (() => void), deps?: unknown[]) {
-      const i = cursor++;
-      const prev = slots[i] as EffectSlot | undefined;
-      if (prev && !depsChanged(prev.deps, deps)) return;
-      const slot: EffectSlot = { deps };
-      slots[i] = slot;
-      effectSlots.push(slot);
-      pending.push(() => {
-        prev?.cleanup?.();
-        const cleanup = effect();
-        if (typeof cleanup === "function") slot.cleanup = cleanup;
-      });
-    },
-    mount<T>(run: () => T): T {
-      slots = [];
-      effectSlots = [];
-      hook = run;
-      return render() as T;
-    },
-    rerender<T>(): T {
-      return render() as T;
-    },
-    unmount() {
-      for (const slot of effectSlots) slot.cleanup?.();
-      slots = [];
-      effectSlots = [];
-      hook = undefined;
-    },
-  };
+vi.mock("react", async () => {
+  const { reactStandIn } = await import("../test/react-stand-in");
+  return reactStandIn;
 });
-vi.mock("react", () => react);
 
 const mock = vi.hoisted(() => ({
   appState: { currentState: "active" },
@@ -96,7 +26,12 @@ const mock = vi.hoisted(() => ({
   markNativeReviewPrompted: vi.fn(),
   secure: new Map<string, string>(),
   kv: new Map<string, string>(),
-  posthog: { optedOut: false, isDisabled: false, capture: vi.fn(), flush: vi.fn(async () => undefined) },
+  posthog: {
+    optedOut: false,
+    isDisabled: false,
+    capture: vi.fn(),
+    flush: vi.fn(async () => undefined),
+  },
 }));
 vi.mock("react-native", () => ({
   AppState: Object.assign(mock.appState, {
@@ -104,10 +39,18 @@ vi.mock("react-native", () => ({
   }),
 }));
 vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
-vi.mock("@/lib/current-user", () => ({ useCurrentUser: () => ({ data: mock.user }) }));
-vi.mock("@/lib/entitlement", () => ({ isPaywallPending: () => mock.paywallPending }));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: mock.user }),
+}));
+vi.mock("@/lib/entitlement", () => ({
+  isPaywallPending: () => mock.paywallPending,
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
-vi.mock("@/lib/posthog", () => ({ posthog: mock.posthog }));
+vi.mock("@/lib/posthog", () => ({
+  posthog: mock.posthog,
+  isAnalyticsAvailable: () =>
+    !mock.posthog.isDisabled && !mock.posthog.optedOut,
+}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "development" } } },
 }));
@@ -132,7 +75,9 @@ vi.mock("@/lib/feedback", async (importOriginal) => ({
   markNativeReviewPrompted: mock.markNativeReviewPrompted,
 }));
 
-const item = (overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {}) => ({
+const item = (
+  overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {},
+) => ({
   status: "ready" as const,
   ...overrides,
 });
@@ -204,7 +149,10 @@ describe("useFeedbackInvitation", () => {
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(true);
     expect(readInvitationState("user-1").shownCount).toBe(1);
-    expect(mock.capture).toHaveBeenCalledWith("feedback_invitation_shown", { surface: "home", ready_count: 3 });
+    expect(mock.capture).toHaveBeenCalledWith("feedback_invitation_shown", {
+      surface: "home",
+      ready_count: 3,
+    });
   });
 
   it("waits out a pending native review check so both prompts cannot appear together", () => {
@@ -226,6 +174,21 @@ describe("useFeedbackInvitation", () => {
     vi.advanceTimersByTime(2000);
     expect(react.rerender<Result>().invitationVisible).toBe(true);
     expect(readInvitationState("user-1").shownCount).toBe(1);
+  });
+
+  it("defers its one-shot claim while the cancel survey owns the Home moment", () => {
+    const items = threeReady();
+    react.mount(() => useFeedbackInvitation(items, { defer: true }));
+
+    // Long past the settle delay — no claim, no shown event, no gate burn.
+    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000);
+    expect(react.rerender<Result>().invitationVisible).toBe(false);
+    expect(readInvitationState("user-1").shownCount).toBe(0);
+    expect(mock.capture).not.toHaveBeenCalledWith(
+      "feedback_invitation_shown",
+      expect.anything(),
+    );
   });
 
   it("clears the paywall poll on unmount", () => {
@@ -251,9 +214,12 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).toHaveBeenCalledOnce();
     expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
     expect(mock.markNativeReviewPrompted).toHaveBeenCalledOnce();
-    expect(mock.capture).toHaveBeenCalledWith("review_prompted", { ready_count: 3 });
-    expect(mock.markNativeReviewPrompted.mock.invocationCallOrder[0])
-      .toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
+    expect(mock.capture).toHaveBeenCalledWith("review_prompted", {
+      ready_count: 3,
+    });
+    expect(
+      mock.markNativeReviewPrompted.mock.invocationCallOrder[0],
+    ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
   });
 
   it("records nothing when a guard fails after hasAction() resolves, and retries later", async () => {

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [".design-sync/**"],
+  "workspaces": {
+    "apps/native": {
+      "entry": [
+        "index.ts",
+        "src/app/**/*.{ts,tsx}",
+        "src/**/*.test.{ts,tsx}",
+        "src/widgets/recent-saves-widget.tsx",
+        "src/lib/revenuecat-api-key*.ts",
+        "convex/**/*.ts",
+        "modules/*/index.{ts,tsx}",
+        "babel.config.js",
+        "metro.config.js",
+        "generateKeys.mjs",
+        "goldie/goldie.config.ts",
+        "plugins/with-widget-localization.js"
+      ],
+      "project": ["**/*.{js,mjs,ts,tsx}"],
+      "ignore": ["convex/_generated/**"]
+    },
+    "apps/web": {
+      "entry": ["src/app/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["tailwindcss"]
+    },
+    ".": {
+      "entry": ["tools/generate-localizations.mjs"],
+      "project": ["tools/**/*.mjs"]
+    }
+  }
+}

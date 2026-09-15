@@ -1,4 +1,5 @@
-import { posthog } from "@/lib/posthog";
+import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
+import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -15,7 +16,7 @@ type ItemProperties = {
   item_age_ms: number;
 };
 
-export type ItemAction =
+type ItemAction =
   | "copy"
   | "share"
   | "share_sheet_opened"
@@ -25,11 +26,12 @@ export type ItemAction =
   | "call"
   | "email"
   | "message"
-  | "calendar_sheet_opened";
+  | "calendar_sheet_opened"
+  | "note_edited";
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
-export type AnalyticsEventProperties = {
+type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
     step_id: string;
@@ -76,6 +78,14 @@ export type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
+  // Fired only when a bulk import created at least one link.
+  links_imported: {
+    url_count: number;
+    created: number;
+    skipped: number;
+    invalid: number;
+    not_processed: number;
+  };
   // Photo saves fail as data, never as thrown errors, so error tracking never
   // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };
@@ -119,9 +129,19 @@ export type AnalyticsEventProperties = {
   onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
+  // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
+  // never free text. A response is stated intent, NOT proof of cancellation —
+  // only the server-side webhook events (trial_cancelled, …) count as
+  // cancellations; funnels must never divide by survey responses.
+  cancel_survey_shown: Record<string, never>;
+  cancel_survey_dismissed: Record<string, never>;
+  cancel_survey_submitted: {
+    reason: CancelSurveyReason;
+    survey_source: "next_visit_card";
+  };
 };
 
-export type AnalyticsEvent = keyof AnalyticsEventProperties;
+type AnalyticsEvent = keyof AnalyticsEventProperties;
 
 function capture<Event extends AnalyticsEvent>(
   event: Event,
@@ -137,6 +157,54 @@ function capture<Event extends AnalyticsEvent>(
     });
   } catch {
     // Analytics must never change the outcome of a product action.
+  }
+}
+
+const SAFE_ERROR_NAMES = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+  "AbortError",
+]);
+
+function captureError(
+  event: string,
+  error: unknown,
+  properties: Record<string, string | number | boolean> = {},
+): void {
+  // Custom names, messages, and stacks can contain user content. Only a
+  // known error type is safe for console diagnostics without PostHog.
+  const errorType =
+    error instanceof Error
+      ? SAFE_ERROR_NAMES.has(error.name)
+        ? error.name
+        : "Error"
+      : "Unknown";
+  console.error(event, { error_type: errorType });
+  if (!posthog) return;
+
+  try {
+    const original = error instanceof Error ? error : new Error(typeof error);
+    const reported =
+      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+        ? original
+        : Object.assign(new Error(original.name), {
+            name: original.name,
+            stack: original.stack,
+          });
+    posthog.captureException(reported, {
+      ...properties,
+      error_event: event,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Error reporting must never mask or replace the original failure.
   }
 }
 
@@ -210,6 +278,7 @@ function screen(route: string): void {
 
 export const analytics = {
   capture,
+  captureError,
   identify,
   reset,
   sessionId,

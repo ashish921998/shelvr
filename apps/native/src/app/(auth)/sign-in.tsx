@@ -1,7 +1,8 @@
-import { LEGAL_URLS } from '@/lib/legal';
-import { useOAuthSignIn } from '@/lib/oauth-sign-in';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import * as React from 'react';
+import { t, useAppLocale } from "@/lib/i18n";
+import { LEGAL_URLS } from "@/lib/legal";
+import { useOAuthSignIn } from "@/lib/oauth-sign-in";
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as React from "react";
 import {
   Linking,
   Platform,
@@ -9,8 +10,8 @@ import {
   Text,
   useColorScheme,
   View,
-} from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 /**
  * Convex Auth OAuth sign-in (React Native). The flow lives in
@@ -20,29 +21,34 @@ import { StyleSheet } from 'react-native-unistyles';
  * Anonymous is enabled on the deployment (AUTH_ENABLE_ANONYMOUS=true).
  */
 export default function Page() {
-  const { signInWith: handleOAuth, pendingProvider: pending, lastError } = useOAuthSignIn();
+  useAppLocale();
+  const {
+    signInWith: handleOAuth,
+    pendingProvider: pending,
+    lastError,
+  } = useOAuthSignIn();
   const colorScheme = useColorScheme();
 
   const anonEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === 'true';
+    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
 
   return (
     <View style={styles.container}>
       <View style={styles.center}>
         <View style={styles.header}>
           <Text style={styles.title}>shelvr</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
         </View>
 
         <View style={styles.buttons}>
-          {Platform.OS === 'ios' ? (
+          {Platform.OS === "ios" ? (
             <AppleAuthentication.AppleAuthenticationButton
               testID="apple-sign-in-button"
               buttonType={
                 AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
               }
               buttonStyle={
-                colorScheme === 'dark'
+                colorScheme === "dark"
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
@@ -51,8 +57,8 @@ export default function Page() {
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
               ]}
-              pointerEvents={pending !== null ? 'none' : 'auto'}
-              onPress={() => handleOAuth('apple')}
+              pointerEvents={pending !== null ? "none" : "auto"}
+              onPress={() => handleOAuth("apple")}
             />
           ) : (
             <Pressable
@@ -61,11 +67,11 @@ export default function Page() {
                 pending !== null && styles.buttonDisabled,
                 pressed && styles.buttonPressed,
               ]}
-              onPress={() => handleOAuth('apple')}
+              onPress={() => handleOAuth("apple")}
               disabled={pending !== null}
             >
               <Text style={styles.appleFallbackButtonText}>
-                Continue with Apple
+                {t("account.apple")}
               </Text>
             </Pressable>
           )}
@@ -75,10 +81,10 @@ export default function Page() {
               pending !== null && styles.buttonDisabled,
               pressed && styles.buttonPressed,
             ]}
-            onPress={() => handleOAuth('google')}
+            onPress={() => handleOAuth("google")}
             disabled={pending !== null}
           >
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
+            <Text style={styles.googleButtonText}>{t("account.google")}</Text>
           </Pressable>
           {anonEnabled && (
             <Pressable
@@ -88,31 +94,38 @@ export default function Page() {
                 pending !== null && styles.buttonDisabled,
                 pressed && styles.buttonPressed,
               ]}
-              onPress={() => handleOAuth('anonymous')}
+              onPress={() => handleOAuth("anonymous")}
               disabled={pending !== null}
             >
-              <Text style={styles.devButtonText}>Continue without account</Text>
+              <Text style={styles.devButtonText}>{t("account.anonymous")}</Text>
             </Pressable>
           )}
         </View>
       </View>
 
       <Text style={styles.terms}>
-        By continuing you agree to our{' '}
-        <Text
-          style={styles.termsLink}
-          onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
-        >
-          Terms
-        </Text>{' '}
-        and acknowledge our{' '}
-        <Text
-          style={styles.termsLink}
-          onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
-        >
-          Privacy Policy
-        </Text>
-        .
+        {t("legal.consent", {
+          terms: "\uE000",
+          privacy: "\uE001",
+        })
+          .split(/(\uE000|\uE001)/)
+          .map((part, index) => {
+            if (part !== "\uE000" && part !== "\uE001") return part;
+            const isTerms = part === "\uE000";
+            return (
+              <Text
+                key={index}
+                style={styles.termsLink}
+                onPress={() =>
+                  void Linking.openURL(
+                    isTerms ? LEGAL_URLS.terms : LEGAL_URLS.privacy,
+                  )
+                }
+              >
+                {t(isTerms ? "legal.termsShort" : "legal.privacy")}
+              </Text>
+            );
+          })}
       </Text>
 
       {lastError !== null && (
@@ -129,17 +142,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     padding: theme.gap(2.5),
     paddingTop: rt.insets.top + theme.gap(3),
     paddingBottom: rt.insets.bottom + theme.gap(2),
-    alignItems: 'center',
+    alignItems: "center",
   },
   center: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'stretch',
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
     gap: theme.gap(8),
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: theme.gap(1),
   },
   title: {
@@ -153,18 +166,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.muted,
   },
   buttons: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: theme.gap(2),
   },
   appleButton: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     height: 52,
   },
   appleFallbackButton: {
     backgroundColor: theme.colors.foreground,
     paddingVertical: theme.gap(2),
     borderRadius: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   appleFallbackButtonText: {
     color: theme.colors.background,
@@ -177,7 +190,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
     paddingVertical: theme.gap(2),
     borderRadius: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   googleButtonText: {
     color: theme.colors.foreground,
@@ -185,9 +198,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 16,
   },
   devButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     paddingVertical: theme.gap(1.25),
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: theme.gap(0.5),
   },
   devButtonText: {
@@ -200,14 +213,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 12,
     lineHeight: 17,
     color: theme.colors.faint,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: theme.gap(4),
     marginBottom: theme.gap(2),
   },
   termsLink: {
     fontFamily: theme.fonts.medium,
     color: theme.colors.muted,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   error: {
     marginTop: 16,

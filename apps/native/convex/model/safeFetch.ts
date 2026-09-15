@@ -25,7 +25,7 @@
  *      resolved addresses.
  *
  * This file imports undici (node:net/node:tls), so its tests MUST run under the
- * vitest Node environment — NOT @vitest-environment edge-runtime.
+ * Vitest Node environment rather than the edge runtime.
  */
 "use node";
 
@@ -34,7 +34,11 @@ import type BodyReadable from "undici/types/readable";
 import { lookup as dnsLookup } from "node:dns/promises";
 import type { LookupAddress } from "node:dns";
 import ipaddr from "ipaddr.js";
-import { normalizeExternalUrl, isUrlPolicyError, type UrlPolicyError } from "./externalUrl";
+import {
+  normalizeExternalUrl,
+  isUrlPolicyError,
+  type UrlPolicyError,
+} from "./externalUrl";
 
 // ---------------------------------------------------------------------------
 // Policy error type
@@ -161,7 +165,11 @@ export type DnsResolver = (
 export const DNS_LOOKUP_TIMEOUT_MS = 8000;
 
 /** Race a promise against a timeout, rejecting with a coded error on expiry. */
-function withTimeout<T>(promise: Promise<T>, ms: number, code: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  code: string,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -218,7 +226,9 @@ export function makeValidatingLookup(resolver: DnsResolver) {
     }
     if (addresses.length === 0) {
       callback(
-        Object.assign(new Error("no DNS answers"), { code: "ENOTFOUND" }) as NodeJS.ErrnoException,
+        Object.assign(new Error("no DNS answers"), {
+          code: "ENOTFOUND",
+        }) as NodeJS.ErrnoException,
         "",
         4,
       );
@@ -228,10 +238,9 @@ export function makeValidatingLookup(resolver: DnsResolver) {
     // a mixed set. This defeats DNS rebinding that returns a public + private.
     for (const a of addresses) {
       if (!isPublicAddress(a.address)) {
-        const err = Object.assign(
-          new Error("blocked private destination"),
-          { code: "ECONNREFUSED" },
-        ) as NodeJS.ErrnoException;
+        const err = Object.assign(new Error("blocked private destination"), {
+          code: "ECONNREFUSED",
+        }) as NodeJS.ErrnoException;
         callback(err, "", 4);
         return;
       }
@@ -250,7 +259,9 @@ export function makeValidatingLookup(resolver: DnsResolver) {
 }
 
 /** Build a production undici Agent whose connections use the validating lookup. */
-export function makeSafeDispatcher(resolver: DnsResolver = defaultResolver): Dispatcher {
+export function makeSafeDispatcher(
+  resolver: DnsResolver = defaultResolver,
+): Dispatcher {
   // undici forwards connect options to net.connect/tls.connect, so `lookup`
   // here is the resolver used when establishing the socket.
   return new Agent({
@@ -348,7 +359,10 @@ async function readBounded(
   let total = 0;
   for await (const chunk of body as unknown as AsyncIterable<Buffer>) {
     if (signal.aborted) {
-      throw new SafeFetchErrorClass("timeout", "deadline exceeded while reading body");
+      throw new SafeFetchErrorClass(
+        "timeout",
+        "deadline exceeded while reading body",
+      );
     }
     total += chunk.length;
     if (total > maxBytes) {
@@ -362,13 +376,19 @@ async function readBounded(
         // signal so a deadline that fires during the dump is surfaced as a
         // timeout instead of a successful truncated result.
         if (signal.aborted) {
-          throw new SafeFetchErrorClass("timeout", "deadline exceeded while draining overflow");
+          throw new SafeFetchErrorClass(
+            "timeout",
+            "deadline exceeded while draining overflow",
+          );
         }
         return new Uint8Array(Buffer.concat(chunks));
       }
       // Over cap in error mode: cancel the body by dumping the remainder.
       await safeDump(body);
-      throw new SafeFetchErrorClass("response_too_large", "body exceeded max bytes");
+      throw new SafeFetchErrorClass(
+        "response_too_large",
+        "body exceeded max bytes",
+      );
     }
     chunks.push(chunk);
   }
@@ -401,6 +421,71 @@ export async function safeFetch(
       return { ok: false, code: "fetch_failed" };
     },
   );
+}
+
+/** Resolve one 3xx hop. Location is mandatory; relative targets are resolved
+ * against the current URL and re-run through the full URL policy (scheme,
+ * credentials, port, length), and IP-literal destinations are re-checked (a
+ * public page can redirect to a private IP literal). Throws on redirect
+ * limit, missing Location, policy-rejected targets, and private literals. */
+function followRedirect(
+  response: Dispatcher.ResponseData,
+  currentUrl: string,
+  redirectsDone: number,
+  maxRedirects: number,
+): string {
+  if (redirectsDone >= maxRedirects) {
+    throw new SafeFetchErrorClass("redirect_limit", "too many redirects");
+  }
+  const location = response.headers["location"];
+  if (typeof location !== "string" || location === "") {
+    throw new SafeFetchErrorClass("fetch_failed", "redirect without Location");
+  }
+  let nextUrl: string;
+  try {
+    nextUrl = normalizeExternalUrl(new URL(location, currentUrl).toString());
+  } catch (e) {
+    if (isUrlPolicyError(e)) {
+      throw new SafeFetchErrorClass(
+        e.code,
+        "redirect target rejected by url policy",
+      );
+    }
+    throw new SafeFetchErrorClass("fetch_failed", "invalid redirect target");
+  }
+  try {
+    assertHostAllowed(nextUrl);
+  } catch (e) {
+    if (isSafeFetchError(e)) {
+      throw e;
+    }
+    throw new SafeFetchErrorClass(
+      "blocked_destination",
+      "redirect target rejected",
+    );
+  }
+  return nextUrl;
+}
+
+/** Pre-check a declared Content-Length against the cap before streaming.
+ * Skipped in truncate mode — the reader stops at maxBytes and returns the
+ * prefix instead of failing. */
+async function rejectOversizeContentLength(
+  response: Dispatcher.ResponseData,
+  maxBytes: number,
+): Promise<void> {
+  const declared = response.headers["content-length"];
+  if (typeof declared !== "string") {
+    return;
+  }
+  const len = Number(declared);
+  if (Number.isFinite(len) && len > maxBytes) {
+    await safeDump(response.body);
+    throw new SafeFetchErrorClass(
+      "response_too_large",
+      "content-length over cap",
+    );
+  }
 }
 
 async function safeFetchThrowing(
@@ -439,48 +524,24 @@ async function safeFetchThrowing(
       if (ac.signal.aborted) {
         throw new SafeFetchErrorClass("timeout", "deadline exceeded");
       }
-      const response = await dispatch(dispatcher, currentUrl, headers, ac.signal);
+      const response = await dispatch(
+        dispatcher,
+        currentUrl,
+        headers,
+        ac.signal,
+      );
       // The response body must always be consumed or cancelled. We either
       // follow a redirect (cancel body, continue), error (cancel body, throw),
       // or return (read bounded body).
       if (response.statusCode >= 300 && response.statusCode < 400) {
         await safeDump(response.body);
-        if (redirects >= maxRedirects) {
-          throw new SafeFetchErrorClass("redirect_limit", "too many redirects");
-        }
-        const location = response.headers["location"];
-        if (typeof location !== "string" || location === "") {
-          throw new SafeFetchErrorClass("fetch_failed", "redirect without Location");
-        }
-        // Resolve relative Location against the current URL, then re-run full
-        // URL policy (scheme, credentials, port, length).
-        let nextUrl: string;
-        try {
-          nextUrl = normalizeExternalUrl(new URL(location, currentUrl).toString());
-        } catch (e) {
-          if (isUrlPolicyError(e)) {
-            throw new SafeFetchErrorClass(
-              e.code,
-              "redirect target rejected by url policy",
-            );
-          }
-          throw new SafeFetchErrorClass("fetch_failed", "invalid redirect target");
-        }
-        // Re-check IP-literal destinations on the redirect target too (a public
-        // page can redirect to a private IP literal).
-        try {
-          assertHostAllowed(nextUrl);
-        } catch (e) {
-          if (isSafeFetchError(e)) {
-            throw e;
-          }
-          throw new SafeFetchErrorClass(
-            "blocked_destination",
-            "redirect target rejected",
-          );
-        }
+        currentUrl = followRedirect(
+          response,
+          currentUrl,
+          redirects,
+          maxRedirects,
+        );
         redirects++;
-        currentUrl = nextUrl;
         continue;
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -507,16 +568,14 @@ async function safeFetchThrowing(
       // Skip this pre-check in truncate mode — the reader will stop at maxBytes
       // and return the prefix instead of failing.
       if (onOverflow === "error") {
-        const declared = response.headers["content-length"];
-        if (typeof declared === "string") {
-          const len = Number(declared);
-          if (Number.isFinite(len) && len > maxBytes) {
-            await safeDump(response.body);
-            throw new SafeFetchErrorClass("response_too_large", "content-length over cap");
-          }
-        }
+        await rejectOversizeContentLength(response, maxBytes);
       }
-      const bytes = await readBounded(response.body, maxBytes, ac.signal, onOverflow);
+      const bytes = await readBounded(
+        response.body,
+        maxBytes,
+        ac.signal,
+        onOverflow,
+      );
       return {
         finalUrl: currentUrl,
         status: response.statusCode,
@@ -575,7 +634,11 @@ async function dispatch(
     // (ECONNRESET, EHOSTUNREACH, etc.) is reported as fetch_failed instead.
     // Check this before signal.aborted: under a near-simultaneous block + abort,
     // a genuinely blocked destination should be reported as such, not as timeout.
-    if (err !== null && typeof err === "object" && err.code === "ECONNREFUSED") {
+    if (
+      err !== null &&
+      typeof err === "object" &&
+      err.code === "ECONNREFUSED"
+    ) {
       throw new SafeFetchErrorClass("blocked_destination", "request failed");
     }
     if (signal.aborted) {
@@ -642,10 +705,10 @@ const WINDOWS_1252_LABELS = new Set([
  * index-single-byte visualization does.
  */
 const WINDOWS_1252_C1: readonly number[] = [
-  0x20ac, 0x0081, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021,
-  0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008d, 0x017d, 0x008f,
-  0x0090, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
-  0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x009d, 0x017e, 0x0178,
+  0x20ac, 0x0081, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6,
+  0x2030, 0x0160, 0x2039, 0x0152, 0x008d, 0x017d, 0x008f, 0x0090, 0x2018,
+  0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161,
+  0x203a, 0x0153, 0x009d, 0x017e, 0x0178,
 ];
 
 /** Decode windows-1252 bytes. Every byte maps to exactly one code point, so

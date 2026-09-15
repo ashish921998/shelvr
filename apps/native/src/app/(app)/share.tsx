@@ -1,10 +1,17 @@
+import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import {
   classifyEntries,
   processSession,
-  resolvedFromRawPayloads,
   type ResolvedPayload,
   type ShareSaveDeps,
-} from '@/lib/share/process-share';
+} from "@/lib/share/process-share";
+import {
+  countPartial,
+  countProgress,
+  hasRetryableEntries,
+  selectProcessorPayloads,
+  withEntry,
+} from "@/lib/share/session-view";
 import {
   deleteSession,
   loadSession,
@@ -15,17 +22,17 @@ import {
   type SessionStoreAdapter,
   type ShareEntry,
   type ShareSession,
-} from '@/lib/share/storage';
-import { clearPendingShareOnDevice } from '@/lib/share/pending-share-store';
-import { useSaveImages } from '@/lib/use-save-image';
-import { analytics } from '@/lib/analytics';
-import { openPaywall, useEntitlement } from '@/lib/entitlement';
-import { useCurrentUser } from '@/lib/current-user';
-import { api } from '@convex/_generated/api';
-import { useMutation } from 'convex/react';
-import * as Crypto from 'expo-crypto';
-import { useRouter } from 'expo-router';
-import { useIncomingShare } from 'expo-sharing';
+} from "@/lib/share/storage";
+import { clearPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { useSaveImages } from "@/lib/use-save-image";
+import { analytics } from "@/lib/analytics";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import { useCurrentUser } from "@/lib/current-user";
+import { api } from "@convex/_generated/api";
+import { useMutation } from "convex/react";
+import * as Crypto from "expo-crypto";
+import { useRouter } from "expo-router";
+import { useIncomingShare } from "expo-sharing";
 import {
   useCallback,
   useEffect,
@@ -33,23 +40,23 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from 'react';
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
   View,
-} from 'react-native';
-import { createMMKV } from 'react-native-mmkv';
-import Animated, { Keyframe, useReducedMotion } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+} from "react-native";
+import { createMMKV } from "react-native-mmkv";
+import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   EASE_OUT,
   EASE_OUT_CSS,
   REDUCED_FADE_IN,
   REDUCED_FADE_OUT,
-} from '@/lib/motion';
+} from "@/lib/motion";
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -70,7 +77,7 @@ import {
 // Dedicated MMKV instance for the one share session record. The adapter
 // interface lives in storage.ts so its reconciliation rules stay pure and
 // unit-testable with a Map; only this native binding is owned here.
-const shareStore: SessionStoreAdapter = createMMKV({ id: 'incoming-share' });
+const shareStore: SessionStoreAdapter = createMMKV({ id: "incoming-share" });
 
 const PHASE_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 6 }] },
@@ -108,14 +115,15 @@ const PHASE_EXIT = new Keyframe({
  * through to the terminal "Saved to Shelvr" spinner (which would otherwise
  * claim a save that never happened). */
 type Phase =
-  | { kind: 'idle' }
-  | { kind: 'locked' }
-  | { kind: 'saving'; session: ShareSession }
-  | { kind: 'partial'; session: ShareSession }
-  | { kind: 'clearFailed'; session: ShareSession }
-  | { kind: 'complete' };
+  | { kind: "idle" }
+  | { kind: "locked" }
+  | { kind: "saving"; session: ShareSession }
+  | { kind: "partial"; session: ShareSession }
+  | { kind: "clearFailed"; session: ShareSession }
+  | { kind: "complete" };
 
 export default function ShareScreen() {
+  useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
@@ -131,7 +139,7 @@ export default function ShareScreen() {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
 
-  const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   // The session id currently being saved, set when a run starts and cleared when
   // it settles. A NEW share arriving mid-flight replaces the persisted record;
   // this id lets persistEntry/completeSession no-op against that newer session
@@ -149,37 +157,48 @@ export default function ShareScreen() {
    * "Retry failed" press share this so the deps object is never rebuilt. */
   const saveDeps = useMemo<ShareSaveDeps>(
     () => ({
-      saveLink: ({ url, operationId }) => createLinkItem({ url, operationId, analyticsSessionId: analytics.sessionId() }),
+      saveLink: ({ url, operationId }) =>
+        createLinkItem({
+          url,
+          operationId,
+          analyticsSessionId: analytics.sessionId(),
+        }),
       saveNote: ({ text, operationId }) =>
-        createNoteItem({ text, operationId, analyticsSessionId: analytics.sessionId() }),
+        createNoteItem({
+          text,
+          operationId,
+          analyticsSessionId: analytics.sessionId(),
+        }),
       saveImage: ({ image, operationId }) =>
         saveImages([{ image, operationId }]).then((results) => results[0]),
     }),
     [createLinkItem, createNoteItem, saveImages],
   );
 
-  /** The payload list the processor runs against. Normal path: the natively
-   * resolved payloads. When resolution failed or its results no longer align
-   * with the raw payloads — the resolver probes shared URLs with a live
-   * request, so bot-hostile hosts (TikTok) can fail the whole resolution —
-   * fall back to the raw payloads: for url/text shares the raw value is
-   * everything the save needs, and entries the fallback cannot resolve
-   * (images) are reported as failed entries instead of killing the share. */
-  const processorPayloads = useMemo<ResolvedPayload[]>(() => {
-    if (
-      error === null &&
-      resolvedSharedPayloads.length === sharedPayloads.length
-    ) {
-      return toResolved(resolvedSharedPayloads);
-    }
-    return resolvedFromRawPayloads(
+  /** The raw payload batch, narrowed to the identity-bearing fields the session
+   * store and the processor's fallback read. Memoized because both the
+   * processor payloads and the reconcile effect run against the same list. */
+  const rawPayloads = useMemo<RawSharePayload[]>(
+    () =>
       sharedPayloads.map((p) => ({
         value: p.value,
         shareType: p.shareType,
         mimeType: p.mimeType,
       })),
-    );
-  }, [error, resolvedSharedPayloads, sharedPayloads]);
+    [sharedPayloads],
+  );
+
+  /** The payload list the processor runs against (see selectProcessorPayloads
+   * for the resolution-failure fallback). */
+  const processorPayloads = useMemo<ResolvedPayload[]>(
+    () =>
+      selectProcessorPayloads({
+        resolutionError: error,
+        resolved: resolvedSharedPayloads,
+        raw: rawPayloads,
+      }),
+    [error, rawPayloads, resolvedSharedPayloads],
+  );
 
   /** The single idempotent completion path used by all-success, continue, AND
    * cancel. Cancel reuses it deliberately so the same persist-complete → native
@@ -204,12 +223,9 @@ export default function ShareScreen() {
         //    delete, no navigation) and surfaces clearFailed for a manual retry.
         clearSharedPayloads();
       } catch (err) {
-        console.error(
-          'clearSharedPayloads threw during completion; surfacing retry',
-          err,
-        );
+        analytics.captureError("clear_shared_payloads_failed", err);
         completingSessionId.current = null;
-        setPhase({ kind: 'clearFailed', session });
+        setPhase({ kind: "clearFailed", session });
         return;
       }
       // 3. Delete the local session ONLY after a successful clear — otherwise a
@@ -225,16 +241,16 @@ export default function ShareScreen() {
       } catch (err) {
         // The share is already complete; a SecureStore failure must not trap
         // the user on this screen or prevent navigation home.
-        console.error('Could not clear pending share marker', err);
+        analytics.captureError("clear_pending_share_failed", err);
       }
       // 4. Navigate Home exactly once.
-      if (session.entries.every((entry) => entry.status === 'saved')) {
-        analytics.capture('shared_content_saved', {
+      if (session.entries.every((entry) => entry.status === "saved")) {
+        analytics.capture("shared_content_saved", {
           item_count: session.entries.length,
         });
       }
-      setPhase({ kind: 'complete' });
-      router.replace('/');
+      setPhase({ kind: "complete" });
+      router.replace("/");
     },
     [clearSharedPayloads, router],
   );
@@ -257,8 +273,8 @@ export default function ShareScreen() {
       // the locked phase BEFORE presenting so a cancel lands on the explicit
       // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
       if (!entitled) {
-        setPhase({ kind: 'locked' });
-        void openPaywall(router, 'share');
+        setPhase({ kind: "locked" });
+        void openPaywall(router, "share");
         return;
       }
       runningSessionId.current = session.sessionId;
@@ -272,19 +288,19 @@ export default function ShareScreen() {
         // persisting terminal statuses so a crash before any save still records
         // failed/unsupported entries on remount. Scoped to this session so a
         // newer session that replaced the record mid-flight is not corrupted.
-        const fresh = session.entries.every((e) => e.status === 'pending');
+        const fresh = session.entries.every((e) => e.status === "pending");
         let working = session;
         if (fresh) {
           const classified = classifyEntries(session, resolved);
           working = { ...session, entries: classified };
           for (const entry of classified) {
-            if (entry.status !== 'pending') {
+            if (entry.status !== "pending") {
               persistEntry(entry, sid);
             }
           }
         }
 
-        setPhase({ kind: 'saving', session: working });
+        setPhase({ kind: "saving", session: working });
 
         const result = await processSession(
           working,
@@ -295,14 +311,14 @@ export default function ShareScreen() {
             // Reflect incremental progress: update the saving phase's session so
             // "Saved N of M" advances as each entry settles, not just at the end.
             setPhase((prev) =>
-              prev.kind === 'saving' && prev.session.sessionId === sid
-                ? { kind: 'saving', session: withEntry(prev.session, entry) }
+              prev.kind === "saving" && prev.session.sessionId === sid
+                ? { kind: "saving", session: withEntry(prev.session, entry) }
                 : prev,
             );
           },
         );
 
-        const allSaved = result.entries.every((e) => e.status === 'saved');
+        const allSaved = result.entries.every((e) => e.status === "saved");
         if (allSaved) {
           completeSession(result);
         } else {
@@ -310,7 +326,7 @@ export default function ShareScreen() {
           // Mark this session partial-settled so the effect won't auto-restart
           // it; only the Retry button re-runs it.
           partialSessionId.current = sid;
-          setPhase({ kind: 'partial', session: result });
+          setPhase({ kind: "partial", session: result });
         }
       } catch (err) {
         // processSession catches per-entry save failures as data, so an
@@ -318,10 +334,10 @@ export default function ShareScreen() {
         // Reload whatever survived from the store and route to the partial phase
         // so the user gets retry/continue/cancel — never an eternal "Saving…"
         // spinner (the plan's "never spin forever" done criterion).
-        console.error('Share save orchestration failed', err);
+        analytics.captureError("share_save_failed", err);
         const live = loadSession(shareStore);
         partialSessionId.current = sid;
-        setPhase({ kind: 'partial', session: live ?? session });
+        setPhase({ kind: "partial", session: live ?? session });
       } finally {
         // Only clear the run guard if this run is still the active one — a newer
         // session may have started (the effect allows a new run once the old
@@ -352,21 +368,15 @@ export default function ShareScreen() {
       return;
     }
 
-    const raw: RawSharePayload[] = sharedPayloads.map((p) => ({
-      value: p.value,
-      shareType: p.shareType,
-      mimeType: p.mimeType,
-    }));
-
-    const reconciled = reconcileSession(shareStore, userId, raw, () =>
+    const reconciled = reconcileSession(shareStore, userId, rawPayloads, () =>
       Crypto.randomUUID(),
     );
 
-    if (reconciled.kind === 'empty') {
+    if (reconciled.kind === "empty") {
       // No payloads resolved to anything saveable; render's empty branch covers it.
       return;
     }
-    if (reconciled.kind === 'clear') {
+    if (reconciled.kind === "clear") {
       // A previously-completed session matches: clear native payloads and leave.
       // Deferred out of the synchronous effect body so completeSession's
       // setState does not trigger a cascading render.
@@ -400,6 +410,7 @@ export default function ShareScreen() {
   }, [
     user,
     sharedPayloads,
+    rawPayloads,
     processorPayloads,
     isResolving,
     saveDeps,
@@ -413,7 +424,7 @@ export default function ShareScreen() {
   // the raw payloads (see processorPayloads) and entries the fallback cannot
   // resolve surface as failed entries on the partial screen.
   const nothingResolved =
-    !isResolving && sharedPayloads.length === 0 && phase.kind === 'idle';
+    !isResolving && sharedPayloads.length === 0 && phase.kind === "idle";
 
   // --- Phase render ---------------------------------------------------------
 
@@ -430,14 +441,14 @@ export default function ShareScreen() {
     } catch (err) {
       // Best-effort: abandoning the share must still clear native payloads and
       // leave the screen if SecureStore is temporarily unavailable.
-      console.error('Could not clear pending share marker', err);
+      analytics.captureError("clear_pending_share_failed", err);
     }
     try {
       clearSharedPayloads();
     } catch {
       // best-effort; the share extension has nothing durable to lose here
     }
-    router.replace('/');
+    router.replace("/");
   }, [clearSharedPayloads, router]);
 
   // --- Phase render ---------------------------------------------------------
@@ -445,11 +456,11 @@ export default function ShareScreen() {
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
   // until it resolves.
-  if (entitlementLoading && phase.kind === 'idle') {
+  if (entitlementLoading && phase.kind === "idle") {
     return (
       <Centered
         phaseKey="checking-entitlement"
-        label="Checking subscription…"
+        label={t("pro.checking")}
         spinner
         theme={theme}
       />
@@ -459,22 +470,23 @@ export default function ShareScreen() {
   // Pro gate: an unentitled user sharing into Shelvr reached the paywall and
   // (on cancel) landed here. Do NOT fall through to the terminal "Saved to
   // Shelvr" spinner — the save never happened. Offer Unlock Pro or Cancel.
-  if (phase.kind === 'locked') {
+  if (phase.kind === "locked") {
     return (
       <PhaseSurface key="locked" phaseKey="locked">
-        <Text style={styles.title(theme)}>Unlock Shelvr Pro</Text>
-        <Text style={styles.subtitle(theme)}>
-          Saving shared content is a Pro feature. View Shelvr Pro plans to save
-          it to your hub.
-        </Text>
+        <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
+        <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
         <View style={styles.actions}>
-          <Button label="Cancel" theme={theme} onPress={() => abandon()} />
           <Button
-            label="Unlock Pro"
+            label={t("common.cancel")}
+            theme={theme}
+            onPress={() => abandon()}
+          />
+          <Button
+            label={t("pro.unlock")}
             theme={theme}
             primary
             onPress={() => {
-              void openPaywall(router, 'share');
+              void openPaywall(router, "share");
             }}
           />
         </View>
@@ -485,11 +497,11 @@ export default function ShareScreen() {
   // Derived resolution states take precedence over the session-driven phases
   // stored in `phase`: they are pure functions of the hook props and avoid the
   // synchronous-in-effect setState that storing them would require.
-  if (isResolving && phase.kind === 'idle') {
+  if (isResolving && phase.kind === "idle") {
     return (
       <Centered
         phaseKey="resolving"
-        label="Reading shared content…"
+        label={t("share.reading")}
         spinner
         theme={theme}
       />
@@ -499,75 +511,71 @@ export default function ShareScreen() {
     return (
       <ErrorActions
         phaseKey="nothing-resolved"
-        title="Nothing to save"
+        title={t("share.empty")}
         theme={theme}
-        retryLabel="Done"
+        retryLabel={t("common.done")}
         onRetry={abandon}
         single
       />
     );
   }
-  if (phase.kind === 'saving') {
+  if (phase.kind === "saving") {
     const { saved, total } = countProgress(phase.session);
     return (
       <Centered
         phaseKey="saving"
-        label={`Saved ${saved} of ${total}…`}
+        label={t("share.progress", { saved, total })}
         spinner
         theme={theme}
       />
     );
   }
-  if (phase.kind === 'partial') {
+  if (phase.kind === "partial") {
     const { saved, failed, total } = countPartial(phase.session);
     // Show Retry only when there is at least one failed/pending entry left to
     // attempt. Unsupported entries have nothing to retry.
-    const hasRetryable = phase.session.entries.some(
-      (e) => e.status === 'failed' || e.status === 'pending',
-    );
+    const hasRetryable = hasRetryableEntries(phase.session);
     // failed counts only failed/unsupported terminal entries; the orchestration-
     // error catch path can land here with still-pending entries (failed===0), so
     // word the subtitle from the count rather than assuming at least one failed.
     const failedWording =
       failed === 0
-        ? 'Some items are still pending.'
-        : failed === 1
-          ? 'One item couldn’t be saved.'
-          : `${failed} items couldn’t be saved.`;
+        ? t("share.pending")
+        : t("share.failureCount", { count: failed });
     return (
       <PhaseSurface key="partial" phaseKey="partial">
         <Text style={styles.title(theme)}>
-          Saved {saved} of {total}
+          {t("share.savedCount", { saved, total })}
         </Text>
         <Text style={styles.subtitle(theme)}>
-          {failedWording} You can retry, or keep what saved.
+          {failedWording} {t("share.retryHelp")}
         </Text>
         <ScrollView
           style={styles.list}
           contentContainerStyle={styles.listContent}
         >
           {phase.session.entries
-            .filter((e) => e.status === 'failed' || e.status === 'unsupported')
+            .filter((e) => e.status === "failed" || e.status === "unsupported")
             .map((e) => (
               <Text key={e.operationId} style={styles.failedItem(theme)}>
-                {e.message ?? 'Could not save this item'}
+                {localizeError(e.message)}
               </Text>
             ))}
         </ScrollView>
         <View style={styles.actions}>
           <Button
-            label="Cancel"
+            label={t("common.cancel")}
             theme={theme}
             onPress={() => completeSession(phase.session)}
           />
           <Button
-            label="Continue with saved"
+            label={t("share.continueSaved")}
             theme={theme}
             onPress={() => completeSession(phase.session)}
           />
           {hasRetryable ? (
             <Button
-              label="Retry failed"
+              label={t("capture.retryFailed")}
               theme={theme}
               primary
               onPress={() => {
@@ -581,18 +589,18 @@ export default function ShareScreen() {
       </PhaseSurface>
     );
   }
-  if (phase.kind === 'clearFailed') {
+  if (phase.kind === "clearFailed") {
     // Native clear threw: the completed session is retained so a remount (or the
     // Try again press) re-attempts it. This is the escape hatch so a persistently
     // throwing clear never traps the user on an eternal "Saving…" spinner.
     return (
       <ErrorActions
         phaseKey="clear-failed"
-        title="Saved, but couldn’t finish"
+        title={t("share.finishFailed")}
         theme={theme}
-        cancelLabel="Cancel"
+        cancelLabel={t("common.cancel")}
         onCancel={abandon}
-        retryLabel="Try again"
+        retryLabel={t("common.tryAgain")}
         onRetry={() => completeSession(phase.session)}
       />
     );
@@ -601,7 +609,7 @@ export default function ShareScreen() {
   return (
     <Centered
       phaseKey="complete"
-      label="Saved to Shelvr"
+      label={t("share.success")}
       spinner
       theme={theme}
     />
@@ -625,54 +633,11 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   updateEntry(shareStore, entry.index, patch, sessionId);
 }
 
-/** Returns a copy of `session` with the entry matching `settled.index` replaced
- * by the settled version, so the saving phase can reflect incremental progress. */
-function withEntry(session: ShareSession, settled: ShareEntry): ShareSession {
-  return {
-    ...session,
-    entries: session.entries.map((e) =>
-      e.index === settled.index ? settled : e,
-    ),
-  };
-}
-
-/** Maps the SDK's resolved payloads to the processor's minimal slice. */
-function toResolved(
-  resolved: ReturnType<typeof useIncomingShare>['resolvedSharedPayloads'],
-): ResolvedPayload[] {
-  return resolved.map((p) => ({
-    contentType: p.contentType,
-    value: p.value,
-    contentUri: p.contentUri,
-    contentMimeType: p.contentMimeType,
-  }));
-}
-
-function countProgress(session: ShareSession): {
-  saved: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === 'saved').length;
-  return { saved, total: session.entries.length };
-}
-
-function countPartial(session: ShareSession): {
-  saved: number;
-  failed: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === 'saved').length;
-  const failed = session.entries.filter(
-    (e) => e.status === 'failed' || e.status === 'unsupported',
-  ).length;
-  return { saved, failed, total: session.entries.length };
-}
-
 // ---------------------------------------------------------------------------
 // Presentational pieces (existing theme typography/buttons — no design system)
 // ---------------------------------------------------------------------------
 
-type Theme = ReturnType<typeof useUnistyles>['theme'];
+type Theme = ReturnType<typeof useUnistyles>["theme"];
 
 /** Phase chrome with enter/exit transitions. The Reanimated drivers fire on
  * mount/unmount, so a phase change only animates if React remounts the
@@ -779,8 +744,8 @@ function Button({
           primary && styles.buttonPrimary(theme),
           {
             transform: [{ scale }],
-            transitionProperty: 'transform',
-            transitionDuration: '120ms',
+            transitionProperty: "transform",
+            transitionDuration: "120ms",
             transitionTimingFunction: EASE_OUT_CSS,
           },
         ]}
@@ -801,8 +766,8 @@ function Button({
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(1.5),
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
@@ -816,16 +781,16 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 17,
     color: theme.colors.foreground,
-    textAlign: 'center',
+    textAlign: "center",
   }),
   subtitle: (theme: Theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 14,
     color: theme.colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
   }),
   list: {
-    width: '100%',
+    width: "100%",
     maxHeight: 200,
   },
   listContent: {
@@ -836,12 +801,12 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     color: theme.colors.danger,
-    textAlign: 'center',
+    textAlign: "center",
   }),
   actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: theme.gap(1.5),
     marginTop: theme.gap(2),
   },

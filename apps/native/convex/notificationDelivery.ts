@@ -4,9 +4,10 @@ import { internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
   recipientValidator,
+  digestCopy,
   recipientError,
   type Recipient,
-} from "./model/notificationDelivery";
+} from "./model/notificationFields";
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
@@ -112,6 +113,7 @@ export const claim = internalMutation({
       digest.deliveryRecipients ??
       devices.map((device) => ({
         token: device.token,
+        locale: device.locale,
         state: "pending" as const,
       }))
     ).map((recipient): Recipient => {
@@ -121,11 +123,15 @@ export const claim = internalMutation({
       ) {
         return {
           token: recipient.token,
+          locale: recipient.locale,
           state: "failed",
           error: "device_unavailable",
         };
       }
-      return recipient;
+      const locale = devices.find(
+        (device) => device.token === recipient.token,
+      )?.locale;
+      return locale === undefined ? recipient : { ...recipient, locale };
     });
     const items = await Promise.all(digest.itemIds.map((id) => ctx.db.get(id)));
     const itemCount = items.filter(
@@ -258,6 +264,7 @@ export const send = internalAction({
           if (result.status === "ok") {
             return {
               token: recipient.token,
+              locale: recipient.locale,
               state: "delivered",
               ticketId: recipient.ticketId,
             };
@@ -282,8 +289,7 @@ export const send = internalAction({
             "send",
             pending.map((recipient) => ({
               to: recipient.token,
-              title: "Your weekly shelf is ready",
-              body: `${delivery.itemCount} saved things are waiting on your weekly shelf.`,
+              ...digestCopy(recipient.locale, delivery.itemCount),
               data: { url: `/digest/${digestId}` },
               sound: "default",
               channelId: "weekly-shelf",
@@ -299,6 +305,7 @@ export const send = internalAction({
           if (result.status === "ok" && result.id) {
             return {
               token: recipient.token,
+              locale: recipient.locale,
               state: "receipt",
               ticketId: result.id,
             };
