@@ -180,6 +180,16 @@ describe("notification device session", () => {
     expect(deps.getToken).toHaveBeenCalledTimes(2);
   });
 
+  it("surfaces token registration failures separately from denied permission", async () => {
+    const { session, deps } = setup();
+    deps.getToken.mockRejectedValueOnce(new Error("token service unavailable"));
+
+    await expect(session.setWeeklyShelf(true)).rejects.toThrow(
+      "token service unavailable",
+    );
+    expect(deps.setWeeklyShelf).not.toHaveBeenCalled();
+  });
+
   it("restores registration after failed account deletion without ending authentication", async () => {
     const { session, deps } = setup(["token-a"]);
     deps.deleteAccount.mockRejectedValueOnce(new Error("offline"));

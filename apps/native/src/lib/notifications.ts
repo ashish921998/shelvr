@@ -91,18 +91,14 @@ async function getExpoPushToken(
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
-  if (!projectId) return null;
+  if (!projectId) throw new Error("Expo project ID is unavailable");
 
-  try {
-    return (
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-        devicePushToken,
-      })
-    ).data;
-  } catch {
-    return null;
-  }
+  return (
+    await Notifications.getExpoPushTokenAsync({
+      projectId,
+      devicePushToken,
+    })
+  ).data;
 }
 
 export function NotificationSessionProvider({

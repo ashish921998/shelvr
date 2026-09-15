@@ -75,6 +75,12 @@ if (buildPlatform === "android") {
     (value) => value?.startsWith("goog_"),
     "a goog_ Google Play public SDK key",
   );
+  requireProductionValue(
+    "GOOGLE_SERVICES_JSON",
+    process.env.GOOGLE_SERVICES_JSON,
+    (value) => Boolean(value),
+    "an EAS file variable containing google-services.json",
+  );
 }
 // The production Convex URL must parse as https:// with a hostname — a bare
 // prefix check would let `https://` (no host) reach a store build.
@@ -100,6 +106,7 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
   .map((arch) => arch.trim())
@@ -141,6 +148,7 @@ module.exports = ({ config }) => ({
     ...(googleMapsApiKey
       ? { config: { googleMaps: { apiKey: googleMapsApiKey } } }
       : {}),
+    ...(googleServicesFile ? { googleServicesFile } : {}),
     package: bundleId,
   },
   locales: Object.fromEntries(

@@ -194,6 +194,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
+  - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
+    `google-services.json`; required by production Android builds so `expo-notifications`
+    can obtain an FCM token
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
 
