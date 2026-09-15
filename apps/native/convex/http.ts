@@ -3,8 +3,15 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
-import { mapRevenueCatStatus, parseRevenueCatEvent } from "./model/revenuecat";
-import { reconcileRevenueCatTransfer } from "./model/revenuecatTransfer";
+import {
+  mapRevenueCatStatus,
+  parseRevenueCatEvent,
+  type RevenueCatEvent,
+} from "./model/revenuecat";
+import {
+  reconcileRevenueCatCustomers,
+  reconcileRevenueCatTransfer,
+} from "./model/revenuecatTransfer";
 import { errorName, logEvent } from "./model/log";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { secureCompare } from "./model/secureCompare";
@@ -98,17 +105,24 @@ http.route({
     const { type, userId, expiresAt, productId, periodType, eventTimestampMs } =
       event;
 
-    // Lifetime-ness is decided once, here at the edge, from the product id —
-    // not re-derived in the handler. A lifetime purchase carries
-    // `status: "lifetime"` into upsertSubscription; every other event is mapped
-    // by type. Events that preserve the existing status (CANCELLATION, etc.)
-    // pass `status: undefined` so upsertSubscription keeps the current status
-    // transactionally — no separate read here that could race with a concurrent
-    // event.
-    const status =
-      productId !== undefined && isLifetimeProduct(productId)
-        ? "lifetime"
-        : mapRevenueCatStatus(type, periodType);
+    if (requiresRefundReconciliation(event)) {
+      try {
+        await reconcileRevenueCatCustomers(ctx, [userId], eventTimestampMs);
+      } catch (error) {
+        logEvent("error", "revenuecat_refund_reconciliation_failed", {
+          error_name: errorName(error),
+        });
+        return new Response("Refund reconciliation unavailable", {
+          status: 503,
+        });
+      }
+      const payment = parsePaymentTelemetry(body);
+      if (payment)
+        await ctx.runMutation(internal.paymentTelemetry.enqueue, { payment });
+      return new Response(null, { status: 200 });
+    }
+
+    const status = mapRevenueCatStatus(type, periodType);
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
       status,
@@ -220,15 +234,13 @@ http.route({
   }),
 });
 
-/**
- * Product ids (as configured in RevenueCat) that grant a lifetime (permanent,
- * non-expiring) entitlement instead of a time-limited subscription. Add a
- * product id here when you create a new lifetime product in RevenueCat.
- */
-const LIFETIME_PRODUCT_IDS = new Set<string>(["lifetime"]);
-
-function isLifetimeProduct(productId: string): boolean {
-  return LIFETIME_PRODUCT_IDS.has(productId);
+function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
+  if (event.type === "REFUND_REVERSED") return true;
+  if (event.type === "CANCELLATION")
+    return event.cancelReason === "CUSTOMER_SUPPORT";
+  if (event.type === "EXPIRATION")
+    return event.expirationReason === "CUSTOMER_SUPPORT";
+  return false;
 }
 
 export default http;

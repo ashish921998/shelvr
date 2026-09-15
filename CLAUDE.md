@@ -220,7 +220,8 @@ needed at runtime by the features that use them:
 - `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts.
   The route answers 500 when it is unset
 - `REVENUECAT_API_KEY` — RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER` webhook event
+  `TRANSFER`, refund, or `REFUND_REVERSED` webhook event. Refund reconciliation returns
+  503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
