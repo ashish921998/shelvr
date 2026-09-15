@@ -11,6 +11,7 @@ import {
   getSpacePresets,
 } from "@/components/onboarding/space-picker";
 import { SurveyStep } from "@/components/onboarding/survey";
+import { WhatChangedStep } from "@/components/onboarding/what-changed";
 import type { FeedItem } from "@/components/item-card";
 import { useOnboarding } from "@/lib/onboarding";
 import {
@@ -26,15 +27,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 
-// Onboarding v2 — an 8-step quiz-funnel flow.
+// Onboarding v2 — a 9-step quiz-funnel flow.
 // This file is the step machine: a `step` index, lifted survey/space/demo state,
 // a thin progress bar, and step transitions between the step components.
 // Each step owns its own CTA copy and advance condition; the orchestrator
 // hands them `advance`/`finish` and the shared state.
 //
 // Order: promise → survey Q1 → survey Q2 → space picker → building → live demo
-// → permissions → ready → (paywall). Sign-in stays first (the route is
-// auth-gated); the paywall is the existing finish() verbatim.
+// → what changed → permissions → ready → (paywall). The "what changed" step
+// only exists when the demo produced an item, so it is skipped outright
+// otherwise. Sign-in stays first (the route is auth-gated); the paywall is the
+// existing finish() verbatim.
 // App Store rating is NOT requested during onboarding — it is deferred to the
 // post-engagement useReviewPrompt hook that fires after 3+ ready items.
 
@@ -46,8 +49,9 @@ const STEPS = {
   spaces: 3,
   building: 4,
   demo: 5,
-  permissions: 6,
-  ready: 7,
+  changed: 6,
+  permissions: 7,
+  ready: 8,
 } as const;
 type StepIndex = (typeof STEPS)[keyof typeof STEPS];
 
@@ -58,6 +62,7 @@ const STEP_IDS = {
   [STEPS.spaces]: "spaces",
   [STEPS.building]: "building",
   [STEPS.demo]: "live_demo",
+  [STEPS.changed]: "what_changed",
   [STEPS.permissions]: "permissions",
   [STEPS.ready]: "ready",
 } as const satisfies Record<(typeof STEPS)[keyof typeof STEPS], string>;
@@ -91,11 +96,11 @@ const Q2_OPTIONS: readonly SaveKind[] = [
   "Videos",
 ];
 
-// The progress bar covers steps 2–7 (survey Q1 through permissions). Promise
-// (step 1) has no bar — it's the value screen, not the quiz — and ready shows
-// no bar since it's the recap.
+// The progress bar covers survey Q1 through permissions. Promise has no bar —
+// it's the value screen, not the quiz — and ready shows no bar since it's the
+// recap.
 const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
-const LAST_PROGRESS_STEP = STEPS.permissions; // 6
+const LAST_PROGRESS_STEP = STEPS.permissions; // 7
 
 export default function OnboardingScreen() {
   useAppLocale();
@@ -125,6 +130,7 @@ export default function OnboardingScreen() {
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
+  const [demoSpaces, setDemoSpaces] = useState<string[]>([]);
   const spacesInitRef = useRef(initialProgress.spaces.length > 0);
   const trackedStepsRef = useRef(new Set<number>());
   const stepEnteredAt = useRef(0);
@@ -166,9 +172,21 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     setStep((current) => {
       const next = current + 1;
-      return isStepIndex(next) ? next : STEPS.ready;
+      if (!isStepIndex(next)) return STEPS.ready;
+      // Nothing to recap without a demo save (skipped, timed out, or failed).
+      if (next === STEPS.changed && demoItem === null) return STEPS.permissions;
+      return next;
     });
-  }, [recordCurrentStep]);
+  }, [recordCurrentStep, demoItem]);
+
+  // A restored step index can point at the recap even though demoItem is
+  // in-memory only, so leave rather than render an empty step.
+  useEffect(() => {
+    if (step === STEPS.changed && demoItem === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStep(STEPS.permissions);
+    }
+  }, [step, demoItem]);
 
   // Pre-select spaces from Q2 presets when the user first reaches the spaces
   // step. The ref guard ensures this runs only once, preserving subsequent
@@ -283,7 +301,19 @@ export default function OnboardingScreen() {
               // (ready step) can render the same card. If the user skips,
               // demoItem stays null and ready shows the spaces only.
               resumeDemo={resumeDemo}
-              onReady={setDemoItem}
+              onReady={(item, savedSpaceNames) => {
+                setDemoItem(item);
+                setDemoSpaces(savedSpaceNames);
+              }}
+              onAdvance={advance}
+            />
+          )}
+
+          {step === STEPS.changed && demoItem !== null && (
+            <WhatChangedStep
+              item={demoItem}
+              spaceNames={spaces.map(onboardingLabel)}
+              savedSpaces={demoSpaces}
               onAdvance={advance}
             />
           )}
