@@ -39,6 +39,22 @@ type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
  * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
 
+/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
+ * iOS-only, so Android reads the raw string and keeps it only when it parses as
+ * an http(s) URL. A failed read resolves to null instead of rejecting. */
+async function readClipboardUrl(): Promise<string | null> {
+  try {
+    if (Platform.OS === "ios") {
+      return (await Clipboard.getUrlAsync()) ?? null;
+    }
+    const text = (await Clipboard.getStringAsync()).trim();
+    if (text === "") return null;
+    return new URL(text).protocol.startsWith("http") ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 function ActionButton({
   icon,
   label,
@@ -153,7 +169,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   useEffect(() => {
     if (mode !== "article") return;
     let active = true;
-    Clipboard.getUrlAsync().then((url) => {
+    readClipboardUrl().then((url) => {
       if (active && url) setValue((current) => current || url);
     });
     return () => {
