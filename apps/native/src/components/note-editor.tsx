@@ -2,7 +2,7 @@ import type { DetailItem } from "@/components/item-detail";
 import { analytics } from "@/lib/analytics";
 import { openPaywall } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
-import { pendingNoteEdit, type NoteDraft } from "@/lib/note-edit";
+import { createNoteSaveQueue, type NoteEdit } from "@/lib/note-edit";
 import { api } from "@convex/_generated/api";
 import {
   MAX_ITEM_TITLE_CHARS,
@@ -11,7 +11,7 @@ import {
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -19,71 +19,116 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const SAVE_DELAY_MS = 800;
 const PAYWALL_PLACEMENT = "item_detail";
 
+type LocalNoteEdits = {
+  title?: { value: string; saved: boolean };
+  text?: { value: string; saved: boolean };
+};
+
 /**
  * A note's title and text, edited in place and saved as the owner types. The
  * title field holds only a title the owner typed; the classifier's title shows
  * as its placeholder until they type their own.
  *
- * Mount one per note (keyed by id). The fields are seeded once, so a server
- * push of the same note never overwrites text mid-edit; the classifier's
- * refresh only changes fields this editor does not own.
+ * Mount one per note (keyed by id). Untouched fields follow server updates;
+ * local edits stay visible until the server acknowledges the same value.
  */
 export function NoteEditor({ item }: { item: DetailItem }) {
   useAppLocale();
   const { theme } = useUnistyles();
   const router = useRouter();
   const updateNote = useMutation(api.items.updateNoteItem);
-  const [draft, setDraft] = useState<NoteDraft>(() => ({
-    title: item.titleSource === "user" ? (item.title ?? "") : "",
-    text: item.note ?? "",
-  }));
-  const saved = useRef(draft);
-  const latest = useRef(draft);
+  const title = item.titleSource === "user" ? (item.title ?? "") : "";
+  const text = item.note ?? "";
+  const [state, setState] = useState<{
+    title: string;
+    text: string;
+    edits: LocalNoteEdits;
+  }>(() => ({ title, text, edits: {} }));
+  if (state.title !== title || state.text !== text) {
+    const edits = { ...state.edits };
+    if (
+      state.title !== title &&
+      (edits.title?.saved || edits.title?.value.trim() === title)
+    )
+      delete edits.title;
+    if (
+      state.text !== text &&
+      (edits.text?.saved || edits.text?.value === text)
+    )
+      delete edits.text;
+    setState({ title, text, edits });
+  }
+  const draft = {
+    title: state.edits.title?.value ?? title,
+    text: state.edits.text?.value ?? text,
+  };
   const textInput = useRef<TextInput>(null);
-  // One edit event per visit, and one alert per run of failed saves.
-  const reportedEdit = useRef(false);
-  const alerted = useRef(false);
-
-  const save = useEffectEvent(async (next: NoteDraft) => {
-    const edit = pendingNoteEdit(next, saved.current);
-    if (edit === null) return;
-    const previous = saved.current;
-    saved.current = edit;
-    try {
-      await updateNote({ id: item._id, title: edit.title, text: edit.text });
-      alerted.current = false;
-      if (!reportedEdit.current) {
-        reportedEdit.current = true;
-        analytics.itemAction(item, "note_edited");
-      }
-    } catch (error) {
-      // Unsaved: the next pause in typing, or leaving the page, tries again.
-      saved.current = previous;
-      if (saveErrorCode(error) === "pro_required") {
-        await openPaywall(router, PAYWALL_PLACEMENT);
-        return;
-      }
-      if (!alerted.current) {
-        alerted.current = true;
-        Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
-      }
-    }
+  const [queue] = useState(() => {
+    // The component is keyed by note id: one queue and edit event per visit.
+    let reportedEdit = false;
+    let alerted = false;
+    return createNoteSaveQueue(
+      async (edit) => {
+        await updateNote({ id: item._id, ...edit });
+        setState((current) => {
+          const edits = { ...current.edits };
+          if (
+            edit.title !== undefined &&
+            edits.title?.value.trim() === edit.title
+          )
+            edits.title = { value: edit.title, saved: true };
+          if (edit.text !== undefined && edits.text?.value === edit.text)
+            edits.text = { value: edit.text, saved: true };
+          return { ...current, edits };
+        });
+        alerted = false;
+        if (!reportedEdit) {
+          reportedEdit = true;
+          analytics.itemAction(item, "note_edited");
+        }
+      },
+      async (error) => {
+        analytics.captureError("note_update_failed", error);
+        if (saveErrorCode(error) === "pro_required") {
+          await openPaywall(router, PAYWALL_PLACEMENT);
+          return;
+        }
+        if (!alerted) {
+          alerted = true;
+          Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
+        }
+      },
+    );
   });
+  const change = (edit: NoteEdit) => {
+    queue.change(edit);
+    setState((current) => ({
+      ...current,
+      edits: {
+        ...current.edits,
+        ...(edit.title !== undefined
+          ? { title: { value: edit.title, saved: false } }
+          : {}),
+        ...(edit.text !== undefined
+          ? { text: { value: edit.text, saved: false } }
+          : {}),
+      },
+    }));
+  };
 
   useEffect(() => {
-    latest.current = draft;
-    const timer = setTimeout(() => void save(draft), SAVE_DELAY_MS);
+    const timer = setTimeout(() => void queue.flush(), SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [draft]);
+  }, [queue, state.edits]);
 
   // Leaving the page, or swiping to another save, keeps what was typed.
-  useEffect(() => () => void save(latest.current), []);
+  useEffect(() => () => void queue.flush(), [queue]);
 
   return (
     <View style={styles.editor}>
       <TextInput
         value={draft.title}
-        onChangeText={(title) => setDraft((current) => ({ ...current, title }))}
+        onChangeText={(title) => change({ title })}
         placeholder={
           item.titleSource !== "user" && item.title
             ? item.title
@@ -102,7 +147,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
       <TextInput
         ref={textInput}
         value={draft.text}
-        onChangeText={(text) => setDraft((current) => ({ ...current, text }))}
+        onChangeText={(text) => change({ text })}
         maxLength={MAX_NOTE_TEXT_CHARS}
         placeholder={t("capture.notePlaceholder")}
         placeholderTextColor={theme.colors.muted}
