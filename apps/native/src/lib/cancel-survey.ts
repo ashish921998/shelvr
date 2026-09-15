@@ -19,7 +19,8 @@ export type { CancelSurveyReason };
  * Once-per-account is enforced server-side (convex/cancelSurvey.ts): the row
  * is the durable record across devices and reinstalls, and useCancelSurvey
  * fails closed — no card when the ask cannot be verified as unspent. There is
- * deliberately no local persistence here.
+ * no local persistence of the ask. A pending bounded response is stored
+ * separately until its idempotent server mutation completes.
  *
  * Privacy rules, mirroring lib/feedback.ts:
  * - Events carry bounded reason ids only — never free text, URLs, or content.

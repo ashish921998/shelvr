@@ -1,16 +1,15 @@
-// Tests for the hook that decides when the cancel-survey card may appear.
-// Effect-only hook, driven by the shared slot-indexed React stand-in (see
-// src/test/react-stand-in.ts). The AppState mock records listeners so tests
-// can simulate backgrounding and returning from iPhone Settings / Customer
-// Center.
+// @vitest-environment jsdom
+// Real React effects and callbacks, with native events supplied by the test.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { useCancelSurvey } from "./use-cancel-survey";
-import { reactStandIn as react } from "../test/react-stand-in";
+import { getPendingCancelSurvey } from "./pending-cancel-survey";
 
-vi.mock("react", async () => {
-  const { reactStandIn } = await import("../test/react-stand-in");
-  return reactStandIn;
-});
+const storage = vi.hoisted(() => new Map<string, string>());
+vi.mock("expo-secure-store", () => ({
+  getItem: (key: string) => storage.get(key) ?? null,
+  setItem: (key: string, value: string) => storage.set(key, value),
+}));
 
 const mock = vi.hoisted(() => ({
   appState: "active" as string,
@@ -22,7 +21,16 @@ const mock = vi.hoisted(() => ({
   surveyStatus: { asked: false } as { asked: boolean } | undefined,
   paywallPending: false,
   markShown: vi.fn(async () => ({ accepted: true })),
-  respond: vi.fn(async () => ({ accepted: true })),
+  respond: vi.fn(
+    async (_response: {
+      outcome: "submitted" | "dismissed";
+      reason?:
+        | "other"
+        | "too_expensive"
+        | "not_useful_enough"
+        | "missing_feature";
+    }) => ({ accepted: true }),
+  ),
   capture: vi.fn(),
   // useMutation call counter — see the convex/react mock below.
   mutationCalls: 0,
@@ -74,23 +82,59 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mock.surveyStatus }),
 }));
 
-const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+const flush = async () => {
+  await act(async () => {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  });
+};
 
 type Survey = ReturnType<typeof useCancelSurvey>;
+let rendered: ReturnType<typeof renderHook<Survey, void>> | undefined;
+const react = {
+  mount(run: () => Survey) {
+    rendered = renderHook(run);
+    return rendered.result.current;
+  },
+  rerender() {
+    if (!rendered) throw new Error("Hook not mounted");
+    rendered.rerender();
+    const current = rendered.result.current;
+    return {
+      ...current,
+      presented: () => act(() => current.presented()),
+      finish: (response: Parameters<Survey["finish"]>[0]) =>
+        act(() => current.finish(response)),
+    };
+  },
+  unmount() {
+    rendered?.unmount();
+    rendered = undefined;
+  },
+};
 /** mount/rerender return a fresh result object per render — always read the
  * current one after an await. */
-const latest = (): Survey => react.rerender<Survey>();
+const latest = (): Survey => react.rerender();
 
 /** Simulate leaving Shelvr (e.g. to iPhone Settings) and coming back. */
 const roundTrip = async () => {
-  for (const listener of mock.appStateListeners) listener("background");
+  act(() => {
+    for (const listener of mock.appStateListeners) listener("background");
+  });
   await flush();
-  for (const listener of mock.appStateListeners) listener("active");
+  act(() => {
+    for (const listener of mock.appStateListeners) listener("active");
+  });
   await flush();
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  storage.clear();
+  mock.markShown.mockReset().mockImplementation(async () => {
+    mock.surveyStatus = { asked: true };
+    return { accepted: true };
+  });
+  mock.respond.mockReset().mockResolvedValue({ accepted: true });
   // Fake only the retry timer (2s paywall poll); setImmediate-based flush
   // and promise microtasks stay real so async detection resolves normally.
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -336,38 +380,68 @@ describe("useCancelSurvey", () => {
     ).toHaveLength(1);
   });
 
-  it("leaves the card down when a respond fails, then re-asks on the next visit", async () => {
-    mock.respond.mockRejectedValueOnce(new Error("response failed"));
-    react.mount(() => useCancelSurvey());
-    await flush();
-    latest().presented();
-    await flush();
-    latest().finish({ outcome: "submitted", reason: "other" });
-    await flush();
+  it.each(["foreground", "relaunch"])(
+    "retries the saved response on %s after the real server has consumed the ask",
+    async (resume) => {
+      const { newConvexTest } = await import("../../convex/test.setup");
+      const { api } = await import("../../convex/_generated/api");
+      const backend = newConvexTest();
+      const user = backend.withIdentity({ subject: "user-1|session" });
+      mock.surveyStatus = await user.query(api.cancelSurvey.getStatus, {});
+      mock.markShown.mockImplementation(async () => {
+        const result = await user.mutation(api.cancelSurvey.markShown, {});
+        mock.surveyStatus = await user.query(api.cancelSurvey.getStatus, {});
+        return result;
+      });
+      mock.respond.mockImplementation((response) =>
+        user.mutation(api.cancelSurvey.respond, response),
+      );
+      mock.respond.mockRejectedValueOnce(new Error("response failed"));
+      react.mount(() => useCancelSurvey());
+      await flush();
+      latest().presented();
+      await mock.markShown.mock.results[0].value;
+      await flush();
+      latest().finish({ outcome: "submitted", reason: "other" });
+      await flush();
 
-    // A failed respond committed nothing: no analytics, and the card stays
-    // down for the rest of this episode — no immediate re-show.
-    expect(latest().visible).toBe(false);
-    expect(
-      mock.capture.mock.calls.filter(
-        ([name]) => name === "cancel_survey_submitted",
-      ),
-    ).toHaveLength(0);
+      expect(latest().visible).toBe(false);
+      expect(await user.query(api.cancelSurvey.getStatus, {})).toEqual({
+        asked: true,
+      });
+      expect(getPendingCancelSurvey("user-1")).toEqual({
+        outcome: "submitted",
+        reason: "other",
+      });
+      expect(
+        mock.capture.mock.calls.filter(
+          ([name]) => name === "cancel_survey_submitted",
+        ),
+      ).toHaveLength(0);
 
-    // The failed respond never wrote the row, so the next foreground visit
-    // re-detects and re-asks instead of stranding the survey.
-    await roundTrip();
-    expect(latest().visible).toBe(true);
-    latest().presented();
-    await flush();
-    latest().finish({ outcome: "submitted", reason: "other" });
-    await flush();
-    expect(mock.respond).toHaveBeenCalledTimes(2);
-    expect(mock.capture).toHaveBeenCalledWith("cancel_survey_submitted", {
-      reason: "other",
-      survey_source: "next_visit_card",
-    });
-  });
+      if (resume === "foreground") await roundTrip();
+      else {
+        react.unmount();
+        react.mount(() => useCancelSurvey());
+      }
+      await flush();
+      await mock.respond.mock.results[1].value;
+      await flush();
+      expect(latest().visible).toBe(false);
+      expect(mock.respond).toHaveBeenCalledTimes(2);
+      expect(mock.markShown).toHaveBeenCalledTimes(1);
+      expect(getPendingCancelSurvey("user-1")).toBeNull();
+      const rows = await backend.run((ctx) =>
+        ctx.db.query("cancelSurveys").collect(),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ outcome: "submitted", reason: "other" });
+      expect(mock.capture).toHaveBeenCalledWith("cancel_survey_submitted", {
+        reason: "other",
+        survey_source: "next_visit_card",
+      });
+    },
+  );
 
   it("double-tapping a reason submits exactly once", async () => {
     react.mount(() => useCancelSurvey());
