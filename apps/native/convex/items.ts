@@ -1,4 +1,4 @@
-import { v, type Infer } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -13,8 +13,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { PRO_REQUIRED, requireProEntitlement } from "./subscriptions";
-import { saveError } from "./model/saveErrors";
+import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -1460,14 +1459,7 @@ export const updateNoteItem = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    try {
-      await requireProEntitlement(ctx, userId);
-    } catch (error) {
-      if (error instanceof Error && error.message === PRO_REQUIRED) {
-        throw saveError("pro_required");
-      }
-      throw error;
-    }
+    await requireProEntitlement(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.type !== "note") {
       throw new Error("Item not found");
