@@ -17,6 +17,7 @@ import {
   getOnboardingProgress,
   setOnboardingProgress,
   setPendingSpaces,
+  resolveOnboardingSpaceName,
 } from "@/lib/pending-onboarding";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -208,7 +209,7 @@ export default function OnboardingScreen() {
       $set: { save_pileup: q1, save_types: q2 },
     });
     recordCurrentStep();
-    setPendingSpaces(spaces.map(onboardingLabel));
+    setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     completeOnboarding();
   };
 

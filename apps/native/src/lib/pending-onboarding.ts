@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
+import { onboardingLabel } from "./onboarding-labels";
 
 // Persisted store for onboarding state that must survive leaving the screen
 // (the demo step's inline OAuth) or an app kill: the picked library
@@ -30,6 +31,7 @@ type PendingRecord = {
   q2: string[];
   step: number | null;
   demo: PendingDemo | null;
+  spaceNames: Record<string, string>;
 };
 
 /** What onboarding.tsx restores on mount. */
@@ -102,10 +104,21 @@ function readPendingRecord(): PendingRecord | null {
       q2,
       step,
       demo,
+      spaceNames: readSpaceNames(record.spaceNames),
     };
   } catch {
     return null;
   }
+}
+
+function readSpaceNames(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
 }
 
 function writePendingRecord(record: PendingRecord | null) {
@@ -127,6 +140,7 @@ function ensureOperationId(): string {
     q2: [],
     step: null,
     demo: null,
+    spaceNames: {},
   });
   return operationId;
 }
@@ -152,6 +166,7 @@ function writePendingSpaces(
     q2: existing?.q2 ?? [],
     step: existing?.step ?? null,
     demo,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -225,6 +240,7 @@ export function setOnboardingProgress(progress: {
     q2: progress.q2,
     step: progress.step,
     demo: existing?.demo ?? null,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -241,6 +257,7 @@ export function setPendingDemo(demo: PendingDemo | null) {
     q2: existing?.q2 ?? [],
     step: existing?.step ?? null,
     demo,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -250,6 +267,21 @@ export function hasPending(): boolean {
   return (
     record !== null && (record.spaces.length > 0 || record.demoUrl !== null)
   );
+}
+
+/** Freeze a preset's persisted name before its first creation. Display labels
+ * may change language, but demo and completion must use the same identity. */
+export function resolveOnboardingSpaceName(id: string): string {
+  ensureOperationId();
+  const record = readPendingRecord();
+  if (record === null) throw new Error("Onboarding state unavailable");
+  if (Object.hasOwn(record.spaceNames, id)) return record.spaceNames[id];
+  const name = onboardingLabel(id);
+  writePendingRecord({
+    ...record,
+    spaceNames: { ...record.spaceNames, [id]: name },
+  });
+  return name;
 }
 
 export function clearPending() {

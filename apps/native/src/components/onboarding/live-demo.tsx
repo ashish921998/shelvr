@@ -5,6 +5,7 @@ import { ItemCard, type FeedItem } from "@/components/item-card";
 import { analytics } from "@/lib/analytics";
 import {
   clearLegacyDemoUrlIfSaved,
+  resolveOnboardingSpaceName,
   setPendingDemo,
   type PendingDemo,
 } from "@/lib/pending-onboarding";
@@ -190,7 +191,7 @@ export function LiveDemoStep({
           ? destinationOverride
           : destination === null
             ? null
-            : onboardingLabel(destination);
+            : resolveOnboardingSpaceName(destination);
       const request = { url: trimmed, destination: chosenDestination };
       setPendingDemo(request);
 
