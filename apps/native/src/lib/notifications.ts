@@ -19,6 +19,7 @@ import {
 } from "react";
 import { NotificationDeviceSession } from "./notification-device-session";
 import { analytics } from "./analytics";
+import { syncPendingWeeklyShelfOptIn } from "./pending-notification-preference";
 
 const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
@@ -76,17 +77,32 @@ async function prepareNotificationChannel(): Promise<void> {
   });
 }
 
+function allowsNotifications(
+  permission: Notifications.NotificationPermissionsStatus,
+): boolean {
+  return (
+    permission.granted ||
+    permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  );
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  await prepareNotificationChannel();
+  const existing = await Notifications.getPermissionsAsync();
+  if (allowsNotifications(existing)) return true;
+  return allowsNotifications(await Notifications.requestPermissionsAsync());
+}
+
 async function getExpoPushToken(
   requestPermission: boolean,
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<string | null> {
   await prepareNotificationChannel();
   const existing = await Notifications.getPermissionsAsync();
-  let permission = existing;
-  if (!permission.granted && requestPermission) {
-    permission = await Notifications.requestPermissionsAsync();
-  }
-  if (!permission.granted) return null;
+  const allowed = requestPermission
+    ? await requestNotificationPermission()
+    : allowsNotifications(existing);
+  if (!allowed) return null;
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
@@ -150,6 +166,14 @@ export function NotificationSessionProvider({
     }
     session.start();
 
+    const syncPendingPreference = async () => {
+      try {
+        await syncPendingWeeklyShelfOptIn(() => session.setWeeklyShelf(true));
+      } catch (error) {
+        analytics.captureError("notification_preference_sync_failed", error);
+      }
+    };
+
     const register = async (
       devicePushToken?: Notifications.DevicePushToken,
     ) => {
@@ -160,6 +184,7 @@ export function NotificationSessionProvider({
       }
     };
 
+    void syncPendingPreference();
     void register();
     const tokenListener = Notifications.addPushTokenListener(
       (devicePushToken) => {

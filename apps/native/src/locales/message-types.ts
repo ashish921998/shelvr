@@ -227,6 +227,8 @@ export type MessageParams = {
   "demo.signInFailed": undefined;
   "permissions.title": undefined;
   "permissions.help": undefined;
+  "permissions.captureHelp": undefined;
+  "permissions.enableNotifications": undefined;
   "permissions.cameraContext": undefined;
   "permissions.photoLibrary": undefined;
   "permissions.photosContext": undefined;

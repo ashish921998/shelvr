@@ -127,6 +127,7 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   onboarding_demo_skipped: Record<string, never>;
+  onboarding_notification_choice: { enabled: boolean };
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,

@@ -30,6 +30,7 @@ const SF_TO_MATERIAL = {
   envelope: "mail",
   message: "chat",
   phone: "call",
+  bell: "notifications",
   // Content / media
   camera: "photo_camera",
   "photo.on.rectangle": "add_photo_alternate",
