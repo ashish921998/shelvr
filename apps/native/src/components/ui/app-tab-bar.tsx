@@ -35,6 +35,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolate,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
@@ -204,8 +205,10 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
 
   const morph = useSharedValue(searchFocused ? 1 : 0);
   const focusedSlot = useSharedValue(Math.max(focusedIndex, 0));
-  const highlight = useSharedValue(Math.max(focusedIndex, 0));
   const hovered = useSharedValue(-1);
+  const highlightTarget = useDerivedValue(() =>
+    hovered.get() >= 0 ? hovered.get() : focusedSlot.get(),
+  );
   const pressed = useSharedValue(0);
   const pullX = useSharedValue(0);
   const pullY = useSharedValue(0);
@@ -231,10 +234,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   useEffect(() => {
     if (focusedIndex < 0) return;
     focusedSlot.set(focusedIndex);
-    if (hovered.get() < 0) {
-      highlight.set(withSpring(focusedIndex, SETTLE_SPRING));
-    }
-  }, [focusedIndex, focusedSlot, highlight, hovered]);
+  }, [focusedIndex, focusedSlot]);
 
   useEffect(() => {
     if (!searchFocused) {
@@ -292,7 +292,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
         PILL_INSET,
       );
       hovered.set(index);
-      if (index >= 0) highlight.set(withSpring(index, SETTLE_SPRING));
     })
     .onTouchesMove((event) => {
       let touch = null;
@@ -323,10 +322,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
       if (index === hovered.get()) return;
       hovered.set(index);
       if (index >= 0) {
-        highlight.set(withSpring(index, SETTLE_SPRING));
         scheduleOnRN(tick);
-      } else {
-        highlight.set(withSpring(focusedSlot.get(), SETTLE_SPRING));
       }
     })
     .onTouchesUp((event, manager) => {
@@ -357,14 +353,11 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
         return;
       }
       const index = hovered.get();
-      hovered.set(-1);
       if (success && index >= 0) {
         focusedSlot.set(index);
-        highlight.set(withSpring(index, SETTLE_SPRING));
         scheduleOnRN(selectTab, index);
-      } else {
-        highlight.set(withSpring(focusedSlot.get(), SETTLE_SPRING));
       }
+      hovered.set(-1);
     });
 
   const pillStyle = useAnimatedStyle(() => {
@@ -393,7 +386,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     transform: [
       {
         translateX: tabSlotX(
-          highlight.get(),
+          highlightTarget.get(),
           pillWidth,
           PILL_TABS.length,
           PILL_INSET,
