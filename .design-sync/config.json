@@ -1,0 +1,22 @@
+{
+  "projectId": "6e7499f7-ab69-4035-9839-8fa5e911c4ca",
+  "shape": "package",
+  "pkg": "@shelvr/native-ui",
+  "globalName": "ShelvrUI",
+  "buildCmd": "node .design-sync/build-web.mjs",
+  "entry": ".design-sync/.cache/web-pkg/dist/index.js",
+  "srcDir": "../../../apps/native/src",
+  "componentSrcMap": {
+    "AppSymbolIcon": "../../../apps/native/src/components/symbol.tsx"
+  },
+  "extraFonts": ["../../fonts.css"],
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "EmptyState": { "cardMode": "column" },
+    "ScreenLoader": { "cardMode": "column" }
+  },
+  "dtsPropsFor": {
+    "AppSymbolIcon": "name: 'xmark' | 'checkmark' | 'plus' | 'ellipsis' | 'arrow.up.right' | 'checkmark.circle.fill' | 'exclamationmark.triangle.fill' | 'exclamationmark.circle' | 'info.circle' | 'person.fill' | 'envelope' | 'message' | 'phone' | 'camera' | 'photo.on.rectangle' | 'photo.on.rectangle.angled' | 'photo.stack' | 'square.grid.2x2' | 'square.grid.2x2.fill' | 'star.fill' | 'heart' | 'play.rectangle' | 'play.fill' | 'rectangle.stack' | 'rectangle.stack.fill' | 'link' | 'safari' | 'map' | 'magnifyingglass' | 'bag' | 'square.and.arrow.up' | 'square.and.pencil' | 'sparkles' | 'trash' | 'doc.on.doc' | 'calendar' | 'arrow.up.right.square' | 'chevron.left' | 'chevron.right' | 'arrow.uturn.backward' | 'house.fill' | 'gearshape' | 'gearshape.fill' | 'arrow.2.circlepath' | 'arrow.clockwise' | 'speedometer' | 'viewfinder' | 'figure.run' | 'hand.tap' | 'tray.and.arrow.up' | 'arrow.up' | 'doc.text' | 'arrow.triangle.2.circlepath.camera'; size?: number; tintColor?: string; weight?: 'unspecified' | 'ultraLight' | 'thin' | 'light' | 'regular' | 'medium' | 'semibold' | 'bold' | 'heavy' | 'black'; style?: object;",
+    "HeaderIconButton": "icon: 'xmark' | 'checkmark' | 'plus' | 'ellipsis' | 'arrow.up.right' | 'checkmark.circle.fill' | 'exclamationmark.triangle.fill' | 'exclamationmark.circle' | 'info.circle' | 'person.fill' | 'envelope' | 'message' | 'phone' | 'camera' | 'photo.on.rectangle' | 'photo.on.rectangle.angled' | 'photo.stack' | 'square.grid.2x2' | 'square.grid.2x2.fill' | 'star.fill' | 'heart' | 'play.rectangle' | 'play.fill' | 'rectangle.stack' | 'rectangle.stack.fill' | 'link' | 'safari' | 'map' | 'magnifyingglass' | 'bag' | 'square.and.arrow.up' | 'square.and.pencil' | 'sparkles' | 'trash' | 'doc.on.doc' | 'calendar' | 'arrow.up.right.square' | 'chevron.left' | 'chevron.right' | 'arrow.uturn.backward' | 'house.fill' | 'gearshape' | 'gearshape.fill' | 'arrow.2.circlepath' | 'arrow.clockwise' | 'speedometer' | 'viewfinder' | 'figure.run' | 'hand.tap' | 'tray.and.arrow.up' | 'arrow.up' | 'doc.text' | 'arrow.triangle.2.circlepath.camera'; label: string; badge?: number; disabled?: boolean; onPress: () => void;"
+  }
+}

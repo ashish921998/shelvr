@@ -84,15 +84,15 @@ export type AppSymbolName = keyof typeof SF_TO_MATERIAL;
  * expo-symbols SymbolView expects.
  *
  * On iOS, the original SF Symbol name is used.
- * On Android, the mapped Material Symbols name (or 'circle' fallback).
+ * On Android and web, the mapped Material Symbols name (or 'circle' fallback).
+ * expo-symbols reads the `web` key in browsers, so omitting it renders nothing.
  */
 function resolveSymbolName(sfName: AppSymbolName): SymbolViewProps["name"] {
   if (Platform.OS === "ios") {
     return sfName;
   }
-  return {
-    android: SF_TO_MATERIAL[sfName] ?? "circle",
-  } as const;
+  const material = SF_TO_MATERIAL[sfName] ?? "circle";
+  return { android: material, web: material } as const;
 }
 
 /**
