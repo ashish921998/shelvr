@@ -8,8 +8,17 @@ export async function reconcileRevenueCatTransfer(
   to: string[],
   eventTimestampMs: number,
 ): Promise<void> {
+  await reconcileRevenueCatCustomers(ctx, [...from, ...to], eventTimestampMs);
+}
+
+/** Refunds and transfers both replace local access with the current Pro entitlement. */
+export async function reconcileRevenueCatCustomers(
+  ctx: ActionCtx,
+  userIds: string[],
+  eventTimestampMs: number,
+): Promise<void> {
   const owners = await ctx.runQuery(internal.subscriptions.transferOwners, {
-    userIds: [...new Set([...from, ...to])],
+    userIds: [...new Set(userIds)],
   });
   if (owners.length === 0) return;
   const apiKey = env.REVENUECAT_API_KEY;
@@ -27,7 +36,10 @@ export async function reconcileRevenueCatTransfer(
     const body: unknown = await response.json();
     snapshots.push({
       userId,
-      ...parseRevenueCatSnapshot(body, env.REVENUECAT_ENTITLEMENT_ID ?? "Shelvr Pro"),
+      ...parseRevenueCatSnapshot(
+        body,
+        env.REVENUECAT_ENTITLEMENT_ID ?? "Shelvr Pro",
+      ),
     });
   }
   await ctx.runMutation(internal.subscriptions.reconcileTransfer, {

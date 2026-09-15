@@ -88,9 +88,8 @@ export async function hasProEntitlement(
 }
 
 /**
- * Written by the RevenueCat webhook (`http.ts`). Lifetime-ness is decided once
- * at the webhook edge (from the product id) and arrives here as
- * `status: "lifetime"`; this handler never inspects product ids.
+ * Written by the RevenueCat webhook (`http.ts`). This handler honours the
+ * supplied status and never infers access from product ids.
  *
  * Idempotent per user using the RevenueCat `event_timestamp_ms` as the ordering
  * key: a repeat or stale event whose `eventTimestampMs` is not newer than the
@@ -101,7 +100,8 @@ export async function hasProEntitlement(
  * `status` is optional — when omitted (e.g. a CANCELLATION that still has
  * access until period end) the existing status is preserved and only
  * `expiresAt` is refreshed. When `expiresAt` is 0 and no existing row is found,
- * the event is acknowledged but no row is created (there is nothing to lapse).
+ * the event is acknowledged but no row is created unless it is authoritative
+ * (a refund snapshot must record its timestamp to reject older purchases).
  */
 export const upsertSubscription = internalMutation({
   args: {
@@ -146,11 +146,12 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // A lifetime row is sticky: once `lifetime`, no later event changes it — a
+    // A lifetime row is sticky unless an authoritative snapshot replaces it — a
     // stray CANCELLATION or an EXPIRATION for an unrelated product (this table
-    // is one row per user, not per-product) is preserved as-is. The webhook
-    // edge already decided lifetime-ness, so a fresh lifetime purchase arrives
-    // as `status: "lifetime"`.
+    // is one row per user, not per-product) is preserved as-is. Refunds and
+    // reversals reconcile the current Pro entitlement instead. The webhook
+    // uses this non-expiring status for developer access and authoritative
+    // permanent grants, not a purchasable lifetime plan.
     const stickyLifetime =
       !args.authoritative &&
       existing?.status === "lifetime" &&
@@ -170,7 +171,14 @@ export const upsertSubscription = internalMutation({
     // Nothing to record: an event with no expiry and no prior state (e.g. a
     // lapsed non-lifetime event). A lifetime purchase is exempt — it reports
     // `expiresAt: 0` (non-renewing) but is a real entitlement.
-    if (existing === null && args.expiresAt === 0 && status !== "lifetime") {
+    // An authoritative lapse records the ordering timestamp even before a
+    // purchase arrives, so a delayed purchase cannot resurrect refunded access.
+    if (
+      !args.authoritative &&
+      existing === null &&
+      args.expiresAt === 0 &&
+      status !== "lifetime"
+    ) {
       return null;
     }
 
@@ -187,7 +195,8 @@ export const upsertSubscription = internalMutation({
     const doc = {
       status,
       expiresAt,
-      ...(!stickyLifetime && args.productId !== undefined
+      ...(args.authoritative ||
+      (!stickyLifetime && args.productId !== undefined)
         ? { productId: args.productId }
         : {}),
       ...(args.eventTimestampMs !== undefined
