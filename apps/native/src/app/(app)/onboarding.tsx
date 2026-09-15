@@ -234,6 +234,8 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + 24 },
           ]}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
           {step === STEPS.promise && <PromiseStep onAdvance={advance} />}

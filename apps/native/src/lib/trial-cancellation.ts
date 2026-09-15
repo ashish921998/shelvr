@@ -11,10 +11,7 @@
  */
 
 /** The next-visit cancel survey shows only on `cancelled`. */
-export type TrialCancellationState =
-  | 'cancelled'
-  | 'none'
-  | 'unknown';
+export type TrialCancellationState = "cancelled" | "none" | "unknown";
 
 /**
  * - `cancelled` — show the next-visit cancel survey.
@@ -32,7 +29,8 @@ export function classifyTrialCancellation(
   // ever reports several active trials, a cancelled one must not be masked
   // by a renewing one (order-independent by construction).
   const cancelledTrial = activeEntitlements.some(
-    (entitlement) => entitlement.periodType === 'TRIAL' && !entitlement.willRenew,
+    (entitlement) =>
+      entitlement.periodType === "TRIAL" && !entitlement.willRenew,
   );
-  return cancelledTrial ? 'cancelled' : 'none';
+  return cancelledTrial ? "cancelled" : "none";
 }

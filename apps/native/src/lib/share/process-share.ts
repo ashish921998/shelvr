@@ -12,22 +12,22 @@
 //     `failed` entries; saved entries are never re-saved.
 //   - onEntrySettled callback emits progress after each entry settles.
 
-import { extractFirstUrl, isProbablyUrl } from '@/lib/url';
-import { userSafeMessage } from '@/lib/user-safe-message';
-import type { Id } from '@convex/_generated/dataModel';
-import type { ImageSaveResult, LocalImage } from '@/lib/use-save-image';
+import { extractFirstUrl, isProbablyUrl } from "@/lib/url";
+import { userSafeMessage } from "@/lib/user-safe-message";
+import type { Id } from "@convex/_generated/dataModel";
+import type { ImageSaveResult, LocalImage } from "@/lib/use-save-image";
 import type {
   RawSharePayload,
   ShareEntry,
   ShareEntryKind,
   ShareSession,
-} from './storage';
+} from "./storage";
 
 /** The minimal slice of a resolved share payload the processor needs. Only the
  * fields that drive classification are tracked, so this stays decoupled from
  * the experimental expo-sharing types. */
 export type ResolvedPayload = {
-  contentType: 'text' | 'audio' | 'image' | 'video' | 'file' | 'website' | null;
+  contentType: "text" | "audio" | "image" | "video" | "file" | "website" | null;
   /** The primary value: a URL for `website`, the message body for `text`. */
   value: string;
   /** Resolved, dereferenced URI for uri-based content; null for text. */
@@ -41,11 +41,11 @@ export interface ShareSaveDeps {
   saveLink: (args: {
     url: string;
     operationId: string;
-  }) => Promise<Id<'items'>>;
+  }) => Promise<Id<"items">>;
   saveNote: (args: {
     text: string;
     operationId: string;
-  }) => Promise<Id<'items'>>;
+  }) => Promise<Id<"items">>;
   /** Drives plan 003's begin→upload→attach→finalize lifecycle for one image,
    * returning its settled result. A failure is already a result, never a throw. */
   saveImage: (request: {
@@ -56,11 +56,9 @@ export interface ShareSaveDeps {
 
 /** Content types the share target deliberately does not import. They are
  * reported as unsupported entries, never silently coerced into notes. */
-const UNSUPPORTED_CONTENT_TYPES = new Set<NonNullable<ResolvedPayload['contentType']>>([
-  'audio',
-  'video',
-  'file',
-]);
+const UNSUPPORTED_CONTENT_TYPES = new Set<
+  NonNullable<ResolvedPayload["contentType"]>
+>(["audio", "video", "file"]);
 
 /**
  * Classifies ONE resolved payload into a kind, WITHOUT starting any side effect.
@@ -81,29 +79,37 @@ const UNSUPPORTED_CONTENT_TYPES = new Set<NonNullable<ResolvedPayload['contentTy
  *     shape TikTok/Instagram/X actually share) → link, with the extracted URL.
  *   - other text → note.
  */
-export function classifyPayload(
-  payload: ResolvedPayload,
-): { kind: ShareEntryKind; url?: string; reason?: string } {
-  if (payload.contentType === 'image') {
+export function classifyPayload(payload: ResolvedPayload): {
+  kind: ShareEntryKind;
+  url?: string;
+  reason?: string;
+} {
+  if (payload.contentType === "image") {
     if (!payload.contentUri) {
-      return { kind: 'image', reason: 'Image could not be resolved' };
+      return { kind: "image", reason: "Image could not be resolved" };
     }
-    return { kind: 'image' };
+    return { kind: "image" };
   }
-  if (payload.contentType === 'website') {
+  if (payload.contentType === "website") {
     const url = payload.value.trim();
     if (!url || !isProbablyUrl(url)) {
-      return { kind: 'link', reason: 'Shared link was not a valid URL' };
+      return { kind: "link", reason: "Shared link was not a valid URL" };
     }
-    return { kind: 'link' };
+    return { kind: "link" };
   }
-  if (payload.contentType && UNSUPPORTED_CONTENT_TYPES.has(payload.contentType)) {
-    return { kind: 'unsupported', reason: `Unsupported content type: ${payload.contentType}` };
+  if (
+    payload.contentType &&
+    UNSUPPORTED_CONTENT_TYPES.has(payload.contentType)
+  ) {
+    return {
+      kind: "unsupported",
+      reason: `Unsupported content type: ${payload.contentType}`,
+    };
   }
   // contentType === 'text' (or null, treated as text): pasted text or a note.
   const value = payload.value.trim();
   if (!value) {
-    return { kind: 'note', reason: 'Shared text was empty' };
+    return { kind: "note", reason: "Shared text was empty" };
   }
   // Captioned links: real apps share the URL wrapped in template text ("Check
   // out this video! https://..."), which fails the whole-string isProbablyUrl
@@ -111,9 +117,9 @@ export function classifyPayload(
   // page for real metadata. A bare (possibly scheme-less) URL still wins first.
   const url = isProbablyUrl(value) ? value : extractFirstUrl(value);
   if (url) {
-    return { kind: 'link', url };
+    return { kind: "link", url };
   }
-  return { kind: 'note' };
+  return { kind: "note" };
 }
 
 /**
@@ -133,38 +139,38 @@ export function resolvedFromRawPayloads(
   return raw.map((payload) => {
     const contentMimeType = payload.mimeType ?? null;
     switch (payload.shareType) {
-      case 'url':
+      case "url":
         return {
-          contentType: 'website' as const,
+          contentType: "website" as const,
           value: payload.value,
           contentUri: null,
           contentMimeType,
         };
-      case 'image':
+      case "image":
         // Without the natively resolved contentUri the image is unreachable;
         // classification turns this into an explicit failed entry.
         return {
-          contentType: 'image' as const,
+          contentType: "image" as const,
           value: payload.value,
           contentUri: null,
           contentMimeType,
         };
-      case 'audio':
-      case 'video':
-      case 'file':
+      case "audio":
+      case "video":
+      case "file":
         return {
           contentType: payload.shareType,
           value: payload.value,
           contentUri: null,
           contentMimeType,
         };
-      case 'text':
+      case "text":
       default:
         // Unknown share types are treated as text, mirroring the SDK's own
         // 'text' default: classification extracts an embedded URL if there is
         // one and otherwise saves the body as a note.
         return {
-          contentType: 'text' as const,
+          contentType: "text" as const,
           value: payload.value,
           contentUri: null,
           contentMimeType,
@@ -192,15 +198,15 @@ export function classifyEntries(
       // Should be unreachable when raw/resolved counts match; defensive.
       return {
         ...entry,
-        status: 'failed' as const,
-        message: 'No resolved payload for this entry',
+        status: "failed" as const,
+        message: "No resolved payload for this entry",
       };
     }
     const { kind, reason } = classifyPayload(payload);
     if (reason !== undefined) {
       // The kind still records intent; status is the terminal outcome.
-      const status: ShareEntry['status'] =
-        kind === 'unsupported' ? 'unsupported' : 'failed';
+      const status: ShareEntry["status"] =
+        kind === "unsupported" ? "unsupported" : "failed";
       return { ...entry, kind, status, message: reason };
     }
     return { ...entry, kind };
@@ -231,7 +237,7 @@ export async function processSession(
     entries.map(async (entry): Promise<void> => {
       // Skip terminal entries: saved successes are never re-saved; unsupported
       // entries have nothing to attempt.
-      if (entry.status === 'saved' || entry.status === 'unsupported') return;
+      if (entry.status === "saved" || entry.status === "unsupported") return;
       // Already-processed-and-failed entries are retried; pending entries are
       // attempted for the first time. Both go through the same path.
 
@@ -269,7 +275,9 @@ async function processOne(
   entry: ShareEntry,
   resolved: ResolvedPayload[],
   deps: ShareSaveDeps,
-): Promise<Partial<ShareEntry> & { kind: ShareEntryKind; status: ShareEntry['status'] }> {
+): Promise<
+  Partial<ShareEntry> & { kind: ShareEntryKind; status: ShareEntry["status"] }
+> {
   const payload = resolved[entry.index];
   const operationId = entry.operationId;
 
@@ -277,32 +285,47 @@ async function processOne(
   // is absent (raw/resolved divergence not caught earlier) or malformed, fail
   // WITHOUT a backend call — no empty link/note item, no wasted round-trip.
   if (payload === undefined) {
-    return { kind: entry.kind, status: 'failed', message: 'No resolved payload for this entry' };
+    return {
+      kind: entry.kind,
+      status: "failed",
+      message: "No resolved payload for this entry",
+    };
   }
   const { kind, reason, url } = classifyPayload(payload);
   if (reason !== undefined) {
     // A saveable kind with a malformed payload (blank website/text, image with
     // no contentUri) is terminal; an unsupported type is terminal too.
-    const status: ShareEntry['status'] = kind === 'unsupported' ? 'unsupported' : 'failed';
+    const status: ShareEntry["status"] =
+      kind === "unsupported" ? "unsupported" : "failed";
     return { kind, status, message: reason };
   }
 
   try {
-    if (kind === 'link') {
+    if (kind === "link") {
       // Save the classifier's URL: for caption-wrapped shares this is the
       // extracted link, not the raw caption text.
       const itemId = await deps.saveLink({
         url: url ?? payload.value.trim(),
         operationId,
       });
-      return { kind, status: 'saved', itemId: String(itemId), message: undefined };
+      return {
+        kind,
+        status: "saved",
+        itemId: String(itemId),
+        message: undefined,
+      };
     }
-    if (kind === 'note') {
+    if (kind === "note") {
       const itemId = await deps.saveNote({
         text: payload.value.trim(),
         operationId,
       });
-      return { kind, status: 'saved', itemId: String(itemId), message: undefined };
+      return {
+        kind,
+        status: "saved",
+        itemId: String(itemId),
+        message: undefined,
+      };
     }
     // kind === 'image' (classifyPayload guarantees contentUri when no reason).
     const image: LocalImage = {
@@ -310,15 +333,20 @@ async function processOne(
       mimeType: payload.contentMimeType ?? undefined,
     };
     const result = await deps.saveImage({ image, operationId });
-    if (result.status === 'saved') {
-      return { kind, status: 'saved', itemId: String(result.itemId), message: undefined };
+    if (result.status === "saved") {
+      return {
+        kind,
+        status: "saved",
+        itemId: String(result.itemId),
+        message: undefined,
+      };
     }
-    return { kind, status: 'failed', message: result.message };
+    return { kind, status: "failed", message: result.message };
   } catch (error) {
     return {
       kind,
-      status: 'failed',
-      message: userSafeMessage(error, 'Could not save this item'),
+      status: "failed",
+      message: userSafeMessage(error, "Could not save this item"),
     };
   }
 }

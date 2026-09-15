@@ -21,7 +21,10 @@ vi.mock("expo-file-system", () => ({ File: class {} }));
 vi.mock("@/lib/normalize-image", () => ({ normalizeImage: vi.fn() }));
 const captured: unknown[] = [];
 vi.mock("@/lib/analytics", () => ({
-  analytics: { sessionId: () => undefined, capture: (...args: unknown[]) => captured.push(args) },
+  analytics: {
+    sessionId: () => undefined,
+    capture: (...args: unknown[]) => captured.push(args),
+  },
 }));
 vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
 vi.mock("expo-crypto", () => {
@@ -39,7 +42,9 @@ vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 // test can make a specific stage throw to assert the reported failure stage.
 function makeDeps(overrides: Partial<SaveImageDeps> = {}): SaveImageDeps {
   return {
-    begin: overrides.begin ?? (async () => ({ kind: "upload", uploadUrl: "https://upload.test" })),
+    begin:
+      overrides.begin ??
+      (async () => ({ kind: "upload", uploadUrl: "https://upload.test" })),
     normalize: overrides.normalize ?? (async (image) => image),
     upload: overrides.upload ?? (async () => "ks_storage_uploaded" as never),
     attach: overrides.attach ?? (async (_op, storageId) => ({ storageId })),
@@ -62,8 +67,12 @@ describe("saveImageOperations", () => {
     expect(results).toHaveLength(3);
     expect(results.map((r) => r.status)).toEqual(["saved", "saved", "saved"]);
     // Results follow input order even though tasks run concurrently.
-    expect((results[0] as Extract<ImageSaveResult, { status: "saved" }>).image.uri).toBe("a");
-    expect((results[2] as Extract<ImageSaveResult, { status: "saved" }>).image.uri).toBe("c");
+    expect(
+      (results[0] as Extract<ImageSaveResult, { status: "saved" }>).image.uri,
+    ).toBe("a");
+    expect(
+      (results[2] as Extract<ImageSaveResult, { status: "saved" }>).image.uri,
+    ).toBe("c");
     // Each result carries the operation id it minted — and every image in the
     // batch gets its own distinct id.
     for (const r of results) {
@@ -92,24 +101,35 @@ describe("saveImageOperations", () => {
   });
 
   it("reports a soft attach rejection and finalizes only successful siblings", async () => {
-    const finalize = vi.fn<SaveImageDeps["finalize"]>(async () => "ks_items_final" as never);
+    const finalize = vi.fn<SaveImageDeps["finalize"]>(
+      async () => "ks_items_final" as never,
+    );
     const deps = makeDeps({
-      attach: async (operationId, storageId) => operationId === "image:rejected"
-        ? { storageId, error: "This photo is empty. Please save it again." }
-        : { storageId },
+      attach: async (operationId, storageId) =>
+        operationId === "image:rejected"
+          ? { storageId, error: "This photo is empty. Please save it again." }
+          : { storageId },
       finalize,
     });
-    const results = await saveImageOperations([
-      { image: img("empty"), operationId: "image:rejected" },
-      { image: img("valid"), operationId: "image:valid" },
-    ], deps);
+    const results = await saveImageOperations(
+      [
+        { image: img("empty"), operationId: "image:rejected" },
+        { image: img("valid"), operationId: "image:valid" },
+      ],
+      deps,
+    );
     expect(results[0]).toEqual({
-      status: "failed", operationId: "image:rejected", image: img("empty"),
-      stage: "attach", message: "This photo is empty. Please save it again.",
+      status: "failed",
+      operationId: "image:rejected",
+      image: img("empty"),
+      stage: "attach",
+      message: "This photo is empty. Please save it again.",
     });
     expect(results[1].status).toBe("saved");
     expect(finalize).toHaveBeenCalledTimes(1);
-    expect(finalize).toHaveBeenCalledWith(expect.objectContaining({ operationId: "image:valid" }));
+    expect(finalize).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: "image:valid" }),
+    );
   });
 
   it("lets a retry submit only the failed operation id, reusing it verbatim", async () => {
@@ -150,9 +170,10 @@ describe("saveImageOperations", () => {
     });
     const retryResults = await saveImageOperations(retryRequests, retryDeps);
     expect(retryResults.map((r) => r.status)).toEqual(["saved", "saved"]);
-    expect(
-      (retryResults.map((r) => r.operationId).sort() as string[]),
-    ).toEqual(["image:op-a", "image:op-b"]);
+    expect(retryResults.map((r) => r.operationId).sort() as string[]).toEqual([
+      "image:op-a",
+      "image:op-b",
+    ]);
     expect(finalized.has("image:op-a")).toBe(true);
     expect(finalized.has("image:op-b")).toBe(true);
   });
@@ -160,7 +181,10 @@ describe("saveImageOperations", () => {
   it("skips the upload when begin reports the operation already complete", async () => {
     const upload = vi.fn(async () => "ks_storage_should_not_run" as never);
     const deps = makeDeps({
-      begin: async () => ({ kind: "complete", itemId: "ks_items_existing" as never }),
+      begin: async () => ({
+        kind: "complete",
+        itemId: "ks_items_existing" as never,
+      }),
       upload,
     });
     const results = await saveImageOperations(
@@ -174,15 +198,19 @@ describe("saveImageOperations", () => {
   });
 
   it("reports the correct stage when begin fails", async () => {
-    const deps = makeDeps({ begin: async () => {
-      throw new Error("begin down");
-    } });
+    const deps = makeDeps({
+      begin: async () => {
+        throw new Error("begin down");
+      },
+    });
     const results = await saveImageOperations(
       [{ image: img("a"), operationId: "image:op-a" }],
       deps,
     );
     expect(results[0].status).toBe("failed");
-    expect((results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage).toBe("begin");
+    expect(
+      (results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage,
+    ).toBe("begin");
   });
 
   it("reports the correct stage when attach fails", async () => {
@@ -195,7 +223,9 @@ describe("saveImageOperations", () => {
       [{ image: img("a"), operationId: "image:op-a" }],
       deps,
     );
-    expect((results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage).toBe("attach");
+    expect(
+      (results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage,
+    ).toBe("attach");
   });
 
   it("reports the correct stage when finalize fails", async () => {
@@ -208,7 +238,9 @@ describe("saveImageOperations", () => {
       [{ image: img("a"), operationId: "image:op-a" }],
       deps,
     );
-    expect((results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage).toBe("finalize");
+    expect(
+      (results[0] as Extract<ImageSaveResult, { status: "failed" }>).stage,
+    ).toBe("finalize");
   });
 
   it("sanitizes URLs and ids out of the failure message", async () => {
@@ -292,14 +324,23 @@ describe("saveImageOperations", () => {
       },
     });
     const results = await saveImageOperations(
-      [{ image: { uri: "a", width: 4000, height: 2000 } }, { image: img("bad") }],
+      [
+        { image: { uri: "a", width: 4000, height: 2000 } },
+        { image: img("bad") },
+      ],
       deps,
     );
     expect(uploaded).toEqual(["a-small"]);
-    expect(finalizeInputs).toEqual([expect.objectContaining({ aspectRatio: 2 })]);
+    expect(finalizeInputs).toEqual([
+      expect.objectContaining({ aspectRatio: 2 }),
+    ]);
     // The result still carries the original so a retry re-normalizes from it.
     expect(results[0]).toMatchObject({ status: "saved", image: { uri: "a" } });
-    expect(results[1]).toMatchObject({ status: "failed", stage: "normalize", message: "decode failed" });
+    expect(results[1]).toMatchObject({
+      status: "failed",
+      stage: "normalize",
+      message: "decode failed",
+    });
   });
 
   it("runs at most MAX_CONCURRENT_SAVES operations at a time", async () => {
@@ -313,17 +354,23 @@ describe("saveImageOperations", () => {
         return "ks_storage_uploaded" as never;
       },
     });
-    const requests = Array.from({ length: 10 }, (_, i) => ({ image: img(`img-${i}`) }));
+    const requests = Array.from({ length: 10 }, (_, i) => ({
+      image: img(`img-${i}`),
+    }));
     const results = await saveImageOperations(requests, deps);
     expect(peak).toBe(MAX_CONCURRENT_SAVES);
-    expect(results.map((r) => r.image.uri)).toEqual(requests.map((r) => r.image.uri));
+    expect(results.map((r) => r.image.uri)).toEqual(
+      requests.map((r) => r.image.uri),
+    );
   });
 
   it("surfaces a ConvexError's data as the message, not the transport string", async () => {
     const { ConvexError } = await import("convex/values");
     const deps = makeDeps({
       begin: async () => {
-        throw new ConvexError("Photo limit reached (1,000). Delete some photos to save more.");
+        throw new ConvexError(
+          "Photo limit reached (1,000). Delete some photos to save more.",
+        );
       },
     });
     const results = await saveImageOperations([{ image: img("a") }], deps);
@@ -336,32 +383,55 @@ describe("saveImageOperations", () => {
 
   it("buckets the server's quota and size refusals, everything else as other", async () => {
     const { ConvexError } = await import("convex/values");
-    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");
+    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } =
+      await import("@convex/model/imagePolicy");
     // Server refusals arrive as ConvexError; client-side failures as plain Error.
     const failWith = async (error: unknown) => {
-      const deps = makeDeps({ upload: async () => { throw error; } });
+      const deps = makeDeps({
+        upload: async () => {
+          throw error;
+        },
+      });
       const [result] = await saveImageOperations([{ image: img("a") }], deps);
-      return saveFailureReason((result as Extract<ImageSaveResult, { status: "failed" }>).message);
+      return saveFailureReason(
+        (result as Extract<ImageSaveResult, { status: "failed" }>).message,
+      );
     };
-    expect(await failWith(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe("photo_limit");
-    expect(await failWith(new ConvexError(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
-    expect(await failWith(new Error(IMAGE_TOO_LARGE_MESSAGE))).toBe("too_large");
+    expect(await failWith(new ConvexError(PHOTO_LIMIT_MESSAGE))).toBe(
+      "photo_limit",
+    );
+    expect(await failWith(new ConvexError(IMAGE_TOO_LARGE_MESSAGE))).toBe(
+      "too_large",
+    );
+    expect(await failWith(new Error(IMAGE_TOO_LARGE_MESSAGE))).toBe(
+      "too_large",
+    );
     expect(await failWith(new Error("Upload failed (503)"))).toBe("other");
   });
 
   it("buckets a structured refusal by its code, not by the sentence", async () => {
     const { saveError } = await import("@convex/model/saveErrors");
-    const deps = makeDeps({ upload: async () => { throw saveError("photo_limit"); } });
+    const deps = makeDeps({
+      upload: async () => {
+        throw saveError("photo_limit");
+      },
+    });
     const [result] = await saveImageOperations([{ image: img("a") }], deps);
     const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
     expect(failed.code).toBe("photo_limit");
     // A server-side copy edit must not move the bucket.
-    expect(saveFailureReason("some reworded sentence", failed.code)).toBe("photo_limit");
+    expect(saveFailureReason("some reworded sentence", failed.code)).toBe(
+      "photo_limit",
+    );
   });
 
   it("carries pro_required through so the caller can open the paywall", async () => {
     const { saveError } = await import("@convex/model/saveErrors");
-    const deps = makeDeps({ begin: async () => { throw saveError("pro_required"); } });
+    const deps = makeDeps({
+      begin: async () => {
+        throw saveError("pro_required");
+      },
+    });
     const [result] = await saveImageOperations([{ image: img("a") }], deps);
     const failed = result as Extract<ImageSaveResult, { status: "failed" }>;
     expect(failed.code).toBe("pro_required");
@@ -371,7 +441,8 @@ describe("saveImageOperations", () => {
 
   it("reports one images_save_failed event per reason in a mixed batch", async () => {
     const { ConvexError } = await import("convex/values");
-    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } = await import("@convex/model/imagePolicy");
+    const { PHOTO_LIMIT_MESSAGE, IMAGE_TOO_LARGE_MESSAGE } =
+      await import("@convex/model/imagePolicy");
     const errors: Record<string, unknown> = {
       a: new ConvexError(PHOTO_LIMIT_MESSAGE),
       b: new ConvexError(PHOTO_LIMIT_MESSAGE),
@@ -389,10 +460,12 @@ describe("saveImageOperations", () => {
     );
     captured.length = 0;
     reportSaveFailures(results);
-    expect(captured).toEqual(expect.arrayContaining([
-      ["images_save_failed", { reason: "photo_limit", image_count: 2 }],
-      ["images_save_failed", { reason: "too_large", image_count: 1 }],
-    ]));
+    expect(captured).toEqual(
+      expect.arrayContaining([
+        ["images_save_failed", { reason: "photo_limit", image_count: 2 }],
+        ["images_save_failed", { reason: "too_large", image_count: 1 }],
+      ]),
+    );
     expect(captured).toHaveLength(2);
   });
 

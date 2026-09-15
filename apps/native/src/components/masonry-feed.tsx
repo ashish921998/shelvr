@@ -17,6 +17,7 @@ type Props = {
   loadingMore?: boolean;
   ListEmptyComponent?: React.ComponentType | React.ReactElement;
   ListHeaderComponent?: React.ComponentType | React.ReactElement;
+  onScrollBeginDrag?: () => void;
 };
 
 export function MasonryFeed({
@@ -28,11 +29,13 @@ export function MasonryFeed({
   loadingMore,
   ListEmptyComponent: listEmptyComponent,
   ListHeaderComponent: listHeaderComponent,
+  onScrollBeginDrag,
 }: Props) {
   const { theme } = useUnistyles();
   return (
     <FlashList
       data={items}
+      maintainVisibleContentPosition={{ disabled: source?.from === "search" }}
       masonry
       numColumns={numColumns}
       optimizeItemArrangement
@@ -47,6 +50,9 @@ export function MasonryFeed({
         )
       }
       contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      onScrollBeginDrag={onScrollBeginDrag}
       contentContainerStyle={{
         flexGrow: items.length === 0 ? 1 : undefined,
         paddingHorizontal: 0,

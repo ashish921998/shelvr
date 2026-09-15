@@ -8,7 +8,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -24,6 +24,7 @@ function useDebounced<T>(value: T, delay: number): T {
 export default function SearchScreen() {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
+  const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
   // iOS types into the native header search bar. Everywhere else the floating
   // tab bar owns the field and shares its text through the tab search store.
   const [iosSearch, setIosSearch] = useState("");
@@ -40,6 +41,7 @@ export default function SearchScreen() {
     <View style={styles.container}>
       {Platform.OS === "ios" ? (
         <Stack.SearchBar
+          ref={searchBarRef}
           placeholder={t("search.placeholder")}
           autoCapitalize="none"
           hideWhenScrolling={false}
@@ -64,6 +66,7 @@ export default function SearchScreen() {
         <MasonryFeed
           items={results ?? []}
           source={{ from: "search", q: query }}
+          onScrollBeginDrag={() => searchBarRef.current?.blur()}
         />
       )}
       <ProgressiveBlurHeader />

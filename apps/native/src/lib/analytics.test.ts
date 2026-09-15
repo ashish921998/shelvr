@@ -109,7 +109,9 @@ describe("captureError", () => {
     const error = new TypeError("Value: https://private.example/note text");
     analytics.captureError("share_save_failed", error, { entry_count: 2 });
     // Console diagnostics retain a known type, never the raw error.
-    expect(console.error).toHaveBeenCalledWith("share_save_failed", { error_type: "TypeError" });
+    expect(console.error).toHaveBeenCalledWith("share_save_failed", {
+      error_type: "TypeError",
+    });
     expect(console.error).not.toHaveBeenCalledWith("share_save_failed", error);
     expect(mock.captureException).toHaveBeenCalledTimes(1);
     const [reported, properties] = mock.captureException.mock.calls[0];
@@ -139,9 +141,15 @@ describe("captureError", () => {
     error.name = "private customer name";
     analytics.captureError("save_failed", error);
     analytics.captureError("save_failed", { secret: "private value" });
-    expect(console.error).toHaveBeenNthCalledWith(1, "save_failed", { error_type: "Error" });
-    expect(console.error).toHaveBeenNthCalledWith(2, "save_failed", { error_type: "Unknown" });
-    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private");
+    expect(console.error).toHaveBeenNthCalledWith(1, "save_failed", {
+      error_type: "Error",
+    });
+    expect(console.error).toHaveBeenNthCalledWith(2, "save_failed", {
+      error_type: "Unknown",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      "private",
+    );
   });
 
   it("reduces non-Error throws to their type", () => {

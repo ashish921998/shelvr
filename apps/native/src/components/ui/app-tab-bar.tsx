@@ -140,7 +140,7 @@ function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
 }
 
 function useKeyboardVisible(): boolean {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(Keyboard.isVisible);
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () =>
       setVisible(true),
@@ -570,6 +570,8 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
+            onSubmitEditing={Keyboard.dismiss}
+            accessibilityLabel={t("search.placeholder")}
             style={styles.input}
           />
         </Animated.View>
