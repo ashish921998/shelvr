@@ -109,6 +109,9 @@ export default defineSchema({
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
     .index("by_user_and_type", ["userId", "type"])
+    // Bulk import skips links the user already saved. Link URLs are stored
+    // normalized, so an exact lookup finds a save of any age.
+    .index("by_user_and_url", ["userId", "url"])
     // Status-scoped reads for one user (e.g. the ready items a recommendation
     // pass samples) without over-reading and filtering in JS.
     .index("by_user_and_status", ["userId", "status"])

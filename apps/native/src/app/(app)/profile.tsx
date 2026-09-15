@@ -386,6 +386,19 @@ export default function ProfileScreen() {
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           accessibilityRole="button"
+          accessibilityLabel={t("import.fromX")}
+          onPress={() => router.push("/import")}
+        >
+          <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
+          <AppSymbolIcon
+            name="chevron.right"
+            size={16}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
           accessibilityLabel={t("feedback.open")}
           onPress={() => setFeedbackOpen(true)}
         >

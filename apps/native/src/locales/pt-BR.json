@@ -452,5 +452,45 @@
   "cancelSurvey.missingFeature": "Falta um recurso",
   "cancelSurvey.other": "Outro motivo",
   "cancelSurvey.skipLabel": "Pular pesquisa de cancelamento",
-  "cancelSurvey.skip": "Pular"
+  "cancelSurvey.skip": "Pular",
+  "import.fromX": "Importar do X",
+  "import.title": "Importar links",
+  "import.description": "Cole uma lista de URLs abaixo — uma por linha ou como um array JSON. Cada link será salvo e organizado automaticamente pelo Shelvr, como um salvamento normal.",
+  "import.xHintTitle": "Importar favoritos do X",
+  "import.xHintBody": "1. No X, vá em Configurações → Sua conta → Baixe um arquivo dos seus dados.\n2. Após receber o arquivo, abra o arquivo de Bookmarks e copie seu conteúdo (a lista JSON).\n3. Cole-as acima e toque em Importar.",
+  "import.placeholder": "Cole URLs aqui…",
+  "import.urlReady": {
+    "one": "%{formattedCount} URL pronta para importar",
+    "many": "%{formattedCount} URLs prontas para importar",
+    "other": "%{formattedCount} URLs prontas para importar"
+  },
+  "import.progress": {
+    "one": "Importando %{formattedCount} link…",
+    "many": "Importando %{formattedCount} links…",
+    "other": "Importando %{formattedCount} links…"
+  },
+  "import.action": "Importar",
+  "import.resultCount": {
+    "one": "%{formattedCount} link importado",
+    "many": "%{formattedCount} links importados",
+    "other": "%{formattedCount} links importados"
+  },
+  "import.skipped": {
+    "one": "%{formattedCount} já estava salvo e foi ignorado",
+    "many": "%{formattedCount} já estavam salvos e foram ignorados",
+    "other": "%{formattedCount} já estavam salvos e foram ignorados"
+  },
+  "import.invalid": {
+    "one": "%{formattedCount} não era um link válido",
+    "many": "%{formattedCount} não eram links válidos",
+    "other": "%{formattedCount} não eram links válidos"
+  },
+  "import.notProcessed": {
+    "one": "%{formattedCount} link ainda não foi importado",
+    "many": "%{formattedCount} links ainda não foram importados",
+    "other": "%{formattedCount} links ainda não foram importados"
+  },
+  "import.rateLimited": "Você atingiu o limite de importação por enquanto. Tente novamente mais tarde com a mesma lista para continuar; links já salvos são ignorados.",
+  "import.failed": "A importação parou antes de terminar. Tente novamente mais tarde com a mesma lista para continuar; links já salvos são ignorados.",
+  "import.more": "Importar mais"
 }

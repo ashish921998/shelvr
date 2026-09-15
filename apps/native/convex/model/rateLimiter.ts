@@ -10,6 +10,12 @@ import { components } from "../_generated/api";
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   itemCreate: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
   findLinks: { kind: "token bucket", rate: 60, period: HOUR, capacity: 15 },
+  // Bulk link import (X bookmarks). An export runs to hundreds of links, so
+  // the single-save itemCreate burst of 30 would stop it almost at once. One
+  // token per link actually created (duplicates are free), charged per batch
+  // of up to 50. Still Pro-gated and bounded: at most 600 classifications an
+  // hour through this path.
+  bulkImport: { kind: "token bucket", rate: 600, period: HOUR, capacity: 600 },
   // Retrying a failed/partial save re-runs the fetch + one classification, so
   // it costs the same as a create; capped tighter since it is a manual repair.
   reprocessItem: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },

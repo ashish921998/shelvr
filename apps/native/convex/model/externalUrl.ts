@@ -101,7 +101,10 @@ export function normalizeExternalUrl(raw: string): string {
   }
 
   if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
-    throw new UrlPolicyErrorClass("unsupported_scheme", "Only http(s) URLs are allowed");
+    throw new UrlPolicyErrorClass(
+      "unsupported_scheme",
+      "Only http(s) URLs are allowed",
+    );
   }
   // The URL serializer exposes username/password via these getters even when
   // absent from the original string for some hosts; check the raw userInfo part.
@@ -118,7 +121,10 @@ export function normalizeExternalUrl(raw: string): string {
   // strips only the *default* port for the scheme). Any remaining port is
   // non-default and is rejected — we only ever fetch standard web endpoints.
   if (parsed.port !== "") {
-    throw new UrlPolicyErrorClass("invalid_port", "Non-default ports are not allowed");
+    throw new UrlPolicyErrorClass(
+      "invalid_port",
+      "Non-default ports are not allowed",
+    );
   }
 
   const canonical = parsed.href;
@@ -128,8 +134,6 @@ export function normalizeExternalUrl(raw: string): string {
   return canonical;
 }
 
-
-
 /** True for a TikTok video link (any subdomain, including the `vm`/`vt` short
  * hosts). Shared by the pipeline (oEmbed instead of a page fetch — TikTok
  * refuses bot page loads) and the client (video card/detail treatment). */
@@ -138,6 +142,31 @@ export function isTikTokUrl(url: string | undefined): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host === "tiktok.com" || host.endsWith(".tiktok.com");
+  } catch {
+    return false;
+  }
+}
+
+/** True for an X / Twitter post URL, the only shape X's oEmbed endpoint
+ * accepts: `x.com/{user}/status/{id}` and the `x.com/i/web/status/{id}` path
+ * the import screen builds from archive bookmark ids. Profiles, lists, and
+ * `t.co` short links are not posts and go through the normal page reader. */
+export function isXTweetUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host !== "x.com" &&
+      !host.endsWith(".x.com") &&
+      host !== "twitter.com" &&
+      !host.endsWith(".twitter.com")
+    ) {
+      return false;
+    }
+    // The id must be a whole path segment, optionally followed by more
+    // segments such as /photo/1, so /status/123abc is rejected.
+    return /^\/(?:[^/]+|i\/web)\/status\/\d+(?:\/.*)?$/.test(parsed.pathname);
   } catch {
     return false;
   }

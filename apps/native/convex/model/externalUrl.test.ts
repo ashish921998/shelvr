@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isTikTokUrl,
   isUrlPolicyError,
+  isXTweetUrl,
   MAX_URL_LENGTH,
   normalizeExternalUrl,
 } from "./externalUrl";
@@ -26,8 +27,12 @@ describe("normalizeExternalUrl - scheme handling", () => {
   });
 
   it("keeps an existing http(s) scheme unchanged in form", () => {
-    expect(normalizeExternalUrl("http://example.com")).toBe("http://example.com/");
-    expect(normalizeExternalUrl("https://example.com")).toBe("https://example.com/");
+    expect(normalizeExternalUrl("http://example.com")).toBe(
+      "http://example.com/",
+    );
+    expect(normalizeExternalUrl("https://example.com")).toBe(
+      "https://example.com/",
+    );
   });
 
   it("rejects non-http schemes, including single-colon schemes", () => {
@@ -76,7 +81,9 @@ describe("normalizeExternalUrl - host", () => {
 
 describe("normalizeExternalUrl - ports", () => {
   it("accepts and normalizes explicit default ports", () => {
-    expect(normalizeExternalUrl("http://example.com:80")).toBe("http://example.com/");
+    expect(normalizeExternalUrl("http://example.com:80")).toBe(
+      "http://example.com/",
+    );
     expect(normalizeExternalUrl("https://example.com:443")).toBe(
       "https://example.com/",
     );
@@ -91,11 +98,15 @@ describe("normalizeExternalUrl - ports", () => {
 describe("normalizeExternalUrl - IPv4 canonicalization", () => {
   it("canonicalizes decimal IPv4", () => {
     // 167903424 decimal -> 10.2.0.192 per the WHATWG host parser.
-    expect(normalizeExternalUrl("https://167903424")).toBe("https://10.2.0.192/");
+    expect(normalizeExternalUrl("https://167903424")).toBe(
+      "https://10.2.0.192/",
+    );
   });
   it("canonicalizes hex IPv4", () => {
     // 0x0a.0x02.0x03.0x04 == 10.2.3.4
-    expect(normalizeExternalUrl("https://0x0a020304")).toBe("https://10.2.3.4/");
+    expect(normalizeExternalUrl("https://0x0a020304")).toBe(
+      "https://10.2.3.4/",
+    );
   });
   it("canonicalizes short/legacy IPv4 forms", () => {
     // 10 -> 0.0.0.10
@@ -150,7 +161,9 @@ describe("normalizeExternalUrl - empty / invalid", () => {
 
 describe("isTikTokUrl", () => {
   it("matches tiktok.com and its subdomains, including short hosts", () => {
-    expect(isTikTokUrl("https://www.tiktok.com/@nasa/video/7301234567890123456")).toBe(true);
+    expect(
+      isTikTokUrl("https://www.tiktok.com/@nasa/video/7301234567890123456"),
+    ).toBe(true);
     expect(isTikTokUrl("https://vm.tiktok.com/ZMabc123/")).toBe(true);
     expect(isTikTokUrl("https://tiktok.com/t/ZTabc/")).toBe(true);
   });
@@ -161,5 +174,45 @@ describe("isTikTokUrl", () => {
     expect(isTikTokUrl("https://example.com")).toBe(false);
     expect(isTikTokUrl("not a url")).toBe(false);
     expect(isTikTokUrl(undefined)).toBe(false);
+  });
+});
+
+describe("isXTweetUrl", () => {
+  it("matches post URLs on x.com, twitter.com, and subdomains", () => {
+    expect(isXTweetUrl("https://x.com/nasa/status/1747678091936260416")).toBe(
+      true,
+    );
+    expect(
+      isXTweetUrl("https://twitter.com/nasa/status/1747678091936260416"),
+    ).toBe(true);
+    expect(
+      isXTweetUrl("https://mobile.twitter.com/nasa/status/1747678091936260416"),
+    ).toBe(true);
+  });
+
+  it("matches the archive bookmark shape x.com/i/web/status/{id}", () => {
+    expect(isXTweetUrl("https://x.com/i/web/status/1747678091936260416")).toBe(
+      true,
+    );
+  });
+
+  it("accepts trailing segments but rejects ids with trailing garbage", () => {
+    expect(
+      isXTweetUrl("https://x.com/nasa/status/1747678091936260416/photo/1"),
+    ).toBe(true);
+    expect(isXTweetUrl("https://x.com/nasa/status/123abc")).toBe(false);
+    expect(isXTweetUrl("https://x.com/nasa/status/abc123")).toBe(false);
+  });
+
+  it("rejects profiles, lists, short links, look-alike hosts, and bad input", () => {
+    expect(isXTweetUrl("https://x.com/nasa")).toBe(false);
+    expect(isXTweetUrl("https://x.com/i/lists/12345")).toBe(false);
+    expect(isXTweetUrl("https://x.com/nasa/status")).toBe(false);
+    expect(isXTweetUrl("https://t.co/abc123")).toBe(false);
+    expect(isXTweetUrl("https://x.com.evil.example/nasa/status/123")).toBe(
+      false,
+    );
+    expect(isXTweetUrl("not a url")).toBe(false);
+    expect(isXTweetUrl(undefined)).toBe(false);
   });
 });

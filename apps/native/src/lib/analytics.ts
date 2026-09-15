@@ -78,6 +78,14 @@ type AnalyticsEventProperties = {
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
+  // Fired only when a bulk import created at least one link.
+  links_imported: {
+    url_count: number;
+    created: number;
+    skipped: number;
+    invalid: number;
+    not_processed: number;
+  };
   // Photo saves fail as data, never as thrown errors, so error tracking never
   // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };

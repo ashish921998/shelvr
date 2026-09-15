@@ -444,5 +444,39 @@
   "cancelSurvey.missingFeature": "Eine Funktion fehlt",
   "cancelSurvey.other": "Etwas anderes",
   "cancelSurvey.skipLabel": "Umfrage zur Kündigung überspringen",
-  "cancelSurvey.skip": "Überspringen"
+  "cancelSurvey.skip": "Überspringen",
+  "import.fromX": "Aus X importieren",
+  "import.title": "Links importieren",
+  "import.description": "Füge unten eine Liste von URLs ein — eine pro Zeile oder als JSON-Array. Jeder Link wird in Shelvr gespeichert und automatisch organisiert, genau wie ein normaler Speichervorgang.",
+  "import.xHintTitle": "X-Lesezeichen importieren",
+  "import.xHintBody": "1. Gehe in X zu Einstellungen → Dein Konto → Lade ein Archiv deiner Daten herunter.\n2. Öffne nach Erhalt des Archivs die Bookmarks-Datei und kopiere ihren Inhalt (die JSON-Liste).\n3. Füge sie oben ein und tippe auf Importieren.",
+  "import.placeholder": "URLs hier einfügen…",
+  "import.urlReady": {
+    "one": "%{formattedCount} URL bereit zum Importieren",
+    "other": "%{formattedCount} URLs bereit zum Importieren"
+  },
+  "import.progress": {
+    "one": "%{formattedCount} Link wird importiert…",
+    "other": "%{formattedCount} Links werden importiert…"
+  },
+  "import.action": "Importieren",
+  "import.resultCount": {
+    "one": "%{formattedCount} Link importiert",
+    "other": "%{formattedCount} Links importiert"
+  },
+  "import.skipped": {
+    "one": "%{formattedCount} war bereits gespeichert und wurde übersprungen",
+    "other": "%{formattedCount} waren bereits gespeichert und wurden übersprungen"
+  },
+  "import.invalid": {
+    "one": "%{formattedCount} war kein gültiger Link",
+    "other": "%{formattedCount} waren keine gültigen Links"
+  },
+  "import.notProcessed": {
+    "one": "%{formattedCount} Link wurde noch nicht importiert",
+    "other": "%{formattedCount} Links wurden noch nicht importiert"
+  },
+  "import.rateLimited": "Du hast das Importlimit vorerst erreicht. Versuche es später mit derselben Liste erneut, um fortzufahren; bereits gespeicherte Links werden übersprungen.",
+  "import.failed": "Der Import wurde vorzeitig beendet. Versuche es später mit derselben Liste erneut, um fortzufahren; bereits gespeicherte Links werden übersprungen.",
+  "import.more": "Mehr importieren"
 }
