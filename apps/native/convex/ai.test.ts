@@ -1,14 +1,20 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { extractBodyText, linkEnrichment, storePoster } from "./ai";
+import {
+  extractBodyText,
+  fetchXoEmbed,
+  linkEnrichment,
+  storePoster,
+} from "./ai";
 
 const safeFetch = vi.hoisted(() => vi.fn());
+const parseJson = vi.hoisted(() => vi.fn());
 
 vi.mock("./model/safeFetch", () => ({
   decodeWithContentType: vi.fn(),
   isSafeFetchError: vi.fn(),
-  parseJson: vi.fn(),
+  parseJson,
   safeFetch,
 }));
 
@@ -41,28 +47,86 @@ describe("storePoster", () => {
   });
 });
 
+describe("fetchXoEmbed", () => {
+  beforeEach(() => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    safeFetch.mockResolvedValue({
+      ok: true,
+      finalUrl: "https://publish.twitter.com/oembed",
+      status: 200,
+      contentType: "application/json",
+      bytes: new Uint8Array([1]),
+    });
+  });
+
+  it.each([null, "text", 42, ["html"]])(
+    "rejects a %j body as an unreadable page, not a TypeError",
+    async (body) => {
+      parseJson.mockReturnValue(body);
+      const read = fetchXoEmbed("https://x.com/nasa/status/1");
+      await expect(read).rejects.not.toBeInstanceOf(TypeError);
+      await expect(read).rejects.toMatchObject({ code: "http_error" });
+    },
+  );
+
+  it("keeps the post paragraph and drops the attribution", async () => {
+    parseJson.mockReturnValue({
+      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://t.co/x">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
+      author_url: "https://twitter.com/NASA",
+      author_name: "NASA",
+    });
+    await expect(fetchXoEmbed("https://x.com/NASA/status/1")).resolves.toEqual({
+      title: "Hello & #space",
+      siteName: "X",
+      author: "@NASA",
+      content: "Hello & #space",
+    });
+  });
+});
+
 describe("linkEnrichment", () => {
   it("preserves readable content with a menu class", () => {
-    const content = extractBodyText('<html><head><title>Seasonal menu</title></head><body><main class="menu"><h1>Seasonal menu</h1><p>Our spring tasting menu begins with fresh asparagus, garden peas, and herbs from the kitchen garden.</p><p>The main course pairs roasted vegetables with handmade pasta, followed by a dessert of local strawberries and cream.</p></main></body></html>', "https://example.com/menu");
+    const content = extractBodyText(
+      '<html><head><title>Seasonal menu</title></head><body><main class="menu"><h1>Seasonal menu</h1><p>Our spring tasting menu begins with fresh asparagus, garden peas, and herbs from the kitchen garden.</p><p>The main course pairs roasted vegetables with handmade pasta, followed by a dessert of local strawberries and cream.</p></main></body></html>',
+      "https://example.com/menu",
+    );
     expect(content).toContain("Our spring tasting menu");
     expect(content).toContain("The main course pairs");
     expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
   });
-  it.each(["article", "main", "div"])("preserves short readable text inside %s", (tag) => {
-    const content = extractBodyText(`<html><head><title>Field notes</title></head><body><${tag}><h1>Field notes</h1><p>We walked along the river at dawn. The water was still and the reeds were full of birds.</p><p>By noon the wind had picked up. We returned along the ridge and watched the clouds gather.</p></${tag}></body></html>`, "https://example.com/notes");
-    expect(content).toContain("We walked along the river");
-    expect(content).toContain("By noon the wind");
-    expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();
-  });
+  it.each(["article", "main", "div"])(
+    "preserves short readable text inside %s",
+    (tag) => {
+      const content = extractBodyText(
+        `<html><head><title>Field notes</title></head><body><${tag}><h1>Field notes</h1><p>We walked along the river at dawn. The water was still and the reeds were full of birds.</p><p>By noon the wind had picked up. We returned along the ridge and watched the clouds gather.</p></${tag}></body></html>`,
+        "https://example.com/notes",
+      );
+      expect(content).toContain("We walked along the river");
+      expect(content).toContain("By noon the wind");
+      expect(
+        linkEnrichment({ status: "ok", page: { content } }),
+      ).toBeUndefined();
+    },
+  );
   it("does not turn page chrome into an article body", () => {
-    const content = extractBodyText('<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>', "https://example.com");
+    const content = extractBodyText(
+      '<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>',
+      "https://example.com",
+    );
     expect(content).toBeUndefined();
-    expect(linkEnrichment({ status: "ok", page: { content } })).toBe("no_article");
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBe(
+      "no_article",
+    );
   });
 
   it("preserves readable article text", () => {
-    const paragraph = "A reader follows the winding path through the forest, observing the changing leaves and the quiet stream. Each season brings a different landscape, with new plants and animals to discover. ";
-    const content = extractBodyText(`<html><head><title>A forest walk</title></head><body><nav>Home</nav><article><h1>A forest walk</h1>${Array.from({ length: 6 }, () => `<p>${paragraph.repeat(3)}</p>`).join("")}</article><footer>Copyright</footer></body></html>`, "https://example.com/article");
+    const paragraph =
+      "A reader follows the winding path through the forest, observing the changing leaves and the quiet stream. Each season brings a different landscape, with new plants and animals to discover. ";
+    const content = extractBodyText(
+      `<html><head><title>A forest walk</title></head><body><nav>Home</nav><article><h1>A forest walk</h1>${Array.from({ length: 6 }, () => `<p>${paragraph.repeat(3)}</p>`).join("")}</article><footer>Copyright</footer></body></html>`,
+      "https://example.com/article",
+    );
     expect(content).toContain("A reader follows");
     expect(content).not.toContain("Copyright");
     expect(linkEnrichment({ status: "ok", page: { content } })).toBeUndefined();

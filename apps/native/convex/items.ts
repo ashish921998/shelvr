@@ -1290,6 +1290,152 @@ export const createNoteItem = mutation({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Bulk link import (X bookmarks)
+// ---------------------------------------------------------------------------
+
+/** Most URLs one importLinks call accepts. Each created link is one insert and
+ * two scheduled functions, so a batch stays well inside a transaction; the
+ * client pages through longer lists. */
+const MAX_IMPORT_BATCH = 50;
+
+/** Gap between successive processItem runs of one import, so hundreds of page
+ * fetches and classifications do not start at once. */
+export const IMPORT_STAGGER_MS = 1000;
+
+/** Cap on the client-supplied stagger offset. The bulkImport bucket holds 600
+ * tokens, so an honest import never passes this; a larger value would only
+ * push processing further into the future. */
+const MAX_IMPORT_STAGGER_OFFSET = 1000;
+
+const importLinksResultValidator = v.object({
+  created: v.number(),
+  // Already saved, or repeated earlier in this batch.
+  skipped: v.number(),
+  // Not a URL the save policy accepts.
+  invalid: v.number(),
+  // New, valid links left uncreated because the bulkImport bucket was empty.
+  notProcessed: v.number(),
+  rateLimited: v.boolean(),
+});
+
+/** Whether the user already saved this link. Every link save stores the
+ * normalized URL, so the index lookup is exact and finds a save of any age. */
+async function hasSavedLink(
+  ctx: QueryCtx,
+  userId: string,
+  url: string,
+): Promise<boolean> {
+  const match = await ctx.db
+    .query("items")
+    .withIndex("by_user_and_url", (q) => q.eq("userId", userId).eq("url", url))
+    .first();
+  return match !== null;
+}
+
+/**
+ * Bulk-import link URLs, such as X bookmarks. Each new link goes through the
+ * same pipeline as a single save. Links already saved and repeats within the
+ * batch are skipped for free, so pasting the same list again resumes an
+ * import that stopped at the rate limit.
+ *
+ * The batch draws one `bulkImport` token per link it would create, all or
+ * nothing. When the bucket cannot cover the batch, nothing is created and
+ * `rateLimited` tells the client to stop paging.
+ */
+export const importLinks = mutation({
+  args: {
+    urls: v.array(v.string()),
+    // Links earlier calls of this import created, so the processing stagger
+    // continues across batches instead of restarting at zero.
+    staggerOffset: v.optional(v.number()),
+  },
+  returns: importLinksResultValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    if (args.urls.length > MAX_IMPORT_BATCH) {
+      throw new ConvexError(
+        `Import accepts at most ${MAX_IMPORT_BATCH} URLs per call`,
+      );
+    }
+
+    let skipped = 0;
+    let invalid = 0;
+    const fresh: string[] = [];
+    for (const raw of args.urls) {
+      const trimmed = raw.trim();
+      if (trimmed === "") continue;
+      let url: string;
+      try {
+        url = normalizeExternalUrl(trimmed);
+      } catch {
+        invalid++;
+        continue;
+      }
+      if (fresh.includes(url) || (await hasSavedLink(ctx, userId, url))) {
+        skipped++;
+        continue;
+      }
+      fresh.push(url);
+    }
+    if (fresh.length === 0) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: 0,
+        rateLimited: false,
+      };
+    }
+
+    const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
+      key: userId,
+      count: fresh.length,
+    });
+    if (!ok) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: fresh.length,
+        rateLimited: true,
+      };
+    }
+
+    const offset = Number.isFinite(args.staggerOffset)
+      ? Math.min(
+          Math.max(Math.floor(args.staggerOffset ?? 0), 0),
+          MAX_IMPORT_STAGGER_OFFSET,
+        )
+      : 0;
+    for (const [index, url] of fresh.entries()) {
+      const run = beginProcessingRun();
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        ...run,
+        url,
+        tags: [],
+        searchText: "",
+      });
+      await ctx.scheduler.runAfter(
+        (offset + index) * IMPORT_STAGGER_MS,
+        internal.ai.processItem,
+        { itemId, runId: run.processingRunId },
+      );
+      await scheduleSaveTelemetry(ctx, itemId);
+    }
+    return {
+      created: fresh.length,
+      skipped,
+      invalid,
+      notProcessed: 0,
+      rateLimited: false,
+    };
+  },
+});
+
 /** Delay before an edited note is re-classified. Each edit in the window
  * supersedes the scheduled run, so a burst of typing costs one model call. */
 export const NOTE_REFRESH_DELAY_MS = 20_000;

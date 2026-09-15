@@ -17,7 +17,7 @@ import {
   isSafeFetchError,
   type SafeFetchError,
 } from "./model/safeFetch";
-import { isTikTokUrl } from "./model/externalUrl";
+import { isTikTokUrl, isXTweetUrl } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS } from "./model/itemFields";
 import { logEvent } from "./model/log";
@@ -579,6 +579,59 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
 }
 
 /**
+ * X serves posts behind JS rendering and a login wall, but its public oEmbed
+ * endpoint answers with the post markup and author. The markup is
+ * `<blockquote><p>post text</p>&mdash; Author (@handle) <a>date</a></blockquote>`,
+ * so only the first paragraph becomes content; the attribution stays out. A
+ * body that is not a JSON object is unreadable, like a page that fails to
+ * parse, so the item keeps its URL-only fallback instead of crashing.
+ */
+export async function fetchXoEmbed(url: string): Promise<PageData> {
+  const endpoint = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
+  const result = await safeFetch(endpoint, {
+    timeoutMs: 15000,
+    maxBytes: 64 * 1024,
+    allowContentType: (ct) => ct.startsWith("application/json"),
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+  });
+  if (!result.ok) {
+    throw new PageFetchError(result.code, result.status);
+  }
+  let parsed: unknown;
+  try {
+    parsed = parseJson(result.bytes);
+  } catch {
+    throw new PageFetchError("http_error", result.status);
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new PageFetchError("http_error", result.status);
+  }
+  const data = parsed as Record<string, unknown>;
+  const str = (key: string) => {
+    const value = data[key];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const html = str("html") ?? "";
+  const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  const content = decodeEntities(
+    (paragraph ? paragraph[1] : html)
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+  // author_url carries the handle; author_name is the display name.
+  const handle = str("author_url")?.match(
+    /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
+  )?.[1];
+  return {
+    title: content.slice(0, 100) || undefined,
+    siteName: "X",
+    author: handle ? `@${handle}` : str("author_name"),
+    content: content || undefined,
+  };
+}
+
+/**
  * Copy a poster into Convex storage. TikTok thumbnail URLs are signed and
  * expire within hours, so the card would go blank without this. Best-effort:
  * a blocked or oversized image leaves the (short-lived) URL as the fallback.
@@ -793,7 +846,9 @@ async function readPage(url: string): Promise<PageRead> {
   try {
     const page = isTikTokUrl(url)
       ? await fetchTikTokOEmbed(url)
-      : await fetchPage(url);
+      : isXTweetUrl(url)
+        ? await fetchXoEmbed(url)
+        : await fetchPage(url);
     return { status: "ok", page };
   } catch (error) {
     if (!isPageFetchError(error)) {

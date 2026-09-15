@@ -452,5 +452,45 @@
   "cancelSurvey.missingFeature": "Il manque une fonctionnalité",
   "cancelSurvey.other": "Autre raison",
   "cancelSurvey.skipLabel": "Ignorer le questionnaire d’annulation",
-  "cancelSurvey.skip": "Ignorer"
+  "cancelSurvey.skip": "Ignorer",
+  "import.fromX": "Importer de X",
+  "import.title": "Importer des liens",
+  "import.description": "Collez une liste d’URLs ci-dessous — une par ligne ou sous forme de tableau JSON. Chaque lien sera enregistré et organisé automatiquement par Shelvr, comme une sauvegarde normale.",
+  "import.xHintTitle": "Importer les signets X",
+  "import.xHintBody": "1. Dans X, allez dans Paramètres → Votre compte → Téléchargez une archive de vos données.\n2. Après avoir reçu l’archive, ouvrez le fichier Bookmarks et copiez son contenu (la liste JSON).\n3. Collez-les ci-dessus et appuyez sur Importer.",
+  "import.placeholder": "Collez les URLs ici…",
+  "import.urlReady": {
+    "one": "%{formattedCount} URL prête à importer",
+    "many": "%{formattedCount} URLs prêtes à importer",
+    "other": "%{formattedCount} URLs prêtes à importer"
+  },
+  "import.progress": {
+    "one": "Importation de %{formattedCount} lien…",
+    "many": "Importation de %{formattedCount} liens…",
+    "other": "Importation de %{formattedCount} liens…"
+  },
+  "import.action": "Importer",
+  "import.resultCount": {
+    "one": "%{formattedCount} lien importé",
+    "many": "%{formattedCount} liens importés",
+    "other": "%{formattedCount} liens importés"
+  },
+  "import.skipped": {
+    "one": "%{formattedCount} était déjà enregistré et a été ignoré",
+    "many": "%{formattedCount} étaient déjà enregistrés et ont été ignorés",
+    "other": "%{formattedCount} étaient déjà enregistrés et ont été ignorés"
+  },
+  "import.invalid": {
+    "one": "%{formattedCount} n’était pas un lien valide",
+    "many": "%{formattedCount} n’étaient pas des liens valides",
+    "other": "%{formattedCount} n’étaient pas des liens valides"
+  },
+  "import.notProcessed": {
+    "one": "%{formattedCount} lien n’a pas encore été importé",
+    "many": "%{formattedCount} liens n’ont pas encore été importés",
+    "other": "%{formattedCount} liens n’ont pas encore été importés"
+  },
+  "import.rateLimited": "Vous avez atteint la limite d’importation pour le moment. Réessayez plus tard avec la même liste pour continuer ; les liens déjà enregistrés sont ignorés.",
+  "import.failed": "L’importation s’est arrêtée avant la fin. Réessayez plus tard avec la même liste pour continuer ; les liens déjà enregistrés sont ignorés.",
+  "import.more": "Importer plus"
 }

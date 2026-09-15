@@ -436,5 +436,33 @@
   "cancelSurvey.missingFeature": "必要な機能がない",
   "cancelSurvey.other": "その他",
   "cancelSurvey.skipLabel": "解約アンケートをスキップ",
-  "cancelSurvey.skip": "スキップ"
+  "cancelSurvey.skip": "スキップ",
+  "import.fromX": "Xからインポート",
+  "import.title": "リンクをインポート",
+  "import.description": "下にURLのリストを貼り付けてください — 1行に1つ、またはJSON配列で入力できます。各リンクは通常の保存と同様にShelvrに保存され、自動で整理されます。",
+  "import.xHintTitle": "Xのブックマークをインポート",
+  "import.xHintBody": "1. Xで「設定 → アカウント → データのアーカイブをダウンロード」に進みます。\n2. アーカイブを受け取ったら、Bookmarksファイルを開き内容（JSONリスト）をコピーします。\n3. 上に貼り付けて「インポート」をタップします。",
+  "import.placeholder": "ここにURLを貼り付け…",
+  "import.urlReady": {
+    "other": "%{formattedCount}件のURLをインポート準備完了"
+  },
+  "import.progress": {
+    "other": "%{formattedCount}件のリンクをインポート中…"
+  },
+  "import.action": "インポート",
+  "import.resultCount": {
+    "other": "%{formattedCount}件のリンクをインポートしました"
+  },
+  "import.skipped": {
+    "other": "%{formattedCount}件は保存済みのためスキップしました"
+  },
+  "import.invalid": {
+    "other": "%{formattedCount}件は有効なリンクではありませんでした"
+  },
+  "import.notProcessed": {
+    "other": "%{formattedCount}件のリンクはまだインポートされていません"
+  },
+  "import.rateLimited": "現在インポートの上限に達しています。しばらくしてから同じリストでもう一度お試しください。保存済みのリンクはスキップされます。",
+  "import.failed": "インポートが途中で停止しました。しばらくしてから同じリストでもう一度お試しください。保存済みのリンクはスキップされます。",
+  "import.more": "追加インポート"
 }

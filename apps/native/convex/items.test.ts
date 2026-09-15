@@ -8,7 +8,9 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
+import { rateLimiter } from "./model/rateLimiter";
 import {
+  IMPORT_STAGGER_MS,
   LIST_PAGE_MAX,
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
@@ -2068,6 +2070,154 @@ describe("rate limiting", () => {
     await expect(
       t.mutation(api.items.createNoteItem, { text: "over the limit" }),
     ).rejects.toThrow();
+  });
+});
+
+describe("importLinks", () => {
+  const processRuns = (t: TestCtx) =>
+    t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect())
+        .filter((job) => job.name === "ai:processItem")
+        .sort((a, b) => a.scheduledTime - b.scheduledTime),
+    );
+
+  it("creates run-fenced items whose processing continues the stagger offset", async () => {
+    const t = await as("import-user");
+    const before = Date.now();
+    const res = await t.mutation(api.items.importLinks, {
+      urls: ["https://example.com/one", "example.com/two", " "],
+      staggerOffset: 5,
+    });
+    expect(res).toEqual({
+      created: 2,
+      skipped: 0,
+      invalid: 0,
+      notProcessed: 0,
+      rateLimited: false,
+    });
+    const items = await t.run((ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", "import-user"))
+        .collect(),
+    );
+    expect(items.map((item) => item.url)).toEqual([
+      "https://example.com/one",
+      "https://example.com/two",
+    ]);
+    const runs = await processRuns(t);
+    expect(runs).toHaveLength(2);
+    expect(runs[0].scheduledTime).toBeGreaterThanOrEqual(
+      before + 5 * IMPORT_STAGGER_MS,
+    );
+    expect(
+      runs[1].scheduledTime - runs[0].scheduledTime,
+    ).toBeGreaterThanOrEqual(IMPORT_STAGGER_MS);
+    for (const run of runs) {
+      const { itemId, runId } = run.args[0] as {
+        itemId: string;
+        runId: string;
+      };
+      expect(items.find((item) => item._id === itemId)?.processingRunId).toBe(
+        runId,
+      );
+    }
+  });
+
+  it("skips a link saved long before the latest 1,000 through the URL index", async () => {
+    const t = await as("import-dedup");
+    await seedFeed(t, "import-dedup", 1); // https://example.com/0, the oldest save
+    await t.run(async (ctx) => {
+      for (let i = 1; i <= 5; i++) {
+        await ctx.db.insert("items", {
+          userId: "import-dedup",
+          type: "link",
+          status: "ready",
+          url: `https://newer.example/${i}`,
+          tags: [],
+          searchText: "",
+        });
+      }
+    });
+    const res = await t.mutation(api.items.importLinks, {
+      urls: [
+        "https://EXAMPLE.com/0", // the old save; hosts compare case-insensitively
+        "https://example.com/Fresh",
+        "https://example.com/Fresh", // repeated within the batch
+        "https://example.com/fresh", // path case differs: a distinct link
+        "ftp://example.com/nope",
+      ],
+    });
+    expect(res).toEqual({
+      created: 2,
+      skipped: 2,
+      invalid: 1,
+      notProcessed: 0,
+      rateLimited: false,
+    });
+  });
+
+  it("rejects an oversized batch instead of truncating it", async () => {
+    const t = await as("import-cap");
+    const urls = Array.from(
+      { length: 51 },
+      (_, i) => `https://example.com/${i}`,
+    );
+    await expect(t.mutation(api.items.importLinks, { urls })).rejects.toThrow(
+      /at most 50 URLs/,
+    );
+  });
+
+  it("draws from its own bucket, not the single-save itemCreate burst", async () => {
+    const t = await as("import-own-bucket");
+    for (let i = 0; i < 30; i++) {
+      await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
+    }
+    const res = await t.mutation(api.items.importLinks, {
+      urls: Array.from({ length: 50 }, (_, i) => `https://example.com/${i}`),
+    });
+    expect(res.created).toBe(50);
+    expect(res.rateLimited).toBe(false);
+  });
+
+  it("stops at the bulkImport limit and resumes free over saved links", async () => {
+    const t = await as("import-rate");
+    const batch = Array.from(
+      { length: 10 },
+      (_, i) => `https://example.com/${i}`,
+    );
+    await t.mutation(api.items.importLinks, { urls: batch });
+    // Drain the 600-token bucket down to 5 without inserting 600 rows.
+    await t.run(async (ctx) => {
+      const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
+        key: "import-rate",
+        count: 585,
+      });
+      expect(ok).toBe(true);
+    });
+    const limited = await t.mutation(api.items.importLinks, {
+      urls: [
+        ...batch,
+        ...Array.from({ length: 6 }, (_, i) => `https://more.example/${i}`),
+      ],
+    });
+    expect(limited).toEqual({
+      created: 0,
+      skipped: 10,
+      invalid: 0,
+      notProcessed: 6,
+      rateLimited: true,
+    });
+    const resumed = await t.mutation(api.items.importLinks, {
+      urls: [...batch, "https://more.example/0"],
+    });
+    expect(resumed).toEqual({
+      created: 1,
+      skipped: 10,
+      invalid: 0,
+      notProcessed: 0,
+      rateLimited: false,
+    });
   });
 });
 

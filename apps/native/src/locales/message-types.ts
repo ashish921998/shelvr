@@ -422,6 +422,22 @@ export type MessageParams = {
   "cancelSurvey.other": undefined;
   "cancelSurvey.skipLabel": undefined;
   "cancelSurvey.skip": undefined;
+  "import.fromX": undefined;
+  "import.title": undefined;
+  "import.description": undefined;
+  "import.xHintTitle": undefined;
+  "import.xHintBody": undefined;
+  "import.placeholder": undefined;
+  "import.urlReady": { count: number };
+  "import.progress": { count: number };
+  "import.action": undefined;
+  "import.resultCount": { count: number };
+  "import.skipped": { count: number };
+  "import.invalid": { count: number };
+  "import.notProcessed": { count: number };
+  "import.rateLimited": undefined;
+  "import.failed": undefined;
+  "import.more": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
