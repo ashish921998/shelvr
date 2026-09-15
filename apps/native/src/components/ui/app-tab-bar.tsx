@@ -10,6 +10,11 @@ import {
   withAlpha,
 } from "@/lib/tab-bar-motion";
 import { setTabSearchQuery, useTabSearchQuery } from "@/lib/tab-search-query";
+import {
+  reconcileTabSelection,
+  requestTabSelection,
+  type TabSelection,
+} from "@/lib/tab-selection";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import * as Haptics from "expo-haptics";
 import {
@@ -35,6 +40,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolate,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
@@ -42,7 +48,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { scheduleOnRN } from "react-native-worklets";
+import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 
 // The Android and web tab bar: a floating pill of four tabs beside a round
 // search button. A finger can scrub across the pill, with a tick as it crosses
@@ -203,9 +209,16 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   const returnTab = PILL_TABS[returnIndex];
 
   const morph = useSharedValue(searchFocused ? 1 : 0);
-  const focusedSlot = useSharedValue(Math.max(focusedIndex, 0));
-  const highlight = useSharedValue(Math.max(focusedIndex, 0));
+  const selection = useSharedValue<TabSelection>({
+    index: Math.max(focusedIndex, 0),
+    revision: 0,
+    pending: false,
+  });
+  const [renderedRevision, setRenderedRevision] = useState(0);
   const hovered = useSharedValue(-1);
+  const highlightTarget = useDerivedValue(() =>
+    hovered.get() >= 0 ? hovered.get() : selection.get().index,
+  );
   const pressed = useSharedValue(0);
   const pullX = useSharedValue(0);
   const pullY = useSharedValue(0);
@@ -229,12 +242,14 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   }, [morph, searchFocused]);
 
   useEffect(() => {
-    if (focusedIndex < 0) return;
-    focusedSlot.set(focusedIndex);
-    if (hovered.get() < 0) {
-      highlight.set(withSpring(focusedIndex, SETTLE_SPRING));
-    }
-  }, [focusedIndex, focusedSlot, highlight, hovered]);
+    // Check the render's revision on the UI thread, where a newer release may
+    // already have selected another tab while this effect was waiting to run.
+    scheduleOnUI(() => {
+      selection.set(
+        reconcileTabSelection(selection.get(), focusedIndex, renderedRevision),
+      );
+    });
+  }, [focusedIndex, renderedRevision, selection]);
 
   useEffect(() => {
     if (!searchFocused) {
@@ -248,9 +263,10 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     return () => clearTimeout(timer);
   }, [searchFocused]);
 
-  const selectTab = (index: number) => {
+  const selectTab = (index: number, revision?: number) => {
     const trigger = pillTriggers[index];
     if (!trigger) return;
+    if (revision !== undefined) setRenderedRevision(revision);
     setReturnIndex(index);
     if (searchFocused) Keyboard.dismiss();
     pressTrigger(trigger);
@@ -292,7 +308,6 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
         PILL_INSET,
       );
       hovered.set(index);
-      if (index >= 0) highlight.set(withSpring(index, SETTLE_SPRING));
     })
     .onTouchesMove((event) => {
       let touch = null;
@@ -323,10 +338,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
       if (index === hovered.get()) return;
       hovered.set(index);
       if (index >= 0) {
-        highlight.set(withSpring(index, SETTLE_SPRING));
         scheduleOnRN(tick);
-      } else {
-        highlight.set(withSpring(focusedSlot.get(), SETTLE_SPRING));
       }
     })
     .onTouchesUp((event, manager) => {
@@ -357,14 +369,12 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
         return;
       }
       const index = hovered.get();
-      hovered.set(-1);
       if (success && index >= 0) {
-        focusedSlot.set(index);
-        highlight.set(withSpring(index, SETTLE_SPRING));
-        scheduleOnRN(selectTab, index);
-      } else {
-        highlight.set(withSpring(focusedSlot.get(), SETTLE_SPRING));
+        const requested = requestTabSelection(selection.get(), index);
+        selection.set(requested);
+        scheduleOnRN(selectTab, index, requested.revision);
       }
+      hovered.set(-1);
     });
 
   const pillStyle = useAnimatedStyle(() => {
@@ -393,7 +403,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
     transform: [
       {
         translateX: tabSlotX(
-          highlight.get(),
+          highlightTarget.get(),
           pillWidth,
           PILL_TABS.length,
           PILL_INSET,
