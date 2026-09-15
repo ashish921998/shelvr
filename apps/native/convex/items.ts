@@ -1,4 +1,4 @@
-import { ConvexError, v, type Infer } from "convex/values";
+import { v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -37,9 +37,10 @@ import {
 } from "./model/itemFields";
 import {
   imageSizeError,
+  imageSizeErrorCode,
   MAX_PHOTOS_PER_ACCOUNT,
-  PHOTO_LIMIT_MESSAGE,
 } from "./model/imagePolicy";
+import { saveError } from "./model/saveErrors";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -626,7 +627,7 @@ async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
 
 /** Concurrent finalizes at the cap both read the same index range and one
  * inserts into it, so Convex's serializable OCC retries the loser, which then
- * sees the full count and throws. ConvexError, not Error: production redacts
+ * sees the full count and throws. `saveError`, not Error: production redacts
  * plain Error messages to "Server Error", and this one is meant for the user. */
 async function requirePhotoQuota(
   ctx: MutationCtx,
@@ -634,7 +635,7 @@ async function requirePhotoQuota(
 ): Promise<number> {
   const count = await countPhotos(ctx, userId);
   if (count >= MAX_PHOTOS_PER_ACCOUNT) {
-    throw new ConvexError(PHOTO_LIMIT_MESSAGE);
+    throw saveError("photo_limit");
   }
   return count;
 }
@@ -915,8 +916,8 @@ export const finalizeImageImport = mutation({
     if (op?.storageId) {
       const metadata = await ctx.db.system.get("_storage", op.storageId);
       if (!metadata) throw new Error("Storage object not found");
-      const error = imageSizeError(metadata.size);
-      if (error) throw new ConvexError(error);
+      const sizeCode = imageSizeErrorCode(metadata.size);
+      if (sizeCode) throw saveError(sizeCode);
       storedBytes = metadata.size;
     }
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });

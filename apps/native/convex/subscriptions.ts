@@ -5,6 +5,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
+import { saveError } from "./model/saveErrors";
 
 export const subscriptionStatusValidator = v.union(
   v.literal("trialing"),
@@ -45,16 +46,14 @@ export const getEntitlement = query({
   },
 });
 
-/** Sentinel error string the client recognizes to present the paywall instead
- * of a generic failure. Kept as a stable literal so client/server agree. */
-export const PRO_REQUIRED = "Pro required";
-
 /**
  * Server-side entitlement gate for Pro mutations. Reads the wall clock
  * (`Date.now()` is allowed in mutations) so a trial that expired between the
  * client's last fetch and this call is correctly rejected — the client's
- * `entitled` is advisory; this is the source of truth. Throws {@link PRO_REQUIRED}
- * when the user has no active trial or subscription.
+ * `entitled` is advisory; this is the source of truth. Throws
+ * {@link saveError}`("pro_required")` when the user has no active trial or
+ * subscription, which the client decodes to present the paywall instead of a
+ * generic failure.
  *
  * Pass the `userId` already derived via `requireUserId` so this never performs
  * a second auth lookup.
@@ -64,7 +63,7 @@ export async function requireProEntitlement(
   userId: Id<"users">,
 ): Promise<void> {
   if (!(await hasProEntitlement(ctx, userId))) {
-    throw new Error(PRO_REQUIRED);
+    throw saveError("pro_required");
   }
 }
 
