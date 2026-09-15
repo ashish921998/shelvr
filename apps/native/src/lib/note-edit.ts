@@ -14,13 +14,13 @@ export function createNoteSaveQueue(
   async function drain() {
     while (requested) {
       requested = false;
-      if (Object.keys(pending).length === 0 || pending.text?.trim() === "")
-        return;
       const edit = {
         ...pending,
         ...(pending.title !== undefined ? { title: pending.title.trim() } : {}),
       };
-      pending = {};
+      if (edit.text?.trim() === "") delete edit.text;
+      if (Object.keys(edit).length === 0) return;
+      pending = pending.text?.trim() === "" ? { text: pending.text } : {};
       try {
         await write(edit);
       } catch (error) {

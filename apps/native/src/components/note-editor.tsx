@@ -1,6 +1,6 @@
 import type { DetailItem } from "@/components/item-detail";
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { createNoteSaveQueue, type NoteEdit } from "@/lib/note-edit";
 import { api } from "@convex/_generated/api";
@@ -36,6 +36,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
   useAppLocale();
   const { theme } = useUnistyles();
   const router = useRouter();
+  const { entitled } = useEntitlement();
   const updateNote = useMutation(api.items.updateNoteItem);
   const title = item.titleSource === "user" ? (item.title ?? "") : "";
   const text = item.note ?? "";
@@ -120,6 +121,10 @@ export function NoteEditor({ item }: { item: DetailItem }) {
     const timer = setTimeout(() => void queue.flush(), SAVE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [queue, state.edits]);
+
+  useEffect(() => {
+    if (entitled) void queue.flush();
+  }, [entitled, queue]);
 
   // Leaving the page, or swiping to another save, keeps what was typed.
   useEffect(() => () => void queue.flush(), [queue]);

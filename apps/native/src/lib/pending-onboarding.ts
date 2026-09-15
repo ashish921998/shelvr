@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
-import { onboardingLabel } from "./onboarding-labels";
+import { onboardingLabel } from "@/lib/onboarding-labels";
 
 // Persisted store for onboarding state that must survive leaving the screen
 // (the demo step's inline OAuth) or an app kill: the picked library

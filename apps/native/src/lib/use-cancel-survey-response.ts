@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { analytics } from "./analytics";
-import { cancelSurveyAnalytics } from "./cancel-survey";
+import { analytics } from "@/lib/analytics";
+import { cancelSurveyAnalytics } from "@/lib/cancel-survey";
 import {
   getPendingCancelSurvey,
   setPendingCancelSurvey,
   type CancelSurveyResponse,
-} from "./pending-cancel-survey";
+} from "@/lib/pending-cancel-survey";
 
 /** The server owns ask-once semantics; local storage only retains an answer
  * until its idempotent mutation finishes, including across app restarts. */

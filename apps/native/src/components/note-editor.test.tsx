@@ -10,10 +10,14 @@ const mocks = vi.hoisted(() => ({
   paywall: vi.fn(),
   alert: vi.fn(),
   captureError: vi.fn(),
+  entitled: false,
 }));
 vi.mock("convex/react", () => ({ useMutation: () => mocks.update }));
 vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
-vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.paywall }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywall: mocks.paywall,
+  useEntitlement: () => ({ entitled: mocks.entitled }),
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { itemAction: vi.fn(), captureError: mocks.captureError },
 }));
@@ -69,6 +73,7 @@ async function pause() {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  mocks.entitled = false;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -82,6 +87,52 @@ it("opens the paywall for the error the current backend actually throws", async 
   expect(mocks.paywall).toHaveBeenCalledOnce();
   expect(mocks.alert).not.toHaveBeenCalled();
 });
+
+it.each(["before", "after"])(
+  "retries the retained edit when entitlement activates %s the paywall closes",
+  async (activation) => {
+    let closePaywall!: () => void;
+    mocks.paywall.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          closePaywall = resolve;
+        }),
+    );
+    mocks.update
+      .mockRejectedValueOnce(saveError("pro_required"))
+      .mockResolvedValue(undefined);
+    const { rerender } = render(<NoteEditor item={item} />);
+    edit("Retained edit");
+    await pause();
+    expect(mocks.paywall).toHaveBeenCalledOnce();
+    if (activation === "after") {
+      await act(async () => {
+        closePaywall();
+      });
+      await pause();
+      expect(mocks.update).toHaveBeenCalledTimes(1);
+    }
+    mocks.entitled = true;
+    await act(async () => {
+      rerender(<NoteEditor item={item} />);
+    });
+    if (activation === "before") {
+      expect(mocks.update).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        closePaywall();
+      });
+    }
+    expect(mocks.update).toHaveBeenCalledTimes(2);
+    expect(mocks.update).toHaveBeenLastCalledWith({
+      id: "note-1",
+      text: "Retained edit",
+    });
+    rerender(<NoteEditor item={item} />);
+    await pause();
+    expect(mocks.update).toHaveBeenCalledTimes(2);
+    expect(mocks.alert).not.toHaveBeenCalled();
+  },
+);
 
 it("persists a revert after an earlier overlapping save fails", async () => {
   let rejectFirst!: (reason: Error) => void;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { newConvexTest } from "../../convex/test.setup";
+import { newConvexTest } from "@convex/test.setup";
 import { api } from "@convex/_generated/api";
 import {
   clearPending,
@@ -9,8 +9,8 @@ import {
   setOnboardingProgress,
   setPendingDemo,
   setPendingSpaces,
-} from "./pending-onboarding";
-import { onboardingLabel } from "./onboarding-labels";
+} from "@/lib/pending-onboarding";
+import { onboardingLabel } from "@/lib/onboarding-labels";
 
 const device = vi.hoisted(() => ({
   locale: "en-US",

@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import {
   getPendingCancelSurvey,
   setPendingCancelSurvey,
-} from "./pending-cancel-survey";
+} from "@/lib/pending-cancel-survey";
 
 const storage = vi.hoisted(() => new Map<string, string>());
 vi.mock("expo-secure-store", () => ({

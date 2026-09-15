@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createNoteSaveQueue } from "./note-edit";
+import { createNoteSaveQueue } from "@/lib/note-edit";
 
 describe("note save queue", () => {
   it("does not write on an empty flush or repeat acknowledged edits", async () => {
@@ -37,5 +37,33 @@ describe("note save queue", () => {
     queue.change({ text: "Buy milk" });
     await queue.flush();
     expect(write).toHaveBeenLastCalledWith({ title: "", text: "Buy milk" });
+  });
+
+  it("saves a title while retaining blank text until a valid replacement", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const queue = createNoteSaveQueue(write, vi.fn());
+    queue.change({ title: "  New title  ", text: " \n " });
+    await queue.flush();
+    expect(write).toHaveBeenCalledExactlyOnceWith({ title: "New title" });
+    await queue.flush();
+    expect(write).toHaveBeenCalledTimes(1);
+    queue.change({ text: "Valid replacement" });
+    await queue.flush();
+    expect(write).toHaveBeenLastCalledWith({ text: "Valid replacement" });
+  });
+
+  it("retries a failed title without sending the retained blank text", async () => {
+    const write = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("failed"))
+      .mockResolvedValue(undefined);
+    const queue = createNoteSaveQueue(write, vi.fn());
+    queue.change({ title: "", text: "   " });
+    await queue.flush();
+    await queue.flush();
+    expect(write.mock.calls).toEqual([[{ title: "" }], [{ title: "" }]]);
+    queue.change({ text: "Valid replacement" });
+    await queue.flush();
+    expect(write).toHaveBeenLastCalledWith({ text: "Valid replacement" });
   });
 });
