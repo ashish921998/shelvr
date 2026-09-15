@@ -56,7 +56,8 @@ const option = {
   color: "var(--colors-foreground)",
   cursor: "pointer",
 };
-const skip = { ...secondary, alignSelf: "center" };
+// Skip is a full-width row, as the card's column stretches it in the app.
+const skip = secondary;
 
 /** The one-time cancel survey on Home: four one-tap reasons and Skip. */
 export function CancelSurvey() {

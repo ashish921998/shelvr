@@ -204,6 +204,9 @@ console.error(`build-web: dist/index.js ${Math.round(bytes / 1024)} KB`);
 // -- declarations -----------------------------------------------------------------
 
 const dtsConfig = join(PKG_DIR, 'tsconfig.dts.json');
+// expo-env.d.ts is gitignored and only exists once Expo has generated it, so a
+// clean checkout builds without it.
+const EXPO_ENV = join(NATIVE, 'expo-env.d.ts');
 writeFileSync(
   dtsConfig,
   `${JSON.stringify(
@@ -217,7 +220,7 @@ writeFileSync(
         rootDir: REPO,
         outDir: TYPES,
       },
-      files: [ENTRY, join(NATIVE, 'expo-env.d.ts')],
+      files: existsSync(EXPO_ENV) ? [ENTRY, EXPO_ENV] : [ENTRY],
       include: [],
     },
     null,
