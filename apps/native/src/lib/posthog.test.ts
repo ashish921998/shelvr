@@ -145,3 +145,39 @@ describe("posthog before_send", () => {
     expect(SAFE_ERROR_MESSAGES.has("Network request failed")).toBe(true);
   });
 });
+
+describe("posthog exception autocapture gate", () => {
+  it("stays off on a development build", () => {
+    // The module is mocked with variant "development", so a local dev crash
+    // never opens an error issue next to production traffic.
+    const options = posthogCtor.options as {
+      errorTracking: { autocapture: Record<string, unknown> };
+    };
+    expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(false);
+    expect(options.errorTracking.autocapture.unhandledRejections).toBe(false);
+  });
+
+  it("turns on for a production build", async () => {
+    // Re-import the module against a production config so the gate is read
+    // fresh; the PostHog stub records the new constructor options.
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+            variant: "production",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as {
+      errorTracking: { autocapture: Record<string, unknown> };
+    };
+    expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(true);
+    expect(options.errorTracking.autocapture.unhandledRejections).toBe(true);
+    vi.doUnmock("expo-constants");
+  });
+});
