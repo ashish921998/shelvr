@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { classifyTrialCancellation } from "./trial-cancellation";
+import {
+  classifyTrialCancellation,
+  readFreshTrialCancellation,
+} from "./trial-cancellation";
 
 /** EntitlementInfo slices shaped like a RevenueCat CustomerInfo response. */
 const entitlement = (
@@ -10,6 +13,41 @@ const entitlement = (
   willRenew: true,
   ...overrides,
 });
+
+it("reads cancellation after invalidating a cached renewing trial", async () => {
+  let cached = true;
+  const purchases = {
+    invalidateCustomerInfoCache: vi.fn(async () => {
+      cached = false;
+    }),
+    getCustomerInfo: vi.fn(async () => ({
+      entitlements: {
+        active: {
+          pro: entitlement({ periodType: "TRIAL", willRenew: cached }),
+        },
+      },
+    })),
+  };
+  expect(await readFreshTrialCancellation(purchases)).toBe("cancelled");
+});
+
+it.each(["invalidation", "fetch"])(
+  "does not treat an unavailable %s as an uncancelled subscription",
+  async (failure) => {
+    const purchases = {
+      invalidateCustomerInfoCache: vi.fn().mockResolvedValue(undefined),
+      getCustomerInfo: vi
+        .fn()
+        .mockResolvedValue({ entitlements: { active: {} } }),
+    };
+    if (failure === "invalidation")
+      purchases.invalidateCustomerInfoCache.mockRejectedValue(
+        new Error("unavailable"),
+      );
+    else purchases.getCustomerInfo.mockRejectedValue(new Error("unavailable"));
+    expect(await readFreshTrialCancellation(purchases)).toBe("unknown");
+  },
+);
 
 describe("classifyTrialCancellation", () => {
   it("detects a cancelled trial still inside its window", () => {

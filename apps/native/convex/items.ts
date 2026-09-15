@@ -13,7 +13,8 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import { PRO_REQUIRED, requireProEntitlement } from "./subscriptions";
+import { saveError } from "./model/saveErrors";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -1451,30 +1452,39 @@ export const NOTE_REFRESH_DELAY_MS = 20_000;
 export const updateNoteItem = mutation({
   args: {
     id: v.id("items"),
-    title: v.string(),
-    text: v.string(),
+    // Older clients send both fields. New editors send only what was edited.
+    title: v.optional(v.string()),
+    text: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    try {
+      await requireProEntitlement(ctx, userId);
+    } catch (error) {
+      if (error instanceof Error && error.message === PRO_REQUIRED) {
+        throw saveError("pro_required");
+      }
+      throw error;
+    }
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.type !== "note") {
       throw new Error("Item not found");
     }
-    if (args.text.trim() === "") {
+    const text = args.text ?? item.note ?? "";
+    if (text.trim() === "") {
       throw new Error("Note text is empty");
     }
-    if (args.text.length > MAX_NOTE_TEXT_CHARS) {
+    if (text.length > MAX_NOTE_TEXT_CHARS) {
       throw new Error("Note text is too long");
-    }
-    const typedTitle = args.title.trim();
-    if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {
-      throw new Error("Title is too long");
     }
     const currentTypedTitle =
       item.titleSource === "user" ? item.title : undefined;
-    const textChanged = args.text !== item.note;
+    const typedTitle = args.title?.trim() ?? currentTypedTitle ?? "";
+    if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {
+      throw new Error("Title is too long");
+    }
+    const textChanged = text !== item.note;
     const titleChanged = (typedTitle || undefined) !== currentTypedTitle;
     if (!textChanged && !titleChanged) {
       return null;
@@ -1487,31 +1497,37 @@ export const updateNoteItem = mutation({
         : item.titleSource === "user"
           ? undefined
           : item.title;
-    // Only a ready note is refreshed: a first run still in flight reads the
-    // latest text when it finalizes, and a failed note has its own retry. A
-    // cleared title is re-named by the same refresh.
+    // A processing note must supersede its snapshot too. Its replacement
+    // completes initial classification; ready notes refresh quietly.
     const refreshRunId =
       (textChanged || (titleChanged && typedTitle === "")) &&
-      item.status === "ready"
+      item.status !== "failed"
         ? crypto.randomUUID()
         : undefined;
     await ctx.db.patch(item._id, {
-      note: args.text,
+      note: text,
       title,
       titleSource: typedTitle !== "" ? "user" : undefined,
       searchText: buildSearchText({
         title,
         description: item.description,
         tags: item.tags,
-        note: args.text,
+        note: text,
       }),
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
+      ...(refreshRunId !== undefined && item.status === "processing"
+        ? { processingStartedAt: Date.now() }
+        : {}),
     });
     if (refreshRunId !== undefined) {
       await ctx.scheduler.runAfter(
         NOTE_REFRESH_DELAY_MS,
         internal.ai.processItem,
-        { itemId: item._id, runId: refreshRunId, refresh: true },
+        {
+          itemId: item._id,
+          runId: refreshRunId,
+          refresh: item.status === "ready",
+        },
       );
     }
     return null;
@@ -1977,11 +1993,15 @@ export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),
     spaceIds: v.array(v.id("spaces")),
+    runId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (item === null) {
+    if (
+      item === null ||
+      (args.runId !== undefined && !ownsRun(item, args.runId))
+    ) {
       return null;
     }
     const wanted = new Set(args.spaceIds);

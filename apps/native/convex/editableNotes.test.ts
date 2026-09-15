@@ -223,7 +223,36 @@ describe("updateNoteItem", () => {
         title: "",
         text: "Changed",
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      data: { code: "pro_required", message: "Pro required" },
+    });
+  });
+
+  it("updates only supplied fields while preserving newer body and title changes", async () => {
+    const owner = await proUser(newConvexTest(), "partial-editor");
+    const id = await readyNote(owner, "partial-editor");
+    await owner.mutation(api.items.updateNoteItem, {
+      id,
+      text: "A newer body",
+    });
+    await owner.mutation(api.items.updateNoteItem, {
+      id,
+      title: "A new title",
+    });
+    expect(await owner.run((ctx) => ctx.db.get(id))).toMatchObject({
+      note: "A newer body",
+      title: "A new title",
+      titleSource: "user",
+    });
+    await owner.mutation(api.items.updateNoteItem, {
+      id,
+      text: "Only the body changes",
+    });
+    expect(await owner.run((ctx) => ctx.db.get(id))).toMatchObject({
+      note: "Only the body changes",
+      title: "A new title",
+      titleSource: "user",
+    });
   });
 });
 

@@ -1,21 +1,45 @@
-// The note page saves as the owner types. This decides what, if anything, a
-// save sends, so the editor only has to debounce.
-
 export type NoteDraft = { title: string; text: string };
+export type NoteEdit = Partial<NoteDraft>;
 
-/** The edit to send for `draft`, or null when it matches what was last saved
- * or cannot be saved (a note needs text). Titles are compared and sent trimmed,
- * the way the server stores them. */
-export function pendingNoteEdit(
-  draft: NoteDraft,
-  saved: NoteDraft,
-): NoteDraft | null {
-  if (draft.text.trim() === "") {
-    return null;
+/** Serializes edits and retains failed fields until another flush. A newer
+ * field value always wins over the value in a failed request. */
+export function createNoteSaveQueue(
+  write: (edit: NoteEdit) => Promise<void>,
+  onError: (error: unknown) => Promise<void>,
+) {
+  let pending: NoteEdit = {};
+  let running: Promise<void> | null = null;
+  let requested = false;
+
+  async function drain() {
+    while (requested) {
+      requested = false;
+      const edit = {
+        ...pending,
+        ...(pending.title !== undefined ? { title: pending.title.trim() } : {}),
+      };
+      if (edit.text?.trim() === "") delete edit.text;
+      if (Object.keys(edit).length === 0) return;
+      pending = pending.text?.trim() === "" ? { text: pending.text } : {};
+      try {
+        await write(edit);
+      } catch (error) {
+        pending = { ...edit, ...pending };
+        await onError(error);
+      }
+    }
   }
-  const title = draft.title.trim();
-  if (title === saved.title.trim() && draft.text === saved.text) {
-    return null;
-  }
-  return { title, text: draft.text };
+
+  return {
+    change(edit: NoteEdit) {
+      pending = { ...pending, ...edit };
+    },
+    flush() {
+      requested = true;
+      running ??= drain().finally(() => {
+        running = null;
+      });
+      return running;
+    },
+  };
 }

@@ -14,7 +14,7 @@ import {
   type PaywallOutcome,
 } from "@/lib/paywall-result";
 import {
-  classifyTrialCancellation,
+  readFreshTrialCancellation,
   type TrialCancellationState,
 } from "@/lib/trial-cancellation";
 import { REVENUECAT_API_KEY } from "@/lib/revenuecat-api-key";
@@ -458,17 +458,7 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
   if (!(await awaitRcSyncReady())) return "unknown";
   const rc = getPurchases();
   if (!rc) return "unknown";
-  try {
-    const info = await rc.getCustomerInfo();
-    return classifyTrialCancellation(
-      Object.values(info.entitlements.active).map((entitlement) => ({
-        periodType: entitlement.periodType,
-        willRenew: entitlement.willRenew,
-      })),
-    );
-  } catch {
-    return "unknown";
-  }
+  return await readFreshTrialCancellation(rc);
 }
 
 // ---------------------------------------------------------------------------

@@ -1282,7 +1282,7 @@ export const processItem = internalAction({
       const item = await ctx.runQuery(internal.items.getItemInternal, {
         itemId: args.itemId,
       });
-      if (item === null) {
+      if (item === null || item.processingRunId !== args.runId) {
         return null;
       }
       itemType = item.type;
@@ -1361,12 +1361,11 @@ export const processItem = internalAction({
         }
         return null;
       }
-      if (spaceIds.length > 0) {
-        await ctx.runMutation(internal.items.setSpacesForItem, {
-          itemId: args.itemId,
-          spaceIds,
-        });
-      }
+      await ctx.runMutation(internal.items.setSpacesForItem, {
+        itemId: args.itemId,
+        spaceIds,
+        runId: args.runId,
+      });
 
       if (args.refresh === true) {
         // An edited note: search and suggestions are updated. Steering and
