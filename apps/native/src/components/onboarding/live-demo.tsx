@@ -1,7 +1,11 @@
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
-import { ItemCard, type FeedItem } from "@/components/item-card";
+import type { FeedItem } from "@/components/item-card";
+import { CtaButton } from "@/components/onboarding/parts";
+import { RevealCard } from "@/components/onboarding/reveal-card";
+import { buildRevealPieces, type RevealPiece } from "@/lib/reveal-pieces";
+import { EASE_OUT, REDUCED_FADE_IN } from "@/lib/motion";
 import { analytics } from "@/lib/analytics";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -9,7 +13,6 @@ import {
   setPendingDemo,
   type PendingDemo,
 } from "@/lib/pending-onboarding";
-import { AppSymbolIcon } from "@/components/symbol";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { demoErrorCode, isRateLimitedError } from "@convex/model/demoErrors";
@@ -18,26 +21,39 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useRef, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+  type EntryAnimationsValues,
+  type ExitAnimationsValues,
+  type LayoutAnimation,
+} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 
 // Step 6 — the gotcha. "Paste any link — watch Shelvr file it." Every path is
 // REAL: one server-enforced demo save per authenticated user (api.demo
 // .createDemoItem, no Pro needed), processed by the actual pipeline, revealed
-// as an actual ItemCard. Pre-auth, submitting routes through an inline
-// sign-in (no navigation, so onboarding state survives) with the pending save
-// persisted, so an app kill mid-OAuth resumes the same save. There is no
-// canned card — skip/error/timeout never claim a save happened.
+// piece by piece as the real classified save. Pre-auth, submitting routes
+// through an inline sign-in (no navigation, so onboarding state survives) with
+// the pending save persisted, so an app kill mid-OAuth resumes the same save.
+// There is no canned card — skip/error/timeout never claim a save happened.
 //
 // The persisted demo record (lib/pending-onboarding) means "this step has a
 // save in flight": it is written on submit, kept through processing/reveal so
@@ -59,6 +75,83 @@ const SAMPLE_LINKS: { label: TextMessageKey; url: string }[] = [
 
 const TIMEOUT_MS = 15_000;
 
+// How long the reveal waits before letting the next piece land. Keyed by piece
+// kind so the pacing is a property of what is arriving, not of where it sits in
+// the list: tags rattle off quickly, the destination gets a beat of its own.
+const PIECE_DELAY_MS: Record<RevealPiece["kind"], number> = {
+  image: 350,
+  title: 300,
+  tag: 180,
+  space: 350,
+  inbox: 350,
+};
+
+// The verdict lines rise rather than drop, so they read as the save settling
+// into place under the card instead of two more pieces falling in.
+const headlineEnter = (delayMs: number) => (): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 10 }] },
+    animations: {
+      opacity: withDelay(delayMs, withTiming(1, { duration: 260 })),
+      transform: [
+        {
+          translateY: withDelay(
+            delayMs,
+            withSpring(0, { damping: 18, stiffness: 180 }),
+          ),
+        },
+      ],
+    },
+  };
+};
+const HEADLINE_ENTER = headlineEnter(0);
+const HEADLINE_ENTER_STAGGERED = headlineEnter(80);
+
+const COUNT_ROLL_MS = 220;
+const COUNT_LINE_HEIGHT = 18;
+
+// Travel is the line's own measured height rather than a constant, so the roll
+// stays inside the clipped window at every accessibility text size.
+const COUNT_ENTER = (values: EntryAnimationsValues): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: {
+      opacity: 0,
+      transform: [{ translateY: values.targetHeight }],
+    },
+    animations: {
+      opacity: withTiming(1, { duration: COUNT_ROLL_MS, easing: EASE_OUT }),
+      transform: [
+        {
+          translateY: withTiming(0, {
+            duration: COUNT_ROLL_MS,
+            easing: EASE_OUT,
+          }),
+        },
+      ],
+    },
+  };
+};
+
+const COUNT_EXIT = (values: ExitAnimationsValues): LayoutAnimation => {
+  "worklet";
+  return {
+    initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+    animations: {
+      opacity: withTiming(0, { duration: COUNT_ROLL_MS, easing: EASE_OUT }),
+      transform: [
+        {
+          translateY: withTiming(-values.currentHeight, {
+            duration: COUNT_ROLL_MS,
+            easing: EASE_OUT,
+          }),
+        },
+      ],
+    },
+  };
+};
+
 type DemoPhase = "input" | "auth" | "processing" | "reveal" | "failed";
 
 export function LiveDemoStep({
@@ -72,7 +165,9 @@ export function LiveDemoStep({
   selectedSpaces: string[];
   /** A demo captured before an earlier sign-in; resumes it exactly once. */
   resumeDemo: PendingDemo | null;
-  onReady: (item: FeedItem) => void;
+  /** Reports the classified save and the space names it actually landed in, so
+   * later steps can show both without re-deriving either. */
+  onReady: (item: FeedItem, savedSpaceNames: string[]) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -87,6 +182,9 @@ export function LiveDemoStep({
     resumeDemo?.destination ?? null,
   );
   const [itemId, setItemId] = useState<Id<"items"> | null>(null);
+  // Snapshotted when the pipeline reports ready. The reveal stages its pieces
+  // off this value, so later live-query ticks cannot restart the animation.
+  const [revealItem, setRevealItem] = useState<FeedItem | null>(null);
   const [savedSpaces, setSavedSpaces] = useState<string[]>([]);
   const [reused, setReused] = useState(false);
   const [authRequest, setAuthRequest] = useState<PendingDemo | null>(
@@ -145,9 +243,11 @@ export function LiveDemoStep({
     if (!item || !["processing", "failed", "reveal"].includes(phase)) return;
     if (item.status === "ready" && phase !== "reveal") {
       analytics.capture("onboarding_demo_result", { outcome: "ready" });
+      const feedItem = toFeedItem(item);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase("reveal");
-      onReady(toFeedItem(item));
+      setRevealItem(feedItem);
+      onReady(feedItem, savedSpaces);
     } else if (item.status === "failed" && phase !== "failed") {
       analytics.capture("onboarding_demo_result", { outcome: "failed" });
       setPhase("failed");
@@ -316,78 +416,14 @@ export function LiveDemoStep({
 
   // ---- Reveal state: the real item, with its real destination ------------
   if (phase === "reveal") {
-    const revealItem =
-      item && item.status === "ready" ? toFeedItem(item) : undefined;
     return (
-      <View style={styles.wrap}>
-        <Animated.Text
-          entering={FadeInDown.duration(400)}
-          style={styles.headline}
-        >
-          {t("demo.filed")}
-        </Animated.Text>
-        <Animated.Text
-          entering={FadeInDown.delay(60).duration(400)}
-          style={styles.support}
-        >
-          {t("demo.filedHelp")}
-        </Animated.Text>
-
-        <Animated.View
-          pointerEvents="none"
-          entering={FadeInDown.delay(120).duration(400)}
-          style={styles.reveal}
-        >
-          {revealItem ? <ItemCard item={revealItem} /> : null}
-        </Animated.View>
-
-        <View
-          style={styles.destinationChips}
-          accessibilityLabel={t("demo.labels")}
-        >
-          {item?.tags.map((tag) => (
-            <View key={tag} style={styles.destinationChip}>
-              <Text style={styles.destinationChipText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-        {item?.enrichment === "partial" ? (
-          <Text style={styles.support}>{t("demo.partial")}</Text>
-        ) : null}
-
-        {savedSpaces.length > 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(180).duration(400)}
-            style={styles.destination}
-          >
-            <Text style={styles.destinationLabel}>{t("demo.spaceChosen")}</Text>
-            <View style={styles.destinationChips}>
-              {savedSpaces.map((name) => (
-                <View key={name} style={styles.destinationChip}>
-                  <Text style={styles.destinationChipText}>{name}</Text>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
-        ) : (
-          <Text style={styles.destinationLabel}>{t("demo.inbox")}</Text>
-        )}
-
-        {reused ? (
-          <Text style={styles.reuseNote}>{t("demo.usedHelp")}</Text>
-        ) : null}
-
-        <View style={styles.footer}>
-          <Pressable style={styles.skipRow} onPress={advance}>
-            <Text style={styles.continueText}>{t("common.continue")}</Text>
-            <AppSymbolIcon
-              name="chevron.right"
-              size={14}
-              tintColor={theme.colors.primary}
-            />
-          </Pressable>
-        </View>
-      </View>
+      <DemoRevealView
+        url={url}
+        item={revealItem}
+        savedSpaces={savedSpaces}
+        reused={reused}
+        onAdvance={advance}
+      />
     );
   }
 
@@ -584,6 +620,161 @@ export function LiveDemoStep({
   );
 }
 
+// The payoff. The raw URL the user pasted stays on screen and dims while the
+// classified save assembles itself underneath it, one piece at a time; the
+// headline and the CTA only arrive once every piece has landed.
+function DemoRevealView({
+  url,
+  item,
+  savedSpaces,
+  reused,
+  onAdvance,
+}: {
+  url: string;
+  item: FeedItem | null;
+  savedSpaces: string[];
+  reused: boolean;
+  onAdvance: () => void;
+}) {
+  useAppLocale();
+  const reducedMotion = useReducedMotion();
+  const pieces = useMemo(
+    () => (item === null ? [] : buildRevealPieces(item, savedSpaces)),
+    [item, savedSpaces],
+  );
+  const [revealedCount, setRevealedCount] = useState(0);
+  const visibleCount = reducedMotion ? pieces.length : revealedCount;
+  const settled = visibleCount >= pieces.length;
+
+  // The pasted URL stays legible until the classified card starts landing,
+  // then steps back so the result is what the eye goes to.
+  const rawUrlOpacity = useSharedValue(1);
+  useEffect(() => {
+    rawUrlOpacity.value = withTiming(visibleCount > 0 ? 0.4 : 1, {
+      duration: 300,
+    });
+  }, [visibleCount, rawUrlOpacity]);
+  const rawUrlStyle = useAnimatedStyle(() => ({
+    opacity: rawUrlOpacity.value,
+  }));
+
+  useEffect(() => {
+    if (pieces.length === 0) return;
+    if (reducedMotion) {
+      if (process.env.EXPO_OS === "ios") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      return;
+    }
+    if (revealedCount >= pieces.length) return;
+    const id = setTimeout(() => {
+      const next = revealedCount + 1;
+      setRevealedCount(next);
+      if (process.env.EXPO_OS !== "ios") return;
+      if (next >= pieces.length) {
+        // An impact rather than a success chime, so the last piece lands with
+        // the same weight as the card's settle bump.
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } else {
+        Haptics.selectionAsync();
+      }
+    }, PIECE_DELAY_MS[pieces[revealedCount].kind]);
+    return () => clearTimeout(id);
+  }, [pieces, revealedCount, reducedMotion]);
+
+  return (
+    <View style={styles.wrap}>
+      <Animated.Text
+        style={[styles.rawUrl, rawUrlStyle]}
+        numberOfLines={2}
+        ellipsizeMode="middle"
+      >
+        {url}
+      </Animated.Text>
+
+      {item !== null && (
+        <RevealCard item={item} pieces={pieces} revealedCount={visibleCount} />
+      )}
+
+      {settled && (
+        <View style={styles.verdict}>
+          <Animated.Text
+            entering={reducedMotion ? REDUCED_FADE_IN : HEADLINE_ENTER}
+            style={styles.headline}
+          >
+            {t("demo.savedHeadline")}
+          </Animated.Text>
+          <Animated.Text
+            entering={
+              reducedMotion ? REDUCED_FADE_IN : HEADLINE_ENTER_STAGGERED
+            }
+            style={styles.firstSave}
+          >
+            {t("demo.firstSave")}
+          </Animated.Text>
+          <RollingCount reducedMotion={reducedMotion} />
+        </View>
+      )}
+
+      {settled && item?.enrichment === "partial" ? (
+        <Text style={styles.support}>{t("demo.partial")}</Text>
+      ) : null}
+      {settled && reused ? (
+        <Text style={styles.reuseNote}>{t("demo.usedHelp")}</Text>
+      ) : null}
+
+      <View style={styles.footer}>
+        {settled && (
+          <Animated.View
+            entering={FadeInDown.delay(240).duration(400)}
+            style={styles.fullWidth}
+          >
+            <CtaButton label={t("common.continue")} onPress={onAdvance} />
+          </Animated.View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// The shelf tally is a real count, not a literal one. It starts empty and turns
+// over once the verdict has landed, so the user watches their shelf gain the
+// save rather than being told it already has it.
+function RollingCount({ reducedMotion }: { reducedMotion: boolean }) {
+  useAppLocale();
+  const { fontScale } = useWindowDimensions();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (reducedMotion) return;
+    const id = setTimeout(() => setCount(1), 400);
+    return () => clearTimeout(id);
+  }, [reducedMotion]);
+
+  if (reducedMotion) {
+    return (
+      <View style={styles.countWindow}>
+        <Text style={styles.shelfCount}>
+          {t("demo.shelfCount", { count: 1 })}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View
+      style={[styles.countWindow, { height: COUNT_LINE_HEIGHT * fontScale }]}
+    >
+      <Animated.Text
+        key={count}
+        entering={COUNT_ENTER}
+        exiting={COUNT_EXIT}
+        style={[styles.shelfCount, styles.countLine]}
+      >
+        {t("demo.shelfCount", { count })}
+      </Animated.Text>
+    </View>
+  );
+}
+
 function DemoAuthView({
   pendingProvider,
   lastError,
@@ -765,32 +956,37 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     color: theme.colors.muted,
   },
-  reveal: {
-    // ItemCard carries its own padding; let it sit on the surface.
-  },
-  destination: {
-    gap: theme.gap(1),
-  },
-  destinationLabel: {
+  rawUrl: {
     fontFamily: theme.fonts.regular,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 0.2,
+    color: theme.colors.faint,
+  },
+  verdict: {
+    gap: 2,
+  },
+  firstSave: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.4,
     color: theme.colors.muted,
   },
-  destinationChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.gap(1),
-  },
-  destinationChip: {
-    backgroundColor: theme.colors.primarySoft,
-    paddingVertical: theme.gap(0.5),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: 50,
-  },
-  destinationChipText: {
+  shelfCount: {
     fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    color: theme.colors.primaryText,
+    fontSize: 14,
+    lineHeight: COUNT_LINE_HEIGHT,
+    color: theme.colors.muted,
+  },
+  countWindow: {
+    marginTop: theme.gap(0.75),
+    overflow: "hidden",
+  },
+  countLine: {
+    position: "absolute",
+    left: 0,
+    top: 0,
   },
   reuseNote: {
     fontFamily: theme.fonts.regular,
@@ -824,10 +1020,8 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 17,
     color: theme.colors.primaryForeground,
   },
-  skipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  fullWidth: {
+    width: "100%",
   },
   continueText: {
     fontFamily: theme.fonts.bold,
