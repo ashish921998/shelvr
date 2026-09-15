@@ -38,7 +38,7 @@ export async function reconcileRevenueCatCustomers(
       userId,
       ...parseRevenueCatSnapshot(
         body,
-        env.REVENUECAT_ENTITLEMENT_ID ?? "Shelvr Pro",
+        env.REVENUECAT_ENTITLEMENT_ID || "Shelvr Pro",
       ),
     });
   }

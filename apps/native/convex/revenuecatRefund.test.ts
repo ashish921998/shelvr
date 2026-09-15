@@ -194,6 +194,23 @@ describe("refund webhook reconciliation", () => {
     });
   });
 
+  it.each(["", undefined])(
+    "uses the default entitlement when its setting is %s",
+    async (entitlementId) => {
+      const f = await fixture();
+      vi.stubEnv("REVENUECAT_ENTITLEMENT_ID", entitlementId);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(Response.json(snapshot("annual_1999"))),
+      );
+      expect((await f.send()).status).toBe(200);
+      expect(await f.row()).toMatchObject({
+        status: "pro",
+        productId: "annual_1999",
+      });
+    },
+  );
+
   it("uses the configured entitlement and ignores unrelated access", async () => {
     const f = await fixture();
     vi.stubEnv("REVENUECAT_ENTITLEMENT_ID", "shelvr_pro");
