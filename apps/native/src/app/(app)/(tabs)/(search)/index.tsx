@@ -1,13 +1,14 @@
 import { EmptyState } from '@/components/empty-state';
 import { AppSymbolIcon } from '@/components/symbol';
 import { MasonryFeed } from '@/components/masonry-feed';
+import { useAppHeaderHeight } from '@/lib/header-layout';
 import { api } from '@convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { ProgressiveBlurHeader } from 'progressive-blur';
-import { useEffect, useState } from 'react';
-import { Platform, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Keyboard, Platform, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 function useDebounced<T>(value: T, delay: number): T {
@@ -21,6 +22,8 @@ function useDebounced<T>(value: T, delay: number): T {
 
 export default function SearchScreen() {
   const { theme } = useUnistyles();
+  const headerHeight = useAppHeaderHeight();
+  const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
   const [search, setSearch] = useState('');
   const query = useDebounced(search.trim(), 250);
 
@@ -33,6 +36,7 @@ export default function SearchScreen() {
     <View style={styles.container}>
       {Platform.OS === 'ios' ? (
         <Stack.SearchBar
+          ref={searchBarRef}
           placeholder="Search your saves"
           autoCapitalize="none"
           hideWhenScrolling={false}
@@ -40,7 +44,7 @@ export default function SearchScreen() {
           onCancelButtonPress={() => setSearch('')}
         />
       ) : (
-        <View style={styles.searchField}>
+        <View style={[styles.searchField, { marginTop: headerHeight + theme.gap(2) }]}>
           <AppSymbolIcon name="magnifyingglass" size={20} tintColor={theme.colors.muted} />
           <TextInput
             value={search}
@@ -50,6 +54,8 @@ export default function SearchScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
+            onSubmitEditing={Keyboard.dismiss}
+            accessibilityLabel="Search your saves"
             style={styles.searchInput}
           />
         </View>
@@ -65,7 +71,11 @@ export default function SearchScreen() {
           message={`No saves match “${query}”.`}
         />
       ) : (
-        <MasonryFeed items={results ?? []} source={{ from: 'search', q: query }} />
+        <MasonryFeed
+          items={results ?? []}
+          source={{ from: 'search', q: query }}
+          onScrollBeginDrag={() => searchBarRef.current?.blur()}
+        />
       )}
       <ProgressiveBlurHeader />
     </View>
@@ -77,7 +87,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   searchField: {
-    marginTop: 112,
+    flexShrink: 0,
     marginHorizontal: theme.gap(2),
     height: 52,
     flexDirection: 'row',

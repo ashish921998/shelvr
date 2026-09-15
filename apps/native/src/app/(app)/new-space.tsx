@@ -145,6 +145,8 @@ function SpaceForm(props: SpaceFormProps) {
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
     >

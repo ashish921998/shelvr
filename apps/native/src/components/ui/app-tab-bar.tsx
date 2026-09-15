@@ -1,7 +1,7 @@
 import { AppSymbolIcon, type AppSymbolName } from '@/components/symbol';
 import { Tabs, TabList, TabSlot, TabTrigger, type TabTriggerSlotProps } from 'expo-router/ui';
-import { forwardRef } from 'react';
-import { Pressable, Text, View, type View as NativeView } from 'react-native';
+import { forwardRef, useEffect, useState } from 'react';
+import { Keyboard, Pressable, Text, View, type View as NativeView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -48,13 +48,24 @@ const TabButton = forwardRef<
 
 export function AppTabs() {
   const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(Keyboard.isVisible);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const dockBottom = Math.max(insets.bottom, 10);
-  const contentBottomInset = dockBottom + TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
+  const contentBottomInset = keyboardVisible ? 0 : dockBottom + TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
 
   return (
     <Tabs style={styles.root} options={{ backBehavior: 'history' }}>
       <TabSlot style={[styles.slot, { paddingBottom: contentBottomInset }]} />
-      <TabList style={[styles.dock, { bottom: dockBottom }]}>
+      <TabList style={[styles.dock, { bottom: dockBottom }, keyboardVisible && { display: 'none' }]}>
         {tabs.map((tab) => (
           <TabTrigger key={tab.name} name={tab.name} href={tab.href} asChild>
             <TabButton label={tab.label} icon={tab.icon} />
