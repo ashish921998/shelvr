@@ -14,11 +14,11 @@ export function redirectSystemPath({
   initial: boolean;
 }) {
   try {
-    const url = new URL(path);
+    const url = new URL(path, "shelvr:///");
 
     // The OAuth browser session receives this URL to finish the token
     // exchange. Expo Router receives the same native intent and would also
-    // try to render `/auth/callback`, which is not an app screen. Keep the
+    // try to render `/auth/callback`. Keep the
     // user on sign-in until Convex Auth flips the authenticated route guard.
     const isOAuthCallback =
       url.protocol === "shelvr:" &&

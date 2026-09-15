@@ -17,8 +17,11 @@ describe("redirectSystemPath", () => {
   it.each([
     "shelvr://auth/callback?code=verification-code",
     "shelvr:///auth/callback?code=verification-code",
+    "/auth/callback?code=verification-code",
+    "auth/callback?code=verification-code",
   ])("keeps OAuth callbacks on the sign-in route for %s", (path) => {
     expect(redirectSystemPath({ path, initial: false })).toBe("/sign-in");
+    expect(redirectSystemPath({ path, initial: true })).toBe("/sign-in");
     expect(markPendingShareOnDevice).not.toHaveBeenCalled();
   });
 
@@ -31,6 +34,11 @@ describe("redirectSystemPath", () => {
 
   it("leaves unrelated deep links untouched", () => {
     const path = "shelvr:///add";
+    expect(redirectSystemPath({ path, initial: false })).toBe(path);
+  });
+
+  it("does not treat external callback URLs as Shelvr authentication", () => {
+    const path = "https://example.com/auth/callback?code=verification-code";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);
   });
 });
