@@ -498,5 +498,11 @@
   "home.onYourShelf": "Sur votre étagère",
   "demo.pickHelp": "Shelvr le lit, lui donne un titre et le classe pour vous.",
   "demo.clipboardNoLink": "Votre presse-papiers ne contient aucun lien. Copiez-en un ou essayez l'un de ceux-ci.",
-  "demo.samplesOr": "Ou essayez l'un de ceux-ci"
+  "demo.samplesOr": "Ou essayez l'un de ceux-ci",
+  "demo.shareTitle": "Enregistrez votre premier lien avec le menu Partager.",
+  "demo.shareSupport": "Touchez Partager sur la publication, puis Shelvr dans la rangée d'applis. Absent? Touchez Plus.",
+  "demo.shareOthers": "Ou partagez l'un de ceux-ci",
+  "demo.pasteOwn": "Ou collez votre propre lien",
+  "demo.pickShelvr": "C'est parti vers une autre appli. Touchez Partager de nouveau et choisissez Shelvr.",
+  "demo.shareThis": "Partager cette publication"
 }

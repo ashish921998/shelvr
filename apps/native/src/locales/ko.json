@@ -470,5 +470,11 @@
   "home.onYourShelf": "내 책장",
   "demo.pickHelp": "Shelvr가 읽고 제목을 붙여 정리해 드려요.",
   "demo.clipboardNoLink": "클립보드에 링크가 없어요. 링크를 복사하거나 아래 링크로 해 보세요.",
-  "demo.samplesOr": "또는 이 링크로 해 보기"
+  "demo.samplesOr": "또는 이 링크로 해 보기",
+  "demo.shareTitle": "공유 메뉴로 첫 링크를 저장하세요.",
+  "demo.shareSupport": "게시물에서 공유를 탭한 다음 앱 줄에서 Shelvr를 탭하세요. 없나요? 더 보기를 탭하세요.",
+  "demo.shareOthers": "또는 이 중 하나를 공유",
+  "demo.pasteOwn": "또는 내 링크 붙여넣기",
+  "demo.pickShelvr": "다른 앱으로 전송됐어요. 공유를 다시 탭하고 Shelvr를 선택하세요.",
+  "demo.shareThis": "이 게시물 공유"
 }

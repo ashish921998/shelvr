@@ -28,7 +28,13 @@ import { useConvexAuth, useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -36,6 +42,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  Share,
   Text,
   TextInput,
   View,
@@ -50,6 +57,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // same server item; finish() drops it.
 
 const TIMEOUT_MS = 15_000;
+const SHARE_EXTENSION_SUFFIX = ".expo-sharing-extension";
+// iOS ignores a modal presented while the share sheet is still animating out.
+const SHARE_SHEET_DISMISS_MS = 500;
 const APP_ICON = require("../../../assets/icon.png");
 const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Articles: require("../../../assets/onboarding/demo-article.jpg"),
@@ -95,6 +105,7 @@ export function LiveDemoStep({
   const inFlightRef = useRef(false);
   const [error, setError] = useState<TextMessageKey | null>(null);
   const [demoUsed, setDemoUsed] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [deadlineNonce, setDeadlineNonce] = useState(0);
   const advancedRef = useRef(false);
@@ -220,19 +231,50 @@ export function LiveDemoStep({
   // The share extension relaunches the app with an expo-sharing URL. The
   // payload is read directly: useIncomingShare caches its state and would not
   // refresh after a clear followed by a second share of the same link.
-  const consumeShare = useCallback(() => {
-    if (inFlightRef.current || advancedRef.current) return;
+  const consumeShare = useCallback((): boolean => {
+    if (inFlightRef.current || advancedRef.current) return false;
     let url: string | null;
     try {
       url = firstSharedUrl(getSharedPayloads());
     } catch (err) {
       analytics.captureError("onboarding_share_read_failed", err);
-      return;
+      return false;
     }
-    if (url === null) return;
+    if (url === null) return false;
     clearSharedPayloads();
     submitUrl(url);
+    return true;
   }, [submitUrl]);
+
+  // iOS opens the real share sheet over a sample, so the first save goes
+  // through the same Shelvr tile the user will tap in other apps.
+  const shareSample = useCallback(
+    async (url: string) => {
+      setError(null);
+      setShareSheetOpen(true);
+      let result: Awaited<ReturnType<typeof Share.share>>;
+      try {
+        result = await Share.share({ url });
+      } catch (err) {
+        analytics.captureError("onboarding_share_sheet_failed", err);
+        setShareSheetOpen(false);
+        submitUrl(url);
+        return;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, SHARE_SHEET_DISMISS_MS),
+      );
+      setShareSheetOpen(false);
+      if (result.action !== Share.sharedAction) return;
+      if (consumeShare()) return;
+      if (result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
+        submitUrl(url);
+      } else {
+        setError("demo.pickShelvr");
+      }
+    },
+    [consumeShare, submitUrl],
+  );
 
   const consumeShareRef = useRef(consumeShare);
   useEffect(() => {
@@ -410,8 +452,165 @@ export function LiveDemoStep({
     );
   }
 
+  const pasteRow = (
+    <View style={styles.inputRow}>
+      <TextInput
+        value={draft}
+        onChangeText={(text) => {
+          setDraft(text);
+          setError(null);
+        }}
+        placeholder={t("demo.pastePlaceholder")}
+        placeholderTextColor={theme.colors.faint}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+        returnKeyType="go"
+        accessibilityLabel={t("demo.linkLabel")}
+        style={styles.input}
+        onSubmitEditing={() => {
+          if (draft.trim() !== "") submitUrl(draft);
+        }}
+      />
+      {draft.trim() !== "" ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={submitting}
+          onPress={() => submitUrl(draft)}
+          style={({ pressed }) => [
+            styles.inputAction,
+            (pressed || submitting) && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.inputActionText}>{t("demo.save")}</Text>
+        </Pressable>
+      ) : Clipboard.isPasteButtonAvailable ? (
+        <Clipboard.ClipboardPasteButton
+          acceptedContentTypes={["url", "plain-text"]}
+          displayMode="iconAndLabel"
+          cornerStyle="capsule"
+          backgroundColor={theme.colors.primary}
+          foregroundColor={theme.colors.primaryForeground}
+          style={styles.pasteControl}
+          onPress={(data) => {
+            if (data.type === "text") savePasted(data.text);
+          }}
+        />
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void pasteClipboard()}
+          style={({ pressed }) => [
+            styles.inputAction,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.inputActionText}>{t("common.paste")}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.wrap}>
+      {Platform.OS === "ios" ? (
+        <SharePicker
+          samples={samples}
+          disabled={submitting}
+          error={errorLine}
+          pasteRow={pasteRow}
+          onShare={(url) => void shareSample(url)}
+        />
+      ) : (
+        <PastePicker
+          samples={samples}
+          disabled={submitting}
+          error={errorLine}
+          pasteRow={pasteRow}
+          onPick={submitUrl}
+        />
+      )}
+
+      {continueAfterUsed === null ? null : (
+        <View style={styles.foot}>{continueAfterUsed}</View>
+      )}
+
+      <DemoAuthSheet
+        visible={phase === "auth" && !isAuthenticated && !shareSheetOpen}
+        url={authRequest?.url ?? savingUrl ?? ""}
+        onCancel={cancelAuth}
+      />
+    </View>
+  );
+}
+
+type PickerProps = {
+  samples: DemoSample[];
+  disabled: boolean;
+  error: ReactNode;
+  pasteRow: ReactNode;
+};
+
+/** iOS: the first save goes through the real share sheet, Matter-style. */
+function SharePicker({
+  samples,
+  disabled,
+  error,
+  pasteRow,
+  onShare,
+}: PickerProps & { onShare: (url: string) => void }) {
+  useAppLocale();
+  const [featured, ...others] = samples;
+  return (
+    <>
+      <View style={styles.head}>
+        <Text style={styles.headline}>{t("demo.shareTitle")}</Text>
+        <Text style={styles.support}>{t("demo.shareSupport")}</Text>
+      </View>
+
+      {featured === undefined ? null : (
+        <SharePost
+          sample={featured}
+          disabled={disabled}
+          onShare={() => onShare(featured.url)}
+        />
+      )}
+
+      {error}
+
+      {others.length === 0 ? null : (
+        <View style={styles.samples}>
+          <Text style={styles.samplesLabel}>{t("demo.shareOthers")}</Text>
+          {others.map((candidate) => (
+            <SampleRow
+              key={candidate.url}
+              sample={candidate}
+              icon="square.and.arrow.up"
+              disabled={disabled}
+              onPress={() => onShare(candidate.url)}
+            />
+          ))}
+        </View>
+      )}
+
+      <View style={styles.samples}>
+        <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
+        {pasteRow}
+      </View>
+    </>
+  );
+}
+
+function PastePicker({
+  samples,
+  disabled,
+  error,
+  pasteRow,
+  onPick,
+}: PickerProps & { onPick: (url: string) => void }) {
+  useAppLocale();
+  return (
+    <>
       <View style={styles.head}>
         <Text style={styles.headline}>{t("demo.title")}</Text>
         <Text style={styles.support}>{t("demo.pickHelp")}</Text>
@@ -419,62 +618,7 @@ export function LiveDemoStep({
 
       <ShareHint />
 
-      <View style={styles.inputRow}>
-        <TextInput
-          value={draft}
-          onChangeText={(text) => {
-            setDraft(text);
-            setError(null);
-          }}
-          placeholder={t("demo.pastePlaceholder")}
-          placeholderTextColor={theme.colors.faint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          returnKeyType="go"
-          accessibilityLabel={t("demo.linkLabel")}
-          style={styles.input}
-          onSubmitEditing={() => {
-            if (draft.trim() !== "") submitUrl(draft);
-          }}
-        />
-        {draft.trim() !== "" ? (
-          <Pressable
-            accessibilityRole="button"
-            disabled={submitting}
-            onPress={() => submitUrl(draft)}
-            style={({ pressed }) => [
-              styles.inputAction,
-              (pressed || submitting) && { opacity: 0.85 },
-            ]}
-          >
-            <Text style={styles.inputActionText}>{t("demo.save")}</Text>
-          </Pressable>
-        ) : Clipboard.isPasteButtonAvailable ? (
-          <Clipboard.ClipboardPasteButton
-            acceptedContentTypes={["url", "plain-text"]}
-            displayMode="iconAndLabel"
-            cornerStyle="capsule"
-            backgroundColor={theme.colors.primary}
-            foregroundColor={theme.colors.primaryForeground}
-            style={styles.pasteControl}
-            onPress={(data) => {
-              if (data.type === "text") savePasted(data.text);
-            }}
-          />
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void pasteClipboard()}
-            style={({ pressed }) => [
-              styles.inputAction,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Text style={styles.inputActionText}>{t("common.paste")}</Text>
-          </Pressable>
-        )}
-      </View>
+      {pasteRow}
 
       <View style={styles.samples}>
         <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
@@ -482,26 +626,15 @@ export function LiveDemoStep({
           <SampleRow
             key={candidate.url}
             sample={candidate}
-            disabled={submitting}
-            onPress={() => {
-              submitUrl(candidate.url);
-            }}
+            icon="plus"
+            disabled={disabled}
+            onPress={() => onPick(candidate.url)}
           />
         ))}
       </View>
 
-      {errorLine}
-
-      {continueAfterUsed === null ? null : (
-        <View style={styles.foot}>{continueAfterUsed}</View>
-      )}
-
-      <DemoAuthSheet
-        visible={phase === "auth" && !isAuthenticated}
-        url={authRequest?.url ?? savingUrl ?? ""}
-        onCancel={cancelAuth}
-      />
-    </View>
+      {error}
+    </>
   );
 }
 
@@ -535,12 +668,62 @@ function ShareHint() {
   );
 }
 
+/** The sample post the share sheet opens over, with its own Share button. */
+function SharePost({
+  sample,
+  disabled,
+  onShare,
+}: {
+  sample: DemoSample;
+  disabled: boolean;
+  onShare: () => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
+      disabled={disabled}
+      onPress={onShare}
+      style={({ pressed }) => [
+        styles.post,
+        (pressed || disabled) && { opacity: 0.85 },
+      ]}
+    >
+      <Image
+        source={SAMPLE_IMAGES[sample.kind]}
+        contentFit="cover"
+        style={styles.postImage}
+      />
+      <View style={styles.postBody}>
+        <View style={styles.linkText}>
+          <Text style={styles.postTitle} numberOfLines={2}>
+            {sample.pageHeading}
+          </Text>
+          <Text style={styles.linkUrl} numberOfLines={1}>
+            {sample.domain}
+          </Text>
+        </View>
+        <View style={styles.hintShare}>
+          <AppSymbolIcon
+            name="square.and.arrow.up"
+            size={18}
+            tintColor={theme.colors.primaryForeground}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function SampleRow({
   sample,
+  icon,
   disabled,
   onPress,
 }: {
   sample: DemoSample;
+  icon: "plus" | "square.and.arrow.up";
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -569,7 +752,7 @@ function SampleRow({
           {sample.domain}
         </Text>
       </View>
-      <AppSymbolIcon name="plus" size={16} tintColor={theme.colors.primary} />
+      <AppSymbolIcon name={icon} size={16} tintColor={theme.colors.primary} />
     </Pressable>
   );
 }
@@ -788,6 +971,31 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 14,
     lineHeight: 19,
+    color: theme.colors.foreground,
+  },
+  post: {
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    overflow: "hidden",
+  },
+  postImage: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  postBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    padding: theme.gap(1.5),
+  },
+  postTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 17,
+    lineHeight: 22,
     color: theme.colors.foreground,
   },
   pasteControl: {

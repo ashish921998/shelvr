@@ -470,5 +470,11 @@
   "home.onYourShelf": "シェルフ",
   "demo.pickHelp": "Shelvr が読み込み、タイトルを付けて整理します。",
   "demo.clipboardNoLink": "クリップボードにリンクがありません。リンクをコピーするか、下のリンクを試してください。",
-  "demo.samplesOr": "または、このリンクで試す"
+  "demo.samplesOr": "または、このリンクで試す",
+  "demo.shareTitle": "共有メニューで最初のリンクを保存しましょう。",
+  "demo.shareSupport": "投稿の共有をタップし、アプリの列からShelvrをタップします。見つからない場合は「その他」をタップ。",
+  "demo.shareOthers": "またはこちらを共有",
+  "demo.pasteOwn": "または自分のリンクを貼り付け",
+  "demo.pickShelvr": "別のアプリに送られました。もう一度共有をタップしてShelvrを選んでください。",
+  "demo.shareThis": "この投稿を共有"
 }

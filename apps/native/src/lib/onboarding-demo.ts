@@ -36,9 +36,9 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
   },
   {
     kind: "Articles",
-    url: "https://www.paulgraham.com/ds.html",
-    pageHeading: "Do Things that Don't Scale",
-    domain: "paulgraham.com",
+    url: "https://fs.blog/reading/",
+    pageHeading: "Use These Simple Strategies to Retain Everything You Read",
+    domain: "fs.blog",
   },
 ];
 
@@ -53,6 +53,18 @@ export function orderDemoSamples(kinds: readonly SaveKind[]): DemoSample[] {
   return [...DEMO_SAMPLES]
     .sort((a, b) => rank(a) - rank(b))
     .slice(0, SAMPLE_COUNT);
+}
+
+/** The iOS share demo always features the reading article, then the picked
+ * kinds' other samples. */
+export function orderShareDemoSamples(
+  kinds: readonly SaveKind[],
+): DemoSample[] {
+  const featured = DEMO_SAMPLES.find((sample) => sample.kind === "Articles");
+  const rest = orderDemoSamples(kinds).filter((sample) => sample !== featured);
+  return featured === undefined
+    ? rest
+    : [featured, ...rest.slice(0, SAMPLE_COUNT - 1)];
 }
 
 /** A sample files into its kind's first preset space when the user kept that

@@ -484,5 +484,11 @@
   "home.onYourShelf": "In deinem Regal",
   "demo.pickHelp": "Shelvr liest ihn, gibt ihm einen Titel und sortiert ihn für dich ein.",
   "demo.clipboardNoLink": "In deiner Zwischenablage ist kein Link. Kopiere einen oder probier einen von diesen.",
-  "demo.samplesOr": "Oder probier einen von diesen"
+  "demo.samplesOr": "Oder probier einen von diesen",
+  "demo.shareTitle": "Speichere deinen ersten Link über das Teilen-Menü.",
+  "demo.shareSupport": "Tippe beim Beitrag auf Teilen und dann in der App-Reihe auf Shelvr. Nicht dabei? Tippe auf Mehr.",
+  "demo.shareOthers": "Oder teile einen von diesen",
+  "demo.pasteOwn": "Oder füge deinen eigenen Link ein",
+  "demo.pickShelvr": "Das ging an eine andere App. Tippe nochmal auf Teilen und wähle Shelvr.",
+  "demo.shareThis": "Diesen Beitrag teilen"
 }

@@ -498,5 +498,11 @@
   "home.onYourShelf": "En tu estantería",
   "demo.pickHelp": "Shelvr lo lee, le pone título y lo archiva por ti.",
   "demo.clipboardNoLink": "No hay ningún enlace en el portapapeles. Copia uno o prueba uno de estos.",
-  "demo.samplesOr": "O prueba uno de estos"
+  "demo.samplesOr": "O prueba uno de estos",
+  "demo.shareTitle": "Guarda tu primer enlace con el menú Compartir.",
+  "demo.shareSupport": "Toca Compartir en la publicación y luego Shelvr en la fila de apps. ¿No aparece? Toca Más.",
+  "demo.shareOthers": "O comparte uno de estos",
+  "demo.pasteOwn": "O pega tu propio enlace",
+  "demo.pickShelvr": "Eso se fue a otra app. Toca Compartir otra vez y elige Shelvr.",
+  "demo.shareThis": "Compartir esta publicación"
 }

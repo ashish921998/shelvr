@@ -1,7 +1,7 @@
 import { useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
-import { orderDemoSamples } from "@/lib/onboarding-demo";
+import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
 import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
@@ -34,7 +34,7 @@ import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -224,7 +224,11 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds)}
+              samples={
+                Platform.OS === "ios"
+                  ? orderShareDemoSamples(kinds)
+                  : orderDemoSamples(kinds)
+              }
               spaces={spaces}
               resume={initialStep === "demo" ? initialProgress.demo : null}
               onSaved={setSaved}

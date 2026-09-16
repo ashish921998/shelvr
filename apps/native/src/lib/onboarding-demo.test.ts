@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { demoDestination, orderDemoSamples } from "./onboarding-demo";
+import {
+  demoDestination,
+  orderDemoSamples,
+  orderShareDemoSamples,
+} from "./onboarding-demo";
 
 describe("orderDemoSamples", () => {
   it("puts the picked kinds' samples first", () => {
     expect(
       orderDemoSamples(["Fitness", "Articles", "Travel"]).map((s) => s.domain),
-    ).toEqual(["paulgraham.com", "lonelyplanet.com", "bbcgoodfood.com"]);
+    ).toEqual(["fs.blog", "lonelyplanet.com", "bbcgoodfood.com"]);
   });
 
   it("offers three samples when no picked kind has one", () => {
@@ -14,6 +18,20 @@ describe("orderDemoSamples", () => {
       "apple.com",
       "lonelyplanet.com",
     ]);
+  });
+});
+
+describe("orderShareDemoSamples", () => {
+  it("leads with the reading article, then the picked kinds", () => {
+    expect(
+      orderShareDemoSamples(["Recipes", "Travel"]).map((s) => s.domain),
+    ).toEqual(["fs.blog", "bbcgoodfood.com", "lonelyplanet.com"]);
+  });
+
+  it("does not repeat the article when Articles was picked", () => {
+    expect(
+      orderShareDemoSamples(["Articles", "Products"]).map((s) => s.domain),
+    ).toEqual(["fs.blog", "apple.com", "bbcgoodfood.com"]);
   });
 });
 

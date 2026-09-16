@@ -484,5 +484,11 @@
   "home.onYourShelf": "On your shelf",
   "demo.pickHelp": "Shelvr reads it, titles it and files it for you.",
   "demo.clipboardNoLink": "Your clipboard has no link. Copy one, or try one of these.",
-  "demo.samplesOr": "Or try one of these"
+  "demo.samplesOr": "Or try one of these",
+  "demo.shareTitle": "Save your first link using the Share menu.",
+  "demo.shareSupport": "Tap Share on the post, then tap Shelvr in the row of apps. Not there? Tap More.",
+  "demo.shareOthers": "Or share one of these",
+  "demo.pasteOwn": "Or paste your own link",
+  "demo.pickShelvr": "That went to another app. Tap Share again and pick Shelvr.",
+  "demo.shareThis": "Share this post"
 }

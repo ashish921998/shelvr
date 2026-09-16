@@ -444,6 +444,12 @@ export type MessageParams = {
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
+  "demo.shareTitle": undefined;
+  "demo.shareSupport": undefined;
+  "demo.shareOthers": undefined;
+  "demo.pasteOwn": undefined;
+  "demo.pickShelvr": undefined;
+  "demo.shareThis": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
