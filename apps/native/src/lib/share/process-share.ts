@@ -232,6 +232,7 @@ export async function processSession(
   onEntrySettled?: (entry: ShareEntry) => void,
 ): Promise<ShareSession> {
   const entries = session.entries.map((e) => ({ ...e }));
+  const linkDeps = sharedLinkSaves(entries, resolved, deps);
 
   await Promise.all(
     entries.map(async (entry): Promise<void> => {
@@ -241,7 +242,7 @@ export async function processSession(
       // Already-processed-and-failed entries are retried; pending entries are
       // attempted for the first time. Both go through the same path.
 
-      const settled = await processOne(entry, resolved, deps);
+      const settled = await processOne(entry, resolved, linkDeps);
       // Merge the settled outcome onto this entry, including the re-derived kind.
       // On a resume where classifyEntries did not run (a sibling was already
       // settled), a pending entry may still carry its placeholder kind:'link';
@@ -255,6 +256,42 @@ export async function processSession(
   );
 
   return { ...session, entries };
+}
+
+/**
+ * Wraps `deps.saveLink` so every entry in one session that resolves to the same
+ * URL shares a single save. The iOS share extension turns each attachment into
+ * its own payload, and Instagram attaches the URL twice: once as a URL and once
+ * as caption text holding the same URL. Without this, each copy saved under its
+ * own operation id and the user got two items. Saved entries seed the map, so a
+ * retry of a failed copy reuses the item its sibling already created.
+ */
+function sharedLinkSaves(
+  entries: ShareEntry[],
+  resolved: ResolvedPayload[],
+  deps: ShareSaveDeps,
+): ShareSaveDeps {
+  const saves = new Map<string, Promise<Id<"items">>>();
+  for (const entry of entries) {
+    const payload = resolved[entry.index];
+    if (entry.status !== "saved" || !entry.itemId || !payload) continue;
+    const { kind, reason, url } = classifyPayload(payload);
+    if (kind !== "link" || reason !== undefined) continue;
+    saves.set(
+      url ?? payload.value.trim(),
+      Promise.resolve(entry.itemId as Id<"items">),
+    );
+  }
+  return {
+    ...deps,
+    saveLink: (args) => {
+      const existing = saves.get(args.url);
+      if (existing) return existing;
+      const save = deps.saveLink(args);
+      saves.set(args.url, save);
+      return save;
+    },
+  };
 }
 
 /** Processes a single entry and returns its settled outcome. A failure is data,
