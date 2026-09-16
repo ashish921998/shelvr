@@ -306,9 +306,6 @@ export type MessageParams = {
   "presets.fitness": undefined;
   "presets.inspiration": undefined;
   "presets.videos": undefined;
-  "demo.sampleRecipe": undefined;
-  "demo.sampleArticle": undefined;
-  "demo.sampleProduct": undefined;
   "presets.readLater": undefined;
   "presets.longReads": undefined;
   "presets.restaurants": undefined;
@@ -418,13 +415,7 @@ export type MessageParams = {
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
   "demo.shareHelp": undefined;
-  "demo.shareSheet": undefined;
-  "demo.messages": undefined;
-  "demo.mail": undefined;
-  "demo.notes": undefined;
-  "demo.saveToShelvr": undefined;
   "demo.pasteInstead": undefined;
-  "demo.backToShare": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
   "demo.stepReading": undefined;
@@ -454,6 +445,11 @@ export type MessageParams = {
   "home.openInstagram": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "demo.pickHelp": undefined;
+  "demo.clipboardTitle": undefined;
+  "demo.clipboardHelp": undefined;
+  "demo.clipboardNoLink": undefined;
+  "demo.samplesOr": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { demoDestination, pickDemoSample } from "./onboarding-demo";
+import { demoDestination, orderDemoSamples } from "./onboarding-demo";
 
-describe("pickDemoSample", () => {
-  it("uses the first picked kind that has a sample", () => {
-    expect(pickDemoSample(["Fitness", "Recipes", "Articles"]).url).toBe(
-      "https://www.bbcgoodfood.com/recipes/classic-lasagne",
-    );
+describe("orderDemoSamples", () => {
+  it("puts the picked kinds' samples first", () => {
+    expect(
+      orderDemoSamples(["Fitness", "Articles", "Travel"]).map((s) => s.domain),
+    ).toEqual(["paulgraham.com", "lonelyplanet.com", "bbcgoodfood.com"]);
   });
 
-  it("falls back to the Prague travel article", () => {
-    expect(pickDemoSample(["Videos"]).url).toBe(
-      "https://www.lonelyplanet.com/articles/best-things-to-do-in-prague",
-    );
-    expect(pickDemoSample([]).domain).toBe("lonelyplanet.com");
+  it("offers three samples when no picked kind has one", () => {
+    expect(orderDemoSamples(["Videos"]).map((s) => s.domain)).toEqual([
+      "bbcgoodfood.com",
+      "apple.com",
+      "lonelyplanet.com",
+    ]);
   });
 });
 

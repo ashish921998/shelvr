@@ -7,6 +7,7 @@ import {
   type DemoKind,
   type DemoSample,
 } from "@/lib/onboarding-demo";
+import { REDUCED_FADE_IN } from "@/lib/motion";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -14,10 +15,10 @@ import {
   type PendingDemo,
 } from "@/lib/pending-onboarding";
 import { firstSharedUrl } from "@/lib/share/process-share";
-import { displayHost } from "@/lib/url";
+import { displayHost, extractFirstUrl, isProbablyUrl } from "@/lib/url";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { AppSymbolIcon } from "@/components/symbol";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { demoErrorCode, isRateLimitedError } from "@convex/model/demoErrors";
@@ -36,15 +37,23 @@ import {
   Modal,
   Platform,
   Pressable,
-  Share,
   Text,
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Every path is real. The share button opens the system share sheet, the
-// Shelvr extension hands the link back through expo-sharing, and the save runs
+// Every path is real. The first save is a copied link or a ready-made one; a
+// link shared from another app still arrives through expo-sharing. The save runs
 // through api.demo.createDemoItem (one per user, no Pro needed) and the actual
 // pipeline. Before auth, the pending save is persisted so an app kill mid-OAuth
 // resumes it. The record stays through reveal so a relaunch re-attaches to the
@@ -52,7 +61,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const TIMEOUT_MS = 15_000;
 const APP_ICON = require("../../../assets/icon.png");
-const POST_IMAGES: Record<DemoKind, number> = {
+const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Articles: require("../../../assets/onboarding/demo-article.jpg"),
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
   Products: require("../../../assets/onboarding/demo-product.jpg"),
@@ -64,14 +73,15 @@ export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 type Phase = "share" | "paste" | "auth" | "reading" | "failed";
 
 export function LiveDemoStep({
-  sample,
+  samples,
   spaces,
   resume,
   onSaved,
   onReadingChange,
   onAdvance,
 }: {
-  sample: DemoSample;
+  /** Ready-made links, the picked kinds first. */
+  samples: DemoSample[];
   /** Stable preset identities kept in setup. */
   spaces: string[];
   /** A save captured before an earlier sign-in or relaunch. */
@@ -99,7 +109,7 @@ export function LiveDemoStep({
   const [timedOut, setTimedOut] = useState(false);
   const [deadlineNonce, setDeadlineNonce] = useState(0);
   const advancedRef = useRef(false);
-  const shareSheetOpenRef = useRef(false);
+  const [clipboardHasLink, setClipboardHasLink] = useState(false);
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
   // Convex adapter and sends `id: null`, which fails argument validation.
@@ -230,8 +240,7 @@ export function LiveDemoStep({
   // payload is read directly: useIncomingShare caches its state and would not
   // refresh after a clear followed by a second share of the same link.
   const consumeShare = useCallback(() => {
-    if (inFlightRef.current || advancedRef.current || shareSheetOpenRef.current)
-      return;
+    if (inFlightRef.current || advancedRef.current) return;
     let url: string | null;
     try {
       url = firstSharedUrl(getSharedPayloads());
@@ -264,6 +273,22 @@ export function LiveDemoStep({
     };
   }, [resume]);
 
+  // These probes never trigger the iOS paste prompt. A link copied from
+  // Notes or Messages is plain text, so any string counts; the paste itself
+  // checks for a link. Re-checked on return, after copying elsewhere.
+  useEffect(() => {
+    const check = () => {
+      Clipboard.hasStringAsync().then(setClipboardHasLink, () =>
+        setClipboardHasLink(false),
+      );
+    };
+    check();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") check();
+    });
+    return () => appState.remove();
+  }, []);
+
   // Resume the save once auth is ready. Server idempotency makes a repeat
   // submit return the same item.
   useEffect(() => {
@@ -274,21 +299,24 @@ export function LiveDemoStep({
     void submit(request.url, request.destination);
   }, [isAuthenticated, authRequest, submit]);
 
-  const openShareSheet = async () => {
-    // The extension's relaunch URL arrives while the activity sheet is still
-    // up, and the sign-in modal cannot present over it. Hold the payload
-    // until Share.share resolves, after the sheet has dismissed.
-    shareSheetOpenRef.current = true;
-    try {
-      await Share.share(
-        Platform.OS === "ios" ? { url: sample.url } : { message: sample.url },
-      );
-    } catch (err) {
-      analytics.captureError("onboarding_share_sheet_failed", err);
-    } finally {
-      shareSheetOpenRef.current = false;
+  const saveClipboardText = (text: string) => {
+    const url =
+      extractFirstUrl(text) ?? (isProbablyUrl(text) ? text.trim() : null);
+    if (url === null) {
+      setError("demo.clipboardNoLink");
+      return;
     }
-    consumeShare();
+    setReturnPhase("share");
+    submitUrl(url);
+  };
+
+  const pasteClipboard = async () => {
+    try {
+      saveClipboardText(await Clipboard.getStringAsync());
+    } catch (err) {
+      analytics.captureError("onboarding_clipboard_read_failed", err);
+      setError("demo.clipboardNoLink");
+    }
   };
 
   const cancelAuth = () => {
@@ -448,34 +476,6 @@ export function LiveDemoStep({
           </Pressable>
         </View>
 
-        <View style={styles.samples}>
-          <Text style={styles.samplesLabel}>{t("demo.samples")}</Text>
-          <View style={styles.sampleRow}>
-            {DEMO_SAMPLES.map((candidate) =>
-              candidate.chipKey === null ? null : (
-                <Pressable
-                  key={candidate.url}
-                  onPress={() => setDraft(candidate.url)}
-                  style={({ pressed }) => [
-                    styles.sampleChip,
-                    draft === candidate.url && styles.sampleChipActive,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.sampleLabel,
-                      draft === candidate.url && styles.sampleLabelActive,
-                    ]}
-                  >
-                    {t(candidate.chipKey)}
-                  </Text>
-                </Pressable>
-              ),
-            )}
-          </View>
-        </View>
-
         {errorLine}
 
         <View style={styles.foot}>
@@ -487,7 +487,7 @@ export function LiveDemoStep({
           />
           {continueAfterUsed ?? (
             <GhostButton
-              label={t("demo.backToShare")}
+              label={t("common.back")}
               onPress={() => {
                 setError(null);
                 setReturnPhase("share");
@@ -504,35 +504,64 @@ export function LiveDemoStep({
     <View style={styles.wrap}>
       <View style={styles.head}>
         <Text style={styles.headline}>{t("demo.title")}</Text>
-        <Text style={styles.support}>{t("demo.shareHelp")}</Text>
+        <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 
-      <SamplePost sample={sample} />
+      <ShareHint />
 
-      <View style={styles.sheet} accessibilityElementsHidden>
-        <Text style={styles.sheetLabel}>{t("demo.shareSheet")}</Text>
-        <View style={styles.apps}>
-          <ShareApp icon="message" label={t("demo.messages")} />
-          <View style={styles.app}>
-            <Image
-              source={APP_ICON}
-              style={[styles.appIcon, styles.appIconShelvr]}
-            />
-            <Text style={[styles.appLabel, styles.appLabelShelvr]}>Shelvr</Text>
+      {clipboardHasLink ? (
+        <Animated.View entering={REDUCED_FADE_IN} style={styles.clipCard}>
+          <View style={styles.clipText}>
+            <Text style={styles.clipTitle}>{t("demo.clipboardTitle")}</Text>
+            <Text style={styles.clipHelp}>{t("demo.clipboardHelp")}</Text>
           </View>
-          <ShareApp icon="envelope" label={t("demo.mail")} />
-          <ShareApp icon="doc.text" label={t("demo.notes")} />
-        </View>
+          {Clipboard.isPasteButtonAvailable ? (
+            <Clipboard.ClipboardPasteButton
+              acceptedContentTypes={["url", "plain-text"]}
+              displayMode="iconAndLabel"
+              cornerStyle="capsule"
+              backgroundColor={theme.colors.primary}
+              foregroundColor={theme.colors.primaryForeground}
+              style={styles.pasteControl}
+              onPress={(data) => {
+                if (data.type === "text") saveClipboardText(data.text);
+              }}
+            />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void pasteClipboard()}
+              style={({ pressed }) => [
+                styles.pasteFallback,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.pasteFallbackText}>{t("common.paste")}</Text>
+            </Pressable>
+          )}
+        </Animated.View>
+      ) : null}
+
+      <View style={styles.samples}>
+        <Text style={styles.samplesLabel}>
+          {clipboardHasLink ? t("demo.samplesOr") : t("demo.samples")}
+        </Text>
+        {samples.map((candidate) => (
+          <SampleRow
+            key={candidate.url}
+            sample={candidate}
+            disabled={submitting}
+            onPress={() => {
+              setReturnPhase("share");
+              submitUrl(candidate.url);
+            }}
+          />
+        ))}
       </View>
 
       {errorLine}
 
       <View style={styles.foot}>
-        <CtaButton
-          label={t("demo.saveToShelvr")}
-          onPress={() => void openShareSheet()}
-          busy={submitting}
-        />
         {continueAfterUsed ?? (
           <GhostButton
             label={t("demo.pasteInstead")}
@@ -547,65 +576,109 @@ export function LiveDemoStep({
 
       <DemoAuthSheet
         visible={phase === "auth" && !isAuthenticated}
-        url={authRequest?.url ?? savingUrl ?? sample.url}
-        sample={sample}
+        url={authRequest?.url ?? savingUrl ?? ""}
         onCancel={cancelAuth}
       />
     </View>
   );
 }
 
-function SamplePost({ sample }: { sample: DemoSample }) {
+function pulse(delay: number) {
+  return withRepeat(
+    withSequence(
+      withDelay(delay, withTiming(1.12, { duration: 260 })),
+      withTiming(1, { duration: 260 }),
+      withDelay(1400 - delay, withTiming(1, { duration: 0 })),
+    ),
+    -1,
+  );
+}
+
+/** An illustration of the share gesture, not a control. */
+function ShareHint() {
+  useAppLocale();
   const { theme } = useUnistyles();
+  const reduceMotion = useReducedMotion();
+  const shareScale = useSharedValue(1);
+  const shelvrScale = useSharedValue(1);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    shareScale.value = pulse(0);
+    shelvrScale.value = pulse(600);
+  }, [reduceMotion, shareScale, shelvrScale]);
+
+  const shareStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: shareScale.value }],
+  }));
+  const shelvrStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: shelvrScale.value }],
+  }));
+
   return (
-    <View style={styles.post} accessibilityElementsHidden>
-      <View style={styles.postHead}>
-        <View style={styles.avatar} />
-        <Text style={styles.postHandle}>{sample.domain}</Text>
-      </View>
-      <Image
-        source={POST_IMAGES[sample.kind]}
-        contentFit="cover"
-        style={styles.postImage}
-      />
-      <View style={styles.postActions}>
-        <AppSymbolIcon
-          name="heart"
-          size={20}
-          tintColor={theme.colors.foreground}
-        />
-        <AppSymbolIcon
-          name="message"
-          size={20}
-          tintColor={theme.colors.foreground}
-        />
-        <View style={styles.shareHighlight}>
+    <View
+      style={styles.hint}
+      accessible
+      accessibilityLabel={t("demo.shareHelp")}
+    >
+      <View style={styles.hintArt}>
+        <Animated.View style={[styles.hintShare, shareStyle]}>
           <AppSymbolIcon
             name="square.and.arrow.up"
             size={18}
             tintColor={theme.colors.primaryForeground}
           />
-        </View>
+        </Animated.View>
+        <AppSymbolIcon
+          name="chevron.right"
+          size={12}
+          tintColor={theme.colors.faint}
+        />
+        <Animated.View style={shelvrStyle}>
+          <Image source={APP_ICON} style={styles.hintIcon} />
+        </Animated.View>
       </View>
-      <Text style={styles.caption} numberOfLines={2}>
-        <Text style={styles.captionHandle}>{sample.domain} </Text>
-        {sample.pageHeading}
-      </Text>
+      <Text style={styles.hintText}>{t("demo.shareHelp")}</Text>
     </View>
   );
 }
 
-function ShareApp({ icon, label }: { icon: AppSymbolName; label: string }) {
+function SampleRow({
+  sample,
+  disabled,
+  onPress,
+}: {
+  sample: DemoSample;
+  disabled: boolean;
+  onPress: () => void;
+}) {
   const { theme } = useUnistyles();
   return (
-    <View style={styles.app}>
-      <View style={styles.appIcon}>
-        <AppSymbolIcon name={icon} size={22} tintColor={theme.colors.muted} />
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${sample.pageHeading}, ${sample.domain}`}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.sampleRow,
+        (pressed || disabled) && { opacity: 0.7 },
+      ]}
+    >
+      <Image
+        source={SAMPLE_IMAGES[sample.kind]}
+        contentFit="cover"
+        style={styles.sampleThumb}
+      />
+      <View style={styles.linkText}>
+        <Text style={styles.linkHost} numberOfLines={1}>
+          {sample.pageHeading}
+        </Text>
+        <Text style={styles.linkUrl} numberOfLines={1}>
+          {sample.domain}
+        </Text>
       </View>
-      <Text style={styles.appLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
+      <AppSymbolIcon name="plus" size={16} tintColor={theme.colors.primary} />
+    </Pressable>
   );
 }
 
@@ -645,12 +718,10 @@ function ReadingSteps() {
 function DemoAuthSheet({
   visible,
   url,
-  sample,
   onCancel,
 }: {
   visible: boolean;
   url: string;
-  sample: DemoSample;
   onCancel: () => void;
 }) {
   useAppLocale();
@@ -658,7 +729,8 @@ function DemoAuthSheet({
   const { signInWith, pendingProvider, lastError } = useOAuthSignIn();
   const busy = pendingProvider !== null;
   const pageHeading =
-    url === sample.url ? sample.pageHeading : displayHost(url);
+    DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
+    displayHost(url);
 
   const signIn = async (provider: OAuthProvider) => {
     const outcome = await signInWith(provider);
@@ -791,99 +863,83 @@ const styles = StyleSheet.create((theme, rt) => ({
     marginTop: "auto",
     gap: theme.gap(1),
   },
-  post: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.gap(1.5),
-    gap: theme.gap(1),
-  },
-  postHead: {
+  hint: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1),
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  postHandle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 13,
-    color: theme.colors.foreground,
-  },
-  postImage: {
-    height: 150,
+    gap: theme.gap(1.5),
+    padding: theme.gap(1.5),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  postActions: {
+  hintArt: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(2),
+    gap: theme.gap(0.75),
   },
-  shareHighlight: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  hintShare: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  caption: {
+  hintIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    borderCurve: "continuous",
+  },
+  hintText: {
+    flex: 1,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 19,
+    color: theme.colors.foreground,
+  },
+  clipCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    padding: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  clipText: {
+    flex: 1,
+    gap: 2,
+  },
+  clipTitle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  clipHelp: {
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
-    color: theme.colors.foreground,
+    color: theme.colors.muted,
   },
-  captionHandle: {
-    fontFamily: theme.fonts.bold,
+  pasteControl: {
+    width: 104,
+    height: 40,
   },
-  sheet: {
-    gap: theme.gap(1),
-  },
-  sheetLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
-  },
-  apps: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  app: {
-    width: 64,
-    alignItems: "center",
-    gap: 6,
-  },
-  appIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 13,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
+  pasteFallback: {
+    height: 40,
+    paddingHorizontal: theme.gap(2),
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  appIconShelvr: {
-    borderWidth: 2,
-    borderColor: theme.colors.primarySoft,
-  },
-  appLabel: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 11,
-    color: theme.colors.muted,
-  },
-  appLabelShelvr: {
+  pasteFallbackText: {
     fontFamily: theme.fonts.bold,
-    color: theme.colors.primaryText,
+    fontSize: 15,
+    color: theme.colors.primaryForeground,
   },
   linkRow: {
     flexDirection: "row",
@@ -988,28 +1044,22 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   sampleRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.gap(1),
-  },
-  sampleChip: {
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(1.75),
-    borderRadius: 50,
-    backgroundColor: theme.colors.surface,
+    alignItems: "center",
+    gap: theme.gap(1.25),
+    padding: theme.gap(1),
+    paddingRight: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
-  sampleChipActive: {
+  sampleThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.sm,
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
-    borderColor: theme.colors.primary,
-  },
-  sampleLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    color: theme.colors.muted,
-  },
-  sampleLabelActive: {
-    color: theme.colors.primaryText,
   },
   scrim: {
     flex: 1,
