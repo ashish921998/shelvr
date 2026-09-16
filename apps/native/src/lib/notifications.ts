@@ -156,7 +156,7 @@ export function NotificationSessionProvider({
         : "notification_registration_failed",
     );
     const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active" && !session.isRegistered()) register();
+      if (state === "active" && session.shouldRetryRegistration()) register();
     });
     return () => listener.remove();
   }, [locale, isAuthenticated, session]);

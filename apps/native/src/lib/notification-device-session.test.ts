@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
 import { NotificationDeviceSession } from "./notification-device-session";
 
 function deferred() {
@@ -38,6 +39,72 @@ function setup(initial: string[] = [], getLocale?: () => string) {
 }
 
 describe("notification device session", () => {
+  it("blocks foreground retries for ownership rejection until a new session or token succeeds", async () => {
+    const { session, deps } = setup();
+    const conflict = new ConvexError({
+      code: "notification_token_owned_by_another_account",
+    });
+    deps.saveToken.mockRejectedValueOnce(conflict);
+    await expect(session.register()).rejects.toThrow();
+    expect(session.isRegistered()).toBe(false);
+    expect(session.shouldRetryRegistration()).toBe(false);
+    // A token-rotation event can still attempt a different token.
+    await session.register(async () => "token-b");
+    expect(session.isRegistered()).toBe(true);
+    deps.saveToken.mockRejectedValueOnce(conflict);
+    await expect(session.register(async () => "token-c")).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    session.stop();
+    session.start();
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("keeps token-acquisition failure retryable after a blocked token is rotated", async () => {
+    const { session, deps } = setup();
+    deps.saveToken.mockRejectedValueOnce(
+      new ConvexError({ code: "notification_token_owned_by_another_account" }),
+    );
+    await expect(session.register()).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    await expect(
+      session.register(async () => {
+        throw new Error("offline");
+      }),
+    ).rejects.toThrow("offline");
+    expect(session.shouldRetryRegistration()).toBe(true);
+  });
+
+  it.each([
+    new Error("offline"),
+    new ConvexError({ code: "temporary_failure" }),
+  ])("keeps non-ownership server failures retryable: %s", async (error) => {
+    const { session, deps } = setup();
+    deps.saveToken.mockRejectedValueOnce(error);
+    await expect(session.register()).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("does not let an old account's rejection block the next session", async () => {
+    const { session, deps } = setup();
+    const pending = deferred();
+    deps.saveToken.mockImplementationOnce(async () => {
+      await pending.promise;
+      throw new ConvexError({
+        code: "notification_token_owned_by_another_account",
+      });
+    });
+    const failed = expect(session.register()).rejects.toThrow();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    session.stop();
+    session.start();
+    pending.resolve();
+    await failed;
+    expect(session.shouldRetryRegistration()).toBe(true);
+  });
   it("tracks registration readiness across failures, denied permission, and restarts", async () => {
     const { session, deps } = setup();
     expect(session.isRegistered()).toBe(false);

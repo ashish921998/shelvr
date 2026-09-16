@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
   useNotificationSession,
@@ -78,6 +79,7 @@ beforeEach(() => {
   mock.authenticated = true;
   mock.locale = "en";
   mock.token.mockReset().mockResolvedValue("expo-token");
+  mock.register.mockReset().mockResolvedValue(undefined);
 });
 
 function renderSession() {
@@ -87,6 +89,28 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("does not repeat token requests or server mutations on foreground after ownership rejection", async () => {
+    mock.register.mockRejectedValueOnce(
+      new ConvexError({ code: "notification_token_owned_by_another_account" }),
+    );
+    renderSession();
+    await waitFor(() => expect(mock.captureError).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      mock.appState?.("active");
+      mock.appState?.("active");
+    });
+    expect(mock.token).toHaveBeenCalledTimes(1);
+    expect(mock.register).toHaveBeenCalledTimes(1);
+    expect(mock.captureError).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient server failure on foreground", async () => {
+    mock.register.mockRejectedValueOnce(new Error("temporarily unavailable"));
+    renderSession();
+    await waitFor(() => expect(mock.captureError).toHaveBeenCalledTimes(1));
+    act(() => mock.appState?.("active"));
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(2));
+  });
   it("registers only once at startup and updates a changed locale", async () => {
     const { rerender } = renderSession();
     await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
