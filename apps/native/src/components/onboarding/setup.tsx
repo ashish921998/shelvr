@@ -11,7 +11,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const KIND_IMAGES: Record<SaveKind, number> = {
   Articles: require("../../../assets/onboarding/article.jpg"),
   Recipes: require("../../../assets/onboarding/recipes.jpg"),
-  Products: require("../../../assets/onboarding/gifts.jpg"),
+  Products: require("../../../assets/onboarding/product.jpg"),
   "Home & decor": require("../../../assets/onboarding/sofa.jpg"),
   Travel: require("../../../assets/onboarding/prague.jpg"),
   Inspiration: require("../../../assets/onboarding/reading.jpg"),
