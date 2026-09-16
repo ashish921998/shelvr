@@ -106,9 +106,10 @@ type AnalyticsEventProperties = {
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   onboarding_completed: {
-    // Q1 "Where do your saves pile up today?" — free analytics signal.
+    // Always empty since the pileup question was removed. Kept so existing
+    // PostHog insights keep a stable property shape.
     save_pileup: string[];
-    // Q2 "What do you save most?" — also seeds the space presets.
+    // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
     space_count: number;
     space_names: string[];
@@ -126,7 +127,6 @@ type AnalyticsEventProperties = {
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
-  onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,

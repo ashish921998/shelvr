@@ -13,7 +13,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Onboarding
 
-1. Promise screen → survey (optional multi-select) → space picker → short building animation → optional live demo save → permissions explanation (no system prompts yet) → Ready.
+1. Opener (with a Sign in link for existing accounts) → setup (what you save and your spaces) → live demo that saves one link through the real share sheet or a pasted link, with Sign in with Apple or Google when the save needs an account → reveal of the filed save → paywall.
 2. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
 3. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
 

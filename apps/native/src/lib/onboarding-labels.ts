@@ -1,14 +1,8 @@
 import { t } from "./i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 
-// Stable survey/preset identities remain compatible with persisted onboarding.
+// Stable kind and preset identities remain compatible with persisted onboarding.
 const LABELS: Record<string, TextMessageKey> = {
-  "X bookmarks": "survey.xBookmarks",
-  "Instagram saved": "survey.instagram",
-  Screenshots: "survey.screenshots",
-  "Notes app": "survey.notesApp",
-  "Browser tabs": "survey.browserTabs",
-  Everywhere: "survey.everywhere",
   Articles: "presets.articles",
   Recipes: "presets.recipes",
   Products: "presets.products",

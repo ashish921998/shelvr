@@ -4,9 +4,9 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
 import { TidyDone } from "./tidy/tidy-done";
-import { SpacePickerStep, getSpacePresets } from "./onboarding/space-picker";
-import { SurveyStep } from "./onboarding/survey";
+import { SetupStep } from "./onboarding/setup";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import { getSpacePresets } from "@/lib/save-kinds";
 
 const device = vi.hoisted(() => ({
   tag: "en-US",
@@ -75,6 +75,7 @@ vi.mock("react-native", () => {
       ),
     ),
     ActivityIndicator: vi.fn(() => null),
+    TextInput: vi.fn(() => <input />),
     StyleSheet: { flatten },
   };
 });
@@ -126,6 +127,9 @@ vi.mock("@shopify/react-native-skia", () => {
     BlurMask: vi.fn(() => null),
   };
 });
+vi.mock("@/components/symbol", () => ({
+  AppSymbolIcon: vi.fn(() => null),
+}));
 vi.mock("./onboarding/parts", () => ({
   CtaButton: vi.fn(({ label }: { label: string }) => <button>{label}</button>),
 }));
@@ -183,51 +187,46 @@ it("translates the singular deleted-photo summary on a mounted screen", () => {
   expect(screen.queryByText(/1 deleted/)).toBeNull();
 });
 
-it("preserves selected preset identities and focused survey chips across languages", () => {
+it("preserves selected preset identities and focused setup chips across languages", () => {
   let selected: string[] = [];
-  function Picker() {
+  const toggleKind = vi.fn();
+  function Setup() {
     const [spaces, setSpaces] = useState(getSpacePresets(["Recipes"]));
     selected = spaces;
     return (
-      <SpacePickerStep
-        answers={["Recipes"]}
-        selected={spaces}
-        onToggle={(name) =>
+      <SetupStep
+        kinds={["Recipes"]}
+        spaces={spaces}
+        onToggleKind={toggleKind}
+        onToggleSpace={(name) =>
           setSpaces((prev) => prev.filter((item) => item !== name))
         }
+        onAddSpace={() => {}}
         onAdvance={() => {}}
       />
     );
   }
-  render(<Picker />);
-  const button = screen.getByRole("button", { name: /Recipes/ });
-  button.focus();
-  changeLanguage("de-DE");
-  expect(document.activeElement).toBe(button);
-  expect(selected).toContain("Recipes");
-  expect(button.textContent).toContain(onboardingLabel("Recipes"));
-  fireEvent.click(button);
-  expect(selected).not.toContain("Recipes");
-  const toggle = vi.fn();
-  render(
-    <SurveyStep
-      headline="Survey"
-      support=""
-      options={["Articles"]}
-      selected={[]}
-      onToggle={toggle}
-      ctaLabel="Next"
-      onAdvance={() => {}}
-    />,
-  );
-  const surveyChip = screen.getByRole("button", {
-    name: onboardingLabel("Articles"),
+  render(<Setup />);
+  const chip = screen.getByRole("button", {
+    name: onboardingLabel("Restaurants to try"),
   });
-  surveyChip.focus();
+  chip.focus();
+  changeLanguage("de-DE");
+  expect(document.activeElement).toBe(chip);
+  expect(chip.textContent).toBe(onboardingLabel("Restaurants to try"));
+  expect(chip.textContent).not.toBe("Restaurants to try");
+  fireEvent.click(chip);
+  expect(selected).not.toContain("Restaurants to try");
+  expect(selected).toContain("Recipes");
+
+  const kindTile = screen.getByRole("button", {
+    name: onboardingLabel("Fitness"),
+  });
+  kindTile.focus();
   changeLanguage("ja-JP");
-  expect(document.activeElement).toBe(surveyChip);
-  fireEvent.click(surveyChip);
-  expect(toggle).toHaveBeenCalledWith("Articles");
+  expect(document.activeElement).toBe(kindTile);
+  fireEvent.click(kindTile);
+  expect(toggleKind).toHaveBeenCalledWith("Fitness");
 });
 
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));

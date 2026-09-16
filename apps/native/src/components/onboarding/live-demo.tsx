@@ -1,15 +1,22 @@
-import { onboardingLabel } from "@/lib/onboarding-labels";
 import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
-import { ItemCard, type FeedItem } from "@/components/item-card";
 import { analytics } from "@/lib/analytics";
+import {
+  DEMO_SAMPLES,
+  demoDestination,
+  type DemoSample,
+} from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
   setPendingDemo,
   type PendingDemo,
 } from "@/lib/pending-onboarding";
-import { AppSymbolIcon } from "@/components/symbol";
+import { firstSharedUrl } from "@/lib/share/process-share";
+import { displayHost } from "@/lib/url";
+import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
+import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { demoErrorCode, isRateLimitedError } from "@convex/model/demoErrors";
@@ -18,61 +25,52 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
+import { Image } from "expo-image";
+import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  Linking,
+  Modal,
   Platform,
   Pressable,
+  Share,
   Text,
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 
-// Step 6 — the gotcha. "Paste any link — watch Shelvr file it." Every path is
-// REAL: one server-enforced demo save per authenticated user (api.demo
-// .createDemoItem, no Pro needed), processed by the actual pipeline, revealed
-// as an actual ItemCard. Pre-auth, submitting routes through an inline
-// sign-in (no navigation, so onboarding state survives) with the pending save
-// persisted, so an app kill mid-OAuth resumes the same save. There is no
-// canned card — skip/error/timeout never claim a save happened.
-//
-// The persisted demo record (lib/pending-onboarding) means "this step has a
-// save in flight": it is written on submit, kept through processing/reveal so
-// a relaunch re-attaches to the same server item, and cleared the moment the
-// step is left (advance or skip). Later steps never see it, so a relaunch on
-// permissions/ready restores that step instead of replaying the save.
-
-// Curated sample links — each is a real, classifiable page that exercises the
-// pipeline end to end (fetch → readability → tag → file). Kept generic so they
-// work regardless of which spaces the user just created.
-const SAMPLE_LINKS: { label: TextMessageKey; url: string }[] = [
-  {
-    label: "demo.sampleRecipe",
-    url: "https://www.bbcgoodfood.com/recipes/classic-lasagne",
-  },
-  { label: "demo.sampleArticle", url: "https://www.paulgraham.com/ds.html" },
-  { label: "demo.sampleProduct", url: "https://www.apple.com/airpods-pro/" },
-];
+// Every path is real. The share button opens the system share sheet, the
+// Shelvr extension hands the link back through expo-sharing, and the save runs
+// through api.demo.createDemoItem (one per user, no Pro needed) and the actual
+// pipeline. Before auth, the pending save is persisted so an app kill mid-OAuth
+// resumes it. The record stays through reveal so a relaunch re-attaches to the
+// same server item; finish() drops it.
 
 const TIMEOUT_MS = 15_000;
+const APP_ICON = require("../../../assets/icon.png");
 
-type DemoPhase = "input" | "auth" | "processing" | "reveal" | "failed";
+export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
+
+type Phase = "share" | "paste" | "auth" | "reading" | "failed";
 
 export function LiveDemoStep({
-  selectedSpaces,
-  resumeDemo,
-  onReady,
+  sample,
+  spaces,
+  resume,
+  onSaved,
+  onReadingChange,
   onAdvance,
 }: {
-  /** Stable preset identities picked earlier in onboarding — offered as destination
-   * OPTIONS only. The user's explicit single choice is what files the save. */
-  selectedSpaces: string[];
-  /** A demo captured before an earlier sign-in; resumes it exactly once. */
-  resumeDemo: PendingDemo | null;
-  onReady: (item: FeedItem) => void;
+  sample: DemoSample;
+  /** Stable preset identities kept in setup. */
+  spaces: string[];
+  /** A save captured before an earlier sign-in or relaunch. */
+  resume: PendingDemo | null;
+  onSaved: (saved: DemoSaved) => void;
+  onReadingChange: (reading: boolean) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -80,124 +78,92 @@ export function LiveDemoStep({
   const { isAuthenticated } = useConvexAuth();
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const retryDemoItem = useMutation(api.demo.retryDemoItem);
-  const { signInWith, pendingProvider, lastError } = useOAuthSignIn();
 
-  const [url, setUrl] = useState(resumeDemo?.url ?? "");
-  const [destination, setDestination] = useState<string | null>(
-    resumeDemo?.destination ?? null,
-  );
+  const [phase, setPhase] = useState<Phase>(resume ? "auth" : "share");
+  const [returnPhase, setReturnPhase] = useState<"share" | "paste">("share");
+  const [authRequest, setAuthRequest] = useState<PendingDemo | null>(resume);
+  const [draft, setDraft] = useState("");
+  const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [itemId, setItemId] = useState<Id<"items"> | null>(null);
-  const [savedSpaces, setSavedSpaces] = useState<string[]>([]);
-  const [reused, setReused] = useState(false);
-  const [authRequest, setAuthRequest] = useState<PendingDemo | null>(
-    resumeDemo,
-  );
-  // Mutation in flight only. Guarded by a ref so concurrent taps can't double
-  // submit and the guard is always released (finally), including when the
-  // component hands off to the auth view.
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
   const [error, setError] = useState<TextMessageKey | null>(null);
-  const [phase, setPhase] = useState<DemoPhase>("input");
-  // Set 15s into a processing run; the user — never a timer — decides between
-  // keep waiting and continue. The live subscription keeps running either way.
+  const [demoUsed, setDemoUsed] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [deadlineNonce, setDeadlineNonce] = useState(0);
   const advancedRef = useRef(false);
+  const shareSheetOpenRef = useRef(false);
 
-  // Subscribe to the item once we have an id — re-renders as the AI pipeline
-  // fills in title/tags/spaces and flips status to ready.
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
-  // Convex adapter and sends `id: null`, which fails argument validation on
-  // the server for every demo run.
+  // Convex adapter and sends `id: null`, which fails argument validation.
   const itemQuery = useQuery(
     convexQuery(api.items.getItem, itemId === null ? "skip" : { id: itemId }),
   );
   const item = itemQuery.data;
 
-  // Leaving the step ends the in-flight demo: clear the persisted record so a
-  // relaunch restores the next step rather than replaying a completed save.
-  const advance = () => {
+  useEffect(() => {
+    onReadingChange(phase === "reading");
+  }, [phase, onReadingChange]);
+
+  const advance = useCallback(() => {
     if (advancedRef.current) return;
     advancedRef.current = true;
-    setPendingDemo(null);
     onAdvance();
-  };
+  }, [onAdvance]);
 
-  const toFeedItem = (row: NonNullable<typeof item>): FeedItem => ({
-    _id: row._id,
-    type: row.type,
-    status: row.status,
-    title: row.title,
-    url: row.url,
-    siteName: row.siteName,
-    heroImageUrl: row.heroImageUrl,
-    imageUrl: row.imageUrl,
-    aspectRatio: row.aspectRatio,
-    enrichment: row.enrichment,
-    tags: row.tags,
-  });
-
-  // Lift the classified item up to the orchestrator exactly once (the recap
-  // renders the same card the user just watched get filed), and surface the
-  // failure state if classification fails.
   useEffect(() => {
-    if (!item || !["processing", "failed", "reveal"].includes(phase)) return;
-    if (item.status === "ready" && phase !== "reveal") {
+    if (!item || (phase !== "reading" && phase !== "failed")) return;
+    if (item.status === "ready") {
       analytics.capture("onboarding_demo_result", { outcome: "ready" });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPhase("reveal");
-      onReady(toFeedItem(item));
+      advance();
     } else if (item.status === "failed" && phase !== "failed") {
       analytics.capture("onboarding_demo_result", { outcome: "failed" });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the server status
       setPhase("failed");
-    } else if (item.status === "processing" && phase !== "processing") {
-      setPhase("processing");
+    } else if (item.status === "processing" && phase !== "reading") {
+      setPhase("reading");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item, phase]);
+  }, [item, phase, advance]);
 
-  // A vanished save (deleted elsewhere, query error, auth blip) is reported
-  // instead of spinning forever.
+  // A vanished save (deleted elsewhere, query error) is reported instead of
+  // spinning forever.
   useEffect(() => {
-    if (itemId === null || phase !== "processing") return;
+    if (itemId === null || phase !== "reading") return;
     if (itemQuery.isError || (itemQuery.isSuccess && item === null)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- surfaces a lost subscription
       setError(itemQuery.isError ? "demo.loadFailed" : "demo.saveGone");
-      setPhase("input");
+      setItemId(null);
+      setPhase(returnPhase);
     }
-  }, [itemId, phase, item, itemQuery.isError, itemQuery.isSuccess]);
+  }, [
+    itemId,
+    phase,
+    item,
+    itemQuery.isError,
+    itemQuery.isSuccess,
+    returnPhase,
+  ]);
 
-  // Processing deadline. Restarted by phase changes, a retry, or "keep
-  // waiting" (deadlineNonce). Only flips the timedOut flag — no auto-advance.
+  // Only flips the slow flag. The user, never a timer, decides to move on.
   useEffect(() => {
-    if (itemId === null || phase !== "processing") return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the deadline clock when the effect re-arms
+    if (itemId === null || phase !== "reading") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the deadline when the effect re-arms
     setTimedOut(false);
     const id = setTimeout(() => setTimedOut(true), TIMEOUT_MS);
     return () => clearTimeout(id);
   }, [itemId, phase, deadlineNonce]);
 
   const submit = useCallback(
-    async (rawUrl: string, destinationOverride?: string | null) => {
-      const trimmed = rawUrl.trim();
-      if (trimmed === "" || inFlightRef.current) return;
+    async (rawUrl: string, destination: string | null) => {
+      const url = rawUrl.trim();
+      if (url === "" || inFlightRef.current) return;
       inFlightRef.current = true;
       setSubmitting(true);
       setError(null);
-      setUrl(trimmed);
-      const chosenDestination =
-        destinationOverride !== undefined
-          ? destinationOverride
-          : destination === null
-            ? null
-            : resolveOnboardingSpaceName(destination);
-      const request = { url: trimmed, destination: chosenDestination };
+      setSavingUrl(url);
+      const request = { url, destination };
       setPendingDemo(request);
 
-      // Not signed in yet: persist the exact save (URL + destination) so an
-      // app kill mid-OAuth resumes it, then authenticate inline — staying on
-      // this step, so spaces/survey state survive.
       if (!isAuthenticated) {
         setAuthRequest(request);
         setPhase("auth");
@@ -209,19 +175,21 @@ export function LiveDemoStep({
       analytics.capture("onboarding_demo_submitted");
       try {
         const result = await createDemoItem({
-          url: trimmed,
-          spaceName: chosenDestination ?? undefined,
+          url,
+          spaceName: destination ?? undefined,
           analyticsSessionId: analytics.sessionId(),
         });
-        setSavedSpaces(result.savedSpaceNames);
-        setReused(result.reused);
-        setItemId(result.itemId);
-        setPhase("processing");
         setPendingDemo({
           url: result.url,
           destination: result.savedSpaceNames[0] ?? null,
         });
         clearLegacyDemoUrlIfSaved(result.url);
+        setItemId(result.itemId);
+        onSaved({
+          itemId: result.itemId,
+          savedSpaceNames: result.savedSpaceNames,
+        });
+        setPhase("reading");
       } catch (err) {
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
@@ -229,38 +197,98 @@ export function LiveDemoStep({
         analytics.capture("onboarding_demo_result", {
           outcome: used ? "already_used" : "error",
         });
+        setDemoUsed(used);
         setError(used ? "demo.alreadyUsed" : "demo.saveFailed");
-        setPhase("input");
+        setPhase((current) => (current === "auth" ? returnPhase : current));
       } finally {
         inFlightRef.current = false;
         setSubmitting(false);
       }
     },
-    [createDemoItem, destination, isAuthenticated],
+    [createDemoItem, isAuthenticated, onSaved, returnPhase],
   );
 
-  // Resume a demo captured before a previous sign-in. If the user is already
-  // authenticated (returned from OAuth after an app kill), finish the save
-  // they asked for — the server's idempotency makes this duplicate-proof.
+  const submitUrl = useCallback(
+    (url: string) => {
+      const preset = demoDestination(url.trim(), spaces);
+      void submit(
+        url,
+        preset === null ? null : resolveOnboardingSpaceName(preset),
+      );
+    },
+    [spaces, submit],
+  );
+
+  // The share extension relaunches the app with an expo-sharing URL. The
+  // payload is read directly: useIncomingShare caches its state and would not
+  // refresh after a clear followed by a second share of the same link.
+  const consumeShare = useCallback(() => {
+    if (inFlightRef.current || advancedRef.current || shareSheetOpenRef.current)
+      return;
+    let url: string | null;
+    try {
+      url = firstSharedUrl(getSharedPayloads());
+    } catch (err) {
+      analytics.captureError("onboarding_share_read_failed", err);
+      return;
+    }
+    if (url === null) return;
+    clearSharedPayloads();
+    setReturnPhase("share");
+    submitUrl(url);
+  }, [submitUrl]);
+
+  const consumeShareRef = useRef(consumeShare);
+  useEffect(() => {
+    consumeShareRef.current = consumeShare;
+  }, [consumeShare]);
+
+  useEffect(() => {
+    if (resume === null) consumeShareRef.current();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") consumeShareRef.current();
+    });
+    const links = Linking.addEventListener("url", ({ url }) => {
+      if (url.includes("expo-sharing")) consumeShareRef.current();
+    });
+    return () => {
+      appState.remove();
+      links.remove();
+    };
+  }, [resume]);
+
+  // Resume the save once auth is ready. Server idempotency makes a repeat
+  // submit return the same item.
   useEffect(() => {
     if (!isAuthenticated || authRequest === null) return;
     const request = authRequest;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- consume the request after auth becomes ready
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- consume the request once auth is ready
     setAuthRequest(null);
     void submit(request.url, request.destination);
   }, [isAuthenticated, authRequest, submit]);
 
-  const backFromAuth = () => {
-    setAuthRequest(null);
-    setPendingDemo(null);
-    setPhase("input");
+  const openShareSheet = async () => {
+    // The extension's relaunch URL arrives while the activity sheet is still
+    // up, and the sign-in modal cannot present over it. Hold the payload
+    // until Share.share resolves, after the sheet has dismissed.
+    shareSheetOpenRef.current = true;
+    try {
+      await Share.share(
+        Platform.OS === "ios" ? { url: sample.url } : { message: sample.url },
+      );
+    } catch (err) {
+      analytics.captureError("onboarding_share_sheet_failed", err);
+    } finally {
+      shareSheetOpenRef.current = false;
+    }
+    consumeShare();
   };
 
-  const signIn = async (provider: OAuthProvider) => {
-    const outcome = await signInWith(provider);
-    if (outcome === "cancelled") backFromAuth();
-    // 'failed': stay on the auth view — lastError renders below and the user
-    // can retry or go back.
+  const cancelAuth = () => {
+    setAuthRequest(null);
+    setPendingDemo(null);
+    setSavingUrl(null);
+    setPhase(returnPhase);
   };
 
   const retry = async () => {
@@ -271,7 +299,7 @@ export function LiveDemoStep({
     try {
       const result = await retryDemoItem({});
       if (result.scheduled) setDeadlineNonce((nonce) => nonce + 1);
-      setPhase("processing");
+      setPhase("reading");
     } catch (err) {
       const code = demoErrorCode(err);
       setError(
@@ -291,369 +319,450 @@ export function LiveDemoStep({
 
   const paste = async () => {
     const clipped = await Clipboard.getStringAsync();
-    if (clipped.trim() !== "") setUrl(clipped.trim());
+    if (clipped.trim() !== "") setDraft(clipped.trim());
   };
 
-  const destinationOptions: { label: string; value: string | null }[] = [
-    { label: t("demo.justShelf"), value: null },
-    ...selectedSpaces.map((name) => ({
-      label: onboardingLabel(name),
-      value: name,
-    })),
-  ];
+  const errorLine =
+    error === null ? null : <Text style={styles.error}>{t(error)}</Text>;
+  const continueAfterUsed = demoUsed ? (
+    <GhostButton label={t("common.continue")} onPress={advance} />
+  ) : null;
 
-  // ---- Auth state: inline sign-in so the demo save can be real -----------
-  if (phase === "auth") {
-    return (
-      <DemoAuthView
-        pendingProvider={pendingProvider}
-        lastError={lastError}
-        onSignIn={(provider) => void signIn(provider)}
-        onBack={backFromAuth}
-      />
-    );
-  }
-
-  // ---- Reveal state: the real item, with its real destination ------------
-  if (phase === "reveal") {
-    const revealItem =
-      item && item.status === "ready" ? toFeedItem(item) : undefined;
+  if (phase === "reading" || phase === "failed") {
+    const failed = phase === "failed";
+    const terminal = failed && isTerminalFailure(item?.failureReason);
+    const url = item?.url ?? savingUrl ?? "";
     return (
       <View style={styles.wrap}>
-        <Animated.Text
-          entering={FadeInDown.duration(400)}
-          style={styles.headline}
-        >
-          {t("demo.filed")}
-        </Animated.Text>
-        <Animated.Text
-          entering={FadeInDown.delay(60).duration(400)}
-          style={styles.support}
-        >
-          {t("demo.filedHelp")}
-        </Animated.Text>
-
-        <Animated.View
-          pointerEvents="none"
-          entering={FadeInDown.delay(120).duration(400)}
-          style={styles.reveal}
-        >
-          {revealItem ? <ItemCard item={revealItem} /> : null}
-        </Animated.View>
-
-        <View
-          style={styles.destinationChips}
-          accessibilityLabel={t("demo.labels")}
-        >
-          {item?.tags.map((tag) => (
-            <View key={tag} style={styles.destinationChip}>
-              <Text style={styles.destinationChipText}>{tag}</Text>
-            </View>
-          ))}
+        <View style={styles.linkRow}>
+          <View style={styles.linkThumb}>
+            <AppSymbolIcon
+              name="link"
+              size={18}
+              tintColor={theme.colors.muted}
+            />
+          </View>
+          <View style={styles.linkText}>
+            <Text style={styles.linkHost} numberOfLines={1}>
+              {displayHost(url)}
+            </Text>
+            <Text style={styles.linkUrl} numberOfLines={1}>
+              {url}
+            </Text>
+          </View>
+          {failed ? null : (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          )}
         </View>
-        {item?.enrichment === "partial" ? (
-          <Text style={styles.support}>{t("demo.partial")}</Text>
-        ) : null}
 
-        {savedSpaces.length > 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(180).duration(400)}
-            style={styles.destination}
-          >
-            <Text style={styles.destinationLabel}>{t("demo.spaceChosen")}</Text>
-            <View style={styles.destinationChips}>
-              {savedSpaces.map((name) => (
-                <View key={name} style={styles.destinationChip}>
-                  <Text style={styles.destinationChipText}>{name}</Text>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
+        {failed ? (
+          <View style={styles.head}>
+            <Text style={styles.headline}>{t("demo.linkSaved")}</Text>
+            <Text style={styles.support}>
+              {terminal ? t("demo.notFoundHelp") : t("demo.processingFailed")}
+            </Text>
+          </View>
         ) : (
-          <Text style={styles.destinationLabel}>{t("demo.inbox")}</Text>
+          <View style={[styles.head, styles.centered]}>
+            <Text style={[styles.headline, styles.center]}>
+              {timedOut ? t("demo.slow") : t("demo.reading")}
+            </Text>
+            <ReadingSteps />
+            <Text style={[styles.support, styles.center]}>
+              {timedOut ? t("demo.eitherWay") : t("demo.keepsGoing")}
+            </Text>
+          </View>
         )}
 
-        {reused ? (
-          <Text style={styles.reuseNote}>{t("demo.usedHelp")}</Text>
-        ) : null}
+        {errorLine}
 
-        <View style={styles.footer}>
-          <Pressable style={styles.skipRow} onPress={advance}>
-            <Text style={styles.continueText}>{t("common.continue")}</Text>
-            <AppSymbolIcon
-              name="chevron.right"
-              size={14}
-              tintColor={theme.colors.primary}
-            />
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  // ---- Failed state: honest failure with a real retry --------------------
-  // A terminal failure (the page is gone) gets no Retry button: the server
-  // refuses it anyway, mirroring reprocessItem, and offering one would only
-  // end in an error line.
-  if (phase === "failed") {
-    const terminal = isTerminalFailure(item?.failureReason);
-    return (
-      <View style={styles.wrap}>
-        <Text style={styles.headline}>{t("demo.linkSaved")}</Text>
-        <Text style={styles.support}>
-          {terminal ? t("demo.notFoundHelp") : t("demo.processingFailed")}
-        </Text>
-
-        {error !== null && <Text style={styles.error}>{t(error)}</Text>}
-
-        <View style={styles.footer}>
-          {terminal ? null : (
-            <Pressable
-              onPress={() => void retry()}
-              disabled={submitting}
-              style={({ pressed }) => [
-                styles.submitBtn,
-                submitting && { opacity: 0.5 },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              {submitting ? (
-                <ActivityIndicator color={theme.colors.primaryForeground} />
-              ) : (
-                <Text style={styles.submitText}>{t("common.retry")}</Text>
-              )}
-            </Pressable>
-          )}
-          <Pressable onPress={advance}>
-            <Text style={styles.skipText}>{t("common.continue")}</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  // ---- Processing state: shimmer while the real pipeline runs ------------
-  if (phase === "processing") {
-    return (
-      <View style={styles.wrap}>
-        <Text style={styles.headline}>{t("demo.title")}</Text>
-        <Text style={styles.support}>{t("demo.reading")}</Text>
-
-        <View style={styles.processingCard}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.processingLine}>{t("demo.classifying")}</Text>
-        </View>
-
-        <View style={styles.footer}>
-          {timedOut ? (
+        <View style={styles.foot}>
+          {failed ? (
             <>
-              <Text style={styles.support}>{t("demo.slow")}</Text>
-              <View style={styles.timeoutRow}>
+              {terminal ? (
+                <CtaButton label={t("common.continue")} onPress={advance} />
+              ) : (
+                <>
+                  <CtaButton
+                    label={t("common.retry")}
+                    onPress={() => void retry()}
+                    busy={submitting}
+                  />
+                  <GhostButton label={t("common.continue")} onPress={advance} />
+                </>
+              )}
+            </>
+          ) : timedOut ? (
+            <>
+              <CtaButton
+                label={t("demo.keepWaiting")}
+                onPress={() => setDeadlineNonce((nonce) => nonce + 1)}
+              />
+              <GhostButton
+                label={t("demo.continueWaiting")}
+                onPress={() => {
+                  analytics.capture("onboarding_demo_result", {
+                    outcome: "timeout",
+                  });
+                  advance();
+                }}
+              />
+            </>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  if (phase === "paste") {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.head}>
+          <Text style={styles.headline}>{t("demo.title")}</Text>
+          <Text style={styles.support}>{t("demo.pasteHelp")}</Text>
+        </View>
+
+        <View style={styles.inputRow}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={t("demo.pastePlaceholder")}
+            placeholderTextColor={theme.colors.faint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+            accessibilityLabel={t("demo.linkLabel")}
+            style={styles.input}
+            onSubmitEditing={() => submitUrl(draft)}
+          />
+          <Pressable onPress={() => void paste()} style={styles.pasteBtn}>
+            <Text style={styles.pasteText}>{t("common.paste")}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.samples}>
+          <Text style={styles.samplesLabel}>{t("demo.samples")}</Text>
+          <View style={styles.sampleRow}>
+            {DEMO_SAMPLES.map((candidate) =>
+              candidate.chipKey === null ? null : (
                 <Pressable
-                  onPress={() => setDeadlineNonce((nonce) => nonce + 1)}
+                  key={candidate.url}
+                  onPress={() => setDraft(candidate.url)}
                   style={({ pressed }) => [
-                    styles.timeoutBtn,
+                    styles.sampleChip,
+                    draft === candidate.url && styles.sampleChipActive,
                     pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Text style={styles.continueText}>
-                    {t("demo.keepWaiting")}
+                  <Text
+                    style={[
+                      styles.sampleLabel,
+                      draft === candidate.url && styles.sampleLabelActive,
+                    ]}
+                  >
+                    {t(candidate.chipKey)}
                   </Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => {
-                    analytics.capture("onboarding_demo_result", {
-                      outcome: "timeout",
-                    });
-                    advance();
-                  }}
-                >
-                  <Text style={styles.skipText}>
-                    {t("demo.continueWaiting")}
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <Pressable onPress={advance}>
-              <Text style={styles.skipText}>{t("demo.stillWorking")}</Text>
-            </Pressable>
+              ),
+            )}
+          </View>
+        </View>
+
+        {errorLine}
+
+        <View style={styles.foot}>
+          <CtaButton
+            label={t("demo.save")}
+            onPress={() => submitUrl(draft)}
+            disabled={draft.trim() === ""}
+            busy={submitting}
+          />
+          {continueAfterUsed ?? (
+            <GhostButton
+              label={t("demo.backToShare")}
+              onPress={() => {
+                setError(null);
+                setReturnPhase("share");
+                setPhase("share");
+              }}
+            />
           )}
         </View>
       </View>
     );
   }
 
-  // ---- Input state: paste field, destination, sample links ---------------
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>{t("demo.title")}</Text>
-      <Text style={styles.support}>{t("demo.pasteHelp")}</Text>
+      <View style={styles.head}>
+        <Text style={styles.headline}>{t("demo.title")}</Text>
+        <Text style={styles.support}>{t("demo.shareHelp")}</Text>
+      </View>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          value={url}
-          onChangeText={setUrl}
-          placeholder={t("demo.pastePlaceholder")}
-          placeholderTextColor={theme.colors.faint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          returnKeyType="go"
-          accessibilityLabel={t("demo.linkLabel")}
-          style={styles.input}
-          onSubmitEditing={() => void submit(url)}
+      <SamplePost sample={sample} />
+
+      <View style={styles.sheet} accessibilityElementsHidden>
+        <Text style={styles.sheetLabel}>{t("demo.shareSheet")}</Text>
+        <View style={styles.apps}>
+          <ShareApp icon="message" label={t("demo.messages")} />
+          <View style={styles.app}>
+            <Image
+              source={APP_ICON}
+              style={[styles.appIcon, styles.appIconShelvr]}
+            />
+            <Text style={[styles.appLabel, styles.appLabelShelvr]}>Shelvr</Text>
+          </View>
+          <ShareApp icon="envelope" label={t("demo.mail")} />
+          <ShareApp icon="doc.text" label={t("demo.notes")} />
+        </View>
+      </View>
+
+      {errorLine}
+
+      <View style={styles.foot}>
+        <CtaButton
+          label={t("demo.saveToShelvr")}
+          onPress={() => void openShareSheet()}
+          busy={submitting}
         />
-        <Pressable onPress={() => void paste()} style={styles.pasteBtn}>
-          <Text style={styles.pasteText}>{t("common.paste")}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.destination")}</Text>
-        <View style={styles.sampleRow}>
-          {destinationOptions.map((option) => (
-            <Pressable
-              key={option.label}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: destination === option.value }}
-              onPress={() => setDestination(option.value)}
-              style={({ pressed }) => [
-                styles.sampleChip,
-                destination === option.value && styles.sampleChipActive,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sampleLabel,
-                  destination === option.value && styles.sampleLabelActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {error !== null && <Text style={styles.error}>{t(error)}</Text>}
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.samples")}</Text>
-        <View style={styles.sampleRow}>
-          {SAMPLE_LINKS.map((s) => (
-            <Pressable
-              key={s.url}
-              onPress={() => void submit(s.url)}
-              disabled={submitting}
-              style={({ pressed }) => [
-                styles.sampleChip,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text style={styles.sampleLabel}>{t(s.label)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        {url.trim() !== "" && !submitting && (
-          <Pressable
-            onPress={() => void submit(url)}
-            style={({ pressed }) => [
-              styles.submitBtn,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Text style={styles.submitText}>{t("demo.save")}</Text>
-          </Pressable>
+        {continueAfterUsed ?? (
+          <GhostButton
+            label={t("demo.pasteInstead")}
+            onPress={() => {
+              setError(null);
+              setReturnPhase("paste");
+              setPhase("paste");
+            }}
+          />
         )}
-        <Pressable
-          disabled={submitting}
-          onPress={() => {
-            analytics.capture("onboarding_demo_skipped");
-            advance();
-          }}
-        >
-          <Text style={styles.skipText}>{t("demo.skip")}</Text>
-        </Pressable>
       </View>
+
+      <DemoAuthSheet
+        visible={phase === "auth" && !isAuthenticated}
+        url={authRequest?.url ?? savingUrl ?? sample.url}
+        sample={sample}
+        onCancel={cancelAuth}
+      />
     </View>
   );
 }
 
-function DemoAuthView({
-  pendingProvider,
-  lastError,
-  onSignIn,
-  onBack,
+function SamplePost({ sample }: { sample: DemoSample }) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.post} accessibilityElementsHidden>
+      <View style={styles.postHead}>
+        <View style={styles.avatar} />
+        <Text style={styles.postHandle}>{sample.domain}</Text>
+      </View>
+      <View style={styles.postImage}>
+        <AppSymbolIcon
+          name="photo.on.rectangle"
+          size={28}
+          tintColor={theme.colors.primaryText}
+        />
+      </View>
+      <View style={styles.postActions}>
+        <AppSymbolIcon
+          name="heart"
+          size={20}
+          tintColor={theme.colors.foreground}
+        />
+        <AppSymbolIcon
+          name="message"
+          size={20}
+          tintColor={theme.colors.foreground}
+        />
+        <View style={styles.shareHighlight}>
+          <AppSymbolIcon
+            name="square.and.arrow.up"
+            size={18}
+            tintColor={theme.colors.primaryForeground}
+          />
+        </View>
+      </View>
+      <Text style={styles.caption} numberOfLines={2}>
+        <Text style={styles.captionHandle}>{sample.domain} </Text>
+        {sample.pageHeading}
+      </Text>
+    </View>
+  );
+}
+
+function ShareApp({ icon, label }: { icon: AppSymbolName; label: string }) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.app}>
+      <View style={styles.appIcon}>
+        <AppSymbolIcon name={icon} size={22} tintColor={theme.colors.muted} />
+      </View>
+      <Text style={styles.appLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const READING_STEPS: TextMessageKey[] = [
+  "demo.stepSaved",
+  "demo.stepReading",
+  "demo.stepTitling",
+  "demo.stepFiling",
+];
+
+function ReadingSteps() {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.steps}>
+      {READING_STEPS.map((key, index) => (
+        <View key={key} style={[styles.stepRow, index > 1 && styles.stepTodo]}>
+          <View style={[styles.stepDot, index === 0 && styles.stepDotDone]}>
+            {index === 0 ? (
+              <AppSymbolIcon
+                name="checkmark"
+                size={10}
+                tintColor={theme.colors.primaryForeground}
+              />
+            ) : index === 1 ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : null}
+          </View>
+          <Text style={[styles.stepText, index === 1 && styles.stepNow]}>
+            {t(key)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function DemoAuthSheet({
+  visible,
+  url,
+  sample,
+  onCancel,
 }: {
-  pendingProvider: OAuthProvider | null;
-  lastError: string | null;
-  onSignIn: (provider: OAuthProvider) => void;
-  onBack: () => void;
+  visible: boolean;
+  url: string;
+  sample: DemoSample;
+  onCancel: () => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const { signInWith, pendingProvider, lastError } = useOAuthSignIn();
+  const busy = pendingProvider !== null;
+  const pageHeading =
+    url === sample.url ? sample.pageHeading : displayHost(url);
+
+  const signIn = async (provider: OAuthProvider) => {
+    const outcome = await signInWith(provider);
+    if (outcome === "cancelled") onCancel();
+  };
+
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.headline}>{t("demo.signInTitle")}</Text>
-      <Text style={styles.support}>{t("demo.signInHelp")}</Text>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={busy ? undefined : onCancel}
+    >
+      <Pressable
+        style={styles.scrim}
+        onPress={busy ? undefined : onCancel}
+        accessibilityRole="button"
+        accessibilityLabel={t("common.back")}
+      />
+      <View style={styles.authSheet}>
+        <View style={styles.grabber} />
+        <Text style={styles.sheetHeadline}>{t("demo.signInTitle")}</Text>
+        <Text style={styles.support}>{t("demo.signInHelp")}</Text>
 
-      {pendingProvider === null && lastError !== null && (
-        <Text style={styles.error}>{t("demo.signInFailed")}</Text>
-      )}
+        <View style={styles.linkRow}>
+          <View style={styles.linkThumb}>
+            <AppSymbolIcon
+              name="link"
+              size={18}
+              tintColor={theme.colors.muted}
+            />
+          </View>
+          <View style={styles.linkText}>
+            <Text style={styles.linkHost} numberOfLines={1}>
+              {pageHeading}
+            </Text>
+            <Text style={styles.linkUrl} numberOfLines={1}>
+              {url}
+            </Text>
+          </View>
+        </View>
 
-      <View style={styles.authButtons}>
+        {!busy && lastError !== null ? (
+          <Text style={styles.error}>{t("demo.signInFailed")}</Text>
+        ) : null}
+
         {Platform.OS === "ios" ? (
           <Pressable
-            onPress={() => onSignIn("apple")}
-            disabled={pendingProvider !== null}
+            onPress={() => void signIn("apple")}
+            disabled={busy}
             style={({ pressed }) => [
               styles.authBtn,
               styles.authBtnApple,
-              pendingProvider !== null && { opacity: 0.5 },
+              busy && { opacity: 0.5 },
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text
-              style={[styles.authBtnText, { color: theme.colors.background }]}
-            >
-              {t("account.apple")}
-            </Text>
+            {pendingProvider === "apple" ? (
+              <ActivityIndicator color={theme.colors.background} />
+            ) : (
+              <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
+                {t("account.apple")}
+              </Text>
+            )}
           </Pressable>
         ) : null}
         <Pressable
-          onPress={() => onSignIn("google")}
-          disabled={pendingProvider !== null}
+          onPress={() => void signIn("google")}
+          disabled={busy}
           style={({ pressed }) => [
             styles.authBtn,
-            pendingProvider !== null && { opacity: 0.5 },
+            busy && { opacity: 0.5 },
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Text style={styles.authBtnText}>{t("account.google")}</Text>
-        </Pressable>
-        {__DEV__ &&
-          process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" && (
-            <Pressable onPress={() => onSignIn("anonymous")}>
-              <Text style={styles.skipText}>{t("account.anonymous")}</Text>
-            </Pressable>
+          {pendingProvider === "google" ? (
+            <ActivityIndicator color={theme.colors.foreground} />
+          ) : (
+            <Text style={styles.authBtnText}>{t("account.google")}</Text>
           )}
-        <Pressable onPress={onBack}>
-          <Text style={styles.skipText}>{t("common.back")}</Text>
         </Pressable>
+        {__DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" ? (
+          <GhostButton
+            label={t("account.anonymous")}
+            onPress={() => void signIn("anonymous")}
+            disabled={busy}
+          />
+        ) : null}
+        <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
       </View>
-    </View>
+    </Modal>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   wrap: {
     flex: 1,
     gap: theme.gap(2),
+  },
+  head: {
+    gap: theme.gap(1),
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    gap: theme.gap(2.5),
+  },
+  center: {
+    textAlign: "center",
   },
   headline: {
     fontFamily: theme.fonts.bold,
@@ -665,7 +774,180 @@ const styles = StyleSheet.create((theme) => ({
   support: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
+    lineHeight: 21,
     color: theme.colors.muted,
+  },
+  error: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    color: theme.colors.danger,
+  },
+  foot: {
+    marginTop: "auto",
+    gap: theme.gap(1),
+  },
+  post: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.gap(1.5),
+    gap: theme.gap(1),
+  },
+  postHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  postHandle: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
+    color: theme.colors.foreground,
+  },
+  postImage: {
+    height: 150,
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(2),
+  },
+  shareHighlight: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  caption: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.foreground,
+  },
+  captionHandle: {
+    fontFamily: theme.fonts.bold,
+  },
+  sheet: {
+    gap: theme.gap(1),
+  },
+  sheetLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
+  },
+  apps: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  app: {
+    width: 64,
+    alignItems: "center",
+    gap: 6,
+  },
+  appIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 13,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  appIconShelvr: {
+    borderWidth: 2,
+    borderColor: theme.colors.primarySoft,
+  },
+  appLabel: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 11,
+    color: theme.colors.muted,
+  },
+  appLabelShelvr: {
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.primaryText,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.25),
+    padding: theme.gap(1.25),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  linkThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.sm,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkText: {
+    flex: 1,
+    gap: 2,
+  },
+  linkHost: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 14,
+    color: theme.colors.foreground,
+  },
+  linkUrl: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    color: theme.colors.faint,
+  },
+  steps: {
+    alignSelf: "center",
+    gap: theme.gap(1.5),
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.25),
+  },
+  stepTodo: {
+    opacity: 0.4,
+  },
+  stepDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDotDone: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  stepText: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  stepNow: {
+    fontFamily: theme.fonts.bold,
   },
   inputRow: {
     flexDirection: "row",
@@ -692,32 +974,6 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.primary,
-  },
-  error: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.danger,
-  },
-  authButtons: {
-    gap: theme.gap(1.5),
-  },
-  authBtn: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    paddingVertical: theme.gap(1.75),
-    alignItems: "center",
-  },
-  authBtnApple: {
-    backgroundColor: theme.colors.foreground,
-    borderColor: theme.colors.foreground,
-  },
-  authBtnText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.foreground,
   },
   samples: {
     gap: theme.gap(1),
@@ -752,91 +1008,60 @@ const styles = StyleSheet.create((theme) => ({
   sampleLabelActive: {
     color: theme.colors.primaryText,
   },
-  processingCard: {
-    alignItems: "center",
-    gap: theme.gap(2),
-    paddingVertical: theme.gap(5),
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+  scrim: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
+  },
+  authSheet: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
     borderCurve: "continuous",
-  },
-  processingLine: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 15,
-    color: theme.colors.muted,
-  },
-  reveal: {
-    // ItemCard carries its own padding; let it sit on the surface.
-  },
-  destination: {
-    gap: theme.gap(1),
-  },
-  destinationLabel: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.muted,
-  },
-  destinationChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.gap(1),
-  },
-  destinationChip: {
-    backgroundColor: theme.colors.primarySoft,
-    paddingVertical: theme.gap(0.5),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: 50,
-  },
-  destinationChipText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    color: theme.colors.primaryText,
-  },
-  reuseNote: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.muted,
-  },
-  timeoutRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(2),
-  },
-  timeoutBtn: {
-    paddingVertical: theme.gap(0.5),
-  },
-  footer: {
-    marginTop: "auto",
-    alignItems: "center",
+    paddingHorizontal: theme.gap(3),
+    paddingTop: theme.gap(1),
+    paddingBottom: rt.insets.bottom + theme.gap(2),
     gap: theme.gap(1.5),
   },
-  submitBtn: {
-    backgroundColor: theme.colors.primary,
+  grabber: {
+    alignSelf: "center",
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.border,
+    marginBottom: theme.gap(1),
+  },
+  sheetHeadline: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    color: theme.colors.foreground,
+  },
+  authBtn: {
+    minHeight: 52,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
-    paddingVertical: theme.gap(1.75),
-    paddingHorizontal: theme.gap(4),
     alignItems: "center",
-    alignSelf: "stretch",
+    justifyContent: "center",
   },
-  submitText: {
+  authBtnApple: {
+    backgroundColor: theme.colors.foreground,
+    borderColor: theme.colors.foreground,
+  },
+  authBtnText: {
     fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    color: theme.colors.primaryForeground,
+    fontSize: 16,
+    color: theme.colors.foreground,
   },
-  skipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  authBtnTextApple: {
+    color: theme.colors.background,
   },
-  continueText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    color: theme.colors.primary,
-  },
-  skipText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 15,
-    color: theme.colors.muted,
+  privacy: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    textAlign: "center",
+    color: theme.colors.faint,
   },
 }));

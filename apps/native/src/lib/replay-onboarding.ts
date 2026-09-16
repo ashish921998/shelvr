@@ -21,6 +21,15 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 
+// The onboarding reveal opens its own paywall. A purchase there can finish
+// onboarding before the webhook marks the user entitled, so replay must wait
+// for the entitlement instead of showing the paywall a second time.
+let purchasedDuringOnboarding = false;
+
+export function notePurchasedDuringOnboarding() {
+  purchasedDuringOnboarding = true;
+}
+
 /**
  * After onboarding is finished and the user signs in, replay the deferred
  * onboarding spaces, then present the paywall. Runs once.
@@ -66,7 +75,11 @@ export function useReplayOnboarding() {
       return;
     }
     if (!hasPending()) return;
-    if (!entitled && awaitingEntitlementRef.current) return;
+    if (
+      !entitled &&
+      (awaitingEntitlementRef.current || purchasedDuringOnboarding)
+    )
+      return;
 
     const spaces = getPendingSpaces();
 
@@ -94,6 +107,7 @@ export function useReplayOnboarding() {
         }
 
         awaitingEntitlementRef.current = false;
+        purchasedDuringOnboarding = false;
 
         // Match the new-space screen: starter spaces receive AI suggestions.
         const spaceResults = await Promise.allSettled(
