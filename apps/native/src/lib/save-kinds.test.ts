@@ -29,25 +29,25 @@ describe("spacesAfterKindToggle", () => {
       ["Read later", "Inspiration"],
     ],
     [
-      "drops every preset when the last kind is unpicked, keeping typed names",
+      "drops only the seeded preset when the last kind is unpicked",
       ["Recipes"],
       ["Recipes", "Restaurants to try", "Read later", "Book club"],
       "Recipes",
-      ["Book club"],
+      ["Restaurants to try", "Read later", "Book club"],
     ],
     [
-      "keeps presets another picked kind still offers",
+      "keeps a space the user picked when its kind is unpicked",
       ["Articles", "Recipes"],
       ["Articles", "Read later", "Long reads", "Recipes", "Book club"],
       "Articles",
-      ["Read later", "Recipes", "Book club"],
+      ["Read later", "Long reads", "Recipes", "Book club"],
     ],
     [
-      "keeps a preset that is both a kind preset and a generic one",
+      "keeps a seeded preset that is also a generic one",
       ["Products", "Travel"],
       ["Wishlist", "Gift ideas", "Travel"],
       "Products",
-      ["Wishlist", "Travel"],
+      ["Wishlist", "Gift ideas", "Travel"],
     ],
   ])("%s", (_name, kinds, spaces, kind, expected) => {
     expect(spacesAfterKindToggle(kinds, spaces, kind)).toEqual(expected);

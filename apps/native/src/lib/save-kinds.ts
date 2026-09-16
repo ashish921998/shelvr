@@ -60,22 +60,20 @@ export function isPresetSpace(name: string): boolean {
   return PRESET_SPACES.has(name);
 }
 
-/** The picked spaces after `kind` is picked or unpicked. Unpicking drops the
- * presets no remaining kind still offers, so nothing the user can no longer
- * see gets created. Typed names stay. */
+/** The picked spaces after `kind` is picked or unpicked. Unpicking drops only
+ * the preset that picking the kind added, unless a remaining kind still offers
+ * it. Spaces the user picked stay, and the setup step keeps showing them. */
 export function spacesAfterKindToggle(
   kinds: readonly SaveKind[],
   spaces: readonly string[],
   kind: SaveKind,
 ): string[] {
+  const seeded = SPACE_PRESETS[kind][0];
   if (!kinds.includes(kind)) {
     if (spaces.length === 0) return getDefaultSpaces([...kinds, kind]);
-    const first = SPACE_PRESETS[kind][0];
-    return spaces.includes(first) ? [...spaces] : [...spaces, first];
+    return spaces.includes(seeded) ? [...spaces] : [...spaces, seeded];
   }
   const remaining = kinds.filter((value) => value !== kind);
-  const offered = new Set(
-    remaining.length === 0 ? [] : getSpacePresets(remaining),
-  );
-  return spaces.filter((name) => !isPresetSpace(name) || offered.has(name));
+  if (getSpacePresets(remaining).includes(seeded)) return [...spaces];
+  return spaces.filter((name) => name !== seeded);
 }
