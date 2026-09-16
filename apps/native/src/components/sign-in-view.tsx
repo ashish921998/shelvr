@@ -26,7 +26,12 @@ export function SignInView({
   onBack?: () => void;
 }) {
   useAppLocale();
-  const { signInWith, pendingProvider: pending, lastError } = useOAuthSignIn();
+  const {
+    signInWith,
+    pendingProvider: pending,
+    lastError,
+    interrupted,
+  } = useOAuthSignIn();
   const colorScheme = useColorScheme();
   const { theme } = useUnistyles();
 
@@ -155,6 +160,9 @@ export function SignInView({
         <Text selectable style={styles.error}>
           {lastError}
         </Text>
+      )}
+      {pending === null && interrupted && (
+        <Text style={styles.error}>{t("account.signInNotFinished")}</Text>
       )}
     </View>
   );

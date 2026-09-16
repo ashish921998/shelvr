@@ -443,15 +443,18 @@ function DemoAuthSheet({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const { signInWith, pendingProvider, lastError } = useOAuthSignIn();
+  const { signInWith, pendingProvider, lastError, interrupted } =
+    useOAuthSignIn();
   const busy = pendingProvider !== null;
   const pageHeading =
     DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
     displayHost(url);
 
-  const signIn = async (provider: OAuthProvider) => {
-    const outcome = await signInWith(provider);
-    if (outcome === "cancelled") onCancel();
+  // A cancel keeps the sheet open: the auth session reports its own failures
+  // as cancels, and closing on them reads as a button that does nothing.
+  // Back and the scrim still close it.
+  const signIn = (provider: OAuthProvider) => {
+    void signInWith(provider);
   };
 
   return (
@@ -474,13 +477,13 @@ function DemoAuthSheet({
 
         <DemoLinkRow title={pageHeading} url={url} />
 
-        {!busy && lastError !== null ? (
+        {!busy && (lastError !== null || interrupted) ? (
           <Text style={styles.error}>{t("demo.signInFailed")}</Text>
         ) : null}
 
         {Platform.OS === "ios" ? (
           <Pressable
-            onPress={() => void signIn("apple")}
+            onPress={() => signIn("apple")}
             disabled={busy}
             style={({ pressed }) => [
               styles.authBtn,
@@ -499,7 +502,7 @@ function DemoAuthSheet({
           </Pressable>
         ) : null}
         <Pressable
-          onPress={() => void signIn("google")}
+          onPress={() => signIn("google")}
           disabled={busy}
           style={({ pressed }) => [
             styles.authBtn,
@@ -516,7 +519,7 @@ function DemoAuthSheet({
         {__DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" ? (
           <GhostButton
             label={t("account.anonymous")}
-            onPress={() => void signIn("anonymous")}
+            onPress={() => signIn("anonymous")}
             disabled={busy}
           />
         ) : null}

@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
@@ -61,6 +62,17 @@ function redactExceptionProperties(properties: unknown): void {
   }
 }
 
+// The SDK attaches the launch deep link to "Application Opened". That URL can
+// carry an OAuth callback code or saved content, so it never leaves the device.
+function dropLaunchUrl(event: {
+  event: string;
+  properties?: Record<string, unknown>;
+}): void {
+  if (event.event === "Application Opened" && event.properties) {
+    delete event.properties.url;
+  }
+}
+
 // Analytics is optional in local development and in builds that do not have
 // PostHog configured. The analytics boundary treats this as a no-op instead of
 // making the app fail during module initialization.
@@ -97,16 +109,39 @@ export const posthog =
         },
         // eslint-disable-next-line @typescript-eslint/naming-convention -- the SDK's option key is fixed snake_case
         before_send: (event) => {
-          if (event !== null) redactExceptionProperties(event.properties);
+          if (event !== null) {
+            redactExceptionProperties(event.properties);
+            dropLaunchUrl(event);
+          }
           return event;
         },
       })
     : undefined;
 
-posthog?.register({
-  environment: Constants.expoConfig?.extra?.variant ?? "development",
-  analytics_version: 1,
-});
+// `$app_build` stays the store build across OTA updates, so the running
+// update is recorded separately to tell which JS a user had.
+function updateProperties(): Record<string, string | boolean> {
+  try {
+    return {
+      ...(Updates.updateId ? { ota_update_id: Updates.updateId } : {}),
+      ...(Updates.channel ? { ota_channel: Updates.channel } : {}),
+      ota_embedded: Updates.isEmbeddedLaunch,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Properties registered on every event, and again after each reset. */
+export function superProperties(): Record<string, string | number | boolean> {
+  return {
+    environment: Constants.expoConfig?.extra?.variant ?? "development",
+    analytics_version: 1,
+    ...updateProperties(),
+  };
+}
+
+posthog?.register(superProperties());
 
 /** True when the client analytics boundary may capture. The single canonical
  * check — every analytics facade (feedback, cancel survey) delegates here

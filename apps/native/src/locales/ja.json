@@ -162,6 +162,7 @@
   "share.success": "Shelvrに保存しました",
   "account.signingIn": "サインイン中",
   "account.signInTitle": "続けるにはサインインしてください",
+  "account.signInNotFinished": "サインインが完了しませんでした。もう一度お試しください。",
   "account.apple": "Appleで続ける",
   "account.google": "Googleで続ける",
   "account.anonymous": "アカウントなしで続ける",

@@ -61,14 +61,17 @@ const authStorage: TokenStorage = {
 // white flash on push / zoom transitions). `useColorScheme` is the reliable
 // system-appearance signal; the palette comes from Unistyles.
 function PostHogIdentity() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);
 
   useEffect(() => {
+    // Convex Auth reports signed out while it reads the stored token. Acting
+    // then would reset analytics on every cold start.
+    if (isLoading) return;
     if (!isAuthenticated) {
-      analytics.reset();
+      void analytics.resetIfIdentified();
       identifiedUserId.current = undefined;
       // Convex query keys don't include the authenticated user. Remove every
       // Convex entry once per unauthenticated interval so its subscription
@@ -93,7 +96,7 @@ function PostHogIdentity() {
     analytics.identify(user._id);
     analytics.capture("auth_completed");
     identifiedUserId.current = user._id;
-  }, [isAuthenticated, isFetching, user]);
+  }, [isAuthenticated, isLoading, isFetching, user]);
 
   return null;
 }

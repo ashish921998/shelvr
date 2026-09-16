@@ -162,6 +162,7 @@
   "share.success": "Enregistré dans Shelvr",
   "account.signingIn": "Connexion",
   "account.signInTitle": "Connectez-vous pour continuer",
+  "account.signInNotFinished": "La connexion n'a pas abouti. Réessayez.",
   "account.apple": "Continuer avec Apple",
   "account.google": "Continuer avec Google",
   "account.anonymous": "Continuer sans compte",

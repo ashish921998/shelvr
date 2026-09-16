@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -187,7 +188,10 @@ export default function SpacesScreen() {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () => deleteSpace({ id }),
+        onPress: async () => {
+          await deleteSpace({ id });
+          analytics.capture("space_deleted");
+        },
       },
     ]);
   };

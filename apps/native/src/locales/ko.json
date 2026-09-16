@@ -162,6 +162,7 @@
   "share.success": "Shelvr에 저장됨",
   "account.signingIn": "로그인 중",
   "account.signInTitle": "계속하려면 로그인하세요",
+  "account.signInNotFinished": "로그인이 완료되지 않았어요. 다시 시도해 주세요.",
   "account.apple": "Apple로 계속",
   "account.google": "Google로 계속",
   "account.anonymous": "계정 없이 계속",

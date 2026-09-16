@@ -162,6 +162,7 @@
   "share.success": "Guardado en Shelvr",
   "account.signingIn": "Iniciando sesión",
   "account.signInTitle": "Inicia sesión para continuar",
+  "account.signInNotFinished": "El inicio de sesión no ha terminado. Reintenta.",
   "account.apple": "Continuar con Apple",
   "account.google": "Continuar con Google",
   "account.anonymous": "Continuar sin cuenta",
