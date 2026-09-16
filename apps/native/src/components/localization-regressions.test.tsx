@@ -251,7 +251,7 @@ vi.mock("@tanstack/react-query", () => {
   ];
   return { useQuery: () => ({ data }) };
 });
-vi.mock("expo-image", () => ({ Image: {} }));
+vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("expo-maps", () => {
   const map = ({ markers }: { markers: { id: string; title: string }[] }) => (

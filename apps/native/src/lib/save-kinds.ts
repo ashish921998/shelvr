@@ -1,5 +1,5 @@
-// The answers to "What do you save?". Each seeds starter spaces, so a user who
-// picks Recipes lands with Recipes and Restaurants to try already selected.
+// The answers to "What do you save?". Each seeds starter spaces: the first
+// preset of every picked kind starts selected, the rest are offered as chips.
 export const SAVE_KINDS = [
   "Articles",
   "Recipes",
@@ -28,6 +28,7 @@ export const SPACE_PRESETS: Record<SaveKind, readonly string[]> = {
 };
 
 const GENERIC_PRESETS = ["Read later", "Inspiration", "Wishlist"];
+const DEFAULT_GENERIC = "Read later";
 
 /** Deduped preset identities for the picked kinds, in first-seen order. */
 export function getSpacePresets(kinds: readonly SaveKind[]): string[] {
@@ -35,6 +36,16 @@ export function getSpacePresets(kinds: readonly SaveKind[]): string[] {
     ...new Set([
       ...kinds.flatMap((kind) => SPACE_PRESETS[kind]),
       ...GENERIC_PRESETS,
+    ]),
+  ];
+}
+
+/** The spaces that start selected for the picked kinds. */
+export function getDefaultSpaces(kinds: readonly SaveKind[]): string[] {
+  return [
+    ...new Set([
+      ...kinds.map((kind) => SPACE_PRESETS[kind][0]),
+      DEFAULT_GENERIC,
     ]),
   ];
 }

@@ -17,7 +17,7 @@ import {
 } from "@/lib/pending-onboarding";
 import {
   isSaveKind,
-  getSpacePresets,
+  getDefaultSpaces,
   SPACE_PRESETS,
   type SaveKind,
 } from "@/lib/save-kinds";
@@ -130,11 +130,10 @@ export default function OnboardingScreen() {
     setKinds(nextKinds);
     setSpaces((current) =>
       current.length === 0
-        ? getSpacePresets(nextKinds)
-        : [
-            ...current,
-            ...SPACE_PRESETS[kind].filter((name) => !current.includes(name)),
-          ],
+        ? getDefaultSpaces(nextKinds)
+        : current.includes(SPACE_PRESETS[kind][0])
+          ? current
+          : [...current, SPACE_PRESETS[kind][0]],
     );
   };
 
