@@ -43,6 +43,16 @@ crons.interval(
   {},
 );
 
+// Drop browser-extension pairing codes nobody redeemed. They expire in ten
+// minutes and are checked on redemption, so this is housekeeping rather than a
+// guard; bounded to 200 rows per run.
+crons.interval(
+  "cleanup expired extension pairings",
+  { hours: 1 },
+  internal.extension.cleanupExpiredPairings,
+  {},
+);
+
 crons.interval(
   "recover weekly shelf deliveries",
   { minutes: 5 },

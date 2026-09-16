@@ -131,6 +131,11 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
+  // Browser-extension pairing, from the app's side only. The extension is not
+  // an analytics client, so these say a user reached for desktop capture and
+  // whether they later revoked it — never which browser, or what it saved.
+  extension_pairing_code_created: Record<string, never>;
+  extension_connection_revoked: Record<string, never>;
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —

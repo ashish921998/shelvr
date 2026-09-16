@@ -17,10 +17,11 @@ dismisses each suggestion.
 
 ## Monorepo layout
 
-| Path          | Role                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists |
-| `apps/native` | Expo Router native app (includes `convex/` backend)                           |
+| Path             | Role                                                                          |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `apps/web`       | Next.js marketing / landing site; server routes may call Convex for waitlists |
+| `apps/native`    | Expo Router native app (includes `convex/` backend)                           |
+| `apps/extension` | Manifest V3 browser extension for saving links from a desktop browser         |
 
 Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
@@ -70,6 +71,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemOperations` — per-import idempotency ledger for image, link, and note saves
   - `subscriptions` — one Pro entitlement row per user, written by the RevenueCat webhook
   - `paymentAnalyticsReceipts` — seen payment event ids, so telemetry is not double counted
+  - `extensionPairings` — short-lived, single-use browser-extension pairing codes
+  - `extensionConnections` — one paired browser each, holding only the token's hash
   - `notificationDevices` — one Expo push token per device, scoped to a user
   - `notificationPreferences` — weekly shelf opt-in, timezone, and the next digest instant
   - `itemReads` — per-user read state, kept out of the item row
@@ -96,6 +99,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
   RevenueCat webhook.
+- **`extension.ts`** — browser-extension pairing and saves. The app mints a code
+  (`createPairingCode`), the extension redeems it for a bearer token, and every later
+  request resolves through the token's hash. Public: `createPairingCode`, `listConnections`,
+  `revokeConnection`. The internals (`redeemPairingCode`, `describeConnection`, `saveLink`,
+  `disconnect`, `cleanupExpiredPairings`) are called only by the `/extension` HTTP routes and
+  take a hash, never a userId. Saves go through `items.saveLinkForConnectedClient`, which is
+  the in-app save path plus duplicate detection — the extension can never save something the
+  app would refuse. Credential helpers live in `model/extensionAuth.ts`.
 - **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
   `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
   plus internal digest preparation and send. `notificationDelivery.ts` holds the
@@ -104,10 +115,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Resend projection and its bounded retry.
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
-  the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
-  monitors, backed by the `health.ts` `ping` query).
-- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
-  and weekly shelf delivery recovery.
+  the waitlist receiver at `/waitlist/join`, the browser-extension routes
+  (`POST /extension/pair`, `GET /extension/session`, `POST /extension/save`,
+  `POST /extension/disconnect`, each with an `OPTIONS` preflight that echoes only
+  `chrome-extension://`-style origins and never allows credentials), and `GET /health`
+  (200/503 probe for uptime monitors, backed by the `health.ts` `ping` query).
+- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, expired extension pairing
+  cleanup, weekly shelf preparation, and weekly shelf delivery recovery.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
@@ -147,6 +161,18 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   for marketing forms such as platform waitlists
 - Landing page at `/` — product experience lives in the native app
 
+### Browser extension (`apps/extension`)
+
+- Manifest V3, plain static files: no build step, no dependencies, no bundler, and
+  deliberately not a pnpm workspace package
+- Saves the current page from the toolbar, a keyboard shortcut, or the context menu, through
+  the `/extension` HTTP routes rather than the Convex client
+- Authenticates with a connection token traded for a pairing code the app shows under
+  **Profile → Browser extension**. The server stores only the token's SHA-256, so the copy in
+  the browser is the only one; revoking from either side is a row delete
+- `activeTab` rather than `tabs`, and no content script: it can read only the tab you invoked
+  a save on, at that moment. See `apps/extension/README.md`
+
 ### Native (`apps/native`)
 
 - UI localization uses `expo-localization` and i18n-js. Read
@@ -159,7 +185,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
 - Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
-  `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
+  `new-space`, `manage-spaces`, `browser-extension`, `item/[id]`, `space/[id]`, `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides
@@ -247,6 +273,10 @@ needed at runtime by the features that use them:
   old bundle still calling it.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
+- The `/extension` HTTP routes are a published contract with installed browser extensions,
+  which update on the Chrome Web Store's schedule and can be pinned by a user indefinitely.
+  Treat their request and response shapes exactly like a public Convex function: expand
+  first, contract only once no old extension is calling.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
   `analytics.captureError` (native app) so events land in the Convex log stream or PostHog
   error tracking in a queryable shape. Keep messages, URLs, and user content out of log

@@ -359,6 +359,48 @@ export default defineSchema({
     retryCount: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
+  // A pairing code the signed-in app minted so a browser extension can trade
+  // it for a connection token. Single use and short-lived: `redeemPairingCode`
+  // deletes the row in the same transaction that mints the connection, so a
+  // replay finds nothing, and an hourly cron sweeps codes nobody redeemed.
+  // Only the SHA-256 of the displayed code is stored (model/extensionAuth.ts),
+  // so the table hands out nothing replayable and the lookup index is keyed on
+  // the hash rather than the secret.
+  extensionPairings: defineTable({
+    userId: v.string(),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+  })
+    // The redemption lookup. Not unique by construction — a collision across
+    // two live codes is a 2^-40 event that redeeming resolves either way.
+    .index("by_code_hash", ["codeHash"])
+    // One live code per user: minting a new one clears the old.
+    .index("by_user", ["userId"])
+    // Bounded expiry sweep across all users, oldest first.
+    .index("by_expires_at", ["expiresAt"]),
+
+  // One paired browser. The token itself is shown to the extension once, at
+  // pairing, and never stored — `tokenHash` is the only copy, so a database
+  // read cannot be replayed against the save route. Revoking is a delete:
+  // there is no disabled state to resurrect, and the next request from that
+  // browser simply fails to resolve.
+  extensionConnections: defineTable({
+    userId: v.string(),
+    tokenHash: v.string(),
+    // Display copy from the extension ("Chrome on macOS"), bounded and
+    // sanitized on the way in. Never an identifier.
+    label: v.string(),
+    createdAt: v.number(),
+    // Last save (or session check) this connection made, so the app's list can
+    // show which browser is still in use and which one to revoke. Absent until
+    // the extension's first request after pairing.
+    lastUsedAt: v.optional(v.number()),
+  })
+    // Every authenticated extension request resolves through this.
+    .index("by_token_hash", ["tokenHash"])
+    // The app's connected-browsers list, and account deletion's cleanup.
+    .index("by_user", ["userId"]),
+
   // Provider-independent waitlist source of truth. Resend is only a delivery
   // and preference-management projection of these records, so a provider
   // outage or migration can never lose the original signup or consent trail.

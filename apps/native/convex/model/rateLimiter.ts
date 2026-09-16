@@ -40,6 +40,27 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.
   demoRetry: { kind: "token bucket", rate: 4, period: HOUR, capacity: 3 },
+  // Minting a browser-extension pairing code. Costs nothing to serve, but the
+  // per-user cap keeps a stuck client from rewriting the row in a loop while
+  // leaving plenty of room for a user who regenerates a few times.
+  extensionPairCode: {
+    kind: "token bucket",
+    rate: 30,
+    period: HOUR,
+    capacity: 10,
+  },
+  // Redeeming a pairing code, counted globally because the caller is anonymous
+  // until the code checks out — there is no user to key on, and keying on a
+  // client-chosen value would let an attacker rotate past the limit. The code's
+  // own 2^40 space and ten-minute life are what make guessing hopeless; this is
+  // the second layer, sized to be invisible to real pairing traffic (a 100-deep
+  // burst) while capping a grinder at 600 tries an hour.
+  extensionPairRedeem: {
+    kind: "token bucket",
+    rate: 600,
+    period: HOUR,
+    capacity: 100,
+  },
   // Email-keyed limit still stops one address from looping. IP and global
   // buckets stop a client from rotating emails (or one IP from flooding).
   // The global bucket gates every signup site-wide, so it must sit well

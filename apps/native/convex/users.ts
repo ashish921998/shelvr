@@ -43,6 +43,8 @@ export const getCurrentUser = query({
  *
  * Identity is always derived from Convex Auth — never from a client-supplied
  * user id. Cleanup covers:
+ *  - extensionConnections and extensionPairings (paired browsers first, since a
+ *    live connection token could otherwise save behind the sweep)
  *  - items (and their image storage blobs)
  *  - space memberships
  *  - spaces
@@ -102,6 +104,34 @@ async function deleteAccountBatch(
   await deleteAuthIdentity(ctx, userId);
 }
 
+/** Drains the browser-extension credentials for one account: the paired
+ * browsers, then any pairing code still outstanding. Returns false when a full
+ * batch came back, meaning more remain and the caller should resume here.
+ * Both tables hold a handful of rows per account, so in practice one pass
+ * clears them. */
+async function deleteExtensionAccessBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const connections = await ctx.db
+    .query("extensionConnections")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const connection of connections) {
+    await ctx.db.delete(connection._id);
+  }
+  if (connections.length === DELETE_BATCH) return false;
+
+  const pairings = await ctx.db
+    .query("extensionPairings")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const pairing of pairings) {
+    await ctx.db.delete(pairing._id);
+  }
+  return pairings.length < DELETE_BATCH;
+}
+
 /** Deletes up to one batch of domain data keyed by the Convex Auth user id.
  * Returns true when everything is gone. Tables drain strictly in order —
  * memberships fully first so join rows never dangle mid-deletion — and a full
@@ -112,6 +142,12 @@ async function deleteUserOwnedDataBatch(
   userId: Id<"users"> | string,
 ): Promise<boolean> {
   const userKey = userId as string;
+
+  // Paired browsers go first, ahead of any user data. An extension connection
+  // is a live credential that can insert items without a session, so leaving
+  // one alive while the tables drain would let a save land behind the sweep
+  // and survive the deletion.
+  if (!(await deleteExtensionAccessBatch(ctx, userKey))) return false;
 
   // Raw deletes on purpose: every spaceItems write normally goes through
   // model/memberships.ts to keep the space summary exact, but these spaces

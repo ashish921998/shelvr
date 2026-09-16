@@ -453,6 +453,25 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "extension.title": undefined;
+  "extension.description": undefined;
+  "extension.connect": undefined;
+  "extension.creating": undefined;
+  "extension.codeLabel": undefined;
+  "extension.codeAccessibility": { characters: string };
+  "extension.expiresIn": { time: string };
+  "extension.expired": undefined;
+  "extension.steps": undefined;
+  "extension.newCode": undefined;
+  "extension.codeFailed": undefined;
+  "extension.connected": undefined;
+  "extension.noneConnected": undefined;
+  "extension.connectedOn": { date: string };
+  "extension.lastUsed": { date: string };
+  "extension.disconnect": undefined;
+  "extension.disconnectTitle": { browser: string };
+  "extension.disconnectBody": undefined;
+  "extension.disconnectFailed": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
