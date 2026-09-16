@@ -7,7 +7,6 @@ import {
   type DemoKind,
   type DemoSample,
 } from "@/lib/onboarding-demo";
-import { REDUCED_FADE_IN } from "@/lib/motion";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -41,18 +40,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Every path is real. The first save is a copied link or a ready-made one; a
+// Every path is real. The first save is a pasted, typed or ready-made link; a
 // link shared from another app still arrives through expo-sharing. The save runs
 // through api.demo.createDemoItem (one per user, no Pro needed) and the actual
 // pipeline. Before auth, the pending save is persisted so an app kill mid-OAuth
@@ -70,7 +60,7 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
-type Phase = "share" | "paste" | "auth" | "reading" | "failed";
+type Phase = "share" | "auth" | "reading" | "failed";
 
 export function LiveDemoStep({
   samples,
@@ -97,7 +87,6 @@ export function LiveDemoStep({
   const retryDemoItem = useMutation(api.demo.retryDemoItem);
 
   const [phase, setPhase] = useState<Phase>(resume ? "auth" : "share");
-  const [returnPhase, setReturnPhase] = useState<"share" | "paste">("share");
   const [authRequest, setAuthRequest] = useState<PendingDemo | null>(resume);
   const [draft, setDraft] = useState("");
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
@@ -109,7 +98,6 @@ export function LiveDemoStep({
   const [timedOut, setTimedOut] = useState(false);
   const [deadlineNonce, setDeadlineNonce] = useState(0);
   const advancedRef = useRef(false);
-  const [clipboardHasLink, setClipboardHasLink] = useState(false);
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
   // Convex adapter and sends `id: null`, which fails argument validation.
@@ -150,16 +138,9 @@ export function LiveDemoStep({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- surfaces a lost subscription
       setError(itemQuery.isError ? "demo.loadFailed" : "demo.saveGone");
       setItemId(null);
-      setPhase(returnPhase);
+      setPhase("share");
     }
-  }, [
-    itemId,
-    phase,
-    item,
-    itemQuery.isError,
-    itemQuery.isSuccess,
-    returnPhase,
-  ]);
+  }, [itemId, phase, item, itemQuery.isError, itemQuery.isSuccess]);
 
   // Only flips the slow flag. The user, never a timer, decides to move on.
   useEffect(() => {
@@ -216,13 +197,13 @@ export function LiveDemoStep({
         });
         setDemoUsed(used);
         setError(used ? "demo.alreadyUsed" : "demo.saveFailed");
-        setPhase((current) => (current === "auth" ? returnPhase : current));
+        setPhase((current) => (current === "auth" ? "share" : current));
       } finally {
         inFlightRef.current = false;
         setSubmitting(false);
       }
     },
-    [createDemoItem, isAuthenticated, onSaved, returnPhase],
+    [createDemoItem, isAuthenticated, onSaved],
   );
 
   const submitUrl = useCallback(
@@ -250,7 +231,6 @@ export function LiveDemoStep({
     }
     if (url === null) return;
     clearSharedPayloads();
-    setReturnPhase("share");
     submitUrl(url);
   }, [submitUrl]);
 
@@ -273,22 +253,6 @@ export function LiveDemoStep({
     };
   }, [resume]);
 
-  // These probes never trigger the iOS paste prompt. A link copied from
-  // Notes or Messages is plain text, so any string counts; the paste itself
-  // checks for a link. Re-checked on return, after copying elsewhere.
-  useEffect(() => {
-    const check = () => {
-      Clipboard.hasStringAsync().then(setClipboardHasLink, () =>
-        setClipboardHasLink(false),
-      );
-    };
-    check();
-    const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active") check();
-    });
-    return () => appState.remove();
-  }, []);
-
   // Resume the save once auth is ready. Server idempotency makes a repeat
   // submit return the same item.
   useEffect(() => {
@@ -299,20 +263,22 @@ export function LiveDemoStep({
     void submit(request.url, request.destination);
   }, [isAuthenticated, authRequest, submit]);
 
-  const saveClipboardText = (text: string) => {
+  // A paste saves at once when it holds a link and shows just that link.
+  // Otherwise the text stays in the field so the user sees what was pasted.
+  const savePasted = (text: string) => {
     const url =
       extractFirstUrl(text) ?? (isProbablyUrl(text) ? text.trim() : null);
+    setDraft(url ?? text.trim());
     if (url === null) {
       setError("demo.clipboardNoLink");
       return;
     }
-    setReturnPhase("share");
     submitUrl(url);
   };
 
   const pasteClipboard = async () => {
     try {
-      saveClipboardText(await Clipboard.getStringAsync());
+      savePasted(await Clipboard.getStringAsync());
     } catch (err) {
       analytics.captureError("onboarding_clipboard_read_failed", err);
       setError("demo.clipboardNoLink");
@@ -323,7 +289,7 @@ export function LiveDemoStep({
     setAuthRequest(null);
     setPendingDemo(null);
     setSavingUrl(null);
-    setPhase(returnPhase);
+    setPhase("share");
   };
 
   const retry = async () => {
@@ -350,11 +316,6 @@ export function LiveDemoStep({
       inFlightRef.current = false;
       setSubmitting(false);
     }
-  };
-
-  const paste = async () => {
-    const clipped = await Clipboard.getStringAsync();
-    if (clipped.trim() !== "") setDraft(clipped.trim());
   };
 
   const errorLine =
@@ -449,57 +410,6 @@ export function LiveDemoStep({
     );
   }
 
-  if (phase === "paste") {
-    return (
-      <View style={styles.wrap}>
-        <View style={styles.head}>
-          <Text style={styles.headline}>{t("demo.title")}</Text>
-          <Text style={styles.support}>{t("demo.pasteHelp")}</Text>
-        </View>
-
-        <View style={styles.inputRow}>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={t("demo.pastePlaceholder")}
-            placeholderTextColor={theme.colors.faint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            returnKeyType="go"
-            accessibilityLabel={t("demo.linkLabel")}
-            style={styles.input}
-            onSubmitEditing={() => submitUrl(draft)}
-          />
-          <Pressable onPress={() => void paste()} style={styles.pasteBtn}>
-            <Text style={styles.pasteText}>{t("common.paste")}</Text>
-          </Pressable>
-        </View>
-
-        {errorLine}
-
-        <View style={styles.foot}>
-          <CtaButton
-            label={t("demo.save")}
-            onPress={() => submitUrl(draft)}
-            disabled={draft.trim() === ""}
-            busy={submitting}
-          />
-          {continueAfterUsed ?? (
-            <GhostButton
-              label={t("common.back")}
-              onPress={() => {
-                setError(null);
-                setReturnPhase("share");
-                setPhase("share");
-              }}
-            />
-          )}
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -509,50 +419,71 @@ export function LiveDemoStep({
 
       <ShareHint />
 
-      {clipboardHasLink ? (
-        <Animated.View entering={REDUCED_FADE_IN} style={styles.clipCard}>
-          <View style={styles.clipText}>
-            <Text style={styles.clipTitle}>{t("demo.clipboardTitle")}</Text>
-            <Text style={styles.clipHelp}>{t("demo.clipboardHelp")}</Text>
-          </View>
-          {Clipboard.isPasteButtonAvailable ? (
-            <Clipboard.ClipboardPasteButton
-              acceptedContentTypes={["url", "plain-text"]}
-              displayMode="iconAndLabel"
-              cornerStyle="capsule"
-              backgroundColor={theme.colors.primary}
-              foregroundColor={theme.colors.primaryForeground}
-              style={styles.pasteControl}
-              onPress={(data) => {
-                if (data.type === "text") saveClipboardText(data.text);
-              }}
-            />
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void pasteClipboard()}
-              style={({ pressed }) => [
-                styles.pasteFallback,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Text style={styles.pasteFallbackText}>{t("common.paste")}</Text>
-            </Pressable>
-          )}
-        </Animated.View>
-      ) : null}
+      <View style={styles.inputRow}>
+        <TextInput
+          value={draft}
+          onChangeText={(text) => {
+            setDraft(text);
+            setError(null);
+          }}
+          placeholder={t("demo.pastePlaceholder")}
+          placeholderTextColor={theme.colors.faint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          returnKeyType="go"
+          accessibilityLabel={t("demo.linkLabel")}
+          style={styles.input}
+          onSubmitEditing={() => {
+            if (draft.trim() !== "") submitUrl(draft);
+          }}
+        />
+        {draft.trim() !== "" ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={submitting}
+            onPress={() => submitUrl(draft)}
+            style={({ pressed }) => [
+              styles.inputAction,
+              (pressed || submitting) && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={styles.inputActionText}>{t("demo.save")}</Text>
+          </Pressable>
+        ) : Clipboard.isPasteButtonAvailable ? (
+          <Clipboard.ClipboardPasteButton
+            acceptedContentTypes={["url", "plain-text"]}
+            displayMode="iconAndLabel"
+            cornerStyle="capsule"
+            backgroundColor={theme.colors.primary}
+            foregroundColor={theme.colors.primaryForeground}
+            style={styles.pasteControl}
+            onPress={(data) => {
+              if (data.type === "text") savePasted(data.text);
+            }}
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void pasteClipboard()}
+            style={({ pressed }) => [
+              styles.inputAction,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={styles.inputActionText}>{t("common.paste")}</Text>
+          </Pressable>
+        )}
+      </View>
 
       <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>
-          {clipboardHasLink ? t("demo.samplesOr") : t("demo.samples")}
-        </Text>
+        <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
         {samples.map((candidate) => (
           <SampleRow
             key={candidate.url}
             sample={candidate}
             disabled={submitting}
             onPress={() => {
-              setReturnPhase("share");
               submitUrl(candidate.url);
             }}
           />
@@ -561,18 +492,9 @@ export function LiveDemoStep({
 
       {errorLine}
 
-      <View style={styles.foot}>
-        {continueAfterUsed ?? (
-          <GhostButton
-            label={t("demo.pasteInstead")}
-            onPress={() => {
-              setError(null);
-              setReturnPhase("paste");
-              setPhase("paste");
-            }}
-          />
-        )}
-      </View>
+      {continueAfterUsed === null ? null : (
+        <View style={styles.foot}>{continueAfterUsed}</View>
+      )}
 
       <DemoAuthSheet
         visible={phase === "auth" && !isAuthenticated}
@@ -583,38 +505,10 @@ export function LiveDemoStep({
   );
 }
 
-function pulse(delay: number) {
-  return withRepeat(
-    withSequence(
-      withDelay(delay, withTiming(1.12, { duration: 260 })),
-      withTiming(1, { duration: 260 }),
-      withDelay(1400 - delay, withTiming(1, { duration: 0 })),
-    ),
-    -1,
-  );
-}
-
 /** An illustration of the share gesture, not a control. */
 function ShareHint() {
   useAppLocale();
   const { theme } = useUnistyles();
-  const reduceMotion = useReducedMotion();
-  const shareScale = useSharedValue(1);
-  const shelvrScale = useSharedValue(1);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    shareScale.value = pulse(0);
-    shelvrScale.value = pulse(600);
-  }, [reduceMotion, shareScale, shelvrScale]);
-
-  const shareStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: shareScale.value }],
-  }));
-  const shelvrStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: shelvrScale.value }],
-  }));
-
   return (
     <View
       style={styles.hint}
@@ -622,21 +516,19 @@ function ShareHint() {
       accessibilityLabel={t("demo.shareHelp")}
     >
       <View style={styles.hintArt}>
-        <Animated.View style={[styles.hintShare, shareStyle]}>
+        <View style={styles.hintShare}>
           <AppSymbolIcon
             name="square.and.arrow.up"
             size={18}
             tintColor={theme.colors.primaryForeground}
           />
-        </Animated.View>
+        </View>
         <AppSymbolIcon
           name="chevron.right"
           size={12}
           tintColor={theme.colors.faint}
         />
-        <Animated.View style={shelvrStyle}>
-          <Image source={APP_ICON} style={styles.hintIcon} />
-        </Animated.View>
+        <Image source={APP_ICON} style={styles.hintIcon} />
       </View>
       <Text style={styles.hintText}>{t("demo.shareHelp")}</Text>
     </View>
@@ -898,48 +790,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     lineHeight: 19,
     color: theme.colors.foreground,
   },
-  clipCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  clipText: {
-    flex: 1,
-    gap: 2,
-  },
-  clipTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  clipHelp: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
-  },
   pasteControl: {
     width: 104,
-    height: 40,
-  },
-  pasteFallback: {
-    height: 40,
-    paddingHorizontal: theme.gap(2),
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pasteFallbackText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.primaryForeground,
+    height: 48,
   },
   linkRow: {
     flexDirection: "row",
@@ -1010,6 +863,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   inputRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: theme.gap(1),
   },
   input: {
@@ -1022,17 +876,22 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
+    height: 48,
     paddingHorizontal: theme.gap(1.5),
-    paddingVertical: theme.gap(1.5),
   },
-  pasteBtn: {
+  inputAction: {
+    minWidth: 88,
+    height: 48,
+    paddingHorizontal: theme.gap(2),
+    borderRadius: 24,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.gap(1.5),
   },
-  pasteText: {
+  inputActionText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: theme.colors.primary,
+    color: theme.colors.primaryForeground,
   },
   samples: {
     gap: theme.gap(1),

@@ -201,12 +201,10 @@ export type MessageParams = {
   "demo.slow": undefined;
   "demo.keepWaiting": undefined;
   "demo.continueWaiting": undefined;
-  "demo.pasteHelp": undefined;
   "demo.pastePlaceholder": undefined;
   "demo.linkLabel": undefined;
   "common.paste": undefined;
   "demo.destination": undefined;
-  "demo.samples": undefined;
   "demo.save": undefined;
   "demo.signInTitle": undefined;
   "demo.signInHelp": undefined;
@@ -415,7 +413,6 @@ export type MessageParams = {
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
   "demo.shareHelp": undefined;
-  "demo.pasteInstead": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
   "demo.stepReading": undefined;
@@ -446,8 +443,6 @@ export type MessageParams = {
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
   "demo.pickHelp": undefined;
-  "demo.clipboardTitle": undefined;
-  "demo.clipboardHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
 };
