@@ -1,4 +1,5 @@
 const appConfig = require("./app.json");
+const { readFileSync } = require("node:fs");
 const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
@@ -75,12 +76,6 @@ if (buildPlatform === "android") {
     (value) => value?.startsWith("goog_"),
     "a goog_ Google Play public SDK key",
   );
-  requireProductionValue(
-    "GOOGLE_SERVICES_JSON",
-    process.env.GOOGLE_SERVICES_JSON,
-    (value) => Boolean(value),
-    "an EAS file variable containing google-services.json",
-  );
 }
 // The production Convex URL must parse as https:// with a hostname — a bare
 // prefix check would let `https://` (no host) reach a store build.
@@ -107,6 +102,34 @@ function displayName(base) {
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
 const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
+// Every Android variant needs its own matching Firebase client. Validate on
+// the EAS worker, where secret file variables are available, before compiling.
+if (buildPlatform === "android" && process.env.EAS_BUILD === "true") {
+  if (!googleServicesFile) {
+    throw new Error("Android builds require GOOGLE_SERVICES_JSON.");
+  }
+  let firebase;
+  try {
+    firebase = JSON.parse(readFileSync(googleServicesFile, "utf8"));
+  } catch {
+    throw new Error(
+      "GOOGLE_SERVICES_JSON must be a readable Firebase JSON file.",
+    );
+  }
+  if (
+    !firebase?.project_info?.project_number ||
+    !firebase?.client?.some(
+      (client) =>
+        client.client_info?.android_client_info?.package_name === bundleId &&
+        client.client_info?.mobilesdk_app_id &&
+        client.api_key?.some((key) => key.current_key),
+    )
+  ) {
+    throw new Error(
+      `GOOGLE_SERVICES_JSON requires a Firebase client for ${bundleId}.`,
+    );
+  }
+}
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
   .map((arch) => arch.trim())

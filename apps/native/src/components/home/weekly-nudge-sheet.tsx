@@ -9,7 +9,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Modal, Pressable, Text, View } from "react-native";
+import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** Asks once, after the first share-sheet save, whether to turn on the weekly shelf. */
@@ -47,13 +47,23 @@ export function WeeklyNudgeSheet({
   const remind = async () => {
     setBusy(true);
     try {
-      if ((await session.setWeeklyShelf(true)) === false) {
+      const enabled = await session.setWeeklyShelf(true);
+      if (enabled === false) {
         Alert.alert(
           t("notifications.disabledTitle"),
           t("notifications.disabledBody"),
+          [
+            { text: t("common.cancel"), style: "cancel", onPress: close },
+            {
+              text: t("permissions.openSettings"),
+              onPress: () => void Linking.openSettings(),
+            },
+          ],
         );
       }
-      close();
+      // Keep the prompt available after Settings, or while another session
+      // operation is busy. Only a saved preference completes this opt-in.
+      if (enabled === true) close();
     } catch (err) {
       // Keep the nudge pending so the user can try again.
       analytics.captureError("weekly_shelf_preference_failed", err);

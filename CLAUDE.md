@@ -195,8 +195,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
   - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
-    `google-services.json`; required by production Android builds so `expo-notifications`
-    can obtain an FCM token
+    `google-services.json`; required by every Android EAS build, with a Firebase
+    client matching that variant's package, so `expo-notifications` can obtain an
+    FCM token. See [push notification builds and updates](docs/architecture/push-notifications.md)
+    for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
 

@@ -72,6 +72,14 @@ export class NotificationDeviceSession {
     this.registeredKey = null;
   }
 
+  isRegistered() {
+    return (
+      !this.paused &&
+      this.registeredKey !== null &&
+      this.registeredKey.endsWith(`\0${this.deps.getLocale?.() ?? ""}`)
+    );
+  }
+
   register(getToken = () => this.deps.getToken(false)): Promise<boolean> {
     const generation = this.generation;
     const current = () =>
@@ -79,23 +87,32 @@ export class NotificationDeviceSession {
       this.operation !== "sign_out" &&
       this.operation !== "delete_account" &&
       generation === this.generation;
-    const operation = this.queue.then(async () => {
-      if (!current()) return false;
-      const token = await getToken();
-      if (!token || !current()) return false;
-      const locale = this.deps.getLocale?.();
-      const key = `${token}\0${locale ?? ""}`;
-      if (key === this.registeredKey) return true;
-      // Persist before the server write so a restart can still revoke an accepted token.
-      const tokens = await this.store.read();
-      if (!tokens.includes(token)) await this.store.write([...tokens, token]);
-      if (!current()) return false;
-      if (locale === undefined) await this.deps.saveToken(token);
-      else await this.deps.saveToken(token, locale);
-      if (!current()) return false;
-      this.registeredKey = key;
-      return true;
-    });
+    const operation = this.queue
+      .then(async () => {
+        if (!current()) return false;
+        const token = await getToken();
+        if (!current()) return false;
+        if (!token) {
+          this.registeredKey = null;
+          return false;
+        }
+        const locale = this.deps.getLocale?.();
+        const key = `${token}\0${locale ?? ""}`;
+        if (key === this.registeredKey) return true;
+        // Persist before the server write so a restart can still revoke an accepted token.
+        const tokens = await this.store.read();
+        if (!tokens.includes(token)) await this.store.write([...tokens, token]);
+        if (!current()) return false;
+        if (locale === undefined) await this.deps.saveToken(token);
+        else await this.deps.saveToken(token, locale);
+        if (!current()) return false;
+        this.registeredKey = key;
+        return true;
+      })
+      .catch((error: unknown) => {
+        if (current()) this.registeredKey = null;
+        throw error;
+      });
     this.queue = operation.then(
       () => undefined,
       () => undefined,

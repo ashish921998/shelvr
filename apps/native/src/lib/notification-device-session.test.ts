@@ -38,6 +38,24 @@ function setup(initial: string[] = [], getLocale?: () => string) {
 }
 
 describe("notification device session", () => {
+  it("tracks registration readiness across failures, denied permission, and restarts", async () => {
+    const { session, deps } = setup();
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+    deps.getToken.mockRejectedValueOnce(new Error("offline"));
+    await expect(session.register()).rejects.toThrow("offline");
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    deps.getToken.mockResolvedValueOnce(null);
+    await session.register();
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    session.stop();
+    expect(session.isRegistered()).toBe(false);
+    session.start();
+    expect(session.isRegistered()).toBe(false);
+  });
   it("updates a stable token when its language changes", async () => {
     let locale = "en";
     const { session, deps } = setup([], () => locale);
