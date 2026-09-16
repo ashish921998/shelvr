@@ -175,6 +175,11 @@ const REEL_PAGE = `<html><head><title>Instagram</title>
 const REEL_EMBED = `<div class="Embed"><img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;natgeo" src="https://cdn.fbcdn.net/poster.jpg?x=1&amp;y=2" srcset="https://cdn.fbcdn.net/poster.jpg 612w" />
 <div class="Caption"><a class="CaptionUsername" href="https://www.instagram.com/natgeo/" target="_blank">natgeo</a><br /><br />Meet the National Geographic 33! <br /><br />We&#039;re honoring modern trailblazers. <a href="/explore/tags/NatGeo33/">#NatGeo33</a><div class="CaptionComments"><a class="CaptionCommentsExpand" href="#">View all comments</a></div></div></div>`;
 
+const REEL_PAGE_WITH_DESCRIPTION = REEL_PAGE.replace(
+  "</head>",
+  '<meta property="og:description" content="12K likes, 80 comments - natgeo on March 20, 2025: &quot;Meet the 33&quot;" /></head>',
+);
+
 const SHELL_PAGE =
   "<html><head><title>Instagram</title></head><body><div>Log in Sign up</div></body></html>";
 
@@ -190,11 +195,19 @@ function html(body: string) {
   };
 }
 
+type EmbedFailure = { ok: false; code: string; status?: number };
+
 /** Route mocked fetches the way Instagram answers the crawler: the post page,
- * its captioned embed, and the poster image. */
-function instagramAnswers(page: string, embed: string) {
+ * its captioned embed (or how its fetch failed), and the poster image. */
+function instagramAnswers(
+  page: string,
+  embed: string | EmbedFailure | "throws",
+) {
   safeFetch.mockImplementation(async (url: string) => {
-    if (url.includes("/embed/captioned/")) return html(embed);
+    if (url.includes("/embed/captioned/")) {
+      if (embed === "throws") throw new TypeError("network down");
+      return typeof embed === "string" ? html(embed) : embed;
+    }
     if (url.startsWith("https://cdn.fbcdn.net/")) {
       return {
         ok: true,
@@ -266,13 +279,53 @@ describe("fetchInstagram", () => {
       fetchInstagram("https://www.instagram.com/p/DHVrPLrIyQ_/"),
     ).resolves.toEqual({
       title: "National Geographic (@natgeo) • Instagram reel",
-      description: "National Geographic (@natgeo) • Instagram reel",
+      description: undefined,
       siteName: "Instagram",
       author: "@natgeo",
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 1,
       content: undefined,
     });
+  });
+
+  it("uses the page's og:description when the caption is missing", async () => {
+    instagramAnswers(REEL_PAGE_WITH_DESCRIPTION, SHELL_PAGE);
+    const page = await fetchInstagram(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+    );
+    expect(page.title).toBe("National Geographic (@natgeo) • Instagram reel");
+    expect(page.description).toBe(
+      '12K likes, 80 comments - natgeo on March 20, 2025: "Meet the 33"',
+    );
+    expect(page.incomplete).toBeUndefined();
+  });
+
+  it.each<[string, EmbedFailure | "throws"]>([
+    ["a server error", { ok: false, code: "http_error", status: 503 }],
+    ["rate limiting", { ok: false, code: "http_error", status: 429 }],
+    ["a timeout", { ok: false, code: "timeout" }],
+    ["a network error", { ok: false, code: "fetch_failed" }],
+    ["a thrown fetch", "throws"],
+  ])(
+    "marks the read incomplete when the caption fetch hits %s",
+    async (_, embed) => {
+      instagramAnswers(REEL_PAGE, embed);
+      const page = await fetchInstagram(
+        "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+      );
+      expect(page.incomplete).toBe(true);
+      expect(page.content).toBeUndefined();
+      expect(linkEnrichment({ status: "ok", page })).toBe("partial");
+    },
+  );
+
+  it("treats a caption embed that is not found as no caption", async () => {
+    instagramAnswers(REEL_PAGE, { ok: false, code: "http_error", status: 404 });
+    const page = await fetchInstagram(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+    );
+    expect(page.incomplete).toBeUndefined();
+    expect(linkEnrichment({ status: "ok", page })).toBe("no_article");
   });
 
   it("reports a missing post like any gone page", async () => {
@@ -359,5 +412,23 @@ describe("processItem for Instagram links", () => {
     });
     expect(item?.content).toBeUndefined();
     expect(item?.storageId).toBeUndefined();
+  });
+
+  it("offers a retry when the caption fetch fails transiently", async () => {
+    instagramAnswers(REEL_PAGE, { ok: false, code: "http_error", status: 502 });
+    const t = newConvexTest();
+    const itemId = await reel(t);
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "NatGeo 33",
+      siteName: "Instagram",
+      author: "@natgeo",
+      enrichment: "partial",
+    });
+    expect(item?.content).toBeUndefined();
   });
 });

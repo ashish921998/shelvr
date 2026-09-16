@@ -543,6 +543,9 @@ type PageData = {
   siteName?: string;
   author?: string;
   content?: string;
+  /** A best-effort part of the read failed transiently (e.g. the Instagram
+   * caption), so a retry can still add content. Internal only. */
+  incomplete?: true;
 };
 
 const BROWSER_USER_AGENT =
@@ -692,11 +695,47 @@ async function fetchInstagramHtml(url: string) {
   });
 }
 
+type InstagramEmbed =
+  | { status: "ok"; html: string }
+  | { status: "missing" }
+  | { status: "transient"; errorCategory: string };
+
+/** True for a fetch failure a later retry may not repeat: a timeout, a network
+ * error, rate limiting, or a server error. */
+function isTransientFetchFailure(code: SafeFetchError, status?: number) {
+  return (
+    code === "timeout" ||
+    code === "fetch_failed" ||
+    (code === "http_error" &&
+      status !== undefined &&
+      (status === 429 || status >= 500))
+  );
+}
+
+async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
+  let result: Awaited<ReturnType<typeof fetchInstagramHtml>>;
+  try {
+    result = await fetchInstagramHtml(url);
+  } catch (error) {
+    return { status: "transient", errorCategory: summarizeError(error) };
+  }
+  if (result.ok) {
+    return {
+      status: "ok",
+      html: decodeWithContentType(result.bytes, result.contentType),
+    };
+  }
+  return isTransientFetchFailure(result.code, result.status)
+    ? { status: "transient", errorCategory: `page_fetch_error:${result.code}` }
+    : { status: "missing" };
+}
+
 /**
  * Read an Instagram post or reel. The page fetch decides gone/unreadable like
  * any link; the embed is best-effort. Shell markup is never article content:
  * the only content is the caption. When Instagram shares nothing, the result
- * is a bare "Instagram" page and the item still classifies from its URL.
+ * is a bare "Instagram" page and the item still classifies from its URL. A
+ * transiently failed embed marks the read incomplete so the save can retry.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
   const media = instagramMedia(url);
@@ -706,16 +745,19 @@ export async function fetchInstagram(url: string): Promise<PageData> {
   const [page, embed] = await Promise.all([
     fetchInstagramHtml(url),
     embedUrl
-      ? fetchInstagramHtml(embedUrl).catch(() => undefined)
-      : Promise.resolve(undefined),
+      ? fetchInstagramEmbed(embedUrl)
+      : Promise.resolve<InstagramEmbed>({ status: "missing" }),
   ]);
   if (!page.ok) {
     throw new PageFetchError(page.code, page.status);
   }
   const html = decodeWithContentType(page.bytes, page.contentType);
-  const embedded = embed?.ok
-    ? parseInstagramEmbed(decodeWithContentType(embed.bytes, embed.contentType))
-    : {};
+  if (embed.status === "transient") {
+    logEvent("warn", "instagram_caption_fetch_failed", {
+      error_category: embed.errorCategory,
+    });
+  }
+  const embedded = embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const cardTitle =
     extractMetaContent(html, "twitter:title") ??
     extractMetaContent(html, "og:title");
@@ -735,12 +777,17 @@ export async function fetchInstagram(url: string): Promise<PageData> {
       Array.from(caption?.split("\n")[0] ?? "")
         .slice(0, 100)
         .join("") || cardTitle,
-    description: cardTitle,
+    // With a caption the card names the creator; without one the card is
+    // already the title, so the page's own description is the only new text.
+    description: caption
+      ? cardTitle
+      : extractMetaContent(html, "og:description"),
     siteName: "Instagram",
     author: handle ? `@${handle}` : undefined,
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
 
@@ -821,7 +868,7 @@ export function linkEnrichment(
   if (read === undefined) {
     return undefined;
   }
-  if (read.status === "unreadable") {
+  if (read.status === "unreadable" || read.page.incomplete) {
     return "partial";
   }
   return read.page.content ? undefined : "no_article";
@@ -1514,7 +1561,8 @@ export const processItem = internalAction({
         });
       }
       await captureCategorizationTelemetry(ctx, {
-        outcome: linkRead?.status === "unreadable" ? "partial" : "succeeded",
+        outcome:
+          linkEnrichment(linkRead) === "partial" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
       });
