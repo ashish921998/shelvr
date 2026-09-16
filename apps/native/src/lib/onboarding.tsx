@@ -1,7 +1,11 @@
-import * as SecureStore from 'expo-secure-store';
-import { createContext, use, useCallback, useMemo, useState } from 'react';
+import * as SecureStore from "expo-secure-store";
+import { createContext, use, useCallback, useMemo, useState } from "react";
 
-const ONBOARDING_KEY = 'shelvr.onboarded';
+const ONBOARDING_KEY = "shelvr.onboarded";
+
+export function readOnboardedFlag(): boolean {
+  return SecureStore.getItem(ONBOARDING_KEY) === "true";
+}
 
 type OnboardingContextValue = {
   onboarded: boolean;
@@ -13,13 +17,15 @@ const OnboardingContext = createContext<OnboardingContextValue>({
   completeOnboarding: () => {},
 });
 
-export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [onboarded, setOnboarded] = useState(() => {
-    return SecureStore.getItem(ONBOARDING_KEY) === 'true';
-  });
+export function OnboardingProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [onboarded, setOnboarded] = useState(readOnboardedFlag);
 
   const completeOnboarding = useCallback(() => {
-    SecureStore.setItem(ONBOARDING_KEY, 'true');
+    SecureStore.setItem(ONBOARDING_KEY, "true");
     setOnboarded(true);
   }, []);
 
