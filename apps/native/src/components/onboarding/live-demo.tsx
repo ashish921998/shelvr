@@ -488,7 +488,7 @@ export function LiveDemoStep({
         <Clipboard.ClipboardPasteButton
           acceptedContentTypes={["url", "plain-text"]}
           displayMode="iconAndLabel"
-          cornerStyle="capsule"
+          cornerStyle="large"
           backgroundColor={theme.colors.primary}
           foregroundColor={theme.colors.primaryForeground}
           style={styles.pasteControl}
@@ -1091,7 +1091,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     minWidth: 88,
     height: 48,
     paddingHorizontal: theme.gap(2),
-    borderRadius: 24,
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
