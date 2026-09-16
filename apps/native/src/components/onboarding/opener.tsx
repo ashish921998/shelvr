@@ -142,7 +142,7 @@ export function OpenerStep({
         <Pressable
           accessibilityRole="button"
           onPress={onSignIn}
-          style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
         >
           <Text style={styles.signInText}>
             {t("onboarding.haveAccount")}{" "}
@@ -250,7 +250,7 @@ const styles = StyleSheet.create((theme) => ({
   proPillText: {
     fontFamily: theme.fonts.bold,
     fontSize: 11,
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.primaryText,
   },
@@ -272,6 +272,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   signInLink: {
     fontFamily: theme.fonts.bold,
-    color: theme.colors.primary,
+    color: theme.colors.primaryText,
   },
 }));

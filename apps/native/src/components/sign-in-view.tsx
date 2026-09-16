@@ -72,7 +72,7 @@ export function SignInView({
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
-              cornerRadius={14}
+              cornerRadius={theme.radius.md}
               style={[
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
@@ -201,27 +201,33 @@ const styles = StyleSheet.create((theme, rt) => ({
     height: 52,
   },
   appleFallbackButton: {
+    minHeight: 52,
     backgroundColor: theme.colors.foreground,
-    paddingVertical: theme.gap(2),
-    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.foreground,
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
     alignItems: "center",
+    justifyContent: "center",
   },
   appleFallbackButtonText: {
     color: theme.colors.background,
-    fontFamily: theme.fonts.medium,
+    fontFamily: theme.fonts.bold,
     fontSize: 16,
   },
   googleButton: {
-    backgroundColor: theme.colors.background,
+    minHeight: 52,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingVertical: theme.gap(2),
-    borderRadius: 14,
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
     alignItems: "center",
+    justifyContent: "center",
   },
   googleButtonText: {
     color: theme.colors.foreground,
-    fontFamily: theme.fonts.medium,
+    fontFamily: theme.fonts.bold,
     fontSize: 16,
   },
   devButton: {
@@ -250,13 +256,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     textDecorationLine: "underline",
   },
   error: {
-    marginTop: 16,
-    paddingHorizontal: 16,
+    marginTop: theme.gap(2),
+    paddingHorizontal: theme.gap(2),
+    fontFamily: theme.fonts.regular,
     color: theme.colors.danger,
     fontSize: 12,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   buttonPressed: {
     opacity: 0.7,

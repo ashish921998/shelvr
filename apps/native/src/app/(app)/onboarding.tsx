@@ -36,7 +36,7 @@ import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
@@ -59,6 +59,7 @@ function holdIncomingShare() {
 export default function OnboardingScreen() {
   useAppLocale();
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
 
@@ -194,7 +195,7 @@ export default function OnboardingScreen() {
           style={[
             styles.content,
             styles.scroll,
-            { paddingBottom: insets.bottom + 8 },
+            { paddingBottom: insets.bottom + theme.gap(1) },
           ]}
         >
           <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
@@ -204,7 +205,7 @@ export default function OnboardingScreen() {
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: insets.bottom + 24 },
+            { paddingBottom: insets.bottom + theme.gap(3) },
           ]}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets

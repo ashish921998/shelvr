@@ -687,7 +687,7 @@ function SharePost({
       onPress={onShare}
       style={({ pressed }) => [
         styles.post,
-        (pressed || disabled) && { opacity: 0.85 },
+        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
       ]}
     >
       <Image
@@ -736,7 +736,7 @@ function SampleRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.sampleRow,
-        (pressed || disabled) && { opacity: 0.7 },
+        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
       ]}
     >
       <Image
@@ -859,7 +859,7 @@ function DemoAuthSheet({
             style={({ pressed }) => [
               styles.authBtn,
               styles.authBtnApple,
-              busy && { opacity: 0.5 },
+              busy && { opacity: 0.4 },
               pressed && { opacity: 0.85 },
             ]}
           >
@@ -877,7 +877,7 @@ function DemoAuthSheet({
           disabled={busy}
           style={({ pressed }) => [
             styles.authBtn,
-            busy && { opacity: 0.5 },
+            busy && { opacity: 0.4 },
             pressed && { opacity: 0.85 },
           ]}
         >
@@ -963,7 +963,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   hintIcon: {
     width: 36,
     height: 36,
-    borderRadius: 9,
+    borderRadius: theme.radius.sm,
     borderCurve: "continuous",
   },
   hintText: {

@@ -52,7 +52,8 @@ export function GhostButton({
       disabled={disabled}
       style={({ pressed }) => [
         styles.ghost,
-        (pressed || disabled) && { opacity: 0.6 },
+        disabled && { opacity: 0.4 },
+        pressed && { opacity: 0.7 },
       ]}
     >
       <Text style={styles.ghostText}>{label}</Text>

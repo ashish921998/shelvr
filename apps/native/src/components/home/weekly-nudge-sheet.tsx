@@ -115,6 +115,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom + theme.gap(2),
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
+    borderCurve: "continuous",
     backgroundColor: theme.colors.background,
   },
   grabber: {
@@ -127,8 +128,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   title: {
     fontFamily: theme.fonts.bold,
-    fontSize: 24,
-    letterSpacing: -0.3,
+    fontSize: 22,
+    lineHeight: 28,
     color: theme.colors.foreground,
   },
   body: {
