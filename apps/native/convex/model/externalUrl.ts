@@ -150,11 +150,13 @@ export function isTikTokUrl(url: string | undefined): boolean {
 /** An Instagram post, reel, or IGTV link reduced to its media kind and
  * shortcode. Accepts instagram.com with or without the www/m subdomain, the
  * instagr.am short host, the `/reels/` alias, and the `/{user}/reel/{id}`
- * shape Instagram serves after a share. Profiles, stories, and look-alike
- * hosts are not media links. */
+ * shape Instagram serves after a share. A `/share/{kind}/{token}` link names
+ * the kind but carries a redirect token, not a shortcode, so its shortcode is
+ * left for the caller to resolve from the redirect. Profiles, stories, and
+ * look-alike hosts are not media links. */
 export function instagramMedia(
   url: string | undefined,
-): { kind: "reel" | "p" | "tv"; shortcode: string } | undefined {
+): { kind: "reel" | "p" | "tv"; shortcode?: string } | undefined {
   if (!url) return undefined;
   try {
     const parsed = new URL(url);
@@ -175,7 +177,9 @@ export function instagramMedia(
     if (!match || match[2] === "audio") return undefined;
     const kind =
       match[1] === "reels" ? "reel" : (match[1] as "reel" | "p" | "tv");
-    return { kind, shortcode: match[2] };
+    return match[0].startsWith("/share/")
+      ? { kind }
+      : { kind, shortcode: match[2] };
   } catch {
     return undefined;
   }

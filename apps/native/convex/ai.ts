@@ -256,6 +256,13 @@ function decodeEntities(text: string): string {
     .replace(/&ldquo;/g, "“");
 }
 
+/** The page's `<link rel="canonical">` href, tolerant of attribute order. */
+function extractCanonical(html: string): string | undefined {
+  const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
+  const href = tag?.match(/href\s*=\s*["']([^"']*)["']/i)?.[1]?.trim();
+  return href ? decodeEntities(href) : undefined;
+}
+
 /** Find the content of a meta tag by property/name, tolerant of attribute order. */
 function extractMetaContent(html: string, key: string): string | undefined {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -738,20 +745,34 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
  * transiently failed embed marks the read incomplete so the save can retry.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
-  const media = instagramMedia(url);
-  const embedUrl = media
-    ? `https://www.instagram.com/${media.kind}/${media.shortcode}/embed/captioned/`
-    : undefined;
-  const [page, embed] = await Promise.all([
+  const linked = instagramMedia(url);
+  const embedFor = (media: { kind: string; shortcode?: string } | undefined) =>
+    media?.shortcode
+      ? fetchInstagramEmbed(
+          `https://www.instagram.com/${media.kind}/${media.shortcode}/embed/captioned/`,
+        )
+      : Promise.resolve<InstagramEmbed>({ status: "missing" });
+  // A direct link names its shortcode, so the embed is read alongside the
+  // page. A share link only names it after the page fetch follows the
+  // redirect, so its embed waits for the page.
+  const [page, directEmbed] = await Promise.all([
     fetchInstagramHtml(url),
-    embedUrl
-      ? fetchInstagramEmbed(embedUrl)
-      : Promise.resolve<InstagramEmbed>({ status: "missing" }),
+    linked?.shortcode ? embedFor(linked) : Promise.resolve(undefined),
   ]);
   if (!page.ok) {
     throw new PageFetchError(page.code, page.status);
   }
   const html = decodeWithContentType(page.bytes, page.contentType);
+  const media = linked?.shortcode
+    ? linked
+    : ([
+        page.finalUrl,
+        extractMetaContent(html, "og:url"),
+        extractCanonical(html),
+      ]
+        .map((candidate) => instagramMedia(candidate))
+        .find((candidate) => candidate?.shortcode) ?? linked);
+  const embed = directEmbed ?? (await embedFor(media));
   if (embed.status === "transient") {
     logEvent("warn", "instagram_caption_fetch_failed", {
       error_category: embed.errorCategory,

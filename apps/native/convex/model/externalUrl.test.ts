@@ -233,6 +233,14 @@ describe("instagramMedia", () => {
     expect(instagramMedia(url)).toEqual({ kind, shortcode: "DHVrPLrIyQ_" });
   });
 
+  it.each([
+    ["https://www.instagram.com/share/reel/BAbc123xyz/", "reel"],
+    ["https://www.instagram.com/share/p/BAbc123xyz", "p"],
+  ])("reads the share link %s as a %s with no shortcode", (url, kind) => {
+    expect(instagramMedia(url)).toEqual({ kind });
+    expect(isInstagramUrl(url)).toBe(true);
+  });
+
   it("rejects profiles, sound pages, look-alike hosts, and bad input", () => {
     expect(isInstagramUrl("https://www.instagram.com/natgeo/")).toBe(false);
     expect(isInstagramUrl("https://www.instagram.com/reels/audio/123/")).toBe(

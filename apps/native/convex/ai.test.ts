@@ -328,6 +328,73 @@ describe("fetchInstagram", () => {
     expect(linkEnrichment({ status: "ok", page })).toBe("no_article");
   });
 
+  it.each([
+    [
+      "the redirected final URL",
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc",
+      REEL_PAGE,
+    ],
+    [
+      "og:url",
+      "https://www.instagram.com/",
+      REEL_PAGE.replace(
+        "</head>",
+        '<meta property="og:url" content="https://www.instagram.com/reel/DHVrPLrIyQ_/" /></head>',
+      ),
+    ],
+    [
+      "the canonical link",
+      "https://www.instagram.com/",
+      REEL_PAGE.replace(
+        "</head>",
+        '<link rel="canonical" href="https://www.instagram.com/reel/DHVrPLrIyQ_/" /></head>',
+      ),
+    ],
+  ])("reads a share link's caption through %s", async (_, finalUrl, page) => {
+    instagramAnswers(page, REEL_EMBED);
+    const answer = safeFetch.getMockImplementation()!;
+    safeFetch.mockImplementation(async (url: string, options: unknown) =>
+      url.includes("/share/")
+        ? { ...html(page), finalUrl }
+        : answer(url, options),
+    );
+    const read = await fetchInstagram(
+      "https://www.instagram.com/share/reel/BAbc123xyz/",
+    );
+    expect(read.content).toBe(
+      "Meet the National Geographic 33!\n\nWe're honoring modern trailblazers. #NatGeo33",
+    );
+    expect(read.author).toBe("@natgeo");
+    expect(safeFetch).toHaveBeenCalledWith(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/embed/captioned/",
+      expect.anything(),
+    );
+    expect(safeFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("BAbc123xyz/embed"),
+      expect.anything(),
+    );
+  });
+
+  it("reads a share link without a resolvable shortcode from its card", async () => {
+    instagramAnswers(REEL_PAGE, REEL_EMBED);
+    const read = await fetchInstagram(
+      "https://www.instagram.com/share/reel/BAbc123xyz/",
+    );
+    expect(read).toEqual({
+      title: "National Geographic (@natgeo) • Instagram reel",
+      description: undefined,
+      siteName: "Instagram",
+      author: "@natgeo",
+      heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
+      heroAspectRatio: 9 / 16,
+      content: undefined,
+    });
+    expect(safeFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/embed/captioned/"),
+      expect.anything(),
+    );
+  });
+
   it("reports a missing post like any gone page", async () => {
     safeFetch.mockResolvedValue({ ok: false, code: "http_error", status: 404 });
     await expect(
