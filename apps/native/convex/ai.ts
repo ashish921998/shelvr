@@ -17,7 +17,13 @@ import {
   isSafeFetchError,
   type SafeFetchError,
 } from "./model/safeFetch";
-import { isTikTokUrl, isXTweetUrl } from "./model/externalUrl";
+import {
+  instagramMedia,
+  isInstagramUrl,
+  isTikTokUrl,
+  isXTweetUrl,
+  shortFormSource,
+} from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS } from "./model/itemFields";
 import { logEvent } from "./model/log";
@@ -632,8 +638,115 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
 }
 
 /**
- * Copy a poster into Convex storage. TikTok thumbnail URLs are signed and
- * expire within hours, so the card would go blank without this. Best-effort:
+ * Instagram serves browsers a login shell with no metadata, but answers a link
+ * preview crawler with `twitter:title` ("Name (@handle) • Instagram reel") and
+ * a square-cropped `og:image`. Its captioned embed adds the caption and the
+ * uncropped poster. Parsed apart from the fetch so it is testable.
+ */
+export function parseInstagramEmbed(html: string): {
+  caption?: string;
+  username?: string;
+  posterUrl?: string;
+} {
+  const block = html.match(
+    /<div class="Caption">([\s\S]*?)<div class="CaptionComments">/i,
+  )?.[1];
+  const username = block
+    ?.match(/<a[^>]*class="CaptionUsername"[^>]*>([^<]*)<\/a>/i)?.[1]
+    ?.trim();
+  const caption = block
+    ? decodeEntities(
+        block
+          .replace(/<a[^>]*class="CaptionUsername"[^>]*>[^<]*<\/a>/i, "")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, ""),
+      )
+        .split("\n")
+        .map((line) => line.replace(/[ \t]+/g, " ").trim())
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
+    : undefined;
+  const img = html.match(/<img[^>]*class="EmbeddedMediaImage"[^>]*>/i)?.[0];
+  const src = img?.match(/\ssrc="([^"]+)"/i)?.[1];
+  return {
+    caption: caption || undefined,
+    username: username ? decodeEntities(username) : undefined,
+    posterUrl: src ? decodeEntities(src) : undefined,
+  };
+}
+
+const LINK_PREVIEW_USER_AGENT = "facebookexternalhit/1.1";
+
+async function fetchInstagramHtml(url: string) {
+  return await safeFetch(url, {
+    timeoutMs: 15000,
+    maxBytes: 1024 * 1024,
+    onOverflow: "truncate",
+    allowContentType: (ct) => ct.startsWith("text/html"),
+    headers: {
+      "User-Agent": LINK_PREVIEW_USER_AGENT,
+      Accept: "text/html",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+}
+
+/**
+ * Read an Instagram post or reel. The page fetch decides gone/unreadable like
+ * any link; the embed is best-effort. Shell markup is never article content:
+ * the only content is the caption. When Instagram shares nothing, the result
+ * is a bare "Instagram" page and the item still classifies from its URL.
+ */
+export async function fetchInstagram(url: string): Promise<PageData> {
+  const media = instagramMedia(url);
+  const embedUrl = media
+    ? `https://www.instagram.com/${media.kind}/${media.shortcode}/embed/captioned/`
+    : undefined;
+  const [page, embed] = await Promise.all([
+    fetchInstagramHtml(url),
+    embedUrl
+      ? fetchInstagramHtml(embedUrl).catch(() => undefined)
+      : Promise.resolve(undefined),
+  ]);
+  if (!page.ok) {
+    throw new PageFetchError(page.code, page.status);
+  }
+  const html = decodeWithContentType(page.bytes, page.contentType);
+  const embedded = embed?.ok
+    ? parseInstagramEmbed(decodeWithContentType(embed.bytes, embed.contentType))
+    : {};
+  const cardTitle =
+    extractMetaContent(html, "twitter:title") ??
+    extractMetaContent(html, "og:title");
+  const handle =
+    embedded.username ?? cardTitle?.match(/\(@([A-Za-z0-9._]+)\)/)?.[1];
+  const heroImageUrl =
+    embedded.posterUrl ??
+    extractMetaContent(html, "og:image") ??
+    extractMetaContent(html, "twitter:image");
+  const caption = embedded.caption?.slice(0, MAX_STORED_CONTENT_CHARS);
+  const heroAspectRatio = heroImageUrl
+    ? ((await fetchImageAspectRatio(heroImageUrl)) ??
+      (media?.kind === "p" ? 1 : 9 / 16))
+    : undefined;
+  return {
+    title:
+      Array.from(caption?.split("\n")[0] ?? "")
+        .slice(0, 100)
+        .join("") || cardTitle,
+    description: cardTitle,
+    siteName: "Instagram",
+    author: handle ? `@${handle}` : undefined,
+    heroImageUrl,
+    heroAspectRatio,
+    content: caption,
+  };
+}
+
+/**
+ * Copy a poster into Convex storage. TikTok and Instagram poster URLs are
+ * signed and expire, so the card would go blank without this. Best-effort:
  * a blocked or oversized image leaves the (short-lived) URL as the fallback.
  */
 export async function storePoster(
@@ -848,7 +961,9 @@ async function readPage(url: string): Promise<PageRead> {
       ? await fetchTikTokOEmbed(url)
       : isXTweetUrl(url)
         ? await fetchXoEmbed(url)
-        : await fetchPage(url);
+        : isInstagramUrl(url)
+          ? await fetchInstagram(url)
+          : await fetchPage(url);
     return { status: "ok", page };
   } catch (error) {
     if (!isPageFetchError(error)) {
@@ -986,6 +1101,18 @@ type Classification = {
  * here (a gone URL) and the pipeline must stop. */
 type AnalysisOutcome = Classification | { terminal: true };
 
+/** How the prompt introduces a page's content: a short-form social link only
+ * carries its caption. */
+function captionIntro(url: string | undefined): string {
+  const source = shortFormSource(url);
+  if (source === undefined) {
+    return "Page content:";
+  }
+  return source.video
+    ? "This is a short video. Only its caption is available:"
+    : `This is a ${source.site} post. Only its caption is available:`;
+}
+
 /** Build the link prompt. Sections the page read couldn't produce are
  * dropped; an unreadable read swaps the page body for a URL-only instruction
  * so the model invents nothing the URL doesn't show. */
@@ -1004,9 +1131,7 @@ function linkAnalysisPrompt(
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
     page?.content
-      ? page.siteName === "TikTok"
-        ? `This is a short video. Only its caption is available:\n${page.content.slice(0, 6000)}`
-        : `Page content:\n${page.content.slice(0, 6000)}`
+      ? `${captionIntro(item.url)}\n${page.content.slice(0, 6000)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
@@ -1324,7 +1449,9 @@ export const processItem = internalAction({
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
       posterStorageId =
-        page?.siteName === "TikTok" && page.heroImageUrl
+        item.type === "link" &&
+        shortFormSource(item.url) !== undefined &&
+        page?.heroImageUrl
           ? await storePoster(ctx, page.heroImageUrl)
           : undefined;
 

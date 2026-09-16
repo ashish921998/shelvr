@@ -147,6 +147,62 @@ export function isTikTokUrl(url: string | undefined): boolean {
   }
 }
 
+/** An Instagram post, reel, or IGTV link reduced to its media kind and
+ * shortcode. Accepts instagram.com with or without the www/m subdomain, the
+ * instagr.am short host, the `/reels/` alias, and the `/{user}/reel/{id}`
+ * shape Instagram serves after a share. Profiles, stories, and look-alike
+ * hosts are not media links. */
+export function instagramMedia(
+  url: string | undefined,
+): { kind: "reel" | "p" | "tv"; shortcode: string } | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host !== "instagram.com" &&
+      host !== "www.instagram.com" &&
+      host !== "m.instagram.com" &&
+      host !== "instagr.am" &&
+      host !== "www.instagr.am"
+    ) {
+      return undefined;
+    }
+    const match = parsed.pathname.match(
+      /^\/(?:[A-Za-z0-9._]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)(?:\/.*)?$/,
+    );
+    // `/reels/audio/{id}` is a sound page, not a reel.
+    if (!match || match[2] === "audio") return undefined;
+    const kind =
+      match[1] === "reels" ? "reel" : (match[1] as "reel" | "p" | "tv");
+    return { kind, shortcode: match[2] };
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for an Instagram post, reel, or IGTV link. */
+export function isInstagramUrl(url: string | undefined): boolean {
+  return instagramMedia(url) !== undefined;
+}
+
+/** Short-form social links whose saved content is a caption, not an article:
+ * TikTok videos and Instagram media. `video` is true for TikTok and for
+ * Instagram reels and IGTV; an Instagram `/p/` link may be a photo. The
+ * pipeline and the client share this so both treat these links the same way. */
+export function shortFormSource(
+  url: string | undefined,
+): { site: "TikTok" | "Instagram"; video: boolean } | undefined {
+  if (isTikTokUrl(url)) {
+    return { site: "TikTok", video: true };
+  }
+  const media = instagramMedia(url);
+  if (media) {
+    return { site: "Instagram", video: media.kind !== "p" };
+  }
+  return undefined;
+}
+
 /** True for an X / Twitter post URL, the only shape X's oEmbed endpoint
  * accepts: `x.com/{user}/status/{id}` and the `x.com/i/web/status/{id}` path
  * the import screen builds from archive bookmark ids. Profiles, lists, and
