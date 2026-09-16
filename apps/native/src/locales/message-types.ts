@@ -439,7 +439,6 @@ export type MessageParams = {
   "home.howToPick": undefined;
   "home.howToMore": undefined;
   "home.howToMoreHelp": undefined;
-  "home.openInstagram": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
   "demo.pickHelp": undefined;

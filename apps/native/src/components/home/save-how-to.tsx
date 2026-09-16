@@ -1,9 +1,8 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { analytics } from "@/lib/analytics";
 import type { TextMessageKey } from "@/locales/message-types";
-import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { CtaButton } from "@/components/onboarding/parts";
 import { useRouter } from "expo-router";
-import { Linking, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 const STEPS: { titleKey: TextMessageKey; helpKey?: TextMessageKey }[] = [
@@ -11,18 +10,6 @@ const STEPS: { titleKey: TextMessageKey; helpKey?: TextMessageKey }[] = [
   { titleKey: "home.howToPick" },
   { titleKey: "home.howToMore", helpKey: "home.howToMoreHelp" },
 ];
-
-async function openInstagram() {
-  try {
-    await Linking.openURL("instagram://app");
-  } catch {
-    try {
-      await Linking.openURL("https://www.instagram.com/");
-    } catch (err) {
-      analytics.captureError("home_open_instagram_failed", err);
-    }
-  }
-}
 
 /** Shown on Home until the first share-sheet save lands. */
 export function SaveHowTo() {
@@ -50,16 +37,10 @@ export function SaveHowTo() {
           </View>
         ))}
       </View>
-      <View style={styles.actions}>
-        <CtaButton
-          label={t("home.openInstagram")}
-          onPress={() => void openInstagram()}
-        />
-        <GhostButton
-          label={t("home.pasteLink")}
-          onPress={() => router.push("/add")}
-        />
-      </View>
+      <CtaButton
+        label={t("home.pasteLink")}
+        onPress={() => router.push("/add")}
+      />
     </View>
   );
 }
@@ -124,8 +105,5 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     lineHeight: 18,
     color: theme.colors.muted,
-  },
-  actions: {
-    gap: theme.gap(0.5),
   },
 }));
