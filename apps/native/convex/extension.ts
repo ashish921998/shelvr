@@ -160,9 +160,16 @@ export const storePairingCode = internalMutation({
  *
  * The code is consumed whether or not it turns out to be usable, so a single
  * code can never mint two connections and a stale one cannot be ground
- * against. The limiter is global and charged before the lookup, because the
- * caller is anonymous until the code checks out — there is nothing to key on
- * and nothing else standing between an attacker and the code space.
+ * against.
+ *
+ * The limiter is charged only when the lookup misses. A hit is not a guess, so
+ * refusing one buys nothing — and charging every attempt up front would let a
+ * grinder drain the shared bucket and hold every legitimate pairing behind a
+ * 429 for as long as they cared to keep it empty. Per-caller keying is not an
+ * option here: Convex HTTP actions expose no client address, which is exactly
+ * why the waitlist route can only limit per-IP after our own server forwards
+ * the address behind a shared secret. `/extension/pair` has no such server in
+ * front of it.
  *
  * Expired and unknown codes return the same answer: distinguishing them would
  * tell a guesser that a code exists, which is most of the secret.
@@ -183,10 +190,6 @@ export const redeemPairingCode = internalMutation({
     v.object({ status: v.literal("rate_limited") }),
   ),
   handler: async (ctx, args) => {
-    const { ok } = await rateLimiter.limit(ctx, "extensionPairRedeem");
-    if (!ok) {
-      return { status: "rate_limited" as const };
-    }
     // `first`, not `unique`: two live rows sharing a hash is a 2^-40 event,
     // and answering it with a 500 would be worse than pairing the older code.
     const pairing = await ctx.db
@@ -194,6 +197,12 @@ export const redeemPairingCode = internalMutation({
       .withIndex("by_code_hash", (q) => q.eq("codeHash", args.codeHash))
       .first();
     if (pairing === null) {
+      // A miss is what guessing produces, so this is where the budget goes.
+      // Mistyped codes land here too, which the burst is sized to absorb.
+      const { ok } = await rateLimiter.limit(ctx, "extensionPairRedeem");
+      if (!ok) {
+        return { status: "rate_limited" as const };
+      }
       return { status: "invalid_code" as const };
     }
     await ctx.db.delete(pairing._id);

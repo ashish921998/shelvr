@@ -88,6 +88,17 @@ async function pair(
   return body.token;
 }
 
+/** Empty the global redemption bucket the way a grinder would, without
+ * actually sending a hundred requests. */
+async function drainRedeemBudget(t: TestBackend): Promise<void> {
+  await t.run(async (ctx) => {
+    const { ok } = await rateLimiter.limit(ctx, "extensionPairRedeem", {
+      count: 100,
+    });
+    expect(ok).toBe(true);
+  });
+}
+
 function save(
   t: TestBackend,
   token: string,
@@ -198,6 +209,18 @@ describe("connection labels", () => {
     expect(label).toHaveLength(MAX_CONNECTION_LABEL_LENGTH);
   });
 
+  it("truncates by code point, so an emoji is never cut in half", () => {
+    // Convex stores strings as valid Unicode and rejects a lone surrogate, so
+    // a UTF-16 `slice` landing between the halves of an emoji would fail the
+    // insert rather than shorten the label.
+    const label = sanitizeConnectionLabel(
+      `${"x".repeat(MAX_CONNECTION_LABEL_LENGTH - 1)}\u{1F600}tail`,
+    );
+    expect(label.isWellFormed()).toBe(true);
+    expect([...label]).toHaveLength(MAX_CONNECTION_LABEL_LENGTH);
+    expect(label.endsWith("\u{1F600}")).toBe(true);
+  });
+
   it("falls back for missing or empty labels", () => {
     expect(sanitizeConnectionLabel("   ")).toBe(DEFAULT_CONNECTION_LABEL);
     expect(sanitizeConnectionLabel(undefined)).toBe(DEFAULT_CONNECTION_LABEL);
@@ -280,27 +303,53 @@ describe("POST /extension/pair", () => {
     expect(remaining).toEqual([]);
   });
 
-  it("caps redemption attempts globally, before any code is looked up", async () => {
+  it("caps guessing once the global budget is spent", async () => {
     const t = newConvexTest();
-    const { identity } = await seedUser(t, "owner@example.com");
-    const { code } = await identity.action(api.extension.createPairingCode, {});
     // Spend the global burst without sending a hundred requests. The caller is
     // anonymous at this point, so there is no per-user bucket to fall back on.
-    await t.run(async (ctx) => {
-      const { ok } = await rateLimiter.limit(ctx, "extensionPairRedeem", {
-        count: 100,
-      });
-      expect(ok).toBe(true);
-    });
+    await drainRedeemBudget(t);
 
     const response = await t.fetch("/extension/pair", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code: "ZZZZ-ZZZZ" }),
     });
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({ error: "rate_limited" });
-    // Throttled, not consumed: the real user's code still works afterwards.
+  });
+
+  it("still pairs a real code while a grinder holds the budget empty", async () => {
+    const t = newConvexTest();
+    const { identity } = await seedUser(t, "owner@example.com");
+    const { code } = await identity.action(api.extension.createPairingCode, {});
+    await drainRedeemBudget(t);
+
+    // The bucket is charged only on a miss, so one caller burning it cannot
+    // lock everyone else out of pairing — which a shared bucket charged on
+    // every attempt would let them do.
+    const response = await t.fetch("/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, label: "Chrome on macOS" }),
+    });
+    expect(response.status).toBe(200);
+    expect(
+      await identity.query(api.extension.listConnections, {}),
+    ).toHaveLength(1);
+  });
+
+  it("does not consume a real code when the budget is spent", async () => {
+    const t = newConvexTest();
+    const { identity } = await seedUser(t, "owner@example.com");
+    await identity.action(api.extension.createPairingCode, {});
+    await drainRedeemBudget(t);
+
+    await t.fetch("/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "ZZZZ-ZZZZ" }),
+    });
+
     const survivors = await t.run(async (ctx) =>
       ctx.db.query("extensionPairings").collect(),
     );

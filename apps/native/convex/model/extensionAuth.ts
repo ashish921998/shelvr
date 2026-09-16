@@ -155,7 +155,15 @@ export function sanitizeConnectionLabel(raw: unknown): string {
     .replace(/\s+/g, " ")
     .trim();
   if (cleaned === "") return DEFAULT_CONNECTION_LABEL;
-  return cleaned.slice(0, MAX_CONNECTION_LABEL_LENGTH).trim();
+  // By code point, not by `slice`: `slice` counts UTF-16 code units, so a label
+  // whose emoji straddles the limit would be cut between the two halves of a
+  // surrogate pair. Convex stores strings as valid Unicode and rejects a lone
+  // surrogate, so that truncation would fail the insert and break pairing for
+  // whatever label the extension sent.
+  return Array.from(cleaned)
+    .slice(0, MAX_CONNECTION_LABEL_LENGTH)
+    .join("")
+    .trim();
 }
 
 /** The bearer token carried by an `Authorization` header, or null when the

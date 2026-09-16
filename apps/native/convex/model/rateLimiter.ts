@@ -49,12 +49,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 10,
   },
-  // Redeeming a pairing code, counted globally because the caller is anonymous
-  // until the code checks out — there is no user to key on, and keying on a
-  // client-chosen value would let an attacker rotate past the limit. The code's
-  // own 2^40 space and ten-minute life are what make guessing hopeless; this is
-  // the second layer, sized to be invisible to real pairing traffic (a 100-deep
-  // burst) while capping a grinder at 600 tries an hour.
+  // Failed pairing-code redemptions, counted globally because the caller is
+  // anonymous — Convex HTTP actions expose no client address, and keying on
+  // anything the caller chooses would let them rotate past the limit. The
+  // code's own 2^40 space and ten-minute life are what make guessing hopeless;
+  // this is the second layer, capping a grinder at 600 tries an hour.
+  //
+  // `redeemPairingCode` charges it only on a miss, so draining the bucket can
+  // never refuse a real code — a shared bucket charged on every attempt would
+  // otherwise be a lockout anyone could trigger. The burst covers the other
+  // thing that misses: users mistyping.
   extensionPairRedeem: {
     kind: "token bucket",
     rate: 600,

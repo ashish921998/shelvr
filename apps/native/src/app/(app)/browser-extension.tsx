@@ -49,9 +49,19 @@ export default function BrowserExtensionScreen() {
   // re-rendering in the background.
   useEffect(() => {
     if (pairing === null) return;
-    const tick = () => setRemainingMs(pairing.expiresAt - Date.now());
-    tick();
-    const interval = setInterval(tick, 1000);
+    // Returns whether the code is still live, so the interval can stop itself
+    // the moment it expires: past that there is nothing left to count down,
+    // and a timer that kept firing would re-render the screen every second for
+    // as long as it stayed open.
+    const tick = () => {
+      const remaining = pairing.expiresAt - Date.now();
+      setRemainingMs(remaining);
+      return remaining > 0;
+    };
+    if (!tick()) return;
+    const interval = setInterval(() => {
+      if (!tick()) clearInterval(interval);
+    }, 1000);
     return () => clearInterval(interval);
   }, [pairing]);
 

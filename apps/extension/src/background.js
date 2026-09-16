@@ -115,9 +115,15 @@ async function handlePair({ code, label, endpoint }) {
       [STORAGE_KEYS.recent]: [],
       [STORAGE_KEYS.lastResult]: null,
     });
-    // Fills in the account email for the popup header. A failure here is
-    // cosmetic: pairing already succeeded.
-    await handleRefresh();
+    // Fills in the account email for the popup header. Cosmetic unless it
+    // comes back unauthorized — that means the connection was revoked between
+    // pairing and this call, and `handleRefresh` has already dropped the dead
+    // token. Reporting success there would bounce the popup back to the
+    // pairing form with no explanation.
+    const refresh = await handleRefresh();
+    if (!refresh.ok && refresh.code === "unauthorized") {
+      return refresh;
+    }
     return { ok: true };
   } catch (error) {
     return { ok: false, code: codeOf(error) };
@@ -233,10 +239,22 @@ async function recordResult(result) {
   });
 }
 
-async function rememberRecent(entry) {
-  const { recent } = await readSettings();
-  const next = [entry, ...recent.filter((item) => item.url !== entry.url)];
-  await writeSettings({ [STORAGE_KEYS.recent]: next.slice(0, MAX_RECENT) });
+/** Serializes the recent-saves list against itself. `chrome.storage` has no
+ * read-modify-write primitive, so two saves landing together would both read
+ * the old list and the second write would drop the first one's entry. The
+ * chain resets when Chrome restarts the worker, which is fine: the race only
+ * exists between saves that overlap inside one worker's life. */
+let recentWrite = Promise.resolve();
+
+function rememberRecent(entry) {
+  recentWrite = recentWrite
+    .catch(() => {})
+    .then(async () => {
+      const { recent } = await readSettings();
+      const next = [entry, ...recent.filter((item) => item.url !== entry.url)];
+      await writeSettings({ [STORAGE_KEYS.recent]: next.slice(0, MAX_RECENT) });
+    });
+  return recentWrite;
 }
 
 /**

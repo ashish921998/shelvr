@@ -35,8 +35,21 @@ const els = {
  * a tab change. */
 let currentTab = null;
 
-function send(message) {
-  return chrome.runtime.sendMessage(message);
+/** Ask the service worker to do something, and never throw.
+ *
+ * `sendMessage` rejects when the worker cannot be reached or closes the port
+ * before replying. Left unhandled that would break the popup in two ways: the
+ * opening `state` request would reject before `render` unhides either panel,
+ * leaving a blank window, and the pair/save/disconnect handlers disable their
+ * button before awaiting, so a rejection would skip the re-enable and strand
+ * it. Answering in the same `{ ok, code }` shape a refusal uses keeps every
+ * caller on its existing error path. */
+async function send(message) {
+  try {
+    return await chrome.runtime.sendMessage(message);
+  } catch {
+    return { ok: false, code: "unreachable" };
+  }
 }
 
 /** Copy for every failure code the backend and worker can produce. The server
@@ -58,6 +71,8 @@ function errorText(code) {
       return "Couldn't reach Shelvr. Check your connection.";
     case "not_connected":
       return "Connect this browser first.";
+    case "unreachable":
+      return "Shelvr didn't respond. Close this and try again.";
     default:
       return "Something went wrong. Try again.";
   }
@@ -198,6 +213,10 @@ async function renderShortcut() {
 async function render({ keepStatus = false } = {}) {
   const response = await send({ type: "state" });
   const state = response?.state ?? {};
+  // An unreachable worker leaves us with no idea whether this browser is
+  // paired. Show the pairing panel — the only one that works without the
+  // worker — and say why, rather than implying the connection is gone.
+  const unreachable = !response?.ok;
   const connected = Boolean(state.token);
 
   els.connect.hidden = connected;
@@ -206,7 +225,11 @@ async function render({ keepStatus = false } = {}) {
 
   if (!connected) {
     els.account.hidden = true;
-    els.code.focus();
+    if (unreachable) {
+      setStatus(els.pairStatus, errorText(response?.code), "error");
+    } else {
+      els.code.focus();
+    }
     return;
   }
 
