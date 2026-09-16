@@ -1,4 +1,9 @@
-import { SAFE_ERROR_MESSAGES, posthog, superProperties } from "@/lib/posthog";
+import {
+  SAFE_ERROR_MESSAGES,
+  afterIdentitySettles,
+  posthog,
+  superProperties,
+} from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
 
@@ -157,17 +162,20 @@ function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
-  if (!posthog) return;
+  const client = posthog;
+  if (!client) return;
 
-  try {
-    posthog.capture(event, {
-      ...properties,
-      environment: Constants.expoConfig?.extra?.variant ?? "development",
-      analytics_version: 1,
-    });
-  } catch {
-    // Analytics must never change the outcome of a product action.
-  }
+  afterIdentitySettles(() => {
+    try {
+      client.capture(event, {
+        ...properties,
+        environment: Constants.expoConfig?.extra?.variant ?? "development",
+        analytics_version: 1,
+      });
+    } catch {
+      // Analytics must never change the outcome of a product action.
+    }
+  });
 }
 
 const SAFE_ERROR_NAMES = new Set([
@@ -196,7 +204,8 @@ function captureError(
         : "Error"
       : "Unknown";
   console.error(event, { error_type: errorType });
-  if (!posthog) return;
+  const client = posthog;
+  if (!client) return;
 
   try {
     const original = error instanceof Error ? error : new Error(typeof error);
@@ -207,11 +216,17 @@ function captureError(
             name: original.name,
             stack: original.stack,
           });
-    posthog.captureException(reported, {
-      ...properties,
-      error_event: event,
-      environment: Constants.expoConfig?.extra?.variant ?? "development",
-      analytics_version: 1,
+    afterIdentitySettles(() => {
+      try {
+        client.captureException(reported, {
+          ...properties,
+          error_event: event,
+          environment: Constants.expoConfig?.extra?.variant ?? "development",
+          analytics_version: 1,
+        });
+      } catch {
+        // Error reporting must never mask or replace the original failure.
+      }
     });
   } catch {
     // Error reporting must never mask or replace the original failure.
@@ -252,24 +267,30 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
 // Convex: sending it as a person property would copy PII into a third party
 // (and into replay-linked person profiles) for no analytics gain.
 function identify(userId: string): void {
-  if (!posthog) return;
+  const client = posthog;
+  if (!client) return;
 
-  try {
-    posthog.identify(userId);
-  } catch {
-    // Analytics must never block authentication or app rendering.
-  }
+  afterIdentitySettles(() => {
+    try {
+      client.identify(userId);
+    } catch {
+      // Analytics must never block authentication or app rendering.
+    }
+  });
 }
 
 function reset(): void {
-  if (!posthog) return;
+  const client = posthog;
+  if (!client) return;
 
-  try {
-    posthog.reset();
-    posthog.register(superProperties());
-  } catch {
-    // Analytics must never block sign-out.
-  }
+  afterIdentitySettles(() => {
+    try {
+      client.reset();
+      client.register(superProperties());
+    } catch {
+      // Analytics must never block sign-out.
+    }
+  });
 }
 
 /** Resets only when PostHog still holds an identified user. A signed-out
@@ -290,14 +311,19 @@ async function resetIfIdentified(): Promise<void> {
 }
 
 function screen(route: string): void {
-  try {
-    posthog?.screen(route, {
-      environment: Constants.expoConfig?.extra?.variant ?? "development",
-      analytics_version: 1,
-    });
-  } catch {
-    // Screen tracking must never interrupt navigation.
-  }
+  const client = posthog;
+  if (!client) return;
+
+  afterIdentitySettles(() => {
+    try {
+      void client.screen(route, {
+        environment: Constants.expoConfig?.extra?.variant ?? "development",
+        analytics_version: 1,
+      });
+    } catch {
+      // Screen tracking must never interrupt navigation.
+    }
+  });
 }
 
 export const analytics = {

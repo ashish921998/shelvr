@@ -4,7 +4,8 @@ import { analytics } from "@/lib/analytics";
 import { useEntitlementSync } from "@/lib/entitlement";
 import { useCurrentUser } from "@/lib/current-user";
 import { posthog } from "@/lib/posthog";
-import { ConvexAuthProvider, type TokenStorage } from "@convex-dev/auth/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { authStorage } from "@/lib/auth-storage";
 import {
   convex,
   persister,
@@ -14,7 +15,6 @@ import {
 import { observeAuthQueryErrors } from "@/lib/query-auth-recovery";
 import { useConvexAuth } from "convex/react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import * as SecureStore from "expo-secure-store";
 import {
   DarkTheme,
   DefaultTheme,
@@ -37,22 +37,6 @@ import {
   NotificationSessionProvider,
   useNotificationObserver,
 } from "@/lib/notifications";
-
-// Convex Auth persists its JWT + refresh token client-side. In React Native we
-// must supply the storage ourselves — wrap Keychain-backed expo-secure-store
-// behind the awaitable TokenStorage interface the provider expects. Scope the
-// keys to the Convex deployment so a development refresh token can never be
-// presented to production (or leave auth initialization stuck while testing).
-const authStorageNamespace = (
-  process.env.EXPO_PUBLIC_CONVEX_URL ?? "default"
-).replace(/[^A-Za-z0-9._-]/g, "_");
-const authStorageKey = (key: string) => `${authStorageNamespace}_${key}`;
-
-const authStorage: TokenStorage = {
-  getItem: (key) => SecureStore.getItemAsync(authStorageKey(key)),
-  setItem: (key, value) => SecureStore.setItemAsync(authStorageKey(key), value),
-  removeItem: (key) => SecureStore.deleteItemAsync(authStorageKey(key)),
-};
 
 // Single source of truth for the native route background. The navigator paints
 // every screen's container with the navigation theme's `background`, so setting

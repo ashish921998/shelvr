@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
+import { hasStoredAuthSession } from "@/lib/auth-storage";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -142,6 +143,48 @@ export function superProperties(): Record<string, string | number | boolean> {
 }
 
 posthog?.register(superProperties());
+
+// Read before anything renders, so a sign-in during this launch can't count.
+const startedWithSession = hasStoredAuthSession();
+
+// PostHog keeps its ids in its own storage, which outlives a lost Convex
+// session (expired, or a wiped keychain). Such a launch would report its first
+// screens as the previous account, so the stale identity is dropped as soon as
+// the SDK has loaded, before any app event is sent. A launch that still holds
+// a session is left alone, even one the server will reject: only Convex knows
+// that, and PostHogIdentity resets once it says so. The SDK's own "Application
+// Updated" is captured before this runs, so a store update on such a launch
+// still lands on the previous account.
+async function dropStaleIdentity(client: PostHog): Promise<void> {
+  if (startedWithSession) return;
+  try {
+    await client.ready();
+    const distinctId = client.getDistinctId();
+    const anonymousId = client.getAnonymousId();
+    if (distinctId && anonymousId && distinctId !== anonymousId) {
+      client.reset();
+      client.register(superProperties());
+    }
+  } catch {
+    // Analytics must never block startup.
+  }
+}
+
+let identitySettled = posthog === undefined;
+const identityReady = posthog
+  ? dropStaleIdentity(posthog).then(() => {
+      identitySettled = true;
+    })
+  : Promise.resolve();
+
+/**
+ * Runs `send` once the launch identity is settled. The SDK's
+ * "Application Opened" waits on a native call, so it also follows the settle.
+ */
+export function afterIdentitySettles(send: () => void): void {
+  if (identitySettled) send();
+  else void identityReady.then(send);
+}
 
 /** True when the client analytics boundary may capture. The single canonical
  * check — every analytics facade (feedback, cancel survey) delegates here
