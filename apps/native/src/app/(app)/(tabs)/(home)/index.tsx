@@ -1,10 +1,13 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { SaveHowTo } from "@/components/home/save-how-to";
+import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
   useBusySaving,
@@ -13,7 +16,9 @@ import {
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { ProgressiveBlurHeader } from "progressive-blur";
-import { View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export default function HomeScreen() {
@@ -28,6 +33,11 @@ export default function HomeScreen() {
     defer: cancelSurvey.visible,
   });
   const busySaving = useBusySaving(items);
+  // The share screen records the first save while Home stays mounted below it.
+  const [firstShareSaved, setFirstShareSaved] = useState(hasSavedFirstShare);
+  useFocusEffect(
+    useCallback(() => setFirstShareSaved(hasSavedFirstShare()), []),
+  );
 
   // One element, two slots (empty feed and feed header) — the survey claims
   // the Home moment when both prompts are eligible.
@@ -45,18 +55,41 @@ export default function HomeScreen() {
     return <ScreenLoader label={t("loading.home")} />;
   }
 
+  const showHowTo = shouldShowHowTo({
+    firstShareSaved,
+    itemCount: items.length,
+  });
+  const nudge = <WeeklyNudgeSheet previewTitle={items[0]?.title} />;
+
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        <EmptyState
-          title={t("home.emptyTitle")}
-          message={t("home.emptyBody")}
-        />
+        {showHowTo ? (
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={styles.howToOnly}
+          >
+            <SaveHowTo />
+          </ScrollView>
+        ) : (
+          <EmptyState
+            title={t("home.emptyTitle")}
+            message={t("home.emptyBody")}
+          />
+        )}
         {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
+        {nudge}
       </View>
     );
   }
+
+  const howToHeader = showHowTo ? (
+    <View style={styles.howToHeader}>
+      <SaveHowTo />
+      <Text style={styles.shelfLabel}>{t("home.onYourShelf")}</Text>
+    </View>
+  ) : null;
 
   return (
     <View style={styles.container}>
@@ -71,6 +104,7 @@ export default function HomeScreen() {
         // cancel survey claims the slot when both are eligible.
         ListHeaderComponent={
           cancelSurveyCard ??
+          howToHeader ??
           (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
               onSendFeedback={feedback.openFeedbackFromInvitation}
@@ -80,6 +114,7 @@ export default function HomeScreen() {
         }
       />
       <ProgressiveBlurHeader />
+      {nudge}
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}
@@ -90,5 +125,20 @@ export default function HomeScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
+  },
+  howToOnly: {
+    padding: theme.gap(2),
+  },
+  howToHeader: {
+    gap: theme.gap(2.5),
+    paddingHorizontal: theme.gap(2),
+    paddingBottom: theme.gap(1.5),
+  },
+  shelfLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
   },
 }));
