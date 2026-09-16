@@ -21,13 +21,25 @@ export function hasRetryableEntries(session: ShareSession): boolean {
   return entriesToProcess(session).length > 0;
 }
 
+/** Saved entries counted once per item, plus how many saved entries repeat an
+ * item a sibling already saved. Entries that share one link reuse one item, so
+ * a repeat is neither another save nor another entry to wait on. */
+function uniqueSaves(session: ShareSession): {
+  saved: number;
+  repeats: number;
+} {
+  const saved = session.entries.filter((e) => e.status === "saved");
+  const unique = new Set(saved.map((e) => e.itemId ?? e.operationId)).size;
+  return { saved: unique, repeats: saved.length - unique };
+}
+
 /** Saved-of-total for the in-flight "Saved N of M" progress label. */
 export function countProgress(session: ShareSession): {
   saved: number;
   total: number;
 } {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
-  return { saved, total: session.entries.length };
+  const { saved, repeats } = uniqueSaves(session);
+  return { saved, total: session.entries.length - repeats };
 }
 
 /** Saved/failed/total for the terminal partial screen. `failed` counts the
@@ -39,11 +51,11 @@ export function countPartial(session: ShareSession): {
   failed: number;
   total: number;
 } {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
+  const { saved, repeats } = uniqueSaves(session);
   const failed = session.entries.filter(
     (e) => e.status === "failed" || e.status === "unsupported",
   ).length;
-  return { saved, failed, total: session.entries.length };
+  return { saved, failed, total: session.entries.length - repeats };
 }
 
 /** Returns a copy of `session` with the entry matching `settled.index` replaced

@@ -14,6 +14,7 @@ import {
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "./process-share";
+import { countPartial, countProgress } from "./session-view";
 import {
   operationIdFor,
   type RawSharePayload,
@@ -424,6 +425,8 @@ describe("processSession", () => {
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
     ]);
+    expect(countProgress(result)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result)).toEqual({ saved: 1, failed: 0, total: 1 });
   });
 
   it("reuses a saved sibling's item when retrying a failed copy of the same URL", async () => {

@@ -93,6 +93,14 @@ describe("countProgress / countPartial", () => {
     ).toEqual({ saved: 1, failed: 2, total: 3 });
   });
 
+  it("counts entries that reuse one item as a single save", () => {
+    const session = makeSession(["saved", "saved", "pending"]);
+    session.entries[0].itemId = "items:reel";
+    session.entries[1].itemId = "items:reel";
+    expect(countProgress(session)).toEqual({ saved: 1, total: 2 });
+    expect(countPartial(session)).toEqual({ saved: 1, failed: 0, total: 2 });
+  });
+
   it("reports zero failures when the batch only stalled", () => {
     // The orchestration-error path lands on the partial screen with entries
     // still pending, so the screen must be able to word itself from failed===0.
