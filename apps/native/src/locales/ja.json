@@ -205,7 +205,6 @@
   "demo.pastePlaceholder": "リンクをペーストまたは入力",
   "demo.linkLabel": "保存するリンク",
   "common.paste": "貼り付け",
-  "demo.destination": "このリンクの保存先",
   "demo.save": "保存する",
   "demo.signInTitle": "サインインして保存",
   "demo.signInHelp": "シェルフはアカウントに保存されるので、どのデバイスでも使えます。",

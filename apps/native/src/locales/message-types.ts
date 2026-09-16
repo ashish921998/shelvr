@@ -204,7 +204,6 @@ export type MessageParams = {
   "demo.pastePlaceholder": undefined;
   "demo.linkLabel": undefined;
   "common.paste": undefined;
-  "demo.destination": undefined;
   "demo.save": undefined;
   "demo.signInTitle": undefined;
   "demo.signInHelp": undefined;
