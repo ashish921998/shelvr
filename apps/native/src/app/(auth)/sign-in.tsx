@@ -1,17 +1,23 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
+import { WelcomeGlass } from "@/components/welcome-glass";
+import { Wordmark } from "@/components/wordmark";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as React from "react";
 import {
   Linking,
+  ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
  * Convex Auth OAuth sign-in (React Native). The flow lives in
@@ -28,146 +34,178 @@ export default function Page() {
     lastError,
   } = useOAuthSignIn();
   const colorScheme = useColorScheme();
+  const { width, height } = useWindowDimensions();
 
   const anonEnabled =
     __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
 
   return (
-    <View style={styles.container}>
-      <View style={styles.center}>
-        <View style={styles.header}>
-          <Text style={styles.title}>shelvr</Text>
-          <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
-        </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.container}
+      >
+        <View style={styles.center}>
+          <View style={styles.art}>
+            <WelcomeGlass width={Math.min(width - 40, height * 0.38, 400)} />
+          </View>
+          <View style={styles.header}>
+            <Wordmark size={52} />
+            <Text style={styles.subtitle}>{t("brand.tagline")}</Text>
+          </View>
 
-        <View style={styles.buttons}>
-          {Platform.OS === "ios" ? (
-            <AppleAuthentication.AppleAuthenticationButton
-              testID="apple-sign-in-button"
-              buttonType={
-                AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-              }
-              buttonStyle={
-                colorScheme === "dark"
-                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-              }
-              cornerRadius={14}
-              style={[
-                styles.appleButton,
-                pending !== null && styles.buttonDisabled,
-              ]}
-              pointerEvents={pending !== null ? "none" : "auto"}
-              onPress={() => handleOAuth("apple")}
-            />
-          ) : (
-            <Pressable
-              style={({ pressed }) => [
-                styles.appleFallbackButton,
-                pending !== null && styles.buttonDisabled,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={() => handleOAuth("apple")}
-              disabled={pending !== null}
-            >
-              <Text style={styles.appleFallbackButtonText}>
-                {t("account.apple")}
-              </Text>
-            </Pressable>
-          )}
-          <Pressable
-            style={({ pressed }) => [
-              styles.googleButton,
-              pending !== null && styles.buttonDisabled,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={() => handleOAuth("google")}
-            disabled={pending !== null}
-          >
-            <Text style={styles.googleButtonText}>{t("account.google")}</Text>
-          </Pressable>
-          {anonEnabled && (
-            <Pressable
-              testID="dev-login-button"
-              style={({ pressed }) => [
-                styles.devButton,
-                pending !== null && styles.buttonDisabled,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={() => handleOAuth("anonymous")}
-              disabled={pending !== null}
-            >
-              <Text style={styles.devButtonText}>{t("account.anonymous")}</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      <Text style={styles.terms}>
-        {t("legal.consent", {
-          terms: "\uE000",
-          privacy: "\uE001",
-        })
-          .split(/(\uE000|\uE001)/)
-          .map((part, index) => {
-            if (part !== "\uE000" && part !== "\uE001") return part;
-            const isTerms = part === "\uE000";
-            return (
-              <Text
-                key={index}
-                style={styles.termsLink}
-                onPress={() =>
-                  void Linking.openURL(
-                    isTerms ? LEGAL_URLS.terms : LEGAL_URLS.privacy,
-                  )
+          <View style={styles.buttons}>
+            {Platform.OS === "ios" ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                testID="apple-sign-in-button"
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
                 }
+                buttonStyle={
+                  colorScheme === "dark"
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={28}
+                style={[
+                  styles.appleButton,
+                  pending !== null && styles.buttonDisabled,
+                ]}
+                pointerEvents={pending !== null ? "none" : "auto"}
+                onPress={() => handleOAuth("apple")}
+              />
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.appleFallbackButton,
+                  pending !== null && styles.buttonDisabled,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => handleOAuth("apple")}
+                disabled={pending !== null}
               >
-                {t(isTerms ? "legal.termsShort" : "legal.privacy")}
-              </Text>
-            );
-          })}
-      </Text>
+                <Text style={styles.appleFallbackButtonText}>
+                  {t("account.apple")}
+                </Text>
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.googleButton,
+                pending !== null && styles.buttonDisabled,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => handleOAuth("google")}
+              disabled={pending !== null}
+            >
+              <Text style={styles.googleButtonText}>{t("account.google")}</Text>
+            </Pressable>
+            {anonEnabled && (
+              <Pressable
+                accessibilityRole="button"
+                testID="dev-login-button"
+                style={({ pressed }) => [
+                  styles.devButton,
+                  pending !== null && styles.buttonDisabled,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => handleOAuth("anonymous")}
+                disabled={pending !== null}
+              >
+                <Text style={styles.devButtonText}>
+                  {t("account.anonymous")}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {pending !== null && (
+            <View style={styles.pending} accessibilityLiveRegion="polite">
+              <ActivityIndicator
+                color={colorScheme === "dark" ? "#f4eddd" : "#2b2418"}
+              />
+              <Text style={styles.pendingText}>{t("account.signingIn")}</Text>
+            </View>
+          )}
+          {lastError !== null && (
+            <Text accessibilityRole="alert" selectable style={styles.error}>
+              {lastError}
+            </Text>
+          )}
+        </View>
 
-      {lastError !== null && (
-        <Text selectable style={styles.error}>
-          {lastError}
+        <Text style={styles.terms}>
+          {t("legal.consent", {
+            terms: "\uE000",
+            privacy: "\uE001",
+          })
+            .split(/(\uE000|\uE001)/)
+            .map((part, index) => {
+              if (part !== "\uE000" && part !== "\uE001") return part;
+              const isTerms = part === "\uE000";
+              return (
+                <Text
+                  key={index}
+                  style={styles.termsLink}
+                  onPress={() =>
+                    void Linking.openURL(
+                      isTerms ? LEGAL_URLS.terms : LEGAL_URLS.privacy,
+                    )
+                  }
+                >
+                  {t(isTerms ? "legal.termsShort" : "legal.privacy")}
+                </Text>
+              );
+            })}
         </Text>
-      )}
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-const styles = StyleSheet.create((theme, rt) => ({
-  container: {
+const styles = StyleSheet.create((theme) => ({
+  safeArea: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flexGrow: 1,
+    backgroundColor: theme.colors.background,
     padding: theme.gap(2.5),
-    paddingTop: rt.insets.top + theme.gap(3),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
+    paddingTop: theme.gap(2),
+    paddingBottom: theme.gap(2),
     alignItems: "center",
   },
   center: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    alignSelf: "stretch",
-    gap: theme.gap(8),
+    gap: theme.gap(2),
+    maxWidth: 440,
+    width: "100%",
+    alignSelf: "center",
+  },
+  art: {
+    alignItems: "center",
+    marginBottom: -24,
   },
   header: {
     alignItems: "center",
     gap: theme.gap(1),
   },
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 48,
-    color: theme.colors.primary,
-  },
   subtitle: {
     fontFamily: theme.fonts.regular,
-    fontSize: 16,
-    color: theme.colors.muted,
+    fontSize: 24,
+    lineHeight: 32,
+    textAlign: "center",
+    color: theme.colors.foreground,
   },
   buttons: {
     alignSelf: "stretch",
-    gap: theme.gap(2),
+    gap: theme.gap(1.5),
+    marginTop: "auto",
+    paddingTop: theme.gap(3),
+    paddingBottom: theme.gap(2),
   },
   appleButton: {
     alignSelf: "stretch",
@@ -176,7 +214,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   appleFallbackButton: {
     backgroundColor: theme.colors.foreground,
     paddingVertical: theme.gap(2),
-    borderRadius: 14,
+    borderRadius: 28,
+    borderCurve: "continuous",
+    minHeight: 52,
     alignItems: "center",
   },
   appleFallbackButtonText: {
@@ -189,7 +229,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingVertical: theme.gap(2),
-    borderRadius: 14,
+    borderRadius: 28,
+    borderCurve: "continuous",
+    minHeight: 52,
     alignItems: "center",
   },
   googleButtonText: {
@@ -198,6 +240,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 16,
   },
   devButton: {
+    minHeight: 44,
     backgroundColor: "transparent",
     paddingVertical: theme.gap(1.25),
     alignItems: "center",
@@ -212,7 +255,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 12,
     lineHeight: 17,
-    color: theme.colors.faint,
+    color: theme.colors.foreground,
     textAlign: "center",
     paddingHorizontal: theme.gap(4),
     marginBottom: theme.gap(2),
@@ -227,6 +270,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: 16,
     color: theme.colors.danger,
     fontSize: 12,
+  },
+  pending: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    paddingBottom: 16,
+  },
+  pendingText: {
+    color: theme.colors.foreground,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
   },
   buttonDisabled: {
     opacity: 0.5,
