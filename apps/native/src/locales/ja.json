@@ -450,7 +450,7 @@
   "reveal.title": "保存しました。",
   "reveal.subtitle": "最初のひとつです。",
   "reveal.filedIn": "指定したとおり%{space}に整理しました",
-  "reveal.explainer": "タイトルとタグを付けて、指定した場所に整理しました。保存するたびに提案が届きます。",
+  "reveal.explainer": "タイトルとタグを付けました。保存するたびに提案が届きます。",
   "reveal.everySunday": "毎週日曜日",
   "reveal.keepSaving": "Proで保存を続ける",
   "weekly.previewTime": "日 9:00",
