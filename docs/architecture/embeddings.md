@@ -1,0 +1,294 @@
+# Embeddings and semantic retrieval
+
+Status: proposed. Nothing below is implemented.
+
+## Why
+
+Three shipped features are capped by the amount of the shelf they can see, and the
+caps tighten exactly as a shelf becomes worth having:
+
+| Feature | Today | Cap |
+| --- | --- | --- |
+| `ai.ts` `recommendForSpace` | newest 100 `ready` items (`listReadyItemsInternal`, `limit: 100`) | a user with 600 saves gets picks drawn from 100 |
+| `items.ts` `similarItems` | newest 300 rows, tag + token overlap | `SIMILAR_CANDIDATES = 300` |
+| `items.ts` `searchItems` | `search_text` index over `buildSearchText` | title + description + tags + siteName + note — **never `content`** |
+
+`finalizeItem` stores the extracted article body (`content`, up to 100k chars) and
+then indexes only the classifier's summary of it. A saved essay is searchable by
+its ~40-word description, not by anything it says.
+
+All three sit on the retrieval side of the useful-returns metric
+(`docs/analytics/README.md`). Capture is already frictionless; retrieval is the
+bound.
+
+## Decision
+
+Store one embedding per item in Convex, indexed by a native `vectorIndex`. No
+external vector store — see "Rejected alternatives".
+
+Retrieval becomes two complementary signals:
+
+- **vector** — topical recall. "that thing about why you shouldn't sear meat first"
+  has zero keyword overlap with its title.
+- **lexical** — literal phrase recall, once `content` is actually indexed.
+
+They fail in different directions, so hybrid search fuses both rather than
+replacing one with the other.
+
+## Phase 0 — index the article body (independent, ship first)
+
+`buildSearchText` (`items.ts:224`) gains a bounded slice of `content`:
+
+```ts
+const MAX_SEARCH_CONTENT_CHARS = 8000; // mirrors MAX_SEARCH_NOTE_CHARS
+```
+
+Both `buildSearchText` call sites (`items.ts:1504`, `items.ts:1783`) pass it.
+No schema change, no client change, no new dependency. Existing rows pick it up
+on their next classification; a backfill is optional (Phase 1's sweeper can
+rewrite `searchText` in the same pass).
+
+This is not redundant with embeddings. It is the half that makes exact phrases
+findable, and it can ship this week.
+
+## Phase 1 — write embeddings (backend only)
+
+### Schema (`schema.ts`)
+
+```ts
+items: defineTable({
+  // ...existing fields
+  // Semantic index vector. Optional: rows written before this existed carry
+  // none and are simply absent from the vector index until the backfill runs.
+  embedding: v.optional(v.array(v.float64())),
+  // Which generation produced `embedding`. Bumped when the model or the
+  // composed text changes, so the sweeper can find stale rows. `undefined`
+  // sorts before every number, so a `lt(CURRENT)` range covers never-embedded
+  // and out-of-date rows in one scan (same trick as
+  // `by_status_and_processingStartedAt`).
+  embeddingVersion: v.optional(v.number()),
+})
+  // Backfill/refresh sweeper: `ready` rows below the current generation.
+  .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
+  .vectorIndex("by_embedding", {
+    vectorField: "embedding",
+    dimensions: EMBEDDING_DIMENSIONS,
+    filterFields: ["userId"],
+  }),
+```
+
+`filterFields` is **`userId` only**, deliberately. Convex vector filters support
+equality and `q.or(...)` but no AND across fields, so adding `status` would
+force a choice between them. `userId` is the one that must never be wrong;
+`status === "ready"` is applied after hydration.
+
+### The field must not reach the client
+
+`itemFields` (`items.ts:100`) is spread into `enrichedItemValidator`, which is
+the `returns:` validator of `searchItems`, `getItem`, and the legacy
+`listItems`. A 768-float array is ~6 KB. Shipping it with every feed row is
+precisely the cost the card/detail split was built to avoid (`items.ts:176-183`).
+
+Therefore:
+
+- Add `embedding` / `embeddingVersion` to the **schema only**, not to `itemFields`.
+- Destructure them out in `toItemCard` (`items.ts:209`) alongside `content`,
+  `searchText`, and `products` — the destructure-don't-pick pattern there exists
+  so the compiler flags exactly this.
+- `listReadyItemsInternal` returns `v.array(v.object(itemFields))`; keeping the
+  fields out of `itemFields` also keeps 100 vectors from crossing the
+  action boundary on every recommendation pass.
+
+### Composing the embedded text
+
+New helper beside `buildSearchText`:
+
+```ts
+const MAX_EMBED_CHARS = 6000; // ~1.5k tokens, under the model's input limit
+
+function buildEmbeddingText(parts: {
+  title?: string; description?: string; tags: string[];
+  siteName?: string; note?: string; content?: string;
+}): string
+```
+
+Title, description, tags, then the lede of `content` or `note`. Intents stay out,
+for the reason already documented at `items.ts:1774` — they are actions, not
+descriptive text.
+
+### Where the call goes
+
+In `processItem` (`ai.ts`), after `generateObject`, before `finalizeItem`.
+`embedding` becomes a new optional arg on `finalizeItem` (`items.ts:1733`) so it
+lands in the **same run-fenced transaction** as the rest of the classification.
+A separate mutation could commit after a superseding run and defeat `ownsRun`.
+
+Follows the file's existing deadline convention:
+
+```ts
+const EMBED_TIMEOUT_MS = 15_000;
+```
+
+The per-action budget comment (`ai.ts:53-59`) gains one line; ~100 s worst case
+is unchanged in practice.
+
+**Embedding failure must never fail the item.** Wrap the call; on error log via
+`logEvent` and call `finalizeItem` without `embedding`. The item goes `ready`
+and the sweeper picks it up. Degradable by construction.
+
+### Model
+
+Google, through the `@ai-sdk/google` provider and the existing
+`GOOGLE_GENERATIVE_AI_API_KEY`. **No new env var, no change to
+`convex.config.ts`, no new vendor in the save path.**
+
+Use Matryoshka truncation to 768 dimensions: a quarter the storage of 3072 at
+negligible quality cost for per-user corpora this size.
+
+> Confirm the current embedding model id and its `outputDimensionality` support
+> against the live provider docs at implementation time. `EMBEDDING_DIMENSIONS`
+> must exactly match what is stored — Convex enforces it.
+
+### Backfill
+
+`internalAction` mirroring `backfillImageAspectRatios` (`ai.ts:1422`), paged by
+the new index, batching through `embedMany`:
+
+- page ≤ 100 `ready` rows with `embeddingVersion < CURRENT_EMBEDDING_VERSION`
+- one `embedMany` per page
+- one bounded mutation to write them back
+- a page that made progress chains itself, exactly like `failStaleProcessingItems`
+
+Driven by a cron in `crons.ts` that idles at zero cost once drained, so it
+doubles as the repair path for items whose inline embed failed and as the
+migration path when `CURRENT_EMBEDDING_VERSION` is bumped.
+
+Watch the provider's embedding rate limit; the page size is the throttle.
+
+## Phase 2 — recommendations get the whole shelf (backend only)
+
+The highest-value change, and it needs **no client release**.
+
+`recommendForSpace` (`ai.ts:1467`) replaces its "newest 100" read:
+
+1. Embed `space.name` + `space.description`.
+2. `ctx.vectorSearch("items", "by_embedding", { vector, limit: 150, filter: q => q.eq("userId", space.userId) })`
+3. Hydrate through one internal query preserving order; drop non-`ready` rows and
+   existing members; take 100.
+4. Hand to the **same** `generateObject` prompt, unchanged.
+
+Same model, same token cost, same output contract, same `suggested`-only write
+rule. The only difference is that the 100 candidates are the 100 most relevant
+instead of the 100 most recent.
+
+**Fallback is mandatory.** If the vector search returns nothing — backfill still
+running, or a user whose items all failed to embed — fall through to the current
+`listReadyItemsInternal` path. Otherwise the feature regresses to nothing for
+every pre-backfill user.
+
+## Phase 3 — hybrid search (expand/contract)
+
+`searchItems` is a public query and therefore a contract with every build in the
+wild, and `ctx.vectorSearch` is action-only. Per the CLAUDE.md expand/contract
+rule, `searchItems` is **not modified**.
+
+Add a new public action:
+
+```ts
+export const searchItemsHybrid = action({
+  args: { query: v.string() },
+  returns: v.array(enrichedItemValidator), // same shape as searchItems
+  ...
+});
+```
+
+Flow, kept to one query round trip per the guidelines' "as few calls as possible":
+
+1. `requireUserId(ctx)` — already accepts `ActionCtx` (`model/auth.ts:22`).
+   The vector filter uses that id. Never a client argument.
+2. Embed the query string.
+3. `ctx.vectorSearch(..., filter: q => q.eq("userId", userId))` → `{_id, _score}`.
+4. One `internalQuery` that runs the lexical `search_text` search, fuses it with
+   the vector ids by reciprocal rank fusion (`1/(k + rank)`, k = 60), drops
+   non-`ready` rows, hydrates through `enrichItem`, and returns in fused order.
+
+Client: the search tab (`(tabs)/(search)/index.tsx:36`) moves from
+`convexQuery(api.items.searchItems)` to the action. This is the one real
+ergonomic cost of staying native — results stop being reactive. The screen
+already debounces at 250 ms, so the user-visible change is small, but it is a
+data-path rewrite, not a one-line swap.
+
+Contract `searchItems` only once the production update channel shows no bundle
+still calling it.
+
+## Phase 4 — later, once the above is live
+
+- **`similarItems`** — same query-vs-action problem; add `similarItemsHybrid` as
+  an action and migrate. Sequenced last because it runs on every item-detail
+  open, so it trades reactive caching for a per-open action call. Measure before
+  committing.
+- **Ask your shelf** — retrieval is already built by Phase 3; this is a prompt, a
+  citation UI, and a Pro gate.
+- **Chunked bodies** — one vector per item gives topical matching, not
+  sentence-level recall inside long articles. If that turns out to matter, it
+  needs an `itemChunks` table (Convex indexes one vector per document), which is
+  a real schema addition rather than an extension of this one. Phase 0 covers
+  literal-phrase recall in the meantime.
+
+## Rejected alternatives
+
+**turbopuffer (or any external vector store).** Queries here are always scoped to
+one `userId`, so the natural layout is one namespace per user: thousands of tiny
+namespaces, each touched every few days. That makes effectively every search a
+cold object-storage read — paying turbopuffer's central tradeoff while a power
+user's shelf (~10⁴ items) is far below the scale where its cost advantage
+appears. It would also put an external system in two paths that must not have
+partial-failure modes: `deleteItem` (`items.ts:1625`) is one transaction today,
+and `deleteUserOwnedDataBatch` (`users.ts:91`) is the GDPR path. Both would need
+tombstones and retry ledgers. Revisit if per-user corpora approach 10⁵, if
+hand-rolled RRF becomes limiting, or — most likely first — if shared/public
+spaces ship and break the one-namespace-per-user model.
+
+**Brute-force cosine in an action.** Reading every embedding for a user costs
+~6 KB × N of action bandwidth per search. Worse than the native index at every
+size that matters.
+
+**Keeping the embedding as the only source of truth in an index.** The vector
+lives on the item row so any future migration is a re-index, not a re-embed.
+
+## Deploy order
+
+Backend deploys before the client that needs it (CLAUDE.md; `.github/workflows/deploy.yml`).
+
+1. Phase 0 — backend only.
+2. Phase 1 schema + write path + backfill cron — backend only, old clients unaffected.
+3. Wait for the backfill to drain.
+4. Phase 2 — backend only. **Value lands here with no app release.**
+5. Phase 3 action — backend only (additive).
+6. Client update pointing search at the action.
+7. Contract `searchItems` once no old bundle calls it.
+
+## Testing
+
+Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
+`convexTest`. Stub the embedding provider the way `ai.test.ts` stubs the model.
+
+- `toItemCard` / card validators reject a row carrying `embedding` — the
+  regression that would ship 6 KB per feed row.
+- `finalizeItem` writes `embedding` under a matching `runId` and returns
+  `stale_run` under a superseded one.
+- Embedding failure still produces a `ready` item with no `embedding`.
+- `recommendForSpace` falls back to the recency path when vector search is empty,
+  and still writes `suggested` rows only.
+- Hybrid search never returns another user's item (filter derived from
+  `requireUserId`, not an argument).
+- Backfill is bounded per run and chains while progress is made.
+
+> Confirm `convex-test` implements `ctx.vectorSearch` before relying on it; if it
+> does not, the vector step needs a seam that tests can stub.
+
+## Costs
+
+- ~6 KB per item at 768 dims, plus the index.
+- One extra provider call per save (sub-second) and one per search/recommendation.
+- Backfill is a one-time embed of every existing `ready` item, throttled by page size.
