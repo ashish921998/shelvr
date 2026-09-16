@@ -188,6 +188,7 @@ export type MessageParams = {
   "demo.saveGone": undefined;
   "demo.alreadyUsed": undefined;
   "demo.saveFailed": undefined;
+  "demo.notALink": undefined;
   "demo.notFoundRetry": undefined;
   "demo.repeatedFailure": undefined;
   "demo.tryLater": undefined;
@@ -423,6 +424,9 @@ export type MessageParams = {
   "reveal.subtitle": undefined;
   "reveal.filedIn": { space: string };
   "reveal.explainer": undefined;
+  "reveal.emptyTitle": undefined;
+  "reveal.emptySubtitle": undefined;
+  "reveal.emptyExplainer": undefined;
   "reveal.everySunday": undefined;
   "reveal.keepSaving": undefined;
   "weekly.previewTime": undefined;

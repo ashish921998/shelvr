@@ -7,6 +7,7 @@ import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card"
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { useCurrentUser } from "@/lib/current-user";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
@@ -33,11 +34,12 @@ export default function HomeScreen() {
     defer: cancelSurvey.visible,
   });
   const busySaving = useBusySaving(items);
-  // The share screen records the first save while Home stays mounted below it.
-  const [firstShareSaved, setFirstShareSaved] = useState(hasSavedFirstShare);
-  useFocusEffect(
-    useCallback(() => setFirstShareSaved(hasSavedFirstShare()), []),
-  );
+  const { data: user } = useCurrentUser();
+  // The share screen records the first save while Home stays mounted below
+  // it, so re-read the flag on focus.
+  const [, setFocusCount] = useState(0);
+  useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
+  const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
 
   // One element, two slots (empty feed and feed header) — the survey claims
   // the Home moment when both prompts are eligible.
@@ -59,7 +61,9 @@ export default function HomeScreen() {
     firstShareSaved,
     itemCount: items.length,
   });
-  const nudge = <WeeklyNudgeSheet previewTitle={items[0]?.title} />;
+  const nudge = user ? (
+    <WeeklyNudgeSheet userId={user._id} previewTitle={items[0]?.title} />
+  ) : null;
 
   if (items.length === 0) {
     return (

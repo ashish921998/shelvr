@@ -82,6 +82,7 @@ export function SignInView({
             />
           ) : (
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.appleFallbackButton,
                 pending !== null && styles.buttonDisabled,
@@ -96,6 +97,7 @@ export function SignInView({
             </Pressable>
           )}
           <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.googleButton,
               pending !== null && styles.buttonDisabled,
@@ -108,6 +110,7 @@ export function SignInView({
           </Pressable>
           {anonEnabled && (
             <Pressable
+              accessibilityRole="button"
               testID="dev-login-button"
               style={({ pressed }) => [
                 styles.devButton,

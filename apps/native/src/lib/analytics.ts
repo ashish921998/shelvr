@@ -112,8 +112,10 @@ type AnalyticsEventProperties = {
     // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
     space_count: number;
+    // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
-    // Mirror the survey answers onto the person so they're durable for
+    custom_space_count: number;
+    // Mirror the setup answers onto the person so they're durable for
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
@@ -124,6 +126,7 @@ type AnalyticsEventProperties = {
   // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
+  onboarding_demo_skipped: Record<string, never>;
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };

@@ -12,7 +12,7 @@ describe("restoreOnboardingStep", () => {
   });
 
   it.each([null, -1, 4, 5, 7, 1.5])(
-    "restarts an old or invalid record (%s) at the opener",
+    "restarts a missing or out-of-range index (%s) at the opener",
     (stored) => {
       expect(restoreOnboardingStep(stored)).toBe("opener");
     },

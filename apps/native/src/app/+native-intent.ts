@@ -5,9 +5,10 @@ import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 // something is shared into Shelvr from another app. Route those to the receiver
 // screen; leave every other deep link untouched.
 //
-// Before onboarding, the demo step consumes the share itself, so the resume
-// flag stays unset. Otherwise mark it: a signed-out user is redirected away
-// from `/share`, and the flag resumes the share after sign-in.
+// Before onboarding, the demo step reads the share: it saves a single link
+// while it still wants one and flags anything else itself. Otherwise mark it:
+// a signed-out user is redirected away from `/share`, and the flag resumes the
+// share after sign-in.
 export function redirectSystemPath({
   path,
 }: {

@@ -41,11 +41,41 @@ export function getSpacePresets(kinds: readonly SaveKind[]): string[] {
 }
 
 /** The spaces that start selected for the picked kinds. */
-export function getDefaultSpaces(kinds: readonly SaveKind[]): string[] {
+function getDefaultSpaces(kinds: readonly SaveKind[]): string[] {
   return [
     ...new Set([
       ...kinds.map((kind) => SPACE_PRESETS[kind][0]),
       DEFAULT_GENERIC,
     ]),
   ];
+}
+
+const PRESET_SPACES: ReadonlySet<string> = new Set([
+  ...Object.values(SPACE_PRESETS).flat(),
+  ...GENERIC_PRESETS,
+]);
+
+/** Whether a picked space is a preset identity rather than a typed name. */
+export function isPresetSpace(name: string): boolean {
+  return PRESET_SPACES.has(name);
+}
+
+/** The picked spaces after `kind` is picked or unpicked. Unpicking drops the
+ * presets no remaining kind still offers, so nothing the user can no longer
+ * see gets created. Typed names stay. */
+export function spacesAfterKindToggle(
+  kinds: readonly SaveKind[],
+  spaces: readonly string[],
+  kind: SaveKind,
+): string[] {
+  if (!kinds.includes(kind)) {
+    if (spaces.length === 0) return getDefaultSpaces([...kinds, kind]);
+    const first = SPACE_PRESETS[kind][0];
+    return spaces.includes(first) ? [...spaces] : [...spaces, first];
+  }
+  const remaining = kinds.filter((value) => value !== kind);
+  const offered = new Set(
+    remaining.length === 0 ? [] : getSpacePresets(remaining),
+  );
+  return spaces.filter((name) => !isPresetSpace(name) || offered.has(name));
 }

@@ -244,9 +244,9 @@ export default function ShareScreen() {
         // the user on this screen or prevent navigation home.
         analytics.captureError("clear_pending_share_failed", err);
       }
-      if (session.entries.some((entry) => entry.status === "saved")) {
+      if (user && session.entries.some((entry) => entry.status === "saved")) {
         try {
-          recordShareSaved();
+          recordShareSaved(user._id);
         } catch (err) {
           analytics.captureError("record_first_share_failed", err);
         }
@@ -260,7 +260,7 @@ export default function ShareScreen() {
       setPhase({ kind: "complete" });
       router.replace("/");
     },
-    [clearSharedPayloads, router],
+    [clearSharedPayloads, router, user],
   );
 
   /** Runs the processor for `session`, persisting each settled entry (scoped to

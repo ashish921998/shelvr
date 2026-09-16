@@ -1,28 +1,32 @@
 import * as SecureStore from "expo-secure-store";
 
-const FIRST_SHARE_KEY = "shelvr.firstShareSaved";
-const WEEKLY_NUDGE_KEY = "shelvr.weeklyNudge";
+// Keyed per account so a second account on the same phone still gets the
+// how-to card and the weekly nudge.
+const firstShareKey = (userId: string) => `shelvr.firstShareSaved.${userId}`;
+const weeklyNudgeKey = (userId: string) => `shelvr.weeklyNudge.${userId}`;
 
-export function recordShareSaved(): void {
-  SecureStore.setItem(FIRST_SHARE_KEY, "1");
-  const nudge = SecureStore.getItem(WEEKLY_NUDGE_KEY);
+export function recordShareSaved(userId: string): void {
+  SecureStore.setItem(firstShareKey(userId), "1");
+  const nudge = SecureStore.getItem(weeklyNudgeKey(userId));
   if (nudge === null || nudge === "") {
-    SecureStore.setItem(WEEKLY_NUDGE_KEY, "pending");
+    SecureStore.setItem(weeklyNudgeKey(userId), "pending");
   }
 }
 
-export function hasSavedFirstShare(): boolean {
-  return SecureStore.getItem(FIRST_SHARE_KEY) === "1";
+export function hasSavedFirstShare(userId: string): boolean {
+  return SecureStore.getItem(firstShareKey(userId)) === "1";
 }
 
-export function isWeeklyNudgePending(): boolean {
-  return SecureStore.getItem(WEEKLY_NUDGE_KEY) === "pending";
+export function isWeeklyNudgePending(userId: string): boolean {
+  return SecureStore.getItem(weeklyNudgeKey(userId)) === "pending";
 }
 
-export function finishWeeklyNudge(): void {
-  SecureStore.setItem(WEEKLY_NUDGE_KEY, "done");
+export function finishWeeklyNudge(userId: string): void {
+  SecureStore.setItem(weeklyNudgeKey(userId), "done");
 }
 
+/** One item is the onboarding demo save, which does not pass through the share
+ * screen. Larger libraries, including existing users', skip the guide. */
 export function shouldShowHowTo({
   firstShareSaved,
   itemCount,

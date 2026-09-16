@@ -13,12 +13,20 @@ import { Alert, Modal, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** Asks once, after the first share-sheet save, whether to turn on the weekly shelf. */
-export function WeeklyNudgeSheet({ previewTitle }: { previewTitle?: string }) {
+export function WeeklyNudgeSheet({
+  userId,
+  previewTitle,
+}: {
+  userId: string;
+  previewTitle?: string;
+}) {
   useAppLocale();
   const { session } = useNotificationSession();
-  const [pending, setPending] = useState(isWeeklyNudgePending);
+  const [pending, setPending] = useState(() => isWeeklyNudgePending(userId));
   const [busy, setBusy] = useState(false);
-  useFocusEffect(useCallback(() => setPending(isWeeklyNudgePending()), []));
+  useFocusEffect(
+    useCallback(() => setPending(isWeeklyNudgePending(userId)), [userId]),
+  );
   const { data: preferences } = useQuery({
     ...convexQuery(api.notifications.getPreferences, {}),
     enabled: pending,
@@ -27,12 +35,12 @@ export function WeeklyNudgeSheet({ previewTitle }: { previewTitle?: string }) {
 
   useEffect(() => {
     if (pending && alreadyOn) {
-      finishWeeklyNudge();
+      finishWeeklyNudge(userId);
     }
-  }, [pending, alreadyOn]);
+  }, [pending, alreadyOn, userId]);
 
   const close = () => {
-    finishWeeklyNudge();
+    finishWeeklyNudge(userId);
     setPending(false);
   };
 
@@ -45,12 +53,13 @@ export function WeeklyNudgeSheet({ previewTitle }: { previewTitle?: string }) {
           t("notifications.disabledBody"),
         );
       }
+      close();
     } catch (err) {
+      // Keep the nudge pending so the user can try again.
       analytics.captureError("weekly_shelf_preference_failed", err);
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
     } finally {
       setBusy(false);
-      close();
     }
   };
 

@@ -3,6 +3,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
+import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
@@ -135,7 +136,7 @@ export function SetupStep({
                 onChangeText={setDraft}
                 onSubmitEditing={commitDraft}
                 onBlur={commitDraft}
-                maxLength={60}
+                maxLength={MAX_SPACE_NAME_LENGTH}
                 returnKeyType="done"
                 placeholder={t("onboarding.newSpacePlaceholder")}
                 placeholderTextColor={theme.colors.faint}
@@ -164,7 +165,7 @@ export function SetupStep({
         <CtaButton
           label={t("common.continue")}
           onPress={onAdvance}
-          disabled={spaces.length === 0}
+          disabled={kinds.length === 0 || spaces.length === 0}
         />
       </View>
     </View>

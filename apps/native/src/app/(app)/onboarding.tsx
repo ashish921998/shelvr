@@ -16,9 +16,9 @@ import {
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import {
+  isPresetSpace,
   isSaveKind,
-  getDefaultSpaces,
-  SPACE_PRESETS,
+  spacesAfterKindToggle,
   type SaveKind,
 } from "@/lib/save-kinds";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
@@ -69,7 +69,7 @@ export default function OnboardingScreen() {
   );
   const [step, setStep] = useState<OnboardingStep>(initialStep);
   const [kinds, setKinds] = useState<SaveKind[]>(() =>
-    initialProgress.q2.filter(isSaveKind),
+    initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
   const [saved, setSaved] = useState<DemoSaved | null>(null);
@@ -82,7 +82,7 @@ export default function OnboardingScreen() {
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
 
   useEffect(() => {
-    setOnboardingProgress({ q1: [], q2: kinds, spaces, step: stepIndex });
+    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
   }, [kinds, spaces, stepIndex]);
 
   useEffect(() => {
@@ -123,18 +123,11 @@ export default function OnboardingScreen() {
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const toggleKind = (kind: SaveKind) => {
-    if (kinds.includes(kind)) {
-      setKinds(kinds.filter((value) => value !== kind));
-      return;
-    }
-    const nextKinds = [...kinds, kind];
-    setKinds(nextKinds);
-    setSpaces((current) =>
-      current.length === 0
-        ? getDefaultSpaces(nextKinds)
-        : current.includes(SPACE_PRESETS[kind][0])
-          ? current
-          : [...current, SPACE_PRESETS[kind][0]],
+    setSpaces(spacesAfterKindToggle(kinds, spaces, kind));
+    setKinds(
+      kinds.includes(kind)
+        ? kinds.filter((value) => value !== kind)
+        : [...kinds, kind],
     );
   };
 
@@ -158,7 +151,8 @@ export default function OnboardingScreen() {
       save_pileup: [],
       save_types: kinds,
       space_count: spaces.length,
-      space_names: spaces,
+      space_names: spaces.filter(isPresetSpace),
+      custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
       $set: { save_pileup: [], save_types: kinds },
     });
     recordCurrentStep();

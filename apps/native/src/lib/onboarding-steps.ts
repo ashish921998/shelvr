@@ -10,8 +10,8 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   reveal: "reveal",
 };
 
-// Records from the older 8-step flow store indexes up to 7. Those restart at
-// the opener instead of landing on an unrelated screen.
+// Takes an index written by this flow. getOnboardingProgress already returns
+// null for records from older flows, whose indexes point at different steps.
 export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";

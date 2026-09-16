@@ -19,26 +19,36 @@ describe("first share-sheet save", () => {
   beforeEach(() => store.clear());
 
   it("marks the first save and queues the weekly nudge", () => {
-    expect(hasSavedFirstShare()).toBe(false);
-    expect(isWeeklyNudgePending()).toBe(false);
-    recordShareSaved();
-    expect(hasSavedFirstShare()).toBe(true);
-    expect(isWeeklyNudgePending()).toBe(true);
+    expect(hasSavedFirstShare("user_a")).toBe(false);
+    expect(isWeeklyNudgePending("user_a")).toBe(false);
+    recordShareSaved("user_a");
+    expect(hasSavedFirstShare("user_a")).toBe(true);
+    expect(isWeeklyNudgePending("user_a")).toBe(true);
+  });
+
+  it("keeps each account's state separate", () => {
+    recordShareSaved("user_a");
+    finishWeeklyNudge("user_a");
+    expect(hasSavedFirstShare("user_b")).toBe(false);
+    expect(isWeeklyNudgePending("user_b")).toBe(false);
+    recordShareSaved("user_b");
+    expect(isWeeklyNudgePending("user_b")).toBe(true);
+    expect(isWeeklyNudgePending("user_a")).toBe(false);
   });
 
   it("does not queue the nudge again once it was answered", () => {
-    recordShareSaved();
-    finishWeeklyNudge();
-    expect(isWeeklyNudgePending()).toBe(false);
-    recordShareSaved();
-    expect(isWeeklyNudgePending()).toBe(false);
-    expect(store.get("shelvr.weeklyNudge")).toBe("done");
+    recordShareSaved("user_a");
+    finishWeeklyNudge("user_a");
+    expect(isWeeklyNudgePending("user_a")).toBe(false);
+    recordShareSaved("user_a");
+    expect(isWeeklyNudgePending("user_a")).toBe(false);
+    expect(store.get("shelvr.weeklyNudge.user_a")).toBe("done");
   });
 
   it("queues the nudge when the stored value was cleared", () => {
-    store.set("shelvr.weeklyNudge", "");
-    recordShareSaved();
-    expect(isWeeklyNudgePending()).toBe(true);
+    store.set("shelvr.weeklyNudge.user_a", "");
+    recordShareSaved("user_a");
+    expect(isWeeklyNudgePending("user_a")).toBe(true);
   });
 });
 

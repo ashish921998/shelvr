@@ -6,10 +6,13 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import { getOnboardingProgress } from "@/lib/pending-onboarding";
-import { notePurchasedDuringOnboarding } from "@/lib/replay-onboarding";
+import {
+  noteDeclinedDuringOnboarding,
+  notePurchasedDuringOnboarding,
+} from "@/lib/replay-onboarding";
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { NotificationPreview } from "@/components/notification-preview";
-import { CtaButton } from "@/components/onboarding/parts";
+import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { api } from "@convex/_generated/api";
 import { demoErrorCode } from "@convex/model/demoErrors";
@@ -41,6 +44,7 @@ export function RevealStep({
   const [paywallOpen, setPaywallOpen] = useState(false);
   const attachRef = useRef(false);
   const autoPaywallRef = useRef(!restored);
+  const [attaching] = useState(() => getOnboardingProgress().demo !== null);
 
   const itemQuery = useQuery(
     convexQuery(
@@ -120,14 +124,18 @@ export function RevealStep({
         tags: item.tags,
       }
     : null;
-  const space = saved?.savedSpaceNames[0];
+  // Skipped after a failed save, or the saved item was deleted since.
+  const empty = item === null || (saved === null && !attaching);
+  const space = empty ? undefined : saved?.savedSpaceNames[0];
   const previewTitle = item?.title;
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.verdict}>
-        {t("reveal.title")}{" "}
-        <Text style={styles.verdictMuted}>{t("reveal.subtitle")}</Text>
+        {t(empty ? "reveal.emptyTitle" : "reveal.title")}{" "}
+        <Text style={styles.verdictMuted}>
+          {t(empty ? "reveal.emptySubtitle" : "reveal.subtitle")}
+        </Text>
       </Text>
 
       {card ? (
@@ -145,7 +153,7 @@ export function RevealStep({
       <Text style={styles.support}>
         {item?.enrichment === "partial"
           ? t("demo.partial")
-          : t("reveal.explainer")}
+          : t(empty ? "reveal.emptyExplainer" : "reveal.explainer")}
       </Text>
 
       <View style={styles.sunday}>
@@ -165,6 +173,16 @@ export function RevealStep({
           onPress={() => void keepSaving()}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
+        {entitled ? null : (
+          <GhostButton
+            label={t("common.notNow")}
+            onPress={() => {
+              noteDeclinedDuringOnboarding();
+              onFinish();
+            }}
+            disabled={paywallOpen}
+          />
+        )}
       </View>
     </View>
   );
@@ -215,5 +233,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   foot: {
     marginTop: "auto",
+    gap: theme.gap(1),
   },
 }));

@@ -4,7 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
 import { TidyDone } from "./tidy/tidy-done";
-import { SetupStep } from "./onboarding/setup";
+import { SetupStep } from "@/components/onboarding/setup";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import { getSpacePresets } from "@/lib/save-kinds";
 
