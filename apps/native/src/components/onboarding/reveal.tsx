@@ -44,7 +44,9 @@ export function RevealStep({
   const [paywallOpen, setPaywallOpen] = useState(false);
   const attachRef = useRef(false);
   const autoPaywallRef = useRef(!restored);
-  const [attaching] = useState(() => getOnboardingProgress().demo !== null);
+  const [attaching, setAttaching] = useState(
+    () => getOnboardingProgress().demo !== null,
+  );
 
   const itemQuery = useQuery(
     convexQuery(
@@ -73,6 +75,7 @@ export function RevealStep({
         }),
       )
       .catch((err: unknown) => {
+        setAttaching(false);
         if (demoErrorCode(err) !== "demo_used") {
           analytics.captureError("onboarding_reveal_attach_failed", err);
         }

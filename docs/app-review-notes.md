@@ -17,7 +17,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 2. **Setup:** “What do you save?” picks save kinds and the spaces to start with.
 3. **Demo:** saves one real link. On iOS the user shares a sample post through the system share sheet to Shelvr; on Android the user pastes a link or picks a sample. When the save needs an account, Sign in with Apple or Google appears inline. If the save fails, for example while offline, the demo offers a way to continue without saving.
 4. **Reading:** a short wait while Shelvr reads, titles, and files the link.
-5. **Reveal:** “Saved. Your first one.” shows the filed save.
+5. **Reveal:** “Saved. Your first one.” shows the filed save. If the demo save failed or was skipped, the reveal shows “You're in. Your shelf is ready.” with no saved item.
 6. **Paywall:** “Keep saving with Pro” opens the RevenueCat paywall. **Not now** goes to Home; new saves stay Pro-gated.
 7. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
 8. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
