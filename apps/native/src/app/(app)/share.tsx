@@ -1,4 +1,5 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
+import { recordShareSaved } from "@/lib/first-share";
 import {
   classifyEntries,
   processSession,
@@ -242,6 +243,13 @@ export default function ShareScreen() {
         // The share is already complete; a SecureStore failure must not trap
         // the user on this screen or prevent navigation home.
         analytics.captureError("clear_pending_share_failed", err);
+      }
+      if (session.entries.some((entry) => entry.status === "saved")) {
+        try {
+          recordShareSaved();
+        } catch (err) {
+          analytics.captureError("record_first_share_failed", err);
+        }
       }
       // 4. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === "saved")) {

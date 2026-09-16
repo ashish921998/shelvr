@@ -350,3 +350,15 @@ async function processOne(
     };
   }
 }
+
+/** The first shared link in a raw share, for the onboarding demo, which saves
+ * exactly one link and leaves every other payload to the share screen. */
+export function firstSharedUrl(raw: RawSharePayload[]): string | null {
+  for (const payload of resolvedFromRawPayloads(raw)) {
+    const result = classifyPayload(payload);
+    if (result.kind === "link" && result.reason === undefined) {
+      return result.url ?? payload.value.trim();
+    }
+  }
+  return null;
+}
