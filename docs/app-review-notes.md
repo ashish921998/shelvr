@@ -6,23 +6,29 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: complete onboarding → sign in with Apple → Home.
+- Reviewer path: onboarding opener → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reveal → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only—never in this repo or the app binary.
 - Anonymous / “Continue without account” is **dev-only** and disabled in production builds.
 
 ## Onboarding
 
-1. Promise screen → survey (optional multi-select) → space picker → short building animation → optional live demo save → permissions explanation (no system prompts yet) → Ready.
-2. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-3. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
+1. **Opener:** the Shelvr Pro line (“Saving is part of Shelvr Pro. Free trial.”) and an **Already have an account? Sign in** link.
+2. **Setup:** “What do you save?” picks save kinds and the spaces to start with.
+3. **Demo:** saves one real link. On iOS the user shares a sample post through the system share sheet to Shelvr; on Android the user pastes a link or picks a sample. When the save needs an account, Sign in with Apple or Google appears inline. If the save fails, for example while offline, the demo offers a way to continue without saving.
+4. **Reading:** a short wait while Shelvr reads, titles, and files the link.
+5. **Reveal:** “Saved. Your first one.” shows the filed save. If the demo save failed or was skipped, the reveal shows “You're in. Your shelf is ready.” with no saved item.
+6. **Paywall:** “Keep saving with Pro” opens the RevenueCat paywall. **Not now** goes to Home; new saves stay Pro-gated.
+7. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
+8. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+9. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
 
 ## Core save loop
 
 - **Link:** Add → paste URL → save. Item enters processing, then ready with title/description/tags when AI completes.
 - **Note:** Add → type note → save. Content remains if AI classification fails.
 - **Image:** Camera capture or library import. Upload progress and retry are shown on failure.
-- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out or mid-onboarding, Shelvr preserves the intent and resumes after auth. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
+- **Share Sheet:** From Safari or Photos, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, the demo consumes the shared link itself and asks for sign-in inline before saving it. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
@@ -100,13 +106,14 @@ Shelvr is a private save-it-for-later app for links, notes, and images. It uses 
 
 Account access:
 
-1. Launch Shelvr and complete the optional onboarding questions.
-2. Choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required.
-3. Sign in completes through Apple's system authentication flow.
+1. Launch Shelvr and tap "Start yours". If you already have an account, tap "Already have an account? Sign in" instead.
+2. On "What do you save?", pick at least one kind, keep or edit the suggested spaces, and tap Continue.
+3. Save the featured link: tap it, then choose Shelvr in the share sheet.
+4. When Shelvr asks you to sign in, choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
 
 Subscription testing:
 
-1. After onboarding and sign-in, Shelvr presents the RevenueCat paywall using Apple's sandbox environment.
+1. After the saved link is revealed, tap "Keep saving with Pro" to open the RevenueCat paywall in Apple's sandbox environment. "Not now" goes to Home; new saves then ask for Pro.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile.

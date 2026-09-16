@@ -1,12 +1,14 @@
+import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 
 // expo-sharing launches the app with a `<scheme>://expo-sharing` deep link when
 // something is shared into Shelvr from another app. Route those to the receiver
 // screen; leave every other deep link untouched.
 //
-// Always mark a pending-share flag too. If the user is mid-onboarding or signed
-// out, the app layout guards will redirect away from `/share` — the flag lets
-// us resume the share after onboarding + auth instead of dropping it.
+// Before onboarding, the demo step reads the share: it saves a single link
+// while it still wants one and flags anything else itself. Otherwise mark it:
+// a signed-out user is redirected away from `/share`, and the flag resumes the
+// share after sign-in.
 export function redirectSystemPath({
   path,
 }: {
@@ -29,6 +31,7 @@ export function redirectSystemPath({
     }
 
     if (url.hostname === "expo-sharing") {
+      if (!onboardedOrUnknown()) return "/onboarding";
       try {
         markPendingShareOnDevice();
       } catch {
@@ -41,4 +44,12 @@ export function redirectSystemPath({
     // Relative/malformed paths aren't share intents — fall through.
   }
   return path;
+}
+
+function onboardedOrUnknown(): boolean {
+  try {
+    return readOnboardedFlag();
+  } catch {
+    return true;
+  }
 }
