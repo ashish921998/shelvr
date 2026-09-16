@@ -100,6 +100,23 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+// expo-maps reads the Android Google Maps key from the config block below. A
+// production build without it ships the Pro-gated map screen unconfigured, so
+// fail the build instead — matching the RevenueCat key guardrails above.
+if (buildPlatform === "android") {
+  requireProductionValue(
+    "GOOGLE_MAPS_API_KEY",
+    googleMapsApiKey,
+    (value) => Boolean(value),
+    "a Google Maps API key so expo-maps is configured on Android",
+  );
+}
+
+// PostHog source map upload runs inside the native build (Gradle/Xcode) and
+// fails the build when it cannot authenticate. Enable it only once the CLI key
+// is present, so a build without credentials keeps working and uploads switch on
+// the moment the EAS secret is set.
+const uploadsSourceMaps = Boolean(process.env.POSTHOG_CLI_API_KEY);
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
   .map((arch) => arch.trim())
@@ -191,6 +208,12 @@ module.exports = ({ config }) => ({
         ],
       },
     ],
+    // Uploads the Hermes source map on each native build so error tracking can
+    // symbolicate crash stacks. skipOnConflict keeps a rebuild of the same
+    // commit from failing on an already-uploaded release.
+    ...(uploadsSourceMaps
+      ? [["posthog-react-native/expo", { skipOnConflict: true }]]
+      : []),
   ],
   extra: {
     ...appConfig.expo.extra,

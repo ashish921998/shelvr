@@ -51,7 +51,9 @@
       "channel": "production",
       "environment": "production",
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "POSTHOG_CLI_PROJECT_ID": "546847",
+        "POSTHOG_CLI_HOST": "https://us.posthog.com"
       },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"

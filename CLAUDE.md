@@ -193,9 +193,16 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
     iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
-    `expo-maps` on the map screen
+    `expo-maps` on the map screen. A production Android EAS build fails without it, so the map
+    screen never ships unconfigured
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
+  - `POSTHOG_CLI_API_KEY` — PostHog personal API key (scopes: error tracking write, organization
+    read). `app.config.js` adds the `posthog-react-native/expo` source map upload plugin only when
+    this is set, so a build without it keeps working and uploads switch on the moment the EAS
+    secret is added. The upload runs inside the native build and needs `@posthog/cli` available
+    there; `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` are already set in the production EAS
+    profile. `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
 `apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and
