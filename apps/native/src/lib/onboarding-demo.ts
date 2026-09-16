@@ -4,8 +4,13 @@ import type { TextMessageKey } from "@/locales/message-types";
 // Real pages, checked to fetch with a 200 and an og:title, so the demo runs the
 // actual pipeline end to end. pageHeading and domain are the page's own text and
 // stay untranslated.
+export type DemoKind = Extract<
+  SaveKind,
+  "Articles" | "Recipes" | "Products" | "Travel"
+>;
+
 export type DemoSample = {
-  kind: SaveKind;
+  kind: DemoKind;
   url: string;
   pageHeading: string;
   domain: string;

@@ -4,6 +4,7 @@ import { analytics } from "@/lib/analytics";
 import {
   DEMO_SAMPLES,
   demoDestination,
+  type DemoKind,
   type DemoSample,
 } from "@/lib/onboarding-demo";
 import {
@@ -51,6 +52,12 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const TIMEOUT_MS = 15_000;
 const APP_ICON = require("../../../assets/icon.png");
+const POST_IMAGES: Record<DemoKind, number> = {
+  Articles: require("../../../assets/onboarding/demo-article.jpg"),
+  Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
+  Products: require("../../../assets/onboarding/demo-product.jpg"),
+  Travel: require("../../../assets/onboarding/demo-travel.jpg"),
+};
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
@@ -556,13 +563,11 @@ function SamplePost({ sample }: { sample: DemoSample }) {
         <View style={styles.avatar} />
         <Text style={styles.postHandle}>{sample.domain}</Text>
       </View>
-      <View style={styles.postImage}>
-        <AppSymbolIcon
-          name="photo.on.rectangle"
-          size={28}
-          tintColor={theme.colors.primaryText}
-        />
-      </View>
+      <Image
+        source={POST_IMAGES[sample.kind]}
+        contentFit="cover"
+        style={styles.postImage}
+      />
       <View style={styles.postActions}>
         <AppSymbolIcon
           name="heart"
@@ -816,8 +821,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
   },
   postActions: {
     flexDirection: "row",

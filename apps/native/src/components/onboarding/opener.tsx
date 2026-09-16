@@ -1,21 +1,20 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { withAlpha } from "@/lib/tab-bar-motion";
+import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
-// Sample saves for the collage. No bundled photos: each tile is a tinted block,
-// so the collage reads as "a shelf" without image licensing questions.
+// Sample saves for the collage. The photos are generated for the app, so they
+// carry no licensing or brand questions.
 type Tile =
   | {
       kind: "link";
       titleKey: TextMessageKey;
       domain: string;
       height: number;
-      icon: AppSymbolName;
-      tint: "muted" | "soft";
+      image: number;
     }
   | { kind: "note"; titleKey: TextMessageKey };
 
@@ -26,8 +25,7 @@ const COLUMNS: Tile[][] = [
       titleKey: "onboarding.sampleTee",
       domain: "everlane.com",
       height: 188,
-      icon: "bag",
-      tint: "soft",
+      image: require("../../../assets/onboarding/tee.jpg"),
     },
     { kind: "note", titleKey: "onboarding.sampleNote" },
     {
@@ -35,16 +33,14 @@ const COLUMNS: Tile[][] = [
       titleKey: "onboarding.sampleEspresso",
       domain: "ebay.co.uk",
       height: 86,
-      icon: "bag",
-      tint: "muted",
+      image: require("../../../assets/onboarding/espresso.jpg"),
     },
     {
       kind: "link",
       titleKey: "onboarding.sampleFinishBook",
       domain: "theatlantic.com",
       height: 110,
-      icon: "doc.text",
-      tint: "soft",
+      image: require("../../../assets/onboarding/book.jpg"),
     },
   ],
   [
@@ -53,40 +49,35 @@ const COLUMNS: Tile[][] = [
       titleKey: "onboarding.sampleOneThing",
       domain: "nytimes.com",
       height: 122,
-      icon: "doc.text",
-      tint: "muted",
+      image: require("../../../assets/onboarding/reading.jpg"),
     },
     {
       kind: "link",
       titleKey: "onboarding.sampleRamen",
       domain: "bbcgoodfood.com",
       height: 94,
-      icon: "star.fill",
-      tint: "soft",
+      image: require("../../../assets/onboarding/ramen.jpg"),
     },
     {
       kind: "link",
       titleKey: "onboarding.samplePrague",
       domain: "cntraveler.com",
       height: 130,
-      icon: "map",
-      tint: "muted",
+      image: require("../../../assets/onboarding/prague.jpg"),
     },
     {
       kind: "link",
       titleKey: "onboarding.sampleSofa",
       domain: "article.com",
       height: 108,
-      icon: "bag",
-      tint: "soft",
+      image: require("../../../assets/onboarding/sofa.jpg"),
     },
     {
       kind: "link",
       titleKey: "onboarding.sampleDiner",
       domain: "eater.com",
       height: 100,
-      icon: "map",
-      tint: "muted",
+      image: require("../../../assets/onboarding/diner.jpg"),
     },
   ],
 ];
@@ -99,7 +90,6 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
-  const { theme } = useUnistyles();
 
   return (
     <View style={styles.wrap}>
@@ -122,23 +112,11 @@ export function OpenerStep({
                 </View>
               ) : (
                 <View key={tile.titleKey} style={styles.tile}>
-                  <View
-                    style={[
-                      styles.thumb,
-                      { height: tile.height },
-                      tile.tint === "soft" ? styles.thumbSoft : null,
-                    ]}
-                  >
-                    <AppSymbolIcon
-                      name={tile.icon}
-                      size={22}
-                      tintColor={
-                        tile.tint === "soft"
-                          ? theme.colors.primaryText
-                          : theme.colors.faint
-                      }
-                    />
-                  </View>
+                  <Image
+                    source={tile.image}
+                    contentFit="cover"
+                    style={[styles.thumb, { height: tile.height }]}
+                  />
                   <View style={styles.meta}>
                     <Text style={styles.tileTitle} numberOfLines={2}>
                       {t(tile.titleKey)}
@@ -229,11 +207,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   thumb: {
     backgroundColor: theme.colors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  thumbSoft: {
-    backgroundColor: theme.colors.primarySoft,
   },
   meta: {
     padding: theme.gap(1),
