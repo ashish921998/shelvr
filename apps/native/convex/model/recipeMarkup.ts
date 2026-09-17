@@ -164,7 +164,9 @@ function instructionSteps(value: unknown, clean: TextCleaner): string[] {
   if (!isObject(value)) {
     return [];
   }
-  if (Array.isArray(value.itemListElement)) {
+  // schema.org allows a single value wherever a list is expected, and the
+  // recursion below already handles both shapes.
+  if (value.itemListElement !== undefined) {
     const steps = instructionSteps(value.itemListElement, clean);
     const sectionName = stringValue(value.name, clean);
     if (sectionName !== undefined && steps.length > 0) {
