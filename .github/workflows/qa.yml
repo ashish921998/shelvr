@@ -1,0 +1,131 @@
+name: QA
+
+# Informational only: this check does NOT gate merges. Make it required by
+# adding it to branch protection rules only if you decide to later.
+#
+# Scope: backend-only functional QA (curl against the Convex HTTP surface —
+# read-only production flows + dev negative/positive flows). Mobile app E2E is
+# local-only by design (iOS simulator + the argent session tools are not
+# available on CI runners); those flows report BLOCKED in CI and should be run
+# locally via the qa skill.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write # update the sticky QA report comment on PRs
+
+concurrency:
+  group: qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: qa (backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for git diff analysis
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0 # match root package.json engines / ci.yml
+
+      - name: Install tooling
+        run: |
+          sudo apt-get update -qq
+          # jq backs report/comment JSON handling; imagemagick is declared in
+          # .factory/skills/qa/config.yaml (only screenshot-diff flows use it,
+          # which never run in backend-only CI — installed for config parity).
+          sudo apt-get install -y -qq imagemagick jq
+
+      - name: Install droid CLI
+        run: |
+          curl -fsSL https://app.factory.ai/cli | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.factory/bin" >> "$GITHUB_PATH"
+
+      # fetch-depth: 0 already fetched every branch, so origin/<base> exists
+      # without another fetch (persist-credentials: false means git has no
+      # token anyway).
+      - name: Resolve diff base
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=origin/${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            # Post-merge run on main: diff against the commit before the push.
+            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run QA
+        id: qa
+        continue-on-error: true
+        timeout-minutes: 18
+        env:
+          CI: "true"
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+          # Optional. Same value as the dev deployment's WAITLIST_SHARED_SECRET.
+          # Without it the secret-gated dev waitlist flows report BLOCKED;
+          # health + negative auth flows run either way.
+          QA_WAITLIST_SHARED_SECRET: ${{ secrets.QA_WAITLIST_SHARED_SECRET }}
+        run: |
+          droid exec --auto high "You are running in a non-interactive CI environment. There is NO human available. Do NOT use AskUser, do NOT wait for confirmations, do NOT pause for input. Run the qa skill. The diff base is ${{ steps.base.outputs.base }}. Read video_evidence and droid_control.compose from .factory/skills/qa/config.yaml at run time: CI runs backend-only curl flows, so do not produce or upload any media evidence. If the diff affects the native app, report its flows as BLOCKED with the note 'mobile QA is local-only — run the qa skill locally for simulator coverage' instead of attempting simulator work. Respect the production environment restrictions in config.yaml exactly. Write the final report to qa-results/report.md" 2>&1 | tee qa-output.txt
+
+      - name: Upload QA artifacts
+        if: always() && steps.qa.outcome != 'cancelled'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-results
+          path: qa-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Post QA report as PR comment
+        if: always() && github.event_name == 'pull_request' && steps.qa.outcome != 'cancelled'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          {
+            echo '<!-- qa-report -->'
+            if [ -f qa-results/report.md ]; then
+              cat qa-results/report.md
+            else
+              echo '## QA Report'
+              echo
+              echo ':no_entry: QA run produced no report. Check the job log and artifacts.'
+              echo
+              echo '<details><summary>Raw QA output (tail)</summary>'
+              echo
+              echo '```'
+              tail -n 100 qa-output.txt 2>/dev/null || true
+              echo '```'
+              echo
+              echo '</details>'
+            fi
+            printf '\n\n---\n\n[Workflow run](%s) · evidence in the `qa-results` artifact\n' \
+              "${{ github.event.html_url }}"
+          } > comment-body.md
+
+          jq -Rs '{body: .}' < comment-body.md > comment.json
+
+          MARKER='<!-- qa-report -->'
+          COMMENTS_URL="repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
+          COMMENT_ID=$(gh api "$COMMENTS_URL" --paginate --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n 1 || true)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" --input comment.json --silent
+          else
+            gh api -X POST "$COMMENTS_URL" --input comment.json --silent
+          fi
