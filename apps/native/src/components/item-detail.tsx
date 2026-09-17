@@ -12,8 +12,8 @@ import { TagChip } from "@/components/tag-chip";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { socialPost, type SocialPost } from "@/lib/social-post";
 import { displayHost } from "@/lib/url";
-import { shortFormSource } from "@convex/model/externalUrl";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -130,10 +130,9 @@ export const ItemDetail = memo(function ItemDetail({
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
-  // A TikTok or Instagram save's "content" is its caption, not an article:
-  // keep the poster layout.
-  const social = item.type === "link" ? shortFormSource(item.url) : undefined;
-  const isVideo = social?.video === true;
+  // A social save's "content" is its caption, not an article: keep the
+  // poster layout.
+  const social = socialPost(item);
 
   // Link saves with extracted content get the compact reader layout.
   if (
@@ -173,7 +172,8 @@ export const ItemDetail = memo(function ItemDetail({
 
   // Source shape; OG images default to 1200×630 (≈1.91).
   const heroAspect =
-    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap — and when the cap bites, pull
@@ -181,9 +181,11 @@ export const ItemDetail = memo(function ItemDetail({
   // (no cropping, no lopsided gap). The frame insets the image by its own
   // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
-  const heroMaxWidth = width - frameInset;
-  const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
-  const heroWidth = heroHeight * heroAspect;
+  const frameSize = (aspect: number) => {
+    const frameHeight = Math.min((width - frameInset) / aspect, maxHeroHeight);
+    return { width: frameHeight * aspect, height: frameHeight };
+  };
+  const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
   const heroImage = heroUri ? (
     <Image
@@ -197,39 +199,55 @@ export const ItemDetail = memo(function ItemDetail({
     />
   ) : null;
 
-  // The poster is the post's one real action: tap anywhere on it to open.
+  const openPost = () => {
+    void WebBrowser.openBrowserAsync(item.url!)
+      .then(() => analytics.itemAction(item, "open_source"))
+      .catch(() => {});
+  };
+
   const hero =
     heroImage && social && item.url ? (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("item.openSite", { site: social.site })}
-        onPress={() => {
-          void WebBrowser.openBrowserAsync(item.url!)
-            .then(() => analytics.itemAction(item, "open_source"))
-            .catch(() => {});
-        }}
+      <PostMediaButton
+        site={social.site}
+        playable={social.playable}
+        onPress={openPost}
       >
         {heroImage}
-        {isVideo ? (
-          <View style={styles.playOverlay} pointerEvents="none">
-            <View style={styles.playButton}>
-              <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
-            </View>
-          </View>
-        ) : null}
-      </Pressable>
+      </PostMediaButton>
     ) : (
       heroImage
     );
 
+  const moreMedia =
+    social && item.url
+      ? (item.media ?? []).slice(1).map((media, index) => (
+          <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
+            <PostMediaButton
+              site={social.site}
+              playable={media.kind !== "photo"}
+              onPress={openPost}
+            >
+              <Image
+                source={{ uri: media.imageUrl }}
+                contentFit="contain"
+                style={[styles.heroImage, frameSize(media.aspectRatio)]}
+              />
+            </PostMediaButton>
+          </View>
+        ))
+      : null;
+
   const heroBlock = heroUri ? (
-    <View style={item.isSticker ? undefined : styles.heroContainer}>
-      {isZoomTarget ? (
-        <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-      ) : (
-        hero
-      )}
-    </View>
+    <>
+      <View style={item.isSticker ? undefined : styles.heroContainer}>
+        {isZoomTarget ? (
+          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
+        ) : (
+          hero
+        )}
+      </View>
+      {moreMedia}
+    </>
   ) : null;
 
   const scrollProps = {
@@ -295,7 +313,7 @@ function ItemDetailBody({
   spaces: ReturnType<typeof useItemDetailData>["spaces"];
   similar: ReturnType<typeof useItemDetailData>["similar"];
   paragraphs: string[];
-  social: ReturnType<typeof shortFormSource>;
+  social: SocialPost | undefined;
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
@@ -334,7 +352,7 @@ function ItemDetailBody({
             }}
           >
             <AppSymbolIcon
-              name={social?.video ? "play.rectangle" : "safari"}
+              name={social?.playable ? "play.rectangle" : "safari"}
               size={15}
               tintColor={theme.colors.muted}
             />
@@ -403,6 +421,35 @@ function ItemDetailBody({
         </View>
       ) : null}
     </View>
+  );
+}
+
+function PostMediaButton({
+  site,
+  playable,
+  onPress,
+  children,
+}: {
+  site: string;
+  playable: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("item.openSite", { site })}
+      onPress={onPress}
+    >
+      {children}
+      {playable ? (
+        <View style={styles.playOverlay} pointerEvents="none">
+          <View style={styles.playButton}>
+            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
+          </View>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -627,6 +674,9 @@ const styles = StyleSheet.create((theme) => ({
     borderCurve: "continuous",
     padding: theme.gap(1),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
+  },
+  moreMedia: {
+    marginTop: theme.gap(2),
   },
   heroImage: {
     borderRadius: theme.radius.md,
