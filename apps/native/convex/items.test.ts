@@ -236,6 +236,37 @@ describe("listRecentItems", () => {
     await seedFeed(t, "recent-free-user", 2);
 
     await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for an expired Pro subscription", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-expired-user|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-expired-user",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-expired-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves when the client omits its clock", async () => {
+    const t = await as("recent-user");
+    await seedFeed(t, "recent-user", 1);
+
+    // Expand-phase contract: `now` is client-supplied so the query never
+    // reads the wall clock. A build that predates the argument gets no data
+    // rather than an entitlement read the backend could serve stale.
+    await expect(
       t.query(api.items.listRecentItems, { limit: 5 }),
     ).resolves.toEqual([]);
   });
@@ -248,7 +279,10 @@ describe("listRecentItems", () => {
     });
     const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 2 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 2,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([older[2], older[1]]);
     expect(recent.map((item) => item._id)).not.toContain(pending[0]);
     expect(recent.map((item) => item._id)).not.toContain(failed[0]);
@@ -262,7 +296,10 @@ describe("listRecentItems", () => {
     // window would cover. The widget must still show the older ready saves.
     await seedFeed(t, "recent-user", 30, { status: "processing" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([
       ready[2],
       ready[1],
@@ -275,7 +312,10 @@ describe("listRecentItems", () => {
     const ready = await seedFeed(t, "recent-user", 1);
     await seedFeed(t, "recent-user", 200, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([ready[0]]);
   });
 
@@ -284,14 +324,20 @@ describe("listRecentItems", () => {
     await seedFeed(t, "recent-user", RECENT_ITEMS_MAX + 5);
     await seedFeed(t, "someone-else", 2);
 
-    const capped = await t.query(api.items.listRecentItems, { limit: 1000 });
+    const capped = await t.query(api.items.listRecentItems, {
+      limit: 1000,
+      now: Date.now(),
+    });
     expect(capped).toHaveLength(RECENT_ITEMS_MAX);
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
     // A non-positive or fractional limit still yields at least one item.
-    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(
-      1,
-    );
+    expect(
+      await t.query(api.items.listRecentItems, {
+        limit: 0,
+        now: Date.now(),
+      }),
+    ).toHaveLength(1);
   });
 });
 

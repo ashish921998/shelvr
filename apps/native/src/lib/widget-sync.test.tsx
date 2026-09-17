@@ -119,6 +119,7 @@ vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({
     entitled: fsx.entitled,
     loading: fsx.entitlementLoading,
+    now: Date.now(),
   }),
 }));
 

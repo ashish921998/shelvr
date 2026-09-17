@@ -13,7 +13,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
+import { hasProEntitlementAt, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -296,13 +296,23 @@ export const listItemsPage = query({
 
 /** The newest `ready` saves for the Pro-only home-screen widget. The status
  * index reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view. */
+ * processing can never push older ready saves out of view.
+ *
+ * Pro is checked against the client-supplied `now` so the query never reads
+ * the wall clock (queries are not rerun as time advances). A caller that
+ * omits `now` — a build that predates the argument — gets no data rather
+ * than an entitlement read the backend could serve stale. */
 export const listRecentItems = query({
-  args: { limit: v.number() },
+  args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    if (!(await hasProEntitlement(ctx, userId))) return [];
+    if (
+      args.now === undefined ||
+      !(await hasProEntitlementAt(ctx, userId, args.now))
+    ) {
+      return [];
+    }
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
       RECENT_ITEMS_MAX,

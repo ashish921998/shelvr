@@ -68,7 +68,7 @@ function widgetSubtitle(item: FeedItem): string {
   return t("item.photo");
 }
 
-async function syncWidget(items: FeedItem[], locked = false) {
+async function syncWidget(items: FeedItem[], locked: boolean) {
   // Metro can evaluate a dynamic import eagerly. Check the native registry
   // before touching expo-widgets so older development clients degrade safely
   // instead of crashing in ExpoWidgets.ios.js at startup.
@@ -137,9 +137,16 @@ let syncChain: Promise<void> = Promise.resolve();
  */
 export function RecentSavesWidgetSync() {
   const locale = useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const {
+    entitled,
+    loading: entitlementLoading,
+    now: entitlementNow,
+  } = useEntitlement();
   const { data: recent } = useQuery({
-    ...convexQuery(api.items.listRecentItems, { limit: WIDGET_ITEM_COUNT }),
+    ...convexQuery(api.items.listRecentItems, {
+      limit: WIDGET_ITEM_COUNT,
+      now: entitlementNow,
+    }),
     enabled: !entitlementLoading && entitled,
   });
   const lastKey = useRef<string | null>(null);
@@ -158,7 +165,7 @@ export function RecentSavesWidgetSync() {
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
-      (entitled ? "pro" : "free") +
+      (entitled ? "open" : "locked") +
       items
         .map(
           (item) =>

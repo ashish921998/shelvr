@@ -70,11 +70,21 @@ export async function requireProEntitlement(
 /**
  * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
  * whose core write must succeed for every user can use this to skip a
- * Pro-only side effect, and Pro-only queries can return an empty result.
+ * Pro-only side effect. Reads the wall clock, so it is mutation-only;
+ * queries use {@link hasProEntitlementAt} with a client-supplied clock.
  */
 export async function hasProEntitlement(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  return await hasProEntitlementAt(ctx, userId, Date.now());
+}
+
+/** Query-safe entitlement check. The caller supplies the current client time. */
+export async function hasProEntitlementAt(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
+  now: number,
 ): Promise<boolean> {
   if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
   const sub = await ctx.db
@@ -84,7 +94,7 @@ export async function hasProEntitlement(
   if (sub === null) {
     return false;
   }
-  return isEntitled(sub.status, sub.expiresAt, Date.now());
+  return isEntitled(sub.status, sub.expiresAt, now);
 }
 
 /**
