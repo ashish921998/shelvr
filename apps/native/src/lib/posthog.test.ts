@@ -34,7 +34,6 @@ const posthogCtor = vi.hoisted(() => {
   return PostHogStub;
 });
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
-vi.mock("expo-secure-store", () => ({ getItem: () => null }));
 vi.mock("expo-updates", () => ({
   updateId: "update-7",
   channel: "production",

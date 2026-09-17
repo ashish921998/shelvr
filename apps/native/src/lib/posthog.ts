@@ -1,7 +1,6 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
-import { hasStoredAuthSession } from "@/lib/auth-storage";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -160,39 +159,6 @@ export async function resetIfIdentified(client: PostHog): Promise<void> {
   if (distinctId && anonymousId && distinctId !== anonymousId) {
     resetClient(client);
   }
-}
-
-// Read before anything renders, so a sign-in during this launch can't count.
-const startedWithSession = hasStoredAuthSession();
-
-// PostHog's ids outlive a lost Convex session (expired, or a wiped keychain),
-// so a launch without one drops the previous account before any app event is
-// sent. A stored session the server will reject is left to PostHogIdentity.
-// The SDK's "Application Updated" is captured earlier and still lands on the
-// previous account.
-async function dropStaleIdentity(client: PostHog): Promise<void> {
-  if (startedWithSession) return;
-  try {
-    await resetIfIdentified(client);
-  } catch {
-    // Analytics must never block startup.
-  }
-}
-
-let identitySettled = posthog === undefined;
-export const identityReady = posthog
-  ? dropStaleIdentity(posthog).then(() => {
-      identitySettled = true;
-    })
-  : Promise.resolve();
-
-/**
- * Runs `send` once the launch identity is settled. The SDK's
- * "Application Opened" waits on a native call, so it also follows the settle.
- */
-export function afterIdentitySettles(send: () => void): void {
-  if (identitySettled) send();
-  else void identityReady.then(send);
 }
 
 /** True when the client analytics boundary may capture. The single canonical

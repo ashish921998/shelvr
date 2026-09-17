@@ -1,7 +1,5 @@
 import {
   SAFE_ERROR_MESSAGES,
-  afterIdentitySettles,
-  identityReady,
   posthog,
   resetClient,
   resetIfIdentified as resetClientIfIdentified,
@@ -164,20 +162,17 @@ function capture<Event extends AnalyticsEvent>(
   event: Event,
   properties?: AnalyticsEventProperties[Event],
 ): void {
-  const client = posthog;
-  if (!client) return;
+  if (!posthog) return;
 
-  afterIdentitySettles(() => {
-    try {
-      client.capture(event, {
-        ...properties,
-        environment: Constants.expoConfig?.extra?.variant ?? "development",
-        analytics_version: 1,
-      });
-    } catch {
-      // Analytics must never change the outcome of a product action.
-    }
-  });
+  try {
+    posthog.capture(event, {
+      ...properties,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Analytics must never change the outcome of a product action.
+  }
 }
 
 const SAFE_ERROR_NAMES = new Set([
@@ -206,29 +201,26 @@ function captureError(
         : "Error"
       : "Unknown";
   console.error(event, { error_type: errorType });
-  const client = posthog;
-  if (!client) return;
+  if (!posthog) return;
 
-  afterIdentitySettles(() => {
-    try {
-      const original = error instanceof Error ? error : new Error(typeof error);
-      const reported =
-        !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
-          ? original
-          : Object.assign(new Error(original.name), {
-              name: original.name,
-              stack: original.stack,
-            });
-      client.captureException(reported, {
-        ...properties,
-        error_event: event,
-        environment: Constants.expoConfig?.extra?.variant ?? "development",
-        analytics_version: 1,
-      });
-    } catch {
-      // Error reporting must never mask or replace the original failure.
-    }
-  });
+  try {
+    const original = error instanceof Error ? error : new Error(typeof error);
+    const reported =
+      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+        ? original
+        : Object.assign(new Error(original.name), {
+            name: original.name,
+            stack: original.stack,
+          });
+    posthog.captureException(reported, {
+      ...properties,
+      error_event: event,
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Error reporting must never mask or replace the original failure.
+  }
 }
 
 function sessionId(): string | undefined {
@@ -265,60 +257,47 @@ function itemAction(item: AnalyticsItem, action: ItemAction): void {
 // Convex: sending it as a person property would copy PII into a third party
 // (and into replay-linked person profiles) for no analytics gain.
 function identify(userId: string): void {
-  const client = posthog;
-  if (!client) return;
+  if (!posthog) return;
 
-  afterIdentitySettles(() => {
-    try {
-      client.identify(userId);
-    } catch {
-      // Analytics must never block authentication or app rendering.
-    }
-  });
+  try {
+    posthog.identify(userId);
+  } catch {
+    // Analytics must never block authentication or app rendering.
+  }
 }
 
 function reset(): void {
-  const client = posthog;
-  if (!client) return;
-
-  afterIdentitySettles(() => {
-    try {
-      resetClient(client);
-    } catch {
-      // Analytics must never block sign-out.
-    }
-  });
-}
-
-/** Resets only when PostHog still holds an identified user. A session that
- * expired while the app was open still stops attributing events to the
- * previous account. */
-async function resetIfIdentified(): Promise<void> {
-  const client = posthog;
-  if (!client) return;
+  if (!posthog) return;
 
   try {
-    await identityReady;
-    await resetClientIfIdentified(client);
+    resetClient(posthog);
+  } catch {
+    // Analytics must never block sign-out.
+  }
+}
+
+/** Resets only when PostHog still holds an identified user. A signed-out
+ * launch keeps its anonymous id, while a session that expired stops
+ * attributing events to the previous account once Convex reports it. */
+async function resetIfIdentified(): Promise<void> {
+  if (!posthog) return;
+
+  try {
+    await resetClientIfIdentified(posthog);
   } catch {
     // Analytics must never block sign-out.
   }
 }
 
 function screen(route: string): void {
-  const client = posthog;
-  if (!client) return;
-
-  afterIdentitySettles(() => {
-    try {
-      void client.screen(route, {
-        environment: Constants.expoConfig?.extra?.variant ?? "development",
-        analytics_version: 1,
-      });
-    } catch {
-      // Screen tracking must never interrupt navigation.
-    }
-  });
+  try {
+    void posthog?.screen(route, {
+      environment: Constants.expoConfig?.extra?.variant ?? "development",
+      analytics_version: 1,
+    });
+  } catch {
+    // Screen tracking must never interrupt navigation.
+  }
 }
 
 export const analytics = {
