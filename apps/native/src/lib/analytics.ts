@@ -1,4 +1,9 @@
-import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
+import {
+  SAFE_ERROR_MESSAGES,
+  posthog,
+  resetClient,
+  resetIfIdentified as resetClientIfIdentified,
+} from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
 
@@ -39,8 +44,15 @@ type AnalyticsEventProperties = {
     duration_ms: number;
   };
   auth_started: { provider: string };
-  auth_cancelled: { provider: string };
-  auth_failed: { provider: string };
+  auth_cancelled: { provider: string; elapsed_ms: number; browser_ms: number };
+  auth_failed: {
+    provider: string;
+    stage: "request" | "browser" | "exchange";
+    elapsed_ms: number;
+  };
+  // A sign-in that finished in this session. `auth_completed` below is the
+  // identify-time signal and also fires on every signed-in cold start.
+  auth_succeeded: { provider: string; elapsed_ms: number };
   auth_completed: Record<string, never>;
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
@@ -258,11 +270,20 @@ function reset(): void {
   if (!posthog) return;
 
   try {
-    posthog.reset();
-    posthog.register({
-      environment: Constants.expoConfig?.extra?.variant ?? "development",
-      analytics_version: 1,
-    });
+    resetClient(posthog);
+  } catch {
+    // Analytics must never block sign-out.
+  }
+}
+
+/** Resets only when PostHog still holds an identified user. A signed-out
+ * launch keeps its anonymous id, while a session that expired stops
+ * attributing events to the previous account once Convex reports it. */
+async function resetIfIdentified(): Promise<void> {
+  if (!posthog) return;
+
+  try {
+    await resetClientIfIdentified(posthog);
   } catch {
     // Analytics must never block sign-out.
   }
@@ -270,7 +291,7 @@ function reset(): void {
 
 function screen(route: string): void {
   try {
-    posthog?.screen(route, {
+    void posthog?.screen(route, {
       environment: Constants.expoConfig?.extra?.variant ?? "development",
       analytics_version: 1,
     });
@@ -284,6 +305,7 @@ export const analytics = {
   captureError,
   identify,
   reset,
+  resetIfIdentified,
   sessionId,
   screen,
   itemOpened,

@@ -162,6 +162,7 @@
   "share.success": "Salvo no Shelvr",
   "account.signingIn": "Entrando",
   "account.signInTitle": "Entre para continuar",
+  "account.signInNotFinished": "O login não foi concluído. Tente novamente.",
   "account.apple": "Continuar com Apple",
   "account.google": "Continuar com Google",
   "account.anonymous": "Continuar sem conta",

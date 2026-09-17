@@ -162,6 +162,7 @@
   "share.success": "In Shelvr gespeichert",
   "account.signingIn": "Anmelden",
   "account.signInTitle": "Melde dich an, um fortzufahren",
+  "account.signInNotFinished": "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut.",
   "account.apple": "Mit Apple fortfahren",
   "account.google": "Mit Google fortfahren",
   "account.anonymous": "Ohne Konto fortfahren",

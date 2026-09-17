@@ -163,6 +163,7 @@ export type MessageParams = {
   "share.success": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
+  "account.signInNotFinished": undefined;
   "account.apple": undefined;
   "account.google": undefined;
   "account.anonymous": undefined;
