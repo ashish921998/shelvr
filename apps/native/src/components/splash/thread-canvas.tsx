@@ -274,8 +274,13 @@ function Burst({
   color: string;
   clock: SharedValue<number>;
 }) {
+  // The ring shows for one short window; outside it the same empty path is
+  // reused rather than building a fresh one on every frame of the splash.
+  const empty = useMemo(() => Skia.Path.Make(), []);
+
   const path = useDerivedValue(() => {
     const progress = span(clock.get(), TIMELINE.burstFrom, TIMELINE.burstTo);
+    if (progress <= 0 || progress >= 1) return empty;
     const skPath = Skia.Path.Make();
     // Radii open outward with the burst, so the ring expands as it dims.
     const inner = BURST_INNER_RADIUS + progress * 24;

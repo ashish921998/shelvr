@@ -3,25 +3,44 @@
 // than simply opening the app.
 //
 // The launch animation is for the second case only. In front of "save this
-// link" it is five seconds between the user and the thing they asked for, so
-// the splash stands down and hands straight over.
+// link" it is seconds between the user and the thing they asked for, so the
+// splash stands down and hands straight over.
 //
 // Expo Router resolves the initial URL asynchronously, so the answer can arrive
 // either before the root layout mounts or a frame or two after. Both are
 // covered: the flag is readable synchronously, and late arrivals notify.
 
 /**
- * Whether a native-intent path is a link into the app rather than a plain
- * launch. Absolute URLs (`shelvr://…`, `https://shelvr.app/…`) are links;
- * relative or malformed paths are not.
+ * Comparable form of a URL: scheme, host (with port) and path, with trailing
+ * slashes removed so `shelvr://` and `shelvr:///` are the same place. Returns
+ * null for relative or malformed input.
  */
-export function isDeepLink(path: string): boolean {
+function normalizeUrl(url: string): string | null {
   try {
     // Absolute URLs parse without a base; relative paths throw.
-    return new URL(path).protocol !== "";
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.protocol}//${parsed.host}${path}${parsed.search}`;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Whether a native-intent path is a link into somewhere in the app, rather
+ * than a plain launch.
+ *
+ * This needs `rootUrl` — `Linking.createURL('/')` — because Expo Router does
+ * not hand us nothing when the app is opened from the home screen: its
+ * `getInitialURL` falls back to that root URL and passes it through
+ * `redirectSystemPath` exactly like a real link. Testing for "parses as an
+ * absolute URL" therefore matches *every* launch, which is why this takes the
+ * root to compare against instead.
+ */
+export function isDeepLink(path: string, rootUrl: string): boolean {
+  const target = normalizeUrl(path);
+  if (target === null) return false;
+  return target !== normalizeUrl(rootUrl);
 }
 
 let directLaunch = false;

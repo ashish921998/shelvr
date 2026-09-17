@@ -27,6 +27,11 @@ vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice,
 }));
 
+// What the native module returns for a production install.
+vi.mock("expo-linking", () => ({
+  createURL: () => "shelvr:///",
+}));
+
 describe("redirectSystemPath", () => {
   beforeEach(() => {
     markPendingShareOnDevice.mockClear();
@@ -98,8 +103,12 @@ describe("redirectSystemPath and the launch animation", () => {
     expect(isDirectLaunch()).toBe(true);
   });
 
-  it("leaves the splash alone for a path that is not a link", () => {
-    redirectSystemPath({ path: "/share", initial: true });
+  it.each([
+    ["the root URL a home-screen launch produces", "shelvr:///"],
+    ["the same root without its trailing slash", "shelvr://"],
+    ["a path that is not a link at all", "/share"],
+  ])("leaves the splash alone for %s", (_name, path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(path);
     expect(isDirectLaunch()).toBe(false);
   });
 });

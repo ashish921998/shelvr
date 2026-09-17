@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Text, useWindowDimensions, View } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
@@ -66,12 +67,12 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
     const finish = () => onFinish?.();
 
     if (reducedMotion) {
-      reducedProgress.set(
-        withTiming(1, { duration: REDUCED_FADE_MS }, (completed) => {
-          "worklet";
-          if (completed) runOnJS(finish)();
-        }),
-      );
+      // Park the clock past the end so anything reading it — the mark, which
+      // has no reduced-motion branch of its own — renders in its settled
+      // state instead of at frame zero.
+      clock.set(SPLASH_DURATION);
+      reducedProgress.set(withTiming(1, { duration: REDUCED_FADE_MS }));
+      // The hold is what ends the splash here; the fade only brings it in.
       const timer = setTimeout(finish, REDUCED_HOLD_MS);
       return () => clearTimeout(timer);
     }
@@ -86,35 +87,29 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         },
       ),
     );
+    // A late deep link can dismiss the splash before the clock runs out —
+    // stop it rather than leaving it ticking on the UI thread, and firing
+    // `onFinish` a second time, on exactly the path the early dismissal is
+    // there to speed up.
+    return () => cancelAnimation(clock);
     // The animation is started once, on mount; `onFinish` is read through the
     // closure above rather than re-armed when the callback identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reducedMotion]);
 
-  // Holds the mark centred until the wordmark unfurls, then slides the pair
-  // left so the finished lockup lands optically centred.
-  const shift = wordmarkWidth === null ? 0 : (wordmarkWidth + LOCKUP_GAP) / 2;
-
-  const rowStyle = useAnimatedStyle(() => {
-    if (reducedMotion) {
-      return { opacity: reducedProgress.get(), transform: [{ translateX: 0 }] };
-    }
-    const progress = cubicBezierEase(
-      span(
-        clock.get(),
-        TIMELINE.lockupFrom,
-        TIMELINE.lockupFrom + TIMELINE.lockupDuration,
-      ),
-      LOCKUP_EASE[0],
-      LOCKUP_EASE[1],
-      LOCKUP_EASE[2],
-      LOCKUP_EASE[3],
-    );
-    return { opacity: 1, transform: [{ translateX: shift * (1 - progress) }] };
-  });
+  // The lockup needs no horizontal offset of its own. The row is centred by
+  // its parent and the clip below is a flex child, so opening the clip widens
+  // the row and slides the mark left on its own — the mark starts centred and
+  // ends beside the wordmark. (The web prototype used `clip-path`, which does
+  // not affect layout, so there it took an explicit counter-translation.)
+  const rowStyle = useAnimatedStyle(() => ({
+    opacity: reducedMotion ? reducedProgress.get() : 1,
+  }));
 
   const wordmarkStyle = useAnimatedStyle(() => {
-    const full = (wordmarkWidth ?? 0) + UNFURL_OVERSHOOT;
+    // The gap lives inside the clip, so an unopened clip takes no width at all
+    // and the mark sits dead centre until the wordmark starts to unfurl.
+    const full = LOCKUP_GAP + (wordmarkWidth ?? 0) + UNFURL_OVERSHOOT;
     if (reducedMotion) return { width: full };
     const progress = cubicBezierEase(
       span(
@@ -197,9 +192,11 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
           <SplashMark size={MARK_SIZE} clock={clock} />
           {wordmarkWidth === null ? null : (
             <Animated.View style={[styles.wordmarkClip, wordmarkStyle]}>
-              <Text style={[styles.wordmark, { width: wordmarkWidth }]}>
-                shelvr
-              </Text>
+              <View style={styles.wordmarkInset}>
+                <Text style={[styles.wordmark, { width: wordmarkWidth }]}>
+                  shelvr
+                </Text>
+              </View>
             </Animated.View>
           )}
         </Animated.View>
@@ -234,7 +231,6 @@ const styles = StyleSheet.create((theme) => ({
   lockup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: LOCKUP_GAP,
   },
   wordmarkClip: {
     overflow: "hidden",
@@ -242,6 +238,11 @@ const styles = StyleSheet.create((theme) => ({
     // behind the mark instead of sliding in as a block.
     alignItems: "flex-start",
     justifyContent: "center",
+  },
+  // Inside the clip, so a closed clip contributes no width and the mark stays
+  // centred until the unfurl begins.
+  wordmarkInset: {
+    paddingLeft: LOCKUP_GAP,
   },
   wordmark: {
     fontFamily: theme.fonts.display,

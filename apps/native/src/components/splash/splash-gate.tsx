@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 
+import { getNotificationUrl } from "@/lib/notifications";
 import {
   isDirectLaunch,
   subscribeDirectLaunch,
@@ -14,23 +15,28 @@ import { AnimatedSplash } from "./animated-splash";
 // of it, and hands off with a cross-fade to whatever is already there.
 //
 // It stands down entirely when the launch is heading somewhere specific: a
-// Share Sheet intent, a deep link, or a tapped notification.
+// Share Sheet intent, a deep link, or a notification that carries a route.
 
 /**
  * Module scope, deliberately: the splash belongs to the process, not to a
  * component. A Fast Refresh, a route remount, or a re-render of the root
- * layout must not replay it.
+ * layout must not replay it. Set as soon as the animation *starts*, not when
+ * it finishes, so a remount mid-animation (the root error boundary's retry
+ * remounts the whole route tree) doesn't start it over.
  */
 let hasPlayed = false;
 
 /**
- * Whether a notification response is waiting to be handled. `useNotification-
- * Observer` reads the same value on mount and navigates from it, so this is
- * exactly the set of launches that are about to go somewhere.
+ * Whether a tapped notification is about to take the user somewhere.
+ * `useNotificationObserver` navigates only when the notification carries a
+ * `url`, so an informational push — which goes nowhere — is not a reason to
+ * skip the animation.
  */
-function launchedByNotification(): boolean {
+function launchedByNotificationRoute(): boolean {
   try {
-    return Notifications.getLastNotificationResponse() != null;
+    const response = Notifications.getLastNotificationResponse();
+    if (!response?.notification) return false;
+    return getNotificationUrl(response.notification) != null;
   } catch {
     // A missing or unavailable module must never cost us the splash.
     return false;
@@ -44,18 +50,14 @@ function launchedByNotification(): boolean {
  */
 export function useSplashGate() {
   const [showSplash, setShowSplash] = useState(() => {
-    if (hasPlayed || isDirectLaunch() || launchedByNotification()) {
-      // Settle it now: this process has had its one chance to play.
-      hasPlayed = true;
-      return false;
-    }
-    return true;
+    const play =
+      !hasPlayed && !isDirectLaunch() && !launchedByNotificationRoute();
+    // Either way this process has now had its one chance.
+    hasPlayed = true;
+    return play;
   });
 
-  const finishSplash = useCallback(() => {
-    hasPlayed = true;
-    setShowSplash(false);
-  }, []);
+  const finishSplash = useCallback(() => setShowSplash(false), []);
 
   // Expo Router resolves the initial URL asynchronously, so a share or deep
   // link can land a frame or two after the splash has already started. Drop it
