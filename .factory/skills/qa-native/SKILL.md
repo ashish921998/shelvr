@@ -16,6 +16,13 @@ a real user on an iOS simulator against the **development** Convex deployment
 (`https://amicable-antelope-639.convex.cloud` — the dev build's config
 hard-rejects the production URL; never try to point a dev build at prod).
 
+**Two drivers, same journey:** this skill is the agent-driven layer (argent
+session tools, used in interactive Factory sessions). A subscription-free
+Maestro baseline covers the same core journey in CI — flows live in
+`.maestro/`, scheduled nightly + manual dispatch via
+`.github/workflows/qa-mobile.yml` (macOS runner). Keep the two in sync when
+flows change.
+
 **Driver:** the argent simulator session tools. Use
 `argent___list-devices` / `argent___boot-device` / `argent___launch-app` /
 `argent___gesture-tap` / `argent___gesture-swipe` / `argent___keyboard` /
@@ -43,10 +50,11 @@ an App Store install.
    - If the dev client is already installed: start Metro in the background
      (`pnpm --filter native-app start`), then `argent___launch-app` the dev
      build (`app.shelvr.save.dev`).
-   - Otherwise build + install from the local prebuild (`ios/` project):
-     `pnpm --filter native-app ios` (runs `expo run:ios`; first build takes
-     minutes — build once per simulator image, reuse afterwards). It starts
-     Metro and launches the app itself.
+   - Otherwise build + install from the tracked prebuild at
+     `apps/native/ios/`: `pnpm --filter native-app ios` (runs `expo run:ios`;
+     first build takes minutes — build once per simulator image, reuse
+     afterwards). It starts Metro and launches the app itself. (The
+     repository-root `ios/` directory is gitignored stray output — ignore it.)
 4. Erase simulator content when a run needs a truly fresh install state
    (first-run flows): simulator erase is destructive to that simulator's
    data — only erase a simulator you booted for QA.

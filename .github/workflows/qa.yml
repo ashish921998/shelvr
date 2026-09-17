@@ -3,11 +3,18 @@ name: QA
 # Informational only: this check does NOT gate merges. Make it required by
 # adding it to branch protection rules only if you decide to later.
 #
-# Scope: backend-only functional QA (curl against the Convex HTTP surface —
-# read-only production flows + dev negative/positive flows). Mobile app E2E is
-# local-only by design (iOS simulator + the argent session tools are not
-# available on CI runners); those flows report BLOCKED in CI and should be run
-# locally via the qa skill.
+# Two layers:
+#   1. Deterministic baseline (tools/qa-backend.sh) — subscription-free curl
+#      assertions against the Convex HTTP surface. Always runs, on every PR
+#      and post-merge push to main. Production is read-only; positive waitlist
+#      flows hit the dev deployment only, and only when
+#      QA_WAITLIST_SHARED_SECRET is set.
+#   2. Agent layer (droid exec) — diff-aware test selection and ad-hoc tests.
+#      Requires the FACTORY_API_KEY secret; skips automatically without it,
+#      so the workflow is fully functional with no Factory subscription.
+#
+# Mobile E2E lives in qa-mobile.yml (nightly + manual, Maestro on a macOS
+# runner) and locally via the qa skill with the argent simulator tools.
 
 on:
   pull_request:
@@ -67,22 +74,41 @@ jobs:
             echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run QA
-        id: qa
+      - name: Run backend QA (deterministic baseline)
+        id: baseline
+        # Subscription-free floor: plain curl assertions, no agent. A FAIL
+        # here fails the job at the end (propagate step) so it is visible;
+        # the report is still posted either way.
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          # Optional. Same value as the dev deployment's WAITLIST_SHARED_SECRET.
+          # Without it the secret-gated dev waitlist flows report BLOCKED;
+          # health + negative auth flows run either way, creating no data.
+          QA_WAITLIST_SHARED_SECRET: ${{ secrets.QA_WAITLIST_SHARED_SECRET }}
+        run: bash tools/qa-backend.sh
+
+      - name: Run agent QA (optional diff-aware layer)
+        id: agent
+        # Skipped automatically when FACTORY_API_KEY is absent, so this
+        # workflow keeps working without a Factory subscription — the
+        # deterministic baseline above is the guaranteed coverage.
         continue-on-error: true
         timeout-minutes: 18
         env:
           CI: "true"
           FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
-          # Optional. Same value as the dev deployment's WAITLIST_SHARED_SECRET.
-          # Without it the secret-gated dev waitlist flows report BLOCKED;
-          # health + negative auth flows run either way.
           QA_WAITLIST_SHARED_SECRET: ${{ secrets.QA_WAITLIST_SHARED_SECRET }}
         run: |
-          droid exec --auto high "You are running in a non-interactive CI environment. There is NO human available. Do NOT use AskUser, do NOT wait for confirmations, do NOT pause for input. Run the qa skill. The diff base is ${{ steps.base.outputs.base }}. Read video_evidence and droid_control.compose from .factory/skills/qa/config.yaml at run time: CI runs backend-only curl flows, so do not produce or upload any media evidence. If the diff affects the native app, report its flows as BLOCKED with the note 'mobile QA is local-only — run the qa skill locally for simulator coverage' instead of attempting simulator work. Respect the production environment restrictions in config.yaml exactly. Write the final report to qa-results/report.md" 2>&1 | tee qa-output.txt
+          if [ -z "$FACTORY_API_KEY" ]; then
+            echo "FACTORY_API_KEY not set — skipping the agent layer."
+            echo "The deterministic baseline (tools/qa-backend.sh) already ran."
+            exit 0
+          fi
+          droid exec --auto high "You are running in a non-interactive CI environment. There is NO human available. Do NOT use AskUser, do NOT wait for confirmations, do NOT pause for input. Run the qa skill. The diff base is ${{ steps.base.outputs.base }}. A deterministic baseline script (tools/qa-backend.sh) has already run and written qa-results/report.md with fixed backend rows. When you write your final report to qa-results/report.md, MERGE: keep the baseline rows and add your diff-targeted rows; re-run a baseline flow yourself only when the diff changes that flow's behavior. Read video_evidence and droid_control.compose from .factory/skills/qa/config.yaml at run time: CI runs backend-only curl flows, so do not produce or upload any media evidence. If the diff affects the native app, report its flows as BLOCKED with the note 'mobile QA is local-only — run the qa skill locally for simulator coverage' instead of attempting simulator work. Respect the production environment restrictions in config.yaml exactly." 2>&1 | tee qa-output.txt
 
       - name: Upload QA artifacts
-        if: always() && steps.qa.outcome != 'cancelled'
+        if: always() && steps.agent.outcome != 'cancelled'
         uses: actions/upload-artifact@v4
         with:
           name: qa-results
@@ -91,7 +117,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Post QA report as PR comment
-        if: always() && github.event_name == 'pull_request' && steps.qa.outcome != 'cancelled'
+        if: always() && github.event_name == 'pull_request' && steps.agent.outcome != 'cancelled'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -129,3 +155,12 @@ jobs:
           else
             gh api -X POST "$COMMENTS_URL" --input comment.json --silent
           fi
+
+      # A baseline FAIL fails the job after the report is posted, so the red
+      # check is visible on the PR (still informational: it does not gate
+      # merges unless added to branch protection).
+      - name: Propagate baseline result
+        if: always() && steps.baseline.outcome == 'failure'
+        run: |
+          echo "Deterministic backend QA reported FAIL — see the QA report comment and artifacts."
+          exit 1

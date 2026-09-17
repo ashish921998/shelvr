@@ -27,10 +27,24 @@ generated:
   - .factory/skills/qa-backend/SKILL.md
   - .factory/skills/qa-native/SKILL.md
   - .github/workflows/qa.yml
+  - .github/workflows/qa-mobile.yml
+  - .maestro/ (README + 4 flows)
+  - tools/qa-backend.sh
 
 notes:
   - "No droid-control plugin dependency: no QA flow uses a droid-control route
     (backend is curl, mobile uses the argent simulator session tools, web is
     out of scope). Add the plugin if browser-driven web QA enters scope."
-  - "CI secrets required: FACTORY_API_KEY (droid auth); QA_WAITLIST_SHARED_SECRET
-    optional to unlock dev positive waitlist flows."
+  - "Sustainability architecture (survives without a Factory subscription):
+    tools/qa-backend.sh is the deterministic backend baseline that always
+    runs in CI; the droid exec agent layer is optional and auto-skips when
+    FACTORY_API_KEY is absent; .maestro/ + qa-mobile.yml cover mobile E2E on
+    a macOS runner nightly and on dispatch, no subscription needed."
+  - "CI secrets: FACTORY_API_KEY (optional after the baseline change —
+    enables the agent layer only); QA_WAITLIST_SHARED_SECRET (optional —
+    unlocks dev positive waitlist flows); EXPO_TOKEN (qa-mobile.yml only —
+    EAS build download)."
+  - "qa-mobile prerequisites: a finished development-simulator EAS build must
+    exist, and the EAS development environment must set
+    EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS; Maestro flows were authored from the
+    locale catalog and need selector iteration on the first CI run."

@@ -92,6 +92,10 @@ apps:
     skill: qa-backend
     test_tool: curl
     target: production (read-only) + development (positive flows)
+    # Subscription-free CI baseline: runs on every PR and push to main in
+    # .github/workflows/qa.yml, independent of any agent. Keep its URL
+    # defaults in sync with the site URLs above.
+    baseline_script: tools/qa-backend.sh
   native:
     path_patterns:
       - apps/native/src/**
@@ -100,15 +104,21 @@ apps:
       - apps/native/package.json
       - apps/native/assets/**
       - apps/native/locales/**
+      - apps/native/src/locales/**
       - apps/native/localization.config.json
       - apps/native/plugins/**
       - apps/native/ios/**
       - apps/native/eas.json
+      - .maestro/**
       - package.json
       - pnpm-lock.yaml
     skill: qa-native
     test_tool: ios-simulator (argent session tools; local-only)
     build_command: pnpm --filter native-app ios
+    # Subscription-free mobile baseline: Maestro flows, nightly + manual
+    # dispatch on a macOS runner (.github/workflows/qa-mobile.yml). The
+    # agent layer above is the interactive, diff-aware complement.
+    maestro_flows: .maestro/
 
 feature_flags:
   provider: none

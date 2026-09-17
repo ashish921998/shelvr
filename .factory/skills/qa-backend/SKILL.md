@@ -34,6 +34,11 @@ BLOCKED ("QA_WAITLIST_SHARED_SECRET not provided") — the no-secret flows
 below still run. NEVER attempt to read the secret from `convex env list`
 (values print masked) or from the dashboard.
 
+**Deterministic baseline:** `tools/qa-backend.sh` encodes every flow in this
+menu as plain curl assertions and runs as the subscription-free CI baseline
+in `.github/workflows/qa.yml`. When a flow's expectations change here,
+update the script in the same commit (and vice versa).
+
 ## Flow Menu
 
 The orchestrator picks flows relevant to the diff. Pick by what changed:
@@ -90,17 +95,20 @@ Development ONLY.
   email. Assert `saved` is true again.
 - PASS: `200` + `saved:true` on both calls. Rows stay in dev by design.
 
-### 5. waitlist-rate-limit — per-IP limiter trips (dev, needs secret)
+### 5. waitlist-rate-limit — email-keyed limiter trips on repeat (dev, needs secret)
 
-Development ONLY.
+Development ONLY. Verified mechanism: `waitlistJoin` in
+`convex/model/rateLimiter.ts` is a token bucket keyed by email with capacity
+3 and 5/hour refill (a per-IP bucket sits behind it at capacity 8).
 
-- Send the same valid POST (fixed `x-shelvr-client-ip: 198.51.100.<n>`) in a
-  loop, up to 20 attempts, capturing statuses, until one returns `429`
-  `{"message":"Too many attempts."}`.
-- PASS: `429` observed within the cap. If 20 attempts all return `200`,
-  report INCONCLUSIVE (limiter threshold higher than the cap) — do not keep
-  hammering past 20.
-- Use a distinct IP per run so you do not poison later runs' limiter state.
+- Use a fresh run-unique email (`qa+<RUN_ID>-rl@example.com`) and a fixed
+  `x-shelvr-client-ip`. Send the same valid POST up to 5 times, capturing
+  statuses. Requests 1-3 return `200`; the 4th deterministically returns
+  `429` `{"message":"Too many attempts."}`.
+- PASS: `429` observed (expect it on attempt 4). No `429` within 5 attempts
+  → INCONCLUSIVE; do not keep hammering.
+- This creates exactly one dev row (the rate-limit email) on top of the
+  signup email — two rows per run total, both with `qa+` prefixes.
 
 ### 6. revenuecat-unauthorized — webhook rejects unauthenticated posts
 

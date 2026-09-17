@@ -88,12 +88,16 @@ this diff." Do NOT run any app flows.
 - `qa-backend` affected: confirm `curl` and `jq` exist; confirm the target
   site URLs resolve (one cheap `GET /health` or equivalent). If
   `QA_WAITLIST_SHARED_SECRET` is unset in the environment, the secret-gated
-  dev flows report BLOCKED — negative and health flows still run.
+  dev flows report BLOCKED — negative and health flows still run. In CI,
+  `tools/qa-backend.sh` (the deterministic baseline) has already run every
+  backend flow and written `qa-results/report.md`; you may also run it
+  locally as a fast pre-flight.
 - `qa-native` affected: confirm macOS/Xcode + a booted simulator + the dev
   client build exist (see the sub-skill's pre-flight). If the argent session
   tools are unavailable — e.g. running under `droid exec` in CI — report the
   native app as BLOCKED with the reason "mobile QA is local-only"; do NOT
-  attempt simulator flows in CI.
+  attempt simulator flows in CI (the Maestro baseline in qa-mobile.yml is
+  CI's mobile coverage, nightly).
 - When Compose is enabled in config, install its prerequisites only at that
   moment; when it is disabled, never install Compose/Remotion prerequisites.
 
@@ -116,6 +120,12 @@ flows. You must:
    directly verifies the changed behavior.
 5. Do NOT run unit tests, lint, typecheck, or any automated suite. This is
    functional QA only.
+
+In CI, when a deterministic baseline report already exists at
+`qa-results/report.md` (written by `tools/qa-backend.sh`), do not duplicate
+its rows: merge them into your final report unchanged and add your
+diff-targeted rows on top. Re-run a baseline flow yourself only when the
+diff changes that flow's behavior.
 
 ## Step 6: Evidence Capture
 

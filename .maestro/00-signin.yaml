@@ -1,0 +1,17 @@
+appId: app.shelvr.save.dev
+name: 00 Launch and anonymous sign-in
+---
+- launchApp
+# The dev build renders OAuth buttons plus the dev-only anonymous button
+# (requires EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS in the bundle and
+# AUTH_ENABLE_ANONYMOUS=true on the dev deployment).
+- assertVisible:
+    id: apple-sign-in-button
+- takeScreenshot: 00-signin
+- tapOn: "Continue without account"
+# One tap, no OAuth. Onboarding or home follows; 30s covers a cold
+# Convex Auth round trip.
+- extendedWaitUntil:
+    notVisible: "Continue without account"
+    timeout: 30000
+- takeScreenshot: 00-after-signin

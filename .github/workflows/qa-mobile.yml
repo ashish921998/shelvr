@@ -1,0 +1,157 @@
+name: QA Mobile
+
+# Subscription-free mobile E2E: Maestro drives the dev-client app on an iOS
+# simulator against the dev Convex deployment. Nightly + manual dispatch only
+# (macOS runners bill at 10x minutes on private repos; expect 15-25 min per
+# run, roughly 10 free runs/month within the included-minutes allowance).
+#
+# One-time prerequisites:
+#   1. EXPO_TOKEN repo secret (EAS access token, app.factory.ai-unrelated:
+#      create with `eas token:create` or expo.dev accounts).
+#   2. A finished `development-simulator` EAS build exists. Create with:
+#      pnpm --filter native-app exec eas build -p ios --profile development-simulator
+#   3. The EAS `development` environment sets EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS
+#      so the downloaded build shows "Continue without account" (check with:
+#      pnpm --filter native-app exec eas env:list --environment development).
+#      If it was missing on the existing build, set it and rebuild once.
+#
+# The JS under test comes from THIS branch — Metro serves the checkout, the
+# downloaded .app is only the native shell — so most changes need no new
+# EAS build. URLs mirror .factory/skills/qa/config.yaml (development env).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *" # nightly, 02:30 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-mobile
+  cancel-in-progress: false
+
+jobs:
+  maestro:
+    name: maestro (ios simulator)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      MAESTRO_OUTPUT_DIR: ${{ github.workspace }}/maestro-out
+      # Baked into the JS bundle Metro serves (EXPO_PUBLIC_* are inlined at
+      # bundle time, and apps/native/.env.local is not committed).
+      EXPO_PUBLIC_CONVEX_URL: https://amicable-antelope-639.convex.cloud
+      EXPO_PUBLIC_CONVEX_SITE_URL: https://amicable-antelope-639.convex.site
+      EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS: "true"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - name: Check prerequisites
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret is not set — the EAS build download cannot run."
+            echo "Add it at Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev/latest" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Boot an iPhone simulator
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices --json | jq -r \
+            '[.devices[][] | select(.isAvailable and (.name | startswith("iPhone")))][0].udid')
+          NAME=$(xcrun simctl list devices --json | jq -r \
+            --arg u "$UDID" '[.devices[][] | select(.udid == $u)][0].name')
+          echo "Booting $NAME ($UDID)"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Download the dev-client simulator build
+        run: |
+          set -euo pipefail
+          cd apps/native
+          npx --yes eas-cli@latest build:list --platform ios --non-interactive --json --limit 30 > builds.json
+          # Match the development-simulator profile by name or the simulator
+          # flag; tolerate older/newer field spellings.
+          URL=$(jq -r \
+            '[.[] | select(.status == "finished")
+              | select((.appProfile // .buildProfile // "") == "development-simulator" or .simulator == true)]
+            | .[0] | .artifactUrl // .artifactURL // empty' builds.json)
+          if [ -z "$URL" ]; then
+            echo "No finished development-simulator EAS build found."
+            echo "Create one with:"
+            echo "  pnpm --filter native-app exec eas build -p ios --profile development-simulator"
+            exit 1
+          fi
+          echo "Downloading $URL"
+          curl -fsSL -o app.tar.gz "$URL"
+          mkdir -p app && tar -xzf app.tar.gz -C app
+          APP_PATH=$(find app -name "*.app" -maxdepth 4 | head -n 1)
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Start Metro from this branch
+        run: |
+          cd apps/native
+          nohup pnpm exec expo start --dev-client --port 8081 > ../../metro.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:8081/status; then
+              echo "Metro ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Metro did not become ready; see metro.log artifact"
+          exit 1
+
+      - name: Install app and connect it to Metro
+        run: |
+          set -euo pipefail
+          xcrun simctl install "$UDID" "$APP_PATH"
+          # Point the dev client at the local Metro server. The dev build may
+          # register the base scheme or a generated -dev scheme; try both.
+          xcrun simctl openurl "$UDID" \
+            "shelvr://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081" ||
+            xcrun simctl openurl "$UDID" \
+              "shelvr-dev://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081" ||
+            echo "Deep link failed; the app will prompt to pick a dev server."
+
+      - name: Run Maestro flows
+        run: |
+          mkdir -p maestro-out
+          maestro test .maestro/ --format junit
+
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-mobile-results
+          path: |
+            maestro-out/
+            maestro-e2e-tests.xml
+            metro.log
+          retention-days: 14
+          if-no-files-found: ignore
