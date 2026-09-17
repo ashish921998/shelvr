@@ -331,6 +331,10 @@
   "item.noArticle": "This page has no readable article — saved as a plain link.",
   "recipe.ingredients": "Ingredients",
   "recipe.steps": "Steps",
+  "recipe.serves": {
+    "one": "Serves %{formattedCount}",
+    "other": "Serves %{formattedCount}"
+  },
   "survey.xBookmarks": "X bookmarks",
   "survey.instagram": "Instagram saved",
   "survey.screenshots": "Screenshots",

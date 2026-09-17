@@ -333,6 +333,9 @@
   "item.noArticle": "読み取れる記事がないため、通常のリンクとして保存しました。",
   "recipe.ingredients": "材料",
   "recipe.steps": "作り方",
+  "recipe.serves": {
+    "other": "%{formattedCount}人分"
+  },
   "survey.xBookmarks": "Xのブックマーク",
   "survey.instagram": "Instagramの保存済み",
   "survey.screenshots": "スクリーンショット",

@@ -331,6 +331,11 @@
   "item.noArticle": "Cette page ne contient pas d'article lisible — enregistrée comme simple lien.",
   "recipe.ingredients": "Ingrédients",
   "recipe.steps": "Étapes",
+  "recipe.serves": {
+    "one": "Pour %{formattedCount} portion",
+    "many": "Pour %{formattedCount} portions",
+    "other": "Pour %{formattedCount} portions"
+  },
   "survey.xBookmarks": "Signets X",
   "survey.instagram": "Enregistrements Instagram",
   "survey.screenshots": "Captures d'écran",

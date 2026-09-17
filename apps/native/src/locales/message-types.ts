@@ -332,6 +332,7 @@ export type MessageParams = {
   "item.noArticle": undefined;
   "recipe.ingredients": undefined;
   "recipe.steps": undefined;
+  "recipe.serves": { count: number };
   "survey.xBookmarks": undefined;
   "survey.instagram": undefined;
   "survey.screenshots": undefined;

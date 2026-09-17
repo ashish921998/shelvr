@@ -333,6 +333,9 @@
   "item.noArticle": "읽을 수 있는 글이 없는 페이지라 일반 링크로 저장했어요.",
   "recipe.ingredients": "재료",
   "recipe.steps": "만드는 방법",
+  "recipe.serves": {
+    "other": "%{formattedCount}인분"
+  },
   "survey.xBookmarks": "X 북마크",
   "survey.instagram": "Instagram 저장 항목",
   "survey.screenshots": "스크린샷",

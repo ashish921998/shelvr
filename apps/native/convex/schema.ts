@@ -54,8 +54,9 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
-    // Structured recipe the classifier lifted from a recipe page (links
-    // only). Optional so pre-existing rows validate; absent = not a recipe.
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
     recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.

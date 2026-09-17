@@ -331,6 +331,11 @@
   "item.noArticle": "Esta página no contiene un artículo legible — guardada como enlace simple.",
   "recipe.ingredients": "Ingredientes",
   "recipe.steps": "Pasos",
+  "recipe.serves": {
+    "one": "Para %{formattedCount} porción",
+    "many": "Para %{formattedCount} porciones",
+    "other": "Para %{formattedCount} porciones"
+  },
   "survey.xBookmarks": "Marcadores de X",
   "survey.instagram": "Guardados de Instagram",
   "survey.screenshots": "Capturas de pantalla",

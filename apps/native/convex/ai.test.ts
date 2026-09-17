@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   extractBodyText,
   fetchXoEmbed,
+  finalRecipe,
+  firstLinkedUrl,
   linkEnrichment,
   sanitizeRecipe,
   storePoster,
@@ -73,7 +75,7 @@ describe("fetchXoEmbed", () => {
 
   it("keeps the post paragraph and drops the attribution", async () => {
     parseJson.mockReturnValue({
-      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://t.co/x">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
+      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://twitter.com/hashtag/space?src=hash">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
       author_url: "https://twitter.com/NASA",
       author_name: "NASA",
     });
@@ -83,6 +85,61 @@ describe("fetchXoEmbed", () => {
       author: "@NASA",
       content: "Hello & #space",
     });
+  });
+
+  it("keeps the first outside link (a t.co redirect) and skips attached media and the attribution", async () => {
+    parseJson.mockReturnValue({
+      html: '<blockquote class="twitter-tweet"><p lang="en">Full recipe <a href="https://t.co/media1">pic.twitter.com/abc</a> <a href="https://t.co/recipe1">smittenkitchen.com/2023/03/spring…</a> <a href="https://t.co/second">other.com</a></p>&mdash; SK (@sk) <a href="https://twitter.com/sk/status/1">May 1</a></blockquote>',
+      author_url: "https://twitter.com/sk",
+    });
+    const page = await fetchXoEmbed("https://x.com/sk/status/1");
+    expect(page.linkedUrl).toBe("https://t.co/recipe1");
+  });
+});
+
+describe("firstLinkedUrl", () => {
+  it("trims trailing punctuation and skips link hubs and social hosts", () => {
+    expect(
+      firstLinkedUrl(
+        "Recipe in bio https://linktr.ee/cook or here: https://www.budgetbytes.com/dal/. Enjoy!",
+      ),
+    ).toBe("https://www.budgetbytes.com/dal/");
+    expect(
+      firstLinkedUrl("watch https://youtu.be/abc and https://x.com/a"),
+    ).toBe(undefined);
+    expect(firstLinkedUrl("no links here")).toBeUndefined();
+    expect(firstLinkedUrl(undefined)).toBeUndefined();
+  });
+
+  it("stops a URL at whitespace, quotes, and closing brackets", () => {
+    expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
+      "https://example.com/a?b=1&c=2",
+    );
+  });
+});
+
+describe("finalRecipe", () => {
+  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
+  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+  it("prefers the page's structured recipe over the model's proposal", () => {
+    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
+  });
+
+  it("falls back to the sanitized model proposal when the page has none", () => {
+    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+  });
+
+  it("is absent when neither source produced one", () => {
+    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
+    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 

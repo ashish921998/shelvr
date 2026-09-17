@@ -5,7 +5,8 @@ import { RecipeSection } from "./recipe-section";
 
 vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => {},
-  t: (key: string) => key,
+  t: (key: string, params?: { count: number }) =>
+    params ? `${key}:${params.count}` : key,
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -59,4 +60,23 @@ it("omits the servings line when the recipe has none", () => {
     "1",
     "Add salt.",
   ]);
+});
+
+it("phrases a bare numeric yield through the localized serves message but keeps phrases verbatim", () => {
+  const numeric = render(
+    <RecipeSection
+      recipe={{ servings: "4", ingredients: ["Rice"], steps: ["Cook."] }}
+    />,
+  );
+  expect(renderedText(numeric.container)[0]).toBe("recipe.serves:4");
+  const phrase = render(
+    <RecipeSection
+      recipe={{
+        servings: "Makes 16 cookies",
+        ingredients: ["Rice"],
+        steps: ["Cook."],
+      }}
+    />,
+  );
+  expect(renderedText(phrase.container)[0]).toBe("Makes 16 cookies");
 });

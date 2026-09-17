@@ -45,9 +45,10 @@ export const failureReasonValidator = v.union(
   v.literal("image_too_large"),
 );
 
-// A structured recipe lifted out of a recipe page during classification
-// (link items only). Absent for every other save; the client keeps rendering
-// the plain article when absent. `servings` is a display string ("4 servings",
+// A structured recipe lifted during processing: from a recipe page's
+// schema.org markup, from the recipe page a video caption links to, or from
+// the classifier reading a caption or screenshot. Absent for every other
+// save; the client keeps rendering the plain article when absent. `servings` is a display string ("4 servings",
 // "12 cookies") because recipes quantify the yield in too many shapes for a
 // number field to be honest.
 export const recipeValidator = v.object({

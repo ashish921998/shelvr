@@ -331,6 +331,10 @@
   "item.noArticle": "Diese Seite enthält keinen lesbaren Artikel — als einfacher Link gespeichert.",
   "recipe.ingredients": "Zutaten",
   "recipe.steps": "Schritte",
+  "recipe.serves": {
+    "one": "Für %{formattedCount} Portion",
+    "other": "Für %{formattedCount} Portionen"
+  },
   "survey.xBookmarks": "X-Lesezeichen",
   "survey.instagram": "Auf Instagram gespeichert",
   "survey.screenshots": "Bildschirmfotos",

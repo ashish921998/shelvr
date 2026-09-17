@@ -3,15 +3,25 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-// The structured recipe the classifier lifted out of a recipe page. Rendered
-// instead of the article paragraphs: the user wants the recipe itself, not
-// the blog story around it. Lists are selectable so quantities can be copied.
+/** Recipe markup often states the yield as a bare number ("4"); a phrase
+ * ("Makes 16 cookies", "2 1/2 cups") is shown as written. */
+function servingsLabel(servings: string): string {
+  const count = Number(servings);
+  return /^\d+$/.test(servings.trim()) && count > 0
+    ? t("recipe.serves", { count })
+    : servings;
+}
+
+// The structured recipe lifted out of a recipe page, a video caption, or a
+// screenshot. Rendered instead of the article paragraphs: the user wants the
+// recipe itself, not the blog story around it. Lists are selectable so
+// quantities can be copied.
 export function RecipeSection({ recipe }: { recipe: Recipe }) {
   useAppLocale();
   return (
     <View style={styles.section}>
       {recipe.servings ? (
-        <Text style={styles.servings}>{recipe.servings}</Text>
+        <Text style={styles.servings}>{servingsLabel(recipe.servings)}</Text>
       ) : null}
 
       <Text style={styles.sectionTitle}>{t("recipe.ingredients")}</Text>

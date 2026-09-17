@@ -385,9 +385,11 @@ function ItemDetailBody({
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
-      {/* A recipe page replaces the article paragraphs: the classifier already
-          lifted the ingredients and steps out of the story around them. */}
-      {!isVideo && detail.recipe ? (
+      {/* A recipe replaces the article paragraphs: the pipeline already lifted
+          the ingredients and steps out of the story around them. A video keeps
+          its caption above and gains the recipe its caption described or
+          linked to; a recipe screenshot gets the card under the photo. */}
+      {detail.recipe ? (
         <RecipeSection recipe={detail.recipe} />
       ) : !isVideo && paragraphs.length > 0 ? (
         <View style={styles.article}>
