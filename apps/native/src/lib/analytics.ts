@@ -207,30 +207,26 @@ function captureError(
   const client = posthog;
   if (!client) return;
 
-  try {
-    const original = error instanceof Error ? error : new Error(typeof error);
-    const reported =
-      !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
-        ? original
-        : Object.assign(new Error(original.name), {
-            name: original.name,
-            stack: original.stack,
-          });
-    afterIdentitySettles(() => {
-      try {
-        client.captureException(reported, {
-          ...properties,
-          error_event: event,
-          environment: Constants.expoConfig?.extra?.variant ?? "development",
-          analytics_version: 1,
-        });
-      } catch {
-        // Error reporting must never mask or replace the original failure.
-      }
-    });
-  } catch {
-    // Error reporting must never mask or replace the original failure.
-  }
+  afterIdentitySettles(() => {
+    try {
+      const original = error instanceof Error ? error : new Error(typeof error);
+      const reported =
+        !(error instanceof Error) || SAFE_ERROR_MESSAGES.has(original.message)
+          ? original
+          : Object.assign(new Error(original.name), {
+              name: original.name,
+              stack: original.stack,
+            });
+      client.captureException(reported, {
+        ...properties,
+        error_event: event,
+        environment: Constants.expoConfig?.extra?.variant ?? "development",
+        analytics_version: 1,
+      });
+    } catch {
+      // Error reporting must never mask or replace the original failure.
+    }
+  });
 }
 
 function sessionId(): string | undefined {

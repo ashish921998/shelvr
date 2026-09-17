@@ -147,14 +147,11 @@ posthog?.register(superProperties());
 // Read before anything renders, so a sign-in during this launch can't count.
 const startedWithSession = hasStoredAuthSession();
 
-// PostHog keeps its ids in its own storage, which outlives a lost Convex
-// session (expired, or a wiped keychain). Such a launch would report its first
-// screens as the previous account, so the stale identity is dropped as soon as
-// the SDK has loaded, before any app event is sent. A launch that still holds
-// a session is left alone, even one the server will reject: only Convex knows
-// that, and PostHogIdentity resets once it says so. The SDK's own "Application
-// Updated" is captured before this runs, so a store update on such a launch
-// still lands on the previous account.
+// PostHog's ids outlive a lost Convex session (expired, or a wiped keychain),
+// so a launch without one drops the previous account before any app event is
+// sent. A stored session the server will reject is left to PostHogIdentity.
+// The SDK's "Application Updated" is captured earlier and still lands on the
+// previous account.
 async function dropStaleIdentity(client: PostHog): Promise<void> {
   if (startedWithSession) return;
   try {

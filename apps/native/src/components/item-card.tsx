@@ -349,7 +349,7 @@ export const ItemCard = memo(function ItemCard({
       (changed) => {
         if (changed) analytics.capture("suggestion_accepted");
       },
-      (err: unknown) => analytics.captureError("suggestion_accept_failed", err),
+      (err) => analytics.captureError("suggestion_accept_failed", err),
     );
   };
 
@@ -359,8 +359,7 @@ export const ItemCard = memo(function ItemCard({
       (changed) => {
         if (changed) analytics.capture("suggestion_dismissed");
       },
-      (err: unknown) =>
-        analytics.captureError("suggestion_dismiss_failed", err),
+      (err) => analytics.captureError("suggestion_dismiss_failed", err),
     );
   };
 
