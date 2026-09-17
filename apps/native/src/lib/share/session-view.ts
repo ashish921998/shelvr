@@ -29,14 +29,15 @@ const isFailed = (e: ShareEntry) =>
   e.status === "failed" || e.status === "unsupported";
 
 /** One outcome per saved item: a group of entries sharing a link is saved once
- * any of them saved, and failed only when none saved and one failed. */
+ * any of them saved, and failed (as its first failed entry) only when none
+ * saved. */
 function groupOutcomes(
   session: ShareSession,
   resolved: ResolvedPayload[],
-): { entries: ShareEntry[]; saved: boolean; failed: boolean }[] {
+): { saved: boolean; failed: ShareEntry | undefined }[] {
   return shareGroups(session.entries, resolved).map((entries) => {
     const saved = entries.some((e) => e.status === "saved");
-    return { entries, saved, failed: !saved && entries.some(isFailed) };
+    return { saved, failed: saved ? undefined : entries.find(isFailed) };
   });
 }
 
@@ -63,7 +64,7 @@ export function countPartial(
   const groups = groupOutcomes(session, resolved);
   return {
     saved: groups.filter((g) => g.saved).length,
-    failed: groups.filter((g) => g.failed).length,
+    failed: groups.filter((g) => g.failed !== undefined).length,
     total: groups.length,
   };
 }
@@ -73,9 +74,9 @@ export function failedEntries(
   session: ShareSession,
   resolved: ResolvedPayload[],
 ): ShareEntry[] {
-  return groupOutcomes(session, resolved)
-    .filter((g) => g.failed)
-    .map((g) => g.entries.find(isFailed)!);
+  return groupOutcomes(session, resolved).flatMap((g) =>
+    g.failed === undefined ? [] : [g.failed],
+  );
 }
 
 /** Returns a copy of `session` with the entry matching `settled.index` replaced
