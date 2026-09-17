@@ -321,6 +321,8 @@
   "appearance.neutralDark": "Dark (neutral)",
   "widget.emptyTitle": "Nothing saved yet",
   "widget.emptyBody": "Tap + to save a link, photo, or note",
+  "widget.proTitle": "Recent saves are a Pro feature",
+  "widget.proBody": "Subscribe to Shelvr Pro to see your saves here",
   "item.savedItem": "Saved item",
   "item.link": "Link",
   "item.photo": "Photo",

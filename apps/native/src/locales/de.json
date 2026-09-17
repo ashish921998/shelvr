@@ -321,6 +321,8 @@
   "appearance.neutralDark": "Dunkel (neutral)",
   "widget.emptyTitle": "Noch nichts gespeichert",
   "widget.emptyBody": "Tippe auf +, um einen Link, ein Foto oder eine Notiz zu speichern",
+  "widget.proTitle": "Letzte Speicherungen sind eine Pro-Funktion",
+  "widget.proBody": "Abonniere Shelvr Pro, um deine gespeicherten Inhalte hier zu sehen",
   "item.savedItem": "Gespeicherter Inhalt",
   "item.link": "Link",
   "item.photo": "Foto",

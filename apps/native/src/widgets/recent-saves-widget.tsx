@@ -35,6 +35,7 @@ type RecentSavesWidgetProps = {
   items: WidgetSaveItem[];
   emptyTitle?: string;
   emptyHint?: string;
+  locked?: boolean;
 };
 
 // Everything (palette, helpers) lives inside the component: the `'widget'`
@@ -67,6 +68,9 @@ const RecentSavesWidget = (
     kind === "link" ? "link" : kind === "note" ? "note.text" : "photo";
 
   const items = props.items ?? [];
+  // Until the app writes its first snapshot, fail closed and show the Pro
+  // state rather than exposing a misleading free widget.
+  const locked = props.locked ?? true;
 
   if (items.length === 0) {
     return (
@@ -74,10 +78,14 @@ const RecentSavesWidget = (
         spacing={6}
         modifiers={[
           containerBackground(c.background, "widget"),
-          widgetURL("shelvr:///add"),
+          widgetURL(locked ? "shelvr:///paywall" : "shelvr:///add"),
         ]}
       >
-        <Image systemName="tray" size={22} color={c.muted} />
+        <Image
+          systemName={locked ? "lock.fill" : "tray"}
+          size={22}
+          color={c.muted}
+        />
         <Text
           modifiers={[
             font({ size: 12, weight: "medium" }),

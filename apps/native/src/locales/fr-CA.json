@@ -321,6 +321,8 @@
   "appearance.neutralDark": "Sombre (neutre)",
   "widget.emptyTitle": "Aucun contenu enregistré",
   "widget.emptyBody": "Touchez + pour enregistrer un lien, une photo ou une note",
+  "widget.proTitle": "Les éléments récents sont une fonction Pro",
+  "widget.proBody": "Abonnez-vous à Shelvr Pro pour voir vos contenus enregistrés ici",
   "item.savedItem": "Élément enregistré",
   "item.link": "Lien",
   "item.photo": "Photo",

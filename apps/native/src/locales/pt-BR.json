@@ -321,6 +321,8 @@
   "appearance.neutralDark": "Escuro (neutro)",
   "widget.emptyTitle": "Ainda não há nada salvo",
   "widget.emptyBody": "Toque em + para salvar um link, uma foto ou uma nota",
+  "widget.proTitle": "Salvos recentes são um recurso Pro",
+  "widget.proBody": "Assine o Shelvr Pro para ver seus itens salvos aqui",
   "item.savedItem": "Item salvo",
   "item.link": "Link",
   "item.photo": "Foto",
