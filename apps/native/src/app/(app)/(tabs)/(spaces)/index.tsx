@@ -188,9 +188,11 @@ export default function SpacesScreen() {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: async () => {
-          await deleteSpace({ id });
-          analytics.capture("space_deleted");
+        onPress: () => {
+          void deleteSpace({ id }).then(
+            () => analytics.capture("space_deleted"),
+            (err) => analytics.captureError("space_delete_failed", err),
+          );
         },
       },
     ]);
