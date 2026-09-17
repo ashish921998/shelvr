@@ -1,6 +1,14 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import { api, internal } from "@convex/_generated/api";
 import {
   extractBodyText,
@@ -13,7 +21,10 @@ import {
 } from "./ai";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
+import fxArticle from "./testdata/xSyndication/fxArticle.json";
+import fxListArticle from "./testdata/xSyndication/fxListArticle.json";
 import gifSyndication from "./testdata/xSyndication/gif.json";
+import listArticleSyndication from "./testdata/xSyndication/listArticle.json";
 import mediaOnlySyndication from "./testdata/xSyndication/mediaOnly.json";
 import longVideoSyndication from "./testdata/xSyndication/longVideo.json";
 import oembedText from "./testdata/xSyndication/oembedText.json";
@@ -110,9 +121,17 @@ describe("fetchXoEmbed", () => {
   });
 });
 
-type FakeResponse = { status: number; body?: unknown };
+type FakeResponse =
+  | { status: number; body?: unknown; raw?: string }
+  | { error: "timeout" | "fetch_failed" };
 
-function serveX(syndication: FakeResponse, oembed: FakeResponse) {
+const FXTWITTER = "https://api.fxtwitter.com/2/status/";
+
+function serveX(
+  syndication: FakeResponse,
+  oembed: FakeResponse,
+  fxtwitter: FakeResponse = { status: 599 },
+) {
   safeFetch.mockImplementation(async (url: string) => {
     const response = url.startsWith(
       "https://cdn.syndication.twimg.com/tweet-result?",
@@ -120,7 +139,12 @@ function serveX(syndication: FakeResponse, oembed: FakeResponse) {
       ? syndication
       : url.startsWith("https://publish.twitter.com/oembed?")
         ? oembed
-        : { status: 599 };
+        : url.startsWith(FXTWITTER)
+          ? fxtwitter
+          : { status: 599 };
+    if ("error" in response) {
+      return { ok: false, code: response.error };
+    }
     if (response.status !== 200) {
       return { ok: false, code: "http_error", status: response.status };
     }
@@ -129,9 +153,17 @@ function serveX(syndication: FakeResponse, oembed: FakeResponse) {
       finalUrl: url,
       status: 200,
       contentType: "application/json; charset=utf-8",
-      bytes: new TextEncoder().encode(JSON.stringify(response.body)),
+      bytes: new TextEncoder().encode(
+        response.raw ?? JSON.stringify(response.body),
+      ),
     };
   });
+}
+
+function fxtwitterCalls(): unknown[][] {
+  return safeFetch.mock.calls.filter(([url]) =>
+    String(url).startsWith(FXTWITTER),
+  );
 }
 
 const JACK_OEMBED_READ = {
@@ -358,6 +390,354 @@ describe("fetchXPost", () => {
   });
 });
 
+const ARTICLE_URL = "https://x.com/adamtwtz/status/2097073557868056925";
+const ARTICLE_PREVIEW =
+  "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe…";
+
+function withArticleContent(content: unknown) {
+  return {
+    ...fxArticle,
+    status: {
+      ...fxArticle.status,
+      article: { ...fxArticle.status.article, content },
+    },
+  };
+}
+
+describe("fetchXPost for an Article's full body", () => {
+  let warn: MockInstance<typeof console.warn>;
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  function loggedEvents() {
+    return warn.mock.calls.map(([line]: unknown[]) => {
+      const fields = JSON.parse(String(line));
+      return { event: fields.event, error_category: fields.error_category };
+    });
+  }
+
+  it("stores every text block of the Article as a paragraph", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 200, body: fxArticle },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read).toMatchObject({
+      title: "How this GLP-1 app generated 20m+ views",
+      siteName: "X",
+      author: "@adamtwtz",
+      heroImageUrl:
+        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroAspectRatio: 2.5,
+    });
+    expect(read).not.toHaveProperty("media");
+    const paragraphs = read.content?.split("\n\n");
+    expect(paragraphs).toHaveLength(60);
+    expect(paragraphs?.slice(0, 6)).toEqual([
+      "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.",
+      "it's a GLP-1 tracking app, and they've been running one campaign since April.",
+      "the content is faceless AI slideshows posted on tiktok, and they are running with an effective CPM of $0.91",
+      "here's exactly how the whole campaign worked",
+      "why GLP-1 apps can't run ads",
+      "running ads is already a stupid option on its own, due to the crazy high cpms and low af conversion rates",
+    ]);
+    expect(paragraphs).toContain(
+      '"For weight loss products that require prescription, please refer to Drugs and Pharmaceuticals ads policy and comply with the geo-targeting, and written permission requirements."',
+    );
+    expect(paragraphs?.at(-1)).toBe(
+      "Book a call (https://cal.com/team/content-rewards/discovery-call?a=glp)",
+    );
+    expect(read.content).not.toMatch(/\n{3,}| \n|\n /);
+    expect(loggedEvents()).toEqual([]);
+  });
+
+  it("marks list items and leaves links to X profiles as plain text", async () => {
+    serveX(
+      { status: 200, body: listArticleSyndication },
+      { status: 500 },
+      { status: 200, body: fxListArticle },
+    );
+    const read = await fetchXPost(
+      "https://x.com/pauldix/status/2006423514446749965",
+    );
+    const paragraphs = read.content?.split("\n\n") ?? [];
+    expect(paragraphs).toHaveLength(28);
+    expect(paragraphs.slice(12, 20)).toEqual([
+      "How to think about software development in 2026",
+      expect.stringMatching(/^Organizations that update their processes/),
+      "- review bandwidth / ownership",
+      "- testing and validation",
+      "- release/rollback confidence",
+      "- security/compliance gates",
+      "- product decision latency (what to build next)",
+      expect.stringMatching(/^The software delivery process should be updated/),
+    ]);
+  });
+
+  it("numbers ordered lists and restarts the count after other blocks", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            {
+              type: "ordered-list-item",
+              text: "Pick a niche",
+              entityRanges: [],
+            },
+            {
+              type: "ordered-list-item",
+              text: "Write a brief",
+              entityRanges: [],
+            },
+            { type: "header-two", text: "Next", entityRanges: [] },
+            { type: "ordered-list-item", text: "Fund it", entityRanges: [] },
+          ],
+          entityMap: [],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe(
+      "1. Pick a niche\n\n2. Write a brief\n\nNext\n\n1. Fund it",
+    );
+  });
+
+  it("keeps the count across empty items and images in an ordered list", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            { type: "ordered-list-item", text: " ", entityRanges: [] },
+            {
+              type: "ordered-list-item",
+              text: "Pick a niche",
+              entityRanges: [],
+            },
+            { type: "atomic", text: " ", entityRanges: [] },
+            {
+              type: "ordered-list-item",
+              text: "Write a brief",
+              entityRanges: [],
+            },
+          ],
+          entityMap: [],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("1. Pick a niche\n\n2. Write a brief");
+  });
+
+  it("places a link after its text when emoji come before it", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            {
+              type: "unstyled",
+              text: "🚀😆 read HERE and follow @nasa",
+              entityRanges: [
+                { key: 0, offset: 8, length: 4 },
+                { key: 1, offset: 24, length: 5 },
+                { key: 2, offset: 0, length: 1 },
+              ],
+            },
+          ],
+          entityMap: [
+            {
+              key: "0",
+              value: {
+                type: "LINK",
+                mutability: "Mutable",
+                data: { url: "https://example.com/guide" },
+              },
+            },
+            {
+              key: "1",
+              value: {
+                type: "LINK",
+                mutability: "Mutable",
+                data: { url: "https://x.com/nasa" },
+              },
+            },
+            {
+              key: "2",
+              value: {
+                type: "TWEMOJI",
+                mutability: "Immutable",
+                data: {
+                  url: "https://abs-0.twimg.com/emoji/v2/svg/1f680.svg",
+                },
+              },
+            },
+          ],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe(
+      "🚀😆 read HERE (https://example.com/guide) and follow @nasa",
+    );
+  });
+
+  it("asks fxtwitter for the post id only, as Shelvr, with a short deadline", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 200, body: fxArticle },
+    );
+    await fetchXPost(
+      "https://twitter.com/adamtwtz/status/2097073557868056925?s=46&t=abc",
+    );
+    expect(fxtwitterCalls()).toEqual([
+      [
+        "https://api.fxtwitter.com/2/status/2097073557868056925",
+        expect.objectContaining({
+          timeoutMs: 5000,
+          maxRedirects: 0,
+          headers: {
+            "User-Agent": "Shelvr/1.0 (+https://shelvr.app)",
+            Accept: "application/json",
+          },
+        }),
+      ],
+    ]);
+  });
+
+  it.each([
+    ["a timeout", { error: "timeout" }, "fetch:timeout"],
+    ["a network error", { error: "fetch_failed" }, "fetch:fetch_failed"],
+    ["a rate limit", { status: 429 }, "fetch:http_error:429"],
+    ["a missing post", { status: 404 }, "fetch:http_error:404"],
+    ["malformed JSON", { status: 200, raw: "<html>oops" }, "unreadable_json"],
+    [
+      "an unexpected shape",
+      {
+        status: 200,
+        body: { code: 200, status: { id: "2097073557868056925" } },
+      },
+      "schema_mismatch",
+    ],
+    [
+      "another post's body",
+      {
+        status: 200,
+        body: { ...fxArticle, status: { ...fxArticle.status, id: "20" } },
+      },
+      "id_mismatch",
+    ],
+    [
+      "an Article with no content blocks",
+      { status: 200, body: withArticleContent({ blocks: [], entityMap: [] }) },
+      "empty_body",
+    ],
+    [
+      "an Article with only images and dividers",
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            {
+              type: "atomic",
+              text: " ",
+              entityRanges: [{ key: 0, offset: 0, length: 1 }],
+            },
+            { type: "unstyled", text: "  ", entityRanges: [] },
+          ],
+          entityMap: [
+            {
+              key: "0",
+              value: { type: "DIVIDER", mutability: "Immutable", data: {} },
+            },
+          ],
+        }),
+      },
+      "empty_body",
+    ],
+  ] as const)(
+    "keeps the syndication preview on %s",
+    async (_label, fxtwitter, category) => {
+      serveX(
+        { status: 200, body: articleSyndication },
+        { status: 500 },
+        fxtwitter,
+      );
+      await expect(fetchXPost(ARTICLE_URL)).resolves.toEqual({
+        title: "How this GLP-1 app generated 20m+ views",
+        siteName: "X",
+        author: "@adamtwtz",
+        content: ARTICLE_PREVIEW,
+        heroImageUrl:
+          "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+        heroAspectRatio: 2.5,
+      });
+      expect(loggedEvents()).toEqual([
+        { event: "x_article_body_fallback", error_category: category },
+      ]);
+    },
+  );
+
+  it.each([
+    ["a text post", "https://x.com/jack/status/20", textSyndication],
+    [
+      "a photo post",
+      "https://x.com/TheEllenShow/status/440322224407314432",
+      photoSyndication,
+    ],
+    [
+      "a video post",
+      "https://x.com/CincinnatiZoo/status/859073537713328129",
+      videoSyndication,
+    ],
+    [
+      "a truncated long post",
+      "https://x.com/levelsio/status/2021693766793318833",
+      longVideoSyndication,
+    ],
+  ])("never asks fxtwitter about %s", async (_label, url, syndication) => {
+    serveX(
+      { status: 200, body: syndication },
+      { status: 500 },
+      { status: 200, body: fxArticle },
+    );
+    await fetchXPost(url);
+    expect(fxtwitterCalls()).toEqual([]);
+  });
+
+  it("never asks fxtwitter when syndication fails and oEmbed answers", async () => {
+    serveX(
+      { status: 503 },
+      { status: 200, body: oembedText },
+      { status: 200, body: fxArticle },
+    );
+    await fetchXPost("https://x.com/jack/status/20");
+    expect(fxtwitterCalls()).toEqual([]);
+  });
+});
+
 describe("processItem for X posts", () => {
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -424,6 +804,41 @@ describe("processItem for X posts", () => {
     expect(generateObject.mock.calls[0][0].prompt).toContain(
       "Page title: How this GLP-1 app generated 20m+ views",
     );
+  });
+
+  it("saves an Article's full body and classifies from its opening", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 200, body: fxArticle },
+    );
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "GLP-1 App Growth",
+      siteName: "X",
+      author: "@adamtwtz",
+      heroImageUrl:
+        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      aspectRatio: 2.5,
+    });
+    expect(item?.enrichment).toBeUndefined();
+    expect(item).not.toHaveProperty("media");
+    expect(item?.content?.split("\n\n")).toHaveLength(60);
+    expect(item?.content).toContain("\n\nthe numbers so far\n\n");
+    expect(
+      item?.content?.endsWith(
+        "Book a call (https://cal.com/team/content-rewards/discovery-call?a=glp)",
+      ),
+    ).toBe(true);
+    const prompt: string = generateObject.mock.calls[0][0].prompt;
+    expect(prompt).toContain(
+      "Page title: How this GLP-1 app generated 20m+ views",
+    );
+    expect(prompt).toContain(
+      "Page content:\nAn app spent $21,418, generated 23.1M views",
+    );
+    expect(prompt).toContain("\n\nwhy GLP-1 apps can't run ads\n\n");
   });
 
   it("saves every photo of a multi-photo post and serves them to the client", async () => {
