@@ -732,7 +732,11 @@ function xPostText(
   return post.note_tweet ? `${text}…` : text;
 }
 
-type XSyndicationRead = { page: PageData; isArticle: boolean };
+type XSyndicationRead = {
+  page: PageData;
+  isArticle: boolean;
+  sensitive: boolean;
+};
 
 function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   const parsed = xSyndicationSchema.safeParse(body);
@@ -751,6 +755,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
     const preview = post.article.preview_text?.trim();
     return {
       isArticle: true,
+      sensitive: post.possibly_sensitive === true,
       page: {
         title: post.article.title,
         siteName: "X",
@@ -783,6 +788,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   }
   return {
     isArticle: false,
+    sensitive: post.possibly_sensitive === true,
     page: {
       title: content ? Array.from(content).slice(0, 100).join("") : undefined,
       siteName: "X",
@@ -1050,13 +1056,20 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
 
 /** fxtwitter is an unofficial mirror of X's private web API, so the full body
  * is a bonus: any failure keeps the syndication preview. */
-async function withXArticleBody(id: string, page: PageData): Promise<PageData> {
+async function withXArticleBody(
+  id: string,
+  page: PageData,
+  sensitive: boolean,
+): Promise<PageData> {
   const read = await readXArticleBody(id);
   if (read.ok) {
-    // An Article that opens with its cover would show it twice.
-    const media = read.body.media.filter(
-      (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
-    );
+    // Sensitive media stays hidden, as for posts. An Article that opens
+    // with its cover would show it twice.
+    const media = sensitive
+      ? []
+      : read.body.media.filter(
+          (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
+        );
     return {
       ...page,
       content: read.body.text,
@@ -1100,7 +1113,9 @@ export async function fetchXPost(url: string): Promise<PageData> {
     }
   }
   if (read) {
-    return read.isArticle ? await withXArticleBody(id, read.page) : read.page;
+    return read.isArticle
+      ? await withXArticleBody(id, read.page, read.sensitive)
+      : read.page;
   }
   logEvent("warn", "x_syndication_fallback", {
     error_category: result.ok

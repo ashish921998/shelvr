@@ -558,6 +558,21 @@ describe("fetchXPost for an Article's full body", () => {
     expect(loggedEvents()).toEqual([]);
   });
 
+  it("keeps a sensitive Article's text but not its media", async () => {
+    serveX(
+      {
+        status: 200,
+        body: { ...videoArticleSyndication, possibly_sensitive: true },
+      },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const read = await fetchXPost(VIDEO_ARTICLE_URL);
+    expect(read.content?.split("\n\n")).toHaveLength(66);
+    expect(read.heroImageUrl).toBeUndefined();
+    expect(read).not.toHaveProperty("articleMedia");
+  });
+
   it("skips Article media it cannot read and keeps the rest in place", async () => {
     serveX(
       { status: 200, body: articleSyndication },
