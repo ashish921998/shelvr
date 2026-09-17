@@ -1,8 +1,10 @@
 import {
   SAFE_ERROR_MESSAGES,
   afterIdentitySettles,
+  identityReady,
   posthog,
-  superProperties,
+  resetClient,
+  resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
@@ -281,26 +283,23 @@ function reset(): void {
 
   afterIdentitySettles(() => {
     try {
-      client.reset();
-      client.register(superProperties());
+      resetClient(client);
     } catch {
       // Analytics must never block sign-out.
     }
   });
 }
 
-/** Resets only when PostHog still holds an identified user. A signed-out
- * launch keeps its anonymous id, so one person's onboarding stays on one
- * profile, while a session that expired while the app was closed still stops
- * attributing events to the previous account. */
+/** Resets only when PostHog still holds an identified user. A session that
+ * expired while the app was open still stops attributing events to the
+ * previous account. */
 async function resetIfIdentified(): Promise<void> {
-  if (!posthog) return;
+  const client = posthog;
+  if (!client) return;
 
   try {
-    await posthog.ready();
-    const distinctId = posthog.getDistinctId();
-    const anonymousId = posthog.getAnonymousId();
-    if (distinctId && anonymousId && distinctId !== anonymousId) reset();
+    await identityReady;
+    await resetClientIfIdentified(client);
   } catch {
     // Analytics must never block sign-out.
   }

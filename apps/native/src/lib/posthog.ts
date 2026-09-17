@@ -144,6 +144,24 @@ export function superProperties(): Record<string, string | number | boolean> {
 
 posthog?.register(superProperties());
 
+/** Clears the identity and restores the super properties a reset drops. */
+export function resetClient(client: PostHog): void {
+  client.reset();
+  client.register(superProperties());
+}
+
+/** Resets only when PostHog still holds an identified user, so a signed-out
+ * launch keeps its anonymous id and one person's onboarding stays on one
+ * profile. */
+export async function resetIfIdentified(client: PostHog): Promise<void> {
+  await client.ready();
+  const distinctId = client.getDistinctId();
+  const anonymousId = client.getAnonymousId();
+  if (distinctId && anonymousId && distinctId !== anonymousId) {
+    resetClient(client);
+  }
+}
+
 // Read before anything renders, so a sign-in during this launch can't count.
 const startedWithSession = hasStoredAuthSession();
 
@@ -155,20 +173,14 @@ const startedWithSession = hasStoredAuthSession();
 async function dropStaleIdentity(client: PostHog): Promise<void> {
   if (startedWithSession) return;
   try {
-    await client.ready();
-    const distinctId = client.getDistinctId();
-    const anonymousId = client.getAnonymousId();
-    if (distinctId && anonymousId && distinctId !== anonymousId) {
-      client.reset();
-      client.register(superProperties());
-    }
+    await resetIfIdentified(client);
   } catch {
     // Analytics must never block startup.
   }
 }
 
 let identitySettled = posthog === undefined;
-const identityReady = posthog
+export const identityReady = posthog
   ? dropStaleIdentity(posthog).then(() => {
       identitySettled = true;
     })
