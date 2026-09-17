@@ -103,3 +103,4 @@ ds-bundle/
 qa-results/
 maestro-out/
 metro.log
+.worktrees/
