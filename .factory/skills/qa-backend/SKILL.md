@@ -119,9 +119,10 @@ Run on BOTH environments. No secret needed.
 Run on BOTH environments. No secret needed.
 
 - GET `<site>/health` is `200` (sanity), GET `<site>/waitlist/join` (a
-  POST-only route) → non-200 (404/405 per Convex httpRouter).
-- GET `<site>/definitely-not-a-route` → `404`.
-- PASS: both non-200s; assert the status you actually see and note it.
+  POST-only route) → `404` with `No matching routes found` (verified:
+  Convex's httpRouter answers a wrong method with 404, not 405).
+- GET `<site>/definitely-not-a-route` → `404` with the same body.
+- PASS: both `404`.
 
 ## Per-flow evidence
 
