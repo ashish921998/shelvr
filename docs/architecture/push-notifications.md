@@ -33,10 +33,19 @@ and cannot tell the client that this rejection is permanent.
 Keep the `fingerprint` runtime policy. Do not restore an old `eas.json` or force
 an old runtime to send code to a binary with different native configuration.
 
-`GOOGLE_SERVICES_JSON` is a secret EAS file variable. Local `eas update` cannot
-download it merely by selecting `--environment`, so its Android fingerprint can
-differ from the build worker's fingerprint. Every Android OTA, on any channel,
-must use the same Firebase file as its native build. Use EAS workers for all profiles:
+`GOOGLE_SERVICES_JSON` is a secret EAS file variable. EAS writes it under
+`eas-environment-secrets/` on the worker, and a local machine cannot download
+it. `apps/native/.fingerprintignore` leaves that file out of the fingerprint, so
+`eas build` and `eas update` compute the same Android runtime on a local machine
+and on a worker. Without it, the worker rejects every build started from a local
+machine with "Runtime version calculated on local machine not equal to runtime
+version calculated during build."
+
+The Firebase file therefore does not change the fingerprint. A build made after
+replacing it keeps the runtime of builds made before, so later OTAs reach both.
+When the new file must not share updates with older binaries, commit a change
+that the fingerprint does include, such as a native config change, in the same
+release. The workflow below remains the default route for updates:
 
 ```sh
 cd apps/native
