@@ -338,6 +338,15 @@ export const ItemCard = memo(function ItemCard({
     failedLabel ??
     (item.url ? displayHost(item.url) : undefined);
 
+  // A screen reader reads the card through this label. captionTitle is undefined
+  // only for a titleless item with no note and no URL, so fall back to the
+  // processing state or a generic "untitled" so the card never announces blank.
+  const accessibilityLabel =
+    captionTitle ??
+    (item.status === "processing"
+      ? t("item.stillWorking")
+      : t("item.untitledItem"));
+
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
   // exit animation is the confirmation — no navigation, no dialog.
   const accept = () => {
@@ -396,6 +405,8 @@ export const ItemCard = memo(function ItemCard({
       >
         <Link.Trigger withAppleZoom>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel}
             testID={
               item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
             }
