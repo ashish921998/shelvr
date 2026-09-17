@@ -15,8 +15,11 @@ import {
   fetchInstagram,
   fetchXoEmbed,
   fetchXPost,
+  finalRecipe,
+  firstLinkedUrl,
   linkEnrichment,
   parseInstagramEmbed,
+  sanitizeRecipe,
   storePoster,
 } from "./ai";
 import articleSyndication from "./testdata/xSyndication/article.json";
@@ -110,7 +113,7 @@ describe("fetchXoEmbed", () => {
 
   it("keeps the post paragraph and drops the attribution", async () => {
     parseJson.mockReturnValue({
-      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://t.co/x">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
+      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://twitter.com/hashtag/space?src=hash">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
       author_url: "https://twitter.com/NASA",
       author_name: "NASA",
     });
@@ -120,6 +123,61 @@ describe("fetchXoEmbed", () => {
       author: "@NASA",
       content: "Hello & #space",
     });
+  });
+
+  it("keeps the first outside link (a t.co redirect) and skips attached media and the attribution", async () => {
+    parseJson.mockReturnValue({
+      html: '<blockquote class="twitter-tweet"><p lang="en">Full recipe <a href="https://t.co/media1">pic.twitter.com/abc</a> <a href="https://t.co/recipe1">smittenkitchen.com/2023/03/spring…</a> <a href="https://t.co/second">other.com</a></p>&mdash; SK (@sk) <a href="https://twitter.com/sk/status/1">May 1</a></blockquote>',
+      author_url: "https://twitter.com/sk",
+    });
+    const page = await fetchXoEmbed("https://x.com/sk/status/1");
+    expect(page.linkedUrl).toBe("https://t.co/recipe1");
+  });
+});
+
+describe("firstLinkedUrl", () => {
+  it("trims trailing punctuation and skips link hubs and social hosts", () => {
+    expect(
+      firstLinkedUrl(
+        "Recipe in bio https://linktr.ee/cook or here: https://www.budgetbytes.com/dal/. Enjoy!",
+      ),
+    ).toBe("https://www.budgetbytes.com/dal/");
+    expect(
+      firstLinkedUrl("watch https://youtu.be/abc and https://x.com/a"),
+    ).toBe(undefined);
+    expect(firstLinkedUrl("no links here")).toBeUndefined();
+    expect(firstLinkedUrl(undefined)).toBeUndefined();
+  });
+
+  it("stops a URL at whitespace, quotes, and closing brackets", () => {
+    expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
+      "https://example.com/a?b=1&c=2",
+    );
+  });
+});
+
+describe("finalRecipe", () => {
+  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
+  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+  it("prefers the page's structured recipe over the model's proposal", () => {
+    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
+  });
+
+  it("falls back to the sanitized model proposal when the page has none", () => {
+    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+  });
+
+  it("is absent when neither source produced one", () => {
+    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
+    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 
@@ -199,6 +257,9 @@ describe("fetchXPost", () => {
       heroImageUrl:
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
+      // X cut the preview itself, so no length check can tell it from a
+      // complete short post.
+      truncated: true,
     });
   });
 
@@ -495,6 +556,8 @@ describe("fetchXPost for an Article's full body", () => {
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
     });
+    // The whole body replaced the cut preview, so the read is complete.
+    expect(read).not.toHaveProperty("truncated");
     expect(read).not.toHaveProperty("media");
     const paragraphs = read.content?.split("\n\n");
     expect(paragraphs).toHaveLength(60);
@@ -961,6 +1024,7 @@ describe("fetchXPost for an Article's full body", () => {
         heroImageUrl:
           "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
         heroAspectRatio: 2.5,
+        truncated: true,
       });
       expect(loggedEvents()).toEqual([
         { event: "x_article_body_fallback", error_category: category },
@@ -1119,6 +1183,102 @@ describe("processItem for X posts", () => {
     expect(generateObject.mock.calls[0][0].prompt).toContain(
       "Page title: How this GLP-1 app generated 20m+ views",
     );
+  });
+
+  /** Answer as the provider does: the model can only fill fields the chosen
+   * schema declares, and zod strips the rest. */
+  function offerRecipe() {
+    generateObject.mockImplementation(
+      async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
+        object: schema.parse({
+          title: "Pancake post",
+          description: "A post about pancakes.",
+          tags: ["food"],
+          spaceNames: [],
+          intents: [],
+          recipe: {
+            name: "Pancakes",
+            servings: "4 servings",
+            ingredients: ["2 cups flour"],
+            steps: ["Whisk."],
+          },
+        }),
+      }),
+    );
+  }
+
+  it("does not lift a recipe out of a long post X served cut short", async () => {
+    // `note_tweet` means the 280 characters on hand are a cut copy of the post,
+    // which no length check can tell from a post that is simply short.
+    offerRecipe();
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+
+    const { item } = await saveLink(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  it("does not lift a recipe out of an Article preview that stayed cut", async () => {
+    // fxtwitter did not answer, so the body is still the syndication preview.
+    offerRecipe();
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 500 },
+    );
+
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  it("does not lift a recipe out of an Article longer than the prompt carries", async () => {
+    // A caption is text the model receives whole. An Article body runs to
+    // 100k chars while the prompt carries 6k, so a recipe transcribed from one
+    // would be missing every ingredient that fell after the cut.
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour"],
+      steps: ["Whisk."],
+    };
+    generateObject.mockImplementation(
+      async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
+        // Zod strips a field the chosen schema does not declare, which is the
+        // one thing stopping the model from answering with a recipe here.
+        object: schema.parse({
+          title: "Pancake thread",
+          description: "A long post about pancakes.",
+          tags: ["food"],
+          spaceNames: [],
+          intents: [],
+          recipe,
+        }),
+      }),
+    );
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            {
+              type: "unstyled",
+              text: "Pancakes ".repeat(800),
+              entityRanges: [],
+            },
+          ],
+          entityMap: [],
+        }),
+      },
+    );
+
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item?.content?.length).toBeGreaterThan(6000);
+    expect(item?.recipe).toBeUndefined();
   });
 
   it("saves an Article's full body and classifies from its opening", async () => {
@@ -1669,5 +1829,106 @@ describe("processItem for Instagram links", () => {
       enrichment: "partial",
     });
     expect(item?.content).toBeUndefined();
+  });
+});
+
+describe("sanitizeRecipe", () => {
+  it("passes through a plausible recipe", () => {
+    expect(
+      sanitizeRecipe({
+        name: "Slow braised short ribs",
+        servings: "4 servings",
+        ingredients: ["3 lb short ribs", "2 cups beef stock"],
+        steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+      }),
+    ).toEqual({
+      name: "Slow braised short ribs",
+      servings: "4 servings",
+      ingredients: ["3 lb short ribs", "2 cups beef stock"],
+      steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+    });
+  });
+
+  it("rejects null and empty ingredient/step lists", () => {
+    expect(sanitizeRecipe(null)).toBeUndefined();
+    expect(sanitizeRecipe(undefined)).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: [], steps: ["Stir."] }),
+    ).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: ["Salt"], steps: [] }),
+    ).toBeUndefined();
+  });
+
+  it("trims lines and drops the empty ones", () => {
+    expect(
+      sanitizeRecipe({
+        ingredients: ["  Salt ", "", "   ", " 2 eggs"],
+        steps: [" Whisk. ", ""],
+      }),
+    ).toStrictEqual({ ingredients: ["Salt", "2 eggs"], steps: ["Whisk."] });
+  });
+
+  it("keeps a long instruction whole rather than cutting it short", () => {
+    // The card replaces the article body, so a step cut mid-sentence loses its
+    // temperature or its timing with nothing left on screen to recover it.
+    const step = `Braise until fork-tender, ${"about three hours, ".repeat(30)}then glaze.`;
+    const recipe = sanitizeRecipe({
+      ingredients: ["3 lb short ribs"],
+      steps: [step],
+    });
+    expect(recipe?.steps).toStrictEqual([step]);
+  });
+
+  it("keeps a quantity that two components both call for", () => {
+    // `recipeIngredient` is one flat list, so a cake and its frosting each
+    // wanting a cup of sugar reads as a repeat. Dropping it changes the recipe.
+    expect(
+      sanitizeRecipe({
+        ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+        steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+      }),
+    ).toStrictEqual({
+      ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+      steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+    });
+  });
+
+  it("refuses a recipe too long to store instead of trimming it", () => {
+    // Refusing leaves the article body in place, which is readable; a recipe
+    // missing its last ten steps is not, and looks complete.
+    const steps = Array.from({ length: 40 }, () => "x".repeat(600));
+    expect(sanitizeRecipe({ ingredients: ["Salt"], steps })).toBeUndefined();
+    expect(
+      sanitizeRecipe({
+        ingredients: ["Salt"],
+        steps: Array.from({ length: 121 }, (_, i) => `Step ${i + 1}`),
+      }),
+    ).toBeUndefined();
+  });
+
+  it("drops blank name/servings after trimming", () => {
+    const recipe = sanitizeRecipe({
+      name: "   ",
+      servings: "  ",
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    // Strict: the keys must be absent, not present with an undefined value.
+    expect(recipe).toStrictEqual({
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+  });
+
+  it("caps name and servings length", () => {
+    const recipe = sanitizeRecipe({
+      name: "n".repeat(200),
+      servings: "s".repeat(100),
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    expect(recipe?.name).toBe("n".repeat(120));
+    expect(recipe?.servings).toBe("s".repeat(60));
   });
 });

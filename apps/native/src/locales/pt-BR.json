@@ -296,6 +296,13 @@
   "item.stalled": "Isso está demorando mais que o esperado.",
   "item.partial": "Salvo apenas a partir do link — a página não carregou, então estes detalhes são estimativas.",
   "item.noArticle": "Esta página não tem um artigo legível — salva como um link simples.",
+  "recipe.ingredients": "Ingredientes",
+  "recipe.steps": "Modo de preparo",
+  "recipe.serves": {
+    "one": "Rende %{formattedCount} porção",
+    "many": "Rende %{formattedCount} porções",
+    "other": "Rende %{formattedCount} porções"
+  },
   "presets.articles": "Artigos",
   "presets.recipes": "Receitas",
   "presets.products": "Produtos",

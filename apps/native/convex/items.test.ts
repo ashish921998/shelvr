@@ -2728,6 +2728,57 @@ describe("stale processing runs", () => {
     ).resolves.toBe("missing");
   });
 
+  it("finalizeItem persists a recipe extracted from a recipe page", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour", "2 eggs"],
+      steps: ["Whisk.", "Fry."],
+    };
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe,
+    });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
+  });
+
+  it("keeps the recipe off the feed card", async () => {
+    // `itemCardValidator` omits `recipe`, and Convex enforces the returns
+    // validator at runtime, so a card still carrying it fails the whole feed
+    // query rather than just shipping an extra field.
+    const t = await as("recipe-feed");
+    const itemId = await processingLink(t, "recipe-feed", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe: {
+        name: "Pancakes",
+        servings: "4 servings",
+        ingredients: ["2 cups flour", "2 eggs"],
+        steps: ["Whisk.", "Fry."],
+      },
+    });
+
+    const feed = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(feed.page.map((item) => item._id)).toContain(itemId);
+    expect(feed.page[0]).not.toHaveProperty("recipe");
+  });
+
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {
     const t = newConvexTest().withIdentity({
       subject: "retry-stale|session-1",

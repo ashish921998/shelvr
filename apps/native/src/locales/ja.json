@@ -298,6 +298,11 @@
   "item.stalled": "通常より時間がかかっています。",
   "item.partial": "ページを読み込めなかったため、リンクのみから保存しました。詳細は推定です。",
   "item.noArticle": "読み取れる記事がないため、通常のリンクとして保存しました。",
+  "recipe.ingredients": "材料",
+  "recipe.steps": "作り方",
+  "recipe.serves": {
+    "other": "%{formattedCount}人分"
+  },
   "presets.articles": "記事",
   "presets.recipes": "レシピ",
   "presets.products": "商品",

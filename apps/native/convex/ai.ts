@@ -30,8 +30,10 @@ import {
   INTENT_KINDS,
   type ArticleMedia,
   type PostMedia,
+  type Recipe,
 } from "./model/itemFields";
 import { logEvent, errorName } from "./model/log";
+import { extractRecipeMarkup, type RecipeDraft } from "./model/recipeMarkup";
 import {
   buildEmbeddingText,
   EMBEDDING_DIMENSIONS,
@@ -346,6 +348,9 @@ const MAX_CONTENT_CHARS = 8000;
 // How much of the article body to store & render. Kept well under Convex's
 // 1MB document limit; long-form essays run tens of thousands of chars.
 const MAX_STORED_CONTENT_CHARS = 100000;
+// How much page text the classifier prompt actually carries. Anything longer
+// is cut, so the model never sees the tail.
+const PROMPT_CONTENT_CHARS = 6000;
 
 // ---------------------------------------------------------------------------
 // HTML extraction
@@ -677,9 +682,56 @@ type PageData = {
   /** A best-effort part of the read failed transiently (e.g. the Instagram
    * caption), so a retry can still add content. Internal only. */
   incomplete?: true;
+  /** The source served a cut copy of its own text, so `content` ends early no
+   * matter how short it is. X does this for a long post (`note_tweet`) and for
+   * an Article preview. Internal only. */
+  truncated?: true;
   media?: PostMedia[];
   articleMedia?: ArticleMedia[];
+  /** The recipe the page declares in schema.org markup (or, for a caption
+   * source, the recipe page its caption links to). Already sanitized. */
+  recipe?: Recipe;
+  /** The caption's first outside link, when the reader saw the real href
+   * rather than the display text. Readers that don't set it fall back to
+   * scanning the caption in `withLinkedRecipe`. */
+  linkedUrl?: string;
 };
+
+/** Hosts whose pages are link hubs or the social network itself — never the
+ * recipe write-up — so a caption pointing there is not worth a fetch. */
+const LINK_HUB_HOSTS = new Set([
+  "linktr.ee",
+  "linkin.bio",
+  "beacons.ai",
+  "bio.link",
+  "lnk.bio",
+  "tiktok.com",
+  "instagram.com",
+  "x.com",
+  "twitter.com",
+  "youtube.com",
+  "youtu.be",
+]);
+
+/** First http(s) URL in a caption worth following for a recipe, with trailing
+ * punctuation trimmed and link hubs skipped. Exported pure for unit testing. */
+export function firstLinkedUrl(text: string | undefined): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
+    const candidate = match[0].replace(/[.,;:!?]+$/, "");
+    try {
+      const host = new URL(candidate).hostname.replace(/^www\./, "");
+      if (!LINK_HUB_HOSTS.has(host)) {
+        return candidate;
+      }
+    } catch {
+      // Not a URL after all; keep scanning.
+    }
+  }
+  return undefined;
+}
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -755,12 +807,20 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
   };
   const html = str("html") ?? "";
   const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  const body = paragraph ? paragraph[1] : html;
   const content = decodeEntities(
-    (paragraph ? paragraph[1] : html)
+    body
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim(),
   );
+  // Post links are t.co redirects whose anchor text is the display URL;
+  // attached media links display as pic.twitter.com and lead nowhere useful.
+  const hrefs = Array.from(
+    body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi),
+  )
+    .filter(([, , label]) => !/^\s*pic\.(twitter|x)\.com/i.test(label))
+    .map(([, href]) => decodeEntities(href));
   // author_url carries the handle; author_name is the display name.
   const handle = str("author_url")?.match(
     /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
@@ -770,6 +830,7 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
     siteName: "X",
     author: handle ? `@${handle}` : str("author_name"),
     content: content || undefined,
+    linkedUrl: firstLinkedUrl(hrefs.join(" ")),
   };
 }
 
@@ -880,6 +941,9 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
         siteName: "X",
         author,
         content: preview ? `${preview}…` : undefined,
+        // The preview is a cut copy; withXArticleBody swaps in the whole body
+        // when X's private API answers.
+        ...(preview ? { truncated: true as const } : {}),
         heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
         heroAspectRatio: cover
           ? cover.original_img_width / cover.original_img_height
@@ -913,6 +977,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
       siteName: "X",
       author,
       content,
+      ...(post.note_tweet ? { truncated: true as const } : {}),
       ...(media.length > 0
         ? {
             heroImageUrl: media[0].imageUrl,
@@ -1189,8 +1254,11 @@ async function withXArticleBody(
       : read.body.media.filter(
           (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
         );
+    // The whole body replaces the cut preview, so the read is no longer short
+    // of its source.
+    const { truncated: _preview, ...whole } = page;
     return {
-      ...page,
+      ...whole,
       content: read.body.text,
       ...(media.length > 0 ? { articleMedia: media } : {}),
     };
@@ -1525,25 +1593,59 @@ function summarizeError(error: unknown): string {
   return "unexpected_error";
 }
 
+/** Fetch policy for an HTML page read: the saved link itself, or the recipe
+ * page a caption links to. */
+const PAGE_FETCH_OPTIONS = {
+  timeoutMs: 15000,
+  // Hard cap on the streamed page body. Generous for real articles; bounded
+  // to deny a malicious/buggy server from exhausting memory. Truncate instead
+  // of failing — a large page's first 1 MiB is still enough for extraction.
+  maxBytes: 1024 * 1024,
+  onOverflow: "truncate",
+  allowContentType: (ct: string) =>
+    ct.startsWith("text/html") ||
+    ct.startsWith("application/xhtml+xml") ||
+    ct.startsWith("application/xml"),
+  headers: {
+    "User-Agent": BROWSER_USER_AGENT,
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+  },
+} as const;
+
+/**
+ * A caption source (TikTok, X) carries only a caption, and the caption often
+ * links to the full recipe write-up. Follow that one link and read its
+ * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
+ * leaves the post exactly as it was.
+ */
+async function withLinkedRecipe(page: PageData): Promise<PageData> {
+  const caption = captionText(page);
+  if (caption === undefined) {
+    return page;
+  }
+  const linkedUrl = page.linkedUrl ?? firstLinkedUrl(caption);
+  if (linkedUrl === undefined) {
+    return page;
+  }
+  try {
+    const result = await safeFetch(linkedUrl, PAGE_FETCH_OPTIONS);
+    if (!result.ok) {
+      return page;
+    }
+    const recipe = sanitizeRecipe(
+      extractRecipeMarkup(
+        decodeWithContentType(result.bytes, result.contentType),
+      ),
+    );
+    return recipe === undefined ? page : { ...page, recipe };
+  } catch {
+    return page;
+  }
+}
+
 async function fetchPage(url: string): Promise<PageData> {
-  const result = await safeFetch(url, {
-    timeoutMs: 15000,
-    // Hard cap on the streamed page body. Generous for real articles; bounded
-    // to deny a malicious/buggy server from exhausting memory. Truncate instead
-    // of failing — a large page's first 1 MiB is still enough for extraction.
-    maxBytes: 1024 * 1024,
-    onOverflow: "truncate",
-    allowContentType: (ct) =>
-      ct.startsWith("text/html") ||
-      ct.startsWith("application/xhtml+xml") ||
-      ct.startsWith("application/xml"),
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
+  const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
   if (!result.ok) {
     // Surface only the policy code (+ status for http_error); readPage decides
     // whether the item can still be saved.
@@ -1597,6 +1699,9 @@ async function fetchPage(url: string): Promise<PageData> {
   }
 
   const content = extractBodyText(html, finalUrl);
+  // The page's own schema.org Recipe markup is the recipe: exact lines, no
+  // prompt window, nothing invented. Absent for anything not a recipe.
+  const recipe = sanitizeRecipe(extractRecipeMarkup(html));
 
   return {
     title,
@@ -1605,6 +1710,7 @@ async function fetchPage(url: string): Promise<PageData> {
     heroAspectRatio,
     siteName,
     content,
+    ...(recipe ? { recipe } : {}),
   };
 }
 
@@ -1622,14 +1728,32 @@ type PageRead =
  * sanitized log rereads it. */
 type LinkRead = { status: "ok"; page: PageData } | { status: "unreadable" };
 
+/** True for saves whose readable text is a post caption rather than a page
+ * body. Only these let the model propose a recipe: a caption has no schema.org
+ * markup to read. Real web pages use their markup instead. */
+function isCaptionSource(url: string): boolean {
+  return isTikTokUrl(url) || xStatusId(url) !== undefined;
+}
+
+/** The page's text when the model receives all of it, which is what makes it a
+ * caption rather than a body. A longer read (an X Article, a blog post) is
+ * neither text whose one outbound link is the recipe it describes, nor text a
+ * model can transcribe a recipe from without inventing the part that was cut. */
+function captionText(page: PageData): string | undefined {
+  return page.content !== undefined &&
+    page.content.length <= PROMPT_CONTENT_CHARS
+    ? page.content
+    : undefined;
+}
+
 async function readPage(url: string): Promise<PageRead> {
   try {
     const page = isTikTokUrl(url)
-      ? await fetchTikTokOEmbed(url)
+      ? await withLinkedRecipe(await fetchTikTokOEmbed(url))
       : xStatusId(url)
-        ? await fetchXPost(url)
+        ? await withLinkedRecipe(await fetchXPost(url))
         : isInstagramUrl(url)
-          ? await fetchInstagram(url)
+          ? await withLinkedRecipe(await fetchInstagram(url))
           : await fetchPage(url);
     return { status: "ok", page };
   } catch (error) {
@@ -1688,6 +1812,35 @@ const itemAnalysisSchema = z.object({
     ),
 });
 
+const recipeSchema = z
+  .object({
+    name: z.string().optional().describe("The recipe's own name"),
+    servings: z
+      .string()
+      .optional()
+      .describe("Yield exactly as stated, e.g. '4 servings' or '12 cookies'"),
+    ingredients: z
+      .array(z.string())
+      .describe("Every ingredient line, quantities included, in source order"),
+    steps: z
+      .array(z.string())
+      .describe(
+        "Every instruction step, numbered or not in the source, in order, each one a complete instruction",
+      ),
+  })
+  .nullable()
+  .describe(
+    "If this item is a recipe, the complete ingredients and steps exactly as the source states them — the user wants the recipe itself, not the story around it. null for anything that is not a recipe, and never lines the source does not contain.",
+  );
+
+/** The classifier output for sources where the model is the only way to get
+ * a recipe: captions, screenshots, notes. Web pages classify with the base
+ * schema — their recipe comes from schema.org markup, so asking the model
+ * again would only cost output tokens and invite a truncated guess. */
+const itemAnalysisWithRecipeSchema = itemAnalysisSchema.extend({
+  recipe: recipeSchema,
+});
+
 type Intent = z.infer<typeof intentSchema>;
 
 const ALLOWED_INTENT_KINDS = new Set<string>(INTENT_KINDS);
@@ -1732,6 +1885,68 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
     .slice(0, 5);
 }
 
+// Bounds for a proposed recipe. Both reject the whole recipe rather than
+// shorten it, so they sit well above what a real recipe reaches: an elaborate
+// multi-component bake runs to a few thousand characters, not twenty thousand.
+const MAX_RECIPE_LINES = 120;
+const MAX_RECIPE_CHARS = 20000;
+const MAX_RECIPE_NAME_CHARS = 120;
+const MAX_RECIPE_SERVINGS_CHARS = 60;
+
+/** Clean a proposed recipe (page markup or model) before it's persisted: trim
+ * every line, drop the empty ones, and reject the whole recipe when a list
+ * comes back empty (the markup is incomplete or the model is guessing) or when
+ * it is too long to store.
+ *
+ * Nothing here shortens a recipe. The card replaces the article body, so a cut
+ * instruction is a wrong recipe the reader cannot tell from a right one and
+ * cannot read around; a recipe over budget is refused instead, which leaves the
+ * article in place. Repeated lines are kept for the same reason: a recipe in
+ * components lists the same quantity under each one, and a dough really does
+ * rest twice. A rejected recipe is simply omitted — never fails the whole
+ * finalize. */
+export function sanitizeRecipe(
+  raw: RecipeDraft | null | undefined,
+): Recipe | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const clean = (lines: string[] | undefined): string[] =>
+    (lines ?? []).map((line) => line.trim()).filter((line) => line !== "");
+  const ingredients = clean(raw.ingredients);
+  const steps = clean(raw.steps);
+  if (ingredients.length === 0 || steps.length === 0) {
+    return undefined;
+  }
+  if (
+    ingredients.length > MAX_RECIPE_LINES ||
+    steps.length > MAX_RECIPE_LINES
+  ) {
+    return undefined;
+  }
+  // Blank name/servings are left out entirely (not set to undefined) so the
+  // persisted document never carries an explicit undefined key. Both label the
+  // recipe rather than state it, so capping their length loses no instruction.
+  const name = raw.name?.trim().slice(0, MAX_RECIPE_NAME_CHARS);
+  const servings = raw.servings?.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS);
+  const recipe = {
+    ...(name ? { name } : {}),
+    ...(servings ? { servings } : {}),
+    ingredients,
+    steps,
+  };
+  return recipeChars(recipe) > MAX_RECIPE_CHARS ? undefined : recipe;
+}
+
+function recipeChars(recipe: Recipe): number {
+  return [
+    recipe.name ?? "",
+    recipe.servings ?? "",
+    ...recipe.ingredients,
+    ...recipe.steps,
+  ].reduce((total, line) => total + line.length, 0);
+}
+
 function spacesPromptBlock(
   spaces: { name: string; description?: string }[],
 ): string {
@@ -1759,7 +1974,10 @@ function spacesPromptBlock(
  * finalize step needs (always undefined for images and notes, which are fully
  * enriched by definition). */
 type Classification = {
-  result: z.infer<typeof itemAnalysisSchema>;
+  result: z.infer<typeof itemAnalysisSchema> & {
+    /** Present only when the source was classified with the recipe schema. */
+    recipe?: z.infer<typeof recipeSchema>;
+  };
   page?: PageData;
   linkRead?: LinkRead;
 };
@@ -1788,9 +2006,13 @@ function linkAnalysisPrompt(
   page: PageData | undefined,
   linkRead: LinkRead | undefined,
   spacesBlock: string,
+  askForRecipe: boolean,
 ): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+    askForRecipe
+      ? "If the caption shares a recipe, also fill the recipe field with its complete ingredients and steps exactly as the caption states them (null otherwise). Never add lines the caption does not contain — a caption that only names a dish is not a recipe."
+      : "",
     spacesBlock,
     `URL: ${item.url}`,
     page?.title ? `Page title: ${page.title}` : "",
@@ -1798,7 +2020,7 @@ function linkAnalysisPrompt(
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
     page?.content
-      ? `${captionIntro(item.url)}\n${page.content.slice(0, 6000)}`
+      ? `${captionIntro(item.url)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
@@ -1849,14 +2071,28 @@ async function analyzeLinkItem(
     });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
-  const { object } = await generateObject({
+  // The model proposes a recipe only from a caption it can read in full, and
+  // only when the caption's own link did not already yield the structured
+  // recipe. Web pages and URL-only reads never ask: nothing to read exactly.
+  const askForRecipe =
+    page !== undefined &&
+    page.recipe === undefined &&
+    // A cut caption reads as complete at any length, so the length check alone
+    // would let the model transcribe a recipe that stops mid-ingredient.
+    page.truncated !== true &&
+    isCaptionSource(item.url) &&
+    captionText(page) !== undefined;
+  const call = {
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
-    schema: itemAnalysisSchema,
-    prompt: linkAnalysisPrompt(item, page, read, spacesBlock),
-  });
-  return { result: object, page, linkRead: read };
+    prompt: linkAnalysisPrompt(item, page, read, spacesBlock, askForRecipe),
+  };
+  const result = askForRecipe
+    ? (await generateObject({ ...call, schema: itemAnalysisWithRecipeSchema }))
+        .object
+    : (await generateObject({ ...call, schema: itemAnalysisSchema })).object;
+  return { result, page, linkRead: read };
 }
 
 async function analyzeImageItem(
@@ -1872,7 +2108,7 @@ async function analyzeImageItem(
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
-    schema: itemAnalysisSchema,
+    schema: itemAnalysisWithRecipeSchema,
     messages: [
       {
         role: "user",
@@ -1881,6 +2117,7 @@ async function analyzeImageItem(
             type: "text",
             text: [
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
+              "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
               spacesBlock,
               INTENTS_PROMPT_BLOCK,
             ].join("\n\n"),
@@ -1908,6 +2145,8 @@ async function analyzeNoteItem(
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
+    // Notes never carry a recipe field: the note text itself is what the user
+    // wrote (and edits), so a lifted copy would only duplicate it.
     schema: itemAnalysisSchema,
     prompt: [
       "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
@@ -1920,6 +2159,17 @@ async function analyzeNoteItem(
     ].join("\n\n"),
   });
   return { result: object };
+}
+
+/** The recipe to persist: structured markup (the page's own, or the page a
+ * caption links to) wins; the model's proposal only exists for sources that
+ * were classified with the recipe schema (captions, images). Exported pure
+ * for unit testing. */
+export function finalRecipe(
+  page: { recipe?: Recipe } | undefined,
+  result: { recipe?: RecipeDraft | null },
+): Recipe | undefined {
+  return page?.recipe ?? sanitizeRecipe(result.recipe);
 }
 
 /** Map the model's returned space names back to ids (case-insensitive,
@@ -2200,6 +2450,7 @@ export const processItem = internalAction({
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
         intents: sanitizeIntents(result.intents),
+        recipe: finalRecipe(page, result),
         enrichment: linkEnrichment(linkRead),
         status: "ready",
       });
