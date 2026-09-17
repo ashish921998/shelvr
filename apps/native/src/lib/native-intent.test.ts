@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { redirectSystemPath } from "@/app/+native-intent";
+import {
+  isDirectLaunch,
+  resetDirectLaunchForTests,
+} from "@/lib/splash/launch-intent";
 
 const { markPendingShareOnDevice, secureStore } = vi.hoisted(() => ({
   markPendingShareOnDevice: vi.fn(),
@@ -65,5 +69,37 @@ describe("redirectSystemPath", () => {
   it("leaves unrelated deep links untouched", () => {
     const path = "shelvr:///add";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);
+  });
+});
+
+describe("redirectSystemPath and the launch animation", () => {
+  beforeEach(() => {
+    markPendingShareOnDevice.mockClear();
+    secureStore.values.clear();
+    secureStore.values.set("shelvr.onboarded", "true");
+    resetDirectLaunchForTests();
+  });
+
+  it.each([
+    "shelvr://expo-sharing",
+    "shelvr://auth/callback?code=verification-code",
+    "shelvr:///add",
+    "https://shelvr.app/item/abc123",
+  ])("stands the splash down for %s", (path) => {
+    redirectSystemPath({ path, initial: true });
+    expect(isDirectLaunch()).toBe(true);
+  });
+
+  it("stands the splash down for a share held back by onboarding", () => {
+    secureStore.values.delete("shelvr.onboarded");
+    expect(
+      redirectSystemPath({ path: "shelvr://expo-sharing", initial: true }),
+    ).toBe("/onboarding");
+    expect(isDirectLaunch()).toBe(true);
+  });
+
+  it("leaves the splash alone for a path that is not a link", () => {
+    redirectSystemPath({ path: "/share", initial: true });
+    expect(isDirectLaunch()).toBe(false);
   });
 });

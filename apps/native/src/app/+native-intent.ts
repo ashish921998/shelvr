@@ -1,5 +1,6 @@
 import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
 
 // expo-sharing launches the app with a `<scheme>://expo-sharing` deep link when
 // something is shared into Shelvr from another app. Route those to the receiver
@@ -15,6 +16,11 @@ export function redirectSystemPath({
   path: string;
   initial: boolean;
 }) {
+  // Every link into the app arrives here, so it is also where the launch
+  // animation learns to stand down: a user opening a share or a deep link is
+  // on their way somewhere and should not wait out a splash first.
+  if (isDeepLink(path)) markDirectLaunch();
+
   try {
     const url = new URL(path);
 
