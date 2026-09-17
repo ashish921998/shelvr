@@ -1,5 +1,6 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
+import { recordShareSaved } from "@/lib/first-share";
 import { demoDestination } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -181,11 +182,15 @@ export function useDemoSave({
   resume,
   onSaved,
   onAdvance,
+  userId,
 }: {
   spaces: string[];
   resume: PendingDemo | null;
   onSaved: (saved: DemoSaved) => void;
   onAdvance: () => void;
+  /** Current account id, so a share-sheet demo save records the first share
+   * and Home drops the how-to card. Null until sign-in resolves. */
+  userId: string | null;
 }) {
   const { isAuthenticated } = useConvexAuth();
   const createDemoItem = useMutation(api.demo.createDemoItem);
@@ -197,7 +202,28 @@ export function useDemoSave({
   );
   const inFlightRef = useRef(false);
   const advancedRef = useRef(false);
+  // The share sheet, not a paste or typed link, is the user's first share.
+  // The mark is per attempt: a save resumed on a fresh mount (an app kill mid
+  // OAuth) records nothing, so Home shows the card once, which is harmless.
+  const viaShareRef = useRef(false);
+  const pendingShareRecordRef = useRef(false);
   const { itemId } = state;
+
+  // Records a share-sheet demo save as the first share, so Home drops the
+  // how-to card. Waits until sign-in resolves the account id.
+  const recordSharePending = useCallback(() => {
+    if (!pendingShareRecordRef.current || userId === null) return;
+    pendingShareRecordRef.current = false;
+    try {
+      recordShareSaved(userId);
+    } catch (err) {
+      analytics.captureError("record_first_share_failed", err);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    recordSharePending();
+  }, [recordSharePending]);
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
   // Convex adapter and sends `id: null`, which fails argument validation.
@@ -275,6 +301,10 @@ export function useDemoSave({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
         });
+        if (viaShareRef.current) {
+          pendingShareRecordRef.current = true;
+          recordSharePending();
+        }
       } catch (err) {
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
@@ -288,11 +318,12 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, lost, onSaved],
+    [createDemoItem, isAuthenticated, lost, onSaved, recordSharePending],
   );
 
   const submitUrl = useCallback(
-    (url: string) => {
+    (url: string, viaShare = false) => {
+      viaShareRef.current = viaShare;
       const preset = demoDestination(url.trim(), spaces);
       void submit({
         url,
@@ -301,6 +332,13 @@ export function useDemoSave({
       });
     },
     [spaces, submit],
+  );
+
+  // The onboarding share sheet routes its save here so it records the first
+  // share; paste and typed saves stay on submitUrl and keep the how-to card.
+  const submitSharedUrl = useCallback(
+    (url: string) => submitUrl(url, true),
+    [submitUrl],
   );
 
   // Resume the save once auth is ready; submitting consumes the request.
@@ -389,6 +427,7 @@ export function useDemoSave({
     setError,
     cancelAuth,
     retry,
+    submitSharedUrl,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

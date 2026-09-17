@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
+  recordShareSaved: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -64,6 +65,9 @@ vi.mock("@/lib/onboarding-demo", () => ({
   demoDestination: (url: string) =>
     url === "https://sample.test/recipe" ? "recipes" : null,
 }));
+vi.mock("@/lib/first-share", () => ({
+  recordShareSaved: mock.recordShareSaved,
+}));
 
 const ITEM_ID = "item-1";
 const saved = (reused = false) => ({
@@ -73,11 +77,23 @@ const saved = (reused = false) => ({
   savedSpaceNames: [],
 });
 
-function renderDemo(resume: { url: string; destination: null } | null = null) {
+function renderDemo(
+  resume: { url: string; destination: null } | null = null,
+  userId: string | null = null,
+) {
   const onSaved = vi.fn();
   const onAdvance = vi.fn();
-  const hook = renderHook(() =>
-    useDemoSave({ spaces: ["recipes"], resume, onSaved, onAdvance }),
+  // A bare rerender() passes undefined here, so fall back to the initial id.
+  const hook = renderHook(
+    (props?: { userId: string | null }) =>
+      useDemoSave({
+        spaces: ["recipes"],
+        resume,
+        onSaved,
+        onAdvance,
+        userId: props ? props.userId : userId,
+      }),
+    { initialProps: { userId } },
   );
   return { ...hook, onSaved, onAdvance };
 }
@@ -100,6 +116,7 @@ beforeEach(() => {
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
+  mock.recordShareSaved.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
   mock.queryArgs = undefined;
 });
@@ -300,6 +317,46 @@ describe("useDemoSave", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("records the first share for an onboarding share-sheet save", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo(null, "user_1");
+    await flush(() => result.current.submitSharedUrl("https://example.com/"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("keeps the how-to card for a pasted or typed demo save", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo(null, "user_1");
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    await flush(() => result.current.submitTyped("https://example.com/b"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+  });
+
+  it("records the first share once sign-in unlocks a shared save", async () => {
+    mock.authenticated = false;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo(null, "user_1");
+
+    act(() => result.current.submitSharedUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+
+    mock.authenticated = true;
+    rerender({ userId: "user_1" });
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("waits for the account id before recording a shared save", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo(null, null);
+    await flush(() => result.current.submitSharedUrl("https://example.com/"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+
+    rerender({ userId: "user_1" });
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
   });
 
   it("returns to picking when sign-in is cancelled", () => {
