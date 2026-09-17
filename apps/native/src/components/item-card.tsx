@@ -346,12 +346,22 @@ export const ItemCard = memo(function ItemCard({
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    acceptSuggestion({ itemId: item._id, spaceId });
+    void acceptSuggestion({ itemId: item._id, spaceId }).then(
+      (changed) => {
+        if (changed) analytics.capture("suggestion_accepted");
+      },
+      (err) => analytics.captureError("suggestion_accept_failed", err),
+    );
   };
 
   const dismiss = () => {
     if (spaceId === undefined) return;
-    dismissSuggestion({ itemId: item._id, spaceId });
+    void dismissSuggestion({ itemId: item._id, spaceId }).then(
+      (changed) => {
+        if (changed) analytics.capture("suggestion_dismissed");
+      },
+      (err) => analytics.captureError("suggestion_dismiss_failed", err),
+    );
   };
 
   const confirmDelete = () => {

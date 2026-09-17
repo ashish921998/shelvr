@@ -9,6 +9,7 @@ import type { ImageSaveResult } from "@/lib/use-save-image";
 import {
   classifyEntries,
   classifyPayload,
+  firstSharedUrl,
   processSession,
   resolvedFromRawPayloads,
   type ResolvedPayload,
@@ -789,5 +790,38 @@ describe("resolvedFromRawPayloads", () => {
       raw("https://www.tiktok.com/@nasa/video/1", "url"),
     ]);
     expect(classifyPayload(resolved[0])).toEqual({ kind: "link" });
+  });
+});
+
+describe("firstSharedUrl", () => {
+  it("returns the first valid link, trimmed, skipping images and notes", () => {
+    expect(
+      firstSharedUrl([
+        { value: "ph://IMG_0001", shareType: "image" },
+        { value: "just a note", shareType: "text" },
+        { value: " https://example.com/a ", shareType: "url" },
+        { value: "https://example.com/b", shareType: "url" },
+      ]),
+    ).toBe("https://example.com/a");
+  });
+
+  it("extracts a link embedded in caption text", () => {
+    expect(
+      firstSharedUrl([
+        {
+          value: "Look at this https://www.instagram.com/p/abc",
+          shareType: "text",
+        },
+      ]),
+    ).toBe("https://www.instagram.com/p/abc");
+  });
+
+  it("returns null when nothing shared is a link", () => {
+    expect(
+      firstSharedUrl([
+        { value: "not a url", shareType: "url" },
+        { value: "a plain note", shareType: "text" },
+      ]),
+    ).toBeNull();
   });
 });
