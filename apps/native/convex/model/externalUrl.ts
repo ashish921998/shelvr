@@ -209,12 +209,12 @@ export function shortFormSource(
   return undefined;
 }
 
-/** True for an X / Twitter post URL, the only shape X's oEmbed endpoint
- * accepts: `x.com/{user}/status/{id}` and the `x.com/i/web/status/{id}` path
- * the import screen builds from archive bookmark ids. Profiles, lists, and
- * `t.co` short links are not posts and go through the normal page reader. */
-export function isXTweetUrl(url: string | undefined): boolean {
-  if (!url) return false;
+/** The numeric id of an X / Twitter post URL: `x.com/{user}/status/{id}` and
+ * the `x.com/i/web/status/{id}` path the import screen builds from archive
+ * bookmark ids. Profiles, lists, and `t.co` short links are not posts and
+ * return undefined, so they go through the normal page reader. */
+export function xStatusId(url: string | undefined): string | undefined {
+  if (!url) return undefined;
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
@@ -224,12 +224,14 @@ export function isXTweetUrl(url: string | undefined): boolean {
       host !== "twitter.com" &&
       !host.endsWith(".twitter.com")
     ) {
-      return false;
+      return undefined;
     }
     // The id must be a whole path segment, optionally followed by more
     // segments such as /photo/1, so /status/123abc is rejected.
-    return /^\/(?:[^/]+|i\/web)\/status\/\d+(?:\/.*)?$/.test(parsed.pathname);
+    return parsed.pathname.match(
+      /^\/(?:[^/]+|i\/web)\/status\/(\d+)(?:\/.*)?$/,
+    )?.[1];
   } catch {
-    return false;
+    return undefined;
   }
 }

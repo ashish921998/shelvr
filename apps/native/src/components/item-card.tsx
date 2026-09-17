@@ -1,14 +1,16 @@
 import type { TextMessageKey } from "@/locales/message-types";
-import { t, useAppLocale } from "@/lib/i18n";
+import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
 import { displayHost } from "@/lib/url";
 import { shortFormSource } from "@convex/model/externalUrl";
+import { socialPost } from "@/lib/social-post";
 import {
   enrichmentValidator,
   failureReasonValidator,
+  type PostMedia,
 } from "@convex/model/itemFields";
 import type { Infer } from "convex/values";
 import { api } from "@convex/_generated/api";
@@ -49,6 +51,7 @@ export type FeedItem = {
   imageUrl?: string | null;
   heroImageUrl?: string;
   aspectRatio?: number;
+  media?: PostMedia[];
   isSticker?: boolean;
   failureReason?: Infer<typeof failureReasonValidator>;
   enrichment?: Infer<typeof enrichmentValidator>;
@@ -164,8 +167,9 @@ function CardMedia({
   theme: UnistylesTheme;
 }) {
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const isVideo =
-    item.type === "link" && shortFormSource(item.url)?.video === true;
+  const social = socialPost(item);
+  const isVideo = social?.playable === true;
+  const mediaCount = item.media?.length ?? 0;
   if (imageUri) {
     return (
       <View style={!item.isSticker && styles.imageContainer}>
@@ -184,13 +188,27 @@ function CardMedia({
             },
           ]}
         />
-        {isVideo && (
-          <View style={styles.videoBadge}>
-            <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
-            {item.author ? (
-              <Text style={styles.videoBadgeText} numberOfLines={1}>
-                {item.author}
-              </Text>
+        {(isVideo || mediaCount > 1) && (
+          <View style={styles.mediaBadges} pointerEvents="none">
+            {isVideo ? (
+              <View style={styles.mediaBadge}>
+                <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
+                {item.author ? (
+                  <Text style={styles.mediaBadgeText} numberOfLines={1}>
+                    {item.author}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <View />
+            )}
+            {mediaCount > 1 ? (
+              <View style={[styles.mediaBadge, styles.countBadge]}>
+                <AppSymbolIcon name="photo.stack" size={10} tintColor="white" />
+                <Text style={styles.mediaBadgeText}>
+                  {new Intl.NumberFormat(formattingLocale()).format(mediaCount)}
+                </Text>
+              </View>
             ) : null}
           </View>
         )}
@@ -514,10 +532,17 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(0.5),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
-  videoBadge: {
+  mediaBadges: {
     position: "absolute",
     left: theme.gap(1.25),
+    right: theme.gap(1.25),
     bottom: theme.gap(1.25),
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  mediaBadge: {
+    flexShrink: 1,
     maxWidth: "80%",
     flexDirection: "row",
     alignItems: "center",
@@ -527,7 +552,10 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 50,
     backgroundColor: "rgba(0, 0, 0, 0.55)",
   },
-  videoBadgeText: {
+  countBadge: {
+    flexShrink: 0,
+  },
+  mediaBadgeText: {
     flexShrink: 1,
     fontFamily: theme.fonts.bold,
     fontSize: 10,

@@ -1,15 +1,29 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "@convex/_generated/api";
+import { api, internal } from "@convex/_generated/api";
 import {
   extractBodyText,
   fetchInstagram,
   fetchXoEmbed,
+  fetchXPost,
   linkEnrichment,
   parseInstagramEmbed,
   storePoster,
 } from "./ai";
+import articleSyndication from "./testdata/xSyndication/article.json";
+import escapedSyndication from "./testdata/xSyndication/escaped.json";
+import gifSyndication from "./testdata/xSyndication/gif.json";
+import mediaOnlySyndication from "./testdata/xSyndication/mediaOnly.json";
+import longVideoSyndication from "./testdata/xSyndication/longVideo.json";
+import oembedText from "./testdata/xSyndication/oembedText.json";
+import photoSyndication from "./testdata/xSyndication/photo.json";
+import photosSyndication from "./testdata/xSyndication/photos.json";
+import textSyndication from "./testdata/xSyndication/text.json";
+import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
+import videoSyndication from "./testdata/xSyndication/video.json";
+
+import type { PostMedia } from "./model/itemFields";
 import { newConvexTest } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
@@ -96,6 +110,403 @@ describe("fetchXoEmbed", () => {
   });
 });
 
+type FakeResponse = { status: number; body?: unknown };
+
+function serveX(syndication: FakeResponse, oembed: FakeResponse) {
+  safeFetch.mockImplementation(async (url: string) => {
+    const response = url.startsWith(
+      "https://cdn.syndication.twimg.com/tweet-result?",
+    )
+      ? syndication
+      : url.startsWith("https://publish.twitter.com/oembed?")
+        ? oembed
+        : { status: 599 };
+    if (response.status !== 200) {
+      return { ok: false, code: "http_error", status: response.status };
+    }
+    return {
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      bytes: new TextEncoder().encode(JSON.stringify(response.body)),
+    };
+  });
+}
+
+const JACK_OEMBED_READ = {
+  title: "just setting up my twttr",
+  siteName: "X",
+  author: "@jack",
+  content: "just setting up my twttr",
+};
+
+describe("fetchXPost", () => {
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+  });
+
+  it("reads an Article post's title, opening text, and cover", async () => {
+    serveX({ status: 200, body: articleSyndication }, { status: 500 });
+    await expect(
+      fetchXPost("https://x.com/adamtwtz/status/2097073557868056925"),
+    ).resolves.toEqual({
+      title: "How this GLP-1 app generated 20m+ views",
+      siteName: "X",
+      author: "@adamtwtz",
+      content:
+        "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe…",
+      heroImageUrl:
+        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroAspectRatio: 2.5,
+    });
+  });
+
+  it("keeps the cover of an Article X marks sensitive off the card", async () => {
+    serveX(
+      {
+        status: 200,
+        body: { ...articleSyndication, possibly_sensitive: true },
+      },
+      { status: 500 },
+    );
+    const read = await fetchXPost(
+      "https://x.com/adamtwtz/status/2097073557868056925",
+    );
+    expect(read.title).toBe("How this GLP-1 app generated 20m+ views");
+    expect(read.content).toMatch(/^An app spent \$21,418/);
+    expect(read.heroImageUrl).toBeUndefined();
+    expect(read.heroAspectRatio).toBeUndefined();
+  });
+
+  it("reads a text-only post the same way oEmbed does", async () => {
+    serveX({ status: 200, body: textSyndication }, { status: 500 });
+    await expect(fetchXPost("https://x.com/jack/status/20")).resolves.toEqual(
+      JACK_OEMBED_READ,
+    );
+  });
+
+  it("reads a photo post's photo as the hero and drops its media link", async () => {
+    serveX({ status: 200, body: photoSyndication }, { status: 500 });
+    const photo = "https://pbs.twimg.com/media/BhxWutnCEAAtEQ6.jpg?name=large";
+    await expect(
+      fetchXPost("https://x.com/TheEllenShow/status/440322224407314432"),
+    ).resolves.toEqual({
+      title: "If only Bradley's arm was longer. Best photo ever. #oscars",
+      siteName: "X",
+      author: "@TheEllenShow",
+      content: "If only Bradley's arm was longer. Best photo ever. #oscars",
+      heroImageUrl: photo,
+      heroAspectRatio: 1920 / 1080,
+      media: [{ kind: "photo", imageUrl: photo, aspectRatio: 1920 / 1080 }],
+    });
+  });
+
+  it("keeps the media of a post X marks sensitive off the card", async () => {
+    serveX(
+      { status: 200, body: { ...photoSyndication, possibly_sensitive: true } },
+      { status: 500 },
+    );
+    await expect(
+      fetchXPost("https://x.com/TheEllenShow/status/440322224407314432"),
+    ).resolves.toEqual({
+      title: "If only Bradley's arm was longer. Best photo ever. #oscars",
+      siteName: "X",
+      author: "@TheEllenShow",
+      content: "If only Bradley's arm was longer. Best photo ever. #oscars",
+    });
+  });
+
+  it("keeps every photo of a multi-photo post in order", async () => {
+    serveX({ status: 200, body: photosSyndication }, { status: 500 });
+    const read = await fetchXPost(
+      "https://x.com/maruyo_/status/1521844593804906496",
+    );
+    expect(read.content).toBe("GWなので再放送です☺\n #スーパーカブ");
+    expect(read.heroImageUrl).toBe(
+      "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large",
+    );
+    expect(read.heroAspectRatio).toBe(1200 / 1103);
+    expect(read.media).toEqual([
+      {
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large",
+        aspectRatio: 1200 / 1103,
+      },
+      {
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/FRu0eYwVEAAso2d.jpg?name=large",
+        aspectRatio: 1200 / 862,
+      },
+      {
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/FRu0eY2UUAE54PD.jpg?name=large",
+        aspectRatio: 1200 / 1029,
+      },
+      {
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/FRu0eY9VcAEZluY.jpg?name=large",
+        aspectRatio: 1200 / 977,
+      },
+    ]);
+  });
+
+  it("uses a video's poster and shape as the hero", async () => {
+    serveX({ status: 200, body: videoSyndication }, { status: 500 });
+    const poster =
+      "https://pbs.twimg.com/ext_tw_video_thumb/859073467769126913/pu/img/VKHGdXPsqKASBTvm.jpg?name=large";
+    await expect(
+      fetchXPost("https://x.com/CincinnatiZoo/status/859073537713328129"),
+    ).resolves.toMatchObject({
+      author: "@CincinnatiZoo",
+      content:
+        "Fiona loves playing in the hose water just like her parents! 💦 #TeamFiona #fionafix",
+      heroImageUrl: poster,
+      heroAspectRatio: 1280 / 720,
+      media: [{ kind: "video", imageUrl: poster, aspectRatio: 1280 / 720 }],
+    });
+  });
+
+  it("marks an animated GIF apart from a video", async () => {
+    serveX({ status: 200, body: gifSyndication }, { status: 500 });
+    await expect(
+      fetchXPost("https://x.com/Kekeflipnote/status/1241038667898118144"),
+    ).resolves.toMatchObject({
+      content: "Quarantine + online",
+      heroAspectRatio: 320 / 240,
+      media: [
+        {
+          kind: "gif",
+          imageUrl:
+            "https://pbs.twimg.com/tweet_video_thumb/ETkN_L3X0AMy1aT.jpg?name=large",
+          aspectRatio: 320 / 240,
+        },
+      ],
+    });
+  });
+
+  it("marks a truncated long post and keeps its portrait video shape", async () => {
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+    const read = await fetchXPost(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(read.content).toBe(
+      "🇧🇷 New Brazilian buffet tour\n\nThis one is interesting because it's inside a church\n\nBrazil (like South America) is VERY religious, 87% of the population is Christian\n\nCompare that to the Netherlands, where I'm from, where it's now just 30%, and similar for large parts of Europe,…",
+    );
+    expect(read.title).toBe(
+      "🇧🇷 New Brazilian buffet tour\n\nThis one is interesting because it's inside a church\n\nBrazil (like Sou",
+    );
+    expect(read.heroAspectRatio).toBe(1080 / 1920);
+    expect(read.media?.map((m) => m.kind)).toEqual(["video"]);
+  });
+
+  it("reads a media-only post as its media with no text", async () => {
+    serveX({ status: 200, body: mediaOnlySyndication }, { status: 500 });
+    const poster =
+      "https://pbs.twimg.com/tweet_video_thumb/EWHWVrmVcAAp4Vw.jpg?name=large";
+    await expect(
+      fetchXPost("https://x.com/Nazoani_museum/status/1252517866059907073"),
+    ).resolves.toEqual({
+      siteName: "X",
+      author: "@Nazoani_museum",
+      heroImageUrl: poster,
+      heroAspectRatio: 1,
+      media: [{ kind: "gif", imageUrl: poster, aspectRatio: 1 }],
+    });
+  });
+
+  it("decodes the entities X escapes in post text", async () => {
+    serveX({ status: 200, body: escapedSyndication }, { status: 500 });
+    await expect(
+      fetchXPost("https://x.com/takobe_t/status/1777662729890730410"),
+    ).resolves.toMatchObject({
+      content: "ロザリンデ&エルトリンデ\n#ユニコーンオーバーロード",
+    });
+  });
+
+  it.each([
+    ["a deleted post's tombstone", { status: 200, body: tombstoneSyndication }],
+    ["an empty body", { status: 200, body: {} }],
+    ["a server error", { status: 503 }],
+    ["a missing post", { status: 404 }],
+  ])("falls back to oEmbed on %s", async (_label, syndication) => {
+    serveX(syndication, { status: 200, body: oembedText });
+    await expect(fetchXPost("https://x.com/jack/status/20")).resolves.toEqual(
+      JACK_OEMBED_READ,
+    );
+  });
+
+  it("keeps a post oEmbed reports gone as gone", async () => {
+    serveX({ status: 404 }, { status: 404 });
+    await expect(
+      fetchXPost("https://x.com/nasa/status/1999999999999999999"),
+    ).rejects.toMatchObject({ code: "http_error", status: 404 });
+  });
+
+  it("asks the syndication CDN for the post id with a derived token", async () => {
+    serveX({ status: 200, body: textSyndication }, { status: 500 });
+    await fetchXPost("https://twitter.com/jack/status/20?s=21");
+    expect(safeFetch.mock.calls[0][0]).toBe(
+      "https://cdn.syndication.twimg.com/tweet-result?id=20&token=6dq1a2xwd93",
+    );
+  });
+});
+
+describe("processItem for X posts", () => {
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+    generateObject.mockReset();
+    generateObject.mockResolvedValue({
+      object: {
+        title: "GLP-1 App Growth",
+        description: "How a GLP-1 app scaled on Content Rewards.",
+        tags: ["growth"],
+        spaceNames: [],
+        intents: [],
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function saveLink(url: string, fields: { media?: PostMedia[] } = {}) {
+    const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "x-user",
+        type: "link",
+        url,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+        ...fields,
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    return { item: await t.query(api.items.getItem, { id: itemId }) };
+  }
+
+  it("saves an Article post with its opening text and cover, classified from its title", async () => {
+    serveX({ status: 200, body: articleSyndication }, { status: 500 });
+    const { item } = await saveLink(
+      "https://x.com/adamtwtz/status/2097073557868056925",
+    );
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "GLP-1 App Growth",
+      siteName: "X",
+      author: "@adamtwtz",
+      heroImageUrl:
+        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      aspectRatio: 2.5,
+      imageUrl: null,
+    });
+    expect(item?.content).toMatch(/^An app spent \$21,418/);
+    expect(item?.enrichment).toBeUndefined();
+    expect(item).not.toHaveProperty("media");
+    expect(generateObject.mock.calls[0][0].prompt).toContain(
+      "Page title: How this GLP-1 app generated 20m+ views",
+    );
+  });
+
+  it("saves every photo of a multi-photo post and serves them to the client", async () => {
+    serveX({ status: 200, body: photosSyndication }, { status: 500 });
+    const { item } = await saveLink(
+      "https://x.com/maruyo_/status/1521844593804906496",
+    );
+    expect(item?.heroImageUrl).toBe(
+      "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large",
+    );
+    expect(item?.aspectRatio).toBe(1200 / 1103);
+    expect(item?.media?.map((m) => [m.kind, m.imageUrl])).toEqual([
+      ["photo", "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large"],
+      ["photo", "https://pbs.twimg.com/media/FRu0eYwVEAAso2d.jpg?name=large"],
+      ["photo", "https://pbs.twimg.com/media/FRu0eY2UUAE54PD.jpg?name=large"],
+      ["photo", "https://pbs.twimg.com/media/FRu0eY9VcAEZluY.jpg?name=large"],
+    ]);
+  });
+
+  it("still saves a TikTok from oEmbed with its poster copied to storage", async () => {
+    const poster = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    safeFetch.mockImplementation(async (url: string) =>
+      url.startsWith("https://www.tiktok.com/oembed?")
+        ? {
+            ok: true,
+            finalUrl: url,
+            status: 200,
+            contentType: "application/json",
+            bytes: new TextEncoder().encode(
+              JSON.stringify({
+                title: "Scramble up ur name & I’ll try to guess it😍❤️",
+                author_name: "Scout, Suki & Stella",
+                author_unique_id: "scout2015",
+                thumbnail_url: "https://p16-sign-va.tiktokcdn.com/poster.jpeg",
+                thumbnail_width: 720,
+                thumbnail_height: 1280,
+              }),
+            ),
+          }
+        : url === "https://p16-sign-va.tiktokcdn.com/poster.jpeg"
+          ? {
+              ok: true,
+              finalUrl: url,
+              status: 200,
+              contentType: "image/jpeg",
+              bytes: poster,
+            }
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const { item } = await saveLink(
+      "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+    );
+    expect(item).toMatchObject({
+      siteName: "TikTok",
+      author: "@scout2015",
+      content: "Scramble up ur name & I’ll try to guess it😍❤️",
+      heroImageUrl: "https://p16-sign-va.tiktokcdn.com/poster.jpeg",
+      aspectRatio: 720 / 1280,
+    });
+    expect(item).not.toHaveProperty("media");
+    expect(item?.imageUrl).toEqual(expect.stringContaining("/api/storage/"));
+  });
+
+  it("clears media a retried post no longer has", async () => {
+    serveX({ status: 200, body: textSyndication }, { status: 500 });
+    const { item } = await saveLink("https://x.com/jack/status/20", {
+      media: [
+        {
+          kind: "photo",
+          imageUrl: "https://pbs.twimg.com/media/stale.jpg?name=large",
+          aspectRatio: 1,
+        },
+      ],
+    });
+    expect(item).toMatchObject({
+      content: "just setting up my twttr",
+      author: "@jack",
+    });
+    expect(item).not.toHaveProperty("media");
+    expect(item).not.toHaveProperty("heroImageUrl");
+  });
+});
+
 describe("linkEnrichment", () => {
   it("preserves readable content with a menu class", () => {
     const content = extractBodyText(
@@ -152,6 +563,29 @@ describe("linkEnrichment", () => {
 
   it("flags a readable page without an article body as no_article", () => {
     expect(linkEnrichment({ status: "ok", page: {} })).toBe("no_article");
+  });
+
+  it("flags a page with an empty media list as no_article", () => {
+    expect(linkEnrichment({ status: "ok", page: { media: [] } })).toBe(
+      "no_article",
+    );
+  });
+
+  it("flags a post read as media alone as enriched (undefined)", () => {
+    expect(
+      linkEnrichment({
+        status: "ok",
+        page: {
+          media: [
+            {
+              kind: "photo",
+              imageUrl: "https://pbs.twimg.com/a",
+              aspectRatio: 1,
+            },
+          ],
+        },
+      }),
+    ).toBeUndefined();
   });
 
   it("flags a fully read page as enriched (undefined)", () => {
