@@ -15,6 +15,7 @@ import {
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "./process-share";
+import { countPartial, countProgress } from "./session-view";
 import {
   operationIdFor,
   type RawSharePayload,
@@ -222,18 +223,33 @@ describe("classifyEntries", () => {
   it("stamps kinds and terminal statuses without side effects", () => {
     const session = makeSession(3);
     const resolved = [
-      urlPayload("https://a.example"), // link
       textPayload("note"), // note
+      imagePayload("file://img.jpg"), // image
       imagePayload(null), // failed image
     ];
     const entries = classifyEntries(session, resolved);
-    expect(entries.map((e) => e.kind)).toEqual(["link", "note", "image"]);
+    expect(entries.map((e) => e.kind)).toEqual(["note", "image", "image"]);
     expect(entries.map((e) => e.status)).toEqual([
       "pending",
       "pending",
       "failed",
     ]);
     expect(entries[2].message).toBe("Image could not be resolved");
+  });
+
+  it("classifies URL-less text beside a shared link as that link", () => {
+    const session = makeSession(3);
+    const resolved = [
+      textPayload("See this post"),
+      urlPayload("https://a.example"),
+      imagePayload("file://img.jpg"),
+    ];
+    const entries = classifyEntries(session, resolved);
+    expect(entries.map((e) => [e.kind, e.status])).toEqual([
+      ["link", "pending"],
+      ["link", "pending"],
+      ["image", "pending"],
+    ]);
   });
 });
 
@@ -245,9 +261,9 @@ describe("processSession", () => {
   it("saves all entries on full success and reports progress in order", () => {
     const session = makeSession(3);
     const resolved = [
-      urlPayload("https://a.example"),
       textPayload("note body"),
-      imagePayload("file://img.jpg"),
+      imagePayload("file://a.jpg"),
+      imagePayload("file://b.jpg"),
     ];
     const classified = classifyEntries(session, resolved);
     const settled: ShareEntry[] = [];
@@ -397,6 +413,153 @@ describe("processSession", () => {
       "https://www.tiktok.com/@creator/video/7301234567890123456",
     );
     expect(saveNote).not.toHaveBeenCalled();
+  });
+
+  it("saves one item when a share carries the same URL as a link and as caption text", async () => {
+    // Instagram's share sheet attaches the reel URL twice: a URL attachment and
+    // a text attachment holding the same URL. Each becomes its own entry.
+    const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/?igsh=abc123";
+    const session = makeSession(2);
+    const resolved = [urlPayload(reel), textPayload(reel)];
+    const classified = classifyEntries(session, resolved);
+    const saveLink = vi.fn(
+      async ({ operationId }) => `items:${operationId}` as Id<"items">,
+    );
+
+    const result = await processSession(
+      { ...session, entries: classified },
+      resolved,
+      makeDeps({ saveLink }),
+    );
+
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(saveLink.mock.calls[0][0]).toEqual({
+      url: reel,
+      operationId: operationIdFor("sess-1", 0),
+    });
+    expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
+      ["saved", `items:${operationIdFor("sess-1", 0)}`],
+      ["saved", `items:${operationIdFor("sess-1", 0)}`],
+    ]);
+    expect(countProgress(result, resolved)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result, resolved)).toEqual({
+      saved: 1,
+      failed: 0,
+      total: 1,
+    });
+  });
+
+  it("saves one link item when a share pairs the link with caption text that has no URL", async () => {
+    // Instagram's web share sends the caption and the reel URL as separate
+    // attachments; the caption alone is not a note the user meant to save.
+    const reel =
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/?utm_source=ig_web_button_native_share";
+    const session = makeSession(2);
+    const resolved = [
+      textPayload("See this Instagram post by @natgeo"),
+      urlPayload(reel),
+    ];
+    const classified = classifyEntries(session, resolved);
+    const saveLink = vi.fn(
+      async ({ operationId }) => `items:${operationId}` as Id<"items">,
+    );
+    const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
+
+    const result = await processSession(
+      { ...session, entries: classified },
+      resolved,
+      makeDeps({ saveLink, saveNote }),
+    );
+
+    expect(saveNote).not.toHaveBeenCalled();
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(saveLink.mock.calls[0][0].url).toBe(reel);
+    const itemId = saveLink.mock.calls[0][0].operationId;
+    expect(result.entries.map((e) => [e.kind, e.status, e.itemId])).toEqual([
+      ["link", "saved", `items:${itemId}`],
+      ["link", "saved", `items:${itemId}`],
+    ]);
+    expect(countProgress(result, resolved)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result, resolved)).toEqual({
+      saved: 1,
+      failed: 0,
+      total: 1,
+    });
+  });
+
+  it("reuses a saved sibling's item when retrying a failed copy of the same URL", async () => {
+    const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/";
+    const resolved = [urlPayload(reel), textPayload(`Watch this ${reel}`)];
+    const session = makeSession(2);
+    const saveLink = vi.fn(async () => "items:new" as Id<"items">);
+    const prior: ShareSession = {
+      ...session,
+      entries: [
+        { ...session.entries[0], status: "saved", itemId: "items:first" },
+        { ...session.entries[1], status: "failed", message: "offline" },
+      ],
+    };
+
+    const result = await processSession(
+      prior,
+      resolved,
+      makeDeps({ saveLink }),
+    );
+
+    expect(saveLink).not.toHaveBeenCalled();
+    expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
+      ["saved", "items:first"],
+      ["saved", "items:first"],
+    ]);
+  });
+
+  it("never reuses a note an older build saved from a link's caption", async () => {
+    // A session persisted before the caption rule shipped: its URL-less text
+    // entry was saved as a note, and the link entry failed.
+    const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/";
+    const resolved = [textPayload("See this post"), urlPayload(reel)];
+    const session = makeSession(2);
+    const saveLink = vi.fn(async () => "items:link" as Id<"items">);
+    const prior: ShareSession = {
+      ...session,
+      entries: [
+        {
+          ...session.entries[0],
+          kind: "note",
+          status: "saved",
+          itemId: "items:note",
+        },
+        { ...session.entries[1], status: "failed", message: "offline" },
+      ],
+    };
+
+    const result = await processSession(
+      prior,
+      resolved,
+      makeDeps({ saveLink }),
+    );
+
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
+      ["saved", "items:note"],
+      ["saved", "items:link"],
+    ]);
+  });
+
+  it("still saves distinct URLs separately", async () => {
+    const session = makeSession(2);
+    const resolved = [
+      urlPayload("https://a.example/1"),
+      textPayload("see https://a.example/2"),
+    ];
+    const saveLink = vi.fn(async ({ url }) => `items:${url}` as Id<"items">);
+
+    await processSession(session, resolved, makeDeps({ saveLink }));
+
+    expect(saveLink.mock.calls.map((c) => c[0].url)).toEqual([
+      "https://a.example/1",
+      "https://a.example/2",
+    ]);
   });
 
   it("reports an image save failure from the injected save (a result, not a throw)", async () => {

@@ -147,27 +147,95 @@ export function isTikTokUrl(url: string | undefined): boolean {
   }
 }
 
-/** True for an X / Twitter post URL, the only shape X's oEmbed endpoint
- * accepts: `x.com/{user}/status/{id}` and the `x.com/i/web/status/{id}` path
- * the import screen builds from archive bookmark ids. Profiles, lists, and
- * `t.co` short links are not posts and go through the normal page reader. */
-export function isXTweetUrl(url: string | undefined): boolean {
-  if (!url) return false;
+/** An Instagram post, reel, or IGTV link reduced to its media kind and
+ * shortcode. Accepts instagram.com with or without the www/m subdomain, the
+ * instagr.am short host, the `/reels/` alias, and the `/{user}/reel/{id}`
+ * shape Instagram serves after a share. A `/share/{kind}/{token}` link names
+ * the kind but carries a redirect token, not a shortcode, so its shortcode is
+ * left for the caller to resolve from the redirect. Profiles, stories, and
+ * look-alike hosts are not media links. A relative `url` resolves against
+ * `base`. */
+export function instagramMedia(
+  url: string | undefined,
+  base?: string,
+): { kind: "reel" | "p" | "tv"; shortcode?: string } | undefined {
+  if (!url) return undefined;
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url, base);
     const host = parsed.hostname.toLowerCase();
     if (
-      host !== "x.com" &&
-      !host.endsWith(".x.com") &&
-      host !== "twitter.com" &&
-      !host.endsWith(".twitter.com")
+      host !== "instagram.com" &&
+      host !== "www.instagram.com" &&
+      host !== "m.instagram.com" &&
+      host !== "instagr.am" &&
+      host !== "www.instagr.am"
     ) {
-      return false;
+      return undefined;
+    }
+    const match = parsed.pathname.match(
+      /^\/(?:[A-Za-z0-9._]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)(?:\/.*)?$/,
+    );
+    // `/reels/audio/{id}` is a sound page, not a reel.
+    if (!match || match[2] === "audio") return undefined;
+    const kind =
+      match[1] === "reels" ? "reel" : (match[1] as "reel" | "p" | "tv");
+    return match[0].startsWith("/share/")
+      ? { kind }
+      : { kind, shortcode: match[2] };
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for an Instagram post, reel, or IGTV link. */
+export function isInstagramUrl(url: string | undefined): boolean {
+  return instagramMedia(url) !== undefined;
+}
+
+/** Short-form social links whose saved content is a caption, not an article:
+ * TikTok videos and Instagram media. `video` is true for TikTok and for
+ * Instagram reels and IGTV; an Instagram `/p/` link may be a photo. The
+ * pipeline and the client share this so both treat these links the same way. */
+export function shortFormSource(
+  url: string | undefined,
+): { site: "TikTok" | "Instagram"; video: boolean } | undefined {
+  if (isTikTokUrl(url)) {
+    return { site: "TikTok", video: true };
+  }
+  const media = instagramMedia(url);
+  if (media) {
+    return { site: "Instagram", video: media.kind !== "p" };
+  }
+  return undefined;
+}
+
+export function isXHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "x.com" ||
+    host.endsWith(".x.com") ||
+    host === "twitter.com" ||
+    host.endsWith(".twitter.com")
+  );
+}
+
+/** The numeric id of an X / Twitter post URL: `x.com/{user}/status/{id}` and
+ * the `x.com/i/web/status/{id}` path the import screen builds from archive
+ * bookmark ids. Profiles, lists, and `t.co` short links are not posts and
+ * return undefined, so they go through the normal page reader. */
+export function xStatusId(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (!isXHost(parsed.hostname)) {
+      return undefined;
     }
     // The id must be a whole path segment, optionally followed by more
     // segments such as /photo/1, so /status/123abc is rejected.
-    return /^\/(?:[^/]+|i\/web)\/status\/\d+(?:\/.*)?$/.test(parsed.pathname);
+    return parsed.pathname.match(
+      /^\/(?:[^/]+|i\/web)\/status\/(\d+)(?:\/.*)?$/,
+    )?.[1];
   } catch {
-    return false;
+    return undefined;
   }
 }

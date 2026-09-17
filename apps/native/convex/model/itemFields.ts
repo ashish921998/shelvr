@@ -36,6 +36,24 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const postMediaValidator = v.object({
+  kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
+  imageUrl: v.string(),
+  aspectRatio: v.number(),
+});
+
+export type PostMedia = Infer<typeof postMediaValidator>;
+
+// An image or video inside an article body. `paragraph` counts the body's
+// paragraphs (split on blank lines) that come before it, so the reader can
+// place it between them.
+export const articleMediaValidator = v.object({
+  ...postMediaValidator.fields,
+  paragraph: v.number(),
+});
+
+export type ArticleMedia = Infer<typeof articleMediaValidator>;
+
 // Why processing failed. `not_found` (missing page or missing/empty photo) and `image_too_large`
 // are terminal; `error` is a pipeline fault worth retrying. Only set with
 // `status: "failed"`.

@@ -5,6 +5,7 @@ import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
@@ -13,8 +14,8 @@ import { TagChip } from "@/components/tag-chip";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { socialPost, type SocialPost } from "@/lib/social-post";
 import { displayHost } from "@/lib/url";
-import { isTikTokUrl } from "@convex/model/externalUrl";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -52,7 +53,10 @@ type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 // scoped to that space's membership.
 export type DetailItem = CardRow &
   Partial<
-    Pick<FullRow, "content" | "recipe" | "products" | "productsStatus">
+    Pick<
+      FullRow,
+      "content" | "articleMedia" | "recipe" | "products" | "productsStatus"
+    >
   > & {
     spaceIntents?: CardRow["intents"];
   };
@@ -133,14 +137,15 @@ export const ItemDetail = memo(function ItemDetail({
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
-  // A video's "content" is its caption, not an article: keep the poster layout.
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  // A social save's "content" is its caption, not an article: keep the
+  // poster layout.
+  const social = socialPost(item);
 
   // Link saves with extracted content get the compact reader layout.
   if (
     !bodyPending &&
     item.type === "link" &&
-    !isVideo &&
+    social === undefined &&
     paragraphs.length > 0
   ) {
     return (
@@ -174,7 +179,8 @@ export const ItemDetail = memo(function ItemDetail({
 
   // Source shape; OG images default to 1200×630 (≈1.91).
   const heroAspect =
-    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap — and when the cap bites, pull
@@ -182,9 +188,11 @@ export const ItemDetail = memo(function ItemDetail({
   // (no cropping, no lopsided gap). The frame insets the image by its own
   // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
-  const heroMaxWidth = width - frameInset;
-  const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
-  const heroWidth = heroHeight * heroAspect;
+  const frameSize = (aspect: number) => {
+    const frameHeight = Math.min((width - frameInset) / aspect, maxHeroHeight);
+    return { width: frameHeight * aspect, height: frameHeight };
+  };
+  const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
   const heroImage = heroUri ? (
     <Image
@@ -198,37 +206,55 @@ export const ItemDetail = memo(function ItemDetail({
     />
   ) : null;
 
-  // The poster is the video's one real action: tap anywhere on it to open.
+  const openPost = () => {
+    void WebBrowser.openBrowserAsync(item.url!)
+      .then(() => analytics.itemAction(item, "open_source"))
+      .catch(() => {});
+  };
+
   const hero =
-    heroImage && isVideo && item.url ? (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("item.openSite", { site: "TikTok" })}
-        onPress={() => {
-          void WebBrowser.openBrowserAsync(item.url!)
-            .then(() => analytics.itemAction(item, "open_source"))
-            .catch(() => {});
-        }}
+    heroImage && social && item.url ? (
+      <PostMediaButton
+        site={social.site}
+        playable={social.playable}
+        onPress={openPost}
       >
         {heroImage}
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playButton}>
-            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
-          </View>
-        </View>
-      </Pressable>
+      </PostMediaButton>
     ) : (
       heroImage
     );
 
+  const moreMedia =
+    social && item.url
+      ? (item.media ?? []).slice(1).map((media, index) => (
+          <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
+            <PostMediaButton
+              site={social.site}
+              playable={media.kind !== "photo"}
+              onPress={openPost}
+            >
+              <Image
+                source={{ uri: media.imageUrl }}
+                contentFit="contain"
+                style={[styles.heroImage, frameSize(media.aspectRatio)]}
+              />
+            </PostMediaButton>
+          </View>
+        ))
+      : null;
+
   const heroBlock = heroUri ? (
-    <View style={item.isSticker ? undefined : styles.heroContainer}>
-      {isZoomTarget ? (
-        <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-      ) : (
-        hero
-      )}
-    </View>
+    <>
+      <View style={item.isSticker ? undefined : styles.heroContainer}>
+        {isZoomTarget ? (
+          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
+        ) : (
+          hero
+        )}
+      </View>
+      {moreMedia}
+    </>
   ) : null;
 
   const scrollProps = {
@@ -269,7 +295,7 @@ export const ItemDetail = memo(function ItemDetail({
         spaces={spaces}
         similar={similar}
         paragraphs={paragraphs}
-        isVideo={isVideo}
+        social={social}
         intents={intents}
         heroUri={heroUri}
       />
@@ -285,7 +311,7 @@ function ItemDetailBody({
   spaces,
   similar,
   paragraphs,
-  isVideo,
+  social,
   intents,
   heroUri,
 }: {
@@ -294,7 +320,7 @@ function ItemDetailBody({
   spaces: ReturnType<typeof useItemDetailData>["spaces"];
   similar: ReturnType<typeof useItemDetailData>["similar"];
   paragraphs: string[];
-  isVideo: boolean;
+  social: SocialPost | undefined;
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
@@ -333,13 +359,13 @@ function ItemDetailBody({
             }}
           >
             <AppSymbolIcon
-              name={isVideo ? "play.rectangle" : "safari"}
+              name={social?.playable ? "play.rectangle" : "safari"}
               size={15}
               tintColor={theme.colors.muted}
             />
             <Text style={styles.sourceText}>
-              {isVideo && item.author
-                ? `${item.author} · TikTok`
+              {social && item.author
+                ? `${item.author} · ${social.site}`
                 : (item.siteName ?? displayHost(item.url))}
             </Text>
             <AppSymbolIcon
@@ -375,7 +401,7 @@ function ItemDetailBody({
         </Pressable>
       ) : null}
 
-      {isVideo && paragraphs.length > 0 ? (
+      {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -386,12 +412,12 @@ function ItemDetailBody({
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
-          the ingredients and steps out of the story around them. A video keeps
-          its caption above and gains the recipe its caption described or
+          the ingredients and steps out of the story around them. A social post
+          keeps its caption above and gains the recipe its caption described or
           linked to; a recipe screenshot gets the card under the photo. */}
       {detail.recipe ? (
         <RecipeSection recipe={detail.recipe} />
-      ) : !isVideo && paragraphs.length > 0 ? (
+      ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>
@@ -633,28 +659,13 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(1),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
+  moreMedia: {
+    marginTop: theme.gap(2),
+  },
   heroImage: {
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
-  },
-  playOverlay: {
-    position: "absolute",
-    inset: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    // Nudge the glyph to the optical center of the circle.
-    paddingLeft: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   body: {
     gap: theme.gap(5),

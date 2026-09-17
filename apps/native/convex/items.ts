@@ -28,6 +28,7 @@ import {
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
@@ -36,6 +37,7 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
 } from "./model/itemFields";
@@ -122,6 +124,8 @@ const itemFields = {
   siteName: v.optional(v.string()),
   author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
+  media: v.optional(v.array(postMediaValidator)),
+  articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
@@ -192,6 +196,7 @@ const enrichedItemWithSpacesValidator = v.object({
 export const itemCardValidator = enrichedItemValidator.omit(
   "userId",
   "content",
+  "articleMedia",
   "recipe",
   "searchText",
   "products",
@@ -216,6 +221,8 @@ export async function toItemCard(
   const {
     userId: _userId,
     content: _content,
+    articleMedia: _articleMedia,
+    recipe: _recipe,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
@@ -1767,6 +1774,8 @@ export const finalizeItem = internalMutation({
     siteName: v.optional(v.string()),
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     // A poster copied into our storage (TikTok thumbnails expire). Only ever
     // set for links; image items keep the storageId they were uploaded with.
     storageId: v.optional(v.id("_storage")),
@@ -1815,6 +1824,8 @@ export const finalizeItem = internalMutation({
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,
+      media: args.media,
+      articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents: args.intents,
