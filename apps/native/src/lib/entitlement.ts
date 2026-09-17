@@ -106,6 +106,7 @@ type Entitlement = {
   status: EntitlementStatus;
   entitled: boolean;
   loading: boolean;
+  now: number;
   expiresAt?: number;
 };
 
@@ -302,10 +303,15 @@ export function useEntitlement(): Entitlement {
   // authenticated Convex query in that state, and never render persisted data
   // from a previous account as this user's entitlement.
   if (!isAuthenticated) {
-    return { status: "none", entitled: false, loading: authLoading };
+    return { status: "none", entitled: false, loading: authLoading, now };
   }
   if (!data || data.status === "none") {
-    return { status: "none", entitled: false, loading: data === undefined };
+    return {
+      status: "none",
+      entitled: false,
+      loading: data === undefined,
+      now,
+    };
   }
   const expiresAt = data.expiresAt;
   // The shared gate — same logic the server uses in requireProEntitlement, so
@@ -315,6 +321,7 @@ export function useEntitlement(): Entitlement {
     status: active ? data.status : "lapsed",
     entitled: active,
     loading: false,
+    now,
     expiresAt,
   };
 }

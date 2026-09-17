@@ -162,12 +162,16 @@ pnpm --filter native-app exec convex dev
 
 ```sh
 pnpm --filter native-app test    # vitest run
+pnpm --filter web-app test       # vitest run
+pnpm run coverage                 # native and web Vitest coverage gates
 pnpm --filter native-app check   # lint, then typecheck, then test
 ```
 
-Tests are `*.test.ts` files next to the code under `apps/native/convex/` and
-`apps/native/src/`. Convex function tests use `convex-test` and opt into the
-edge runtime per file with a `// @vitest-environment edge-runtime` pragma.
+Tests are `*.test.ts` files next to the code under `apps/native/convex/`,
+`apps/native/src/`, and `apps/web/src/`. Convex function tests use `convex-test`
+and opt into the edge runtime per file with a
+`// @vitest-environment edge-runtime` pragma. Web tests use Vitest's Node
+environment by default and opt into jsdom per file when browser APIs are needed.
 
 ## Domain model (Convex)
 

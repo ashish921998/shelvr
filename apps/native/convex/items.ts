@@ -13,7 +13,11 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import {
+  hasProEntitlementAt,
+  hasProEntitlementStatus,
+  requireProEntitlement,
+} from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -297,15 +301,26 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves, for surfaces that show a handful of items and
- * must not subscribe to the feed (the home-screen widget). The status index
- * reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view. */
+/** The newest `ready` saves for the Pro-only home-screen widget. The status
+ * index reads exactly `limit` ready rows, so a burst of fresh imports still
+ * processing can never push older ready saves out of view.
+ *
+ * Pro is checked without ever reading the wall clock (a query is not rerun
+ * as time advances, so a Date.now() read could serve stale access). A
+ * caller that sends its refreshed clock gets an exact expiry check; a
+ * build that predates the `now` argument keeps its saves while the stored
+ * subscription status is active, and the RevenueCat webhook lapses that
+ * status when a subscription actually expires. */
 export const listRecentItems = query({
-  args: { limit: v.number() },
+  args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    const entitled =
+      args.now === undefined
+        ? await hasProEntitlementStatus(ctx, userId)
+        : await hasProEntitlementAt(ctx, userId, args.now);
+    if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
       RECENT_ITEMS_MAX,
