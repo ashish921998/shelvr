@@ -1,0 +1,6 @@
+{
+  "name": "text-layout-fix",
+  "version": "1.0.0",
+  "description": "Keeps long iOS paragraphs from drawing as one clipped line.",
+  "private": true
+}
