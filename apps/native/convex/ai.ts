@@ -828,9 +828,9 @@ const fxArticleSchema = z.object({
               type: z.string(),
               data: z.object({
                 url: z.string().optional(),
-                mediaItems: z
-                  .array(z.object({ mediaId: z.coerce.string() }))
-                  .optional(),
+                // Parsed in blockMedia, so an odd shape skips the image
+                // rather than the whole body.
+                mediaItems: z.unknown().optional(),
               }),
             }),
           }),
@@ -842,6 +842,10 @@ const fxArticleSchema = z.object({
     }),
   }),
 });
+
+const fxMediaItemsSchema = z.array(
+  z.object({ mediaId: z.union([z.string(), z.number()]).transform(String) }),
+);
 
 const fxImageInfo = z.object({
   original_img_url: z.url(),
@@ -937,7 +941,8 @@ function blockMedia(
 ): Omit<ArticleMedia, "paragraph">[] {
   return block.entityRanges.flatMap((range) => {
     const entity = content.entityMap.find((e) => e.key === range.key);
-    return (entity?.value.data.mediaItems ?? []).flatMap((item) => {
+    const items = fxMediaItemsSchema.safeParse(entity?.value.data.mediaItems);
+    return (items.success ? items.data : []).flatMap((item) => {
       const found = mediaById.get(item.mediaId);
       return found ? [found] : [];
     });
@@ -1048,10 +1053,14 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
 async function withXArticleBody(id: string, page: PageData): Promise<PageData> {
   const read = await readXArticleBody(id);
   if (read.ok) {
+    // An Article that opens with its cover would show it twice.
+    const media = read.body.media.filter(
+      (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
+    );
     return {
       ...page,
       content: read.body.text,
-      ...(read.body.media.length > 0 ? { articleMedia: read.body.media } : {}),
+      ...(media.length > 0 ? { articleMedia: media } : {}),
     };
   }
   logEvent("warn", "x_article_body_fallback", {

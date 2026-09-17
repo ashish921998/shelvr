@@ -608,6 +608,72 @@ describe("fetchXPost for an Article's full body", () => {
     ]);
   });
 
+  it("keeps the body when an Article's media reference is malformed", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [
+              {
+                key: "0",
+                value: { type: "MEDIA", data: { mediaItems: "broken" } },
+              },
+              mediaEntity(1, "1"),
+            ],
+          },
+          [PHOTO_ENTITY],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("One");
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "1:photo",
+    ]);
+  });
+
+  it("does not repeat a cover that opens the Article", async () => {
+    const cover = articleSyndication.article.cover_media.media_info;
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [mediaEntity(0, "9"), mediaEntity(1, "9")],
+          },
+          [{ media_id: "9", media_info: { ...cover, __typename: "ApiImage" } }],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.heroImageUrl).toBe(
+      "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+    );
+    expect(read.articleMedia).toEqual([
+      {
+        paragraph: 1,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+        aspectRatio: 2.5,
+      },
+    ]);
+  });
+
   it("drops media after the part of a long Article it cannot store", async () => {
     serveX(
       { status: 200, body: articleSyndication },
