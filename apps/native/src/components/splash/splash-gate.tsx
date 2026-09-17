@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 
 import { getNotificationUrl } from "@/lib/notifications";
@@ -28,15 +28,16 @@ let hasPlayed = false;
 
 /**
  * Whether a tapped notification is about to take the user somewhere.
- * `useNotificationObserver` navigates only when the notification carries a
- * `url`, so an informational push — which goes nowhere — is not a reason to
- * skip the animation.
+ * `useNotificationObserver` navigates only on a truthy `url` — so an
+ * informational push, or one carrying an empty string, goes nowhere and is not
+ * a reason to skip the animation. The truthiness test is what keeps this in
+ * step with the observer.
  */
 function launchedByNotificationRoute(): boolean {
   try {
     const response = Notifications.getLastNotificationResponse();
     if (!response?.notification) return false;
-    return getNotificationUrl(response.notification) != null;
+    return Boolean(getNotificationUrl(response.notification));
   } catch {
     // A missing or unavailable module must never cost us the splash.
     return false;
@@ -49,25 +50,32 @@ function launchedByNotificationRoute(): boolean {
  * up, so the decision lives in one hook rather than in the gate's own state.
  */
 export function useSplashGate() {
-  const [showSplash, setShowSplash] = useState(() => {
+  // Expo Router resolves the initial URL asynchronously, so a share or deep
+  // link can land at any point: before this hook first runs, between its
+  // render and its commit, or a frame or two into the animation. Reading the
+  // flag as an external store covers all three — a subscription set up in an
+  // effect would miss anything that arrived before the effect ran, since the
+  // store does not replay.
+  const directLaunch = useSyncExternalStore(
+    subscribeDirectLaunch,
+    isDirectLaunch,
+  );
+
+  const [wantsSplash] = useState(() => {
     const play =
       !hasPlayed && !isDirectLaunch() && !launchedByNotificationRoute();
     // Either way this process has now had its one chance.
     hasPlayed = true;
     return play;
   });
+  const [finished, setFinished] = useState(false);
 
-  const finishSplash = useCallback(() => setShowSplash(false), []);
+  const finishSplash = useCallback(() => setFinished(true), []);
 
-  // Expo Router resolves the initial URL asynchronously, so a share or deep
-  // link can land a frame or two after the splash has already started. Drop it
-  // the moment that happens rather than making the user wait out the rest.
-  useEffect(() => {
-    if (!showSplash) return;
-    return subscribeDirectLaunch(finishSplash);
-  }, [showSplash, finishSplash]);
-
-  return { showSplash, finishSplash };
+  return {
+    showSplash: wantsSplash && !finished && !directLaunch,
+    finishSplash,
+  };
 }
 
 export function SplashGate({

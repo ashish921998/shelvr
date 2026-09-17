@@ -196,10 +196,13 @@ describe("cubicBezierEase", () => {
   });
 
   it("resolves a curve too flat for Newton-Raphson alone", () => {
-    // A near-vertical control pair drives the derivative towards zero, which
-    // is the case the bisection fallback exists for.
-    const value = cubicBezierEase(0.5, 0, 1, 1, 0);
-    expect(value).toBeGreaterThanOrEqual(0);
-    expect(value).toBeLessThanOrEqual(1);
+    // Both x control points sit at 0, so the curve leaves the origin with a
+    // near-zero derivative: Newton stalls and the bisection fallback finishes
+    // the solve. The exact value is asserted rather than a range, because a
+    // range passes even when the fallback returns nonsense.
+    expect(cubicBezierEase(0.0001, 0, 1 / 3, 0, 2 / 3)).toBeCloseTo(
+      0.046482,
+      5,
+    );
   });
 });
