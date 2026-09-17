@@ -350,6 +350,14 @@ describe("fetchInstagram", () => {
         '<link rel="canonical" href="https://www.instagram.com/reel/DHVrPLrIyQ_/" /></head>',
       ),
     ],
+    [
+      "a relative canonical link",
+      "https://www.instagram.com/",
+      REEL_PAGE.replace(
+        "</head>",
+        '<link rel="canonical" href="/reel/DHVrPLrIyQ_/" /></head>',
+      ),
+    ],
   ])("reads a share link's caption through %s", async (_, finalUrl, page) => {
     instagramAnswers(page, REEL_EMBED);
     const answer = safeFetch.getMockImplementation()!;

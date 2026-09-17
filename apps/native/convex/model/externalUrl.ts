@@ -153,13 +153,15 @@ export function isTikTokUrl(url: string | undefined): boolean {
  * shape Instagram serves after a share. A `/share/{kind}/{token}` link names
  * the kind but carries a redirect token, not a shortcode, so its shortcode is
  * left for the caller to resolve from the redirect. Profiles, stories, and
- * look-alike hosts are not media links. */
+ * look-alike hosts are not media links. A relative `url` resolves against
+ * `base`. */
 export function instagramMedia(
   url: string | undefined,
+  base?: string,
 ): { kind: "reel" | "p" | "tv"; shortcode?: string } | undefined {
   if (!url) return undefined;
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(url, base);
     const host = parsed.hostname.toLowerCase();
     if (
       host !== "instagram.com" &&

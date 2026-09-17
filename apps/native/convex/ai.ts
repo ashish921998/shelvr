@@ -770,7 +770,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
         extractMetaContent(html, "og:url"),
         extractCanonical(html),
       ]
-        .map((candidate) => instagramMedia(candidate))
+        .map((candidate) => instagramMedia(candidate, page.finalUrl))
         .find((candidate) => candidate?.shortcode) ?? linked);
   const embed = directEmbed ?? (await embedFor(media));
   if (embed.status === "transient") {
