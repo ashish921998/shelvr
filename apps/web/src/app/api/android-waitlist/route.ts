@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   if (!siteUrl || !secret) {
     serverLog("error", "android_waitlist_unconfigured", {
       has_site_url: siteUrl !== undefined,
-      has_shared_secret: secret !== undefined,
+      has_shared_secret: Boolean(secret),
     });
     return NextResponse.json(
       { message: "The waitlist is being connected. Please try again shortly." },
