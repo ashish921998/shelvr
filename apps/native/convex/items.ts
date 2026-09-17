@@ -1787,6 +1787,69 @@ export const listReadyItemsInternal = internalQuery({
 });
 
 /**
+ * Byte budget for one `listReadyItemsByIdInternal` read.
+ *
+ * Page size alone is not a bound, for the same reason it is not one in the
+ * embedding sweep: a single `ready` link can carry 100k characters of
+ * extracted article, so a full page of worst-case rows would be megabytes
+ * inside one Convex transaction. Truncating is safe here specifically because
+ * the ids arrive in descending relevance order — the budget drops the least
+ * relevant tail, never a strong match.
+ */
+const MAX_HYDRATE_READ_BYTES = 2_000_000;
+
+/**
+ * Hydrates vector-search hits back into item documents, preserving the order
+ * they were given in.
+ *
+ * `ctx.vectorSearch` returns `{_id, _score}` and nothing else, and it is
+ * action-only, so the ids have to come back through a query to become rows.
+ * Order is the caller's ranking and is load-bearing: the recommendation prompt
+ * numbers the list it is handed, so re-sorting here would quietly hand the
+ * model a worse shortlist.
+ *
+ * Rows that are not `ready` are dropped rather than returned: the vector index
+ * has no `status` filter field (Convex vector filters cannot AND across
+ * fields), so a stale vector belonging to an item that has since failed can
+ * still match. The `userId` re-check is defence in depth — the search is
+ * already filtered to one owner, and this is the one field whose failure would
+ * cross accounts.
+ */
+export const listReadyItemsByIdInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    itemIds: v.array(v.id("items")),
+    limit: v.number(),
+  },
+  returns: v.array(v.object(itemFields)),
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
+    const rows: Doc<"items">[] = [];
+    let bytes = 0;
+    for (const itemId of args.itemIds) {
+      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
+        break;
+      }
+      const item = await ctx.db.get(itemId);
+      if (
+        item === null ||
+        item.userId !== args.userId ||
+        item.status !== "ready"
+      ) {
+        continue;
+      }
+      rows.push(item);
+      // Approximate, like the sweep's budget: the body dominates, and this
+      // only has to keep the transaction clear of its limit.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+    }
+    // Same reason as listReadyItemsInternal: vectors stay out of the action,
+    // and the rows stay inside `itemFields`.
+    return rows.map(stripEmbedding);
+  },
+});
+
+/**
  * Run fencing for the two writes that end a pipeline run. The run that owns
  * the item is whichever one most recently flipped it to `processing`; a
  * caller whose `runId` differs was superseded (a retry, or a stale-sweep

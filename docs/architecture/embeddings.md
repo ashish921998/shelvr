@@ -1,6 +1,6 @@
 # Embeddings and semantic retrieval
 
-Status: **Phase 0 and Phase 1 implemented.** Phases 2-4 remain proposed.
+Status: **Phases 0-2 implemented.** Phases 3-4 remain proposed.
 
 ## Why
 
@@ -251,26 +251,51 @@ migration path when `CURRENT_EMBEDDING_VERSION` is bumped.
 
 Watch the provider's embedding rate limit; the page size is the throttle.
 
-## Phase 2 — recommendations get the whole shelf (backend only)
+## Phase 2 — recommendations get the whole shelf (implemented, backend only)
 
-The highest-value change, and it needs **no client release**.
+The highest-value change, and it needed **no client release**.
 
-`recommendForSpace` (`ai.ts:1467`) replaces its "newest 100" read:
+`recommendForSpace` replaced its "newest 100" read with
+`recommendationCandidates()` in `ai.ts`:
 
-1. Embed `space.name` + `space.description`.
+1. Embed `space.name` + `space.description`, composed through
+   `buildEmbeddingText` so the query sits where the corpus summaries sit, and
+   sent with `taskType: "RETRIEVAL_QUERY"` — the stored vectors are
+   `RETRIEVAL_DOCUMENT`, and Gemini retrieval is asymmetric. `embedTexts` and
+   `embedQuery` are now thin wrappers over one `embedBatch`, so the pairing is
+   picked by choosing a function rather than by passing a string.
 2. `ctx.vectorSearch("items", "by_embedding", { vector, limit: 150, filter: q => q.eq("userId", space.userId) })`
-3. Hydrate through one internal query preserving order; drop non-`ready` rows and
-   existing members; take 100.
+3. Drop existing members from the hit ids, then hydrate the rest through
+   `items.listReadyItemsByIdInternal`, which preserves the ranking order, drops
+   non-`ready` rows, re-checks the owner, strips vectors, and takes 100.
 4. Hand to the **same** `generateObject` prompt, unchanged.
 
 Same model, same token cost, same output contract, same `suggested`-only write
 rule. The only difference is that the 100 candidates are the 100 most relevant
 instead of the 100 most recent.
 
-**Fallback is mandatory.** If the vector search returns nothing — backfill still
-running, or a user whose items all failed to embed — fall through to the current
-`listReadyItemsInternal` path. Otherwise the feature regresses to nothing for
-every pre-backfill user.
+Two bounds worth naming. The search asks for 150 to leave headroom for the
+members and stale-status rows that step 3 removes, so a space whose strongest
+matches are already filed does not arrive at the prompt short-handed. And
+hydration stops at a 2 MB read budget as well as at 100 rows, because one
+`ready` link can carry 100k characters of extracted article; truncating is safe
+here only because the ids arrive in descending relevance order, so the budget
+drops the least relevant tail.
+
+**Fallback is mandatory**, and is implemented. If the query cannot be embedded,
+or the search returns nothing, or nothing survives hydration — backfill still
+running, a user whose items all failed to embed, a provider outage — the action
+falls through to the original `listReadyItemsInternal` path. Without it the
+feature would regress from "newest 100" to nothing for every pre-backfill user.
+Which path ran is logged as `recommend_candidates` with `source: vector | recent`,
+so the rollout is observable without touching user content.
+
+`listReadyItemsByIdInternal` exists because `ctx.vectorSearch` returns only
+`{_id, _score}` and is action-only: the ids have to come back through a query
+to become rows. The status drop in that query is not belt-and-braces — the
+vector index carries `userId` as its sole filter field (Convex vector filters
+cannot AND across fields), so a vector that outlived its item's flip to
+`failed` will still match.
 
 ## Phase 3 — hybrid search (expand/contract)
 
@@ -355,6 +380,9 @@ Backend deploys before the client that needs it (CLAUDE.md; `.github/workflows/d
 2. Phase 1 schema + write path + backfill cron — backend only, old clients unaffected.
 3. Wait for the backfill to drain.
 4. Phase 2 — backend only. **Value lands here with no app release.**
+   Phases 0-2 ship in one deploy: the mandatory fallback makes step 3 a ramp
+   rather than a gate, so recommendations stay exactly as good as they are
+   today while the sweep drains and improve user by user as vectors land.
 5. Phase 3 action — backend only (additive).
 6. Client update pointing search at the action.
 7. Contract `searchItems` once no old bundle calls it.
@@ -369,8 +397,14 @@ Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
 - `finalizeItem` writes `embedding` under a matching `runId` and returns
   `stale_run` under a superseded one.
 - Embedding failure still produces a `ready` item with no `embedding`.
-- `recommendForSpace` falls back to the recency path when vector search is empty,
-  and still writes `suggested` rows only.
+- `recommendForSpace` ranks by relevance rather than recency, embeds its query
+  as `RETRIEVAL_QUERY`, drops members and rows whose vector outlived their
+  `ready` status, and falls back to the recency path on an unembeddable query,
+  an empty search, or a search that throws — still writing `suggested` rows only
+  (`aiRecommendForSpace.test.ts`).
+- `listReadyItemsByIdInternal` preserves the caller's ranking order, strips
+  vectors, and stops at both the row limit and the byte budget
+  (`itemEmbeddings.test.ts`).
 - Hybrid search never returns another user's item (filter derived from
   `requireUserId`, not an argument).
 - Backfill is bounded per run and chains while progress is made.
@@ -381,14 +415,16 @@ call shape — a unit test has no way to. That nesting was instead verified
 against the installed `@ai-sdk/google` dist, and is worth re-checking on a
 provider upgrade.
 
-Resolved: `convex-test@0.0.54` **does** implement `ctx.vectorSearch` (exact
-brute-force cosine, honoring the filter callback and `limit`), so Phase 3 needs
-no stub seam. Four divergences from production matter when those tests are
-written: it throws rather than skipping when a matched document has no vector
+Confirmed while writing Phase 2: `convex-test@0.0.54` **does** implement
+`ctx.vectorSearch` (exact brute-force cosine, honoring the filter callback and
+`limit`), so no stub seam is needed. Four divergences from production matter:
+it throws rather than skipping when a matched document has no vector
 field, it returns everything when `limit` is omitted, it does not enforce
 `filterFields`, and it does not validate vector width. So assert on set
 membership rather than exact scores, always pass an explicit `limit`, and give
-every fixture row a vector.
+every fixture row a vector. The first divergence turned out to be useful: it is
+the only reachable way to make `ctx.vectorSearch` throw under test, which is how
+the search-failure fallback is covered.
 
 ## Costs
 

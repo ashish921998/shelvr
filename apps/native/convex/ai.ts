@@ -3,7 +3,7 @@
 import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { GenericActionCtx } from "convex/server";
+import type { FunctionReturnType, GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { embedMany, generateObject, wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
@@ -106,17 +106,19 @@ const EMBEDDING_MODEL_NAME = "gemini-embedding-2";
 const EMBED_TIMEOUT_MS = 20_000;
 
 /**
- * Task type for every STORED vector.
+ * The two sides of retrieval.
  *
  * Gemini embeddings are asymmetric: a corpus vector and a query vector are
  * meant to be produced under a matching pair of task types. Items are the
- * corpus, so they are embedded as documents. Anything that later searches
- * against this index must embed its query text with RETRIEVAL_QUERY — mixing
- * the two silently degrades ranking rather than failing, so the pairing is
- * recorded here. Item-to-item similarity is unaffected: both sides are
+ * corpus, so they are embedded as documents; anything searching against that
+ * index embeds its query text as a query. Mixing the two silently degrades
+ * ranking rather than failing, which is why the pairing lives in one place and
+ * callers pick a side by choosing `embedTexts` or `embedQuery` rather than by
+ * passing a string. Item-to-item similarity is unaffected: both sides are
  * documents, which is symmetric.
  */
-const EMBEDDING_TASK_TYPE = "RETRIEVAL_DOCUMENT";
+const EMBEDDING_DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT";
+const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
 
 /**
  * Embeds a batch of texts, in input order.
@@ -136,8 +138,9 @@ const EMBEDDING_TASK_TYPE = "RETRIEVAL_DOCUMENT";
  * Batching is the SDK's: `embedMany` splits at the provider's documented
  * 100-values ceiling on its own, so callers pass a whole page.
  */
-export async function embedTexts(
+async function embedBatch(
   texts: string[],
+  taskType: string,
 ): Promise<(number[] | undefined)[]> {
   const vectors: (number[] | undefined)[] = texts.map(() => undefined);
   const sendable = texts
@@ -153,7 +156,7 @@ export async function embedTexts(
       providerOptions: {
         google: {
           outputDimensionality: EMBEDDING_DIMENSIONS,
-          taskType: EMBEDDING_TASK_TYPE,
+          taskType,
         },
       },
       ...modelCallOptions(EMBED_TIMEOUT_MS),
@@ -168,12 +171,34 @@ export async function embedTexts(
     // Categories and counts only: an embedding error can echo the text.
     logEvent("warn", "embedding_failed", {
       model: EMBEDDING_MODEL_NAME,
+      task_type: taskType,
       count: sendable.length,
       timed_out: isModelTimeout(error),
       error: errorName(error),
     });
   }
   return vectors;
+}
+
+/** Embeds item texts for storage in the vector index. */
+export async function embedTexts(
+  texts: string[],
+): Promise<(number[] | undefined)[]> {
+  return await embedBatch(texts, EMBEDDING_DOCUMENT_TASK_TYPE);
+}
+
+/**
+ * Embeds one search string for use as a `ctx.vectorSearch` vector.
+ *
+ * Same best-effort contract as `embedTexts`: `undefined` means the caller has
+ * no vector to search with and must fall back to whatever it did before, not
+ * that it should fail. Text bounding is the caller's, via
+ * `buildEmbeddingText`, so a query is composed exactly the way the stored
+ * summaries were.
+ */
+async function embedQuery(text: string): Promise<number[] | undefined> {
+  const [vector] = await embedBatch([text], EMBEDDING_QUERY_TASK_TYPE);
+  return vector;
 }
 
 /** True for the error a timed-out or aborted model call rejects with. The SDK
@@ -2065,9 +2090,126 @@ const recommendSchema = z.object({
 // sweep — the user can always add more by hand or ask again later.
 const MAX_RECOMMENDATIONS = 8;
 
+/** How many candidate items the recommendation prompt is handed. */
+const RECOMMEND_CANDIDATES = 100;
+
 /**
- * Recommend existing items for a space, off nothing but its title. Runs when
- * a space is created, and again whenever its dynamic toggle turns on. Writes
+ * How many hits the candidate vector search asks for.
+ *
+ * Wider than RECOMMEND_CANDIDATES because the hits are thinned afterwards:
+ * items already in the space drop out, and so do items whose stored vector
+ * outlived a change of status. The headroom keeps a space whose strongest
+ * matches are already filed from arriving at the prompt short-handed.
+ */
+const RECOMMEND_VECTOR_LIMIT = 150;
+
+type RecommendationCandidate = FunctionReturnType<
+  typeof internal.items.listReadyItemsInternal
+>[number];
+
+/**
+ * The semantic half of `recommendationCandidates`.
+ *
+ * Returns an empty list rather than throwing on any failure. The outer action
+ * catches and logs, so an error escaping here would turn a transient search
+ * hiccup into no recommendations at all — strictly worse than the recency read
+ * this replaced. An empty list is the fallback signal.
+ */
+async function searchCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  vector: number[],
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  try {
+    const matches = await ctx.vectorSearch("items", "by_embedding", {
+      vector,
+      limit: RECOMMEND_VECTOR_LIMIT,
+      // The only filter the index carries, and deliberately so: Convex vector
+      // filters cannot AND across fields, and this is the one whose absence
+      // would leak another account's saves. Everything else the candidates
+      // have to satisfy is enforced when the ids are hydrated.
+      filter: (q) => q.eq("userId", space.userId),
+    });
+    const itemIds = matches
+      .map((match) => match._id)
+      .filter((itemId) => !memberIds.has(itemId));
+    if (itemIds.length === 0) {
+      return [];
+    }
+    return await ctx.runQuery(internal.items.listReadyItemsByIdInternal, {
+      userId: space.userId,
+      itemIds,
+      limit: RECOMMEND_CANDIDATES,
+    });
+  } catch (error) {
+    logEvent("warn", "recommend_vector_search_failed", {
+      space_id: space._id,
+      error: errorName(error),
+    });
+    return [];
+  }
+}
+
+/**
+ * Picks the items the recommendation prompt gets to choose from.
+ *
+ * Semantic first: the space's own name and description are embedded as a
+ * query and matched against the item vector index, so a user with a thousand
+ * saves is judged on the hundred most *relevant* rather than the hundred most
+ * *recent*. That difference is the whole point — the saves worth resurfacing
+ * when someone finally makes a "Recipes" space are the old ones they have
+ * forgotten, and those are exactly the ones a recency read cannot see.
+ *
+ * Recency is the fallback, and it is not optional. A user whose backfill has
+ * not drained yet, or whose items all failed to embed, or whose query text
+ * could not be embedded at all, has no vectors to match; without the fallback
+ * the feature would regress from "newest 100" to nothing for every one of
+ * them. Both paths return the same shape and feed the same prompt.
+ */
+async function recommendationCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  // Composed exactly the way an item's own summary is, so the query sits in
+  // the same region of the space as the corpus text it has to match.
+  const queryText = buildEmbeddingText({
+    title: space.name,
+    description: space.description,
+  });
+  const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
+
+  if (vector !== undefined) {
+    const hydrated = await searchCandidates(ctx, space, vector, memberIds);
+    if (hydrated.length > 0) {
+      logEvent("info", "recommend_candidates", {
+        space_id: space._id,
+        source: "vector",
+        count: hydrated.length,
+      });
+      return hydrated;
+    }
+  }
+
+  const recent = (
+    await ctx.runQuery(internal.items.listReadyItemsInternal, {
+      userId: space.userId,
+      limit: RECOMMEND_CANDIDATES,
+    })
+  ).filter((item) => !memberIds.has(item._id));
+  logEvent("info", "recommend_candidates", {
+    space_id: space._id,
+    source: "recent",
+    count: recent.length,
+  });
+  return recent;
+}
+
+/**
+ * Recommend existing items for a space, off nothing but its name and
+ * description. Runs when a space is created, and again whenever its dynamic
+ * toggle turns on. Writes
  * `suggested` rows only — the user decides what actually enters the space —
  * and never re-suggests anything they already filed or dismissed.
  */
@@ -2087,12 +2229,7 @@ export const recommendForSpace = internalAction({
           spaceId: args.spaceId,
         }),
       );
-      const items = (
-        await ctx.runQuery(internal.items.listReadyItemsInternal, {
-          userId: space.userId,
-          limit: 100,
-        })
-      ).filter((item) => !memberIds.has(item._id));
+      const items = await recommendationCandidates(ctx, space, memberIds);
       if (items.length === 0) {
         return null;
       }

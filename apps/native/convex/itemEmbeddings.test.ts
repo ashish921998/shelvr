@@ -608,3 +608,150 @@ describe("similar items", () => {
     expect(similar.map((r) => r._id)).toContain(related);
   });
 });
+
+describe("listReadyItemsByIdInternal", () => {
+  async function seedReady(userId: string, titles: string[]) {
+    const t = newConvexTest();
+    const ids = await t.run(async (ctx) => {
+      const out: Id<"items">[] = [];
+      for (const title of titles) {
+        out.push(
+          await ctx.db.insert("items", {
+            userId,
+            type: "link" as const,
+            status: "ready" as const,
+            title,
+            tags: [],
+            searchText: title.toLowerCase(),
+            embedding: vector(),
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }),
+        );
+      }
+      return out;
+    });
+    return { t, ids };
+  }
+
+  it("returns rows in the order the ids were given, not insertion order", async () => {
+    const { t, ids } = await seedReady("hydrate", ["A", "B", "C"]);
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "hydrate",
+      itemIds: [ids[2], ids[0], ids[1]],
+      limit: 10,
+    });
+
+    // The caller's order is a relevance ranking the prompt numbers off, so a
+    // re-sort here would silently hand the model a worse shortlist.
+    expect(rows.map((row) => row.title)).toEqual(["C", "A", "B"]);
+  });
+
+  it("drops rows that are not ready, belong to someone else, or are gone", async () => {
+    const t = newConvexTest();
+    const { keep, failed, other, deleted } = await t.run(async (ctx) => {
+      const base = {
+        type: "link" as const,
+        tags: [],
+        searchText: "x",
+        embedding: vector(),
+        embeddingVersion: CURRENT_EMBEDDING_VERSION,
+      };
+      const keep = await ctx.db.insert("items", {
+        ...base,
+        userId: "owner",
+        status: "ready" as const,
+        title: "Keep",
+      });
+      const failed = await ctx.db.insert("items", {
+        ...base,
+        userId: "owner",
+        status: "failed" as const,
+        title: "Failed",
+      });
+      const other = await ctx.db.insert("items", {
+        ...base,
+        userId: "intruder",
+        status: "ready" as const,
+        title: "Other",
+      });
+      const deleted = await ctx.db.insert("items", {
+        ...base,
+        userId: "owner",
+        status: "ready" as const,
+        title: "Deleted",
+      });
+      await ctx.db.delete(deleted);
+      return { keep, failed, other, deleted };
+    });
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "owner",
+      itemIds: [failed, other, deleted, keep],
+      limit: 10,
+    });
+
+    expect(rows.map((row) => row.title)).toEqual(["Keep"]);
+  });
+
+  it("stops at the requested limit", async () => {
+    const { t, ids } = await seedReady("capped", ["A", "B", "C", "D"]);
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "capped",
+      itemIds: ids,
+      limit: 2,
+    });
+
+    expect(rows.map((row) => row.title)).toEqual(["A", "B"]);
+  });
+
+  it("never hands a stored vector back to the caller", async () => {
+    const { t, ids } = await seedReady("stripped", ["A"]);
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "stripped",
+      itemIds: ids,
+      limit: 10,
+    });
+
+    // `itemFields` has no `embedding`, so a raw document here would fail the
+    // returns validator at runtime rather than merely bloat the payload.
+    expect(rows).toHaveLength(1);
+    expect("embedding" in rows[0]).toBe(false);
+  });
+
+  it("stops reading once the byte budget is spent", async () => {
+    const t = newConvexTest();
+    const ids = await t.run(async (ctx) => {
+      const out: Id<"items">[] = [];
+      // Two rows are enough to cross the 2 MB budget; the third is never read.
+      for (const title of ["Big one", "Big two", "Small"]) {
+        out.push(
+          await ctx.db.insert("items", {
+            userId: "heavy",
+            type: "link" as const,
+            status: "ready" as const,
+            title,
+            tags: [],
+            searchText: title.toLowerCase(),
+            content: title === "Small" ? "tiny" : "x".repeat(1_100_000),
+            embedding: vector(),
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }),
+        );
+      }
+      return out;
+    });
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "heavy",
+      itemIds: ids,
+      limit: 100,
+    });
+
+    // Truncation is safe only because the tail is the least relevant end of
+    // the ranking.
+    expect(rows.map((row) => row.title)).toEqual(["Big one", "Big two"]);
+  });
+});
