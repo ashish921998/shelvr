@@ -22,6 +22,8 @@ import {
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
 import fxArticle from "./testdata/xSyndication/fxArticle.json";
+import fxVideoArticle from "./testdata/xSyndication/fxVideoArticle.json";
+import videoArticleSyndication from "./testdata/xSyndication/videoArticle.json";
 import fxListArticle from "./testdata/xSyndication/fxListArticle.json";
 import gifSyndication from "./testdata/xSyndication/gif.json";
 import listArticleSyndication from "./testdata/xSyndication/listArticle.json";
@@ -34,7 +36,7 @@ import textSyndication from "./testdata/xSyndication/text.json";
 import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
-import type { PostMedia } from "./model/itemFields";
+import type { ArticleMedia, PostMedia } from "./model/itemFields";
 import { newConvexTest } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
@@ -394,15 +396,64 @@ const ARTICLE_URL = "https://x.com/adamtwtz/status/2097073557868056925";
 const ARTICLE_PREVIEW =
   "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe…";
 
-function withArticleContent(content: unknown) {
+function withArticleContent(content: unknown, mediaEntities: unknown[] = []) {
   return {
     ...fxArticle,
     status: {
       ...fxArticle.status,
-      article: { ...fxArticle.status.article, content },
+      article: {
+        ...fxArticle.status.article,
+        content,
+        media_entities: mediaEntities,
+      },
     },
   };
 }
+
+const VIDEO_ARTICLE_URL =
+  "https://x.com/jasonzhou1993/status/2099837130927427989?s=20";
+
+function mediaBlock(key: number) {
+  return {
+    type: "atomic",
+    text: " ",
+    entityRanges: [{ key, offset: 0, length: 1 }],
+  };
+}
+
+function mediaEntity(key: number, mediaId: string) {
+  return {
+    key: String(key),
+    value: {
+      type: "MEDIA",
+      mutability: "Immutable",
+      data: { mediaItems: [{ mediaId, mediaCategory: "DraftTweetImage" }] },
+    },
+  };
+}
+
+const PHOTO_ENTITY = {
+  media_id: "1",
+  media_info: {
+    __typename: "ApiImage",
+    original_img_url: "https://pbs.twimg.com/media/photo.jpg",
+    original_img_width: 2000,
+    original_img_height: 1000,
+  },
+};
+
+const VIDEO_ENTITY = {
+  media_id: "2",
+  media_info: {
+    __typename: "ApiVideo",
+    preview_image: {
+      original_img_url:
+        "https://pbs.twimg.com/amplify_video_thumb/2/img/poster.jpg",
+      original_img_width: 720,
+      original_img_height: 1280,
+    },
+  },
+};
 
 describe("fetchXPost for an Article's full body", () => {
   let warn: MockInstance<typeof console.warn>;
@@ -463,6 +514,142 @@ describe("fetchXPost for an Article's full body", () => {
     );
     expect(read.content).not.toMatch(/\n{3,}| \n|\n /);
     expect(loggedEvents()).toEqual([]);
+  });
+
+  it("places an Article's images and videos between its paragraphs", async () => {
+    serveX(
+      { status: 200, body: videoArticleSyndication },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const read = await fetchXPost(VIDEO_ARTICLE_URL);
+    expect(read).not.toHaveProperty("media");
+    expect(read.content?.split("\n\n")).toHaveLength(66);
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "0:video",
+      "2:photo",
+      "7:video",
+      "12:photo",
+      "17:photo",
+      "21:photo",
+      "22:photo",
+      "26:photo",
+      "27:photo",
+      "30:photo",
+      "40:photo",
+      "41:photo",
+      "56:photo",
+    ]);
+    expect(read.articleMedia?.slice(1, 3)).toEqual([
+      {
+        paragraph: 2,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/HSO3PBTa0AAFXp6.jpg?name=large",
+        aspectRatio: 2452 / 1334,
+      },
+      {
+        paragraph: 7,
+        kind: "video",
+        imageUrl:
+          "https://pbs.twimg.com/amplify_video_thumb/2099726256006918145/img/a-PSxh1BV--3EMR3.jpg?name=large",
+        aspectRatio: 720 / 1280,
+      },
+    ]);
+    expect(loggedEvents()).toEqual([]);
+  });
+
+  it("skips Article media it cannot read and keeps the rest in place", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+              mediaBlock(2),
+              { type: "unstyled", text: "Two", entityRanges: [] },
+              mediaBlock(3),
+            ],
+            entityMap: [
+              mediaEntity(0, "1"),
+              mediaEntity(1, "missing"),
+              mediaEntity(2, "2"),
+              mediaEntity(3, "3"),
+            ],
+          },
+          [
+            PHOTO_ENTITY,
+            VIDEO_ENTITY,
+            { media_id: "3", media_info: { __typename: "ApiAudio" } },
+          ],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("One\n\nTwo");
+    expect(read.articleMedia).toEqual([
+      {
+        paragraph: 0,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/photo.jpg?name=large",
+        aspectRatio: 2,
+      },
+      {
+        paragraph: 1,
+        kind: "video",
+        imageUrl:
+          "https://pbs.twimg.com/amplify_video_thumb/2/img/poster.jpg?name=large",
+        aspectRatio: 0.5625,
+      },
+    ]);
+  });
+
+  it("drops media after the part of a long Article it cannot store", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              { type: "unstyled", text: "a".repeat(60_000), entityRanges: [] },
+              mediaBlock(0),
+              { type: "unstyled", text: "b".repeat(60_000), entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [mediaEntity(0, "1"), mediaEntity(1, "2")],
+          },
+          [PHOTO_ENTITY, VIDEO_ENTITY],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content?.length).toBe(100_000);
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "1:photo",
+    ]);
+  });
+
+  it("leaves out articleMedia when an Article has none", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [{ type: "unstyled", text: "Only words", entityRanges: [] }],
+          entityMap: [],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("Only words");
+    expect(read).not.toHaveProperty("articleMedia");
   });
 
   it("marks list items and leaves links to X profiles as plain text", async () => {
@@ -764,7 +951,10 @@ describe("processItem for X posts", () => {
     vi.useRealTimers();
   });
 
-  async function saveLink(url: string, fields: { media?: PostMedia[] } = {}) {
+  async function saveLink(
+    url: string,
+    fields: { media?: PostMedia[]; articleMedia?: ArticleMedia[] } = {},
+  ) {
     const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
@@ -780,8 +970,52 @@ describe("processItem for X posts", () => {
       }),
     );
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    return { item: await t.query(api.items.getItem, { id: itemId }) };
+    const cards = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 1, cursor: null },
+    });
+    return {
+      item: await t.query(api.items.getItem, { id: itemId }),
+      card: cards.page[0],
+    };
   }
+
+  it("saves an Article's images and videos for the reader but not the feed card", async () => {
+    serveX(
+      { status: 200, body: videoArticleSyndication },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const { item, card } = await saveLink(VIDEO_ARTICLE_URL);
+    expect(item).toMatchObject({ status: "ready", author: "@jasonzhou1993" });
+    expect(item).not.toHaveProperty("media");
+    expect(item?.articleMedia).toHaveLength(13);
+    expect(item?.articleMedia?.[0]).toEqual({
+      paragraph: 0,
+      kind: "video",
+      imageUrl:
+        "https://pbs.twimg.com/amplify_video_thumb/2099832515431407616/img/Wp1ZhlvD-TyQAPiJ.jpg?name=large",
+      aspectRatio: 1920 / 1080,
+    });
+    expect(card?._id).toBe(item?._id);
+    expect(card).not.toHaveProperty("articleMedia");
+    expect(card).not.toHaveProperty("content");
+  });
+
+  it("clears Article media a retry could not read again", async () => {
+    serveX({ status: 200, body: videoArticleSyndication }, { status: 500 });
+    const { item } = await saveLink(VIDEO_ARTICLE_URL, {
+      articleMedia: [
+        {
+          paragraph: 0,
+          kind: "photo",
+          imageUrl: "https://pbs.twimg.com/media/stale.jpg?name=large",
+          aspectRatio: 1,
+        },
+      ],
+    });
+    expect(item?.status).toBe("ready");
+    expect(item).not.toHaveProperty("articleMedia");
+  });
 
   it("saves an Article post with its opening text and cover, classified from its title", async () => {
     serveX({ status: 200, body: articleSyndication }, { status: 500 });
