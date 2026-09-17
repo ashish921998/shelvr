@@ -202,6 +202,21 @@ describe("sanitizeRecipe", () => {
       ingredients: ["Salt"],
       steps: ["Add salt."],
     });
-    expect(recipe).toEqual({ ingredients: ["Salt"], steps: ["Add salt."] });
+    // Strict: the keys must be absent, not present with an undefined value.
+    expect(recipe).toStrictEqual({
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+  });
+
+  it("caps name and servings length", () => {
+    const recipe = sanitizeRecipe({
+      name: "n".repeat(200),
+      servings: "s".repeat(100),
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    expect(recipe?.name).toBe("n".repeat(120));
+    expect(recipe?.servings).toBe("s".repeat(60));
   });
 });

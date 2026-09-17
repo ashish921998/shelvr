@@ -1016,17 +1016,13 @@ export function sanitizeRecipe(
   if (ingredients.length === 0 || steps.length === 0) {
     return undefined;
   }
+  // Blank name/servings are left out entirely (not set to undefined) so the
+  // persisted document never carries an explicit undefined key.
+  const name = raw.name?.trim().slice(0, MAX_RECIPE_NAME_CHARS);
+  const servings = raw.servings?.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS);
   return {
-    ...(raw.name
-      ? { name: raw.name.trim().slice(0, MAX_RECIPE_NAME_CHARS) || undefined }
-      : {}),
-    ...(raw.servings
-      ? {
-          servings:
-            raw.servings.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS) ||
-            undefined,
-        }
-      : {}),
+    ...(name ? { name } : {}),
+    ...(servings ? { servings } : {}),
     ingredients,
     steps,
   };
