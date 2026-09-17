@@ -209,6 +209,16 @@ export function shortFormSource(
   return undefined;
 }
 
+export function isXHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "x.com" ||
+    host.endsWith(".x.com") ||
+    host === "twitter.com" ||
+    host.endsWith(".twitter.com")
+  );
+}
+
 /** The numeric id of an X / Twitter post URL: `x.com/{user}/status/{id}` and
  * the `x.com/i/web/status/{id}` path the import screen builds from archive
  * bookmark ids. Profiles, lists, and `t.co` short links are not posts and
@@ -217,13 +227,7 @@ export function xStatusId(url: string | undefined): string | undefined {
   if (!url) return undefined;
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    if (
-      host !== "x.com" &&
-      !host.endsWith(".x.com") &&
-      host !== "twitter.com" &&
-      !host.endsWith(".twitter.com")
-    ) {
+    if (!isXHost(parsed.hostname)) {
       return undefined;
     }
     // The id must be a whole path segment, optionally followed by more

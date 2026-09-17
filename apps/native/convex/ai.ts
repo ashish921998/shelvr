@@ -21,6 +21,7 @@ import {
   instagramMedia,
   isInstagramUrl,
   isTikTokUrl,
+  isXHost,
   shortFormSource,
   xStatusId,
 } from "./model/externalUrl";
@@ -726,7 +727,9 @@ function xPostText(
   return post.note_tweet ? `${text}…` : text;
 }
 
-function parseXSyndication(body: unknown): PageData | undefined {
+type XSyndicationRead = { page: PageData; isArticle: boolean };
+
+function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   const parsed = xSyndicationSchema.safeParse(body);
   if (!parsed.success) {
     return undefined;
@@ -738,17 +741,21 @@ function parseXSyndication(body: unknown): PageData | undefined {
     ? undefined
     : post.article?.cover_media?.media_info;
   if (post.article) {
-    // The syndication preview stops mid-sentence.
+    // Syndication cuts the preview mid-sentence; X's web app loads the rest
+    // from its private API.
     const preview = post.article.preview_text?.trim();
     return {
-      title: post.article.title,
-      siteName: "X",
-      author,
-      content: preview ? `${preview}…` : undefined,
-      heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
-      heroAspectRatio: cover
-        ? cover.original_img_width / cover.original_img_height
-        : undefined,
+      isArticle: true,
+      page: {
+        title: post.article.title,
+        siteName: "X",
+        author,
+        content: preview ? `${preview}…` : undefined,
+        heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
+        heroAspectRatio: cover
+          ? cover.original_img_width / cover.original_img_height
+          : undefined,
+      },
     };
   }
   const content = xPostText(post);
@@ -770,18 +777,188 @@ function parseXSyndication(body: unknown): PageData | undefined {
     return undefined;
   }
   return {
-    title: content ? Array.from(content).slice(0, 100).join("") : undefined,
-    siteName: "X",
-    author,
-    content,
-    ...(media.length > 0
-      ? {
-          heroImageUrl: media[0].imageUrl,
-          heroAspectRatio: media[0].aspectRatio,
-          media,
-        }
-      : {}),
+    isArticle: false,
+    page: {
+      title: content ? Array.from(content).slice(0, 100).join("") : undefined,
+      siteName: "X",
+      author,
+      content,
+      ...(media.length > 0
+        ? {
+            heroImageUrl: media[0].imageUrl,
+            heroAspectRatio: media[0].aspectRatio,
+            media,
+          }
+        : {}),
+    },
   };
+}
+
+// fxtwitter mirrors the Draft.js blocks X's web app renders an Article from.
+// Entity offsets count code points, not UTF-16 units.
+const fxArticleSchema = z.object({
+  status: z.object({
+    id: z.string(),
+    article: z.object({
+      content: z.object({
+        blocks: z.array(
+          z.object({
+            type: z.string(),
+            text: z.string(),
+            entityRanges: z
+              .array(
+                z.object({
+                  key: z.coerce.string(),
+                  offset: z.number().int().nonnegative(),
+                  length: z.number().int().positive(),
+                }),
+              )
+              .default([]),
+          }),
+        ),
+        entityMap: z.array(
+          z.object({
+            key: z.string(),
+            value: z.object({
+              type: z.string(),
+              data: z.object({ url: z.string().optional() }),
+            }),
+          }),
+        ),
+      }),
+    }),
+  }),
+});
+
+type FxArticleContent = z.infer<
+  typeof fxArticleSchema
+>["status"]["article"]["content"];
+
+const FXTWITTER_USER_AGENT = "Shelvr/1.0 (+https://shelvr.app)";
+
+/** An external link's URL, for the reader to see where "HERE" goes. Links to
+ * X itself (mentions, cashtags, subscribe buttons) read fine as their text. */
+function externalLinkUrl(url: string | undefined): string | undefined {
+  if (url === undefined) {
+    return undefined;
+  }
+  try {
+    const parsed = new URL(url);
+    const web = parsed.protocol === "https:" || parsed.protocol === "http:";
+    return web && !isXHost(parsed.hostname) ? parsed.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function articleBlockText(
+  block: FxArticleContent["blocks"][number],
+  links: Map<string, string>,
+): string {
+  const chars = Array.from(block.text);
+  const ranges = [...block.entityRanges].sort((a, b) => b.offset - a.offset);
+  for (const range of ranges) {
+    const url = links.get(range.key);
+    const end = range.offset + range.length;
+    if (url === undefined || end > chars.length) {
+      continue;
+    }
+    const anchor = chars.slice(range.offset, end).join("");
+    if (!anchor.includes(url)) {
+      chars.splice(end, 0, ` (${url})`);
+    }
+  }
+  return chars
+    .join("")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/** The plain-text body the reader view renders: one paragraph per text
+ * block. Images, embedded posts, and dividers are atomic blocks the reader
+ * cannot show inline, so they are left out rather than marked. */
+function articleBodyText(content: FxArticleContent): string | undefined {
+  const links = new Map<string, string>();
+  for (const entity of content.entityMap) {
+    const url =
+      entity.value.type === "LINK"
+        ? externalLinkUrl(entity.value.data.url)
+        : undefined;
+    if (url !== undefined) {
+      links.set(entity.key, url);
+    }
+  }
+  const paragraphs: string[] = [];
+  let listNumber = 0;
+  for (const block of content.blocks) {
+    const text = block.type === "atomic" ? "" : articleBlockText(block, links);
+    listNumber = block.type === "ordered-list-item" ? listNumber + 1 : 0;
+    if (text === "") {
+      continue;
+    }
+    paragraphs.push(
+      block.type === "unordered-list-item"
+        ? `- ${text}`
+        : block.type === "ordered-list-item"
+          ? `${listNumber}. ${text}`
+          : text,
+    );
+  }
+  const body = paragraphs.join("\n\n").slice(0, MAX_STORED_CONTENT_CHARS);
+  return body === "" ? undefined : body;
+}
+
+type ArticleBodyRead =
+  | { ok: true; body: string }
+  | { ok: false; category: string };
+
+async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
+  const result = await safeFetch(`https://api.fxtwitter.com/2/status/${id}`, {
+    timeoutMs: 5000,
+    maxBytes: 2 * 1024 * 1024,
+    maxRedirects: 0,
+    allowContentType: (ct) => ct.startsWith("application/json"),
+    headers: { "User-Agent": FXTWITTER_USER_AGENT, Accept: "application/json" },
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      category:
+        result.status === undefined
+          ? `fetch:${result.code}`
+          : `fetch:${result.code}:${result.status}`,
+    };
+  }
+  let json: unknown;
+  try {
+    json = parseJson(result.bytes);
+  } catch {
+    return { ok: false, category: "unreadable_json" };
+  }
+  const parsed = fxArticleSchema.safeParse(json);
+  if (!parsed.success) {
+    return { ok: false, category: "schema_mismatch" };
+  }
+  if (parsed.data.status.id !== id) {
+    return { ok: false, category: "id_mismatch" };
+  }
+  const body = articleBodyText(parsed.data.status.article.content);
+  return body === undefined
+    ? { ok: false, category: "empty_body" }
+    : { ok: true, body };
+}
+
+/** fxtwitter is an unofficial mirror of X's private web API, so the full body
+ * is a bonus: any failure keeps the syndication preview. */
+async function withXArticleBody(id: string, page: PageData): Promise<PageData> {
+  const read = await readXArticleBody(id);
+  if (read.ok) {
+    return { ...page, content: read.body };
+  }
+  logEvent("warn", "x_article_body_fallback", {
+    error_category: read.category,
+  });
+  return page;
 }
 
 /** react-tweet's token for the syndication endpoint, derived from the id. */
@@ -806,16 +983,16 @@ export async function fetchXPost(url: string): Promise<PageData> {
       headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
     },
   );
-  let page: PageData | undefined;
+  let read: XSyndicationRead | undefined;
   if (result.ok) {
     try {
-      page = parseXSyndication(parseJson(result.bytes));
+      read = parseXSyndication(parseJson(result.bytes));
     } catch {
-      page = undefined;
+      read = undefined;
     }
   }
-  if (page) {
-    return page;
+  if (read) {
+    return read.isArticle ? await withXArticleBody(id, read.page) : read.page;
   }
   logEvent("warn", "x_syndication_fallback", {
     error_category: result.ok
