@@ -6,6 +6,7 @@ import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  postMediaValidator,
 } from "./model/itemFields";
 import {
   cancelSurveyOutcomeValidator,
@@ -57,6 +58,7 @@ export default defineSchema({
     // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.

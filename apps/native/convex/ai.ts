@@ -21,11 +21,11 @@ import {
   instagramMedia,
   isInstagramUrl,
   isTikTokUrl,
-  isXTweetUrl,
   shortFormSource,
+  xStatusId,
 } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS } from "./model/itemFields";
+import { INTENT_KINDS, type PostMedia } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
   deliverPostHogEvent,
@@ -553,6 +553,7 @@ type PageData = {
   /** A best-effort part of the read failed transiently (e.g. the Instagram
    * caption), so a retry can still add content. Internal only. */
   incomplete?: true;
+  media?: PostMedia[];
 };
 
 const BROWSER_USER_AGENT =
@@ -645,6 +646,181 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
     author: handle ? `@${handle}` : str("author_name"),
     content: content || undefined,
   };
+}
+
+const xDimensions = {
+  width: z.number().positive(),
+  height: z.number().positive(),
+};
+
+const xSyndicationSchema = z.object({
+  text: z.string().optional(),
+  user: z.object({ screen_name: z.string() }).optional(),
+  possibly_sensitive: z.boolean().optional(),
+  entities: z
+    .object({
+      urls: z
+        .array(z.object({ url: z.string(), expanded_url: z.string() }))
+        .optional(),
+      media: z.array(z.object({ url: z.string() })).optional(),
+    })
+    .optional(),
+  mediaDetails: z
+    .array(
+      z.object({
+        type: z.string(),
+        media_url_https: z.url(),
+        original_info: z.object(xDimensions),
+      }),
+    )
+    .optional(),
+  // Present when `text` is the first 280 characters of a longer post.
+  note_tweet: z.object({}).optional(),
+  article: z
+    .object({
+      title: z.string(),
+      preview_text: z.string().optional(),
+      cover_media: z
+        .object({
+          media_info: z.object({
+            original_img_url: z.url(),
+            original_img_width: xDimensions.width,
+            original_img_height: xDimensions.height,
+          }),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+const X_MEDIA_KINDS: Partial<Record<string, PostMedia["kind"]>> = {
+  photo: "photo",
+  video: "video",
+  animated_gif: "gif",
+};
+
+/** pbs.twimg.com serves a small rendition by default (600 px for older
+ * posts); `name=large` is the largest one, capped at 2048 px. */
+function xLargeImage(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.set("name", "large");
+  return parsed.toString();
+}
+
+/** A post's display text: X escapes `&`, `<`, and `>`, shortens links to
+ * t.co, and appends a t.co link for its attached media. */
+function xPostText(
+  post: z.infer<typeof xSyndicationSchema>,
+): string | undefined {
+  let text = decodeEntities(post.text ?? "");
+  for (const link of post.entities?.urls ?? []) {
+    text = text.replaceAll(link.url, link.expanded_url);
+  }
+  for (const attachment of post.entities?.media ?? []) {
+    text = text.replaceAll(attachment.url, "");
+  }
+  text = text.trim();
+  if (text === "") {
+    return undefined;
+  }
+  return post.note_tweet ? `${text}…` : text;
+}
+
+function parseXSyndication(body: unknown): PageData | undefined {
+  const parsed = xSyndicationSchema.safeParse(body);
+  if (!parsed.success) {
+    return undefined;
+  }
+  const post = parsed.data;
+  const author = post.user ? `@${post.user.screen_name}` : undefined;
+  const cover = post.article?.cover_media?.media_info;
+  if (post.article) {
+    // The preview is cut mid-sentence; the rest is behind X's login wall.
+    const preview = post.article.preview_text?.trim();
+    return {
+      title: post.article.title,
+      siteName: "X",
+      author,
+      content: preview ? `${preview}…` : undefined,
+      heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
+      heroAspectRatio: cover
+        ? cover.original_img_width / cover.original_img_height
+        : undefined,
+    };
+  }
+  const content = xPostText(post);
+  // X hides sensitive media behind a warning; the feed and widget have none.
+  const attachments = post.possibly_sensitive ? [] : (post.mediaDetails ?? []);
+  const media = attachments.flatMap((attachment) => {
+    const kind = X_MEDIA_KINDS[attachment.type];
+    return kind
+      ? [
+          {
+            kind,
+            imageUrl: xLargeImage(attachment.media_url_https),
+            aspectRatio:
+              attachment.original_info.width / attachment.original_info.height,
+          },
+        ]
+      : [];
+  });
+  if (content === undefined && media.length === 0) {
+    return undefined;
+  }
+  return {
+    title: content ? Array.from(content).slice(0, 100).join("") : undefined,
+    siteName: "X",
+    author,
+    content,
+    ...(media.length > 0
+      ? {
+          heroImageUrl: media[0].imageUrl,
+          heroAspectRatio: media[0].aspectRatio,
+          media,
+        }
+      : {}),
+  };
+}
+
+/** react-tweet's token for the syndication endpoint, derived from the id. */
+function xSyndicationToken(id: string): string {
+  return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+}
+
+/** X's public syndication endpoint (the one embedded posts render from)
+ * carries Article titles and covers and the post's media, which oEmbed does
+ * not. */
+export async function fetchXPost(url: string): Promise<PageData> {
+  const id = xStatusId(url);
+  if (id === undefined) {
+    return await fetchXoEmbed(url);
+  }
+  const result = await safeFetch(
+    `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${xSyndicationToken(id)}`,
+    {
+      timeoutMs: 10000,
+      maxBytes: 256 * 1024,
+      allowContentType: (ct) => ct.startsWith("application/json"),
+      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+    },
+  );
+  let page: PageData | undefined;
+  if (result.ok) {
+    try {
+      page = parseXSyndication(parseJson(result.bytes));
+    } catch {
+      page = undefined;
+    }
+  }
+  if (page) {
+    return page;
+  }
+  logEvent("warn", "x_syndication_fallback", {
+    error_category: result.ok
+      ? "unreadable_post"
+      : `page_fetch_error:${result.code}`,
+  });
+  return await fetchXoEmbed(url);
 }
 
 /**
@@ -892,7 +1068,7 @@ export function linkEnrichment(
   if (read.status === "unreadable" || read.page.incomplete) {
     return "partial";
   }
-  return read.page.content ? undefined : "no_article";
+  return read.page.content || read.page.media ? undefined : "no_article";
 }
 
 /**
@@ -1027,8 +1203,8 @@ async function readPage(url: string): Promise<PageRead> {
   try {
     const page = isTikTokUrl(url)
       ? await fetchTikTokOEmbed(url)
-      : isXTweetUrl(url)
-        ? await fetchXoEmbed(url)
+      : xStatusId(url)
+        ? await fetchXPost(url)
         : isInstagramUrl(url)
           ? await fetchInstagram(url)
           : await fetchPage(url);
@@ -1530,10 +1706,11 @@ export const processItem = internalAction({
         keepTitle: args.refresh === true,
         description: result.description,
         tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-        content: item.type === "link" ? page?.content : undefined,
-        siteName: item.type === "link" ? page?.siteName : undefined,
-        author: item.type === "link" ? page?.author : undefined,
-        heroImageUrl: item.type === "link" ? page?.heroImageUrl : undefined,
+        content: page?.content,
+        siteName: page?.siteName,
+        author: page?.author,
+        heroImageUrl: page?.heroImageUrl,
+        media: page?.media,
         storageId: posterStorageId,
         // Links: the OG image's shape. Images/notes: preserve the ratio the
         // client captured on upload (patching undefined would drop the field).

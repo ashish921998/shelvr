@@ -36,6 +36,14 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const postMediaValidator = v.object({
+  kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
+  imageUrl: v.string(),
+  aspectRatio: v.number(),
+});
+
+export type PostMedia = Infer<typeof postMediaValidator>;
+
 // Why processing failed. `not_found` (missing page or missing/empty photo) and `image_too_large`
 // are terminal; `error` is a pipeline fault worth retrying. Only set with
 // `status: "failed"`.
