@@ -298,6 +298,11 @@
   "item.stalled": "예상보다 오래 걸리고 있어요.",
   "item.partial": "링크만으로 저장했어요. 페이지가 열리지 않아 이 정보는 추정한 내용이에요.",
   "item.noArticle": "읽을 수 있는 글이 없는 페이지라 일반 링크로 저장했어요.",
+  "recipe.ingredients": "재료",
+  "recipe.steps": "만드는 방법",
+  "recipe.serves": {
+    "other": "%{formattedCount}인분"
+  },
   "presets.articles": "글",
   "presets.recipes": "레시피",
   "presets.products": "상품",
