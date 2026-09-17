@@ -2,9 +2,13 @@ import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
-import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
+import {
+  isEntitled,
+  isEntitledStatus,
+  type SubscriptionStatus,
+} from "./model/entitlement";
 import { saveError } from "./model/saveErrors";
 
 export const subscriptionStatusValidator = v.union(
@@ -71,13 +75,25 @@ export async function requireProEntitlement(
  * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
  * whose core write must succeed for every user can use this to skip a
  * Pro-only side effect. Reads the wall clock, so it is mutation-only;
- * queries use {@link hasProEntitlementAt} with a client-supplied clock.
+ * queries use {@link hasProEntitlementAt} with a client-supplied clock,
+ * or {@link hasProEntitlementStatus} when no clock is available.
  */
 export async function hasProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<boolean> {
   return await hasProEntitlementAt(ctx, userId, Date.now());
+}
+
+/** The caller's one subscription row, or null when they never started one. */
+async function subscriptionFor(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<Doc<"subscriptions"> | null> {
+  return await ctx.db
+    .query("subscriptions")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
 }
 
 /** Query-safe entitlement check. The caller supplies the current client time. */
@@ -87,14 +103,26 @@ export async function hasProEntitlementAt(
   now: number,
 ): Promise<boolean> {
   if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
-  const sub = await ctx.db
-    .query("subscriptions")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .unique();
-  if (sub === null) {
-    return false;
-  }
-  return isEntitled(sub.status, sub.expiresAt, now);
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitled(sub.status, sub.expiresAt, now);
+}
+
+/**
+ * Clock-free entitlement check for the legacy callers that predate the
+ * client-supplied `now` argument. The RevenueCat webhook marks the stored
+ * status `lapsed` when a subscription actually expires, so the status
+ * alone gates those callers without reading the wall clock. Unlike
+ * {@link hasProEntitlementAt}, a period that has ended but whose webhook
+ * event has not landed yet still reads as entitled — the rollout window
+ * where installed builds keep their widget instead of losing it.
+ */
+export async function hasProEntitlementStatus(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitledStatus(sub.status);
 }
 
 /**

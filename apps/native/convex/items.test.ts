@@ -238,6 +238,10 @@ describe("listRecentItems", () => {
     await expect(
       t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
     ).resolves.toEqual([]);
+    // The legacy no-clock path gates the same way.
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
   });
 
   it("returns no saves for an expired Pro subscription", async () => {
@@ -259,13 +263,55 @@ describe("listRecentItems", () => {
     ).resolves.toEqual([]);
   });
 
-  it("returns no saves when the client omits its clock", async () => {
+  it("still serves a build that omits its clock while its status is active", async () => {
     const t = await as("recent-user");
-    await seedFeed(t, "recent-user", 1);
+    const ids = await seedFeed(t, "recent-user", 2);
 
-    // Expand-phase contract: `now` is client-supplied so the query never
-    // reads the wall clock. A build that predates the argument gets no data
-    // rather than an entitlement read the backend could serve stale.
+    // Rollout contract: installed builds predate the `now` argument, so the
+    // stored status gates them until the update reaches them.
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it("keeps serving a pre-clock build through the expiry webhook window", async () => {
+    // A period that ended before its webhook landed still says "pro", so
+    // the status-only fallback keeps the installed build's widget fed
+    // while a build that sends its clock is already cut off.
+    const t = newConvexTest().withIdentity({
+      subject: "recent-webhook-window|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-webhook-window",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-webhook-window", 1);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for a lapsed status when the client omits its clock", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-lapsed-legacy|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-lapsed-legacy",
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-lapsed-legacy", 2);
+
     await expect(
       t.query(api.items.listRecentItems, { limit: 5 }),
     ).resolves.toEqual([]);
