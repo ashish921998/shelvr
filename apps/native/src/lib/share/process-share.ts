@@ -149,6 +149,38 @@ function classifyInShare(
   return url === null ? result : { kind: "link", url };
 }
 
+/** The URL an entry's link save uses, or null when it does not save a link. */
+function shareLinkUrl(
+  resolved: ResolvedPayload[],
+  index: number,
+): string | null {
+  const payload = resolved[index];
+  if (payload === undefined) return null;
+  const { kind, reason, url } = classifyInShare(resolved, index);
+  if (kind !== "link" || reason !== undefined) return null;
+  return url ?? payload.value.trim();
+}
+
+/**
+ * The entries of a share grouped by the item they save: entries resolving to
+ * the same link share one save (see sharedLinkSaves), every other entry is its
+ * own group. Groups keep the share's order.
+ */
+export function shareGroups(
+  entries: readonly ShareEntry[],
+  resolved: ResolvedPayload[],
+): ShareEntry[][] {
+  const groups = new Map<string, ShareEntry[]>();
+  for (const entry of entries) {
+    const url = shareLinkUrl(resolved, entry.index);
+    const key = url === null ? `entry:${entry.operationId}` : `link:${url}`;
+    const group = groups.get(key);
+    if (group) group.push(entry);
+    else groups.set(key, [entry]);
+  }
+  return [...groups.values()];
+}
+
 /**
  * Builds processor payloads from RAW share payloads, for use when native
  * resolution failed or its results no longer align with the raw payloads. The
@@ -300,14 +332,15 @@ function sharedLinkSaves(
 ): ShareSaveDeps {
   const saves = new Map<string, Promise<Id<"items">>>();
   for (const entry of entries) {
-    const payload = resolved[entry.index];
-    if (entry.status !== "saved" || !entry.itemId || !payload) continue;
-    const { kind, reason, url } = classifyInShare(resolved, entry.index);
-    if (kind !== "link" || reason !== undefined) continue;
-    saves.set(
-      url ?? payload.value.trim(),
-      Promise.resolve(entry.itemId as Id<"items">),
-    );
+    // An older build may have saved this entry as a note, so its item is only
+    // reusable when it was saved as a link.
+    if (entry.status !== "saved" || entry.kind !== "link" || !entry.itemId) {
+      continue;
+    }
+    const url = shareLinkUrl(resolved, entry.index);
+    if (url !== null) {
+      saves.set(url, Promise.resolve(entry.itemId as Id<"items">));
+    }
   }
   return {
     ...deps,

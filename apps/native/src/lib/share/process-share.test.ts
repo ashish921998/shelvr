@@ -441,8 +441,12 @@ describe("processSession", () => {
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
     ]);
-    expect(countProgress(result)).toEqual({ saved: 1, total: 1 });
-    expect(countPartial(result)).toEqual({ saved: 1, failed: 0, total: 1 });
+    expect(countProgress(result, resolved)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result, resolved)).toEqual({
+      saved: 1,
+      failed: 0,
+      total: 1,
+    });
   });
 
   it("saves one link item when a share pairs the link with caption text that has no URL", async () => {
@@ -475,8 +479,12 @@ describe("processSession", () => {
       ["link", "saved", `items:${itemId}`],
       ["link", "saved", `items:${itemId}`],
     ]);
-    expect(countProgress(result)).toEqual({ saved: 1, total: 1 });
-    expect(countPartial(result)).toEqual({ saved: 1, failed: 0, total: 1 });
+    expect(countProgress(result, resolved)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result, resolved)).toEqual({
+      saved: 1,
+      failed: 0,
+      total: 1,
+    });
   });
 
   it("reuses a saved sibling's item when retrying a failed copy of the same URL", async () => {
@@ -502,6 +510,39 @@ describe("processSession", () => {
     expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
       ["saved", "items:first"],
       ["saved", "items:first"],
+    ]);
+  });
+
+  it("never reuses a note an older build saved from a link's caption", async () => {
+    // A session persisted before the caption rule shipped: its URL-less text
+    // entry was saved as a note, and the link entry failed.
+    const reel = "https://www.instagram.com/reel/DHVrPLrIyQ_/";
+    const resolved = [textPayload("See this post"), urlPayload(reel)];
+    const session = makeSession(2);
+    const saveLink = vi.fn(async () => "items:link" as Id<"items">);
+    const prior: ShareSession = {
+      ...session,
+      entries: [
+        {
+          ...session.entries[0],
+          kind: "note",
+          status: "saved",
+          itemId: "items:note",
+        },
+        { ...session.entries[1], status: "failed", message: "offline" },
+      ],
+    };
+
+    const result = await processSession(
+      prior,
+      resolved,
+      makeDeps({ saveLink }),
+    );
+
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
+      ["saved", "items:note"],
+      ["saved", "items:link"],
     ]);
   });
 
