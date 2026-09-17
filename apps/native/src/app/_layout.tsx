@@ -27,7 +27,7 @@ import {
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
@@ -37,6 +37,11 @@ import {
   NotificationSessionProvider,
   useNotificationObserver,
 } from "@/lib/notifications";
+import {
+  markSplashPlayed,
+  SplashGate,
+  splashHasPlayed,
+} from "@/components/splash/splash-gate";
 
 // Single source of truth for the native route background. The navigator paints
 // every screen's container with the navigation theme's `background`, so setting
@@ -168,16 +173,28 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { rt } = useUnistyles();
+  // The launch animation plays once per process, over the booting app.
+  const [splashDone, setSplashDone] = useState(splashHasPlayed);
+  const finishSplash = useCallback(() => {
+    markSplashPlayed();
+    setSplashDone(true);
+  }, []);
   // Contrast with the active app theme (not the OS scheme); camera stays light
-  // over the viewfinder.
+  // over the viewfinder. The splash pins its own warm paper ground regardless
+  // of theme, so while it is up the status bar has to match that, not the app.
   const appThemeIsDark = isDarkThemeName(rt.themeName);
-  const statusBarStyle =
-    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
+  const statusBarStyle = !splashDone
+    ? "dark"
+    : pathname === "/camera" || appThemeIsDark
+      ? "light"
+      : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
-        <Slot />
+        <SplashGate active={!splashDone} onFinish={finishSplash}>
+          <Slot />
+        </SplashGate>
         <StatusBar style={statusBarStyle} />
       </NavThemeProvider>
     </OnboardingProvider>
