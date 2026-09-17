@@ -322,6 +322,8 @@
   "appearance.neutralDark": "다크 (중립)",
   "widget.emptyTitle": "아직 저장한 항목이 없어요",
   "widget.emptyBody": "+를 눌러 링크, 사진, 메모를 저장하세요",
+  "widget.proTitle": "최근 저장 항목은 Pro 기능이에요",
+  "widget.proBody": "Shelvr Pro에 가입하면 저장한 항목을 여기서 볼 수 있어요",
   "item.savedItem": "저장한 항목",
   "item.link": "링크",
   "item.photo": "사진",

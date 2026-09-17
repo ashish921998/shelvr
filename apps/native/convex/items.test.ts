@@ -229,6 +229,17 @@ describe("listItemsPage", () => {
 });
 
 describe("listRecentItems", () => {
+  it("returns no saves for users without active Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-free-user|session-1",
+    });
+    await seedFeed(t, "recent-free-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns the newest ready items up to the limit, skipping unready ones", async () => {
     const t = await as("recent-user");
     const older = await seedFeed(t, "recent-user", 3);

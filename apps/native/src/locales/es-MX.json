@@ -320,6 +320,8 @@
   "appearance.neutralDark": "Oscuro (neutro)",
   "widget.emptyTitle": "Aún no has guardado nada",
   "widget.emptyBody": "Toca + para guardar un enlace, una foto o una nota",
+  "widget.proTitle": "Tus guardados recientes son una función Pro",
+  "widget.proBody": "Suscríbete a Shelvr Pro para ver aquí tus contenidos guardados",
   "item.savedItem": "Elemento guardado",
   "item.link": "Enlace",
   "item.photo": "Foto",

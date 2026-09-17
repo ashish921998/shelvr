@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
 import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
@@ -68,12 +68,12 @@ export async function requireProEntitlement(
 }
 
 /**
- * The same rule as {@link requireProEntitlement}, as a boolean. For mutations
- * whose core write must succeed for every user but whose paid side effect
- * (an LLM pass) is Pro-only: the caller keeps the write and skips the spend.
+ * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
+ * whose core write must succeed for every user can use this to skip a
+ * Pro-only side effect, and Pro-only queries can return an empty result.
  */
 export async function hasProEntitlement(
-  ctx: MutationCtx,
+  ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
 ): Promise<boolean> {
   if (await isDevelopmentAnonymousUser(ctx, userId)) return true;

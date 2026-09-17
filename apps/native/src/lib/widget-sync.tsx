@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/components/item-card";
+import { useEntitlement } from "@/lib/entitlement";
 import { displayHost } from "@/lib/url";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -67,7 +68,7 @@ function widgetSubtitle(item: FeedItem): string {
   return t("item.photo");
 }
 
-async function syncWidget(items: FeedItem[]) {
+async function syncWidget(items: FeedItem[], locked = false) {
   // Metro can evaluate a dynamic import eagerly. Check the native registry
   // before touching expo-widgets so older development clients degrade safely
   // instead of crashing in ExpoWidgets.ios.js at startup.
@@ -101,8 +102,9 @@ async function syncWidget(items: FeedItem[]) {
 
   RecentSavesWidget.updateSnapshot({
     items: widgetItems,
-    emptyTitle: t("widget.emptyTitle"),
-    emptyHint: t("widget.emptyBody"),
+    emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
+    emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
+    locked,
   });
 
   // Drop thumbnails for items that left the widget so the shared container
@@ -135,17 +137,29 @@ let syncChain: Promise<void> = Promise.resolve();
  */
 export function RecentSavesWidgetSync() {
   const locale = useAppLocale();
-  const { data: recent } = useQuery(
-    convexQuery(api.items.listRecentItems, { limit: WIDGET_ITEM_COUNT }),
-  );
+  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const { data: recent } = useQuery({
+    ...convexQuery(api.items.listRecentItems, { limit: WIDGET_ITEM_COUNT }),
+    enabled: !entitlementLoading && entitled,
+  });
   const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (Platform.OS !== "ios" || recent === undefined) return;
+    if (
+      Platform.OS !== "ios" ||
+      entitlementLoading ||
+      (entitled && recent === undefined)
+    )
+      return;
+    // A widget snapshot survives independently of the app. Clear it when a
+    // subscription lapses or the user signs out so old Pro content is not
+    // left visible on the Home Screen.
+    const items = entitled ? (recent ?? []) : [];
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
-      recent
+      (entitled ? "pro" : "free") +
+      items
         .map(
           (item) =>
             `${item._id}:${item.title ?? ""}:${item.imageUrl ?? item.heroImageUrl ?? ""}`,
@@ -155,12 +169,12 @@ export function RecentSavesWidgetSync() {
     lastKey.current = key;
 
     syncChain = syncChain
-      .then(() => syncWidget(recent))
+      .then(() => syncWidget(items, !entitled))
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [recent, locale]);
+  }, [entitled, entitlementLoading, recent, locale]);
 
   return null;
 }

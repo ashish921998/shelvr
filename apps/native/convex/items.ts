@@ -13,7 +13,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -294,15 +294,15 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves, for surfaces that show a handful of items and
- * must not subscribe to the feed (the home-screen widget). The status index
- * reads exactly `limit` ready rows, so a burst of fresh imports still
+/** The newest `ready` saves for the Pro-only home-screen widget. The status
+ * index reads exactly `limit` ready rows, so a burst of fresh imports still
  * processing can never push older ready saves out of view. */
 export const listRecentItems = query({
   args: { limit: v.number() },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    if (!(await hasProEntitlement(ctx, userId))) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
       RECENT_ITEMS_MAX,

@@ -16,6 +16,8 @@ import ja from "@/locales/ja.json";
 const fsx = vi.hoisted(() => ({
   platformOs: "ios",
   locale: "en-US",
+  entitled: true,
+  entitlementLoading: false,
   nativeModulePresent: true,
   failImages: false,
   failSnapshot: false,
@@ -106,10 +108,18 @@ vi.mock("react-native-nitro-image", () => ({
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: tanstack.data }),
+  useQuery: (options: { enabled?: boolean }) => ({
+    data: options.enabled === false ? undefined : tanstack.data,
+  }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: { items: { listRecentItems: "listRecentItems" } },
+}));
+vi.mock("@/lib/entitlement", () => ({
+  useEntitlement: () => ({
+    entitled: fsx.entitled,
+    loading: fsx.entitlementLoading,
+  }),
 }));
 
 type Item = {
@@ -150,6 +160,8 @@ vi.mock("expo-localization", () => ({
 beforeEach(() => {
   fsx.platformOs = "ios";
   fsx.locale = "en-US";
+  fsx.entitled = true;
+  fsx.entitlementLoading = false;
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
   fsx.failSnapshot = false;
@@ -184,6 +196,36 @@ describe("RecentSavesWidgetSync", () => {
     await act(async () => {});
     expect(fsx.snapshots).toHaveLength(0);
     expect(fsx.downloads).toHaveLength(0);
+  });
+
+  it("does not sync until entitlement is known", async () => {
+    fsx.entitlementLoading = true;
+    renderSync([link]);
+    await act(async () => {});
+    expect(fsx.snapshots).toHaveLength(0);
+    expect(fsx.downloads).toHaveLength(0);
+  });
+
+  it("clears the widget for users without Pro", async () => {
+    fsx.entitled = false;
+    renderSync([link]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.snapshots[0]).toMatchObject({
+      items: [],
+      emptyTitle: "Recent saves are a Pro feature",
+      emptyHint: "Subscribe to Shelvr Pro to see your saves here",
+      locked: true,
+    });
+    expect(fsx.downloads).toHaveLength(0);
+  });
+
+  it("clears existing Pro content when entitlement is lost", async () => {
+    const { rerender } = renderSync([link]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    fsx.entitled = false;
+    rerender(<RecentSavesWidgetSync />);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+    expect(fsx.snapshots[1]).toMatchObject({ items: [] });
   });
 
   it("does nothing when the widget native module is missing", async () => {

@@ -321,6 +321,8 @@ export type MessageParams = {
   "appearance.neutralDark": undefined;
   "widget.emptyTitle": undefined;
   "widget.emptyBody": undefined;
+  "widget.proTitle": undefined;
+  "widget.proBody": undefined;
   "item.savedItem": undefined;
   "item.link": undefined;
   "item.photo": undefined;

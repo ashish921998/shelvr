@@ -322,6 +322,8 @@
   "appearance.neutralDark": "ダーク（ニュートラル）",
   "widget.emptyTitle": "まだ保存されていません",
   "widget.emptyBody": "＋をタップしてリンク、写真、メモを保存",
+  "widget.proTitle": "最近の保存はProの機能です",
+  "widget.proBody": "Shelvr Proに登録すると、保存した項目をここで確認できます",
   "item.savedItem": "保存した項目",
   "item.link": "リンク",
   "item.photo": "写真",
