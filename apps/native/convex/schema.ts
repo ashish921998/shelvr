@@ -8,6 +8,7 @@ import {
   failureReasonValidator,
   intentValidator,
   postMediaValidator,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   cancelSurveyOutcomeValidator,
@@ -55,6 +56,10 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),

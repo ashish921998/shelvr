@@ -1,6 +1,7 @@
 import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
 import { PostMediaButton } from "@/components/post-media-button";
 import { analytics } from "@/lib/analytics";
@@ -236,20 +237,28 @@ export function ArticleReaderView({
 
         {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
-        <View style={styles.article}>
-          {paragraphs.map((paragraph, index) => (
-            <Fragment key={index}>
-              {mediaAt(index)}
-              <Text
-                selectable
-                style={[styles.paragraph, index === 0 && styles.lede]}
-              >
-                {paragraph}
-              </Text>
-            </Fragment>
-          ))}
-          {mediaAt(paragraphs.length)}
-        </View>
+        {/* A recipe page replaces the article body: the classifier already
+            lifted the ingredients and steps out of the story around them. The
+            article's own images go with that story, since their positions are
+            paragraph-relative and the paragraphs are gone. */}
+        {item.recipe ? (
+          <RecipeSection recipe={item.recipe} />
+        ) : (
+          <View style={styles.article}>
+            {paragraphs.map((paragraph, index) => (
+              <Fragment key={index}>
+                {mediaAt(index)}
+                <Text
+                  selectable
+                  style={[styles.paragraph, index === 0 && styles.lede]}
+                >
+                  {paragraph}
+                </Text>
+              </Fragment>
+            ))}
+            {mediaAt(paragraphs.length)}
+          </View>
+        )}
 
         {item.status === "ready" ? <ProductsSection item={item} /> : null}
 

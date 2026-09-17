@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
 import { PostMediaButton } from "@/components/post-media-button";
@@ -52,7 +53,10 @@ type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 // scoped to that space's membership.
 export type DetailItem = CardRow &
   Partial<
-    Pick<FullRow, "content" | "articleMedia" | "products" | "productsStatus">
+    Pick<
+      FullRow,
+      "content" | "articleMedia" | "recipe" | "products" | "productsStatus"
+    >
   > & {
     spaceIntents?: CardRow["intents"];
   };
@@ -407,7 +411,13 @@ function ItemDetailBody({
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
-      {!social && paragraphs.length > 0 ? (
+      {/* A recipe replaces the article paragraphs: the pipeline already lifted
+          the ingredients and steps out of the story around them. A social post
+          keeps its caption above and gains the recipe its caption described or
+          linked to; a recipe screenshot gets the card under the photo. */}
+      {detail.recipe ? (
+        <RecipeSection recipe={detail.recipe} />
+      ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>
