@@ -5,7 +5,7 @@ import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
-import { generateObject, wrapLanguageModel } from "ai";
+import { embedMany, generateObject, wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { Readability } from "@mozilla/readability";
@@ -26,7 +26,14 @@ import {
 } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
 import { INTENT_KINDS, type PostMedia } from "./model/itemFields";
-import { logEvent } from "./model/log";
+import { logEvent, errorName } from "./model/log";
+import {
+  buildEmbeddingText,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+  normalizeEmbedding,
+} from "./model/embedding";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -80,6 +87,93 @@ function modelCallOptions(timeoutMs: number): {
     abortSignal: AbortSignal.timeout(timeoutMs),
     maxRetries: MODEL_MAX_RETRIES,
   };
+}
+
+/**
+ * The embedding model, called through the same provider and API key as
+ * classification. Separate from MODEL_NAME because they are different models
+ * on different release cadences, and because token usage is logged per call
+ * site: embedding spend should be legible on its own.
+ */
+const EMBEDDING_MODEL_NAME = "gemini-embedding-2";
+
+/**
+ * Deadline for one embedding batch. Embedding is a single forward pass with no
+ * generated tokens, so it is far quicker than classification; the allowance is
+ * generous only so a cold provider does not cost an item its vector. It adds
+ * to processItem's budget above, which stays well under the action limit.
+ */
+const EMBED_TIMEOUT_MS = 20_000;
+
+/**
+ * Task type for every STORED vector.
+ *
+ * Gemini embeddings are asymmetric: a corpus vector and a query vector are
+ * meant to be produced under a matching pair of task types. Items are the
+ * corpus, so they are embedded as documents. Anything that later searches
+ * against this index must embed its query text with RETRIEVAL_QUERY — mixing
+ * the two silently degrades ranking rather than failing, so the pairing is
+ * recorded here. Item-to-item similarity is unaffected: both sides are
+ * documents, which is symmetric.
+ */
+const EMBEDDING_TASK_TYPE = "RETRIEVAL_DOCUMENT";
+
+/**
+ * Embeds a batch of texts, in input order.
+ *
+ * Best effort by contract: it never throws and never rejects. Every failure
+ * mode — provider outage, timeout, a malformed vector, an empty input —
+ * collapses to `undefined` in that text's slot, because an item is worth
+ * saving whether or not it could be embedded. Callers write the vectors they
+ * got and leave the rest to the sweeper.
+ *
+ * Empty texts are never sent upstream; their slot is `undefined` from the
+ * start. Vectors are normalized and width-checked before being returned, so a
+ * caller can hand the result straight to a mutation: Convex rejects a vector
+ * whose width does not match the index, which would otherwise fail the whole
+ * classification transaction over an optional field.
+ *
+ * Batching is the SDK's: `embedMany` splits at the provider's documented
+ * 100-values ceiling on its own, so callers pass a whole page.
+ */
+export async function embedTexts(
+  texts: string[],
+): Promise<(number[] | undefined)[]> {
+  const vectors: (number[] | undefined)[] = texts.map(() => undefined);
+  const sendable = texts
+    .map((text, index) => ({ text, index }))
+    .filter((entry) => entry.text.length > 0);
+  if (sendable.length === 0) {
+    return vectors;
+  }
+  try {
+    const { embeddings } = await embedMany({
+      model: google.embedding(EMBEDDING_MODEL_NAME),
+      values: sendable.map((entry) => entry.text),
+      providerOptions: {
+        google: {
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+          taskType: EMBEDDING_TASK_TYPE,
+        },
+      },
+      ...modelCallOptions(EMBED_TIMEOUT_MS),
+    });
+    embeddings.forEach((raw, position) => {
+      const vector = normalizeEmbedding(raw);
+      if (isValidEmbedding(vector)) {
+        vectors[sendable[position].index] = vector;
+      }
+    });
+  } catch (error) {
+    // Categories and counts only: an embedding error can echo the text.
+    logEvent("warn", "embedding_failed", {
+      model: EMBEDDING_MODEL_NAME,
+      count: sendable.length,
+      timed_out: isModelTimeout(error),
+      error: errorName(error),
+    });
+  }
+  return vectors;
 }
 
 /** True for the error a timed-out or aborted model call rejects with. The SDK
@@ -1633,6 +1727,47 @@ async function refreshClaimed(
   });
 }
 
+/**
+ * The vector for a classification about to be finalized.
+ *
+ * Best effort: a failure returns undefined, the item still finalizes, and the
+ * sweeper repairs it. Producing it here rather than in a later mutation is
+ * what lets it ride the same run-fenced write as the text it describes, so a
+ * superseded run can never leave a vector disagreeing with the row beside it.
+ *
+ * The title is resolved with finalizeItem's own rule — a title the owner typed
+ * (or one a note refresh keeps) outranks the classifier's — so the vector
+ * describes the title the row actually ends up with, not one this run proposed
+ * and the mutation then discarded.
+ */
+async function embedForRun(params: {
+  item: { title?: string; titleSource?: "user"; note?: string };
+  refresh: boolean;
+  title: string;
+  description: string;
+  tags: string[];
+  siteName?: string;
+  content?: string;
+}): Promise<number[] | undefined> {
+  const keepsExistingTitle =
+    params.item.titleSource === "user" || params.refresh;
+  const storedTitle =
+    keepsExistingTitle && params.item.title !== undefined
+      ? params.item.title
+      : params.title;
+  const [embedding] = await embedTexts([
+    buildEmbeddingText({
+      title: storedTitle,
+      description: params.description,
+      tags: params.tags,
+      siteName: params.siteName,
+      note: params.item.note,
+      content: params.content,
+    }),
+  ]);
+  return embedding;
+}
+
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -1703,15 +1838,33 @@ export const processItem = internalAction({
           ? await storePoster(ctx, page.heroImageUrl)
           : undefined;
 
+      const tags = result.tags
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      // `page` is undefined for anything that is not a link, so these need no
+      // type guard. Hoisted so the embedded text is exactly the stored text.
+      const pageContent = page?.content;
+      const pageSiteName = page?.siteName;
+      const embedding = await embedForRun({
+        item,
+        refresh: args.refresh === true,
+        title: result.title,
+        description: result.description,
+        tags,
+        siteName: pageSiteName,
+        content: pageContent,
+      });
+
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
         title: result.title,
         keepTitle: args.refresh === true,
         description: result.description,
-        tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-        content: page?.content,
-        siteName: page?.siteName,
+        tags,
+        content: pageContent,
+        siteName: pageSiteName,
+        embedding,
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
@@ -1796,6 +1949,55 @@ export const processItem = internalAction({
  * (older saves whose ratio was dropped before it was persisted). Reads the
  * stored file's header bytes directly — no re-upload needed.
  */
+/**
+ * Embeds one page of items whose vector is missing or from an older
+ * generation, then stamps the whole page.
+ *
+ * This is three jobs in one, which is why it runs on a schedule rather than
+ * once: it backfills saves made before embeddings existed, it repairs saves
+ * whose inline embed call failed during classification, and it is the
+ * migration path when CURRENT_EMBEDDING_VERSION is bumped. Once the range is
+ * empty it costs one indexed read per run and nothing else.
+ *
+ * A full page that made progress chains itself immediately, the same way the
+ * stale-processing sweeper does, so a large existing shelf drains without
+ * waiting a cron interval per page. Progress is guaranteed when there is work:
+ * the mutation stamps every item it is handed, including ones that produced no
+ * vector, so nothing can sit at the front of the range forever.
+ */
+export const sweepItemEmbeddings = internalAction({
+  args: {},
+  returns: v.object({ scanned: v.number(), written: v.number() }),
+  handler: async (ctx): Promise<{ scanned: number; written: number }> => {
+    const pending = await ctx.runQuery(
+      internal.items.listItemsNeedingEmbeddingInternal,
+      { limit: EMBEDDING_SWEEP_PAGE },
+    );
+    if (pending.length === 0) {
+      return { scanned: 0, written: 0 };
+    }
+    const vectors = await embedTexts(pending.map((entry) => entry.text));
+    const { written, stamped } = await ctx.runMutation(
+      internal.items.setEmbeddingsInternal,
+      {
+        entries: pending.map((entry, index) => ({
+          itemId: entry.itemId,
+          embedding: vectors[index],
+        })),
+      },
+    );
+    logEvent("info", "embedding_sweep", {
+      scanned: pending.length,
+      written,
+      stamped,
+    });
+    if (pending.length === EMBEDDING_SWEEP_PAGE && stamped > 0) {
+      await ctx.scheduler.runAfter(0, internal.ai.sweepItemEmbeddings, {});
+    }
+    return { scanned: pending.length, written };
+  },
+});
+
 export const backfillImageAspectRatios = internalAction({
   args: {},
   returns: v.object({ scanned: v.number(), updated: v.number() }),

@@ -40,6 +40,12 @@ import {
   PROCESSING_STALE_MS,
 } from "./model/itemFields";
 import {
+  buildEmbeddingText,
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+} from "./model/embedding";
+import {
   imageSizeError,
   imageSizeErrorCode,
   MAX_PHOTOS_PER_ACCOUNT,
@@ -199,11 +205,32 @@ export const itemCardValidator = enrichedItemValidator.omit(
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
+/**
+ * Drops the retrieval vector before a row crosses any function boundary.
+ *
+ * `embedding` is ~6 KB of floats and `itemFields` is spread into
+ * `enrichedItemValidator` — the return shape of `listItems`, `getItem`,
+ * `searchItems`, the weekly digest, and `getSpace`. Left in, every one of
+ * those reads would ship the vector to the client (and Convex would reject
+ * the response outright, since the field is not in their validators).
+ *
+ * Nothing outside the backend has any use for it: vector search runs server
+ * side, in an action. So the vector is stripped at the boundary rather than
+ * added to the validators.
+ */
+function stripEmbedding(
+  item: Doc<"items">,
+): Omit<Doc<"items">, "embedding" | "embeddingVersion"> {
+  const { embedding: _embedding, embeddingVersion: _version, ...rest } = item;
+  return rest;
+}
+
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
-  return { ...item, imageUrl };
+  // The single chokepoint every client-facing item read shares.
+  return { ...stripEmbedding(item), imageUrl };
 }
 
 export async function toItemCard(
@@ -227,12 +254,21 @@ export async function toItemCard(
  * the cap keeps a pasted essay from bloating the index. */
 const MAX_SEARCH_NOTE_CHARS = 8000;
 
+/** How much of an extracted article body the search index carries. Without
+ * this the index only ever held the classifier's ~40-word summary of a page,
+ * so a phrase the reader actually remembers from the article was unfindable.
+ * The cap mirrors the note cap rather than MAX_STORED_CONTENT_CHARS (100k):
+ * `searchText` rides along on every `enrichedItemValidator` read, so the index
+ * copy stays a lede, not a second copy of the body. */
+const MAX_SEARCH_CONTENT_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
   note?: string;
+  content?: string;
 }): string {
   return [
     parts.title,
@@ -240,6 +276,7 @@ function buildSearchText(parts: {
     ...parts.tags,
     parts.siteName,
     parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+    parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
   ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
@@ -1523,6 +1560,7 @@ export const updateNoteItem = mutation({
         description: item.description,
         tags: item.tags,
         note: text,
+        content: item.content,
       }),
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
@@ -1687,7 +1725,10 @@ export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
   returns: v.union(v.object(itemFields), v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.itemId);
+    const item = await ctx.db.get(args.itemId);
+    // `itemFields` deliberately omits the vector, and Convex enforces
+    // `returns` exactly — the raw document would fail validation here.
+    return item === null ? null : stripEmbedding(item);
   },
 });
 
@@ -1699,13 +1740,16 @@ export const listReadyItemsInternal = internalQuery({
     // Index-scoped to `ready` so a library full of failed or in-flight saves
     // still yields `limit` candidates; the old by_user read took 2x and
     // filtered in JS, which starved users with many failed items.
-    return await ctx.db
+    const rows = await ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
         q.eq("userId", args.userId).eq("status", "ready"),
       )
       .order("desc")
       .take(limit);
+    // Keeps `limit` vectors (~6 KB each) from crossing into the action on
+    // every recommendation pass, and keeps the rows inside `itemFields`.
+    return rows.map(stripEmbedding);
   },
 });
 
@@ -1771,6 +1815,12 @@ export const finalizeItem = internalMutation({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
+    // The retrieval vector for the text this run classified, already
+    // normalized and width-checked by the action. Optional because embedding
+    // is best-effort: a run whose embed call failed still finalizes the item,
+    // and the sweeper fills the vector in later. Never `null` — absent means
+    // "this run produced none".
+    embedding: v.optional(v.array(v.float64())),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
@@ -1804,6 +1854,7 @@ export const finalizeItem = internalMutation({
       tags: args.tags,
       siteName: args.siteName,
       note: item.note,
+      content: args.content,
     });
     await ctx.db.patch(args.itemId, {
       title,
@@ -1823,6 +1874,20 @@ export const finalizeItem = internalMutation({
       enrichment: args.enrichment,
       failureReason: undefined,
       searchText,
+      // Written in the same run-fenced transaction as the classification it
+      // describes, so a superseded run can never leave a vector that
+      // disagrees with the text beside it.
+      ...(args.embedding !== undefined
+        ? {
+            embedding: args.embedding,
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }
+        : // This run could not embed. Keep whatever vector the row already
+          // carried — a slightly stale semantic match beats none — but drop
+          // the generation stamp so the sweeper re-embeds it against the text
+          // just written. Patching `embedding: undefined` instead would
+          // delete a good vector over a transient provider failure.
+          { embeddingVersion: undefined }),
     });
     if (
       args.storageId !== undefined &&
@@ -1851,6 +1916,116 @@ export const deleteStorageIfUnreferenced = internalMutation({
       await safeDeleteStorage(ctx, args.storageId);
     }
     return null;
+  },
+});
+
+/**
+ * One page of items whose stored vector is missing or from an older
+ * generation, already reduced to the exact text each one should be embedded
+ * from.
+ *
+ * Composing the text here rather than in the action is what keeps this cheap:
+ * a `ready` link can carry 100k characters of extracted article, so returning
+ * rows would move megabytes per page across the function boundary. The text
+ * builder already truncates to MAX_EMBED_CHARS, so a page is bounded at
+ * roughly 50 x 6 KB instead.
+ *
+ * Rows with nothing to embed are returned too, with an empty `text`. The
+ * caller stamps them anyway — otherwise an item that can never produce text
+ * would sit at the front of this range forever and the sweep would never
+ * drain.
+ */
+export const listItemsNeedingEmbeddingInternal = internalQuery({
+  args: { limit: v.number() },
+  returns: v.array(v.object({ itemId: v.id("items"), text: v.string() })),
+  handler: async (ctx, args) => {
+    const limit = Math.min(
+      Math.max(1, Math.floor(args.limit)),
+      EMBEDDING_SWEEP_PAGE,
+    );
+    // `undefined` sorts before every number, so this one range covers rows
+    // that have never been embedded and rows left behind by a version bump.
+    const rows = await ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      )
+      .take(limit);
+    return rows.map((item) => ({
+      itemId: item._id,
+      text: buildEmbeddingText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        content: item.content,
+      }),
+    }));
+  },
+});
+
+/**
+ * Writes one sweep's vectors back and stamps the generation on every item it
+ * was handed, including those that produced no vector.
+ *
+ * Guards, in order: the item may have been deleted while the action ran; a
+ * live pipeline run may have written a current-generation vector in the
+ * meantime, which is newer than anything this sweep computed and must win;
+ * and a vector that is the wrong width or carries a non-finite component is
+ * dropped rather than written, because Convex would reject the wrong width at
+ * write time and a NaN would poison every later comparison.
+ *
+ * It also rewrites `searchText`. The item's stored fields are the only input,
+ * so this is deterministic, and it is what makes the article body reach the
+ * full-text index for saves that were classified before it was indexed —
+ * without re-running the model on anything.
+ */
+export const setEmbeddingsInternal = internalMutation({
+  args: {
+    entries: v.array(
+      v.object({
+        itemId: v.id("items"),
+        embedding: v.optional(v.array(v.float64())),
+      }),
+    ),
+  },
+  returns: v.object({ written: v.number(), stamped: v.number() }),
+  handler: async (ctx, args): Promise<{ written: number; stamped: number }> => {
+    let written = 0;
+    let stamped = 0;
+    for (const entry of args.entries) {
+      const item = await ctx.db.get(entry.itemId);
+      if (item === null) {
+        continue;
+      }
+      if ((item.embeddingVersion ?? -1) >= CURRENT_EMBEDDING_VERSION) {
+        // A pipeline run beat the sweep to it. Its vector describes newer
+        // text than the sweep read, so leave it alone.
+        continue;
+      }
+      const usable =
+        entry.embedding !== undefined && isValidEmbedding(entry.embedding);
+      await ctx.db.patch(entry.itemId, {
+        embeddingVersion: CURRENT_EMBEDDING_VERSION,
+        ...(usable ? { embedding: entry.embedding } : {}),
+        searchText: buildSearchText({
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          note: item.note,
+          content: item.content,
+        }),
+      });
+      stamped++;
+      if (usable) {
+        written++;
+      }
+    }
+    return { written, stamped };
   },
 });
 

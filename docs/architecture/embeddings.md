@@ -1,17 +1,17 @@
 # Embeddings and semantic retrieval
 
-Status: proposed. Nothing below is implemented.
+Status: **Phase 0 and Phase 1 implemented.** Phases 2-4 remain proposed.
 
 ## Why
 
 Three shipped features are capped by the amount of the shelf they can see, and the
 caps tighten exactly as a shelf becomes worth having:
 
-| Feature | Today | Cap |
-| --- | --- | --- |
-| `ai.ts` `recommendForSpace` | newest 100 `ready` items (`listReadyItemsInternal`, `limit: 100`) | a user with 600 saves gets picks drawn from 100 |
-| `items.ts` `similarItems` | newest 300 rows, tag + token overlap | `SIMILAR_CANDIDATES = 300` |
-| `items.ts` `searchItems` | `search_text` index over `buildSearchText` | title + description + tags + siteName + note — **never `content`** |
+| Feature                     | Today                                                             | Cap                                                                |
+| --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ai.ts` `recommendForSpace` | newest 100 `ready` items (`listReadyItemsInternal`, `limit: 100`) | a user with 600 saves gets picks drawn from 100                    |
+| `items.ts` `similarItems`   | newest 300 rows, tag + token overlap                              | `SIMILAR_CANDIDATES = 300`                                         |
+| `items.ts` `searchItems`    | `search_text` index over `buildSearchText`                        | title + description + tags + siteName + note — **never `content`** |
 
 `finalizeItem` stores the extracted article body (`content`, up to 100k chars) and
 then indexes only the classifier's summary of it. A saved essay is searchable by
@@ -35,7 +35,7 @@ Retrieval becomes two complementary signals:
 They fail in different directions, so hybrid search fuses both rather than
 replacing one with the other.
 
-## Phase 0 — index the article body (independent, ship first)
+## Phase 0 — index the article body (implemented)
 
 `buildSearchText` (`items.ts:224`) gains a bounded slice of `content`:
 
@@ -51,7 +51,7 @@ rewrite `searchText` in the same pass).
 This is not redundant with embeddings. It is the half that makes exact phrases
 findable, and it can ship this week.
 
-## Phase 1 — write embeddings (backend only)
+## Phase 1 — write embeddings (implemented, backend only)
 
 ### Schema (`schema.ts`)
 
@@ -91,13 +91,18 @@ precisely the cost the card/detail split was built to avoid (`items.ts:176-183`)
 
 Therefore:
 
-- Add `embedding` / `embeddingVersion` to the **schema only**, not to `itemFields`.
-- Destructure them out in `toItemCard` (`items.ts:209`) alongside `content`,
-  `searchText`, and `products` — the destructure-don't-pick pattern there exists
-  so the compiler flags exactly this.
-- `listReadyItemsInternal` returns `v.array(v.object(itemFields))`; keeping the
-  fields out of `itemFields` also keeps 100 vectors from crossing the
-  action boundary on every recommendation pass.
+- The fields are in the **schema only**, not in `itemFields`.
+- As built, the strip happens in **`enrichItem`**, not `toItemCard`. `enrichItem`
+  is the single chokepoint all five client-facing reads share (`listItems`,
+  `listItemsPage` via `toItemCard`, `getItem`, `searchItems`, the weekly digest,
+  and `getSpace`), so one `stripEmbedding` call covers them all instead of five
+  separate edits.
+- The two internal queries that return **raw documents** under
+  `v.object(itemFields)` — `getItemInternal` and `listReadyItemsInternal` — do
+  not pass through `enrichItem`, so they strip explicitly. Without this they
+  would fail their own return validators at runtime, and
+  `listReadyItemsInternal` would drag 100 vectors into the action on every
+  recommendation pass.
 
 ### Composing the embedded text
 
@@ -107,9 +112,13 @@ New helper beside `buildSearchText`:
 const MAX_EMBED_CHARS = 6000; // ~1.5k tokens, under the model's input limit
 
 function buildEmbeddingText(parts: {
-  title?: string; description?: string; tags: string[];
-  siteName?: string; note?: string; content?: string;
-}): string
+  title?: string;
+  description?: string;
+  tags: string[];
+  siteName?: string;
+  note?: string;
+  content?: string;
+}): string;
 ```
 
 Title, description, tags, then the lede of `content` or `note`. Intents stay out,
@@ -126,7 +135,7 @@ A separate mutation could commit after a superseding run and defeat `ownsRun`.
 Follows the file's existing deadline convention:
 
 ```ts
-const EMBED_TIMEOUT_MS = 15_000;
+const EMBED_TIMEOUT_MS = 20_000;
 ```
 
 The per-action budget comment (`ai.ts:53-59`) gains one line; ~100 s worst case
@@ -145,9 +154,23 @@ Google, through the `@ai-sdk/google` provider and the existing
 Use Matryoshka truncation to 768 dimensions: a quarter the storage of 3072 at
 negligible quality cost for per-user corpora this size.
 
-> Confirm the current embedding model id and its `outputDimensionality` support
-> against the live provider docs at implementation time. `EMBEDDING_DIMENSIONS`
-> must exactly match what is stored — Convex enforces it.
+Resolved at implementation: the model is **`gemini-embedding-2`**, confirmed
+present in the installed `@ai-sdk/google@4.0.39` type union rather than from
+memory. The non-deprecated factory in v4 is `google.embedding(id)`, and the
+width is requested as `providerOptions.google.outputDimensionality` — a
+top-level sibling of `model` and `values` on `embedMany`, keyed by provider
+name. Nested anywhere else it is silently ignored and the call returns 3072-dim
+vectors, which Convex would then reject at write time.
+
+**Stored vectors are normalized regardless.** `gemini-embedding-2` is documented
+to L2-normalize its own truncated output, but its sibling `gemini-embedding-001`
+explicitly does not at any width other than 3072. Cosine scoring is only
+meaningful for unit-length vectors, and nothing downstream fails loudly if
+normalization silently stops, so `normalizeEmbedding` runs on every vector. On
+an already-unit vector it is a numerical no-op.
+
+`embedMany` splits at the provider's documented 100-values ceiling on its own,
+so the sweep hands it a whole page and does no chunking itself.
 
 ### Backfill
 
@@ -187,6 +210,11 @@ running, or a user whose items all failed to embed — fall through to the curre
 every pre-backfill user.
 
 ## Phase 3 — hybrid search (expand/contract)
+
+> **Carried obligation from Phase 1.** Stored item vectors are embedded with
+> `taskType: "RETRIEVAL_DOCUMENT"`. Gemini embeddings are asymmetric, so the
+> query side of any search MUST use `RETRIEVAL_QUERY`. Mixing the two degrades
+> ranking silently rather than failing, so it will not surface in tests.
 
 `searchItems` is a public query and therefore a contract with every build in the
 wild, and `ctx.vectorSearch` is action-only. Per the CLAUDE.md expand/contract
@@ -284,8 +312,14 @@ Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
   `requireUserId`, not an argument).
 - Backfill is bounded per run and chains while progress is made.
 
-> Confirm `convex-test` implements `ctx.vectorSearch` before relying on it; if it
-> does not, the vector step needs a seam that tests can stub.
+Resolved: `convex-test@0.0.54` **does** implement `ctx.vectorSearch` (exact
+brute-force cosine, honoring the filter callback and `limit`), so Phase 3 needs
+no stub seam. Four divergences from production matter when those tests are
+written: it throws rather than skipping when a matched document has no vector
+field, it returns everything when `limit` is omitted, it does not enforce
+`filterFields`, and it does not validate vector width. So assert on set
+membership rather than exact scores, always pass an explicit `limit`, and give
+every fixture row a vector.
 
 ## Costs
 
