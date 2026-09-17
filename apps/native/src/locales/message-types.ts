@@ -35,7 +35,7 @@ export type MessageParams = {
   "notifications.weeklyShelf": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
-  "capture.backToLibrary": undefined;
+  "digest.backHome": undefined;
   "capture.backToOptions": undefined;
   "common.save": undefined;
   "errors.saveTitle": undefined;
