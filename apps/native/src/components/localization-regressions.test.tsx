@@ -265,7 +265,7 @@ vi.mock("expo-maps", () => {
 });
 
 it("refreshes loaded map fallback titles without changing saved titles", async () => {
-  const { default: MapScreen } = await import("@/app/(app)/(tabs)/(map)/index");
+  const { default: MapScreen } = await import("@/app/(app)/map");
   render(<MapScreen />);
   expect(screen.getByText("Saved photo")).toBeTruthy();
   changeLanguage("ja-JP");
