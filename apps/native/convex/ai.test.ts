@@ -257,6 +257,9 @@ describe("fetchXPost", () => {
       heroImageUrl:
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
+      // X cut the preview itself, so no length check can tell it from a
+      // complete short post.
+      truncated: true,
     });
   });
 
@@ -553,6 +556,8 @@ describe("fetchXPost for an Article's full body", () => {
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
     });
+    // The whole body replaced the cut preview, so the read is complete.
+    expect(read).not.toHaveProperty("truncated");
     expect(read).not.toHaveProperty("media");
     const paragraphs = read.content?.split("\n\n");
     expect(paragraphs).toHaveLength(60);
@@ -1019,6 +1024,7 @@ describe("fetchXPost for an Article's full body", () => {
         heroImageUrl:
           "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
         heroAspectRatio: 2.5,
+        truncated: true,
       });
       expect(loggedEvents()).toEqual([
         { event: "x_article_body_fallback", error_category: category },
@@ -1177,6 +1183,55 @@ describe("processItem for X posts", () => {
     expect(generateObject.mock.calls[0][0].prompt).toContain(
       "Page title: How this GLP-1 app generated 20m+ views",
     );
+  });
+
+  /** Answer as the provider does: the model can only fill fields the chosen
+   * schema declares, and zod strips the rest. */
+  function offerRecipe() {
+    generateObject.mockImplementation(
+      async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
+        object: schema.parse({
+          title: "Pancake post",
+          description: "A post about pancakes.",
+          tags: ["food"],
+          spaceNames: [],
+          intents: [],
+          recipe: {
+            name: "Pancakes",
+            servings: "4 servings",
+            ingredients: ["2 cups flour"],
+            steps: ["Whisk."],
+          },
+        }),
+      }),
+    );
+  }
+
+  it("does not lift a recipe out of a long post X served cut short", async () => {
+    // `note_tweet` means the 280 characters on hand are a cut copy of the post,
+    // which no length check can tell from a post that is simply short.
+    offerRecipe();
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+
+    const { item } = await saveLink(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  it("does not lift a recipe out of an Article preview that stayed cut", async () => {
+    // fxtwitter did not answer, so the body is still the syndication preview.
+    offerRecipe();
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 500 },
+    );
+
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
   });
 
   it("does not lift a recipe out of an Article longer than the prompt carries", async () => {

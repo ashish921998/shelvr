@@ -563,6 +563,10 @@ type PageData = {
   /** A best-effort part of the read failed transiently (e.g. the Instagram
    * caption), so a retry can still add content. Internal only. */
   incomplete?: true;
+  /** The source served a cut copy of its own text, so `content` ends early no
+   * matter how short it is. X does this for a long post (`note_tweet`) and for
+   * an Article preview. Internal only. */
+  truncated?: true;
   media?: PostMedia[];
   articleMedia?: ArticleMedia[];
   /** The recipe the page declares in schema.org markup (or, for a caption
@@ -818,6 +822,9 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
         siteName: "X",
         author,
         content: preview ? `${preview}…` : undefined,
+        // The preview is a cut copy; withXArticleBody swaps in the whole body
+        // when X's private API answers.
+        ...(preview ? { truncated: true as const } : {}),
         heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
         heroAspectRatio: cover
           ? cover.original_img_width / cover.original_img_height
@@ -851,6 +858,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
       siteName: "X",
       author,
       content,
+      ...(post.note_tweet ? { truncated: true as const } : {}),
       ...(media.length > 0
         ? {
             heroImageUrl: media[0].imageUrl,
@@ -1127,8 +1135,11 @@ async function withXArticleBody(
       : read.body.media.filter(
           (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
         );
+    // The whole body replaces the cut preview, so the read is no longer short
+    // of its source.
+    const { truncated: _preview, ...whole } = page;
     return {
-      ...page,
+      ...whole,
       content: read.body.text,
       ...(media.length > 0 ? { articleMedia: media } : {}),
     };
@@ -1947,6 +1958,9 @@ async function analyzeLinkItem(
   const askForRecipe =
     page !== undefined &&
     page.recipe === undefined &&
+    // A cut caption reads as complete at any length, so the length check alone
+    // would let the model transcribe a recipe that stops mid-ingredient.
+    page.truncated !== true &&
     isCaptionSource(item.url) &&
     captionText(page) !== undefined;
   const call = {
