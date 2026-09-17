@@ -49,7 +49,22 @@ on their next classification; a backfill is optional (Phase 1's sweeper can
 rewrite `searchText` in the same pass).
 
 This is not redundant with embeddings. It is the half that makes exact phrases
-findable, and it can ship this week.
+findable.
+
+**It also required fixing `similarItems`.** That scorer tokenized
+`item.searchText`, and `searchTokens` keeps every token longer than three
+characters with no stopword list. Once the body was in `searchText`, any two
+English articles shared "that", "with", "from", "have" and dozens more, clearing
+`SIMILAR_MIN_SCORE = 3` on filler alone — every candidate would qualify and
+ranking would track document length instead of topic. `similarItems` now scores
+on a `summaryText()` helper that rebuilds exactly the pre-Phase-0 value
+(title + description + tags + siteName + note). The full-text index gets the
+body; the scorer deliberately does not.
+
+Known cost, accepted: `searchText` rides along on `enrichedItemValidator`, so
+public reads ship up to ~8 KB more per row. Those reads already carry `content`
+(up to 100k), so this is roughly an 8% increase on an existing problem rather
+than a new one. Phase 3 retires it by returning cards from an action.
 
 ## Phase 1 — write embeddings (implemented, backend only)
 
@@ -145,6 +160,16 @@ is unchanged in practice.
 `logEvent` and call `finalizeItem` without `embedding`. The item goes `ready`
 and the sweeper picks it up. Degradable by construction.
 
+`finalizeItem` re-validates the vector before writing even though the action
+already did. Convex rejects a wrong-width vector at write time, and that would
+fail the whole classification transaction — losing the classification over a
+field that is optional by design.
+
+`updateNoteItem` clears `embeddingVersion`. A note's own words are most of what
+it is embedded from; a text edit already schedules a re-classify that re-embeds,
+but a title-only edit does not, so clearing the stamp covers both by handing the
+row back to the sweep.
+
 ### Model
 
 Google, through the `@ai-sdk/google` provider and the existing
@@ -177,10 +202,48 @@ so the sweep hands it a whole page and does no chunking itself.
 `internalAction` mirroring `backfillImageAspectRatios` (`ai.ts:1422`), paged by
 the new index, batching through `embedMany`:
 
-- page ≤ 100 `ready` rows with `embeddingVersion < CURRENT_EMBEDDING_VERSION`
+- a page of `ready` rows with `embeddingVersion < CURRENT_EMBEDDING_VERSION`
 - one `embedMany` per page
 - one bounded mutation to write them back
-- a page that made progress chains itself, exactly like `failStaleProcessingItems`
+- a page that embedded something chains itself, like `failStaleProcessingItems`
+
+**The page is bounded by bytes as well as rows.** A `ready` link can carry 100k
+characters of `content`, so rows alone is not a bound: a page of long articles
+would blow the transaction read limit, and because the same rows lead the range
+every run, the sweep would wedge on them permanently rather than failing once.
+The query streams rows and stops at `EMBEDDING_SWEEP_PAGE` or
+`MAX_SWEEP_READ_BYTES`, whichever comes first.
+
+**Stamping is what removes a row from the range, so it is never done on a
+failure the item did not cause.** This was the most serious defect review
+caught. The write-back takes an explicit outcome per item:
+
+| Outcome            | Meaning                                               | Effect                                                   |
+| ------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| `embedded`         | usable vector                                         | write, stamp, clear attempts                             |
+| `nothing_to_embed` | no embeddable text at all                             | stamp — it is finished either way                        |
+| `failed`           | provider answered for the batch but not for this item | spend an attempt; stamp only at `MAX_EMBEDDING_ATTEMPTS` |
+| `deferred`         | whole batch came back empty — provider is down        | change nothing; retry on a later tick                    |
+
+The action tells `failed` from `deferred` by whether the batch produced anything
+at all. Without that distinction, a provider outage would march the entire
+table, stamp every item as done with no vector, and — because chaining was
+gated on rows touched — do it at full speed. Nothing would ever revisit those
+rows. Chaining is now gated on vectors actually written, so an outage does not
+accelerate.
+
+The attempt cap exists so one permanently unembeddable item cannot sit at the
+front of the range blocking everything behind it. A version bump re-enlists
+anything given up on.
+
+**A staleness fence guards the write.** The version guard catches a pipeline run
+that embedded successfully, but not one that re-classified an item and then
+failed to embed — that clears the stamp, so the row looks unembedded while its
+text is newer than what the action read. The write-back echoes back the text it
+embedded and skips the row when the composed text no longer matches.
+
+`searchText` is rewritten only when the value actually changes, so a drained
+sweep does not invalidate every subscribed feed query on a timer.
 
 Driven by a cron in `crons.ts` that idles at zero cost once drained, so it
 doubles as the repair path for items whose inline embed failed and as the
@@ -311,6 +374,12 @@ Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
 - Hybrid search never returns another user's item (filter derived from
   `requireUserId`, not an argument).
 - Backfill is bounded per run and chains while progress is made.
+
+Known limitation: `aiEmbedding.test.ts` asserts the provider-option nesting
+against the same literals the production code uses, so it cannot catch a wrong
+call shape — a unit test has no way to. That nesting was instead verified
+against the installed `@ai-sdk/google` dist, and is worth re-checking on a
+provider upgrade.
 
 Resolved: `convex-test@0.0.54` **does** implement `ctx.vectorSearch` (exact
 brute-force cosine, honoring the filter callback and `limit`), so Phase 3 needs

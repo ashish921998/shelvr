@@ -1959,11 +1959,12 @@ export const processItem = internalAction({
  * migration path when CURRENT_EMBEDDING_VERSION is bumped. Once the range is
  * empty it costs one indexed read per run and nothing else.
  *
- * A full page that made progress chains itself immediately, the same way the
- * stale-processing sweeper does, so a large existing shelf drains without
- * waiting a cron interval per page. Progress is guaranteed when there is work:
- * the mutation stamps every item it is handed, including ones that produced no
- * vector, so nothing can sit at the front of the range forever.
+ * A full page that actually embedded something chains itself immediately, the
+ * same way the stale-processing sweeper does, so a large existing shelf drains
+ * without waiting a cron interval per page. Nothing can sit at the front of
+ * the range forever: an item with no embeddable text is finished on sight, and
+ * one the provider keeps rejecting is stamped after MAX_EMBEDDING_ATTEMPTS.
+ * An item the provider merely could not reach is left exactly as it was.
  */
 export const sweepItemEmbeddings = internalAction({
   args: {},
@@ -1977,12 +1978,32 @@ export const sweepItemEmbeddings = internalAction({
       return { scanned: 0, written: 0 };
     }
     const vectors = await embedTexts(pending.map((entry) => entry.text));
-    const { written, stamped } = await ctx.runMutation(
+
+    // Whether the provider answered at all. `embedTexts` collapses every
+    // failure to `undefined`, so the only way to tell an outage from one bad
+    // item is that an outage produces nothing for a batch that asked for
+    // something. That distinction decides whether a row spends an attempt or
+    // is simply retried later, and it is what stops an outage from marching
+    // the whole table and stamping every item as done with no vector.
+    const askedFor = pending.filter((entry) => entry.text.length > 0).length;
+    const produced = vectors.filter((vector) => vector !== undefined).length;
+    const providerDown = askedFor > 0 && produced === 0;
+
+    const { written, stamped, deferred } = await ctx.runMutation(
       internal.items.setEmbeddingsInternal,
       {
         entries: pending.map((entry, index) => ({
           itemId: entry.itemId,
+          text: entry.text,
           embedding: vectors[index],
+          outcome:
+            vectors[index] !== undefined
+              ? ("embedded" as const)
+              : entry.text.length === 0
+                ? ("nothing_to_embed" as const)
+                : providerDown
+                  ? ("deferred" as const)
+                  : ("failed" as const),
         })),
       },
     );
@@ -1990,8 +2011,15 @@ export const sweepItemEmbeddings = internalAction({
       scanned: pending.length,
       written,
       stamped,
+      deferred,
+      provider_down: providerDown,
     });
-    if (pending.length === EMBEDDING_SWEEP_PAGE && stamped > 0) {
+
+    // Chain only on real progress. Gating on `written` rather than on rows
+    // touched is what keeps a provider outage from accelerating: with nothing
+    // embedded there is nothing to chain for, and the next cron tick retries
+    // at its own pace.
+    if (pending.length === EMBEDDING_SWEEP_PAGE && written > 0) {
       await ctx.scheduler.runAfter(0, internal.ai.sweepItemEmbeddings, {});
     }
     return { scanned: pending.length, written };

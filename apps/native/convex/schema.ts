@@ -126,6 +126,12 @@ export default defineSchema({
     // sweeper's `lt(CURRENT)` range finds never-embedded and stale rows in one
     // scan.
     embeddingVersion: v.optional(v.number()),
+    // Consecutive item-specific embedding failures. Only incremented when the
+    // provider answered for the rest of the batch, so a provider outage never
+    // burns an item's allowance. Cleared on success; once it reaches
+    // MAX_EMBEDDING_ATTEMPTS the sweep stamps the row anyway so one
+    // permanently unembeddable item cannot block every row behind it.
+    embeddingAttempts: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.

@@ -49,7 +49,32 @@ export const MAX_EMBED_CHARS = 6000;
  * rather than in `items.ts` so the query that pages and the action that
  * batches read the same number without importing each other.
  */
-export const EMBEDDING_SWEEP_PAGE = 50;
+export const EMBEDDING_SWEEP_PAGE = 25;
+
+/**
+ * Byte budget for the documents one sweep page may read.
+ *
+ * Page size alone is not a bound: a `ready` link can carry 100k characters of
+ * extracted article, so 25 worst-case rows would be megabytes inside a single
+ * Convex transaction — and the same page would be re-read on every run, so
+ * exceeding the read limit would wedge the sweep permanently on the same rows
+ * rather than failing once. The query stops accumulating at whichever of the
+ * two limits it reaches first.
+ */
+export const MAX_SWEEP_READ_BYTES = 1_000_000;
+
+/**
+ * How many times one item may fail to embed before the sweep gives up on it
+ * and stamps it anyway.
+ *
+ * Without a cap, an item the provider can never embed sits at the front of the
+ * sweep range forever and blocks every row behind it. The cap only counts
+ * item-specific failures: when a whole batch comes back empty the provider is
+ * down, which is not that item's fault, and the sweep defers without spending
+ * an attempt. A later CURRENT_EMBEDDING_VERSION bump re-enlists anything that
+ * was given up on.
+ */
+export const MAX_EMBEDDING_ATTEMPTS = 5;
 
 /**
  * The text an item is embedded from.
@@ -101,17 +126,32 @@ export function buildEmbeddingText(parts: {
  * True when a vector is the exact width the vector index expects and carries
  * only finite components.
  *
- * Both halves matter. Convex rejects a wrong-width vector at write time, which
- * would fail the whole classification transaction over an optional field, and
- * a NaN component silently poisons every later similarity comparison. Callers
- * check before writing and drop the vector instead — an item with no embedding
- * is merely invisible to semantic retrieval until the sweeper repairs it.
+ * All three checks matter. Convex rejects a wrong-width vector at write time,
+ * which would fail the whole classification transaction over an optional
+ * field; a NaN component silently poisons every later similarity comparison;
+ * and an all-zero vector has no direction, so cosine similarity against it is
+ * 0/0. Callers check before writing and drop the vector instead — an item with
+ * no embedding is merely invisible to semantic retrieval until the sweeper
+ * repairs it.
  */
 export function isValidEmbedding(vector: readonly number[]): boolean {
-  return (
-    vector.length === EMBEDDING_DIMENSIONS &&
-    vector.every((component) => Number.isFinite(component))
-  );
+  if (vector.length !== EMBEDDING_DIMENSIONS) {
+    return false;
+  }
+  let sawNonZero = false;
+  for (const component of vector) {
+    if (!Number.isFinite(component)) {
+      return false;
+    }
+    if (component !== 0) {
+      sawNonZero = true;
+    }
+  }
+  // A zero vector survives normalization untouched (there is no direction to
+  // scale) and would otherwise pass every other check. Cosine similarity
+  // against it is 0/0, so indexing one poisons ranking rather than merely
+  // ranking badly.
+  return sawNonZero;
 }
 
 /**

@@ -106,6 +106,26 @@ describe("isValidEmbedding", () => {
     expect(isValidEmbedding([...good, 0.01])).toBe(false);
   });
 
+  it("rejects an all-zero vector", () => {
+    // It survives normalization untouched and passes every other check, but
+    // cosine similarity against it is 0/0.
+    expect(
+      isValidEmbedding(Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0)),
+    ).toBe(false);
+  });
+
+  it("rejects what normalizeEmbedding produces from a zero vector", () => {
+    // The two helpers are always composed in production, so the composition is
+    // what has to be safe — neither one alone catches this.
+    const zero = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0);
+    expect(isValidEmbedding(normalizeEmbedding(zero))).toBe(false);
+  });
+
+  it("accepts what normalizeEmbedding produces from a real vector", () => {
+    const raw = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => i + 1);
+    expect(isValidEmbedding(normalizeEmbedding(raw))).toBe(true);
+  });
+
   it("rejects non-finite components, which would poison comparisons", () => {
     const withNaN = [...good];
     withNaN[0] = Number.NaN;
