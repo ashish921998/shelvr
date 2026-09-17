@@ -28,6 +28,7 @@ import {
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
@@ -122,6 +123,7 @@ const itemFields = {
   author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
   media: v.optional(v.array(postMediaValidator)),
+  articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
@@ -192,6 +194,7 @@ const enrichedItemWithSpacesValidator = v.object({
 export const itemCardValidator = enrichedItemValidator.omit(
   "userId",
   "content",
+  "articleMedia",
   "searchText",
   "products",
   "productsStatus",
@@ -215,6 +218,7 @@ export async function toItemCard(
   const {
     userId: _userId,
     content: _content,
+    articleMedia: _articleMedia,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
@@ -1766,6 +1770,7 @@ export const finalizeItem = internalMutation({
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
     media: v.optional(v.array(postMediaValidator)),
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     // A poster copied into our storage (TikTok thumbnails expire). Only ever
     // set for links; image items keep the storageId they were uploaded with.
     storageId: v.optional(v.id("_storage")),
@@ -1814,6 +1819,7 @@ export const finalizeItem = internalMutation({
       author: args.author,
       heroImageUrl: args.heroImageUrl,
       media: args.media,
+      articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents: args.intents,

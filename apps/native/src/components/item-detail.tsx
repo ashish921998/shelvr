@@ -4,6 +4,7 @@ import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
@@ -23,7 +24,7 @@ import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -50,7 +51,9 @@ type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 // from getSpace additionally carry `spaceIntents`: purpose-steered actions
 // scoped to that space's membership.
 export type DetailItem = CardRow &
-  Partial<Pick<FullRow, "content" | "products" | "productsStatus">> & {
+  Partial<
+    Pick<FullRow, "content" | "articleMedia" | "products" | "productsStatus">
+  > & {
     spaceIntents?: CardRow["intents"];
   };
 
@@ -424,35 +427,6 @@ function ItemDetailBody({
   );
 }
 
-function PostMediaButton({
-  site,
-  playable,
-  onPress,
-  children,
-}: {
-  site: string;
-  playable: boolean;
-  onPress: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("item.openSite", { site })}
-      onPress={onPress}
-    >
-      {children}
-      {playable ? (
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playButton}>
-            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
-          </View>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
 /** The item's suggested actions (add to calendar, open a link, …) as chips. */
 function IntentsRow({
   item,
@@ -682,24 +656,6 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
-  },
-  playOverlay: {
-    position: "absolute",
-    inset: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    // Nudge the glyph to the optical center of the circle.
-    paddingLeft: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   body: {
     gap: theme.gap(5),

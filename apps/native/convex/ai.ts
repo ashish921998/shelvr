@@ -26,7 +26,11 @@ import {
   xStatusId,
 } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS, type PostMedia } from "./model/itemFields";
+import {
+  INTENT_KINDS,
+  type ArticleMedia,
+  type PostMedia,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
   deliverPostHogEvent,
@@ -555,6 +559,7 @@ type PageData = {
    * caption), so a retry can still add content. Internal only. */
   incomplete?: true;
   media?: PostMedia[];
+  articleMedia?: ArticleMedia[];
 };
 
 const BROWSER_USER_AGENT =
@@ -727,7 +732,11 @@ function xPostText(
   return post.note_tweet ? `${text}…` : text;
 }
 
-type XSyndicationRead = { page: PageData; isArticle: boolean };
+type XSyndicationRead = {
+  page: PageData;
+  isArticle: boolean;
+  sensitive: boolean;
+};
 
 function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   const parsed = xSyndicationSchema.safeParse(body);
@@ -746,6 +755,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
     const preview = post.article.preview_text?.trim();
     return {
       isArticle: true,
+      sensitive: post.possibly_sensitive === true,
       page: {
         title: post.article.title,
         siteName: "X",
@@ -778,6 +788,7 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   }
   return {
     isArticle: false,
+    sensitive: post.possibly_sensitive === true,
     page: {
       title: content ? Array.from(content).slice(0, 100).join("") : undefined,
       siteName: "X",
@@ -821,18 +832,46 @@ const fxArticleSchema = z.object({
             key: z.string(),
             value: z.object({
               type: z.string(),
-              data: z.object({ url: z.string().optional() }),
+              data: z.object({
+                url: z.string().optional(),
+                // Parsed in blockMedia, so an odd shape skips the image
+                // rather than the whole body.
+                mediaItems: z.unknown().optional(),
+              }),
             }),
           }),
         ),
       }),
+      // Parsed one entry at a time (see articleMediaById), so a media type
+      // this schema does not know cannot cost the whole body.
+      media_entities: z.array(z.unknown()).default([]),
     }),
   }),
 });
 
-type FxArticleContent = z.infer<
-  typeof fxArticleSchema
->["status"]["article"]["content"];
+const fxMediaItemsSchema = z.array(
+  z.object({ mediaId: z.union([z.string(), z.number()]).transform(String) }),
+);
+
+const fxImageInfo = z.object({
+  original_img_url: z.url(),
+  original_img_width: xDimensions.width,
+  original_img_height: xDimensions.height,
+});
+
+const fxMediaEntitySchema = z.object({
+  media_id: z.coerce.string(),
+  media_info: z.discriminatedUnion("__typename", [
+    fxImageInfo.extend({ __typename: z.literal("ApiImage") }),
+    z.object({
+      __typename: z.enum(["ApiVideo", "ApiGif"]),
+      preview_image: fxImageInfo,
+    }),
+  ]),
+});
+
+type FxArticle = z.infer<typeof fxArticleSchema>["status"]["article"];
+type FxArticleContent = FxArticle["content"];
 
 const FXTWITTER_USER_AGENT = "Shelvr/1.0 (+https://shelvr.app)";
 
@@ -874,10 +913,59 @@ function articleBlockText(
     .trim();
 }
 
-/** The plain-text body the reader view renders: one paragraph per text
- * block. Images, embedded posts, and dividers are atomic blocks the reader
- * cannot show inline, so they are left out rather than marked. */
-function articleBodyText(content: FxArticleContent): string | undefined {
+/** Where to show an Article's images and videos, keyed by media id. */
+function articleMediaById(
+  entities: unknown[],
+): Map<string, Omit<ArticleMedia, "paragraph">> {
+  const byId = new Map<string, Omit<ArticleMedia, "paragraph">>();
+  for (const entity of entities) {
+    const parsed = fxMediaEntitySchema.safeParse(entity);
+    if (!parsed.success) {
+      continue;
+    }
+    const info = parsed.data.media_info;
+    const image = info.__typename === "ApiImage" ? info : info.preview_image;
+    byId.set(parsed.data.media_id, {
+      kind:
+        info.__typename === "ApiImage"
+          ? "photo"
+          : info.__typename === "ApiVideo"
+            ? "video"
+            : "gif",
+      imageUrl: xLargeImage(image.original_img_url),
+      aspectRatio: image.original_img_width / image.original_img_height,
+    });
+  }
+  return byId;
+}
+
+/** The readable media an atomic block points at. */
+function blockMedia(
+  block: FxArticleContent["blocks"][number],
+  content: FxArticleContent,
+  mediaById: Map<string, Omit<ArticleMedia, "paragraph">>,
+): Omit<ArticleMedia, "paragraph">[] {
+  return block.entityRanges.flatMap((range) => {
+    const entity = content.entityMap.find((e) => e.key === range.key);
+    const items = fxMediaItemsSchema.safeParse(entity?.value.data.mediaItems);
+    return (items.success ? items.data : []).flatMap((item) => {
+      const found = mediaById.get(item.mediaId);
+      return found ? [found] : [];
+    });
+  });
+}
+
+const MAX_ARTICLE_MEDIA = 50;
+
+type ArticleBody = { text: string; media: ArticleMedia[] };
+
+/** The plain-text body the reader view renders, one paragraph per text
+ * block, and the images and videos that sit between those paragraphs.
+ * Embedded posts and dividers are atomic blocks the reader cannot show, so
+ * they are left out rather than marked. */
+function articleBody(article: FxArticle): ArticleBody | undefined {
+  const { content } = article;
+  const mediaById = articleMediaById(article.media_entities);
   const links = new Map<string, string>();
   for (const entity of content.entityMap) {
     const url =
@@ -889,8 +977,14 @@ function articleBodyText(content: FxArticleContent): string | undefined {
     }
   }
   const paragraphs: string[] = [];
+  const media: ArticleMedia[] = [];
   let listNumber = 0;
   for (const block of content.blocks) {
+    if (block.type === "atomic") {
+      for (const found of blockMedia(block, content, mediaById)) {
+        media.push({ ...found, paragraph: paragraphs.length });
+      }
+    }
     const text = block.type === "atomic" ? "" : articleBlockText(block, links);
     if (text === "") {
       continue;
@@ -904,12 +998,24 @@ function articleBodyText(content: FxArticleContent): string | undefined {
           : text,
     );
   }
-  const body = paragraphs.join("\n\n").slice(0, MAX_STORED_CONTENT_CHARS);
-  return body === "" ? undefined : body;
+  const joined = paragraphs.join("\n\n");
+  const text = joined.slice(0, MAX_STORED_CONTENT_CHARS);
+  if (text === "") {
+    return undefined;
+  }
+  // A cut body loses its last paragraphs, and the media after them.
+  const kept =
+    text.length === joined.length
+      ? paragraphs.length
+      : text.split("\n\n").length - 1;
+  return {
+    text,
+    media: media.filter((m) => m.paragraph <= kept).slice(0, MAX_ARTICLE_MEDIA),
+  };
 }
 
 type ArticleBodyRead =
-  | { ok: true; body: string }
+  | { ok: true; body: ArticleBody }
   | { ok: false; category: string };
 
 async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
@@ -942,7 +1048,7 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
   if (parsed.data.status.id !== id) {
     return { ok: false, category: "id_mismatch" };
   }
-  const body = articleBodyText(parsed.data.status.article.content);
+  const body = articleBody(parsed.data.status.article);
   return body === undefined
     ? { ok: false, category: "empty_body" }
     : { ok: true, body };
@@ -950,10 +1056,25 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
 
 /** fxtwitter is an unofficial mirror of X's private web API, so the full body
  * is a bonus: any failure keeps the syndication preview. */
-async function withXArticleBody(id: string, page: PageData): Promise<PageData> {
+async function withXArticleBody(
+  id: string,
+  page: PageData,
+  sensitive: boolean,
+): Promise<PageData> {
   const read = await readXArticleBody(id);
   if (read.ok) {
-    return { ...page, content: read.body };
+    // Sensitive media stays hidden, as for posts. An Article that opens
+    // with its cover would show it twice.
+    const media = sensitive
+      ? []
+      : read.body.media.filter(
+          (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
+        );
+    return {
+      ...page,
+      content: read.body.text,
+      ...(media.length > 0 ? { articleMedia: media } : {}),
+    };
   }
   logEvent("warn", "x_article_body_fallback", {
     error_category: read.category,
@@ -992,7 +1113,9 @@ export async function fetchXPost(url: string): Promise<PageData> {
     }
   }
   if (read) {
-    return read.isArticle ? await withXArticleBody(id, read.page) : read.page;
+    return read.isArticle
+      ? await withXArticleBody(id, read.page, read.sensitive)
+      : read.page;
   }
   logEvent("warn", "x_syndication_fallback", {
     error_category: result.ok
@@ -1892,6 +2015,7 @@ export const processItem = internalAction({
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
+        articleMedia: page?.articleMedia,
         storageId: posterStorageId,
         // Links: the OG image's shape. Images/notes: preserve the ratio the
         // client captured on upload (patching undefined would drop the field).

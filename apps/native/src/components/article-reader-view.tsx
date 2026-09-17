@@ -2,6 +2,7 @@ import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
 import { ItemSpaces } from "@/components/item-spaces";
+import { PostMediaButton } from "@/components/post-media-button";
 import { analytics } from "@/lib/analytics";
 import { displayHost } from "@/lib/url";
 import { SimilarGrid } from "@/components/similar-grid";
@@ -11,18 +12,21 @@ import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
 import type { Id } from "@convex/_generated/dataModel";
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type Space = { _id: Id<"spaces">; name: string };
+
+type ArticleMedia = NonNullable<DetailItem["articleMedia"]>[number];
 
 type Props = {
   item: DetailItem;
@@ -51,6 +55,58 @@ export function ArticleReaderView({
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  const window = useWindowDimensions();
+
+  // Media after the last stored paragraph shows at the end.
+  const mediaByParagraph = useMemo(() => {
+    const byParagraph = new Map<number, ArticleMedia[]>();
+    for (const media of item.articleMedia ?? []) {
+      const at = Math.min(media.paragraph, paragraphs.length);
+      byParagraph.set(at, [...(byParagraph.get(at) ?? []), media]);
+    }
+    return byParagraph;
+  }, [item.articleMedia, paragraphs.length]);
+
+  const openSource = () => {
+    void WebBrowser.openBrowserAsync(item.url!)
+      .then(() => analytics.itemAction(item, "open_source"))
+      .catch(() => {});
+  };
+
+  // Full body width, but a tall video poster stops at 60% of the screen.
+  const mediaFrame = (aspectRatio: number) => {
+    const width = Math.min(
+      window.width - theme.gap(2.5) * 2,
+      window.height * 0.6 * aspectRatio,
+    );
+    return { width, height: width / aspectRatio };
+  };
+
+  const mediaAt = (paragraph: number) =>
+    mediaByParagraph.get(paragraph)?.map((media, index) => {
+      const image = (
+        <Image
+          source={{ uri: media.imageUrl }}
+          contentFit="cover"
+          style={[styles.articleMedia, mediaFrame(media.aspectRatio)]}
+        />
+      );
+      return (
+        <View key={`media-${index}`} style={styles.articleMediaRow}>
+          {media.kind !== "photo" && item.url ? (
+            <PostMediaButton
+              site={item.siteName ?? displayHost(item.url)}
+              playable
+              onPress={openSource}
+            >
+              {image}
+            </PostMediaButton>
+          ) : (
+            image
+          )}
+        </View>
+      );
+    });
 
   const compactTags = item.tags.slice(0, 2);
   const remainingTagCount = Math.max(item.tags.length - compactTags.length, 0);
@@ -119,11 +175,7 @@ export function ArticleReaderView({
                     styles.source,
                     pressed && styles.pressed,
                   ]}
-                  onPress={() => {
-                    void WebBrowser.openBrowserAsync(item.url!)
-                      .then(() => analytics.itemAction(item, "open_source"))
-                      .catch(() => {});
-                  }}
+                  onPress={openSource}
                 >
                   <AppSymbolIcon
                     name="safari"
@@ -186,14 +238,17 @@ export function ArticleReaderView({
 
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
-            <Text
-              selectable
-              key={index}
-              style={[styles.paragraph, index === 0 && styles.lede]}
-            >
-              {paragraph}
-            </Text>
+            <Fragment key={index}>
+              {mediaAt(index)}
+              <Text
+                selectable
+                style={[styles.paragraph, index === 0 && styles.lede]}
+              >
+                {paragraph}
+              </Text>
+            </Fragment>
           ))}
+          {mediaAt(paragraphs.length)}
         </View>
 
         {item.status === "ready" ? <ProductsSection item={item} /> : null}
@@ -323,6 +378,14 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 19,
     lineHeight: 28,
+  },
+  articleMediaRow: {
+    alignItems: "center",
+  },
+  articleMedia: {
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
   },
   pressed: {
     opacity: 0.7,
