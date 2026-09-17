@@ -13,7 +13,7 @@ import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
 import { displayHost } from "@/lib/url";
-import { isTikTokUrl } from "@convex/model/externalUrl";
+import { shortFormSource } from "@convex/model/externalUrl";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -130,14 +130,16 @@ export const ItemDetail = memo(function ItemDetail({
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
-  // A video's "content" is its caption, not an article: keep the poster layout.
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  // A TikTok or Instagram save's "content" is its caption, not an article:
+  // keep the poster layout.
+  const social = item.type === "link" ? shortFormSource(item.url) : undefined;
+  const isVideo = social?.video === true;
 
   // Link saves with extracted content get the compact reader layout.
   if (
     !bodyPending &&
     item.type === "link" &&
-    !isVideo &&
+    social === undefined &&
     paragraphs.length > 0
   ) {
     return (
@@ -195,12 +197,12 @@ export const ItemDetail = memo(function ItemDetail({
     />
   ) : null;
 
-  // The poster is the video's one real action: tap anywhere on it to open.
+  // The poster is the post's one real action: tap anywhere on it to open.
   const hero =
-    heroImage && isVideo && item.url ? (
+    heroImage && social && item.url ? (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t("item.openSite", { site: "TikTok" })}
+        accessibilityLabel={t("item.openSite", { site: social.site })}
         onPress={() => {
           void WebBrowser.openBrowserAsync(item.url!)
             .then(() => analytics.itemAction(item, "open_source"))
@@ -208,11 +210,13 @@ export const ItemDetail = memo(function ItemDetail({
         }}
       >
         {heroImage}
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playButton}>
-            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
+        {isVideo ? (
+          <View style={styles.playOverlay} pointerEvents="none">
+            <View style={styles.playButton}>
+              <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
+            </View>
           </View>
-        </View>
+        ) : null}
       </Pressable>
     ) : (
       heroImage
@@ -266,7 +270,7 @@ export const ItemDetail = memo(function ItemDetail({
         spaces={spaces}
         similar={similar}
         paragraphs={paragraphs}
-        isVideo={isVideo}
+        social={social}
         intents={intents}
         heroUri={heroUri}
       />
@@ -282,7 +286,7 @@ function ItemDetailBody({
   spaces,
   similar,
   paragraphs,
-  isVideo,
+  social,
   intents,
   heroUri,
 }: {
@@ -291,7 +295,7 @@ function ItemDetailBody({
   spaces: ReturnType<typeof useItemDetailData>["spaces"];
   similar: ReturnType<typeof useItemDetailData>["similar"];
   paragraphs: string[];
-  isVideo: boolean;
+  social: ReturnType<typeof shortFormSource>;
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
@@ -330,13 +334,13 @@ function ItemDetailBody({
             }}
           >
             <AppSymbolIcon
-              name={isVideo ? "play.rectangle" : "safari"}
+              name={social?.video ? "play.rectangle" : "safari"}
               size={15}
               tintColor={theme.colors.muted}
             />
             <Text style={styles.sourceText}>
-              {isVideo && item.author
-                ? `${item.author} · TikTok`
+              {social && item.author
+                ? `${item.author} · ${social.site}`
                 : (item.siteName ?? displayHost(item.url))}
             </Text>
             <AppSymbolIcon
@@ -372,7 +376,7 @@ function ItemDetailBody({
         </Pressable>
       ) : null}
 
-      {isVideo && paragraphs.length > 0 ? (
+      {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -382,7 +386,7 @@ function ItemDetailBody({
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
-      {!isVideo && paragraphs.length > 0 ? (
+      {!social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>

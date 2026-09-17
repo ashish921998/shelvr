@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  instagramMedia,
+  isInstagramUrl,
   isTikTokUrl,
+  shortFormSource,
   isUrlPolicyError,
   isXTweetUrl,
   MAX_URL_LENGTH,
@@ -214,5 +217,59 @@ describe("isXTweetUrl", () => {
     );
     expect(isXTweetUrl("not a url")).toBe(false);
     expect(isXTweetUrl(undefined)).toBe(false);
+  });
+});
+
+describe("instagramMedia", () => {
+  it.each([
+    ["https://www.instagram.com/reel/DHVrPLrIyQ_/", "reel"],
+    ["https://instagram.com/reel/DHVrPLrIyQ_/?igsh=MWQ1ZGUxMzBkMA==", "reel"],
+    ["https://m.instagram.com/reels/DHVrPLrIyQ_/", "reel"],
+    ["https://www.instagram.com/natgeo/reel/DHVrPLrIyQ_/", "reel"],
+    ["https://www.instagram.com/p/DHVrPLrIyQ_/?img_index=2", "p"],
+    ["https://instagr.am/p/DHVrPLrIyQ_/", "p"],
+    ["https://www.instagram.com/tv/DHVrPLrIyQ_", "tv"],
+  ])("reads %s as a %s", (url, kind) => {
+    expect(instagramMedia(url)).toEqual({ kind, shortcode: "DHVrPLrIyQ_" });
+  });
+
+  it.each([
+    ["https://www.instagram.com/share/reel/BAbc123xyz/", "reel"],
+    ["https://www.instagram.com/share/p/BAbc123xyz", "p"],
+  ])("reads the share link %s as a %s with no shortcode", (url, kind) => {
+    expect(instagramMedia(url)).toEqual({ kind });
+    expect(isInstagramUrl(url)).toBe(true);
+  });
+
+  it("rejects profiles, sound pages, look-alike hosts, and bad input", () => {
+    expect(isInstagramUrl("https://www.instagram.com/natgeo/")).toBe(false);
+    expect(isInstagramUrl("https://www.instagram.com/reels/audio/123/")).toBe(
+      false,
+    );
+    expect(isInstagramUrl("https://www.instagram.com/stories/natgeo/1/")).toBe(
+      false,
+    );
+    expect(isInstagramUrl("https://instagram.com.evil.example/p/abc/")).toBe(
+      false,
+    );
+    expect(isInstagramUrl("https://notinstagram.com/p/abc/")).toBe(false);
+    expect(isInstagramUrl("not a url")).toBe(false);
+    expect(isInstagramUrl(undefined)).toBe(false);
+  });
+});
+
+describe("shortFormSource", () => {
+  it("names the site and whether the link is a video", () => {
+    expect(shortFormSource("https://vm.tiktok.com/ZMabc123/")).toEqual({
+      site: "TikTok",
+      video: true,
+    });
+    expect(
+      shortFormSource("https://www.instagram.com/reel/DHVrPLrIyQ_/"),
+    ).toEqual({ site: "Instagram", video: true });
+    expect(shortFormSource("https://www.instagram.com/p/DHVrPLrIyQ_/")).toEqual(
+      { site: "Instagram", video: false },
+    );
+    expect(shortFormSource("https://example.com/reel/abc/")).toBeUndefined();
   });
 });

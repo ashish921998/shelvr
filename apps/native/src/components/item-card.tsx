@@ -5,7 +5,7 @@ import { analytics } from "@/lib/analytics";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
 import { displayHost } from "@/lib/url";
-import { isTikTokUrl } from "@convex/model/externalUrl";
+import { shortFormSource } from "@convex/model/externalUrl";
 import {
   enrichmentValidator,
   failureReasonValidator,
@@ -164,7 +164,8 @@ function CardMedia({
   theme: UnistylesTheme;
 }) {
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  const isVideo =
+    item.type === "link" && shortFormSource(item.url)?.video === true;
   if (imageUri) {
     return (
       <View style={!item.isSticker && styles.imageContainer}>
@@ -233,7 +234,7 @@ function CardCaption({
         {item.type === "link" && item.url ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
-              {item.siteName === "TikTok" ? "TikTok" : displayHost(item.url)}
+              {shortFormSource(item.url)?.site ?? displayHost(item.url)}
             </Text>
             <AppSymbolIcon
               name="arrow.up.right"
