@@ -223,18 +223,33 @@ describe("classifyEntries", () => {
   it("stamps kinds and terminal statuses without side effects", () => {
     const session = makeSession(3);
     const resolved = [
-      urlPayload("https://a.example"), // link
       textPayload("note"), // note
+      imagePayload("file://img.jpg"), // image
       imagePayload(null), // failed image
     ];
     const entries = classifyEntries(session, resolved);
-    expect(entries.map((e) => e.kind)).toEqual(["link", "note", "image"]);
+    expect(entries.map((e) => e.kind)).toEqual(["note", "image", "image"]);
     expect(entries.map((e) => e.status)).toEqual([
       "pending",
       "pending",
       "failed",
     ]);
     expect(entries[2].message).toBe("Image could not be resolved");
+  });
+
+  it("classifies URL-less text beside a shared link as that link", () => {
+    const session = makeSession(3);
+    const resolved = [
+      textPayload("See this post"),
+      urlPayload("https://a.example"),
+      imagePayload("file://img.jpg"),
+    ];
+    const entries = classifyEntries(session, resolved);
+    expect(entries.map((e) => [e.kind, e.status])).toEqual([
+      ["link", "pending"],
+      ["link", "pending"],
+      ["image", "pending"],
+    ]);
   });
 });
 
@@ -246,9 +261,9 @@ describe("processSession", () => {
   it("saves all entries on full success and reports progress in order", () => {
     const session = makeSession(3);
     const resolved = [
-      urlPayload("https://a.example"),
       textPayload("note body"),
-      imagePayload("file://img.jpg"),
+      imagePayload("file://a.jpg"),
+      imagePayload("file://b.jpg"),
     ];
     const classified = classifyEntries(session, resolved);
     const settled: ShareEntry[] = [];
@@ -425,6 +440,40 @@ describe("processSession", () => {
     expect(result.entries.map((e) => [e.status, e.itemId])).toEqual([
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
       ["saved", `items:${operationIdFor("sess-1", 0)}`],
+    ]);
+    expect(countProgress(result)).toEqual({ saved: 1, total: 1 });
+    expect(countPartial(result)).toEqual({ saved: 1, failed: 0, total: 1 });
+  });
+
+  it("saves one link item when a share pairs the link with caption text that has no URL", async () => {
+    // Instagram's web share sends the caption and the reel URL as separate
+    // attachments; the caption alone is not a note the user meant to save.
+    const reel =
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/?utm_source=ig_web_button_native_share";
+    const session = makeSession(2);
+    const resolved = [
+      textPayload("See this Instagram post by @natgeo"),
+      urlPayload(reel),
+    ];
+    const classified = classifyEntries(session, resolved);
+    const saveLink = vi.fn(
+      async ({ operationId }) => `items:${operationId}` as Id<"items">,
+    );
+    const saveNote = vi.fn(async () => "should-not-be-called" as Id<"items">);
+
+    const result = await processSession(
+      { ...session, entries: classified },
+      resolved,
+      makeDeps({ saveLink, saveNote }),
+    );
+
+    expect(saveNote).not.toHaveBeenCalled();
+    expect(saveLink).toHaveBeenCalledTimes(1);
+    expect(saveLink.mock.calls[0][0].url).toBe(reel);
+    const itemId = saveLink.mock.calls[0][0].operationId;
+    expect(result.entries.map((e) => [e.kind, e.status, e.itemId])).toEqual([
+      ["link", "saved", `items:${itemId}`],
+      ["link", "saved", `items:${itemId}`],
     ]);
     expect(countProgress(result)).toEqual({ saved: 1, total: 1 });
     expect(countPartial(result)).toEqual({ saved: 1, failed: 0, total: 1 });

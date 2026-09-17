@@ -122,6 +122,33 @@ export function classifyPayload(payload: ResolvedPayload): {
   return { kind: "note" };
 }
 
+/** The first valid link in a share, as the URL its save uses. */
+function firstLink(resolved: ResolvedPayload[]): string | null {
+  for (const payload of resolved) {
+    const result = classifyPayload(payload);
+    if (result.kind === "link" && result.reason === undefined) {
+      return result.url ?? payload.value.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * classifyPayload for one payload of a whole share. Text with no URL in a
+ * share that also carries a link is that link's caption (Instagram's web share
+ * sends "See this Instagram post by @user" beside the reel URL), so it resolves
+ * to the link and shares its single save instead of becoming a stray note.
+ */
+function classifyInShare(
+  resolved: ResolvedPayload[],
+  index: number,
+): ReturnType<typeof classifyPayload> {
+  const result = classifyPayload(resolved[index]);
+  if (result.kind !== "note" || result.reason !== undefined) return result;
+  const url = firstLink(resolved);
+  return url === null ? result : { kind: "link", url };
+}
+
 /**
  * Builds processor payloads from RAW share payloads, for use when native
  * resolution failed or its results no longer align with the raw payloads. The
@@ -202,7 +229,7 @@ export function classifyEntries(
         message: "No resolved payload for this entry",
       };
     }
-    const { kind, reason } = classifyPayload(payload);
+    const { kind, reason } = classifyInShare(resolved, entry.index);
     if (reason !== undefined) {
       // The kind still records intent; status is the terminal outcome.
       const status: ShareEntry["status"] =
@@ -275,7 +302,7 @@ function sharedLinkSaves(
   for (const entry of entries) {
     const payload = resolved[entry.index];
     if (entry.status !== "saved" || !entry.itemId || !payload) continue;
-    const { kind, reason, url } = classifyPayload(payload);
+    const { kind, reason, url } = classifyInShare(resolved, entry.index);
     if (kind !== "link" || reason !== undefined) continue;
     saves.set(
       url ?? payload.value.trim(),
@@ -328,7 +355,7 @@ async function processOne(
       message: "No resolved payload for this entry",
     };
   }
-  const { kind, reason, url } = classifyPayload(payload);
+  const { kind, reason, url } = classifyInShare(resolved, entry.index);
   if (reason !== undefined) {
     // A saveable kind with a malformed payload (blank website/text, image with
     // no contentUri) is terminal; an unsupported type is terminal too.
@@ -391,11 +418,5 @@ async function processOne(
 /** The first shared link in a raw share, for the onboarding demo, which saves
  * exactly one link and leaves every other payload to the share screen. */
 export function firstSharedUrl(raw: RawSharePayload[]): string | null {
-  for (const payload of resolvedFromRawPayloads(raw)) {
-    const result = classifyPayload(payload);
-    if (result.kind === "link" && result.reason === undefined) {
-      return result.url ?? payload.value.trim();
-    }
-  }
-  return null;
+  return firstLink(resolvedFromRawPayloads(raw));
 }
