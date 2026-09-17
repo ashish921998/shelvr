@@ -892,10 +892,10 @@ function articleBodyText(content: FxArticleContent): string | undefined {
   let listNumber = 0;
   for (const block of content.blocks) {
     const text = block.type === "atomic" ? "" : articleBlockText(block, links);
-    listNumber = block.type === "ordered-list-item" ? listNumber + 1 : 0;
     if (text === "") {
       continue;
     }
+    listNumber = block.type === "ordered-list-item" ? listNumber + 1 : 0;
     paragraphs.push(
       block.type === "unordered-list-item"
         ? `- ${text}`

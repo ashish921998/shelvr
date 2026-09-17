@@ -519,6 +519,35 @@ describe("fetchXPost for an Article's full body", () => {
     );
   });
 
+  it("keeps the count across empty items and images in an ordered list", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            { type: "ordered-list-item", text: " ", entityRanges: [] },
+            {
+              type: "ordered-list-item",
+              text: "Pick a niche",
+              entityRanges: [],
+            },
+            { type: "atomic", text: " ", entityRanges: [] },
+            {
+              type: "ordered-list-item",
+              text: "Write a brief",
+              entityRanges: [],
+            },
+          ],
+          entityMap: [],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("1. Pick a niche\n\n2. Write a brief");
+  });
+
   it("places a link after its text when emoji come before it", async () => {
     serveX(
       { status: 200, body: articleSyndication },
