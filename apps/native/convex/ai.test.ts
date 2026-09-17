@@ -23,6 +23,7 @@ import textSyndication from "./testdata/xSyndication/text.json";
 import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
+import type { PostMedia } from "./model/itemFields";
 import { newConvexTest } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
@@ -383,7 +384,7 @@ describe("processItem for X posts", () => {
     vi.useRealTimers();
   });
 
-  async function saveLink(url: string, fields: { media?: [] } = {}) {
+  async function saveLink(url: string, fields: { media?: PostMedia[] } = {}) {
     const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
@@ -489,7 +490,13 @@ describe("processItem for X posts", () => {
   it("clears media a retried post no longer has", async () => {
     serveX({ status: 200, body: textSyndication }, { status: 500 });
     const { item } = await saveLink("https://x.com/jack/status/20", {
-      media: [],
+      media: [
+        {
+          kind: "photo",
+          imageUrl: "https://pbs.twimg.com/media/stale.jpg?name=large",
+          aspectRatio: 1,
+        },
+      ],
     });
     expect(item).toMatchObject({
       content: "just setting up my twttr",
