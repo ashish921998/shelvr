@@ -55,7 +55,7 @@ export default defineSchema({
     tags: v.array(v.string()),
     content: v.optional(v.string()),
     siteName: v.optional(v.string()),
-    // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
+    // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
     media: v.optional(v.array(postMediaValidator)),

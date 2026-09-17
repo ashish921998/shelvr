@@ -167,6 +167,23 @@ describe("fetchXPost", () => {
     });
   });
 
+  it("keeps the cover of an Article X marks sensitive off the card", async () => {
+    serveX(
+      {
+        status: 200,
+        body: { ...articleSyndication, possibly_sensitive: true },
+      },
+      { status: 500 },
+    );
+    const read = await fetchXPost(
+      "https://x.com/adamtwtz/status/2097073557868056925",
+    );
+    expect(read.title).toBe("How this GLP-1 app generated 20m+ views");
+    expect(read.content).toMatch(/^An app spent \$21,418/);
+    expect(read.heroImageUrl).toBeUndefined();
+    expect(read.heroAspectRatio).toBeUndefined();
+  });
+
   it("reads a text-only post the same way oEmbed does", async () => {
     serveX({ status: 200, body: textSyndication }, { status: 500 });
     await expect(fetchXPost("https://x.com/jack/status/20")).resolves.toEqual(
@@ -539,6 +556,12 @@ describe("linkEnrichment", () => {
 
   it("flags a readable page without an article body as no_article", () => {
     expect(linkEnrichment({ status: "ok", page: {} })).toBe("no_article");
+  });
+
+  it("flags a page with an empty media list as no_article", () => {
+    expect(linkEnrichment({ status: "ok", page: { media: [] } })).toBe(
+      "no_article",
+    );
   });
 
   it("flags a post read as media alone as enriched (undefined)", () => {

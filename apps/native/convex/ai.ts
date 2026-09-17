@@ -733,9 +733,12 @@ function parseXSyndication(body: unknown): PageData | undefined {
   }
   const post = parsed.data;
   const author = post.user ? `@${post.user.screen_name}` : undefined;
-  const cover = post.article?.cover_media?.media_info;
+  // X hides sensitive media behind a warning; the feed and widget have none.
+  const cover = post.possibly_sensitive
+    ? undefined
+    : post.article?.cover_media?.media_info;
   if (post.article) {
-    // The preview is cut mid-sentence; the rest is behind X's login wall.
+    // The syndication preview stops mid-sentence.
     const preview = post.article.preview_text?.trim();
     return {
       title: post.article.title,
@@ -749,7 +752,6 @@ function parseXSyndication(body: unknown): PageData | undefined {
     };
   }
   const content = xPostText(post);
-  // X hides sensitive media behind a warning; the feed and widget have none.
   const attachments = post.possibly_sensitive ? [] : (post.mediaDetails ?? []);
   const media = attachments.flatMap((attachment) => {
     const kind = X_MEDIA_KINDS[attachment.type];
@@ -1068,7 +1070,9 @@ export function linkEnrichment(
   if (read.status === "unreadable" || read.page.incomplete) {
     return "partial";
   }
-  return read.page.content || read.page.media ? undefined : "no_article";
+  return read.page.content || read.page.media?.length
+    ? undefined
+    : "no_article";
 }
 
 /**
