@@ -1805,16 +1805,51 @@ describe("sanitizeRecipe", () => {
     ).toBeUndefined();
   });
 
-  it("trims lines, drops empties and duplicates, and caps counts", () => {
-    const ingredients = ["Salt", "", "  salt ", `x`.repeat(400)];
-    const steps = Array.from({ length: 80 }, (_, i) => `Step ${i + 1}`);
-    const recipe = sanitizeRecipe({ ingredients, steps });
-    expect(recipe).toBeDefined();
-    expect(recipe!.ingredients[0]).toBe("Salt");
-    // Dedupe collapses to "Salt" plus the trimmed long line; counts capped.
-    expect(recipe!.ingredients.length).toBeLessThanOrEqual(2);
-    expect(recipe!.ingredients.every((l) => l.length <= 300)).toBe(true);
-    expect(recipe!.steps.length).toBe(60);
+  it("trims lines and drops the empty ones", () => {
+    expect(
+      sanitizeRecipe({
+        ingredients: ["  Salt ", "", "   ", " 2 eggs"],
+        steps: [" Whisk. ", ""],
+      }),
+    ).toStrictEqual({ ingredients: ["Salt", "2 eggs"], steps: ["Whisk."] });
+  });
+
+  it("keeps a long instruction whole rather than cutting it short", () => {
+    // The card replaces the article body, so a step cut mid-sentence loses its
+    // temperature or its timing with nothing left on screen to recover it.
+    const step = `Braise until fork-tender, ${"about three hours, ".repeat(30)}then glaze.`;
+    const recipe = sanitizeRecipe({
+      ingredients: ["3 lb short ribs"],
+      steps: [step],
+    });
+    expect(recipe?.steps).toStrictEqual([step]);
+  });
+
+  it("keeps a quantity that two components both call for", () => {
+    // `recipeIngredient` is one flat list, so a cake and its frosting each
+    // wanting a cup of sugar reads as a repeat. Dropping it changes the recipe.
+    expect(
+      sanitizeRecipe({
+        ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+        steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+      }),
+    ).toStrictEqual({
+      ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+      steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+    });
+  });
+
+  it("refuses a recipe too long to store instead of trimming it", () => {
+    // Refusing leaves the article body in place, which is readable; a recipe
+    // missing its last ten steps is not, and looks complete.
+    const steps = Array.from({ length: 40 }, () => "x".repeat(600));
+    expect(sanitizeRecipe({ ingredients: ["Salt"], steps })).toBeUndefined();
+    expect(
+      sanitizeRecipe({
+        ingredients: ["Salt"],
+        steps: Array.from({ length: 121 }, (_, i) => `Step ${i + 1}`),
+      }),
+    ).toBeUndefined();
   });
 
   it("drops blank name/servings after trimming", () => {
