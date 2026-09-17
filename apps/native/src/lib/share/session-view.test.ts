@@ -127,6 +127,27 @@ describe("countProgress / countPartial", () => {
     ).toEqual({ saved: 0, total: 1 });
   });
 
+  it("keeps a caption an older build saved as a note apart from its failed link", () => {
+    const session = makeSession(["saved", "failed"]);
+    session.entries[0] = {
+      ...session.entries[0],
+      kind: "note",
+      itemId: "items:note",
+    };
+    session.entries[1].message = "offline";
+    const payloads = [
+      resolved("See this post"),
+      resolved("https://www.instagram.com/reel/abc/", "website"),
+    ];
+    expect(countProgress(session, payloads)).toEqual({ saved: 1, total: 2 });
+    expect(countPartial(session, payloads)).toEqual({
+      saved: 1,
+      failed: 1,
+      total: 2,
+    });
+    expect(failedEntries(session, payloads).map((e) => e.index)).toEqual([1]);
+  });
+
   it("reports a failed repeated link as one failure with one message", () => {
     const reel = "https://www.instagram.com/reel/abc/";
     const session = makeSession(["failed", "failed", "failed"]);
