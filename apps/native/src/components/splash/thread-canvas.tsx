@@ -17,6 +17,7 @@ import {
   DESIGN_WIDTH,
   easeInOut,
   glyphStrokes,
+  SCHEDULE,
   shelfSlotX,
   SHELF_Y,
   span,
@@ -171,7 +172,7 @@ const SketchedMark = memo(function SketchedMark({
 
   const transform = useDerivedValue(() => {
     const appeared = easeInOut(
-      span(clock.get(), mark.appearAt, mark.appearAt + 0.3),
+      span(clock.get(), mark.appearAt, mark.appearAt + SCHEDULE.appearDuration),
     );
     const g = travel.get();
     return [
@@ -190,7 +191,7 @@ const SketchedMark = memo(function SketchedMark({
   // The glyph and its stitch cross-fade through the last stretch of the glide.
   const glyphOpacity = useDerivedValue(() => {
     const appeared = easeInOut(
-      span(clock.get(), mark.appearAt, mark.appearAt + 0.3),
+      span(clock.get(), mark.appearAt, mark.appearAt + SCHEDULE.appearDuration),
     );
     return (
       appeared * MARK_OPACITY * (1 - span(travel.get(), MORPH_FROM, MORPH_TO))
@@ -199,7 +200,7 @@ const SketchedMark = memo(function SketchedMark({
 
   const stitchOpacity = useDerivedValue(() => {
     const appeared = easeInOut(
-      span(clock.get(), mark.appearAt, mark.appearAt + 0.3),
+      span(clock.get(), mark.appearAt, mark.appearAt + SCHEDULE.appearDuration),
     );
     return appeared * MARK_OPACITY * span(travel.get(), MORPH_FROM, MORPH_TO);
   });
@@ -250,8 +251,9 @@ const DustMote = memo(function DustMote({
 }) {
   const opacity = useDerivedValue(
     () =>
-      easeInOut(span(clock.get(), mote.appearAt, mote.appearAt + 0.4)) *
-      DUST_OPACITY,
+      easeInOut(
+        span(clock.get(), mote.appearAt, mote.appearAt + SCHEDULE.dustDuration),
+      ) * DUST_OPACITY,
   );
   return (
     <Circle

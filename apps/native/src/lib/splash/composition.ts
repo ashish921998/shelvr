@@ -28,6 +28,30 @@ export const SHELF_WIDTH = 240;
 export const MARK_COUNT = 30;
 export const DUST_COUNT = 56;
 
+/**
+ * When each save appears and travels, in seconds from the start of the
+ * animation. These share a clock with `components/splash/timeline.ts` and are
+ * retimed with it — the ring, the mark pop and the canvas fade are all placed
+ * against when the last save lands.
+ *
+ * `APPEAR_FROM + APPEAR_SPREAD` must stay below `TRAVEL_FROM`, or a save could
+ * set off for the shelf before it has been drawn.
+ */
+export const SCHEDULE = {
+  /** A save fades in over this long, wherever its `appearAt` falls. */
+  appearDuration: 0.16,
+  appearFrom: 0.14,
+  appearSpread: 0.52,
+  travelFrom: 0.68,
+  travelSpread: 0.26,
+  travelDurationFrom: 0.36,
+  travelDurationSpread: 0.12,
+  /** Dust motes twinkle in on their own stagger, ahead of the saves. */
+  dustDuration: 0.18,
+  dustFrom: 0.09,
+  dustSpread: 0.58,
+} as const;
+
 /** Peak of the arc a mark travels through on its way to the shelf. */
 export const TRAVEL_LIFT = 26;
 /** Half-length of the stitch a mark becomes once it lands. */
@@ -198,9 +222,10 @@ export function buildComposition(seed = 7): Composition {
       size: 6 + random() * 4.5,
       rotation: (random() - 0.5) * 0.7,
       tone: toneRoll < 0.78 ? "ink" : toneRoll < 0.91 ? "accent" : "cool",
-      appearAt: 0.3 + random() * 1.15,
-      travelAt: 1.5 + random() * 0.55,
-      travelDuration: 0.75 + random() * 0.25,
+      appearAt: SCHEDULE.appearFrom + random() * SCHEDULE.appearSpread,
+      travelAt: SCHEDULE.travelFrom + random() * SCHEDULE.travelSpread,
+      travelDuration:
+        SCHEDULE.travelDurationFrom + random() * SCHEDULE.travelDurationSpread,
       wobble: random() * 10,
       slot: i,
     });
@@ -221,7 +246,7 @@ export function buildComposition(seed = 7): Composition {
     dust.push({
       x: threadXAt(threadAbove, threadBelow, y) + (random() - 0.5) * 120,
       y,
-      appearAt: 0.2 + random() * 1.3,
+      appearAt: SCHEDULE.dustFrom + random() * SCHEDULE.dustSpread,
       radius: 0.6 + random() * 0.6,
     });
   }

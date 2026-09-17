@@ -4,47 +4,54 @@
 // same clock, so their beats have to agree: the mark pops while the last saves
 // are still landing, the wordmark unfurls as the thread resumes downward, and
 // the footer arrives only after the lockup has settled.
+//
+// The saves' own appear/travel times live in `lib/splash/composition.ts` as
+// `SCHEDULE`, because that is where they are generated. The two are retimed
+// together: the ring, the mark pop and the canvas fade are all placed against
+// when the last save lands (`SCHEDULE.travelFrom + travelSpread +
+// travelDurationFrom + travelDurationSpread`, currently 1.42s).
 
 export const TIMELINE = {
   /** The thread draws from off-screen down to the centre. */
-  threadAboveFrom: 0.05,
-  threadAboveTo: 1.35,
+  threadAboveFrom: 0.03,
+  threadAboveTo: 0.62,
 
   /** Ring of ticks breaking outward as the saves reach the shelf. */
-  burstFrom: 2.3,
-  burstTo: 2.85,
+  burstFrom: 1.02,
+  burstTo: 1.32,
 
   /** The S pops in over the settled row. */
-  markFrom: 2.3,
-  markDuration: 0.62,
+  markFrom: 1.05,
+  markDuration: 0.34,
 
   /** The thread picks back up and continues off the bottom of the screen. */
-  threadBelowFrom: 2.65,
-  threadBelowTo: 3.45,
+  threadBelowFrom: 1.22,
+  threadBelowTo: 1.6,
 
   /** The wordmark unfurls while the lockup slides left into its final spot. */
-  lockupFrom: 2.7,
-  lockupDuration: 0.82,
+  lockupFrom: 1.26,
+  lockupDuration: 0.42,
 
   /** The drawn layer clears, leaving the lockup alone on the ground. */
-  canvasFadeFrom: 3.5,
-  canvasFadeTo: 4.5,
+  canvasFadeFrom: 1.62,
+  canvasFadeTo: 2.04,
 
   /** Footer line, last in. */
-  footerFrom: 3.8,
-  footerDuration: 0.72,
+  footerFrom: 1.74,
+  footerDuration: 0.34,
 } as const;
 
 /** Beat the finished lockup is held for before the splash gives way. */
-const SPLASH_HOLD = 0.5;
+const SPLASH_HOLD = 0.2;
 /** Cross-fade to the app behind the splash. */
-const SPLASH_EXIT = 0.4;
+const SPLASH_EXIT = 0.22;
 
 /**
- * Total time the splash owns the screen, after which it hands off. The whole
- * sequence is deliberate and runs a little over five seconds; shortening the
- * launch means retiming `TIMELINE` rather than cutting this off early, which
- * would clip the animation mid-beat.
+ * Total time the splash owns the screen, after which it hands off — 2.5s.
+ *
+ * Retiming means moving `TIMELINE` and `SCHEDULE` together, not cutting this
+ * short: the duration is derived from the last beat, so trimming it here would
+ * only clip the animation mid-footer.
  */
 export const SPLASH_DURATION =
   TIMELINE.footerFrom + TIMELINE.footerDuration + SPLASH_HOLD + SPLASH_EXIT;
