@@ -114,8 +114,8 @@ jobs:
               echo
               echo '</details>'
             fi
-            printf '\n\n---\n\n[Workflow run](%s) · evidence in the `qa-results` artifact\n' \
-              "${{ github.event.html_url }}"
+            printf '\n\n---\n\n[Workflow run](%s/%s/actions/runs/%s) · evidence in the `qa-results` artifact\n' \
+              "${{ github.server_url }}" "${{ github.repository }}" "${{ github.run_id }}"
           } > comment-body.md
 
           jq -Rs '{body: .}' < comment-body.md > comment.json
