@@ -64,3 +64,36 @@ jobs:
 
       - name: Test coverage
         run: pnpm run coverage
+
+  # An OTA update only reaches installs whose store build shares the native
+  # fingerprint, so a pull request that moves it is held until a commit in
+  # the range carries the "Native-Fingerprint: changed" trailer.
+  native-fingerprint:
+    name: native fingerprint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      # The guard exports and installs both refs itself, so the checkout
+      # needs no install of its own.
+      - name: Native fingerprint drift
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          APP_VARIANT: production
+        run: node tools/verify-native-fingerprint.mjs "origin/$BASE_REF" HEAD

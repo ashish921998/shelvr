@@ -66,6 +66,13 @@ The workflow is manual and checks both backend URLs plus the Firebase file for
 Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
+CI computes the fingerprint of every pull request and of its base branch in one
+environment (`tools/verify-native-fingerprint.mjs`) and fails the check when
+they differ, listing each source that moved. A commit in the range carrying the
+`Native-Fingerprint: changed` trailer acknowledges the move. Treat that trailer
+as a release note: the next update needs a store build first. The same
+comparison runs locally with `pnpm run verify:fingerprint origin/main HEAD`.
+
 ## Device verification before release
 
 On a physical iPhone and an Android device with Google Play services:
