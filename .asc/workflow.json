@@ -8,9 +8,17 @@
   // Builds are produced by EAS (see apps/native/eas.json) and uploaded to ASC.
   // These lanes operate on builds that are already in App Store Connect.
   //
-  // NOTE on "if": only 1/true/yes/y/on are truthy. A non-empty string such as
-  // release notes text is NOT truthy, which is why the text lives in WHATS_NEW
-  // and the gate is the separate boolean SET_TEST_NOTES.
+  // NOTE on "if": asc 5.1.0 parses truthiness — only 1/true/yes/y/on gate a step
+  // open. Verified by probe: "false", "0", "no", "banana" and "" all SKIP. A non-
+  // empty string such as release notes text is NOT truthy, which is why the text
+  // lives in WHATS_NEW and the gate is the separate boolean SET_TEST_NOTES.
+  //
+  // The published docs at docs.asccli.sh instead describe "if" as "runs if the
+  // variable exists and is non-empty". That is NOT how 5.1.0 behaves, but the two
+  // readings disagree on every value except "" — which skips under both. So the
+  // mutation gates default to "" rather than "false": if a future asc adopts the
+  // documented non-empty semantics, "false" would silently start opening the gate
+  // on `asc review submit --confirm`. "" cannot.
   "env": {
     "APP_ID": "6798143550",
     "PLATFORM": "IOS",
@@ -18,9 +26,9 @@
     // (external: needs beta review, add --submit --confirm).
     "TF_GROUP_ID": "bab526aa-0fc2-4957-89b2-d94b2c1d0648",
     "VERSION": "",
-    "SET_TEST_NOTES": "false",
+    "SET_TEST_NOTES": "",
     "WHATS_NEW": "",
-    "SUBMIT_FOR_REVIEW": "false"
+    "SUBMIT_FOR_REVIEW": ""
   },
 
   "before_all": "asc auth status",
