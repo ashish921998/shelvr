@@ -1,0 +1,141 @@
+{
+  // Shelvr App Store Connect lanes.
+  // Run from the REPO ROOT (paths like ./metadata are relative to the cwd):
+  //   asc workflow list --pretty
+  //   asc workflow run --dry-run status
+  //   asc workflow run status
+  //
+  // Builds are produced by EAS (see apps/native/eas.json) and uploaded to ASC.
+  // These lanes operate on builds that are already in App Store Connect.
+  //
+  // NOTE on "if": only 1/true/yes/y/on are truthy. A non-empty string such as
+  // release notes text is NOT truthy, which is why the text lives in WHATS_NEW
+  // and the gate is the separate boolean SET_TEST_NOTES.
+  "env": {
+    "APP_ID": "6798143550",
+    "PLATFORM": "IOS",
+    // "Team (Expo)" internal group. Public Beta is a0dfe74f-d332-466e-96e1-6a7b068a4187
+    // (external: needs beta review, add --submit --confirm).
+    "TF_GROUP_ID": "bab526aa-0fc2-4957-89b2-d94b2c1d0648",
+    "VERSION": "",
+    "SET_TEST_NOTES": "false",
+    "WHATS_NEW": "",
+    "SUBMIT_FOR_REVIEW": "false"
+  },
+
+  "before_all": "asc auth status",
+  "error": "echo 'asc workflow failed - see step output on stderr above' 1>&2",
+
+  "workflows": {
+    "status": {
+      "description": "Read-only triage: pipeline dashboard, latest build, review state. Safe to run any time.",
+      "steps": [
+        {
+          "name": "dashboard",
+          "run": "asc status --app $APP_ID --platform $PLATFORM --output table",
+          "retry": { "max_attempts": 3, "delay": "5s" },
+          "timeout": "2m"
+        },
+        {
+          "name": "status_build",
+          "run": "asc builds info --app $APP_ID --latest --platform $PLATFORM --output json",
+          "outputs": {
+            "BUILD_ID": "$.data.id",
+            "BUILD_NUMBER": "$.data.attributes.version",
+            "PROCESSING_STATE": "$.data.attributes.processingState"
+          },
+          "retry": { "max_attempts": 3, "delay": "5s" },
+          "timeout": "2m"
+        },
+        {
+          "name": "review_state",
+          "run": "asc review status --app $APP_ID --platform $PLATFORM --output table",
+          "retry": { "max_attempts": 3, "delay": "5s" },
+          "timeout": "2m"
+        },
+        {
+          "name": "summary",
+          "run": "echo \"latest build ${steps.status_build.BUILD_NUMBER} (${steps.status_build.BUILD_ID}) processingState=${steps.status_build.PROCESSING_STATE}\""
+        }
+      ]
+    },
+
+    "testflight": {
+      "description": "Distribute the latest uploaded iOS build to a TestFlight group.",
+      "steps": [
+        {
+          "name": "tf_build",
+          "run": "asc builds info --app $APP_ID --latest --platform $PLATFORM --output json",
+          "outputs": {
+            "BUILD_ID": "$.data.id",
+            "BUILD_NUMBER": "$.data.attributes.version"
+          },
+          "retry": { "max_attempts": 3, "delay": "5s" },
+          "timeout": "2m"
+        },
+        {
+          // Polling is read-only, so retry is safe and keeps the run resumable.
+          "name": "wait_processing",
+          "run": "asc builds wait --build-id ${steps.tf_build.BUILD_ID} --fail-on-invalid --timeout 20m --output json",
+          "retry": { "max_attempts": 2, "delay": "30s" },
+          "timeout": "22m"
+        },
+        {
+          // create-then-update: create fails if notes already exist for the locale.
+          "name": "test_notes",
+          "if": "SET_TEST_NOTES",
+          "run": "asc builds test-notes create --build-id ${steps.tf_build.BUILD_ID} --locale en-US --whats-new \"$WHATS_NEW\" --output json || asc builds test-notes update --build-id ${steps.tf_build.BUILD_ID} --locale en-US --whats-new \"$WHATS_NEW\" --output json"
+        },
+        {
+          "name": "add_group",
+          "run": "asc builds add-groups --build-id ${steps.tf_build.BUILD_ID} --group $TF_GROUP_ID --output json"
+        },
+        {
+          "name": "distributed",
+          "run": "echo \"build ${steps.tf_build.BUILD_NUMBER} added to group $TF_GROUP_ID\""
+        }
+      ]
+    },
+
+    "release": {
+      "description": "Stage an App Store version from ./metadata/version/$VERSION, then optionally submit for review.",
+      "steps": [
+        {
+          "name": "guard",
+          "run": "[ -n \"$VERSION\" ] || { echo 'VERSION is required, e.g. asc workflow run release VERSION:1.0.3' 1>&2; exit 1; }; [ -d \"./metadata/version/$VERSION\" ] || { echo \"missing metadata dir ./metadata/version/$VERSION - run asc metadata pull first, and run this from the repo root\" 1>&2; exit 1; }"
+        },
+        {
+          "name": "rel_build",
+          "run": "asc builds info --app $APP_ID --latest --platform $PLATFORM --version $VERSION --output json",
+          "outputs": {
+            "BUILD_ID": "$.data.id",
+            "BUILD_NUMBER": "$.data.attributes.version"
+          },
+          "retry": { "max_attempts": 3, "delay": "5s" },
+          "timeout": "2m"
+        },
+        {
+          "name": "preflight",
+          "run": "asc validate --app $APP_ID --version $VERSION --platform $PLATFORM --output table",
+          "retry": { "max_attempts": 2, "delay": "5s" },
+          "timeout": "5m"
+        },
+        {
+          "name": "stage",
+          "run": "asc release stage --app $APP_ID --version $VERSION --build-id ${steps.rel_build.BUILD_ID} --metadata-dir ./metadata/version/$VERSION --platform $PLATFORM --confirm --output json"
+        },
+        {
+          "name": "recheck",
+          "run": "asc validate --app $APP_ID --version $VERSION --platform $PLATFORM --output table",
+          "retry": { "max_attempts": 2, "delay": "5s" },
+          "timeout": "5m"
+        },
+        {
+          "name": "submit",
+          "if": "SUBMIT_FOR_REVIEW",
+          "run": "asc review submit --app $APP_ID --version $VERSION --build-id ${steps.rel_build.BUILD_ID} --platform $PLATFORM --confirm --output json"
+        }
+      ]
+    }
+  }
+}
