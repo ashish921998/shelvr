@@ -151,6 +151,31 @@ function parseModule(path, source) {
       (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
     );
     for (const declaration of statement.declarationList.declarations) {
+      // `export const { signIn, signOut } = convexAuth(...)` produces callable
+      // functions that no registrar names. Their shapes belong to the library
+      // rather than to this tree, so only their presence is tracked: losing one
+      // is a removal every installed app feels on its next launch. Members that
+      // are not callable ride along, which costs an acknowledgement on the day
+      // one is renamed and never a missed removal.
+      if (ts.isObjectBindingPattern(declaration.name)) {
+        const call = declaration.initializer;
+        const fromFactory =
+          isExported &&
+          call &&
+          ts.isCallExpression(call) &&
+          ts.isIdentifier(call.expression);
+        if (!fromFactory) continue;
+        for (const element of declaration.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue;
+          exported.set(element.name.text, element.name.text);
+          registrars.set(element.name.text, {
+            registrar: `${call.expression.text}()`,
+            contract: [],
+          });
+        }
+        continue;
+      }
+
       if (!ts.isIdentifier(declaration.name)) continue;
       const name = declaration.name.text;
       declarations.set(name, declaration);

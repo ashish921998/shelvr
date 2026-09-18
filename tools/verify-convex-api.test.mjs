@@ -306,3 +306,36 @@ export const listStates = query({
   );
   assert.deepEqual(diff.changed, ["api:listStates"]);
 });
+
+// Convex Auth hands back its endpoints from a factory call, so no registrar
+// names them and nothing above sees them.
+const authModule = (names) => `
+import { convexAuth } from "@convex-dev/auth/server";
+
+export const { ${names} } = convexAuth({ providers: [] });
+`;
+
+test("endpoints from a factory call are public", () => {
+  const found = [
+    ...signatures(tree({ auth: authModule("signIn, signOut") })).keys(),
+  ].sort();
+  assert.deepEqual(found, ["auth:signIn", "auth:signOut"]);
+});
+
+test("losing one of them is a removal", () => {
+  const diff = diffSignatures(
+    signatures(tree({ auth: authModule("signIn, signOut, isAuthenticated") })),
+    signatures(tree({ auth: authModule("signIn, signOut") })),
+  );
+  assert.deepEqual(diff.removed, ["auth:isAuthenticated"]);
+  assert.equal(isBreaking(diff), true);
+});
+
+test("a factory result that is not exported is not public", () => {
+  const source = `
+import { convexAuth } from "@convex-dev/auth/server";
+
+const { signIn } = convexAuth({ providers: [] });
+`;
+  assert.deepEqual([...signatures(tree({ auth: source })).keys()], []);
+});
