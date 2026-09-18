@@ -457,6 +457,57 @@ competes for the same two slots.
 | Event reminders from `add_event`      | `intents[].value` holds a title only, no date                                                                                             |
 | Standing badge count                  | An unrepayable claim on attention                                                                                                         |
 
+## The empty shelf
+
+Every kind in the catalogue needs unopened saves, so a user with nothing saved
+receives nothing at all. The people most likely to churn are the ones the
+system is silent toward. That is a real gap, and earlier drafts of this
+document did not mention it.
+
+Two facts soften it, both verified. **Onboarding already captures interests** —
+the "What do you save?" step in `save-kinds.ts` offers Articles, Recipes,
+Products, Home & decor, Travel, Inspiration, Fitness and Videos, and seeds
+starter spaces from the answers. And **every user makes one real save during
+onboarding**, recorded in `onboardingDemos`, so no account is literally empty.
+
+**A push is the wrong instrument.** A user who has saved nothing in their first
+week has an activation problem: they have not learned the share sheet, or they
+forgot Shelvr existed at the moment they needed it. A notification saying "you
+haven't saved anything yet" cannot teach the share sheet, and it is the same
+notification as "you haven't opened Shelvr in 5 days", already on the
+do-not-build list above. Activation is fixed in onboarding and in empty states.
+If a brand-new user is notified at all, it should be about the demo save they
+made, because that one is theirs.
+
+### Using the interest data already captured
+
+The onboarding answers exist and currently only seed spaces. Three uses that
+cost little and keep the promise that Shelvr shows a user their own things:
+
+- **Match the demo article to the answer.** Someone who picks Recipes does
+  their onboarding save on a recipe, so their single item is relevant from the
+  first minute.
+- **Rank their own saves.** `resurfacing` and `reading_time` prefer the types
+  the user said they save.
+- **Write a specific empty state.** "You said you save recipes — here's how to
+  grab one from Instagram" lands where activation actually happens.
+
+### Open: does Shelvr ever send content the user did not save?
+
+Raised, not settled, and recorded here so the trade stays visible.
+
+Sending articles Shelvr selected from stated interests would make it a content
+recommender. The case against: every notification in this document says _you
+chose this_, which is what makes the attention budget defensible and what no
+recommendation can claim; it would mean competing on content quality with the
+feeds that [Interrupting a scroll](#interrupting-a-scroll) exists to interrupt;
+and there is no content pipeline — Shelvr's model classifies what users save
+and discovers nothing, so sources, freshness, moderation and licensing would
+all be new. The case for is the empty shelf above.
+
+This is a product-direction decision rather than a notification one, and it
+belongs to the founder rather than to this document.
+
 ## Interrupting a scroll
 
 **User feedback.** A user asked for exactly this: while scrolling Instagram or
@@ -896,7 +947,10 @@ makes it an alternative.
    whether a lapsed user still gets `resurfacing` for saves they already own —
    plausibly the best win-back, plausibly a nag at someone who stopped paying.
 5. **Geocoding provider terms.** Blocks the places project, not this plan.
-6. **How widely is the interruption wanted?** One user asked for it. Before R2
+6. **Does Shelvr ever send content the user did not save?** See
+   [The empty shelf](#the-empty-shelf). The largest open question here, because
+   it decides what the product is rather than how it notifies.
+7. **How widely is the interruption wanted?** One user asked for it. Before R2
    is scoped it is worth asking a handful more, and worth asking specifically
    whether they would keep it on after a fortnight — the failure mode for this
    feature is enthusiastic adoption followed by quiet disabling, which looks
