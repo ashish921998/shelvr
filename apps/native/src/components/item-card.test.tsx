@@ -106,8 +106,8 @@ vi.mock("@/components/glass", () => ({
     <div>{children}</div>
   )),
 }));
-// ActionMenu itself stays real, so the ellipsis control the card nests inside
-// its own pressable is covered; only the native menu host is stubbed.
+// ActionMenu itself stays real, so the ellipsis control keeps its own label
+// here; only the native menu host is stubbed.
 vi.mock("@expo/ui/community/menu", () => ({
   MenuView: vi.fn(({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
@@ -169,7 +169,11 @@ it("stays a button even though Link marks the trigger a link", () => {
   expect(screen.queryByRole("link")).toBeNull();
 });
 
-it("keeps the nested save-actions control and the long-press menu", () => {
+// Reachability is a separate question from rendering: iOS folds this control
+// into the card, because Pressable is an accessibility element by default. That
+// was true before the card carried a label too, and is not what this asserts —
+// only that labelling the card did not drop either set of actions.
+it("still renders the save-actions control and the long-press menu", () => {
   render(
     <ItemCard
       item={{ ...base, title: "Miso soup recipe", url: "https://example.com" }}
