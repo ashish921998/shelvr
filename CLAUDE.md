@@ -265,6 +265,12 @@ needed at runtime by the features that use them:
   this: approved production deploy, then tester OTA). Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
+- Adding a field to a table is a one-way door once rows carry it. Convex validates
+  every existing document against the new schema on deploy, and a table validator
+  rejects a field it does not declare, failing with an "Unexpected field" error
+  naming it. So reverting the commit that added the field fails the deploy instead
+  of rolling it back. To back a field out, stop writing it and leave it declared
+  `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 

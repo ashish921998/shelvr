@@ -1421,6 +1421,39 @@ describe("linkEnrichment", () => {
       ).toBeUndefined();
     },
   );
+  it("does not turn a skip link into the article body", () => {
+    // The symptom this guards: a bot-hostile page yields only its skip link,
+    // the classifier describes that, and the reader shows "Skip to main
+    // content" as both the description and the whole body.
+    const content = extractBodyText(
+      '<html><head><title>Ultimate chocolate cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><a href="#content">Skip to content</a><div id="main"></div></body></html>',
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toBeUndefined();
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBe(
+      "no_article",
+    );
+  });
+
+  it("drops an extraction too thin to be a body", () => {
+    const content = extractBodyText(
+      "<html><head><title>Members only</title></head><body><article><p>Sign in to continue.</p></article></body></html>",
+      "https://example.com/paywalled",
+    );
+    expect(content).toBeUndefined();
+  });
+
+  it("keeps a skip link's own page body once the link is gone", () => {
+    const paragraph =
+      "The batter comes together in one bowl, which is the only reason this cake gets made on a weeknight at all. ";
+    const content = extractBodyText(
+      `<html><head><title>Cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><article id="main"><h1>Cake</h1><p>${paragraph.repeat(3)}</p></article></body></html>`,
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toContain("The batter comes together");
+    expect(content).not.toContain("Skip to main content");
+  });
+
   it("does not turn page chrome into an article body", () => {
     const content = extractBodyText(
       '<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>',
@@ -1572,6 +1605,33 @@ describe("fetchInstagram", () => {
       new TextDecoder().decode(bytes),
     );
   });
+
+  it.each(["page", "embed", "both"])(
+    "preserves truncation from the %s response",
+    async (source) => {
+      instagramAnswers(REEL_PAGE, REEL_EMBED);
+      const answer = safeFetch.getMockImplementation()!;
+      safeFetch.mockImplementation(async (url: string, options: unknown) => {
+        const result = await answer(url, options);
+        const isEmbed = url.includes("/embed/captioned/");
+        const isInstagram = url.startsWith("https://www.instagram.com/");
+        return isInstagram &&
+          (source === "both" || (source === "embed") === isEmbed)
+          ? { ...result, truncated: true }
+          : result;
+      });
+      const page = await fetchInstagram(
+        "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+      );
+      expect(page.truncated).toBe(true);
+      expect(page.content).toContain("Meet the National Geographic 33!");
+      expect(page.author).toBe("@natgeo");
+      expect(page.heroImageUrl).toBe(
+        "https://cdn.fbcdn.net/poster.jpg?x=1&y=2",
+      );
+      expect(page.incomplete).toBeUndefined();
+    },
+  );
 
   it("reads a reel as the crawler sees it, never the login shell", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
@@ -1930,5 +1990,120 @@ describe("sanitizeRecipe", () => {
     });
     expect(recipe?.name).toBe("n".repeat(120));
     expect(recipe?.servings).toBe("s".repeat(60));
+  });
+});
+
+describe("processItem for a recipe page the fetch cap cut short", () => {
+  const RECIPE_URL = "https://recipes.test/miso-butter-roast-chicken";
+  const INGREDIENTS = [
+    "1 whole chicken, about 1.6kg",
+    "50g white miso paste",
+    "80g unsalted butter, softened",
+    "2 tbsp honey",
+    "1 lemon, halved",
+    "4 garlic cloves, crushed",
+    "1 tsp flaky sea salt",
+  ];
+  const STEPS = [
+    "Heat the oven to 200C/180C fan/gas 6.",
+    "Mash the miso, butter, honey and garlic into a paste.",
+    "Loosen the chicken skin and push half the paste underneath.",
+    "Rub the rest over the skin and season with the salt.",
+    "Stuff the lemon halves into the cavity.",
+    "Roast for 1 hr 20 mins, basting twice.",
+    "Rest for 15 mins before carving.",
+    "Carve and serve with the pan juices spooned over.",
+  ];
+
+  /** Microdata rather than JSON-LD on purpose: a cut JSON-LD block is rejected
+   * by `JSON.parse`, so microdata is the shape that survives a cut and needs
+   * the guard. */
+  function microdataHtml(): string {
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title></head><body>
+<div itemscope itemtype="https://schema.org/Recipe">
+<h1 itemprop="name">Miso butter roast chicken</h1>
+<span itemprop="recipeYield">Serves 4</span>
+${INGREDIENTS.map((i) => `<li itemprop="recipeIngredient">${i}</li>`).join("\n")}
+<div itemprop="recipeInstructions">
+${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
+</div>
+</div></body></html>`;
+  }
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    decodeWithContentType.mockReset();
+    parseJson.mockReset();
+    generateObject.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+    parseJson.mockImplementation(actual.parseJson);
+    generateObject.mockResolvedValue({
+      object: {
+        title: "Miso butter chicken",
+        description: "A whole roast chicken with miso butter.",
+        tags: ["recipes"],
+        spaceNames: [],
+        intents: [],
+      },
+    });
+  });
+
+  async function save(html: string, truncated?: true) {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(html),
+      ...(truncated ? { truncated: true as const } : {}),
+    }));
+    const t = newConvexTest().withIdentity({ subject: "page-user|session-1" });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "page-user",
+        type: "link",
+        url: RECIPE_URL,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    return await t.run((ctx) => ctx.db.get(itemId));
+  }
+
+  /** The document as the fetch cap would hand it over: everything before
+   * `marker`. What makes the read truncated is the flag `save` sets, so the cut
+   * only has to land at a known point in the markup. */
+  function cutAt(html: string, marker: string): string {
+    return html.slice(0, html.indexOf(marker));
+  }
+
+  it("reads the whole recipe when the page arrived whole", async () => {
+    const item = await save(microdataHtml());
+    expect(item?.recipe?.ingredients).toHaveLength(INGREDIENTS.length);
+    expect(item?.recipe?.steps).toHaveLength(STEPS.length);
+  });
+
+  it("refuses a recipe whose method the cap cut off after one step", async () => {
+    // The worst shape, because nothing about it looks wrong: a complete
+    // ingredient list and a method that simply stops. A reader would believe
+    // heating the oven is the whole recipe.
+    const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
+    expect(item?.recipe).toBeUndefined();
+    // The article body still stands in for it, so the save is not wasted.
+    expect(item?.status).toBe("ready");
+  });
+
+  it("refuses a recipe cut mid-instruction", async () => {
+    const item = await save(cutAt(microdataHtml(), "the salt."), true);
+    expect(item?.recipe).toBeUndefined();
+    expect(item?.status).toBe("ready");
   });
 });
