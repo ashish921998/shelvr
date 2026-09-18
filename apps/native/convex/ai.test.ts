@@ -2018,11 +2018,11 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     return await t.run((ctx) => ctx.db.get(itemId));
   }
 
-  /** Byte-truncate the way safeFetch's `onOverflow: "truncate"` does. */
+  /** The document as the fetch cap would hand it over: everything before
+   * `marker`. What makes the read truncated is the flag `save` sets, so the cut
+   * only has to land at a known point in the markup. */
   function cutAt(html: string, marker: string): string {
-    return Buffer.from(html, "utf8")
-      .subarray(0, html.indexOf(marker))
-      .toString("utf8");
+    return html.slice(0, html.indexOf(marker));
   }
 
   it("reads the whole recipe when the page arrived whole", async () => {
