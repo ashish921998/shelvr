@@ -245,8 +245,10 @@ function chromeIcons(name: string): Point[][] | null {
 function contentIcons(name: string): Point[][] | null {
   const { S, L, R, A, C } = pen();
   switch (name) {
+    case "photo.on.rectangle":
     case "photo.on.rectangle.angled": {
-      const rot = -0.14;
+      // The angled variant is the same drawing, tipped.
+      const rot = name === "photo.on.rectangle" ? 0 : -0.14;
       const P = (x: number, y: number): Point => [
         x * Math.cos(rot) - y * Math.sin(rot),
         x * Math.sin(rot) + y * Math.cos(rot),

@@ -1,16 +1,14 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
-import { useAppHeaderHeight } from "@/lib/header-layout";
-import { useTabSearchQuery } from "@/lib/tab-search-query";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { InkIcon } from "@/components/ink/ink-icon";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
-import { ProgressiveBlurHeader } from "progressive-blur";
-import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { Platform, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { useEffect, useRef, useState } from "react";
+import { TextInput, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -23,13 +21,11 @@ function useDebounced<T>(value: T, delay: number): T {
 
 export default function SearchScreen() {
   useAppLocale();
-  const headerHeight = useAppHeaderHeight();
-  const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
-  // iOS types into the native header search bar. Everywhere else the floating
-  // tab bar owns the field and shares its text through the tab search store.
-  const [iosSearch, setIosSearch] = useState("");
-  const tabBarSearch = useTabSearchQuery();
-  const search = Platform.OS === "ios" ? iosSearch : tabBarSearch;
+  const { theme } = useUnistyles();
+  const inputRef = useRef<TextInput>(null);
+  // The screen owns its field now. The nav is five equal tabs with nothing in
+  // them, so there is no bar field to share text with.
+  const [search, setSearch] = useState("");
   const query = useDebounced(search.trim(), 250);
 
   const { data: results } = useQuery({
@@ -39,19 +35,24 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      {Platform.OS === "ios" ? (
-        <Stack.SearchBar
-          ref={searchBarRef}
+      <ScreenHeader title={t("navigation.search")} />
+      <View style={styles.field}>
+        <InkIcon name="magnifyingglass" size={16} tint={theme.colors.muted} />
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          value={search}
+          onChangeText={setSearch}
           placeholder={t("search.placeholder")}
+          placeholderTextColor={theme.colors.faint}
           autoCapitalize="none"
-          hideWhenScrolling={false}
-          onChangeText={(e) => setIosSearch(e.nativeEvent.text)}
-          onCancelButtonPress={() => setIosSearch("")}
+          autoCorrect={false}
+          returnKeyType="search"
+          selectionColor={theme.colors.primary}
+          accessibilityLabel={t("search.placeholder")}
+          testID="search-field"
         />
-      ) : (
-        // The header is transparent, so results start below it.
-        <View style={{ height: headerHeight }} />
-      )}
+      </View>
       {query.length === 0 ? (
         <EmptyState
           title={t("search.emptyTitle")}
@@ -66,16 +67,31 @@ export default function SearchScreen() {
         <MasonryFeed
           items={results ?? []}
           source={{ from: "search", q: query }}
-          onScrollBeginDrag={() => searchBarRef.current?.blur()}
+          onScrollBeginDrag={() => inputRef.current?.blur()}
         />
       )}
-      <ProgressiveBlurHeader />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+const styles = StyleSheet.create((theme) => ({
+  container: { flex: 1 },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 12,
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    backgroundColor: theme.colors.surfaceMuted,
   },
-});
+  input: {
+    flex: 1,
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+}));

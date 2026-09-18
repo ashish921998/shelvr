@@ -1,4 +1,5 @@
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { InkIcon } from "@/components/ink/ink-icon";
+import type { InkIconName } from "@/lib/ink/icons";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -10,7 +11,7 @@ export function HeaderIconButton({
   disabled,
   onPress,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   label: string;
   badge?: number;
   disabled?: boolean;
@@ -48,7 +49,7 @@ export function HeaderActionMenu({
   title,
   actions,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   label: string;
   title: string;
   actions: HeaderMenuAction[];
@@ -72,18 +73,14 @@ function HeaderIconContent({
   badge,
   tintColor,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   badge?: number;
   tintColor: string;
 }) {
   return (
     <>
-      <AppSymbolIcon
-        name={icon}
-        size={21}
-        weight="semibold"
-        tintColor={tintColor}
-      />
+      {/* Header buttons draw their icon at 18, per the ink spec. */}
+      <InkIcon name={icon} size={18} tint={tintColor} />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
