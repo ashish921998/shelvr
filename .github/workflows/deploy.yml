@@ -75,6 +75,15 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
+      # The approval this job just waited on has no time limit, and queueing a
+      # later run does not invalidate this one, so main may have moved since the
+      # verdict that let this job start.
+      - name: Confirm main did not move while approval was pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./tools/verify-ci.cjs').requireTip({ github, context, core });
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:

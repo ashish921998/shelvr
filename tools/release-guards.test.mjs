@@ -235,3 +235,36 @@ test("does not deploy a commit main has already moved past", async () => {
   assert.equal(result.deployable, "false");
   assert.deepEqual(result.failures, []);
 });
+
+async function checkTip(mainHead) {
+  const failures = [];
+  await verifyCi.requireTip({
+    context: {
+      repo: { owner: "owner", repo: "repo" },
+      sha: "selected-sha",
+      payload: {},
+    },
+    core: { setFailed: (message) => failures.push(message) },
+    github: {
+      rest: {
+        repos: {
+          getBranch: async (args) => {
+            assert.equal(args.branch, "main");
+            return { data: { commit: { sha: mainHead } } };
+          },
+        },
+      },
+    },
+  });
+  return failures;
+}
+
+test("refuses a deploy whose approval outlasted the tip it was approved for", async () => {
+  // The freshness verdict is reached before the production environment asks
+  // for approval, and that ask has no time limit, so main can advance while it
+  // waits. Checking once, up front, is not enough.
+  assert.deepEqual(await checkTip("selected-sha"), []);
+  const failures = await checkTip("newer-sha");
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /newer-sha/);
+});
