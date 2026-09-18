@@ -43,7 +43,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { isMainModule } from "./main-module.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const NATIVE_DIR = join(REPO_ROOT, "apps/native");
@@ -67,8 +69,13 @@ export function baselineFor(baselines, profile, platform) {
 
 function hashFailure(hash) {
   if (hash === "") return "fingerprint:generate produced an empty hash";
-  const kind = hash === null ? "null" : typeof hash;
-  return `fingerprint:generate produced a ${kind}, not a hash string`;
+  const kind =
+    hash === undefined
+      ? "nothing"
+      : hash === null
+        ? "null"
+        : `a ${typeof hash}`;
+  return `fingerprint:generate produced ${kind}, not a hash string`;
 }
 
 /**
@@ -146,7 +153,8 @@ const STATUS_DETAIL = {
       "next step",
       `Ship a new store build for ${result.platform}. No update can reach the`,
       "released binary, so users on it stay where they are until they",
-      "upgrade through the store.",
+      "upgrade through the store. If one is already out, record it in",
+      `${BASELINE_PATH} instead.`,
     ),
   ],
   "missing-baseline": (result) => [
@@ -304,10 +312,7 @@ async function main(argv) {
   return isBlocked(results) ? 1 : 0;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (isMainModule(import.meta.url)) {
   process.exit(await main(process.argv.slice(2)));
 }
 

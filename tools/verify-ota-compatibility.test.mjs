@@ -131,8 +131,9 @@ test("a fingerprint that rejects blocks and the report carries the reason", asyn
 test("an empty or non-string hash blocks rather than matching nothing", async () => {
   for (const [hash, expected] of [
     ["", /empty hash/],
-    [undefined, /produced a undefined/],
-    [null, /produced a null/],
+    [undefined, /produced nothing/],
+    [null, /produced null/],
+    [42, /produced a number/],
   ]) {
     const results = await check("production", ["ios"], { ios: hash });
     assert.equal(results[0].status, "fingerprint-failed");
