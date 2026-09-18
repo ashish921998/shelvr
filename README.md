@@ -221,13 +221,30 @@ pnpm --filter web-app build
 once store credentials are configured on EAS; Android submits also need the
 `EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret — the base64 of the Play API
 JSON key), mode `ota` publishes an EAS Update to the `production` channel.
+Both manual workflows require successful push CI for the selected `main`
+commit. Release deploys that commit's Convex backend before building or
+publishing, and shares Deploy's concurrency group to prevent interleaving.
+Release therefore also requires `CONVEX_DEPLOY_KEY`.
+Non-main dispatches fail with a branch-selection error. Before queueing any
+build with iOS submission enabled, Release verifies that EAS has a submission
+API key assigned to the production bundle and Apple team. Configure it with
+`eas credentials --platform ios` under the production profile's App Store
+Connect / EAS Submit settings. This checks the assignment, not revocation
+or permissions on Apple's servers.
 
 **OTA publishes require the EAS `production` environment.** With
-`--environment production`, `app.config.js` is resolved on EAS servers with
-that environment's variables, and the production-value guards in
-`app.config.js` only run during `eas build`. Both workflows fail fast unless
-`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
-there (`eas env:set --name <name> --value <value> --environment production`).
+`--environment production`, updates use that environment's plaintext and
+sensitive variables; Secret values are unavailable. Both workflows pull the
+readable values into a temporary file and validate the production Convex
+deployment/site URLs and the iOS/Android RevenueCat public keys before
+publishing. Set them with `eas env:set --name <name> --value <value>
+--environment production --visibility sensitive`. The temporary file is
+deleted after validation, and validation errors never include values.
+The verifier also requires readable, nonempty `GOOGLE_MAPS_API_KEY`,
+`POSTHOG_PROJECT_TOKEN`, and an HTTPS `POSTHOG_HOST`. Set these explicitly
+with plaintext or sensitive visibility in EAS production so builds and
+updates use the same config inputs. Both environment validation and OTA
+publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native
