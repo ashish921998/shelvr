@@ -265,6 +265,20 @@ needed at runtime by the features that use them:
   this: approved production deploy, then tester OTA). Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
+- An OTA update only reaches installs whose store build shares its native fingerprint. A
+  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
+  `app.config.js`) strands every later OTA until a store build ships, and the diff does
+  not say so. Two layers cover it. On a pull request CI runs
+  `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
+  and never fails the check; acknowledge an intended move with the
+  `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
+  workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
+  compares the fingerprint the update is about to carry against
+  `apps/native/released-builds.json` and blocks the publish on anything but a match,
+  including a profile or platform with no recorded release. A blocked publish means
+  nothing published from this tree reaches the recorded binary, so the usual fix is a
+  store build, and recording the release afterwards. See
+  [push notification builds and updates](docs/architecture/push-notifications.md).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator
   rejects a field it does not declare, failing with an "Unexpected field" error

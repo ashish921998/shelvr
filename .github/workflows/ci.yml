@@ -64,3 +64,59 @@ jobs:
 
       - name: Test coverage
         run: pnpm run coverage
+
+  # An OTA update only reaches installs whose store build shares the native
+  # fingerprint. This job reports a pull request that moves it and never fails,
+  # because merging a native change harms nobody; the OTA workflow's own gate
+  # refuses the publish. A commit carrying the "Native-Fingerprint: changed"
+  # trailer quiets the report.
+  native-fingerprint:
+    name: native fingerprint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      # The guard exports and installs both refs itself, so the checkout
+      # needs no install of its own. --warn-only because a native change is a
+      # legitimate thing to merge; the OTA workflow's own gate is what refuses
+      # to publish an update no released binary can accept.
+      # continue-on-error covers the rest: --warn-only only softens the drift
+      # verdict, and an export or install flake inside the guard would still
+      # redden a pull request this job has no business failing.
+      - name: Native fingerprint drift
+        id: fingerprint
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          APP_VARIANT: production
+        run: |
+          node tools/verify-native-fingerprint.mjs "origin/$BASE_REF" HEAD --warn-only
+
+      # The guard writes its own summary only once it has a report to write, so
+      # a crash before that point would leave a green job and an empty summary,
+      # and the warning would rot unnoticed.
+      - name: Say the drift check did not run
+        if: steps.fingerprint.outcome == 'failure'
+        run: |
+          {
+            echo "### Native fingerprint check did not run"
+            echo
+            echo "The guard failed before it could compare the two refs, so this"
+            echo "pull request carries no fingerprint verdict. The step log says why."
+          } >> "$GITHUB_STEP_SUMMARY"

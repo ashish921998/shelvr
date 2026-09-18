@@ -66,6 +66,89 @@ The workflow is manual and checks both backend URLs plus the Firebase file for
 Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
+### Two layers guard OTA compatibility
+
+**On a pull request, an early warning.** CI computes the fingerprint of the
+branch and of its base in one environment (`tools/verify-native-fingerprint.mjs
+--warn-only`) and lists each source that moved. It never fails the check. A
+native change is a legitimate thing to merge, and merging it harms nobody. A
+commit in the range carrying the `Native-Fingerprint: changed` trailer
+acknowledges the move and quiets the warning. Treat the warning as a release
+note: the next update needs a store build first. The same comparison runs
+locally with `pnpm run verify:fingerprint origin/main HEAD`.
+
+**At publish time, the enforcing gate.** The `before_update` hook in
+`native-update.yml` runs `tools/verify-ota-compatibility.mjs --profile <profile>
+--platform <platform>`, which compares the fingerprint the publish is about to
+be stamped with against `apps/native/released-builds.json`, the registry of
+builds users actually have. Anything but a match blocks the publish: a moved
+fingerprint, a profile or platform with no recorded release, or a fingerprint
+the toolchain could not compute. It runs inside the publishing job so the
+environment it fingerprints in is the one the update is stamped with, which a
+separate job would have to be kept identical to by hand.
+
+A blocked publish is not a problem to work around. When the fingerprints
+differ, **nothing published from this tree reaches the recorded binary**. Its
+runtime version is fixed at build time and an OTA only reaches installs whose
+runtime version matches exactly. The usual answer is a new store build, and
+people on the recorded binary stay where they are until they take it. A
+mismatch has one other cause worth ruling out first. A store build may already
+have shipped and nobody recorded it, so check the registry before building
+again. Reaching people still on the recorded build without a store build is
+possible, but only by publishing from a tree that fingerprints to it, which the
+limits below cover.
+
+The gate only runs inside `native-update.yml`, so that workflow is the only
+sanctioned way to publish. An `eas update` from a laptop bypasses the check
+entirely and can strand an update on a runtime version nobody has.
+
+Two limits of the check are worth knowing. The registry holds one build per
+profile and platform, and the gate compares against that build alone. An older
+binary is not unreachable in itself. Publishing from a tree that fingerprints
+to its runtime version does reach it, which is how a fix gets to people who
+have not taken the store update yet. The gate blocks that publish today,
+because the tree's hash will not match the newer recorded build. To ship it,
+point the entry at the older build for that publish and put it back
+afterwards, or give the profile a list of builds if this stops being rare. And
+the pull-request warning fingerprints `APP_VARIANT=production` only, so a
+change that moves only the development or preview hash stays invisible until a
+publish on that profile.
+
+### Recording a release
+
+`apps/native/released-builds.json` holds one entry per build profile and
+platform, or `null` when no release has been recorded. It starts null for every
+profile but `production`, because the newest successful EAS build is not
+evidence that anyone has it installed. The gate blocks until a maintainer
+records a real release, which is the intended behaviour.
+
+After a build reaches users, read the fingerprint it runs and record it:
+
+```sh
+cd apps/native
+npx eas-cli@24.6.0 fingerprint:compare --build-id <build-id> \
+  --environment <environment> --json
+```
+
+`<environment>` is the profile's environment from the table above. The output
+is `{fingerprint1, fingerprint2}`, where `fingerprint1.hash` is the build's and
+`fingerprint2.hash` is the local project's. Take `fingerprint1.hash`. The
+command **exits 0 even when the two differ**, so read the hashes rather than
+the exit code.
+
+Recording `fingerprint2.hash` by mistake, or pasting the hash the gate just
+printed, makes the gate compare the tree against itself and pass forever. It is
+also the shortest route past a blocked publish, so treat a change to this file
+as a release decision and review it as one. Nothing verifies that the recorded
+hash belongs to the recorded `buildId`.
+
+Set `buildId`, `fingerprint`, and a `release` string naming the version, build
+number, store, and release date, so a later blocked publish says which binary
+it is blocked by. `internal-test` extends `production` with the same
+environment and `APP_VARIANT`, so its hash usually equals production's for the
+same commit. Record its own build id anyway, or `buildId` and `release` stop
+meaning anything.
+
 ## Device verification before release
 
 On a physical iPhone and an Android device with Google Play services:
