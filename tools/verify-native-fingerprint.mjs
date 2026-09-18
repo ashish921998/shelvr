@@ -9,7 +9,8 @@
 // from its own lockfile, computes the fingerprint per platform in one
 // environment, and lists every source that differs.
 //
-// An intended move is acknowledged with a commit trailer in base..head:
+// An intended move is acknowledged with a git trailer on a commit in
+// base..head, in the message's trailer block:
 //
 //   Native-Fingerprint: changed
 //
@@ -25,7 +26,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const NATIVE_DIR = "apps/native";
 const PLATFORMS = ["ios", "android"];
-const ACKNOWLEDGEMENT = "Native-Fingerprint: changed";
+const TRAILER_KEY = "Native-Fingerprint";
+const TRAILER_VALUE = "changed";
+const ACKNOWLEDGEMENT = `${TRAILER_KEY}: ${TRAILER_VALUE}`;
 
 export function sourceKey(source) {
   return source.filePath ?? source.id;
@@ -49,8 +52,25 @@ export function diffSources(base, head) {
   return { added, removed, changed };
 }
 
-export function isAcknowledged(log) {
-  return /^Native-Fingerprint:\s*changed\s*$/m.test(log);
+export function isAcknowledged(values) {
+  return values.some((value) => value.trim() === TRAILER_VALUE);
+}
+
+// Git decides what a trailer is, so the same line in a subject or in ordinary
+// body prose does not acknowledge anything.
+export function acknowledgementValues(dir, range) {
+  const output = execFileSync(
+    "git",
+    [
+      "-C",
+      dir,
+      "log",
+      `--format=%(trailers:key=${TRAILER_KEY},valueonly,separator=%x2C)`,
+      range,
+    ],
+    { encoding: "utf8" },
+  );
+  return output.split(/[\n,]/).filter((value) => value.trim() !== "");
 }
 
 function git(args, options = {}) {
@@ -193,7 +213,7 @@ function main(argv) {
       };
     });
     const acknowledged = isAcknowledged(
-      git(["log", "--format=%B", `${base}..${head}`]),
+      acknowledgementValues(REPO_ROOT, `${base}..${head}`),
     );
     const report = formatReport({
       baseRef,

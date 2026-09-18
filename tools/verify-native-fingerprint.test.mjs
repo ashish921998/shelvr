@@ -1,7 +1,12 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, test } from "node:test";
 
 import {
+  acknowledgementValues,
   diffSources,
   isAcknowledged,
   sourceKey,
@@ -84,25 +89,57 @@ test("identical sources produce an empty diff", () => {
   });
 });
 
-test("the acknowledgement trailer is recognised on its own line", () => {
-  const log = [
+test("only the exact trailer value acknowledges", () => {
+  assert.equal(isAcknowledged(["changed"]), true);
+  assert.equal(isAcknowledged([" changed "]), true);
+  assert.equal(isAcknowledged([]), false);
+  assert.equal(isAcknowledged(["unchanged"]), false);
+  assert.equal(isAcknowledged(["changed later"]), false);
+});
+
+const repo = mkdtempSync(join(tmpdir(), "fingerprint-trailer-"));
+const git = (...args) =>
+  execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+const commit = (message) => git("commit", "-q", "--allow-empty", "-m", message);
+
+git("init", "-q", "-b", "main");
+git("config", "user.email", "test@example.com");
+git("config", "user.name", "Test");
+commit("base");
+commit(
+  [
+    "docs: explain the guard",
+    "",
+    "Acknowledge an intended move with this line:",
+    "Native-Fingerprint: changed",
+    "",
+    "That paragraph is prose, so it is not the trailer block.",
+  ].join("\n"),
+);
+commit(
+  ["Native-Fingerprint: changed", "", "A subject is not a trailer."].join("\n"),
+);
+commit(
+  [
     "chore(native): update PostHog SDK",
+    "",
+    "Bumps the plugin, which moves the fingerprint.",
     "",
     "Native-Fingerprint: changed",
     "Co-Authored-By: Someone <someone@example.com>",
-  ].join("\n");
-  assert.equal(isAcknowledged(log), true);
+  ].join("\n"),
+);
+
+after(() => rmSync(repo, { recursive: true, force: true }));
+
+test("prose and subjects that repeat the line do not acknowledge", () => {
+  assert.deepEqual(acknowledgementValues(repo, "HEAD~3..HEAD~1"), []);
 });
 
-test("a log without the trailer is not an acknowledgement", () => {
-  assert.equal(
-    isAcknowledged("chore(native): update PostHog SDK\n\nBumps the plugin.\n"),
-    false,
-  );
-  assert.equal(isAcknowledged("Native-Fingerprint: unchanged\n"), false);
-  assert.equal(
-    isAcknowledged("mentions Native-Fingerprint: changed mid sentence\n"),
-    false,
-  );
-  assert.equal(isAcknowledged(""), false);
+test("a trailer in the final block acknowledges", () => {
+  assert.deepEqual(acknowledgementValues(repo, "HEAD~1..HEAD"), ["changed"]);
+});
+
+test("a range with no commits acknowledges nothing", () => {
+  assert.deepEqual(acknowledgementValues(repo, "HEAD..HEAD"), []);
 });
