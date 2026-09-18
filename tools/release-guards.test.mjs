@@ -164,17 +164,32 @@ const passingRun = {
   conclusion: "success",
 };
 
-async function checkCi(runs, payload = {}) {
+async function checkCi(runs, payload = {}, mainHead = "selected-sha") {
   const failures = [];
+  const outputs = {};
   await verifyCi({
     context: {
       repo: { owner: "owner", repo: "repo" },
       sha: "selected-sha",
       payload,
     },
-    core: { setFailed: (message) => failures.push(message) },
+    core: {
+      setFailed: (message) => failures.push(message),
+      setOutput: (name, value) => {
+        outputs[name] = value;
+      },
+      notice: () => {},
+    },
     github: {
-      rest: { actions: { listWorkflowRuns: "listWorkflowRuns" } },
+      rest: {
+        actions: { listWorkflowRuns: "listWorkflowRuns" },
+        repos: {
+          getBranch: async (args) => {
+            assert.equal(args.branch, "main");
+            return { data: { commit: { sha: mainHead } } };
+          },
+        },
+      },
       paginate: async (method, args) => {
         assert.equal(method, "listWorkflowRuns");
         assert.equal(args.workflow_id, "ci.yml");
@@ -185,15 +200,15 @@ async function checkCi(runs, payload = {}) {
       },
     },
   });
-  return failures;
+  return { failures, deployable: outputs.deployable };
 }
 
-test("accepts successful CI for the exact commit", async () => {
-  assert.deepEqual(await checkCi([passingRun]), []);
-  assert.deepEqual(
-    await checkCi([passingRun], { workflow_run: { head_sha: "selected-sha" } }),
-    [],
-  );
+test("deploys the tip of main when its CI passed", async () => {
+  for (const payload of [{}, { workflow_run: { head_sha: "selected-sha" } }]) {
+    const result = await checkCi([passingRun], payload);
+    assert.deepEqual(result.failures, []);
+    assert.equal(result.deployable, "true");
+  }
 });
 
 test("rejects missing, failed, pending, wrong-commit and fork CI", async () => {
@@ -205,6 +220,18 @@ test("rejects missing, failed, pending, wrong-commit and fork CI", async () => {
     [{ ...passingRun, head_repository: { full_name: "fork/repo" } }],
     [passingRun, { ...passingRun, run_number: 11, conclusion: "failure" }],
   ]) {
-    assert.equal((await checkCi(runs)).length, 1);
+    const result = await checkCi(runs);
+    assert.equal(result.failures.length, 1);
+    assert.equal(result.deployable, "false");
   }
+});
+
+test("does not deploy a commit main has already moved past", async () => {
+  // Re-running an old commit's CI succeeds whenever it succeeded the first
+  // time, so without this the rerun deploys that older tree over production.
+  // It is superseded rather than broken, so it must not fail the run either:
+  // a failure here asks for a production approval that can only be refused.
+  const result = await checkCi([passingRun], {}, "newer-sha");
+  assert.equal(result.deployable, "false");
+  assert.deepEqual(result.failures, []);
 });

@@ -20,5 +20,26 @@ module.exports = async ({ github, context, core }) => {
     core.setFailed(
       "The selected commit must have a successful main push CI run before deployment.",
     );
+    core.setOutput("deployable", "false");
+    return;
   }
+  // A CI run can be re-run at any time, including long after main moved on, and
+  // it succeeds again because it succeeded before. Deploying what it points at
+  // would put an older backend behind clients already running against a newer
+  // one, which is the one ordering apps/native/convex must never see. So the
+  // tip of main deploys, from its own run, and nothing else does.
+  const { data: branch } = await github.rest.repos.getBranch({
+    ...context.repo,
+    branch: "main",
+  });
+  if (branch.commit.sha !== sha) {
+    // Superseded, not broken. The tip deploys from its own run, so there is
+    // nothing here to fix and nothing to approve.
+    core.notice(
+      `Skipping: ${sha} is behind the tip of main (${branch.commit.sha}), which deploys from its own run.`,
+    );
+    core.setOutput("deployable", "false");
+    return;
+  }
+  core.setOutput("deployable", "true");
 };
