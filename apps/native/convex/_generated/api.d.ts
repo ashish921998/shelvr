@@ -24,6 +24,7 @@ import type * as model_accountCreated from "../model/accountCreated.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
+import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_imagePolicy from "../model/imagePolicy.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
   "model/demoErrors": typeof model_demoErrors;
+  "model/embedding": typeof model_embedding;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/imagePolicy": typeof model_imagePolicy;
