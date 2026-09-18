@@ -203,9 +203,8 @@ export function useDemoSave({
   const inFlightRef = useRef(false);
   const advancedRef = useRef(false);
   // The share sheet, not a paste or typed link, is the user's first share.
-  // The mark is per attempt: a save resumed on a fresh mount (an app kill mid
-  // OAuth) records nothing, so Home shows the card once, which is harmless.
-  const viaShareRef = useRef(false);
+  // The bit rides the persisted request rather than a ref, so a save resumed
+  // on a fresh mount (an app kill mid-OAuth) still records it.
   const pendingShareRecordRef = useRef(false);
   const { itemId } = state;
 
@@ -271,7 +270,11 @@ export function useDemoSave({
     async (request: PendingDemo) => {
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
-      const trimmed = { url, destination: request.destination };
+      const trimmed = {
+        url,
+        destination: request.destination,
+        viaShare: request.viaShare,
+      };
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
@@ -294,6 +297,7 @@ export function useDemoSave({
         setPendingDemo({
           url: result.url,
           destination: result.savedSpaceNames[0] ?? null,
+          viaShare: request.viaShare,
         });
         clearLegacyDemoUrlIfSaved(result.url);
         dispatch({ type: "saved", itemId: result.itemId });
@@ -301,7 +305,10 @@ export function useDemoSave({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
         });
-        if (viaShareRef.current) {
+        // Only a landed save is a first share, so this runs after the item
+        // exists. A repeat submit of the same persisted request returns the
+        // same item and re-records, which SecureStore makes a no-op.
+        if (request.viaShare) {
           pendingShareRecordRef.current = true;
           recordSharePending();
         }
@@ -321,24 +328,33 @@ export function useDemoSave({
     [createDemoItem, isAuthenticated, lost, onSaved, recordSharePending],
   );
 
-  const submitUrl = useCallback(
-    (url: string, viaShare = false) => {
-      viaShareRef.current = viaShare;
+  const submitLink = useCallback(
+    (url: string, viaShare: boolean) => {
       const preset = demoDestination(url.trim(), spaces);
       void submit({
         url,
         destination:
           preset === null ? null : resolveOnboardingSpaceName(preset),
+        viaShare,
       });
     },
     [spaces, submit],
   );
 
-  // The onboarding share sheet routes its save here so it records the first
-  // share; paste and typed saves stay on submitUrl and keep the how-to card.
+  // Two entry points rather than one optional flag: `submitUrl` is handed
+  // straight to callbacks like the sample picker's, where a second argument
+  // would otherwise slip in and mark a paste as a share.
+
+  /** Paste, typed text and sample picks. Not a share, so Home keeps the card. */
+  const submitUrl = useCallback(
+    (url: string) => submitLink(url, false),
+    [submitLink],
+  );
+
+  /** The onboarding share sheet's save, which counts as the first share. */
   const submitSharedUrl = useCallback(
-    (url: string) => submitUrl(url, true),
-    [submitUrl],
+    (url: string) => submitLink(url, true),
+    [submitLink],
   );
 
   // Resume the save once auth is ready; submitting consumes the request.

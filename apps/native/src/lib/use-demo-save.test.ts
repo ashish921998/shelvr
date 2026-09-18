@@ -78,7 +78,7 @@ const saved = (reused = false) => ({
 });
 
 function renderDemo(
-  resume: { url: string; destination: null } | null = null,
+  resume: { url: string; destination: null; viaShare: boolean } | null = null,
   userId: string | null = null,
 ) {
   const onSaved = vi.fn();
@@ -133,6 +133,7 @@ describe("useDemoSave", () => {
     expect(mock.setPendingDemo).toHaveBeenCalledWith({
       url: "https://sample.test/recipe",
       destination: "name:recipes",
+      viaShare: false,
     });
     expect(mock.create).not.toHaveBeenCalled();
 
@@ -158,6 +159,7 @@ describe("useDemoSave", () => {
     const { result } = renderDemo({
       url: "https://example.com/",
       destination: null,
+      viaShare: false,
     });
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.create).toHaveBeenCalledTimes(1);
@@ -359,6 +361,47 @@ describe("useDemoSave", () => {
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
   });
 
+  it("records the first share for a save resumed after an app kill", async () => {
+    // The relaunch has no memory of the share sheet beyond this record, so
+    // the persisted viaShare bit is the only thing that can vouch for it.
+    mock.create.mockResolvedValue(saved(true));
+    const { result } = renderDemo(
+      { url: "https://example.com/", destination: null, viaShare: true },
+      "user_1",
+    );
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("keeps the how-to card for a paste resumed after an app kill", async () => {
+    mock.create.mockResolvedValue(saved(true));
+    const { result } = renderDemo(
+      { url: "https://example.com/", destination: null, viaShare: false },
+      "user_1",
+    );
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+  });
+
+  it("persists the share origin so a relaunch can still record it", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo(null, "user_1");
+    await flush(() => result.current.submitSharedUrl("https://example.com/"));
+    for (const call of mock.setPendingDemo.mock.calls) {
+      expect(call[0]).toMatchObject({ viaShare: true });
+    }
+    expect(mock.setPendingDemo).toHaveBeenCalledTimes(2);
+  });
+
+  it("persists a paste as not shared", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo(null, "user_1");
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    for (const call of mock.setPendingDemo.mock.calls) {
+      expect(call[0]).toMatchObject({ viaShare: false });
+    }
+  });
+
   it("returns to picking when sign-in is cancelled", () => {
     mock.authenticated = false;
     const { result } = renderDemo();
@@ -402,7 +445,11 @@ describe("deriveDemoView", () => {
     );
     expect(
       deriveDemoView(
-        initialDemoSaveState({ url: "https://a.test", destination: null }),
+        initialDemoSaveState({
+          url: "https://a.test",
+          destination: null,
+          viaShare: false,
+        }),
         query,
       ).view,
     ).toBe("auth");
@@ -421,6 +468,7 @@ describe("demoSaveReducer", () => {
     const state = initialDemoSaveState({
       url: "https://a.test",
       destination: null,
+      viaShare: false,
     });
     expect(
       demoSaveReducer(state, { type: "submitFailed", used: false }),
@@ -436,7 +484,7 @@ describe("demoSaveReducer", () => {
     expect(
       demoSaveReducer(lost, {
         type: "submit",
-        request: { url: "https://b.test", destination: null },
+        request: { url: "https://b.test", destination: null, viaShare: false },
         authenticated: true,
         lost: true,
       }),

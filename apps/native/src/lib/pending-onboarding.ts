@@ -27,6 +27,12 @@ export type PendingDemo = {
   url: string;
   /** The demo's explicit single destination ("just my shelf" when null). */
   destination: string | null;
+  /** The save arrived through the real iOS share sheet, so it counts as the
+   * user's first share once it lands. Persisted so a relaunch mid-OAuth still
+   * records it. False for paste and typed saves, and for records written by an
+   * older build, which keeps the Home how-to card rather than dropping it on a
+   * user who never shared. */
+  viaShare: boolean;
 };
 
 type PendingRecord = {
@@ -91,7 +97,11 @@ function readPendingRecord(): PendingRecord | null {
       typeof record.demo.url === "string" &&
       (record.demo.destination === null ||
         typeof record.demo.destination === "string")
-        ? record.demo
+        ? {
+            url: record.demo.url,
+            destination: record.demo.destination,
+            viaShare: record.demo.viaShare === true,
+          }
         : null;
     if (
       typeof record.operationId !== "string" ||

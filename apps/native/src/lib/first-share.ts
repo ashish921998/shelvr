@@ -27,8 +27,10 @@ export function finishWeeklyNudge(userId: string): void {
 
 /** The guide shows until the first share records the flag, and only while the
  * library is nearly empty. The onboarding demo records the flag when it saves
- * through the real share sheet, so only the paste or type demo still sees it.
- * Larger libraries, including existing users', skip the guide. */
+ * through the real share sheet — including a save resumed after an app kill,
+ * since the origin rides the persisted record — so only a paste, a typed link
+ * or a skipped demo still sees it. Larger libraries, including existing
+ * users', skip the guide. */
 export function shouldShowHowTo({
   firstShareSaved,
   itemCount,

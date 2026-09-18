@@ -74,6 +74,7 @@ describe("onboarding recovery", () => {
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      viaShare: true,
     });
     setOnboardingProgress({
       saveKinds: ["Inspiration"],
@@ -84,7 +85,11 @@ describe("onboarding recovery", () => {
       saveKinds: ["Inspiration"],
       spaces: ["Inspiration"],
       step: 3,
-      demo: { url: "https://example.com/design", destination: "Inspiration" },
+      demo: {
+        url: "https://example.com/design",
+        destination: "Inspiration",
+        viaShare: true,
+      },
     });
     setPendingDemo(null);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -93,7 +98,11 @@ describe("onboarding recovery", () => {
 
   it("drops a completed demo when onboarding finishes, even with no spaces picked", () => {
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 2 });
-    setPendingDemo({ url: "https://example.com/design", destination: null });
+    setPendingDemo({
+      url: "https://example.com/design",
+      destination: null,
+      viaShare: false,
+    });
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 3 });
     // finish(): nothing for the replay hook to do, and no stale save left in
     // SecureStore that a later mount could replay.
@@ -107,11 +116,13 @@ describe("onboarding recovery", () => {
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      viaShare: true,
     });
     updatePendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toEqual({
       url: "https://example.com/design",
       destination: "Inspiration",
+      viaShare: true,
     });
     setPendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -171,7 +182,11 @@ describe("progress written by an older onboarding flow", () => {
         progressVersion: 2,
         saveKinds: ["Travel"],
         step: 2,
-        demo: { url: "https://example.com/trip", destination: null },
+        demo: {
+          url: "https://example.com/trip",
+          destination: null,
+          viaShare: true,
+        },
         spaceNames: {},
       }),
     );
@@ -179,7 +194,34 @@ describe("progress written by an older onboarding flow", () => {
       saveKinds: ["Travel"],
       spaces: ["Travel"],
       step: 2,
-      demo: { url: "https://example.com/trip", destination: null },
+      demo: {
+        url: "https://example.com/trip",
+        destination: null,
+        viaShare: true,
+      },
+    });
+  });
+
+  it("reads a demo written before viaShare existed as not shared", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Travel"],
+        demoUrl: null,
+        progressVersion: 2,
+        saveKinds: ["Travel"],
+        step: 2,
+        // An older build wrote no viaShare. Defaulting it to false keeps the
+        // Home how-to card rather than hiding it from a user who never shared.
+        demo: { url: "https://example.com/trip", destination: null },
+        spaceNames: {},
+      }),
+    );
+    expect(getOnboardingProgress().demo).toEqual({
+      url: "https://example.com/trip",
+      destination: null,
+      viaShare: false,
     });
   });
 
