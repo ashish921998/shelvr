@@ -47,6 +47,9 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck
 
+      - name: Convex codegen drift
+        run: pnpm run verify:codegen
+
       - name: Dead code
         run: pnpm run knip
 

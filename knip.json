@@ -26,7 +26,10 @@
       "ignoreDependencies": ["tailwindcss"]
     },
     ".": {
-      "entry": ["tools/generate-localizations.mjs"],
+      "entry": [
+        "tools/generate-localizations.mjs",
+        "tools/verify-convex-codegen.mjs"
+      ],
       "project": ["tools/**/*.mjs"]
     }
   }
