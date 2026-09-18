@@ -8,6 +8,7 @@ import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_SWEEP_PAGE,
+  MAX_EMBEDDING_ATTEMPTS,
 } from "./model/embedding";
 
 const embedMany = vi.hoisted(() => vi.fn());
@@ -113,6 +114,53 @@ describe("sweepItemEmbeddings", () => {
       // An outage is not the item's fault, so it costs no attempt either.
       expect(row.embeddingAttempts).toBeUndefined();
     }
+  });
+
+  it("spends an attempt when the provider answers with nothing usable", async () => {
+    // A completed call whose vectors are all malformed is not an outage. Read
+    // as one, every row would defer, and because the same rows lead the sweep
+    // range every run the page would be re-read forever — wedging the sweep
+    // behind items it can never embed, with every later ready item stuck
+    // behind them. These spend an attempt instead, and the cap clears them.
+    const t = await seedReady(3);
+    embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
+      // Right count, wrong width: the provider answered, the answer is unusable.
+      embeddings: values.map(() => [1, 2, 3]),
+    }));
+
+    const result = await t.action(internal.ai.sweepItemEmbeddings, {});
+
+    expect(result.written).toBe(0);
+    const rows = await t.run((ctx) => ctx.db.query("items").collect());
+    for (const row of rows) {
+      expect(row.embeddingAttempts).toBe(1);
+      // Still unstamped, so the sweep will retry — up to the cap.
+      expect(row.embeddingVersion).toBeUndefined();
+    }
+  });
+
+  it("stamps a permanently unembeddable item once it hits the cap", async () => {
+    // What the attempt budget buys: without it, one row the provider can never
+    // embed leads the range forever and nothing behind it is ever reached.
+    const t = await seedReady(1);
+    embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
+      embeddings: values.map(() => [1, 2, 3]),
+    }));
+
+    for (let run = 0; run < MAX_EMBEDDING_ATTEMPTS; run++) {
+      await t.action(internal.ai.sweepItemEmbeddings, {});
+    }
+
+    const [row] = await t.run((ctx) => ctx.db.query("items").collect());
+    expect(row.embeddingAttempts).toBe(MAX_EMBEDDING_ATTEMPTS);
+    expect(row.embeddingVersion).toBe(CURRENT_EMBEDDING_VERSION);
+    expect(row.embedding).toBeUndefined();
+    // Out of the range, so the rows behind it are reachable again.
+    expect(
+      await t.query(internal.items.listItemsNeedingEmbeddingInternal, {
+        limit: EMBEDDING_SWEEP_PAGE,
+      }),
+    ).toHaveLength(0);
   });
 
   it("recovers the whole page once the provider comes back", async () => {

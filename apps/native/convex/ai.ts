@@ -128,13 +128,32 @@ const EMBEDDING_DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT";
 const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
 
 /**
+ * What one embedding batch produced.
+ *
+ * `callFailed` is reported separately from an empty `vectors` slot on purpose.
+ * A slot is `undefined` for two unrelated reasons — the call never completed,
+ * or the call completed and that particular vector was unusable — and the two
+ * demand opposite handling. The first is nobody's fault and must be retried
+ * for free; the second is that item's own problem and has to spend an
+ * attempt, or a row the provider can never embed leads the sweep range
+ * forever. Inferring one from the other ("the batch produced nothing, so the
+ * provider must be down") gets it wrong in exactly the case that wedges the
+ * sweep: a completed call whose every vector is malformed.
+ */
+export type EmbedBatchResult = {
+  vectors: (number[] | undefined)[];
+  callFailed: boolean;
+};
+
+/**
  * Embeds a batch of texts, in input order.
  *
  * Best effort by contract: it never throws and never rejects. Every failure
  * mode — provider outage, timeout, a malformed vector, an empty input —
  * collapses to `undefined` in that text's slot, because an item is worth
  * saving whether or not it could be embedded. Callers write the vectors they
- * got and leave the rest to the sweeper.
+ * got and leave the rest to the sweeper; `callFailed` tells them which kind
+ * of nothing they are looking at.
  *
  * Empty texts are never sent upstream; their slot is `undefined` from the
  * start. Vectors are normalized and width-checked before being returned, so a
@@ -148,13 +167,13 @@ const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
 async function embedBatch(
   texts: string[],
   taskType: string,
-): Promise<(number[] | undefined)[]> {
+): Promise<EmbedBatchResult> {
   const vectors: (number[] | undefined)[] = texts.map(() => undefined);
   const sendable = texts
     .map((text, index) => ({ text, index }))
     .filter((entry) => entry.text.length > 0);
   if (sendable.length === 0) {
-    return vectors;
+    return { vectors, callFailed: false };
   }
   try {
     const { embeddings } = await embedMany({
@@ -183,14 +202,13 @@ async function embedBatch(
       timed_out: isModelTimeout(error),
       error: errorName(error),
     });
+    return { vectors, callFailed: true };
   }
-  return vectors;
+  return { vectors, callFailed: false };
 }
 
 /** Embeds item texts for storage in the vector index. */
-export async function embedTexts(
-  texts: string[],
-): Promise<(number[] | undefined)[]> {
+export async function embedTexts(texts: string[]): Promise<EmbedBatchResult> {
   return await embedBatch(texts, EMBEDDING_DOCUMENT_TASK_TYPE);
 }
 
@@ -204,8 +222,10 @@ export async function embedTexts(
  * summaries were.
  */
 async function embedQuery(text: string): Promise<number[] | undefined> {
-  const [vector] = await embedBatch([text], EMBEDDING_QUERY_TASK_TYPE);
-  return vector;
+  // A search has no sweep behind it to retry for it, so a failed call and an
+  // unusable vector mean the same thing here: no vector, take the fallback.
+  const { vectors } = await embedBatch([text], EMBEDDING_QUERY_TASK_TYPE);
+  return vectors[0];
 }
 
 /** True for the error a timed-out or aborted model call rejects with. The SDK
@@ -2369,7 +2389,7 @@ async function embedForRun(params: {
     keepsExistingTitle && params.item.title !== undefined
       ? params.item.title
       : params.title;
-  const [embedding] = await embedTexts([
+  const { vectors } = await embedTexts([
     buildEmbeddingText({
       title: storedTitle,
       description: params.description,
@@ -2379,7 +2399,7 @@ async function embedForRun(params: {
       content: params.content,
     }),
   ]);
-  return embedding;
+  return vectors[0];
 }
 
 export const processItem = internalAction({
@@ -2593,17 +2613,19 @@ export const sweepItemEmbeddings = internalAction({
     if (pending.length === 0) {
       return { scanned: 0, written: 0 };
     }
-    const vectors = await embedTexts(pending.map((entry) => entry.text));
+    const { vectors, callFailed } = await embedTexts(
+      pending.map((entry) => entry.text),
+    );
 
-    // Whether the provider answered at all. `embedTexts` collapses every
-    // failure to `undefined`, so the only way to tell an outage from one bad
-    // item is that an outage produces nothing for a batch that asked for
-    // something. That distinction decides whether a row spends an attempt or
-    // is simply retried later, and it is what stops an outage from marching
-    // the whole table and stamping every item as done with no vector.
-    const askedFor = pending.filter((entry) => entry.text.length > 0).length;
-    const produced = vectors.filter((vector) => vector !== undefined).length;
-    const providerDown = askedFor > 0 && produced === 0;
+    // Whether the provider answered at all, taken from the call itself rather
+    // than inferred from its output. Both directions matter. A real outage
+    // must not march the whole table stamping items as done with no vector —
+    // that is what the `deferred` outcome prevents. But a call that completes
+    // and returns nothing usable is not an outage, and deferring those rows
+    // would wedge the sweep: they lead the range every run, so the page would
+    // be re-read forever and every ready item behind it would never be
+    // reached. Those spend an attempt instead, and the cap eventually clears
+    // them.
 
     const { written, stamped, deferred } = await ctx.runMutation(
       internal.items.setEmbeddingsInternal,
@@ -2617,7 +2639,7 @@ export const sweepItemEmbeddings = internalAction({
               ? ("embedded" as const)
               : entry.text.length === 0
                 ? ("nothing_to_embed" as const)
-                : providerDown
+                : callFailed
                   ? ("deferred" as const)
                   : ("failed" as const),
         })),
@@ -2628,7 +2650,7 @@ export const sweepItemEmbeddings = internalAction({
       written,
       stamped,
       deferred,
-      provider_down: providerDown,
+      provider_down: callFailed,
     });
 
     // Chain only on real progress. Gating on `written` rather than on rows
