@@ -90,7 +90,11 @@ describe("isPublicAddress", () => {
 async function runLookup(
   lookup: ReturnType<typeof makeValidatingLookup>,
   hostname: string,
-): Promise<{ err: NodeJS.ErrnoException | null; address: string; family: number }> {
+): Promise<{
+  err: NodeJS.ErrnoException | null;
+  address: string;
+  family: number;
+}> {
   return new Promise((resolve) => {
     lookup(hostname, {}, (err, address, family) =>
       resolve({ err, address: address as string, family: family as number }),
@@ -200,7 +204,9 @@ describe("defaultResolver deadline", () => {
     // A domain that will not resolve -> getaddrinfo fails fast rather than
     // hanging. The point is that the resolver surfaces a rejection (coded),
     // which makeValidatingLookup forwards, instead of lingering indefinitely.
-    await expect(defaultResolver("nonexistent.invalid.local.test")).rejects.toThrow();
+    await expect(
+      defaultResolver("nonexistent.invalid.local.test"),
+    ).rejects.toThrow();
   });
 });
 
@@ -318,9 +324,12 @@ describe("safeFetch HTTP policy", () => {
     // must be rejected. Initial to a is hop 0; a->b (1), b->c (2), c->d (3),
     // then d responds 302 again which is the 4th redirect -> limit.
     const setRedirect = (host: string, target: string) => {
-      agent.get(host).intercept({ method: "GET", path: "/" }).reply(302, "", {
-        headers: { location: target },
-      });
+      agent
+        .get(host)
+        .intercept({ method: "GET", path: "/" })
+        .reply(302, "", {
+          headers: { location: target },
+        });
     };
     setRedirect("http://a.test", "http://b.test/");
     setRedirect("http://b.test", "http://c.test/");
@@ -339,7 +348,10 @@ describe("safeFetch HTTP policy", () => {
 
   it("rejects an http error status", async () => {
     const agent = mockDispatcher();
-    agent.get("http://a.test").intercept({ method: "GET", path: "/" }).reply(500, "");
+    agent
+      .get("http://a.test")
+      .intercept({ method: "GET", path: "/" })
+      .reply(500, "");
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 1024,
@@ -354,7 +366,10 @@ describe("safeFetch HTTP policy", () => {
 
   it("carries the status on an http error so callers can tell gone from blocked", async () => {
     const agent = mockDispatcher();
-    agent.get("http://a.test").intercept({ method: "GET", path: "/" }).reply(404, "");
+    agent
+      .get("http://a.test")
+      .intercept({ method: "GET", path: "/" })
+      .reply(404, "");
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 1024,
@@ -384,7 +399,9 @@ describe("safeFetch HTTP policy", () => {
     agent
       .get("http://a.test")
       .intercept({ method: "GET", path: "/" })
-      .reply(200, "binary", { headers: { "content-type": "application/octet-stream" } });
+      .reply(200, "binary", {
+        headers: { "content-type": "application/octet-stream" },
+      });
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 1024,
@@ -438,7 +455,9 @@ describe("safeFetch HTTP policy", () => {
     agent
       .get("http://a.test")
       .intercept({ method: "GET", path: "/" })
-      .reply(200, Buffer.alloc(200), { headers: { "content-type": "text/html" } });
+      .reply(200, Buffer.alloc(200), {
+        headers: { "content-type": "text/html" },
+      });
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 50,
@@ -455,7 +474,9 @@ describe("safeFetch HTTP policy", () => {
     agent
       .get("http://a.test")
       .intercept({ method: "GET", path: "/" })
-      .reply(200, Buffer.alloc(200), { headers: { "content-type": "text/html" } });
+      .reply(200, Buffer.alloc(200), {
+        headers: { "content-type": "text/html" },
+      });
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 50,
@@ -465,6 +486,51 @@ describe("safeFetch HTTP policy", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.bytes.length).toBe(50);
+      expect(result.truncated).toBe(true);
+    }
+  });
+
+  it("reports a body under the cap as whole, not truncated", async () => {
+    // The flag must distinguish a short page from a cut one: a caller that
+    // refuses truncated reads would otherwise throw away every small page.
+    const agent = mockDispatcher();
+    agent
+      .get("http://a.test")
+      .intercept({ method: "GET", path: "/" })
+      .reply(200, Buffer.alloc(20), {
+        headers: { "content-type": "text/html" },
+      });
+    const result = await safeFetch("http://a.test/", {
+      timeoutMs: 2000,
+      maxBytes: 50,
+      dispatcher: agent,
+      onOverflow: "truncate",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.bytes.length).toBe(20);
+      expect(result.truncated).toBeUndefined();
+    }
+  });
+
+  it("reports a body exactly at the cap as whole", async () => {
+    const agent = mockDispatcher();
+    agent
+      .get("http://a.test")
+      .intercept({ method: "GET", path: "/" })
+      .reply(200, Buffer.alloc(50), {
+        headers: { "content-type": "text/html" },
+      });
+    const result = await safeFetch("http://a.test/", {
+      timeoutMs: 2000,
+      maxBytes: 50,
+      dispatcher: agent,
+      onOverflow: "truncate",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.bytes.length).toBe(50);
+      expect(result.truncated).toBeUndefined();
     }
   });
 
@@ -485,6 +551,7 @@ describe("safeFetch HTTP policy", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.bytes.length).toBe(50);
+      expect(result.truncated).toBe(true);
     }
   });
 
@@ -557,7 +624,10 @@ describe("safeFetch HTTP policy", () => {
 
 /** A dispatcher that records whether request() was ever invoked. Any call
  * means the SSRF gate FAILED to block the URL before dispatch. */
-function recordingDispatcher(): { dispatcher: Dispatcher; called: () => boolean } {
+function recordingDispatcher(): {
+  dispatcher: Dispatcher;
+  called: () => boolean;
+} {
   let called = false;
   const dispatcher = {
     request() {
@@ -646,9 +716,12 @@ describe("safeFetch IP-literal SSRF block", () => {
 
   it("rejects a public URL that redirects to a private IP literal", async () => {
     const agent = mockDispatcher();
-    agent.get("http://a.test").intercept({ method: "GET", path: "/" }).reply(302, "", {
-      headers: { location: "http://169.254.169.254/" },
-    });
+    agent
+      .get("http://a.test")
+      .intercept({ method: "GET", path: "/" })
+      .reply(302, "", {
+        headers: { location: "http://169.254.169.254/" },
+      });
     const result = await safeFetch("http://a.test/", {
       timeoutMs: 2000,
       maxBytes: 1024,
@@ -774,46 +847,59 @@ describe("decodeWithContentType", () => {
   it("decodes ISO-8859-1 when charset is declared", () => {
     // 0xe9 is é in ISO-8859-1
     const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]); // "héllo"
-    expect(decodeWithContentType(bytes, "text/html; charset=iso-8859-1")).toBe("héllo");
+    expect(decodeWithContentType(bytes, "text/html; charset=iso-8859-1")).toBe(
+      "héllo",
+    );
   });
 
   it("decodes Windows-1252 when charset is declared", () => {
     // 0x92 is a curly apostrophe in Windows-1252
     const bytes = new Uint8Array([0x73, 0x92]); // s + right single quote
-    const decoded = decodeWithContentType(bytes, "text/html; charset=windows-1252");
+    const decoded = decodeWithContentType(
+      bytes,
+      "text/html; charset=windows-1252",
+    );
     expect(decoded).toBe("s\u2019");
   });
 
   it("maps the Windows-1252 C1 range with the WHATWG table on every Node version", () => {
     // 0x93/0x94 are the curly double quotes, 0x80 is the euro sign.
     const bytes = new Uint8Array([0x93, 0x68, 0x69, 0x94, 0x20, 0x80, 0x35]);
-    expect(decodeWithContentType(bytes, "text/html; charset=windows-1252")).toBe(
-      "\u201chi\u201d \u20ac5",
-    );
+    expect(
+      decodeWithContentType(bytes, "text/html; charset=windows-1252"),
+    ).toBe("\u201chi\u201d \u20ac5");
     // The five bytes the standard leaves unmapped decode to themselves.
     const unmapped = new Uint8Array([0x81, 0x8d, 0x8f, 0x90, 0x9d]);
-    expect(decodeWithContentType(unmapped, "text/html; charset=windows-1252")).toBe(
-      "\u0081\u008d\u008f\u0090\u009d",
-    );
+    expect(
+      decodeWithContentType(unmapped, "text/html; charset=windows-1252"),
+    ).toBe("\u0081\u008d\u008f\u0090\u009d");
   });
 
   it("treats ISO-8859-1 and its aliases as Windows-1252, as browsers do", () => {
     // 0x92 in a page declared ISO-8859-1 is almost always a Windows-1252 apostrophe.
     const bytes = new Uint8Array([0x73, 0x92, 0xe9]);
     for (const label of ["iso-8859-1", "latin1", "cp1252", "ISO-8859-1"]) {
-      expect(decodeWithContentType(bytes, `text/html; charset=${label}`)).toBe("s\u2019\u00e9");
+      expect(decodeWithContentType(bytes, `text/html; charset=${label}`)).toBe(
+        "s\u2019\u00e9",
+      );
     }
   });
 
   it("falls back to UTF-8 for an unsupported charset", () => {
     const bytes = new Uint8Array([0x68, 0xe9, 0x6c, 0x6c, 0x6f]);
     // Non-existent charset — should fall back to UTF-8 without throwing.
-    expect(() => decodeWithContentType(bytes, "text/html; charset=fake-charset")).not.toThrow();
-    expect(decodeWithContentType(bytes, "text/html; charset=fake-charset")).toContain("h");
+    expect(() =>
+      decodeWithContentType(bytes, "text/html; charset=fake-charset"),
+    ).not.toThrow();
+    expect(
+      decodeWithContentType(bytes, "text/html; charset=fake-charset"),
+    ).toContain("h");
   });
 
   it("extracts charset from quoted values", () => {
     const bytes = new Uint8Array([0xe9]);
-    expect(decodeWithContentType(bytes, 'text/html; charset="iso-8859-1"')).toBe("é");
+    expect(
+      decodeWithContentType(bytes, 'text/html; charset="iso-8859-1"'),
+    ).toBe("é");
   });
 });

@@ -1932,3 +1932,118 @@ describe("sanitizeRecipe", () => {
     expect(recipe?.servings).toBe("s".repeat(60));
   });
 });
+
+describe("processItem for a recipe page the fetch cap cut short", () => {
+  const RECIPE_URL = "https://recipes.test/miso-butter-roast-chicken";
+  const INGREDIENTS = [
+    "1 whole chicken, about 1.6kg",
+    "50g white miso paste",
+    "80g unsalted butter, softened",
+    "2 tbsp honey",
+    "1 lemon, halved",
+    "4 garlic cloves, crushed",
+    "1 tsp flaky sea salt",
+  ];
+  const STEPS = [
+    "Heat the oven to 200C/180C fan/gas 6.",
+    "Mash the miso, butter, honey and garlic into a paste.",
+    "Loosen the chicken skin and push half the paste underneath.",
+    "Rub the rest over the skin and season with the salt.",
+    "Stuff the lemon halves into the cavity.",
+    "Roast for 1 hr 20 mins, basting twice.",
+    "Rest for 15 mins before carving.",
+    "Carve and serve with the pan juices spooned over.",
+  ];
+
+  /** Microdata rather than JSON-LD on purpose: a cut JSON-LD block is rejected
+   * by `JSON.parse`, so microdata is the shape that survives a cut and needs
+   * the guard. */
+  function microdataHtml(): string {
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title></head><body>
+<div itemscope itemtype="https://schema.org/Recipe">
+<h1 itemprop="name">Miso butter roast chicken</h1>
+<span itemprop="recipeYield">Serves 4</span>
+${INGREDIENTS.map((i) => `<li itemprop="recipeIngredient">${i}</li>`).join("\n")}
+<div itemprop="recipeInstructions">
+${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
+</div>
+</div></body></html>`;
+  }
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    decodeWithContentType.mockReset();
+    parseJson.mockReset();
+    generateObject.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+    parseJson.mockImplementation(actual.parseJson);
+    generateObject.mockResolvedValue({
+      object: {
+        title: "Miso butter chicken",
+        description: "A whole roast chicken with miso butter.",
+        tags: ["recipes"],
+        spaceNames: [],
+        intents: [],
+      },
+    });
+  });
+
+  async function save(html: string, truncated?: true) {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(html),
+      ...(truncated ? { truncated: true as const } : {}),
+    }));
+    const t = newConvexTest().withIdentity({ subject: "page-user|session-1" });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "page-user",
+        type: "link",
+        url: RECIPE_URL,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    return await t.run((ctx) => ctx.db.get(itemId));
+  }
+
+  /** Byte-truncate the way safeFetch's `onOverflow: "truncate"` does. */
+  function cutAt(html: string, marker: string): string {
+    return Buffer.from(html, "utf8")
+      .subarray(0, html.indexOf(marker))
+      .toString("utf8");
+  }
+
+  it("reads the whole recipe when the page arrived whole", async () => {
+    const item = await save(microdataHtml());
+    expect(item?.recipe?.ingredients).toHaveLength(INGREDIENTS.length);
+    expect(item?.recipe?.steps).toHaveLength(STEPS.length);
+  });
+
+  it("refuses a recipe whose method the cap cut off after one step", async () => {
+    // The worst shape, because nothing about it looks wrong: a complete
+    // ingredient list and a method that simply stops. A reader would believe
+    // heating the oven is the whole recipe.
+    const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
+    expect(item?.recipe).toBeUndefined();
+    // The article body still stands in for it, so the save is not wasted.
+    expect(item?.status).toBe("ready");
+  });
+
+  it("refuses a recipe cut mid-instruction", async () => {
+    const item = await save(cutAt(microdataHtml(), "the salt."), true);
+    expect(item?.recipe).toBeUndefined();
+    expect(item?.status).toBe("ready");
+  });
+});
