@@ -374,6 +374,10 @@
   "digest.waitingCount": {
     "other": "%{formattedCount}件の保存項目があなたを待っています"
   },
+  "digest.namedCount": {
+    "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
+  },
+  "digest.namedSingle": "「%{title}」を今週保存しました",
   "search.noResults": "「%{query}」に一致する保存項目はありません。",
   "spaces.addedTo": "%{space}に追加しました",
   "spaces.removedFrom": "%{space}から取り除きました",

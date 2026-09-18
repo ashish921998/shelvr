@@ -17,6 +17,9 @@ const MAX_PAYMENT_ATTEMPTS = 5;
 // A save is already committed by the time this runs; a lost event costs the
 // funnel one row, so it retries briefly and then warns.
 const MAX_SAVE_ATTEMPTS = 3;
+// The notification is already out by the time this runs, so a lost event costs
+// the funnel one row and nothing else. Same budget as a save.
+const MAX_NOTIFICATION_ATTEMPTS = 3;
 
 export const capturePayment = internalAction({
   args: {
@@ -135,6 +138,70 @@ export const captureSave = internalAction({
     );
     if (!retried) {
       logEvent("warn", "save_telemetry_delivery_failed", {
+        attempts: attempt + 1,
+      });
+    }
+    return null;
+  },
+});
+
+export const captureNotification = internalAction({
+  args: {
+    userId: v.string(),
+    digestId: v.id("weeklyDigests"),
+    kind: v.string(),
+    itemCount: v.number(),
+    /** Provider acceptance, not a device read. Expo reports that APNs or FCM
+     * took the message; nothing here knows whether it was shown or seen. */
+    delivered: v.boolean(),
+    sentAt: v.number(),
+    attempt: v.optional(v.number()),
+    eventId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!env.POSTHOG_PROJECT_TOKEN) return null;
+    const eventId = args.eventId ?? newDeliveryId();
+    const delivery = await deliverPostHogEvent({
+      event: "notification_sent",
+      distinctId: args.userId,
+      deliveryId: eventId,
+      timestamp: args.sentAt,
+      properties: {
+        $process_person_profile: false,
+        // The digest id is also the deep-link target, so an open recorded by
+        // the client joins to this row without a second identifier.
+        notification_id: args.digestId,
+        notification_kind: args.kind,
+        item_count: args.itemCount,
+        delivered: args.delivered,
+        analytics_version: 1,
+      },
+    });
+    if (delivery.status === "delivered") return null;
+    if (delivery.status === "rejected") {
+      logEvent("warn", "notification_telemetry_rejected", {
+        status: delivery.httpStatus,
+      });
+      return null;
+    }
+    const attempt = args.attempt ?? 0;
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_NOTIFICATION_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(
+          delayMs,
+          internal.analytics.captureNotification,
+          {
+            ...args,
+            attempt: nextAttempt,
+            eventId,
+          },
+        ),
+    );
+    if (!retried) {
+      logEvent("warn", "notification_telemetry_delivery_failed", {
         attempts: attempt + 1,
       });
     }

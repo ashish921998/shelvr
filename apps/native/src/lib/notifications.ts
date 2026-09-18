@@ -168,13 +168,15 @@ export function NotificationSessionProvider({
   );
 }
 
-function getNotificationUrl(
+function notificationField(
   notification: Notifications.Notification,
+  field: string,
 ): string | null {
   const data = notification.request.content.data as
-    | { url?: unknown }
+    | Record<string, unknown>
     | undefined;
-  return typeof data?.url === "string" ? data.url : null;
+  const value = data?.[field];
+  return typeof value === "string" ? value : null;
 }
 
 export function useNotificationObserver(): void {
@@ -183,9 +185,16 @@ export function useNotificationObserver(): void {
   useEffect(() => {
     let lastUrl: string | null = null;
     const redirect = (notification: Notifications.Notification) => {
-      const url = getNotificationUrl(notification);
+      const url = notificationField(notification, "url");
       if (!url || url === lastUrl) return;
       lastUrl = url;
+      // Recorded before navigating: a push that throws must not lose the one
+      // signal V1 exists to collect.
+      analytics.capture("notification_opened", {
+        notification_kind: notificationField(notification, "kind") ?? "unknown",
+        notification_id:
+          notificationField(notification, "notificationId") ?? "",
+      });
       nav.push(url as never);
     };
 

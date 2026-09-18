@@ -381,6 +381,11 @@
     "one": "%{formattedCount} save waiting for you",
     "other": "%{formattedCount} saves waiting for you"
   },
+  "digest.namedCount": {
+    "one": "“%{title}” and %{formattedCount} more you saved this week",
+    "other": "“%{title}” and %{formattedCount} more you saved this week"
+  },
+  "digest.namedSingle": "“%{title}”, saved this week",
   "search.noResults": "No saves match “%{query}”.",
   "spaces.addedTo": "Added to %{space}",
   "spaces.removedFrom": "Removed from %{space}",

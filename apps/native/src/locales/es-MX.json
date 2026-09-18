@@ -390,6 +390,12 @@
     "many": "%{formattedCount} contenidos guardados te esperan",
     "other": "%{formattedCount} contenidos guardados te esperan"
   },
+  "digest.namedCount": {
+    "one": "«%{title}» y %{formattedCount} contenido más que guardaste esta semana",
+    "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
+    "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
+  },
+  "digest.namedSingle": "«%{title}», guardado esta semana",
   "search.noResults": "Ningún contenido coincide con «%{query}».",
   "spaces.addedTo": "Agregado a %{space}",
   "spaces.removedFrom": "Retirado de %{space}",

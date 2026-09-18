@@ -148,6 +148,13 @@ type AnalyticsEventProperties = {
   // never free text. A response is stated intent, NOT proof of cancellation —
   // only the server-side webhook events (trial_cancelled, …) count as
   // cancellations; funnels must never divide by survey responses.
+  // Only the prompted outcome: a cold start that finds an existing grant is
+  // not a decision the user just made.
+  notification_permission_result: {
+    outcome: "granted" | "provisional" | "denied";
+  };
+  notification_opened: { notification_kind: string; notification_id: string };
+  notification_disabled: Record<string, never>;
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
   cancel_survey_submitted: {

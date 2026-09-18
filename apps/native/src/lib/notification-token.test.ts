@@ -11,10 +11,12 @@ const mock = vi.hoisted(() => ({
   permission: vi.fn(),
   request: vi.fn(),
   token: vi.fn(),
+  capture: vi.fn(),
 }));
 vi.mock("react-native", () => ({ Platform: mock.platform }));
 vi.mock("expo-constants", () => ({ default: mock.constants }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
 vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 3 },
   IosAuthorizationStatus: { AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
@@ -105,4 +107,43 @@ describe("notification token registration", () => {
       await expect(getExpoPushToken(true)).rejects.toThrow(message);
     },
   );
+});
+
+describe("notification permission telemetry", () => {
+  it("records only the outcome the user was just prompted for", async () => {
+    mock.permission.mockResolvedValue({ granted: false });
+    mock.request.mockResolvedValue({ granted: true });
+    await getExpoPushToken(true);
+    expect(mock.capture).toHaveBeenCalledWith(
+      "notification_permission_result",
+      { outcome: "granted" },
+    );
+  });
+
+  it("stays silent when an existing grant needs no prompt", async () => {
+    mock.permission.mockResolvedValue({ granted: true });
+    await getExpoPushToken(true);
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
+
+  it("records a denial", async () => {
+    mock.permission.mockResolvedValue({ granted: false });
+    mock.request.mockResolvedValue({ granted: false });
+    expect(await getExpoPushToken(true)).toBeNull();
+    expect(mock.capture).toHaveBeenCalledWith(
+      "notification_permission_result",
+      { outcome: "denied" },
+    );
+  });
+
+  it("separates iOS provisional authorization from a full grant", async () => {
+    mock.platform.OS = "ios";
+    mock.permission.mockResolvedValue({ granted: false, ios: { status: 1 } });
+    mock.request.mockResolvedValue({ granted: false, ios: { status: 3 } });
+    expect(await getExpoPushToken(true)).toBe("expo-token");
+    expect(mock.capture).toHaveBeenCalledWith(
+      "notification_permission_result",
+      { outcome: "provisional" },
+    );
+  });
 });

@@ -381,6 +381,11 @@
     "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",
     "other": "%{formattedCount} gespeicherte Inhalte warten auf dich"
   },
+  "digest.namedCount": {
+    "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt aus dieser Woche",
+    "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
+  },
+  "digest.namedSingle": "„%{title}“ – diese Woche gespeichert",
   "search.noResults": "Keine gespeicherten Inhalte passen zu „%{query}“.",
   "spaces.addedTo": "Zu %{space} hinzugefügt",
   "spaces.removedFrom": "Aus %{space} entfernt",

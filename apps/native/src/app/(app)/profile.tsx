@@ -130,7 +130,8 @@ export default function ProfileScreen() {
 
   const toggleWeeklyShelf = async (enabled: boolean) => {
     try {
-      if ((await session.setWeeklyShelf(enabled)) === false) {
+      const saved = await session.setWeeklyShelf(enabled);
+      if (saved === false) {
         Alert.alert(
           t("notifications.disabledTitle"),
           t("notifications.disabledBody"),
@@ -142,7 +143,12 @@ export default function ProfileScreen() {
             },
           ],
         );
+        return;
       }
+      // Only a saved preference is a decision. `undefined` means another
+      // session operation held the queue and this toggle changed nothing.
+      if (saved === true && !enabled)
+        analytics.capture("notification_disabled", {});
     } catch (error) {
       analytics.captureError("weekly_shelf_preference_failed", error);
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));

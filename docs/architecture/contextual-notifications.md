@@ -4,8 +4,8 @@ What Shelvr sends, when it sends it, and how it is built.
 [Push notification builds and updates](push-notifications.md) stays the
 reference for credentials, EAS profiles and OTA fingerprints.
 
-Status: V1 scoped below. Everything under [Beyond V1](#beyond-v1) is parked
-research, not a plan of record.
+Status: V1 below is implemented and awaiting deploy. Everything under
+[Beyond V1](#beyond-v1) is parked research, not a plan of record.
 
 ## V1
 
@@ -17,8 +17,11 @@ measured.** That is the whole of V1.
 1. **The Sunday notification names a save instead of counting them.**
    Before: _3 saves waiting for you._
    After: _"The 12-hour short rib" and 2 more you saved this week._
-2. **Four events, so we can see what happens:** permission result, sent,
-   opened, turned off.
+2. **Four events, so we can see what happens:**
+   `notification_permission_result` (only when the user was actually
+   prompted), `notification_sent` (once per digest, when delivery reaches a
+   terminal state, carrying whether a provider accepted it),
+   `notification_opened`, and `notification_disabled`.
 
 ### What does not change
 

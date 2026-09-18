@@ -4,14 +4,24 @@
     "body": {
       "one": "%{formattedCount} gespeicherter Inhalt wartet auf dich",
       "other": "%{formattedCount} gespeicherte Inhalte warten auf dich"
-    }
+    },
+    "named": {
+      "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt aus dieser Woche",
+      "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
+    },
+    "namedSingle": "„%{title}“ – diese Woche gespeichert"
   },
   "en": {
     "title": "Your weekly shelf",
     "body": {
       "one": "%{formattedCount} save waiting for you",
       "other": "%{formattedCount} saves waiting for you"
-    }
+    },
+    "named": {
+      "one": "“%{title}” and %{formattedCount} more you saved this week",
+      "other": "“%{title}” and %{formattedCount} more you saved this week"
+    },
+    "namedSingle": "“%{title}”, saved this week"
   },
   "es": {
     "title": "Tu estantería semanal",
@@ -19,7 +29,13 @@
       "one": "%{formattedCount} contenido guardado te espera",
       "many": "%{formattedCount} contenidos guardados te esperan",
       "other": "%{formattedCount} contenidos guardados te esperan"
-    }
+    },
+    "named": {
+      "one": "«%{title}» y %{formattedCount} contenido más que guardaste esta semana",
+      "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
+      "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
+    },
+    "namedSingle": "«%{title}», guardado esta semana"
   },
   "es-MX": {
     "title": "Tu estantería semanal",
@@ -27,7 +43,13 @@
       "one": "%{formattedCount} contenido guardado te espera",
       "many": "%{formattedCount} contenidos guardados te esperan",
       "other": "%{formattedCount} contenidos guardados te esperan"
-    }
+    },
+    "named": {
+      "one": "«%{title}» y %{formattedCount} contenido más que guardaste esta semana",
+      "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
+      "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
+    },
+    "namedSingle": "«%{title}», guardado esta semana"
   },
   "fr": {
     "title": "Votre étagère hebdomadaire",
@@ -35,7 +57,13 @@
       "one": "%{formattedCount} contenu enregistré vous attend",
       "many": "%{formattedCount} contenus enregistrés vous attendent",
       "other": "%{formattedCount} contenus enregistrés vous attendent"
-    }
+    },
+    "named": {
+      "one": "« %{title} » et %{formattedCount} autre contenu enregistré cette semaine",
+      "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
+      "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
+    },
+    "namedSingle": "« %{title} », enregistré cette semaine"
   },
   "fr-CA": {
     "title": "Votre étagère hebdomadaire",
@@ -43,19 +71,33 @@
       "one": "%{formattedCount} contenu enregistré vous attend",
       "many": "%{formattedCount} contenus enregistrés vous attendent",
       "other": "%{formattedCount} contenus enregistrés vous attendent"
-    }
+    },
+    "named": {
+      "one": "« %{title} » et %{formattedCount} autre contenu enregistré cette semaine",
+      "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
+      "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
+    },
+    "namedSingle": "« %{title} », enregistré cette semaine"
   },
   "ja": {
     "title": "あなたの今週のシェルフ",
     "body": {
       "other": "%{formattedCount}件の保存項目があなたを待っています"
-    }
+    },
+    "named": {
+      "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
+    },
+    "namedSingle": "「%{title}」を今週保存しました"
   },
   "ko": {
     "title": "내 주간 책장",
     "body": {
       "other": "저장 항목 %{formattedCount}개가 기다리고 있어요"
-    }
+    },
+    "named": {
+      "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
+    },
+    "namedSingle": "이번 주에 저장한 '%{title}'"
   },
   "pt-BR": {
     "title": "Sua estante semanal",
@@ -63,6 +105,12 @@
       "one": "%{formattedCount} conteúdo salvo esperando por você",
       "many": "%{formattedCount} conteúdos salvos esperando por você",
       "other": "%{formattedCount} conteúdos salvos esperando por você"
-    }
+    },
+    "named": {
+      "one": "“%{title}” e mais %{formattedCount} conteúdo salvo esta semana",
+      "many": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana",
+      "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
+    },
+    "namedSingle": "“%{title}”, salvo esta semana"
   }
 }

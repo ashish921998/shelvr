@@ -390,6 +390,12 @@
     "many": "%{formattedCount} contenus enregistrés vous attendent",
     "other": "%{formattedCount} contenus enregistrés vous attendent"
   },
+  "digest.namedCount": {
+    "one": "« %{title} » et %{formattedCount} autre contenu enregistré cette semaine",
+    "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
+    "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
+  },
+  "digest.namedSingle": "« %{title} », enregistré cette semaine",
   "search.noResults": "Aucun contenu ne correspond à « %{query} ».",
   "spaces.addedTo": "Ajouté à %{space}",
   "spaces.removedFrom": "Retiré de %{space}",

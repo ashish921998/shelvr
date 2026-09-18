@@ -355,6 +355,8 @@ export type MessageParams = {
   "tidy.emptyBody": { source: string };
   "tidy.pendingDeleteCount": { count: number };
   "digest.waitingCount": { count: number };
+  "digest.namedCount": { title: string; count: number };
+  "digest.namedSingle": { title: string };
   "search.noResults": { query: string };
   "spaces.addedTo": { space: string };
   "spaces.removedFrom": { space: string };

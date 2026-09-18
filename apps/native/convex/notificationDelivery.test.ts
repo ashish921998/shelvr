@@ -78,13 +78,15 @@ describe("durable digest delivery", () => {
       payloads.find((p: { to: string }) => p.to === "token-a"),
     ).toMatchObject({
       title: translations.ja.title,
-      body: translations.ja.body.other.replace("%{formattedCount}", "1"),
+      body: translations.ja.namedSingle.replace("%{title}", "A note"),
     });
+    // A device with no stored locale still names the save; only a shelf with
+    // nothing nameable falls back to the pre-locale count copy.
     expect(
       payloads.find((p: { to: string }) => p.to === "token-b"),
     ).toMatchObject({
-      title: "Your weekly shelf is ready",
-      body: "1 saved things are waiting on your weekly shelf.",
+      title: translations.en.title,
+      body: translations.en.namedSingle.replace("%{title}", "A note"),
     });
   });
 
@@ -117,7 +119,7 @@ describe("durable digest delivery", () => {
     const retried = JSON.parse(fetchMock.mock.calls[2][1].body);
     expect(retried[0]).toMatchObject({
       title: translations.ja.title,
-      body: translations.ja.body.other.replace("%{formattedCount}", "1"),
+      body: translations.ja.namedSingle.replace("%{title}", "A note"),
     });
     expect((await digest())?.deliveryRecipients?.[0]).toMatchObject({
       locale: "ja",
@@ -354,6 +356,72 @@ describe("durable digest delivery", () => {
     expect(
       (await t.run((ctx) => ctx.db.get(completedId)))?.deliveryStatus,
     ).toBe("complete");
+  });
+
+  it("names a fully enriched save ahead of one guessed from its URL", async () => {
+    const { t, digestId } = await seed();
+    await t.run(async (ctx) => {
+      const digest = (await ctx.db.get(digestId))!;
+      // A `partial` item is classified from the URL alone because the page
+      // could not be read, so its title is a guess.
+      const guessed = await ctx.db.insert("items", {
+        userId: "user-a",
+        type: "link",
+        status: "ready",
+        title: "Guessed from the URL",
+        enrichment: "partial",
+        tags: [],
+        searchText: "guessed",
+      });
+      await ctx.db.patch(digestId, {
+        itemIds: [guessed, ...digest.itemIds],
+      });
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    const [payload] = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(payload.body).toContain("A note");
+    expect(payload.body).not.toContain("Guessed from the URL");
+    expect(payload.data).toMatchObject({
+      url: `/digest/${digestId}`,
+      kind: "weekly_shelf",
+      notificationId: digestId,
+    });
+  });
+
+  it("records one send event when delivery reaches a terminal state", async () => {
+    const { t, digestId, advance } = await seed();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
+      .mockResolvedValue(json({ "ticket-a": { status: "ok" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    const telemetry = async () =>
+      (
+        await t.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) => job.name.includes("captureNotification"));
+    // Still awaiting a receipt, so nothing is terminal yet.
+    expect(await telemetry()).toHaveLength(0);
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    const jobs = await telemetry();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args[0]).toMatchObject({
+      userId: "user-a",
+      digestId,
+      kind: "weekly_shelf",
+      itemCount: 1,
+      delivered: true,
+    });
+    // A further run must not mint a second event for the same digest.
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(await telemetry()).toHaveLength(1);
   });
 
   it("does not treat a malformed successful HTTP response as delivery", async () => {

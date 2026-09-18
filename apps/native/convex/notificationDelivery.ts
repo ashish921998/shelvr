@@ -9,6 +9,10 @@ import {
   type Recipient,
 } from "./model/notificationFields";
 
+/** V1 sends one kind. It rides in the payload and in telemetry so opens are
+ * attributable from the first event, and so a second kind needs no migration. */
+export const NOTIFICATION_KIND = "weekly_shelf";
+
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
@@ -67,6 +71,7 @@ export const claim = internalMutation({
       attempt: v.number(),
       recipients: v.array(recipientValidator),
       itemCount: v.number(),
+      featuredTitle: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, { digestId }) => {
@@ -134,9 +139,21 @@ export const claim = internalMutation({
       return locale === undefined ? recipient : { ...recipient, locale };
     });
     const items = await Promise.all(digest.itemIds.map((id) => ctx.db.get(id)));
-    const itemCount = items.filter(
-      (item) => item?.userId === digest.userId && item.status === "ready",
-    ).length;
+    const ready = items.flatMap((item) =>
+      item !== null && item.userId === digest.userId && item.status === "ready"
+        ? [item]
+        : [],
+    );
+    const itemCount = ready.length;
+    // The save the body names. A `partial` enrichment means the title was
+    // guessed from the URL alone because the page could not be read, so one is
+    // only named when nothing better is on the shelf. Resolved at claim time,
+    // not at creation, so a retry names whatever is still there.
+    const featuredTitle = (
+      ready.find(
+        (item) => item.title !== undefined && item.enrichment === undefined,
+      ) ?? ready.find((item) => item.title !== undefined)
+    )?.title;
     if (recipients.length === 0 || itemCount === 0) {
       await ctx.db.patch(digestId, {
         deliveryStatus: "failed",
@@ -152,7 +169,7 @@ export const claim = internalMutation({
       deliveryRecipients: recipients,
       deliveryNextAttemptAt: now + LEASE_MS,
     });
-    return { attempt, recipients, itemCount };
+    return { attempt, recipients, itemCount, featuredTitle };
   },
 });
 
@@ -191,13 +208,14 @@ export const finish = internalMutation({
     const anyDelivered = args.recipients.some(
       (recipient) => recipient.state === "delivered",
     );
+    const status = retry
+      ? "pending"
+      : pending || !anyDelivered
+        ? "failed"
+        : "complete";
     await ctx.db.patch(digest._id, {
       deliveryRecipients: args.recipients,
-      deliveryStatus: retry
-        ? "pending"
-        : pending || !anyDelivered
-          ? "failed"
-          : "complete",
+      deliveryStatus: status,
       deliveryNextAttemptAt: retry
         ? now +
           Math.min(RECEIPT_DELAY_MS * 2 ** (args.attempt - 1), 60 * 60 * 1000)
@@ -209,6 +227,18 @@ export const finish = internalMutation({
           ? "retry_limit_reached"
           : args.recipients.find((recipient) => recipient.error)?.error,
     });
+    // Exactly one event per digest: `finish` bails above unless it is the
+    // attempt that owns the lease, and a non-pending status is terminal, so
+    // this transition happens once however many times delivery is retried.
+    if (status !== "pending")
+      await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
+        userId: digest.userId,
+        digestId: digest._id,
+        kind: NOTIFICATION_KIND,
+        itemCount: digest.itemIds.length,
+        delivered: status === "complete",
+        sentAt: now,
+      });
     return null;
   },
 });
@@ -289,8 +319,16 @@ export const send = internalAction({
             "send",
             pending.map((recipient) => ({
               to: recipient.token,
-              ...digestCopy(recipient.locale, delivery.itemCount),
-              data: { url: `/digest/${digestId}` },
+              ...digestCopy(
+                recipient.locale,
+                delivery.itemCount,
+                delivery.featuredTitle,
+              ),
+              data: {
+                url: `/digest/${digestId}`,
+                kind: NOTIFICATION_KIND,
+                notificationId: digestId,
+              },
               sound: "default",
               channelId: "weekly-shelf",
             })),

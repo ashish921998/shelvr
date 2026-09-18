@@ -390,6 +390,12 @@
     "many": "%{formattedCount} conteúdos salvos esperando por você",
     "other": "%{formattedCount} conteúdos salvos esperando por você"
   },
+  "digest.namedCount": {
+    "one": "“%{title}” e mais %{formattedCount} conteúdo salvo esta semana",
+    "many": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana",
+    "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
+  },
+  "digest.namedSingle": "“%{title}”, salvo esta semana",
   "search.noResults": "Nenhum conteúdo corresponde a «%{query}».",
   "spaces.addedTo": "Adicionado a %{space}",
   "spaces.removedFrom": "Removido de %{space}",
