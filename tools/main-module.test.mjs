@@ -79,3 +79,26 @@ test("a module reached by import is not the program", () => {
   // This file imported the helper, so node was asked for this file, not it.
   assert.equal(isMainModule(HELPER), false);
 });
+
+// Replacing argv[1] is the only way to reach these from inside a test run.
+function withEntry(entry, body) {
+  const original = process.argv[1];
+  process.argv[1] = entry;
+  try {
+    body();
+  } finally {
+    process.argv[1] = original;
+  }
+}
+
+test("a path the filesystem cannot resolve throws instead of answering no", () => {
+  withEntry(join(real, "deleted.mjs"), () => {
+    assert.throws(() => isMainModule(HELPER), { code: "ENOENT" });
+  });
+});
+
+test("node given no file to run has no program to compare against", () => {
+  for (const entry of [undefined, ""]) {
+    withEntry(entry, () => assert.equal(isMainModule(HELPER), false));
+  }
+});

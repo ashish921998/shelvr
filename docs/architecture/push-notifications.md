@@ -99,12 +99,17 @@ The gate only runs inside `native-update.yml`, so that workflow is the only
 sanctioned way to publish. An `eas update` from a laptop bypasses the check
 entirely and can strand an update on a runtime version nobody has.
 
-Two limits of the check are worth knowing. It compares against the **newest**
-recorded build per platform, not the installed base, so users still on an older
-binary are unreachable either way and no gate can change that. And the
-pull-request warning fingerprints `APP_VARIANT=production` only, so a change
-that moves only the development or preview hash stays invisible until a publish
-on that profile.
+Two limits of the check are worth knowing. The registry holds one build per
+profile and platform, and the gate compares against that build alone. An older
+binary is not unreachable in itself. Publishing from a tree that fingerprints
+to its runtime version does reach it, which is how a fix gets to people who
+have not taken the store update yet. The gate blocks that publish today,
+because the tree's hash will not match the newer recorded build. To ship it,
+point the entry at the older build for that publish and put it back
+afterwards, or give the profile a list of builds if this stops being rare. And
+the pull-request warning fingerprints `APP_VARIANT=production` only, so a
+change that moves only the development or preview hash stays invisible until a
+publish on that profile.
 
 ### Recording a release
 
