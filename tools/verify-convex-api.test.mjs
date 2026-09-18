@@ -339,3 +339,46 @@ const { signIn } = convexAuth({ providers: [] });
 `;
   assert.deepEqual([...signatures(tree({ auth: source })).keys()], []);
 });
+
+// The word at the call site is a local binding, not the registrar.
+const registrarModule = (importLine, callee) => `
+import { v } from "convex/values";
+import { ${importLine} } from "./_generated/server";
+
+export const listTags = ${callee}({
+  args: {},
+  returns: v.null(),
+  handler: async () => null,
+});
+`;
+
+test("a registrar renamed on import is the registrar it really is", () => {
+  const diff = diffSignatures(
+    signatures(tree({ api: registrarModule("query", "query") })),
+    signatures(tree({ api: registrarModule("mutation as query", "query") })),
+  );
+  assert.deepEqual(diff.changed, ["api:listTags"]);
+});
+
+test("a function called through a renamed registrar is still public", () => {
+  const found = [
+    ...signatures(tree({ api: registrarModule("query as q", "q") })).keys(),
+  ];
+  assert.deepEqual(found, ["api:listTags"]);
+});
+
+test("a contract spread into the config is part of it", () => {
+  const spread = (type) => `
+import { v } from "convex/values";
+import { query } from "./_generated/server";
+
+const contract = { args: { id: v.${type}() }, returns: v.null() };
+
+export const listTags = query({ ...contract, handler: async () => null });
+`;
+  const diff = diffSignatures(
+    signatures(tree({ api: spread("string") })),
+    signatures(tree({ api: spread("number") })),
+  );
+  assert.deepEqual(diff.changed, ["api:listTags"]);
+});

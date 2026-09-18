@@ -102,10 +102,12 @@ function parseModule(path, source) {
   );
   const declarations = new Map();
   const imports = new Map();
-  // Local name to its registrar and contract nodes. Only exported ones are the
-  // API, and a module may export a name well after declaring it, so the two are
+  // Local name to the call that produced it and its contract nodes. Only
+  // exported ones are the API, and a module may export a name well after
+  // declaring it, or import its registrar below the call, so these are
   // collected apart and joined once the whole file has been read.
-  const registrars = new Map();
+  const candidates = new Map();
+  const factoryExports = new Map();
   const exported = new Map();
 
   for (const statement of file.statements) {
@@ -168,7 +170,7 @@ function parseModule(path, source) {
         for (const element of declaration.name.elements) {
           if (!ts.isIdentifier(element.name)) continue;
           exported.set(element.name.text, element.name.text);
-          registrars.set(element.name.text, {
+          factoryExports.set(element.name.text, {
             registrar: `${call.expression.text}()`,
             contract: [],
           });
@@ -182,22 +184,27 @@ function parseModule(path, source) {
       if (isExported) exported.set(name, name);
 
       const call = declaration.initializer;
-      const isPublic =
-        call &&
-        ts.isCallExpression(call) &&
-        ts.isIdentifier(call.expression) &&
-        PUBLIC_REGISTRARS.has(call.expression.text);
-      if (!isPublic) continue;
+      if (
+        !call ||
+        !ts.isCallExpression(call) ||
+        !ts.isIdentifier(call.expression)
+      ) {
+        continue;
+      }
 
       const config = call.arguments[0];
       if (!config || !ts.isObjectLiteralExpression(config)) continue;
+      // A spread carries whatever it carries, and following it can pull a
+      // handler in and report an edit that changes no contract. That is the
+      // side to err on; the alternative is a validator moving unseen.
       const contract = config.properties.filter(
         (property) =>
-          property.name &&
-          ts.isIdentifier(property.name) &&
-          CONTRACT_PROPERTIES.has(property.name.text),
+          ts.isSpreadAssignment(property) ||
+          (property.name &&
+            ts.isIdentifier(property.name) &&
+            CONTRACT_PROPERTIES.has(property.name.text)),
       );
-      registrars.set(name, { registrar: call.expression.text, contract });
+      candidates.set(name, { registrar: call.expression.text, contract });
     }
   }
 
@@ -217,8 +224,20 @@ function parseModule(path, source) {
   // untouched, which is a removal an installed app feels.
   const publics = new Map();
   for (const [name, local] of exported) {
-    const found = registrars.get(local);
-    if (found) publics.set(name, found);
+    const factory = factoryExports.get(local);
+    if (factory) {
+      publics.set(name, factory);
+      continue;
+    }
+    const candidate = candidates.get(local);
+    if (!candidate) continue;
+    // The word at the call site is a local binding. `import { mutation as
+    // query }` makes `query(...)` a mutation, and `import { query as q }`
+    // makes `q(...)` a query that reading the call site alone never sees.
+    const registrar =
+      imports.get(candidate.registrar)?.name ?? candidate.registrar;
+    if (!PUBLIC_REGISTRARS.has(registrar)) continue;
+    publics.set(name, { registrar, contract: candidate.contract });
   }
 
   return { declarations, imports, publics };
