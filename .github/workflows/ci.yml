@@ -65,6 +65,43 @@ jobs:
       - name: Test coverage
         run: pnpm run coverage
 
+  # A Convex deploy reaches every installed build at once, so a public
+  # function's args and returns are a contract with apps already in the wild.
+  # This fails a pull request that narrows one, because unlike a native change
+  # there is no later gate: once it merges, the next deploy breaks those apps.
+  # A commit carrying the "Convex-Api: changed" trailer says the author checked.
+  convex-api:
+    name: convex api contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      # Reads both refs out of git rather than checking them out, but it parses
+      # them with the repo's own TypeScript, so this one does need an install.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Public Convex contract
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/verify-convex-api.mjs "origin/$BASE_REF" HEAD
+
   # An OTA update only reaches installs whose store build shares the native
   # fingerprint. This job reports a pull request that moves it and never fails,
   # because merging a native change harms nobody; the OTA workflow's own gate

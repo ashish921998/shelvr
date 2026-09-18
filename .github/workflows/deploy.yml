@@ -1,11 +1,13 @@
 name: Deploy
 
 on:
-  # Runs after CI on main. The production Convex deploy waits for manual
-  # approval (the GitHub "production" environment needs a required reviewer
-  # configured), and the tester OTA publishes only after that deploy lands,
-  # so a client that needs new backend functions can never ship ahead of
-  # them. Deploying exactly the CI-validated commit keeps the gate honest.
+  # Runs after CI on main and deploys without asking. The production
+  # environment below is where a required reviewer would attach, and none is
+  # configured, so do not read it as an approval gate. What holds the line is
+  # CI passing, the freshness checks in every job that acts, and the
+  # convex-api contract check on the pull request that got the commit here.
+  # The tester OTA publishes only after the deploy lands, so a client that
+  # needs new backend functions can never ship ahead of them.
   workflow_run:
     workflows: [CI]
     branches: [main]

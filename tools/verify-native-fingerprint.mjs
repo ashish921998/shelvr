@@ -29,6 +29,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { trailerValues } from "./git-trailer.mjs";
 import { isMainModule } from "./main-module.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,21 +65,8 @@ export function isAcknowledged(values) {
   return values.some((value) => value.trim() === TRAILER_VALUE);
 }
 
-// Git decides what a trailer is, so the same line in a subject or in ordinary
-// body prose does not acknowledge anything.
 export function acknowledgementValues(dir, range) {
-  const output = execFileSync(
-    "git",
-    [
-      "-C",
-      dir,
-      "log",
-      `--format=%(trailers:key=${TRAILER_KEY},valueonly,separator=%x2C)`,
-      range,
-    ],
-    { encoding: "utf8" },
-  );
-  return output.split(/[\n,]/).filter((value) => value.trim() !== "");
+  return trailerValues(dir, range, TRAILER_KEY);
 }
 
 function git(args, options = {}) {
