@@ -492,5 +492,8 @@
     "other": "%{formattedCount}개가 기다리고 있어요."
   },
   "home.sectionNew": "이번 주 새 항목",
-  "home.sectionEarlier": "이전"
+  "home.sectionEarlier": "이전",
+  "spaces.onTheShelf": "선반에",
+  "spaces.shelved": "선반에 올렸어요.",
+  "spaces.ontoShelf": "%{space}(으)로"
 }

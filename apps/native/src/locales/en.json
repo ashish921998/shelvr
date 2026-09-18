@@ -508,5 +508,8 @@
     "other": "%{formattedCount} things waiting."
   },
   "home.sectionNew": "New this week",
-  "home.sectionEarlier": "Earlier"
+  "home.sectionEarlier": "Earlier",
+  "spaces.onTheShelf": "On the shelf",
+  "spaces.shelved": "Shelved.",
+  "spaces.ontoShelf": "Onto %{space}"
 }

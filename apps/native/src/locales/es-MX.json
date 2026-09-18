@@ -524,5 +524,8 @@
     "other": "%{formattedCount} cosas esperando."
   },
   "home.sectionNew": "Nuevo esta semana",
-  "home.sectionEarlier": "Antes"
+  "home.sectionEarlier": "Antes",
+  "spaces.onTheShelf": "En el estante",
+  "spaces.shelved": "Guardado.",
+  "spaces.ontoShelf": "En %{space}"
 }

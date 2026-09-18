@@ -462,6 +462,9 @@ export type MessageParams = {
   "home.headline": { count: number };
   "home.sectionNew": undefined;
   "home.sectionEarlier": undefined;
+  "spaces.onTheShelf": undefined;
+  "spaces.shelved": undefined;
+  "spaces.ontoShelf": { space: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

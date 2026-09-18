@@ -508,5 +508,8 @@
     "other": "%{formattedCount} Sachen warten."
   },
   "home.sectionNew": "Neu diese Woche",
-  "home.sectionEarlier": "Früher"
+  "home.sectionEarlier": "Früher",
+  "spaces.onTheShelf": "Im Regal",
+  "spaces.shelved": "Eingeräumt.",
+  "spaces.ontoShelf": "In %{space}"
 }

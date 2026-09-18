@@ -1,57 +1,66 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { analytics } from "@/lib/analytics";
 import { EmptyState } from "@/components/empty-state";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { ShelfRow, type ShelfCard } from "@/components/shelf/shelf-row";
+import { ShelfToast } from "@/components/shelf/shelf-toast";
+import { Eyebrow, Gutter } from "@/components/shelf/typography";
+import { StandingCard } from "@/components/shelf/standing-card";
 import {
   HeaderActionMenu,
   HeaderIconButton,
 } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import type { FeedItem } from "@/components/item-card";
-import { MasonryFeed } from "@/components/masonry-feed";
+import { SuggestedBadge } from "@/components/suggested-badge";
+import { saveMark } from "@/lib/ink/save-mark";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { AppSymbolIcon } from "@/components/symbol";
-import { ProgressiveBlurHeader } from "progressive-blur";
-import { useMemo } from "react";
-import { Alert, Platform, Pressable, Text, View } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { analytics } from "@/lib/analytics";
 
 export default function SpaceScreen() {
   useAppLocale();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const { width } = useWindowDimensions();
+  const clock = useInkClock();
+
   const { data: space } = useQuery(
     convexQuery(api.spaces.getSpace, { id: id as Id<"spaces"> }),
   );
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
+  const acceptSuggestion = useMutation(api.spaces.acceptSuggestion);
 
-  // Suggestions lead the feed (they're the ones asking for a decision),
-  // wearing the sparkle badge; saved items follow. Item detail rebuilds this
-  // exact ordering for swipe-paging, so keep the two in sync.
-  const feedItems = useMemo<FeedItem[]>(() => {
-    if (!space) return [];
-    return [
-      ...space.suggestions.map((item) => ({ ...item, suggested: true })),
-      ...space.items,
-    ];
-  }, [space]);
+  // Suggestions hover: they have not landed on the shelf, so the row is closed
+  // until asked for and nothing is drawn under the cards it reveals.
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [shelved, setShelved] = useState<string | null>(null);
 
-  // `undefined` = loading (nothing cached yet); `null` = not found.
   if (space === undefined) {
     return <ScreenLoader label={t("loading.space")} />;
   }
 
   if (space === null) {
     return (
-      <View style={styles.loading}>
+      <View style={styles.container}>
         <EmptyState title={t("item.goneTitle")} message={t("spaces.gone")} />
       </View>
     );
@@ -72,10 +81,15 @@ export default function SpaceScreen() {
     ]);
   };
 
-  const addAll = () => {
+  const confirm = () => {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    setShelved(space.name);
+  };
+
+  const addAll = () => {
+    confirm();
     acceptAllSuggestions({ spaceId: space._id })
       .then((count) => {
         if (count > 0) {
@@ -87,185 +101,239 @@ export default function SpaceScreen() {
       .catch(() => undefined);
   };
 
-  const suggestionCount = space.suggestions.length;
+  const addOne = (itemId: Id<"items">) => {
+    confirm();
+    acceptSuggestion({ spaceId: space._id, itemId })
+      .then(() =>
+        analytics.capture("space_suggestions_accepted", {
+          suggestion_count: 1,
+        }),
+      )
+      .catch(() => undefined);
+  };
+
+  const suggestions = space.suggestions;
+  const items = space.items;
 
   return (
-    <>
-      <Stack.Screen
-        options={
-          Platform.OS === "android"
-            ? {
-                title: space.name,
-                headerTransparent: false,
-                headerStyle: { backgroundColor: theme.colors.background },
-                headerTitleAlign: "center",
-                headerTitleStyle: {
-                  fontFamily: theme.fonts.display,
-                  color: theme.colors.foreground,
-                },
-                headerRight: () => (
-                  <View style={styles.headerActions}>
-                    <HeaderIconButton
-                      icon="plus"
-                      label={t("spaces.addItem")}
+    <View
+      style={styles.container}
+      testID={
+        space.fixtureKey
+          ? `fixture-space-detail-${space.fixtureKey}`
+          : undefined
+      }
+    >
+      <ScreenHeader
+        clock={clock}
+        title={space.name}
+        subtitle={t("spaces.saveCount", { count: items.length })}
+        left={
+          <HeaderIconButton
+            icon="chevron.left"
+            label={t("common.back")}
+            onPress={() => router.back()}
+          />
+        }
+        // The plus is gone: everything that is not "read this shelf" lives in
+        // the menu, so the header carries the name and one button.
+        right={
+          <HeaderActionMenu
+            icon="ellipsis"
+            label={t("spaces.actions")}
+            title={space.name}
+            actions={[
+              {
+                label: t("spaces.addItem"),
+                onPress: () =>
+                  router.push({ pathname: "/add", params: { spaceId: id } }),
+              },
+              {
+                label: t("spaces.editTitle"),
+                onPress: () =>
+                  router.push({ pathname: "/new-space", params: { id } }),
+              },
+              {
+                label: t("spaces.delete"),
+                destructive: true,
+                onPress: confirmDelete,
+              },
+            ]}
+          />
+        }
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {suggestions.length > 0 ? (
+          <View style={styles.suggested}>
+            <Pressable
+              style={styles.suggestedHeader}
+              onPress={() => setSuggestionsOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: suggestionsOpen }}
+              accessibilityLabel={t("spaces.suggestionCount", {
+                count: suggestions.length,
+              })}
+              testID="suggested-row"
+            >
+              <SuggestedBadge size={20} />
+              <Text style={styles.suggestedLabel}>
+                {t("spaces.suggestionCount", { count: suggestions.length })}
+              </Text>
+              <InkIcon
+                name={suggestionsOpen ? "chevron.down" : "chevron.right"}
+                size={14}
+                tint={theme.colors.faint}
+              />
+              <View style={styles.spacer} />
+              <Pressable
+                onPress={addAll}
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <Text style={styles.addAll}>{t("spaces.addAll")}</Text>
+              </Pressable>
+            </Pressable>
+
+            {suggestionsOpen ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.hovering}
+              >
+                {suggestions.map((item, index) => (
+                  <View key={item._id} style={styles.hoveringCard}>
+                    <StandingCard
+                      imageUrl={item.imageUrl ?? item.heroImageUrl}
+                      title={item.title ?? item.note}
+                      note={item.type === "note"}
+                      mark={saveMark(item)}
+                      aspectRatio={item.aspectRatio}
+                      index={index}
+                      clock={clock}
+                      accessibilityLabel={item.title ?? item.note}
                       onPress={() =>
                         router.push({
-                          pathname: "/add",
-                          params: { spaceId: id },
+                          pathname: "/item/[id]",
+                          params: { id: item._id, from: "space", spaceId: id },
                         })
                       }
                     />
-                    <HeaderActionMenu
-                      icon="ellipsis"
-                      label={t("spaces.actions")}
-                      title={space.name}
-                      actions={[
-                        {
-                          label: t("spaces.editTitle"),
-                          onPress: () =>
-                            router.push({
-                              pathname: "/new-space",
-                              params: { id },
-                            }),
-                        },
-                        {
-                          label: t("spaces.delete"),
-                          destructive: true,
-                          onPress: confirmDelete,
-                        },
-                      ]}
-                    />
+                    {/* The sparkle says "suggested"; adding one needs its own
+                        button, so each card carries an ink + disc. */}
+                    <Pressable
+                      style={styles.addDisc}
+                      onPress={() => addOne(item._id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("spaces.addItem")}
+                      hitSlop={6}
+                    >
+                      <InkIcon
+                        name="plus"
+                        size={14}
+                        tint={theme.colors.ink.light}
+                      />
+                    </Pressable>
                   </View>
-                ),
-              }
-            : undefined
-        }
-      />
-      {Platform.OS === "ios" ? (
-        <Stack.Title
-          style={{
-            fontFamily: theme.fonts.display,
-            color: theme.colors.foreground,
-          }}
-        >
-          {space.name}
-        </Stack.Title>
-      ) : null}
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="plus"
-            tintColor={theme.colors.foreground}
-            onPress={() =>
-              router.push({ pathname: "/add", params: { spaceId: id } })
-            }
-          >
-            {t("common.add")}
-          </Stack.Toolbar.Button>
-          <Stack.Toolbar.Menu icon="ellipsis">
-            <Stack.Toolbar.MenuAction
-              icon="pencil"
-              onPress={() =>
-                router.push({ pathname: "/new-space", params: { id } })
-              }
-            >
-              {t("spaces.editTitle")}
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="trash"
-              destructive
-              onPress={confirmDelete}
-            >
-              {t("spaces.delete")}
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-        </Stack.Toolbar>
-      ) : null}
-      <View
-        testID={
-          space.fixtureKey
-            ? `fixture-space-detail-${space.fixtureKey}`
-            : undefined
-        }
-        style={styles.container}
-      >
-        <MasonryFeed
-          items={feedItems}
-          source={{ from: "space", spaceId: id }}
-          firstItemZoomTarget
-          ListHeaderComponent={
-            suggestionCount > 0 ? (
-              <Animated.View
-                entering={FadeIn.duration(250)}
-                exiting={FadeOut.duration(200)}
-                style={styles.suggestionsPill}
-              >
-                <AppSymbolIcon
-                  name="sparkles"
-                  size={14}
-                  tintColor={theme.colors.primaryText}
-                />
-                <Text style={styles.suggestionsText}>
-                  {t("spaces.suggestionCount", { count: suggestionCount })}
-                </Text>
-                <Pressable
-                  onPress={addAll}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && { opacity: 0.7 }}
-                >
-                  <Text style={styles.addAllText}>{t("spaces.addAll")}</Text>
-                </Pressable>
-              </Animated.View>
-            ) : undefined
-          }
-          ListEmptyComponent={
-            <EmptyState
-              title={t("spaces.emptyTitle")}
-              message={t("spaces.emptyBody")}
+                ))}
+              </ScrollView>
+            ) : null}
+
+            <StitchLine width={width} clock={clock} />
+          </View>
+        ) : null}
+
+        {items.length === 0 ? (
+          <EmptyState
+            title={t("spaces.listEmptyTitle")}
+            message={t("spaces.listEmptyBody")}
+          />
+        ) : (
+          <View style={styles.shelf}>
+            <Gutter>
+              <Eyebrow>{`${t("spaces.onTheShelf")} · ${items.length}`}</Eyebrow>
+            </Gutter>
+            <ShelfRow
+              width={width}
+              clock={clock}
+              prop="books"
+              testID="shelf-items"
+              cards={items.map<ShelfCard>((item) => ({
+                key: item._id,
+                imageUrl: item.imageUrl ?? item.heroImageUrl,
+                title: item.title ?? item.note,
+                note: item.type === "note",
+                mark: saveMark(item),
+                aspectRatio: item.aspectRatio,
+                accessibilityLabel: item.title ?? item.note,
+                onPress: () =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item._id, from: "space", spaceId: id },
+                  }),
+              }))}
             />
-          }
-        />
-        {Platform.OS === "ios" ? <ProgressiveBlurHeader /> : null}
-      </View>
-    </>
+          </View>
+        )}
+      </ScrollView>
+
+      <ShelfToast
+        verdict={t("spaces.shelved")}
+        detail={shelved ? t("spaces.ontoShelf", { space: shelved }) : undefined}
+        visible={shelved !== null}
+        onHidden={() => setShelved(null)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: theme.gap(1),
-  },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.background,
-  },
-  suggestionsPill: {
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  content: { paddingTop: 16, paddingBottom: 40 },
+  suggested: { marginBottom: 20, gap: 8 },
+  suggestedHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1),
-    alignSelf: "center",
-    backgroundColor: theme.colors.primarySoft,
-    borderRadius: 50,
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
-    marginTop: theme.gap(0.5),
-    marginBottom: theme.gap(1),
+    gap: 8,
+    minHeight: 36,
+    paddingHorizontal: 20,
   },
-  suggestionsText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
+  suggestedLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
     color: theme.colors.primaryText,
   },
-  addAllText: {
+  spacer: { flex: 1 },
+  addAll: {
     fontFamily: theme.fonts.bold,
     fontSize: 13,
     color: theme.colors.primaryText,
-    textDecorationLine: "underline",
   },
+  // Suggested cards hover with a floating shadow and no board beneath them.
+  hovering: {
+    flexDirection: "row",
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  hoveringCard: { position: "relative" },
+  addDisc: {
+    position: "absolute",
+    right: -10,
+    top: -10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.foreground,
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  shelf: { gap: 8 },
 }));

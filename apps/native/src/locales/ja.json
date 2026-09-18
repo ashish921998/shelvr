@@ -492,5 +492,8 @@
     "other": "%{formattedCount}件が棚で待っています。"
   },
   "home.sectionNew": "今週の新着",
-  "home.sectionEarlier": "それ以前"
+  "home.sectionEarlier": "それ以前",
+  "spaces.onTheShelf": "棚の中",
+  "spaces.shelved": "棚に入れました。",
+  "spaces.ontoShelf": "%{space} へ"
 }
