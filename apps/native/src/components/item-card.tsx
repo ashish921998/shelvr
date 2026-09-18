@@ -351,11 +351,24 @@ export const ItemCard = memo(function ItemCard({
   // A failed save has no AI title, so without this the card is blank forever and
   // indistinguishable from one still processing.
   const failedLabel = failureLabel(item);
-  const captionTitle =
-    item.title ??
-    item.note ??
-    failedLabel ??
-    (item.url ? displayHost(item.url) : undefined);
+  const titles = [
+    item.title,
+    item.note,
+    failedLabel,
+    item.url ? displayHost(item.url) : undefined,
+  ];
+  const captionTitle = titles.find((title) => title !== undefined);
+
+  // What a screen reader reads instead of the card's contents. The classifier
+  // can hand back a title that is empty or only spaces, and an accessibilityLabel
+  // replaces the child text rather than falling back to it — so a blank one
+  // would leave the card announcing nothing at all. Take the first title with
+  // visible characters, then describe the item's state.
+  const accessibilityLabel =
+    titles.find((title) => title?.trim()) ??
+    (item.status === "processing"
+      ? t("item.stillWorking")
+      : t("item.untitledItem"));
 
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
   // exit animation is the confirmation — no navigation, no dialog.
@@ -415,6 +428,12 @@ export const ItemCard = memo(function ItemCard({
       >
         <Link.Trigger withAppleZoom>
           <Pressable
+            // `role`, not `accessibilityRole`: Link spreads its own role="link"
+            // onto this trigger, and React Native reads `role` first on both
+            // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
+            // so an accessibilityRole here would never reach the screen reader.
+            role="button"
+            accessibilityLabel={accessibilityLabel}
             testID={
               item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
             }
