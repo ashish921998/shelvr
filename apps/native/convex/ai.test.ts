@@ -1573,6 +1573,33 @@ describe("fetchInstagram", () => {
     );
   });
 
+  it.each(["page", "embed", "both"])(
+    "preserves truncation from the %s response",
+    async (source) => {
+      instagramAnswers(REEL_PAGE, REEL_EMBED);
+      const answer = safeFetch.getMockImplementation()!;
+      safeFetch.mockImplementation(async (url: string, options: unknown) => {
+        const result = await answer(url, options);
+        const isEmbed = url.includes("/embed/captioned/");
+        const isInstagram = url.startsWith("https://www.instagram.com/");
+        return isInstagram &&
+          (source === "both" || (source === "embed") === isEmbed)
+          ? { ...result, truncated: true }
+          : result;
+      });
+      const page = await fetchInstagram(
+        "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+      );
+      expect(page.truncated).toBe(true);
+      expect(page.content).toContain("Meet the National Geographic 33!");
+      expect(page.author).toBe("@natgeo");
+      expect(page.heroImageUrl).toBe(
+        "https://cdn.fbcdn.net/poster.jpg?x=1&y=2",
+      );
+      expect(page.incomplete).toBeUndefined();
+    },
+  );
+
   it("reads a reel as the crawler sees it, never the login shell", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
     await expect(

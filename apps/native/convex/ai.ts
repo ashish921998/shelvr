@@ -1249,7 +1249,7 @@ async function fetchInstagramHtml(url: string) {
 }
 
 type InstagramEmbed =
-  | { status: "ok"; html: string }
+  | { status: "ok"; html: string; truncated?: true }
   | { status: "missing" }
   | { status: "transient"; errorCategory: string };
 
@@ -1276,6 +1276,7 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     return {
       status: "ok",
       html: decodeWithContentType(result.bytes, result.contentType),
+      ...(result.truncated ? { truncated: true as const } : {}),
     };
   }
   return isTransientFetchFailure(result.code, result.status)
@@ -1354,6 +1355,9 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...(page.truncated || (embed.status === "ok" && embed.truncated)
+      ? { truncated: true as const }
+      : {}),
     ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
