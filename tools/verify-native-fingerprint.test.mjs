@@ -8,6 +8,8 @@ import { after, test } from "node:test";
 import {
   acknowledgementValues,
   diffSources,
+  exitCode,
+  formatReport,
   isAcknowledged,
   sourceKey,
 } from "./verify-native-fingerprint.mjs";
@@ -95,6 +97,59 @@ test("only the exact trailer value acknowledges", () => {
   assert.equal(isAcknowledged([]), false);
   assert.equal(isAcknowledged(["unchanged"]), false);
   assert.equal(isAcknowledged(["changed later"]), false);
+});
+
+test("unacknowledged drift fails only when it is not an early warning", () => {
+  const drift = { drifted: true, acknowledged: false };
+  assert.equal(exitCode({ ...drift, warnOnly: false }), 1);
+  assert.equal(exitCode({ ...drift, warnOnly: true }), 0);
+  assert.equal(
+    exitCode({ drifted: true, acknowledged: true, warnOnly: false }),
+    0,
+  );
+  assert.equal(
+    exitCode({ drifted: false, acknowledged: false, warnOnly: false }),
+    0,
+  );
+});
+
+const drifted = (warnOnly) =>
+  formatReport({
+    baseRef: "origin/main",
+    base: "a".repeat(40),
+    headRef: "HEAD",
+    head: "b".repeat(40),
+    variant: "production",
+    acknowledged: false,
+    warnOnly,
+    results: [
+      {
+        platform: "ios",
+        baseHash: "1111111",
+        headHash: "2222222",
+        diff: diffSources(
+          [file("../../node_modules/posthog-react-native", "1111")],
+          [file("../../node_modules/posthog-react-native", "aaaa")],
+        ),
+      },
+    ],
+  });
+
+test("the early warning names the release gate as what enforces compatibility", () => {
+  const report = drifted(true);
+  assert.match(report, /early warning and does not fail the check/);
+  assert.match(report, /verify-ota-compatibility\.mjs/);
+  // Same comparison either way: the flag changes the verdict, not the finding.
+  assert.match(report, /ios {6}1111111 -> 2222222 {2}CHANGED/);
+  assert.match(report, /posthog-react-native/);
+  assert.match(report, /Native-Fingerprint: changed/);
+});
+
+test("without the flag the report claims no other gate", () => {
+  const report = drifted(false);
+  assert.doesNotMatch(report, /early warning/);
+  assert.doesNotMatch(report, /verify-ota-compatibility/);
+  assert.match(report, /ios {6}1111111 -> 2222222 {2}CHANGED/);
 });
 
 const repo = mkdtempSync(join(tmpdir(), "fingerprint-trailer-"));

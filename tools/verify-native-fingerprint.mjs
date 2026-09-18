@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Fails when the native fingerprint differs between two git refs.
+// Reports when the native fingerprint differs between two git refs.
 //
 // app.json pins the runtime version to the fingerprint policy, so an OTA
 // update only reaches installs whose store build shares its fingerprint. A
@@ -9,12 +9,18 @@
 // from its own lockfile, computes the fingerprint per platform in one
 // environment, and lists every source that differs.
 //
+// On a pull request it runs with --warn-only and never fails the check. A
+// native change is a legitimate thing to merge, and merging it harms nobody.
+// Publishing an update that no released binary can accept is what does, so
+// tools/verify-ota-compatibility.mjs enforces compatibility inside the OTA
+// workflow instead, against the build users actually have.
+//
 // An intended move is acknowledged with a git trailer on a commit in
 // base..head, in the message's trailer block:
 //
 //   Native-Fingerprint: changed
 //
-// Usage: node tools/verify-native-fingerprint.mjs <base-ref> [head-ref]
+// Usage: node tools/verify-native-fingerprint.mjs <base-ref> [head-ref] [--warn-only]
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -135,7 +141,13 @@ function short(sha) {
   return sha.slice(0, 7);
 }
 
-function formatReport({
+/** Drift never fails the check under --warn-only, so the pull request sees an
+ * early warning and the OTA workflow keeps the enforcing verdict. */
+export function exitCode({ drifted, acknowledged, warnOnly }) {
+  return drifted && !acknowledged && !warnOnly ? 1 : 0;
+}
+
+export function formatReport({
   baseRef,
   base,
   headRef,
@@ -143,6 +155,7 @@ function formatReport({
   variant,
   results,
   acknowledged,
+  warnOnly,
 }) {
   const lines = [
     `native fingerprint  base=${baseRef} (${short(base)})  head=${headRef} (${short(head)})  APP_VARIANT=${variant}`,
@@ -167,6 +180,15 @@ function formatReport({
       "",
       "This range moves the native fingerprint, so an OTA published after it",
       "merges reaches no existing install until a new store build ships.",
+    );
+    if (warnOnly) {
+      lines.push(
+        "This is an early warning and does not fail the check. Compatibility is",
+        "enforced at publish time by tools/verify-ota-compatibility.mjs, which",
+        "blocks the OTA workflow when the update cannot reach the released build.",
+      );
+    }
+    lines.push(
       "If that is intended, add this trailer to a commit in the range:",
       "",
       `  ${ACKNOWLEDGEMENT}`,
@@ -176,10 +198,13 @@ function formatReport({
 }
 
 function main(argv) {
-  const [baseRef, headRef = "HEAD"] = argv;
+  const warnOnly = argv.includes("--warn-only");
+  const [baseRef, headRef = "HEAD"] = argv.filter(
+    (arg) => !arg.startsWith("--"),
+  );
   if (!baseRef) {
     process.stderr.write(
-      "usage: verify-native-fingerprint.mjs <base-ref> [head-ref]\n",
+      "usage: verify-native-fingerprint.mjs <base-ref> [head-ref] [--warn-only]\n",
     );
     return 2;
   }
@@ -223,6 +248,7 @@ function main(argv) {
       variant,
       results,
       acknowledged,
+      warnOnly,
     });
     process.stdout.write(`${report}\n`);
     if (process.env.GITHUB_STEP_SUMMARY) {
@@ -232,7 +258,7 @@ function main(argv) {
       );
     }
     const drifted = results.some((r) => r.baseHash !== r.headHash);
-    return drifted && !acknowledged ? 1 : 0;
+    return exitCode({ drifted, acknowledged, warnOnly });
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

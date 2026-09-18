@@ -91,9 +91,12 @@ jobs:
           cache: pnpm
 
       # The guard exports and installs both refs itself, so the checkout
-      # needs no install of its own.
+      # needs no install of its own. --warn-only because a native change is a
+      # legitimate thing to merge; the OTA workflow's own gate is what refuses
+      # to publish an update no released binary can accept.
       - name: Native fingerprint drift
         env:
           BASE_REF: ${{ github.base_ref }}
           APP_VARIANT: production
-        run: node tools/verify-native-fingerprint.mjs "origin/$BASE_REF" HEAD
+        run: |
+          node tools/verify-native-fingerprint.mjs "origin/$BASE_REF" HEAD --warn-only
