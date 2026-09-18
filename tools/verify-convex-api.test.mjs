@@ -13,7 +13,9 @@ import {
 
 const path = (name) => `apps/native/convex/${name}.ts`;
 const tree = (modules) =>
-  new Map(Object.entries(modules).map(([name, source]) => [path(name), source]));
+  new Map(
+    Object.entries(modules).map(([name, source]) => [path(name), source]),
+  );
 
 const shared = `
 import { v } from "convex/values";
@@ -74,7 +76,10 @@ test("narrowing an argument validator is a change", () => {
 test("a validator that moved in another file changes every caller's contract", () => {
   const head = tree({
     items,
-    "model/items": shared.replace("title: v.string()", "title: v.optional(v.string())"),
+    "model/items": shared.replace(
+      "title: v.string()",
+      "title: v.optional(v.string())",
+    ),
   });
   const diff = diffSignatures(signatures(base), signatures(head));
   assert.deepEqual(diff.changed, ["items:listItems"]);
@@ -111,7 +116,10 @@ test("a function an installed app could still call is a removal", () => {
 test("reformatting and handler edits are not contract changes", () => {
   for (const source of [
     items.replace(/\n/g, "\n   "),
-    items.replace("handler: async (ctx) => []", "handler: async (ctx) => {\n    return [];\n  }"),
+    items.replace(
+      "handler: async (ctx) => []",
+      "handler: async (ctx) => {\n    return [];\n  }",
+    ),
   ]) {
     const diff = diffSignatures(
       signatures(base),
@@ -160,4 +168,79 @@ test("an unchanged tree says so", () => {
     formatReport({ baseRef: "a", headRef: "b", diff, acknowledged: false }),
     /No public contract was narrowed/,
   );
+});
+
+// A module may hand a validator on without declaring it. The walk has to keep
+// going or the contract it describes is invisible.
+test("a validator reached through a re-export is part of the contract", () => {
+  const leaf = (extra) => `
+import { v } from "convex/values";
+export const tagValidator = v.object({ name: v.string()${extra} });
+`;
+  const relay = `
+import { tagValidator } from "./model/tags";
+export { tagValidator };
+`;
+  const api = `
+import { v } from "convex/values";
+import { query } from "./_generated/server";
+import { tagValidator } from "./tags";
+
+export const listTags = query({
+  args: {},
+  returns: v.array(tagValidator),
+  handler: async () => [],
+});
+`;
+  const build = (extra) =>
+    signatures(tree({ "model/tags": leaf(extra), tags: relay, api }));
+  const diff = diffSignatures(build(""), build(", color: v.string()"));
+  assert.deepEqual(diff.changed, ["api:listTags"]);
+  assert.equal(isBreaking(diff), true);
+});
+
+// Unexporting is how a function leaves the API without its body being touched.
+test("withdrawing an export is a removal", () => {
+  const head = tree({
+    "model/items": shared,
+    items: items.replace(
+      "export const deleteItem = mutation({",
+      "const deleteItem = mutation({",
+    ),
+  });
+  const diff = diffSignatures(signatures(base), signatures(head));
+  assert.deepEqual(diff.removed, ["items:deleteItem"]);
+  assert.equal(isBreaking(diff), true);
+});
+
+test("a function exported by a later statement is still public", () => {
+  const head = tree({
+    "model/items": shared,
+    items: `${items}
+const pinItem = mutation({
+  args: { itemId: v.id("items") },
+  returns: v.null(),
+  handler: async () => null,
+});
+export { pinItem };
+`,
+  });
+  const diff = diffSignatures(signatures(base), signatures(head));
+  assert.deepEqual(diff.added, ["items:pinItem"]);
+  assert.deepEqual(diff.removed, []);
+});
+
+// An installed app calls a query over one transport and a mutation over
+// another, so the kind is as much a contract as the validators are.
+test("changing a query to a mutation is a change", () => {
+  const head = tree({
+    "model/items": shared,
+    items: items.replace(
+      "export const listItems = query({",
+      "export const listItems = mutation({",
+    ),
+  });
+  const diff = diffSignatures(signatures(base), signatures(head));
+  assert.deepEqual(diff.changed, ["items:listItems"]);
+  assert.equal(isBreaking(diff), true);
 });

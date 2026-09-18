@@ -13,7 +13,10 @@
  * changes while the shape it promises changes underneath it. So each public
  * function's validators are resolved to their full text, following every
  * identifier they reference through the convex tree, and that closure is what
- * gets compared.
+ * gets compared, together with the registrar the function was declared with. A
+ * query an app reaches over one transport is not the mutation it becomes, and
+ * a function that loses its `export` leaves the API without its body moving at
+ * all, so both count as changes to the contract.
  *
  * A new function is additive and passes. A removed or changed one fails, until
  * a commit in the range carries
@@ -99,7 +102,11 @@ function parseModule(path, source) {
   );
   const declarations = new Map();
   const imports = new Map();
-  const publics = new Map();
+  // Local name to its registrar and contract nodes. Only exported ones are the
+  // API, and a module may export a name well after declaring it, so the two are
+  // collected apart and joined once the whole file has been read.
+  const registrars = new Map();
+  const exported = new Map();
 
   for (const statement of file.statements) {
     if (ts.isImportDeclaration(statement)) {
@@ -116,15 +123,38 @@ function parseModule(path, source) {
       continue;
     }
 
+    if (ts.isExportDeclaration(statement)) {
+      const clause = statement.exportClause;
+      if (!clause || !ts.isNamedExports(clause)) continue;
+      const target = statement.moduleSpecifier
+        ? resolveImport(path, statement.moduleSpecifier.text)
+        : null;
+      for (const element of clause.elements) {
+        const local = (element.propertyName ?? element.name).text;
+        exported.set(element.name.text, local);
+        // `export { x } from "./y"` binds a name this module never imported,
+        // so record where it lives or the walk has nowhere to go.
+        if (target) {
+          imports.set(element.name.text, { path: target, name: local });
+        }
+      }
+      continue;
+    }
+
     if (ts.isFunctionDeclaration(statement) && statement.name) {
       declarations.set(statement.name.text, statement);
       continue;
     }
 
     if (!ts.isVariableStatement(statement)) continue;
+    const isExported = statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name)) continue;
-      declarations.set(declaration.name.text, declaration);
+      const name = declaration.name.text;
+      declarations.set(name, declaration);
+      if (isExported) exported.set(name, name);
 
       const call = declaration.initializer;
       const isPublic =
@@ -142,8 +172,16 @@ function parseModule(path, source) {
           ts.isIdentifier(property.name) &&
           CONTRACT_PROPERTIES.has(property.name.text),
       );
-      publics.set(declaration.name.text, contract);
+      registrars.set(name, { registrar: call.expression.text, contract });
     }
+  }
+
+  // Dropping the `export` is how a function leaves the API with its body
+  // untouched, which is a removal an installed app feels.
+  const publics = new Map();
+  for (const [name, local] of exported) {
+    const found = registrars.get(local);
+    if (found) publics.set(name, found);
   }
 
   return { declarations, imports, publics };
@@ -188,6 +226,24 @@ export function contractParts(modules, path, nodes) {
   const parts = new Map();
   const seen = new Set();
 
+  // A module can hand a name straight through (`export { x }` over an import of
+  // it), so the module an import names is not always the one that declares it.
+  const resolve = (binding) => {
+    const hops = new Set();
+    let current = binding;
+    while (current) {
+      const key = `${current.path}#${current.name}`;
+      if (hops.has(key)) return null;
+      hops.add(key);
+      const target = modules.get(current.path);
+      if (!target) return null;
+      const declaration = target.declarations.get(current.name);
+      if (declaration) return { ...current, declaration };
+      current = target.imports.get(current.name);
+    }
+    return null;
+  };
+
   const follow = (currentPath, node) => {
     const parsed = modules.get(currentPath);
     if (!parsed) return;
@@ -201,16 +257,13 @@ export function contractParts(modules, path, nodes) {
         follow(currentPath, local);
         continue;
       }
-      const imported = parsed.imports.get(name);
+      const imported = resolve(parsed.imports.get(name));
       if (!imported) continue;
-      const target = modules.get(imported.path);
-      const declaration = target?.declarations.get(imported.name);
-      if (!declaration) continue;
       const key = `${imported.path}#${imported.name}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      parts.set(key, normalize(declaration.getText()));
-      follow(imported.path, declaration);
+      parts.set(key, normalize(imported.declaration.getText()));
+      follow(imported.path, imported.declaration);
     }
   };
 
@@ -224,11 +277,17 @@ export function signatures(tree) {
   const modules = parseTree(tree);
   const result = new Map();
   for (const [path, parsed] of modules) {
-    for (const [name, nodes] of parsed.publics) {
-      const parts = contractParts(modules, path, nodes);
+    for (const [name, { registrar, contract }] of parsed.publics) {
+      // An installed app reaches a query and a mutation over different
+      // transports, so flipping one breaks it while every validator holds
+      // still.
+      const parts = [registrar, ...contractParts(modules, path, contract)];
       result.set(
         `${moduleName(path)}:${name}`,
-        createHash("sha256").update(parts.join("\n")).digest("hex").slice(0, 12),
+        createHash("sha256")
+          .update(parts.join("\n"))
+          .digest("hex")
+          .slice(0, 12),
       );
     }
   }

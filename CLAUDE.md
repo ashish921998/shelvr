@@ -252,9 +252,11 @@ needed at runtime by the features that use them:
   old bundle still calling it. CI enforces the first half: `tools/verify-convex-api.mjs`
   resolves every public function's `args` and `returns` to their full text, following the
   shared validators they reference, and fails a pull request that changes or removes one.
-  Acknowledge a change an installed app survives, or the expand half of the sequence, with
-  a `Convex-Api: changed` trailer on a commit in the range. It cannot yet tell widening
-  from narrowing, so an added field asks for the trailer too.
+  Withdrawing a function's `export`, or switching it between `query`, `mutation` and
+  `action`, counts the same way. Acknowledge a change an installed app survives, or the
+  expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
+  range. It cannot yet tell widening from narrowing, so an added field asks for the
+  trailer too.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
