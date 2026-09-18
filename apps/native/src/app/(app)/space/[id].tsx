@@ -61,7 +61,11 @@ export default function SpaceScreen() {
   if (space === null) {
     return (
       <View style={styles.container}>
-        <EmptyState title={t("item.goneTitle")} message={t("spaces.gone")} />
+        <EmptyState
+          title={t("item.goneTitle")}
+          message={t("spaces.gone")}
+          prop={null}
+        />
       </View>
     );
   }

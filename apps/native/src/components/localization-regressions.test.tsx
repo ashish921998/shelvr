@@ -81,7 +81,22 @@ vi.mock("react-native", () => {
 });
 vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({
-    theme: { colors: { foreground: "black", primary: "orange" } },
+    theme: {
+      colors: {
+        foreground: "black",
+        primary: "orange",
+        // The drawn layer reads its own three colours off the theme.
+        ink: {
+          thread: "ochre",
+          terracotta: "terracotta",
+          slate: "slate",
+          light: "paper",
+          body: "body",
+          keep: "green",
+        },
+      },
+      fonts: { regular: "r", medium: "m", bold: "b", display: "d" },
+    },
   }),
   StyleSheet: { create: () => ({}) },
 }));
@@ -107,6 +122,18 @@ vi.mock("react-native-reanimated", async () => {
     withTiming: (value: number) => value,
     withSpring: (value: number) => value,
     withDelay: (_delay: number, value: number) => value,
+    withRepeat: (value: number) => value,
+    withSequence: (value: number) => value,
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    useReducedMotion: () => false,
+    cancelAnimation: () => {},
+    Easing: {
+      linear: (t: number) => t,
+      bezier: () => (t: number) => t,
+      out: (fn: (t: number) => number) => fn,
+      quad: (t: number) => t,
+      cubic: (t: number) => t,
+    },
   };
 });
 vi.mock("@shopify/react-native-skia", () => {
@@ -125,6 +152,17 @@ vi.mock("@shopify/react-native-skia", () => {
       <span data-testid="glyph">{text}</span>
     )),
     BlurMask: vi.fn(() => null),
+    Path: vi.fn(() => null),
+    DashPathEffect: vi.fn(() => null),
+    Skia: {
+      Path: {
+        Make: vi.fn(() => ({
+          moveTo: vi.fn(),
+          lineTo: vi.fn(),
+          close: vi.fn(),
+        })),
+      },
+    },
   };
 });
 vi.mock("@/components/symbol", () => ({

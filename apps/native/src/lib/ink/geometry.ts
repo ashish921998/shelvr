@@ -25,7 +25,7 @@ export function span(t: number, a: number, b: number): number {
 
 /** Wobble amplitudes and frequencies, kept as named presets so a stroke type
  * always wobbles the same amount wherever it is drawn. */
-export type WobblePreset = {
+type WobblePreset = {
   /** Amplitude across and down, in points. */
   ax: number;
   ay: number;
@@ -175,7 +175,7 @@ export function handEllipse(
 }
 
 /** One sashiko stitch: 6 units on, 4 off. */
-export type Stitch = { from: Point; to: Point };
+type Stitch = { from: Point; to: Point };
 
 /** Sashiko stitches along `y`, drawn left to right and revealed by `progress`.
  * Used as a divider, a seam, and the mark that closes a save. */

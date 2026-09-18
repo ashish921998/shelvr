@@ -21,6 +21,9 @@ import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Image } from "expo-image";
+import { SketchSkeleton } from "@/components/ink/sketch-skeleton";
+import { TableCard } from "@/components/shelf/table-card";
+import { saveMark } from "@/lib/ink/save-mark";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
@@ -244,7 +247,23 @@ export const ItemDetail = memo(function ItemDetail({
         ))
       : null;
 
-  const heroBlock = heroUri ? (
+  // A photo, a note or a social post is wide enough to be the page itself; a
+  // link, recipe, product or clip is a card you are holding, so it lies on the
+  // table at its shelf size. Item pages never draw a shelf (see table-card).
+  const mark = saveMark(item);
+  const asObject =
+    item.type === "image" || item.type === "note" || social !== undefined;
+
+  const heroBlock = !asObject ? (
+    <View style={styles.tableRow}>
+      <TableCard
+        imageUrl={heroUri}
+        mark={mark}
+        clip={mark === "video"}
+        accessibilityLabel={item.title ?? undefined}
+      />
+    </View>
+  ) : heroUri ? (
     <>
       <View style={item.isSticker ? undefined : styles.heroContainer}>
         {isZoomTarget ? (
@@ -279,7 +298,7 @@ export const ItemDetail = memo(function ItemDetail({
       <ScrollView {...scrollProps}>
         {heroBlock}
         <View style={styles.bodyPending}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <SketchSkeleton width={220} height={120} />
         </View>
       </ScrollView>
     );
@@ -648,6 +667,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Non-sticker heroes get the same white matted frame as the home cards, so
   // the padded look carries through the Apple zoom into this screen.
+  // The card lies to the left, the way you would put a thing down.
+  tableRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    alignItems: "flex-start",
+  },
   heroContainer: {
     backgroundColor: "white",
     // Hug the image so a capped portrait sits as a centered card rather than

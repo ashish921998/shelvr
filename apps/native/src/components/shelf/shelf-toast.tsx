@@ -15,7 +15,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { StitchLine } from "@/components/ink/stitch-line";
 import { INK_A11Y } from "@/components/ink/ink-canvas";
 
-export const TOAST_MS = 2500;
+const TOAST_MS = 2500;
 
 export function ShelfToast({
   /** "Saved." — one word, a full stop. */

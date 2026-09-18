@@ -11,7 +11,7 @@ import { ease, span, stitchSegments } from "@/lib/ink/geometry";
 import type { Stroke } from "@/lib/ink/strokes";
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 
-export const STITCH_HEIGHT = 10;
+const STITCH_HEIGHT = 10;
 
 export function StitchLine({
   width,

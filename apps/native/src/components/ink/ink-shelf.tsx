@@ -17,7 +17,7 @@ import {
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 
 /** The canvas is 30 tall and overlaps the cards above it by 4. */
-export const SHELF_HEIGHT = 30;
+const SHELF_HEIGHT = 30;
 const BOARD_Y = 8;
 
 export function InkShelf({

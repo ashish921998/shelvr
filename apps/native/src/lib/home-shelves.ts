@@ -7,11 +7,11 @@
 // does not carry it — see `lib/ink/save-mark.ts` for the same limit.
 
 /** Everything the grouping reads. A subset of the feed row. */
-export type ShelvedItem = { _creationTime?: number };
+type ShelvedItem = { _creationTime?: number };
 
 export type ShelfSection = "new" | "earlier";
 
-export type HomeShelf<T> = {
+type HomeShelf<T> = {
   section: ShelfSection;
   items: T[];
 };

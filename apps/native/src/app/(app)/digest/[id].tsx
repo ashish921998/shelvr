@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { InkDoodle } from "@/components/ink/ink-doodle";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -85,7 +86,11 @@ export default function DigestScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.eyebrow}>{t("digest.eyebrow")}</Text>
-            <Text style={styles.title}>{t("digest.title")}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{t("digest.title")}</Text>
+              {/* The screen's one accent: Sunday, drawn. */}
+              <InkDoodle kind="sun" size={44} />
+            </View>
             <Text style={styles.subtitle}>
               {t("digest.waitingCount", {
                 count: digest.itemCount,
@@ -129,7 +134,14 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 1.2,
     color: theme.colors.primary,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   title: {
+    flex: 1,
     fontFamily: theme.fonts.display,
     fontSize: 30,
     color: theme.colors.foreground,

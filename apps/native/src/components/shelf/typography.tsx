@@ -43,32 +43,6 @@ export function Headline({
   return <Text style={[styles.headline, style]}>{children}</Text>;
 }
 
-export function Body({
-  children,
-  small = false,
-  style,
-}: {
-  children: React.ReactNode;
-  small?: boolean;
-  style?: StyleProp<TextStyle>;
-}) {
-  return (
-    <Text style={[small ? styles.bodySmall : styles.body, style]}>
-      {children}
-    </Text>
-  );
-}
-
-export function Meta({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: StyleProp<TextStyle>;
-}) {
-  return <Text style={[styles.meta, style]}>{children}</Text>;
-}
-
 /** The screen's one gutter. Content sits 20 in from each edge. */
 export function Gutter({
   children,
@@ -98,23 +72,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 34,
     lineHeight: 38,
     color: theme.colors.foreground,
-  },
-  body: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
-    color: theme.colors.muted,
-  },
-  bodySmall: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-  },
-  meta: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 12,
-    color: theme.colors.muted,
   },
   gutter: { paddingHorizontal: 20 },
 }));

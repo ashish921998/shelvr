@@ -373,7 +373,11 @@ function ItemScreenContent() {
   if (items.length === 0) {
     return (
       <View style={styles.loading}>
-        <EmptyState title={t("item.goneTitle")} message={t("item.goneBody")} />
+        <EmptyState
+          title={t("item.goneTitle")}
+          message={t("item.goneBody")}
+          prop={null}
+        />
       </View>
     );
   }

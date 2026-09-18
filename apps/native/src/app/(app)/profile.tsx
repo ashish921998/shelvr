@@ -1,5 +1,8 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkRing } from "@/components/ink/ink-ring";
+import { SecondaryButton, TertiaryAction } from "@/components/shelf/ink-button";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
@@ -269,11 +272,14 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <AppSymbolIcon
+          <InkIcon
             name="person.fill"
             size={20}
-            tintColor={theme.colors.primaryText}
+            tint={theme.colors.primaryText}
           />
+          <View style={styles.avatarRing} pointerEvents="none">
+            <InkRing width={52} height={52} />
+          </View>
         </View>
         <Text selectable style={styles.email} numberOfLines={1}>
           {user?.email ?? t("account.signedIn")}
@@ -469,29 +475,18 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
+      {/* Sign out is a surface pill in danger text; deleting the account is a
+          line of text under it, because it is not a thing to reach for. */}
+      <SecondaryButton
+        label={signingOut ? t("account.signingOut") : t("account.signOut")}
         disabled={busy}
         onPress={() => void handleSignOut()}
-      >
-        <Text style={styles.signOutText}>
-          {signingOut ? t("account.signingOut") : t("account.signOut")}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.deleteAccount,
-          pressed && { opacity: 0.7 },
-          deleting && { opacity: 0.4 },
-        ]}
-        disabled={busy}
-        onPress={confirmDeleteAccount}
-      >
-        <Text style={styles.deleteAccountText}>
-          {deleting ? t("account.deleting") : t("account.delete")}
-        </Text>
-      </Pressable>
+        style={styles.signOut}
+      />
+      <TertiaryAction
+        label={deleting ? t("account.deleting") : t("account.delete")}
+        onPress={busy ? undefined : confirmDeleteAccount}
+      />
       {feedbackOpen ? (
         <FeedbackModal
           surface="profile"
@@ -544,6 +539,8 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  // The ring is drawn outside the disc, inset -6 as the spec has it.
+  avatarRing: { position: "absolute", left: -6, top: -6 },
   email: {
     flex: 1,
     fontFamily: theme.fonts.medium,

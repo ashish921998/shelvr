@@ -15,7 +15,7 @@ import {
 
 /** Long enough for every entry window in the spec (hairline 1s, shelves 0.7s
  * after their stagger, marks 0.4s after their card lands). */
-export const INK_ENTRY_SECONDS = 3;
+const INK_ENTRY_SECONDS = 3;
 
 /**
  * Seconds since the screen appeared, ramping linearly and then stopping.

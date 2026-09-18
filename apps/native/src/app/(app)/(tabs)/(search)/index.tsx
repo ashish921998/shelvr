@@ -57,11 +57,13 @@ export default function SearchScreen() {
         <EmptyState
           title={t("search.emptyTitle")}
           message={t("search.emptyBody")}
+          prop={null}
         />
       ) : results && results.length === 0 ? (
         <EmptyState
           title={t("search.noResultsTitle")}
           message={t("search.noResults", { query })}
+          prop={null}
         />
       ) : (
         <MasonryFeed

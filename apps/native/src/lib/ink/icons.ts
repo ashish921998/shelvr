@@ -62,7 +62,10 @@ export type InkIconName =
   | "exclamationmark.circle"
   | "checkmark.circle.fill"
   | "square.and.pencil"
-  | "viewfinder";
+  | "viewfinder"
+  | "pencil"
+  | "photo.on.rectangle"
+  | "exclamationmark.triangle.fill";
 
 /** The pen a group of icons is drawn with. Each group gets its own so the
  * switch statements stay small enough to read (and to lint). */
@@ -236,6 +239,11 @@ function chromeIcons(name: string): Point[][] | null {
       C(0, 0, 0.85);
       L([-0.45, 0.02], [-0.12, 0.38], [0.5, -0.38]);
       return S;
+    case "exclamationmark.triangle.fill":
+      L([0, -0.85], [0.88, 0.7], [-0.88, 0.7], [0, -0.85]);
+      L([0, -0.35], [0, 0.22]);
+      A(0, 0.48, 0.06, 0, TAU, 6);
+      return S;
     default:
       return null;
   }
@@ -305,6 +313,17 @@ function contentIcons(name: string): Point[][] | null {
     case "play.fill":
     case "play.rectangle":
       L([-0.55, -0.75], [0.75, 0], [-0.55, 0.75], [-0.55, -0.75]);
+      return S;
+    case "pencil":
+      L(
+        [-0.75, 0.75],
+        [-0.6, 0.2],
+        [0.45, -0.85],
+        [0.8, -0.5],
+        [-0.25, 0.55],
+        [-0.75, 0.75],
+      );
+      L([-0.6, 0.2], [-0.25, 0.55]);
       return S;
     case "square.and.pencil":
       L([0.1, -0.7], [-0.75, -0.7], [-0.75, 0.8], [0.75, 0.8], [0.75, -0.05]);

@@ -10,7 +10,7 @@ import { InkCanvas, InkStrokes } from "@/components/ink/ink-canvas";
 import { bezier, ease, span } from "@/lib/ink/geometry";
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 
-export const METER_HEIGHT = 8;
+const METER_HEIGHT = 8;
 
 export function ReadingMeter({
   width,

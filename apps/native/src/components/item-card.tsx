@@ -19,15 +19,9 @@ import { useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
-import { AppSymbolIcon } from "@/components/symbol";
-import {
-  Alert,
-  ActivityIndicator,
-  Pressable,
-  Share,
-  Text,
-  View,
-} from "react-native";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkSpinner } from "@/components/ink/ink-thread";
+import { Alert, Pressable, Share, Text, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -192,7 +186,7 @@ function CardMedia({
           <View style={styles.mediaBadges} pointerEvents="none">
             {isVideo ? (
               <View style={styles.mediaBadge}>
-                <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
+                <InkIcon name="play.fill" size={9} tint="white" />
                 {item.author ? (
                   <Text style={styles.mediaBadgeText} numberOfLines={1}>
                     {item.author}
@@ -204,7 +198,7 @@ function CardMedia({
             )}
             {mediaCount > 1 ? (
               <View style={[styles.mediaBadge, styles.countBadge]}>
-                <AppSymbolIcon name="photo.stack" size={10} tintColor="white" />
+                <InkIcon name="photo.stack" size={10} tint="white" />
                 <Text style={styles.mediaBadgeText}>
                   {new Intl.NumberFormat(formattingLocale()).format(mediaCount)}
                 </Text>
@@ -218,12 +212,9 @@ function CardMedia({
   return (
     <View style={[styles.textFace, item.type === "note" && styles.noteFace]}>
       {item.type === "link" && (
-        <AppSymbolIcon
-          name="link"
-          size={13}
-          tintColor={theme.colors.faint}
-          style={{ marginBottom: 6 }}
-        />
+        <View style={{ marginBottom: 6 }}>
+          <InkIcon name="link" size={13} tint={theme.colors.faint} />
+        </View>
       )}
       <Text style={styles.textFaceTitle} numberOfLines={5}>
         {item.title ?? item.note ?? failedLabel ?? displayHost(item.url)}
@@ -254,11 +245,7 @@ function CardCaption({
             <Text style={styles.captionHost} numberOfLines={1}>
               {shortFormSource(item.url)?.site ?? displayHost(item.url)}
             </Text>
-            <AppSymbolIcon
-              name="arrow.up.right"
-              size={9}
-              tintColor={theme.colors.faint}
-            />
+            <InkIcon name="arrow.up.right" size={9} tint={theme.colors.faint} />
           </View>
         ) : null}
       </View>
@@ -268,11 +255,7 @@ function CardCaption({
         actions={menuActions}
         style={styles.menuButton}
       >
-        <AppSymbolIcon
-          name="ellipsis"
-          size={15}
-          tintColor={theme.colors.foreground}
-        />
+        <InkIcon name="ellipsis" size={15} tint={theme.colors.foreground} />
       </ActionMenu>
     </View>
   );
@@ -295,12 +278,12 @@ function CardStatusCorner({
       style={styles.processing}
     >
       {item.status === "processing" ? (
-        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <InkSpinner size={20} />
       ) : (
-        <AppSymbolIcon
+        <InkIcon
           name="exclamationmark.triangle.fill"
           size={13}
-          tintColor={theme.colors.danger}
+          tint={theme.colors.danger}
         />
       )}
     </Animated.View>

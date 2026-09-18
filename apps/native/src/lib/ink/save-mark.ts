@@ -13,7 +13,7 @@ import type { PostMedia } from "@convex/model/itemFields";
 import type { MarkKind } from "@/lib/ink/strokes";
 
 /** Everything the mark is decided from. A subset of `FeedItem`. */
-export type MarkSource = {
+type MarkSource = {
   type: "image" | "link" | "note";
   url?: string;
   siteName?: string;

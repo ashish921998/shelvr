@@ -6,7 +6,7 @@
 // reading as a grid that lost its gridlines.
 
 /** A card's box on the shelf. */
-export type CardSize = { width: number; height: number };
+type CardSize = { width: number; height: number };
 
 const PORTRAIT: CardSize = { width: 72, height: 118 };
 const SQUARE: CardSize = { width: 96, height: 104 };

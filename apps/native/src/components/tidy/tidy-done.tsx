@@ -1,6 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { CircledWord } from "@/components/ink/ink-ring";
+import { PrimaryButton } from "@/components/shelf/ink-button";
+import { Headline } from "@/components/shelf/typography";
 import { type FC } from "react";
-import { ActivityIndicator, Pressable, Text } from "react-native";
+import { Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -37,9 +40,15 @@ export const TidyDone: FC<Props> = ({
 
   return (
     <Animated.View entering={FadeIn.duration(250)} style={styles.container}>
-      <Text style={styles.title}>
-        {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
-      </Text>
+      {/* The screen's one accent: the verdict is circled by hand. */}
+      <View style={styles.titleWrap}>
+        <Headline style={styles.title}>
+          {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
+        </Headline>
+        <View style={styles.titleRing} pointerEvents="none">
+          <CircledWord width={168} height={56} />
+        </View>
+      </View>
       <Text style={styles.summary}>
         {empty
           ? t("tidy.emptyBody", {
@@ -53,17 +62,13 @@ export const TidyDone: FC<Props> = ({
         </Text>
       )}
       {!empty && (
-        <Pressable
-          style={styles.button}
+        <PrimaryButton
+          label={t("tidy.continue")}
+          pendingLabel={t("tidy.continue")}
+          state={loading ? "pending" : "idle"}
           onPress={onContinue}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>{t("tidy.continue")}</Text>
-          )}
-        </Pressable>
+          style={styles.button}
+        />
       )}
     </Animated.View>
   );
@@ -78,11 +83,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(4),
     backgroundColor: theme.colors.background,
   },
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 26,
-    color: theme.colors.foreground,
-  },
+  titleWrap: { alignItems: "center", justifyContent: "center" },
+  titleRing: { position: "absolute" },
+  title: { textAlign: "center" },
   summary: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
@@ -95,19 +98,5 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.faint,
     textAlign: "center",
   },
-  button: {
-    marginTop: theme.gap(2),
-    minWidth: 160,
-    alignItems: "center",
-    paddingHorizontal: theme.gap(3),
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  buttonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: "white",
-  },
+  button: { marginTop: theme.gap(2) },
 }));

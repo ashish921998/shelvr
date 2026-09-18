@@ -12,7 +12,7 @@ import { markFill, markStrokes, type MarkKind } from "@/lib/ink/strokes";
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 
 /** The sticker disc a mark sits on when it is pinned to a card. */
-export const STICKER_SIZE = 26;
+const STICKER_SIZE = 26;
 
 /** Marks carry the type word for screen readers; the drawing itself is
  * hidden, like all ink. */

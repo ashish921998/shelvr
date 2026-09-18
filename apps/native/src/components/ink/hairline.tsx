@@ -10,7 +10,7 @@ import { ease, hairlinePoints, span } from "@/lib/ink/geometry";
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 
 /** The canvas is 16 tall and sits directly under the 40-tall header row. */
-export const HAIRLINE_HEIGHT = 16;
+const HAIRLINE_HEIGHT = 16;
 
 export function Hairline({
   width,

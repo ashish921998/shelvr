@@ -52,6 +52,9 @@ const NAMES: InkIconName[] = [
   "checkmark.circle.fill",
   "square.and.pencil",
   "viewfinder",
+  "pencil",
+  "photo.on.rectangle",
+  "exclamationmark.triangle.fill",
 ];
 
 /** The crossed box the set falls back to: one rectangle and one diagonal. */

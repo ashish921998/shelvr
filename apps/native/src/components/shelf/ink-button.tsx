@@ -25,10 +25,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { StitchLine } from "@/components/ink/stitch-line";
 import { InkIcon } from "@/components/ink/ink-icon";
 
-export type ButtonState = "idle" | "pending" | "done" | "disabled";
-
-/** How long "Saved." stays up before the button goes back to itself. */
-const DONE_HOLD_MS = 1000;
+type ButtonState = "idle" | "pending" | "done" | "disabled";
 
 export function PrimaryButton({
   label,
@@ -186,32 +183,6 @@ export function TertiaryAction({
       <Text style={styles.tertiaryLabel}>{label}</Text>
     </Pressable>
   );
-}
-
-/** Holds `done` for a beat after work finishes, so the tick is seen before the
- * button goes back to its verb. */
-export function useSettledState(
-  pending: boolean,
-  succeeded: boolean,
-): ButtonState {
-  const [done, setDone] = useState(false);
-  // Adjusted during render, not in an effect: the tick has to be on screen in
-  // the same frame the work finishes.
-  const outcome = `${pending}:${succeeded}`;
-  const [lastOutcome, setLastOutcome] = useState(outcome);
-  if (lastOutcome !== outcome) {
-    setLastOutcome(outcome);
-    setDone(!pending && succeeded);
-  }
-
-  useEffect(() => {
-    if (!done) return;
-    const timer = setTimeout(() => setDone(false), DONE_HOLD_MS);
-    return () => clearTimeout(timer);
-  }, [done]);
-
-  if (pending) return "pending";
-  return done ? "done" : "idle";
 }
 
 const styles = StyleSheet.create((theme) => ({

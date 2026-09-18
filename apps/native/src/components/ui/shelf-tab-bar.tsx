@@ -96,8 +96,8 @@ export const SHELF_TABS = [
   testID: string;
 }[];
 
-export const PILL_HEIGHT = 64;
-export const PILL_SIDE_INSET = 22;
+const PILL_HEIGHT = 64;
+const PILL_SIDE_INSET = 22;
 const PILL_PADDING = 6;
 const ICON_SIZE = 22;
 const CARD_SIZE = 44;

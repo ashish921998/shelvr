@@ -7,9 +7,7 @@ import { View, Text, useWindowDimensions } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Hairline, HAIRLINE_HEIGHT } from "@/components/ink/hairline";
-
-export { HAIRLINE_HEIGHT };
+import { Hairline } from "@/components/ink/hairline";
 
 export function ScreenHeader({
   /** The screen's name, set in Exposure. Omitted, `center` is drawn instead

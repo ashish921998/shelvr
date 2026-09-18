@@ -10,14 +10,12 @@ import { useMemo } from "react";
 import { ScrollView, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-import { InkShelf, SHELF_HEIGHT } from "@/components/ink/ink-shelf";
+import { InkShelf } from "@/components/ink/ink-shelf";
 import {
   StandingCard,
   type StandingCardProps,
 } from "@/components/shelf/standing-card";
 import type { PropKind } from "@/lib/ink/strokes";
-
-export { SHELF_HEIGHT };
 
 export type ShelfCard = Omit<StandingCardProps, "index" | "clock"> & {
   key: string;
