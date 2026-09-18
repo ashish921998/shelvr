@@ -1,334 +1,446 @@
 # Contextual notifications
 
-What Shelvr sends, when it sends it, and how it is built. This is the design
-decision record for the notification system as a whole; the existing
-[push notification builds and updates](push-notifications.md) stays the
-reference for credentials, EAS profiles, and OTA fingerprints.
+What Shelvr sends, when it sends it, and how it is built.
+[Push notification builds and updates](push-notifications.md) stays the
+reference for credentials, EAS profiles and OTA fingerprints.
 
-Status: specification. Nothing here is implemented beyond the weekly shelf
-described under [What exists today](#what-exists-today).
+Status: specification under review. Only the weekly shelf described in
+[What exists today](#what-exists-today) is implemented.
+
+## Evidence status
+
+This document mixes things that are true of the repository, things that are
+true of the platforms, and things we believe about users. They are not the
+same kind of claim and are labelled throughout:
+
+- **Verified** — checked against this repository, or against the installed
+  package's own types and source. Cited where it matters.
+- **Platform constraint** — imposed by Apple, Google or Expo. Not negotiable.
+- **Hypothesis** — a belief about user behaviour that we have no data for
+  yet. Every one of these is something the first release should measure, and
+  none of them should be treated as settled.
+
+The single biggest risk in this design is not a technical one. It is that a
+system built to be humane is evaluated with a metric that cannot see whether
+it worked. [Measurement](#measurement) is therefore the first section that
+matters and the first phase that ships.
 
 ## The decision in one paragraph
 
-Shelvr may send **at most two pushes per week and at most one per day**, to
-every user, across every notification kind, enforced server-side in one place.
-Adding a notification kind never adds volume — kinds compete for the same two
-slots through a priority ladder. Every notification names a specific thing the
-user saved; none of them says "you have 5 unread items". A kind that a user
-ignores three times running mutes itself. Two on-device kinds (arriving at a
-place they saved, and an opt-in interruption while they are scrolling
-something else) sit outside the push budget because the user's own movement or
-their own explicit request triggers them — but they carry their own caps and
-the same quiet hours.
+By default Shelvr sends **at most two notifications a week**, arbitrated
+server-side, with every one of them naming a specific thing the user saved.
+Anything above that ceiling requires an opt-in the user configured
+themselves, defaults to off, and is shown to them as a weekly total before
+they turn it on. Kinds that go repeatedly unopened slow down rather than stop,
+because non-opening is an uncertain signal and not proof of rejection. The
+first release adds no new notification kinds at all: it instruments the one
+that exists, improves its copy, and establishes a baseline against a holdout
+group, so that every later decision is an evaluation rather than a guess.
 
 ## Principles
 
-These exist to settle future arguments without re-litigating them.
-
-1. **A notification is a claim on attention that has to be repaid.** The test
-   for shipping one is not "would this get opened" but "would the user, a week
-   later, be glad it arrived".
-2. **Name the thing.** Every body text references a real save — its title, its
-   image, its site. Counting is not context. `3 saves waiting for you` is the
-   copy we are replacing.
-3. **Contextual means better-chosen, not more.** The budget is fixed before the
-   catalogue is designed, so every new idea has to beat an existing kind rather
-   than add to it.
-4. **Silence is a valid output.** Every kind has a condition under which it
-   sends nothing, and no kind may substitute filler to occupy its slot.
-5. **Never notify about the app's own housekeeping.** Classification finished,
-   an item was enriched, a space was recommended — these are chores, not news.
-6. **Learn from being ignored.** Ignoring is the clearest feedback signal the
-   product ever gets, and it must reduce volume automatically.
-7. **The user can turn one thing off without turning everything off.** One bad
-   kind must not cost us the channel.
+1. **A notification is a claim on attention that has to be repaid.**
+2. **Name the thing.** Every body references a real save. `3 saves waiting for
+you` is the copy we are replacing.
+3. **Say only what we can observe.** We know what was saved, when, and whether
+   it was opened. We do not know whether it was read, visited, cooked or
+   enjoyed. Copy may not imply otherwise.
+4. **Contextual means better-chosen, not more.** The budget is fixed before
+   the catalogue, so a new idea must beat an existing kind rather than add to
+   it.
+5. **Silence is a valid output.** Every kind has a silent condition, and none
+   may substitute filler to occupy a slot.
+6. **Never notify about the app's own housekeeping.** Classification
+   finished, an item was enriched, a space was recommended — chores, not news.
+7. **The user can turn one thing off without turning everything off.**
+8. **Ambiguous signals get proportional responses.** We reduce volume on weak
+   evidence; we only stop on strong evidence.
 
 ## What exists today
 
-| Piece                         | State                                                                |
-| ----------------------------- | -------------------------------------------------------------------- |
-| Expo Push, APNs, FCM v1       | Working, documented in `push-notifications.md`                       |
-| `notificationDevices`         | One token per device, ownership guarded against takeover             |
-| `notificationPreferences`     | A single `weeklyShelfEnabled` boolean, `nextDigestAt`, `timezone`    |
-| `weeklyDigests`               | Persisted shelf contents plus its whole delivery state               |
-| `notificationDelivery.ts`     | claim / finish / recover, 8 attempts, receipts, backoff, dead-letter |
-| `crons.ts`                    | Hourly `prepareDueWeeklyDigests`, 5-minute delivery recovery         |
-| `model/notificationFields.ts` | `digestCopy` and nine locale catalogs                                |
-| `itemReads`                   | Per-user read state, already the digest's unread filter              |
-| Deep links                    | `data.url` routed by `useNotificationObserver` into `nav.push`       |
-| Android channel               | `weekly-shelf`, created client-side in `notification-token.ts`       |
-| Opt-in prompt                 | `WeeklyNudgeSheet`, once, after the first share-sheet save           |
+Verified against the repository.
 
-The delivery machine is the strongest part of this system and the design below
-reuses it rather than replacing it. The gaps are elsewhere:
+| Piece                         | State                                                             |
+| ----------------------------- | ----------------------------------------------------------------- |
+| Expo Push, APNs, FCM v1       | Working; see `push-notifications.md`                              |
+| `notificationDevices`         | One token per device, guarded against takeover                    |
+| `notificationPreferences`     | A single `weeklyShelfEnabled` boolean, `nextDigestAt`, `timezone` |
+| `weeklyDigests`               | Persisted shelf contents **and** its delivery state               |
+| `notificationDelivery.ts`     | claim / finish / recover, 8 attempts, receipt polling, backoff    |
+| `crons.ts`                    | Hourly `prepareDueWeeklyDigests`, 5-minute recovery               |
+| `model/notificationFields.ts` | `digestCopy` plus nine locale catalogs                            |
+| `itemReads`                   | Per-user read state; already the digest's unread filter           |
+| Deep links                    | `data.url` routed by `useNotificationObserver`                    |
+| Android channel               | `weekly-shelf`, created in `notification-token.ts`                |
+| Opt-in prompt                 | `WeeklyNudgeSheet`, once, after the first share-sheet save        |
 
-- **One kind, one switch.** A second kind hung off `weeklyShelfEnabled` means
-  one bad notification costs us every notification.
-- **No measurement at all.** There is no PostHog event for a permission
-  prompt, a send, a delivery, or an open. `markDigestOpened` writes a
-  timestamp to Convex that nothing ever reads back into analytics. We cannot
-  tune what we cannot see, so this is the first thing to fix.
-- **Notification opens are invisible in the north-star metric.**
-  `analytics.ts` allowlists `item_opened.source` to `home`, `space` and
-  `search` and collapses everything else to `direct`, so an open that came
-  from a notification is indistinguishable from any other. One string in that
-  allowlist makes the whole existing useful-returns query segmentable by
-  notification.
-- **No budget.** Nothing would stop two kinds landing in the same hour.
+The delivery machine is the strongest part of this system. The design below
+reuses it rather than replacing it.
+
+Gaps, all verified:
+
+- **One kind behind one boolean.** A second kind on `weeklyShelfEnabled`
+  means one bad notification costs us every notification.
+- **No notification analytics of any kind.** No event for a permission
+  prompt, a send, a delivery or an open. `markDigestOpened` writes a
+  timestamp nothing reads back.
+- **The existing success metric cannot see notifications, and cannot see
+  resurfacing at all.** See [Measurement](#measurement). This is the finding
+  that reorders the whole plan.
+- **No budget.** Nothing prevents two kinds landing in the same hour.
 - **Generic copy.** `digestCopy` interpolates a count and nothing else.
 
-Two constraints worth stating early, because they kill otherwise good ideas:
-`intents` of kind `add_event` carry **only an event title, never a date**, so
-honest time-based event reminders are impossible without a schema change; and
-`items.latitude/longitude` is **EXIF GPS from photos the user shot**, which
-records where they were, not where they intend to go.
+Two schema facts that kill otherwise good ideas. `intents` of kind
+`add_event` carry **an event title only, never a date**, so time-based event
+reminders cannot be built honestly today. `items.latitude/longitude` is EXIF
+GPS from photos the user shot — it records where they were, which is not the
+same as where they intend to go.
 
-## The budget
+## Measurement
 
-One function, `arbitrate(userId, now)`, is the only thing in the codebase
-allowed to authorise a push. Everything else proposes.
+### Why the existing metric cannot grade this work
+
+`docs/analytics/README.md` defines a **useful return**: a reopen in a later
+session followed by a `copy` or confirmed `share`, both **within 7 days of the
+save**. `useful-returns.sql` implements exactly that — lines 25 and 31 bound
+outcomes at `saved_at + INTERVAL 7 DAY`, and line 43 only admits saves older
+than 7 days.
+
+Two consequences, both verified against the query:
+
+1. **Resurfacing is unmeasurable by construction.** It deliberately targets
+   saves older than 14 days. An action it produces on day 30 falls outside
+   `saved_at + 7 days` and can never be counted. Judged by this metric, a
+   perfectly working resurfacing notification scores zero.
+2. **Segmenting by source is a real query change, not a flag.** Line 9
+   collects opens as `groupArrayIf(tuple(timestamp, session_id), ...)`. There
+   is no `source` in the query at all. Carrying source through requires
+   changing that aggregation and the outcome expressions that consume it.
+
+An earlier draft of this document claimed adding `"notification"` to the
+`item_opened` source allowlist would make the existing query segmentable with
+no query change. That was wrong. The allowlist change is still necessary —
+`analytics.ts` currently collapses every source outside
+`home`/`space`/`search` to `"direct"`, so notification opens are invisible at
+the event level too — but it is not sufficient.
+
+### The notification-anchored metric
+
+Add a second, separate query — `docs/analytics/notification-outcomes.sql` —
+anchored to the notification rather than the save. Leave
+`useful-returns.sql` untouched as the save-anchored baseline.
+
+> A **notification-useful return** is a qualifying item action (`copy`,
+> `share`, `open_source`) performed within 72 hours of a
+> `notification_opened`, on an item reached from that notification.
+
+The weekly shelf is the one kind where the existing save-anchored metric
+partially works, because it only ever contains saves from the last 7 days.
+Every other kind needs the notification-anchored one.
+
+### Attribution
+
+A digest notification points at many items, so attribution has to survive
+`digest → item → action`. Two options, and the choice matters:
+
+- **Time-window attribution** — credit any action within N hours of a
+  notification open. Simple; over-credits activity the notification did not
+  cause.
+- **Navigation-lineage attribution** — carry a `notificationId` as a route
+  parameter from the notification through `/digest/{id}` to `/item/{id}`, held
+  in a context scoped to that navigation stack, and stamp it onto
+  `item_opened` and `item_action`. Under-credits a user who leaves and comes
+  back later.
+
+**Use lineage.** Under-crediting is the safer error: it makes notifications
+look worse than they are, which biases us toward sending fewer. Record the
+known undercount rather than correcting for it.
+
+This means `item_action` needs the attribution property too. An `item_opened`
+carrying `source: "notification"` with no matching action property makes the
+join impossible.
+
+### The holdout
+
+**No notification kind ships without a randomised holdout that receives
+nothing.** Without it we cannot distinguish a notification that created a
+return from one that merely captured a return that was going to happen anyway
+— and for a save-it-for-later product, where the user already intended to come
+back, that distinction is the entire question.
+
+Hold out 10% per kind, assigned per user, stable across kinds so the groups
+stay comparable. Compare notification-useful returns per user per week between
+arms, not open rates.
+
+### Events
+
+| Event                               | Origin | Fields                                        |
+| ----------------------------------- | ------ | --------------------------------------------- |
+| `notification_permission_requested` | client | `trigger`, `provisional`                      |
+| `notification_permission_result`    | client | `status`, `provisional`                       |
+| `notification_sent`                 | Convex | `kind`, `notification_id`, `arm`              |
+| `notification_accepted_by_provider` | Convex | `kind`, `notification_id`, `latency_ms`       |
+| `notification_suppressed`           | Convex | `kind`, `reason`                              |
+| `notification_opened`               | client | `kind`, `notification_id`, `action`, `age_ms` |
+| `notification_action`               | client | `kind`, `action`                              |
+| `notification_cadence_reduced`      | Convex | `kind`, `step`                                |
+
+`notification_accepted_by_provider` is deliberately not called
+`notification_delivered` — see [Non-opening](#non-opening-is-an-uncertain-signal).
+
+`reason` is a closed set: `budget`, `quiet_hours`, `cadence_reduced`,
+`user_disabled`, `no_content`, `no_devices`, `holdout`. All properties are
+categorical; item titles appear in notification bodies but never in event
+properties, per the existing rule in `CLAUDE.md`.
+
+### What the first release must answer
+
+- What fraction of users have notifications enabled, and under provisional
+  versus full authorization?
+- For the weekly shelf: accepted → opened → notification-useful return.
+- Does the notified arm produce more useful returns per user per week than
+  the holdout? **If not, the correct response is to send less, not to tune
+  the copy.**
+
+## The volume promise
+
+The previous draft claimed a two-per-week ceiling while separately permitting
+`trial_ending` to bypass it and allowing two device-originated kinds outside
+it. At the defaults that draft proposed, a fully opted-in user could receive
+**23 notifications a week** — two pushes, seven place alerts and fourteen
+interruptions. That is a contradiction, not a ceiling, and it is corrected
+here.
+
+### Three buckets, one headline
+
+| Bucket                                                        | Who initiates         | Default | Ceiling                                             |
+| ------------------------------------------------------------- | --------------------- | ------- | --------------------------------------------------- |
+| **Unrequested** — `weekly_shelf`, `quiet_week`, `resurfacing` | Shelvr                | On      | **2 per 7 days, ≤1 per day**                        |
+| **Lifecycle** — `trial_ending`                                | A billing fact        | On      | **1 per trial**, ≤2 per account lifetime            |
+| **User-requested** — `nearby_place`, `intercept`              | The user turned it on | **Off** | Combined **≤1 per day**, user-settable down to zero |
+
+> **A user who changes nothing receives at most two notifications a week, plus
+> at most one notification per trial.**
+
+That is the promise, and it is the whole promise. Everything above it is
+something the user switched on.
+
+### Permitted versus expected
+
+Permitted volume is not predicted volume, but users experience permitted
+volume as the risk. State both.
+
+| Configuration                         | Permitted per week | Expected per week |
+| ------------------------------------- | -----------------: | ----------------: |
+| Default                               |                  2 |               0–1 |
+| All opt-ins on, at their own defaults |                  9 |               1–3 |
+| All opt-ins at maximum                |                  9 |           up to 9 |
+
+When a user enables a requested kind, Settings shows the resulting weekly
+maximum as a single number before they confirm, and shows their current
+configured maximum alongside the switches. A user should never be able to
+arrive at nine a week without having seen the number nine.
+
+`trial_ending` is an enumerated exception rather than a bypass: it is the only
+kind allowed to exceed the unrequested ceiling, it fires at most once per
+trial, and it still respects quiet hours.
+
+### Arbitration
+
+One function, `arbitrate(userId, now)`, is the only thing permitted to
+authorise an unrequested push. Everything else proposes.
 
 ```
-ceiling      2 push notifications per rolling 7 days
-daily cap    1 push per rolling 24 hours
-quiet hours  send only between 08:00 and 21:00 in notificationPreferences.timezone
+ceiling      2 unrequested per rolling 7 days
+daily cap    1 per rolling 24 hours, across all buckets
+quiet hours  08:00–21:00 in notificationPreferences.timezone
 kind cap     at most 1 of any single kind per 7 days
 ```
 
-**Priority ladder**, applied when more than one kind is eligible in the same
-window. Highest wins the slot; the rest do not queue up behind it, they expire
-and are reconsidered on their own next trigger.
+Priority when more than one is eligible. The loser does not queue; it expires
+and is reconsidered on its own next trigger.
 
-| Rank | Kind                | Why it outranks the one below                        |
-| ---: | ------------------- | ---------------------------------------------------- |
-|    1 | `trial_ending`      | Time-critical and costs the user money if missed     |
-|    2 | `space_suggestions` | Shelvr already did the work; it is sitting unclaimed |
-|    3 | `resurfacing`       | The contextual pick, chosen for this moment          |
-|    4 | `weekly_shelf`      | Scheduled, and still there next week if skipped      |
-|    5 | `quiet_week`        | Only fires when nothing else has anything to say     |
+| Rank | Kind           | Why                                              |
+| ---: | -------------- | ------------------------------------------------ |
+|    1 | `trial_ending` | Time-critical, costs the user money if missed    |
+|    2 | `resurfacing`  | Chosen for this moment; least replaceable        |
+|    3 | `weekly_shelf` | Scheduled, and still there next week             |
+|    4 | `quiet_week`   | Only fires when nothing else has anything to say |
 
-The two device-originated kinds (`nearby_place`, `intercept`) do not draw from
-this budget — see [Budget across two origins](#budget-across-two-origins).
+## Non-opening is an uncertain signal
 
-### Self-quieting
+**Platform constraint.** An Expo receipt with status `ok` means the push
+service — APNs or FCM — accepted the message. It does not confirm that the
+device received it, that the notification was displayed, or that the user saw
+it. `notificationDelivery.ts` already says so in `finish`: _"This records
+provider acceptance from receipts, not a device read acknowledgment."_
 
-Per user, per kind: three consecutive notifications that were **delivered and
-not opened within 72 hours** mute that kind for 30 days. A second strike after
-the mute lifts turns the kind off until the user re-enables it in Settings.
-Opening resets the counter to zero.
+Three reasons a notification goes unopened without the user having rejected
+anything:
 
-This is the single highest-leverage mechanism in the design. It means a kind
-that turns out to be worthless costs each user three notifications, not an
-indefinite stream, and it means we can ship a kind we are unsure about.
+- The device was off, offline, or in Focus, and the provider dropped or
+  coalesced it.
+- The user is under **provisional authorization**, where notifications land
+  silently in Notification Center with no banner, no sound and no lock-screen
+  presence. Non-opening here is close to uninformative.
+- They saw it, valued it, and did not need to act.
+
+The previous draft muted a kind automatically after three unopened
+notifications. That treats an uncertain signal as proof, and it can silence a
+kind a user never saw — most likely exactly for the provisional users we are
+trying to convert.
+
+### Progressive cadence reduction
+
+Replace muting with slowing down.
+
+| Consecutive unopened | Response                                                        |
+| -------------------: | --------------------------------------------------------------- |
+|                    3 | Halve this kind's cadence. Emit `notification_cadence_reduced`. |
+|                    6 | Halve again, to a floor of once per quarter.                    |
+|                    — | **Never automatically reach zero.**                             |
+
+Only an explicit signal sets `enabled: false`: the **Turn this off** action on
+the notification, the Settings switch, or an OS-level disable. Any open resets
+the counter.
+
+Users under provisional authorization are **excluded from cadence reduction**
+until they upgrade to full authorization, because their non-opening carries
+almost no information.
+
+This is deliberately gentler than the previous draft, and the trade is
+explicit: it protects against silencing a kind the user never saw, at the cost
+of taking longer to quiet a kind that genuinely is not wanted. The explicit
+one-tap off action is what covers the second case.
 
 ## The catalogue
 
-Six kinds plus the two device-originated ones. Each specifies its trigger, what
-is in the payload, where it lands, and — the part that usually gets skipped —
-when it stays silent.
+Four kinds by default. Two user-requested kinds are separate projects
+([Appendix](#appendix-two-later-projects)).
 
 ### 1. `weekly_shelf` — exists, gets rewritten
 
 - **Trigger** Sunday 09:00 local, the existing `nextWeeklyDigestAt` schedule.
-- **Condition** at least 3 `ready` items created in the last 7 days that the
-  user has not opened. Keep this floor. It is what stops light users being
-  notified about nothing, and it is why this kind has never been annoying.
-- **Payload** the newest qualifying item's title, its `heroImageUrl` as
-  `richContent.image`, and a count of the rest.
-- **Lands on** `/digest/{id}` — unchanged, and a public contract with shipped
-  clients.
-- **Silent when** fewer than 3 qualifying items. The slot then falls through to
-  `quiet_week`.
-
-Copy moves from counting to naming:
+- **Condition** at least 3 `ready` items created in the last 7 days and not
+  opened. Keep this floor — it is why this kind has never been annoying.
+- **Payload** the newest qualifying item's title plus a count of the rest.
+- **Lands on** `/digest/{id}`, unchanged. A contract with shipped clients.
+- **Silent when** fewer than 3 qualifying items.
 
 > **Your weekly shelf**
 > _"The 12-hour short rib" and 4 more you saved this week._
 
-### 2. `quiet_week` — new, requested
+Every claim there is observable: the title, the count, the save window.
 
-The "didn't save anything this week" case. It is the **same Sunday slot** as
-the weekly shelf, taken only when the shelf has nothing, so it costs zero
-additional budget — which is the reason it is affordable at all.
+### 2. `quiet_week` — new
 
-- **Trigger** the weekly slot, when `weekly_shelf` found fewer than 3 new
-  unopened saves.
-- **Condition** the user has at least 3 unopened `ready` items **older than 14
-  days**, and has not been sent `quiet_week` in 21 days.
-- **Payload** three old unopened saves, oldest-first, preferring items that
-  belong to a space (evidence the user cared enough to file them).
-- **Lands on** `/digest/{id}`, reusing the digest view with a different title.
-- **Silent when** the shelf is genuinely empty, or the user is in their first
-  14 days.
+The "didn't save anything this week" case, in the Sunday slot the weekly shelf
+leaves empty.
 
-**The copy does not mention the user's inactivity.** "You haven't saved
-anything in a week" is a reprimand, and reprimands are what get apps deleted.
-The same trigger, framed as service:
+- **Trigger** the weekly slot, when `weekly_shelf` did not fire.
+- **Condition** **zero** items created in the last 7 days, **and** at least 3
+  unopened `ready` items older than 14 days, **and** no `quiet_week` in 21
+  days, **and** the account is older than 14 days.
+- **Lands on** `/digest/{id}`.
+- **Silent when** the shelf is empty, or the user saved anything at all.
+
+The previous draft fired this whenever the shelf had fewer than three _new
+unopened_ saves, and described that as the user having saved nothing. Those
+are different conditions — a user can save six things and open all of them.
+The condition above is the literal one.
 
 > **Still on your shelf**
-> _"How to read a balance sheet" — saved in March, never opened._
+> _"How to read a balance sheet" — saved in March, not opened yet._
 
-This is a deliberate reinterpretation of the request. The trigger is exactly
-what was asked for: a user who saved nothing for a week gets a notification.
-What changed is that the notification is about their shelf rather than about
-their behaviour, because the behavioural framing reliably produces churn and
-the shelf framing produces the same open with none of the resentment.
+**Hypothesis, not finding:** that framing a quiet week around the shelf
+rather than around the user's inactivity produces the same open with less
+resentment. We believe reprimanding copy drives uninstalls; we have no Shelvr
+data for it. The holdout and the per-kind disable rate are how we find out.
 
-### 3. `resurfacing` — new, the genuinely contextual one
+### 3. `resurfacing` — new, the contextual one
 
-An old unopened save, matched to a moment. This is the kind that moves the
-existing useful-returns metric and the one worth most of the engineering.
+An old unopened save, surfaced at a plausible moment.
 
-- **Trigger** the candidate scorer runs daily per user; fires at most once a
-  week and only when it clears a confidence floor.
-- **Condition** a `ready`, unopened item older than 14 days that scores above
-  threshold for _this_ hour of _this_ day.
+- **Trigger** scored daily per user; fires at most weekly, above a confidence
+  floor.
+- **Condition** a `ready`, unopened item older than 14 days scoring above
+  threshold.
+- **Lands on** `/item/{id}`.
+- **Silent when** nothing clears the floor. Expect this most weeks for most
+  users; a high fire rate is a bug in the scorer.
 
 Scoring inputs, all already in the schema:
 
-| Signal             | Source                                | Use                                                                    |
-| ------------------ | ------------------------------------- | ---------------------------------------------------------------------- |
-| Item type and tags | `items.tags`, `items.type`            | A recipe wants Saturday afternoon; a long read wants a weekday evening |
-| Structured recipe  | `items.recipe`                        | The strongest single "this is a weekend thing" signal we hold          |
-| Age and unread     | `_creationTime`, `itemReads`          | Old and never opened is the whole point                                |
-| Filed into a space | `spaceItems` where `status = "saved"` | The user chose to keep it; weight it up                                |
-| Actionable intents | `items.intents`                       | An item with a real next action is worth a nudge                       |
-| Personal rhythm    | `item_opened` history                 | The user's own habitual open window, not a global guess                |
-| Anniversary        | `items.capturedAt`                    | A photo from a year ago today                                          |
-
-- **Lands on** `/item/{id}`.
-- **Silent when** nothing clears the floor. Expect this to be most weeks for
-  most users, and treat a high fire rate as a bug in the scorer.
+| Signal             | Source                        | Confidence                           |
+| ------------------ | ----------------------------- | ------------------------------------ |
+| Type and tags      | `items.tags`, `items.type`    | Observable                           |
+| Structured recipe  | `items.recipe`                | Observable                           |
+| Age, unopened      | `_creationTime`, `itemReads`  | Observable                           |
+| Filed into a space | `spaceItems.status = "saved"` | Observable — an explicit user choice |
+| Actionable intents | `items.intents`               | Observable                           |
+| Anniversary        | `items.capturedAt`            | Observable                           |
+| Habitual open hour | derived, see below            | **Hypothesis**                       |
 
 > **Saturday, 4pm**
-> _"Miso-braised short ribs" has been on your shelf since March._
+> _"Miso-braised short ribs" — saved in March, not opened yet._
 
-**Personal rhythm beats a global schedule.** The user's own `item_opened`
-distribution tells us when they actually read things. Sending into that window
-is most of the value of the word "contextual" and costs no new permission, no
-native module and no store review. Build this before anything that needs an
-entitlement.
+**On timing.** A user's historical open hours tell us when they have opened
+things before. They do not tell us that the user is idle, receptive, or
+bored. Treating a past-behaviour distribution as a present mental state is
+the exact overreach this document is trying to avoid. Send into the habitual
+window because it is the best available guess, label it a hypothesis, and let
+the holdout say whether it beats a fixed Saturday-morning schedule.
 
-### 4. `space_suggestions` — new
+**Implementation note.** PostHog is not queryable from Convex at request
+time, so habitual timing needs an aggregate maintained in Convex. `itemReads`
+records `firstOpenedAt`/`lastOpenedAt` but overwrites on re-open and keeps no
+distribution. This needs a new per-user hour-of-week histogram incremented in
+`markItemOpened`, with a decay, and a minimum sample — on the order of 20
+opens — below which the scorer falls back to a fixed schedule. That is real
+work, not a free signal.
 
-Shelvr's AI filed candidates into a dynamic space and they are sitting
-untriaged. This is the one case where the product genuinely did work on the
-user's behalf and needs them to come and claim it.
-
-- **Trigger** daily evaluation.
-- **Condition** one space has at least 5 `suggested` memberships, the oldest is
-  at least 3 days old, and the user has not opened that space since they were
-  created.
-- **Payload** the space name, the suggestion count, and the top suggestion's
-  image.
-- **Lands on** `/space/{id}`.
-- **Silent when** the user triaged anything in that space in the last 3 days —
-  they are already on it.
-
-> **12 picks for "Apartment shopping"**
-> _Shelvr matched these from things you'd already saved._
-
-### 5. `trial_ending` — new
+### 4. `trial_ending` — new
 
 - **Trigger** `subscriptions.expiresAt` minus 24 hours, `status = "trialing"`.
-- **Condition** fires once per trial, and **ignores the weekly ceiling** — it
-  is a billing fact, not a content pick — but still respects quiet hours.
+- **Condition** once per trial. Respects quiet hours; exempt from the
+  unrequested ceiling as an enumerated exception.
 - **Lands on** `/paywall`.
-- **Silent when** the user already converted.
-
-This is the one kind where the honest move is to be plain. It also carries a
-count of what they saved during the trial, which is both the truest argument
-for converting and a genuine reminder of what they'd lose.
 
 > **Your trial ends tomorrow**
-> _You saved 34 things in 7 days. Keep them coming._
+> _You saved 34 things in 7 days._
 
-### 6. `nearby_place` — new, device-originated
+### Not in the push catalogue
 
-Covered in [Geofencing](#geofencing).
+**`space_suggestions` — cut.** The previous draft ranked it second, above
+resurfacing. It notifies the user that Shelvr organised something and would
+like them to come and triage it, which is precisely the case principle 6
+rejects, and the draft's own example of a chore was "a space was
+recommended". Ranking a housekeeping notification above the contextual one was
+not defensible.
 
-### 7. `intercept` — new, device-originated, iOS only
+Suggestions stay in-app: a count on the Spaces tab and a card inside the
+space. Revisit a push only if in-app data shows suggestions systematically go
+unseen **and** users who triage them show better retention — and even then it
+competes for the same two slots.
 
-Covered in [Interrupting a scroll](#interrupting-a-scroll).
-
-### Deliberately not building
-
-| Not building                          | Why                                                                                                                                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Streaks, "don't break your run"       | Manufactures obligation. The fastest route to an uninstall.                                                                                                                                             |
-| "You haven't opened Shelvr in 5 days" | Same trigger as `quiet_week`, but framed as the user's failure. Ship the shelf framing instead.                                                                                                         |
-| "Your save finished processing"       | The app did a chore. Nobody is waiting for that.                                                                                                                                                        |
-| Save-failed push                      | Not selected for this round. A terminal share-sheet failure stays invisible while the app is backgrounded, which is a real trust gap — worth revisiting as an in-app repair surface rather than a push. |
-| Event reminders from `add_event`      | `intents[].value` holds an event **title only**, no date. Cannot be built honestly without a schema change.                                                                                             |
-| Badge counts as a standing nag        | A permanent red dot is an unrepayable claim on attention. Badge only alongside a real notification, cleared on open.                                                                                    |
-
-## Measurement
-
-Build this first. It is the cheapest phase and every later decision depends on
-it.
-
-### Events
-
-| Event                               | Origin                  | Fields                                        |
-| ----------------------------------- | ----------------------- | --------------------------------------------- |
-| `notification_permission_requested` | client                  | `trigger`, `provisional`                      |
-| `notification_permission_result`    | client                  | `status`, `provisional`                       |
-| `notification_sent`                 | Convex                  | `kind`, `notification_id`                     |
-| `notification_delivered`            | Convex, on receipt `ok` | `kind`, `notification_id`, `latency_ms`       |
-| `notification_suppressed`           | Convex                  | `kind`, `reason`                              |
-| `notification_opened`               | client                  | `kind`, `notification_id`, `action`, `age_ms` |
-| `notification_action`               | client                  | `kind`, `action`                              |
-| `notification_kind_muted`           | Convex                  | `kind`, `reason`                              |
-
-`reason` on suppression is a closed set — `budget`, `quiet_hours`,
-`kind_muted`, `user_disabled`, `no_content`, `no_devices` — so the funnel
-between "eligible" and "sent" is visible rather than inferred.
-
-All of it is categorical. Item titles and space names go into notification
-**bodies** but never into event properties, matching the existing rule in
-`CLAUDE.md`.
-
-### Attribution to the north-star metric
-
-`docs/analytics/README.md` already defines a **useful return**: a reopen in a
-later session followed by a `copy` or confirmed `share` of the same item, both
-within 7 days of the save. That same document closes by saying "AI-inferred
-purpose and contextual resurfacing remain the next phase; this establishes the
-baseline for evaluating them". This spec is that phase, and it should be
-judged by that metric rather than by open rate.
-
-One change makes that possible. `analytics.ts` line 247 currently reads:
-
-```ts
-source: ["home", "space", "search"].includes(source) ? source : "direct",
-```
-
-Add `"notification"` to the allowlist and pass it from the notification
-response handler. `useful-returns.sql` then segments by source with no query
-change, and the question becomes answerable: **does an item opened from a
-notification produce a useful return at the same rate as one opened
-organically?** If it does not, the notification is borrowing attention rather
-than creating value, and the kind should be cut regardless of its open rate.
-
-Per-kind success criteria, evaluated on mature cohorts:
-
-- Open rate within 72 hours ≥ 15%.
-- Notification-sourced useful-return rate ≥ 70% of the organic rate.
-- Per-kind mute rate < 5%.
-- Notification-attributable permission revocations ≈ 0.
-
-A kind that misses these for two consecutive months is removed, not tuned.
+| Also not building                     | Why                                                                                                                                       |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Streaks                               | Manufactures obligation                                                                                                                   |
+| "You haven't opened Shelvr in 5 days" | Same trigger as `quiet_week`, framed as the user's failure                                                                                |
+| "Your save finished processing"       | A chore                                                                                                                                   |
+| Save-failed push                      | Not selected this round. A terminal share-sheet failure while backgrounded is invisible, which is a real trust gap — better solved in-app |
+| Event reminders from `add_event`      | `intents[].value` holds a title only, no date                                                                                             |
+| Standing badge count                  | An unrepayable claim on attention                                                                                                         |
 
 ## Permission
 
-Never at launch. The current `WeeklyNudgeSheet` — asking once after the first
-share-sheet save — is already the right shape and stays.
+Never at launch. `WeeklyNudgeSheet` — once, after the first share-sheet save —
+is the right shape and stays.
 
-**Use iOS provisional authorization for the first ask.** SDK 57 exposes
-`allowProvisional` on `requestPermissionsAsync` and reports
-`IosAuthorizationStatus.PROVISIONAL`, and `push-notifications.md` already
-records that provisional and ephemeral authorization are valid for token
-registration.
+**Verified:** SDK 57 exposes `allowProvisional` on
+`requestPermissionsAsync` and reports `IosAuthorizationStatus.PROVISIONAL`;
+`push-notifications.md` already records provisional and ephemeral
+authorization as valid for token registration.
 
 ```ts
 await Notifications.requestPermissionsAsync({
@@ -336,35 +448,33 @@ await Notifications.requestPermissionsAsync({
 });
 ```
 
-Provisional notifications arrive with no permission prompt at all, delivered
-quietly to Notification Center with **Keep** / **Turn off** buttons attached by
-the system. The user judges the real thing instead of a dialog. We then ask for
-full authorization only after they have opened one — at which point the ask is
-backed by evidence rather than a promise.
+Provisional notifications arrive with no prompt, delivered quietly to
+Notification Center with system **Keep** / **Turn off** buttons. The user
+judges the real thing rather than a dialog, and we ask for full authorization
+only after they have opened one.
 
-The cost is honest: provisional notifications do not appear on the lock screen
-and make no sound, so reach is lower until a user upgrades. For a weekly,
-low-urgency product this is the right trade, and the open-rate difference
-between provisional and full authorization is exactly what the events above
-will show.
+The cost is real: no lock screen, no sound, lower reach, and — as above —
+non-opening under provisional carries little information. Whether the reduced
+friction outweighs the reduced reach is a **hypothesis**, and the
+`provisional` property on the permission and open events is what settles it.
+If reach turns out to be severe, fall back to a conventional prompt after the
+first opened provisional notification.
 
-Set `provideAppNotificationSettings: true` as well, so iOS surfaces a link
-straight into Shelvr's own notification settings from the system settings page.
+Set `provideAppNotificationSettings: true` so iOS links into Shelvr's own
+notification settings.
 
 ## Preferences
 
-`weeklyShelfEnabled` is a boolean and cannot carry seven kinds. Replace it with
-per-kind state, without breaking shipped clients.
-
-New table, one row per user per kind:
+`weeklyShelfEnabled` cannot carry several kinds. Add per-kind state without
+breaking shipped clients.
 
 ```ts
 notificationKinds: defineTable({
   userId: v.string(),
-  kind: notificationKindValidator,   // closed union, one place
+  kind: notificationKindValidator,
   enabled: v.boolean(),
-  mutedUntil: v.optional(v.number()),
-  consecutiveIgnored: v.number(),
+  cadenceStep: v.number(),              // 0 = full, 1 = halved, 2 = quarterly
+  consecutiveUnopened: v.number(),
   lastSentAt: v.optional(v.number()),
   lastOpenedAt: v.optional(v.number()),
 })
@@ -372,55 +482,54 @@ notificationKinds: defineTable({
   .index("by_user_and_kind", ["userId", "kind"]),
 ```
 
-Expand/contract, as `CLAUDE.md` requires for every public function:
+Expand/contract, as `CLAUDE.md` requires:
 
-1. **Expand.** Keep `weeklyShelfEnabled` written and read exactly as today.
-   `getPreferences` gains an optional `kinds` array; `setPreferences` accepts
-   an optional per-kind argument. Old clients keep working unchanged, and a
-   write to `weeklyShelfEnabled` mirrors into the `weekly_shelf` row.
+1. **Expand.** `weeklyShelfEnabled` keeps being written and read exactly as
+   today; a write mirrors into the `weekly_shelf` row. `getPreferences` gains
+   an optional `kinds` array; `setPreferences` an optional per-kind argument.
 2. **Deploy** the backend, then ship the client that reads `kinds`.
 3. **Contract** only once the production channel shows no bundle still writing
    the boolean.
 
-In the app, the Settings row becomes a section: one switch per kind, each with
-one line of plain description, plus a master switch. A muted kind shows _why_
-("paused because it went unopened") rather than silently reading as off.
+In Settings: one switch per kind with a one-line description, a master switch,
+and the configured weekly maximum. A kind on reduced cadence says so —
+"sending less often because it hasn't been opened" — rather than reading as
+off.
 
-### Turning one off from the notification itself
+### Turning one off from the notification
 
-The push contract supports `categoryId`, and SDK 57 exposes
-`setNotificationCategoryAsync(identifier, actions, options)`. Register one
-category per kind with:
+**Verified:** the push contract supports `categoryId`, and SDK 57 exposes
+`setNotificationCategoryAsync(identifier, actions, options)` with
+`opensAppToForeground` per action.
 
-| Action            | Behaviour                                                   |
-| ----------------- | ----------------------------------------------------------- |
-| **Open**          | Default tap, follows `data.url`                             |
-| **Later**         | Snoozes this kind for 7 days, `opensAppToForeground: false` |
-| **Turn this off** | Disables this kind, `opensAppToForeground: false`           |
+| Action            | Behaviour                               |
+| ----------------- | --------------------------------------- |
+| **Open**          | Default tap, follows `data.url`         |
+| **Later**         | Snoozes this kind 7 days, no foreground |
+| **Turn this off** | Sets `enabled: false`, no foreground    |
 
-Both non-opening actions need a background handler that writes the preference
-without a cold start. This is the humane half of the design: a user who is
-mildly irritated should be able to act on it in one tap, in the moment, rather
-than hunting through Settings — and the alternative to a one-tap mute is a
-one-tap uninstall.
+Both background actions need a handler that writes the preference without a
+cold start. This matters because the alternative to a one-tap mute is a
+one-tap uninstall, and because **Turn this off** is the strong signal that
+cadence reduction deliberately does not infer.
 
 ## Delivery architecture
 
 ### Generalising the outbox
 
-`weeklyDigests` currently holds both the **contents** of a shelf and its
-**delivery state**. Split them. The contents stay — `/digest/{id}` and
-`getDigest` are contracts with every shipped build and must not move. Delivery
-moves to a table that any kind can use.
+`weeklyDigests` holds both shelf **contents** and **delivery state**. Split
+them. Contents stay — `/digest/{id}` and `getDigest` are contracts with every
+shipped build.
 
 ```ts
 notificationOutbox: defineTable({
   userId: v.string(),
   kind: notificationKindValidator,
-  payload: notificationPayloadValidator,   // discriminated by kind
-  dedupeKey: v.string(),                   // e.g. "weekly_shelf:2026-09-20"
+  payload: notificationPayloadValidator,
+  dedupeKey: v.string(),
   collapseId: v.optional(v.string()),
   scheduledFor: v.number(),
+  arm: v.optional(v.union(v.literal("notified"), v.literal("holdout"))),
   deliveryStatus: v.optional(v.union(
     v.literal("pending"), v.literal("complete"), v.literal("failed"))),
   deliveryNextAttemptAt: v.optional(v.number()),
@@ -436,306 +545,242 @@ notificationOutbox: defineTable({
          ["deliveryStatus", "deliveryNextAttemptAt"]),
 ```
 
-`notificationDelivery.ts` then generalises from `digestId` to `outboxId`. Its
-claim / finish / recover machine, its 8-attempt cap, its receipt polling and
-its `DeviceNotRegistered` handling are all kind-agnostic already and carry
-over untouched — this is a rename plus a payload indirection, not a rewrite.
-`weeklyDigests` keeps its delivery columns until the contract step retires
-them.
+### The migration is not a rename
 
-`dedupeKey` is what makes retries and racing crons safe, in the same spirit as
-the existing `itemOperations` ledger. `collapseId` means a new resurfacing
-notification **replaces** an unopened older one on the lock screen rather than
-stacking beneath it.
+The previous draft called this "a rename plus a payload indirection". It is
+not. Four things must survive it:
+
+1. **In-flight scheduled jobs.** `prepareWeeklyDigest` calls
+   `ctx.scheduler.runAfter(0, internal.notificationDelivery.send, { digestId })`.
+   Jobs already queued at deploy time will fail argument validation if `send`
+   stops accepting `digestId`. The repo already has precedent for this —
+   `sendDigestNotification` exists purely as "the scheduled entry point used
+   by previously deployed code". So `send` must accept **both**
+   `{ digestId }` and `{ outboxId }` for at least one release.
+2. **In-flight receipt state.** `deliveryRecipients` holds
+   `state: "receipt"` entries with Expo `ticketId`s awaiting a poll. Dropping
+   them either loses deliveries or re-sends them. The backfill must copy
+   `deliveryRecipients`, `deliveryAttempts`, `deliveryNextAttemptAt` and
+   `deliveryStatus` verbatim, not reset them.
+3. **Exactly-once claiming across two tables.** `recover` sweeps
+   `by_delivery_status_and_attempt` on `weeklyDigests`. During migration both
+   tables need sweeping, and a row must not be claimable from both. Mark
+   migrated rows with a `migratedToOutboxId` field and have the legacy sweep
+   skip them.
+4. **Bounded batches.** Run the backfill as a chained, paginated internal
+   mutation in the style of `prepareDueWeeklyDigests` and
+   `cleanupStaleImageImports` — never a single scan.
+
+Order: expand `send` → deploy → backfill → switch writers → contract. The
+claim/finish/recover logic itself is genuinely kind-agnostic and carries over;
+it is the cutover that needs care.
+
+`dedupeKey` makes retries and racing crons safe, in the spirit of the existing
+`itemOperations` ledger.
 
 ### Payload
 
-Verified against the Expo push contract shipped in `expo-server-sdk`:
+Verified against the `ExpoPushMessage` type in `expo-server-sdk`:
 
 ```ts
 {
   to: token,
-  title, body,                              // localized per recipient
+  title, body,
   data: { url, kind, notificationId },
-  richContent: { image: heroImageUrl },     // the save's own image
-  categoryId: `shelvr.${kind}`,             // action buttons
-  collapseId,                               // replaces, not stacks
-  threadId: "shelvr",                       // groups in Notification Center
-  interruptionLevel: "passive" | "active",  // passive for all content kinds
-  channelId,                                // one Android channel per kind
-  badge, sound, ttl,
+  categoryId: `shelvr.${kind}`,
+  collapseId,                               // replaces an undelivered message
+  tag,                                      // replaces a displayed Android one
+  threadId: "shelvr",
+  interruptionLevel: "passive",             // "active" only for trial_ending
+  channelId,
+  ttl,
 }
 ```
 
-`interruptionLevel: "passive"` for every content kind. Passive notifications do
-not wake the screen — correct for a product whose entire premise is that
-nothing here is urgent. `trial_ending` is the only `"active"` one.
+**`collapseId` and `tag` are not interchangeable.** `collapseId` maps to the
+provider collapse key and replaces a message that has **not yet been
+delivered**. `tag` is what replaces a notification **already posted** in the
+Android tray. Set both; they are separate fields in the push contract.
 
-One Android channel per kind (`weekly-shelf` already exists), because Android
-users manage notifications per channel and a single channel would make "mute
-the resurfacing ones" impossible at the OS level.
+`interruptionLevel: "passive"` for every default kind — passive notifications
+do not wake the screen, which is correct for a product whose premise is that
+nothing here is urgent.
 
-Batch sends in chunks of 100, the documented `pushNotificationChunkLimit`.
+One Android channel per kind, so Android users can mute a kind at OS level.
+Batch in chunks of 100, the documented `pushNotificationChunkLimit`.
+
+### Rich images need a native extension
+
+**Verified:** `expo-notifications` 57.0.17 contains no Notification Service
+Extension. Its config plugin is `withNotificationsIOS` and
+`withNotificationsAndroid` only — sounds, icons, entitlements, channels. A
+search of the package for `UNNotificationServiceExtension` returns nothing.
+
+**Platform constraint:** displaying a remote image on an iOS push requires
+`mutable-content: 1` **and** a Notification Service Extension inside the app
+that downloads the image and attaches it. Expo's push service can set the
+flag; it cannot supply the extension.
+
+So `richContent: { image }` is not a copy improvement. It needs a new iOS
+target, a custom config plugin, a fingerprint change and a new binary. It
+moves out of the first release and into its own piece of work, and the first
+release ships text-only notifications — which is fine, because naming the item
+is where most of the value is.
 
 ### Copy and localization
 
-New kinds extend `convex/model/notificationTranslations.json`, which already
-carries nine catalogs and shares `make-plural` rules with the app via
+New kinds extend `convex/model/notificationTranslations.json`, which carries
+nine catalogs and shares `make-plural` rules with the app via
 `convex/model/localization.ts`. Per `docs/architecture/localization.md`: every
-plural variant carries `%{formattedCount}`, every CLDR category required by
-the locale is present, and translated fragments are never concatenated around
-a count.
+plural variant carries `%{formattedCount}`, every required CLDR category is
+present, and fragments are never concatenated around a count.
 
-Interpolating an item title means **user content travels to Expo, APNs and
-FCM**. That is a deliberate exception to the repo's "keep user content out of
-log fields" rule, and it is confined to notification bodies: titles never enter
-`logEvent` fields or PostHog properties. Titles are truncated to 60 characters
-on a word boundary, and items with `status: "failed"` or
-`enrichment: "partial"` are never used as the named item, since their titles
-are guesses.
+Interpolating an item title sends **user content to Expo, APNs and FCM**. That
+is a deliberate exception to the repo's "keep user content out of log fields"
+rule, confined to notification bodies: titles never enter `logEvent` fields or
+PostHog properties. Titles truncate at 60 characters on a word boundary, and
+items with `status: "failed"` or `enrichment: "partial"` are never the named
+item, because their titles are guesses.
 
-### Budget across two origins
+## Rollout
 
-Server-sent pushes and device-fired local notifications cannot share a single
-counter, because a geofence crossing or a scroll threshold fires with no
-guaranteed network.
+### R1 — Instrument and establish a baseline
 
-- **Convex holds the authority.** One `notificationBudget` row per user:
-  rolling counters, `lastSentAt`, and the local-origin counts most recently
-  reconciled from devices.
-- **The device holds a conservative mirror.** Local kinds decrement a mirror
-  in device storage before firing, and reconcile on next foreground.
-- **Drift is allowed in exactly one direction.** If the device cannot tell
-  whether it has budget, it does not fire. Under-notifying is a smaller
-  failure than double-notifying, and a stale mirror must never be able to
-  spend the server's budget.
+**Ships no new notification kinds.**
 
-The two local kinds have separate caps — 1 per day for `nearby_place`, a
-user-chosen 1–4 per day for `intercept` — because both are triggered by the
-user's own movement or their own standing request, not by us deciding to
-interrupt. They still obey quiet hours and the same self-quieting rule.
+- All eight analytics events.
+- `"notification"` added to the `item_opened` source allowlist; attribution
+  property on `item_action`.
+- `notification-outcomes.sql` and its dashboard tile.
+- Holdout assignment, applied to the weekly shelf.
+- Weekly shelf copy rewritten to name the newest save. Text only.
 
-## Geofencing
+**Exit:** the dashboard reports, for the weekly shelf, accepted → opened →
+notification-useful return, split by arm and by authorization type, on a
+matured cohort.
 
-Selected for scope. Building it well means fixing the data first, because the
-data we currently have is the wrong data.
+### R2 — Budget, controls, and one experiment
 
-### The signal problem, and the fix
+- Outbox generalisation, with the migration sequence above.
+- Per-kind preferences (expand step), category actions, per-kind channels.
+- The shared budget and `arbitrate`.
+- Progressive cadence reduction.
+- `quiet_week`.
+- **One** deterministic `resurfacing` experiment, holdout-controlled, on a
+  fixed schedule — no habitual-hour timing yet.
 
-`items.latitude/longitude` is EXIF GPS from photos the user shot. It records
-**where they were**, not where they intend to go. A geofence on it fires when
-someone walks past a place they have already been — which is a memory, not an
-errand, and memories do not need a notification.
+**Exit:** the notified arm beats the holdout on useful returns per user per
+week, for at least one kind. If it does not, stop and reconsider rather than
+proceeding.
 
-The right signal is already in the schema and unused: **`intents` of kind
-`open_maps` carry a place or address string**, produced by the classifier for
-exactly those saves that are about going somewhere. A restaurant the user
-saved from TikTok has one. Geocoding those turns "somewhere I photographed"
-into "somewhere I meant to go", which is the difference between this feature
-working and being noise.
+### R3 — Refinement
 
-```ts
-itemPlaces: defineTable({
-  userId: v.string(),
-  itemId: v.id("items"),
-  latitude: v.number(),
-  longitude: v.number(),
-  label: v.string(),
-  source: v.union(
-    v.literal("exif"),            // photo GPS — weakest, memory not errand
-    v.literal("open_maps_intent"), // geocoded intent — strongest
-    v.literal("link_metadata"),    // place markup on the saved page
-  ),
-  geocodedAt: v.number(),
-})
-  .index("by_user", ["userId"])
-  .index("by_item", ["itemId"]),
-```
+- Habitual-hour timing, with the Convex-side histogram, tested against R2's
+  fixed schedule.
+- `trial_ending`.
+- Notification Service Extension and rich images, if R1/R2 justify the binary.
 
-Geocoding runs in `ai.ts` after classification, for items that produced an
-`open_maps` intent. It needs a geocoding provider and a new deployment
-variable; `GOOGLE_MAPS_API_KEY` already exists for the Android map and its
-Geocoding API is the least-new-surface option. Rate-limit it on the same
-per-user token bucket pattern as `findLinks`.
+### Later, separate projects
 
-### Platform limits
+Geofencing and Screen Time interception are scoped in the
+[Appendix](#appendix-two-later-projects). Neither belongs in this plan: both
+need new native binaries, new permissions and store declarations, and both
+should be evaluated only once R1 has established that Shelvr's notifications
+create value at all.
 
-| Constraint                | iOS                                            | Android                                                    |
-| ------------------------- | ---------------------------------------------- | ---------------------------------------------------------- |
-| Monitored regions per app | **20, hard**                                   | 100                                                        |
-| Permission                | `Always`, two-step                             | `ACCESS_BACKGROUND_LOCATION`                               |
-| Store requirement         | `NSLocationAlwaysAndWhenInUseUsageDescription` | Play background-location declaration **plus a demo video** |
-| Minimum radius            | ~100 m reliable                                | ~100 m reliable                                            |
+Each release respects the deploy order in `CLAUDE.md`: the Convex deploy lands
+before the client update that needs it, public shapes expand before clients
+move, and nothing contracts until the production channel shows no old bundle
+calling it.
 
-`expo-location` provides what is needed:
-`startGeofencingAsync(taskName, regions)` with `LocationRegion`
-(`latitude`, `longitude`, `radius`, `notifyOnEnter`, `notifyOnExit`), a
-`TaskManager` task receiving `GeofencingEventType.Enter`, and
-`requestBackgroundPermissionsAsync`.
+## Appendix: two later projects
 
-### Working within 20 regions
+Research retained because it is load-bearing for scoping, not because either
+is scheduled.
 
-Twenty is a hard cap on iOS and the design has to be built around it rather
-than discover it late.
+### Places and geofencing
 
-- Monitor **19 places plus one perimeter region** — a large circle (5–20 km)
-  around the current cluster. Exiting the perimeter is the signal to recompute
-  the 19, which is how a fixed cap covers an unbounded set of places.
-- Rank candidates by: unopened, recency of save, filed into a space,
-  `source = "open_maps_intent"` over `exif`, and distance from the user's
-  centre of mass.
-- Selection lives server-side as a query returning ≤20 regions, so it can be
-  recomputed when the user saves something new. The client calls
-  `startGeofencingAsync` with whatever it returns.
-- Radius 150 m default, clamped 100–500 m; wider for a neighbourhood, tighter
-  for an address.
+**The data we have is the wrong data.** `items.latitude/longitude` is EXIF GPS
+from the user's own photos — where they were, which is a memory, not an
+errand. The right signal is already in the schema and unused: `intents` of
+kind `open_maps` carry a place or address string, produced by the classifier
+for exactly those saves that are about going somewhere. Geocoding those is a
+prerequisite; without it the feature is noise.
 
-### Firing rules
+That geocoding needs a provider and a new deployment variable.
+`GOOGLE_MAPS_API_KEY` exists for the Android map, but Google's Geocoding terms
+restrict storing results — confirm or price an alternative before committing.
 
-Deliberately strict, because a geofence notification arrives when the user is
-out in the world and mildly busy:
+**Platform constraints.** iOS monitors **20 regions per app, hard**; Android 100. iOS needs `Always` location and
+`NSLocationAlwaysAndWhenInUseUsageDescription`; Android needs
+`ACCESS_BACKGROUND_LOCATION` plus a Play declaration **and a demo video**.
+`expo-location` provides `startGeofencingAsync(taskName, regions)`,
+`LocationRegion`, `GeofencingEventType.Enter` and
+`requestBackgroundPermissionsAsync` — verified against the package types.
 
-- Enter only, never exit.
-- The place must be **unopened** or carry an unexecuted `open_maps` intent.
-- One `nearby_place` per day, maximum.
-- The same place never twice in 30 days.
-- Quiet hours apply.
-- A dwell delay of about 60 seconds, so driving past does not fire.
+Design within 20 regions: monitor 19 places plus one large perimeter region
+(5–20 km); exiting the perimeter triggers reselection. Rank by unopened,
+recency, space membership, `open_maps` origin over EXIF, and distance from the
+user's centre of mass. Firing rules: enter only, one per day, same place never
+twice in 30 days, quiet hours, ~60 s dwell so driving past does not fire.
 
-> **You're near "Kiln"**
-> _You saved it in June and never went._
+Copy states only what is observable:
 
-Lands on `/item/{id}`.
+> **You're near Kiln**
+> _You saved it in June._
 
-### Permission sequencing
+Not "and never went" — an unopened save is not evidence of a missed visit.
 
-Do not ask for `Always` up front. Ask only from a user who has **opened the map
-tab** and has **at least 5 geocoded places** — they have seen the feature's
-raw material. Show an explanation screen before the system prompt, `WhenInUse`
-first, then the upgrade. iOS will also surface its own "keep allowing?" prompt
-after a while, and the honest way to survive it is to have sent something
-worth keeping before it arrives.
+### Screen Time interception
 
-Battery cost is modest — region monitoring uses cell and Wi-Fi rather than
-continuous GPS — but it is not zero, and it should be measured on a real device
-across a full day before release rather than asserted.
+Apple's `FamilyControls` / `DeviceActivity` / `ManagedSettings` stack.
+`react-native-device-activity` (0.6.1, February 2026, peer `expo >= 52`) wraps
+it with `requestAuthorization`, `DeviceActivitySelectionView`,
+`startMonitoring`, `onDeviceActivityMonitorEvent` and a `sendNotification`
+action — verified against the package's types.
 
-## Interrupting a scroll
+Four constraints that shape any estimate:
 
-The ask: when the user is doomscrolling TikTok or Instagram instead of opening
-Shelvr, interrupt them with something from their own shelf.
+- **`com.apple.developer.family-controls` requires Apple's approval** for
+  distribution. Weeks, and the critical path.
+- **A new native binary** — config plugin, `DeviceActivityMonitor` app
+  extension, App Group. Not OTA-able; changes the fingerprint.
+- **The extension has no network and no JS runtime.** It cannot choose an item
+  when it fires, so the app must pre-stage a candidate into the shared App
+  Group container on every foreground. A stale or empty interruption is worse
+  than none.
+- **No Android equivalent.** `UsageStatsManager` needs the special
+  `PACKAGE_USAGE_STATS` grant, which Play restricts to apps whose core purpose
+  is usage management.
 
-This is the most differentiated idea in the set and the most constrained. It
-splits cleanly into a version that ships now and a version that needs Apple's
-permission.
+Apple's picker keeps the chosen apps opaque — Shelvr never learns which apps
+they are — which is what makes this defensible to ship at all.
 
-### Tier 1 — no entitlement, ships with Phase 2
-
-We cannot see other apps without Screen Time, but we do not have to in order to
-get most of the value. **The user's own `item_opened` history tells us when
-they are idle and receptive** — the weeknight window where they habitually
-open things. That window is where doomscrolling lives, and targeting it needs
-no permission, no native module and no store review.
-
-Tier 1 is therefore not a separate kind at all: it is the `resurfacing` scorer
-using personal rhythm instead of a global schedule. It is also the **only**
-option on Android.
-
-### Tier 2 — Screen Time, iOS only
-
-Apple's `FamilyControls` / `DeviceActivity` / `ManagedSettings` stack does
-exactly what was asked, and `react-native-device-activity` (0.6.1, updated
-February 2026, peer `expo >= 52`) wraps it for Expo with `requestAuthorization`,
-`DeviceActivitySelectionView`, `startMonitoring`, `onDeviceActivityMonitorEvent`,
-and a `sendNotification` action available to the monitor extension.
-
-Flow:
-
-1. The user opts in explicitly. This is a feature they turn on, never a default.
-2. `requestAuthorization` for `.individual`.
-3. `DeviceActivitySelectionView` — Apple's own picker — lets them choose which
-   apps count. **The tokens are opaque: Shelvr never learns which apps they
-   picked.** That privacy property is Apple's, not ours, and it is also why
-   this is defensible to ship.
-4. `startMonitoring` with a `DeviceActivityEvent` whose `threshold` is the
-   user's chosen limit (default 20 minutes within a rolling window).
-5. On `eventDidReachThreshold`, the extension fires a **local** notification.
-
-Four constraints that shape the build:
-
-- **The entitlement is the long pole.** `com.apple.developer.family-controls`
-  requires a request to Apple and approval for distribution. Start it in week
-  one regardless of when the feature is scheduled; everything else can proceed
-  in parallel.
-- **A new native binary.** A config plugin, a `DeviceActivityMonitor` app
-  extension and an App Group. Not OTA-able, and it changes the fingerprint —
-  see `push-notifications.md`.
-- **The extension has no network and no JS runtime.** It cannot pick an item
-  when it fires. **The app must pre-stage a candidate** — title, image, deep
-  link — into the shared App Group container every time it is foregrounded,
-  and the extension reads whatever is there. Getting this wrong produces an
-  empty or stale interruption, which is worse than none.
-- **Android has no equivalent.** `UsageStatsManager` needs the special
-  `PACKAGE_USAGE_STATS` grant and Play restricts it to apps whose core purpose
-  is usage management, which Shelvr's is not. Android gets Tier 1.
-
-The copy is the entire product here. The wrong version scolds:
-
-> ~~You've been scrolling for 20 minutes.~~
-
-The right version substitutes rather than reprimands — it offers the thing the
-user themselves decided was worth their attention:
+Copy substitutes rather than reprimands, and claims nothing about the user's
+state of mind:
 
 > **Something you saved**
 > _"Miso-braised short ribs" — 4 minutes._
 
-A reading-time estimate is worth adding for exactly this surface: the reason
-people keep scrolling is that the alternative feels unbounded, and "4 minutes"
-is what makes the alternative feel finite.
+**Hypothesis:** that a bounded alternative ("4 minutes") competes with an
+unbounded feed better than an unbounded one does. Untested.
 
-Cap: user-chosen 1–4 per day, default 2. Shelvr does **not** shield or block
-the other app, even though `ManagedSettings` would allow it. Blocking makes
-Shelvr an adversary of the user's own phone; offering makes it an alternative.
-That distinction is the whole feature.
-
-## Rollout
-
-| Phase                                     | Ships                                                                                                                                                                            | Needs                                                   | Exit criteria                                                                        |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **0. Instrument and govern**              | All 8 analytics events, `"notification"` in the `item_opened` source allowlist, outbox generalisation, budget ledger, arbiter, per-kind preferences (expand step), self-quieting | Backend deploy before client                            | Dashboard shows per-kind send → deliver → open → useful-return, for the weekly shelf |
-| **1. Make the one we have worth opening** | Named-item copy, `richContent` image, category actions, `collapseId`, `quiet_week`                                                                                               | New binary for categories                               | Weekly shelf open rate ≥ 15%; mute rate < 5%                                         |
-| **2. The contextual pair**                | `resurfacing` with personal-rhythm timing (Tier 1 intercept), `space_suggestions`                                                                                                | OTA                                                     | Notification-sourced useful returns ≥ 70% of organic                                 |
-| **3. Business**                           | `trial_ending`                                                                                                                                                                   | OTA                                                     | Measurable trial-conversion lift                                                     |
-| **4. Places**                             | Geocoding of `open_maps` intents, `itemPlaces`, geofencing, `nearby_place`                                                                                                       | New binary, `Always` location, Play declaration + video | ≥ 20% open rate; no measurable battery regression                                    |
-| **5. Interception**                       | Screen Time Tier 2                                                                                                                                                               | **Apple entitlement**, new binary, App Group, extension | Opt-in retention beats control                                                       |
-
-Two sequencing notes that matter more than the order itself:
-
-- **Phase 0 ships no new notifications.** It is pure foundation, and doing it
-  first is what makes every later phase evaluable instead of a guess.
-- **Start the `FamilyControls` entitlement request during Phase 0.** Apple's
-  approval, not the code, is the critical path for Phase 5.
-
-Each phase respects the deploy order in `CLAUDE.md`: the Convex deploy lands
-before the client update that needs it, public function shapes expand before
-clients move, and nothing contracts until the production channel shows no old
-bundle still calling it.
+Shelvr does not shield or block the other app, though `ManagedSettings` would
+allow it. Blocking makes Shelvr an adversary of the user's own phone; offering
+makes it an alternative.
 
 ## Open questions
 
-1. **Geocoding provider.** Google Geocoding reuses the existing
-   `GOOGLE_MAPS_API_KEY` and adds the least new surface, but its terms restrict
-   storing results. Confirm before Phase 4, or price an alternative.
-2. **Does `resurfacing` need the model?** The scorer above is deterministic and
-   uses only existing fields. A `gemini-3.1-flash-lite` pass could pick better,
-   at a per-user-per-week cost. Ship deterministic, measure, then decide.
-3. **Provisional authorization reach.** Expect lower delivery until users
-   upgrade. Phase 0's events will size the gap; if it is severe, fall back to a
-   conventional prompt after the first opened provisional notification.
+1. **Attribution undercount.** Lineage attribution will miss users who return
+   later by another route. Size it in R1 by comparing against a time-window
+   measure reported alongside, and report both.
+2. **Holdout ethics and size.** 10% per kind, stable per user. Long-running
+   holdouts on a paid product need a defensible cap — decide how long a user
+   may sit in one.
+3. **Does `resurfacing` need the model?** The scorer is deterministic and uses
+   existing fields. A `gemini-3.1-flash-lite` pass might pick better at a
+   per-user-per-week cost. Ship deterministic, measure, then decide.
 4. **Non-Pro users.** Every save is gated on `requireProEntitlement`. Decide
    whether a lapsed user still gets `resurfacing` for saves they already own —
-   arguably the best possible win-back, arguably a nag at someone who stopped
-   paying.
-5. **`intercept` cap interaction.** If a user sets 4 interceptions a day, is
-   the weekly push budget still 2? Current answer is yes, on the grounds that
-   they are different contracts, but it deserves a look once real data exists.
+   plausibly the best win-back, plausibly a nag at someone who stopped paying.
+5. **Geocoding provider terms.** Blocks the places project, not this plan.
