@@ -268,8 +268,10 @@ needed at runtime by the features that use them:
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
   no AI pass ever overwrites a user decision.
 - Deploy backend changes in a compatible order: the Convex deploy lands before
-  the client update that needs it (`.github/workflows/deploy.yml` enforces
-  this: approved production deploy, then tester OTA). Breaking changes ship as
+  the client update that needs it. `.github/workflows/deploy.yml` deploys the
+  backend alone, and `.github/workflows/release.yml` deploys the selected
+  commit's backend before it builds or publishes anything, so no client reaches
+  a person ahead of the functions it calls. Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A

@@ -6,8 +6,9 @@ on:
   # configured, so do not read it as an approval gate. What holds the line is
   # CI passing, the freshness checks in every job that acts, and the
   # convex-api contract check on the pull request that got the commit here.
-  # The tester OTA publishes only after the deploy lands, so a client that
-  # needs new backend functions can never ship ahead of them.
+  # Only the backend deploys here. A client update ships from release.yml,
+  # which deploys the same commit's backend before publishing, so a client can
+  # never reach anyone ahead of the functions it calls.
   workflow_run:
     workflows: [CI]
     branches: [main]
@@ -116,97 +117,3 @@ jobs:
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
         run: pnpm exec convex deploy
-
-  eas-update-internal-test:
-    name: Publish tester OTA (internal-test)
-    needs: [selected-commit, convex-production]
-    # Repeat the freshness verdict rather than relying on the needs chain alone,
-    # so this cannot publish for a commit the deploy job declined.
-    if: needs.selected-commit.outputs.deployable == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the validated commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          persist-credentials: false
-
-      # The verdict above is this run's, recorded when it started. Re-running
-      # this job alone keeps the original commit and the outputs already
-      # computed for it, so a later rerun would serve that older bundle to
-      # testers after a newer one shipped. Ask again, before the expensive
-      # setup below.
-      - name: Confirm main has not moved past this commit
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await require('./tools/verify-ci.cjs').requireTip({ github, context, core });
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.20.0
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify Expo token
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "EXPO_TOKEN is not set. Create a robot access token at expo.dev (Account settings > Access tokens) and add it as a repository secret."
-            exit 1
-          fi
-
-      - name: Set up EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          packager: pnpm
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      # Pull only OTA-readable variables. Secret values are unavailable to
-      # updates, so a declared name alone is not sufficient validation.
-      - name: Verify the EAS production environment
-        working-directory: apps/native
-        env:
-          APP_VARIANT: production
-        run: |
-          ota_env="$(mktemp)"
-          trap 'rm -f "$ota_env"' EXIT
-          eas env:pull production --path "$ota_env" --non-interactive > /dev/null
-          node ../../tools/verify-ota-env.mjs "$ota_env"
-
-      # The update carries this tree's fingerprint and a binary only accepts
-      # one that matches its own, so a publish that moves it reaches nobody and
-      # still reports success. env:exec runs the check under the same
-      # environment the publish resolves, which matters: without it
-      # GOOGLE_MAPS_API_KEY is absent and the Android hash is not the one the
-      # update gets stamped with. APP_VARIANT is set here for the same reason.
-      - name: Verify the update can reach the released build
-        working-directory: apps/native
-        env:
-          APP_VARIANT: production
-        run: >-
-          eas env:exec production
-          "node ../../tools/verify-ota-compatibility.mjs
-          --profile internal-test --platform all"
-
-      # internal-test builds point at the production backend, which is why
-      # this job waits on the approved Convex deploy above.
-      - name: Publish EAS Update
-        working-directory: apps/native
-        env:
-          # Pin the variant so app.config.js resolves the production bundle
-          # identity — without it the update is built as the development
-          # variant, never matches a store build's fingerprint, and the
-          # publish silently reaches nobody.
-          APP_VARIANT: production
-        run: eas update --channel internal-test --environment production --message "main $(git rev-parse --short HEAD)" --non-interactive
