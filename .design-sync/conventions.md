@@ -24,7 +24,7 @@ object. For your own layout glue, use plain elements with the theme variables:
 | Text            | `--colors-foreground`, `--colors-muted`, `--colors-faint`                                                                                   |
 | Accent          | `--colors-primary` (buttons), `--colors-primary-foreground` (text on primary), `--colors-primary-soft` (chip fill), `--colors-primary-text` |
 | Lines and state | `--colors-border`, `--colors-image-border`, `--colors-danger`, `--colors-overlay`                                                           |
-| Type            | `--fonts-regular`, `--fonts-medium`, `--fonts-bold` (Satoshi), `--fonts-display` (Exposure, for titles and the wordmark)                    |
+| Type            | `--fonts-regular`, `--fonts-medium`, `--fonts-bold` (Satoshi), `--fonts-display` (Faculty Glyphic, for titles and the wordmark)             |
 
 Spacing and radii are not variables. Use the app's literal values: spacing steps of
 8px (4, 8, 12, 16, 24, 32), radii 8 (images), 11 (cards and buttons), 16 (inline

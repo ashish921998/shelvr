@@ -13,11 +13,11 @@ const device = vi.hoisted(() => ({
   fontReady: true,
   listeners: new Set<() => void>(),
 }));
-// The native asset loader normally handles this require; Node has no OTF loader.
+// The native asset loader normally handles this require; Node has no TTF loader.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
-  load.extensions[".otf"] = (module) => {
+  load.extensions[".ttf"] = (module) => {
     module.exports = "font-asset";
   };
 });

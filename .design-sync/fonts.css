@@ -14,6 +14,6 @@
   src: url('../apps/native/assets/fonts/Satoshi-Bold.otf') format('opentype');
 }
 @font-face {
-  font-family: 'ExposureTrial-0';
-  src: url('../apps/native/assets/fonts/ExposureTrial-0.otf') format('opentype');
+  font-family: 'FacultyGlyphic-Regular';
+  src: url('../apps/native/assets/fonts/FacultyGlyphic-Regular.ttf') format('truetype');
 }

@@ -31,7 +31,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // removed characters animate out (up + right, shrink, blur, fade) and added
 // characters animate in (rise from below, grow, sharpen, fade) — each staggered.
 
-const FONT = require("../../assets/fonts/ExposureTrial-0.otf");
+const FONT = require("../../assets/fonts/FacultyGlyphic-Regular.ttf");
 
 const STAGGER_MS = 25; // per-character delay
 const ENTER_DELAY_MS = 120; // lead so exiting letters clear before new ones arrive

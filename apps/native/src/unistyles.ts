@@ -11,7 +11,7 @@ const shared = {
     regular: "Satoshi-Regular",
     medium: "Satoshi-Medium",
     bold: "Satoshi-Bold",
-    display: "ExposureTrial-0",
+    display: "FacultyGlyphic-Regular",
   },
   gap: (v: number) => v * 8,
   radius: {
