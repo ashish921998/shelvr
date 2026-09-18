@@ -96,7 +96,7 @@ has one other cause worth ruling out first: a store build may already have
 shipped and nobody recorded it. Check the registry before building again.
 
 The gate only runs inside `native-update.yml`, so that workflow is the only
-sanctioned way to publish. A `eas update` from a laptop bypasses the check
+sanctioned way to publish. An `eas update` from a laptop bypasses the check
 entirely and can strand an update on a runtime version nobody has.
 
 Two limits of the check are worth knowing. It compares against the **newest**

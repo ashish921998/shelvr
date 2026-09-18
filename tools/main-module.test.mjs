@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -12,13 +19,19 @@ const HELPER = pathToFileURL(
   join(dirname(fileURLToPath(import.meta.url)), "main-module.mjs"),
 ).href;
 
-// mkdtemp hands back a path under /var, which is a symlink to /private/var, so
-// a script run from here is exactly the case the string idiom gets wrong.
-const work = mkdtempSync(join(tmpdir(), "main-module-"));
+// A Linux tmpdir is a real path and a macOS one is not, so make the symlink
+// here instead of depending on the platform for the case under test. Scripts
+// are written under `real` and run through `linked`, which is how argv[1] and
+// import.meta.url come to name one file by two paths.
+const work = realpathSync(mkdtempSync(join(tmpdir(), "main-module-")));
+const real = join(work, "real");
+const linked = join(work, "link");
+mkdirSync(real);
+symlinkSync(real, linked);
 after(() => rmSync(work, { recursive: true, force: true }));
 
 function script(name, lines) {
-  const path = join(work, name);
+  const path = join(real, name);
   writeFileSync(path, lines.join("\n"));
   return path;
 }
@@ -37,7 +50,7 @@ const subject = script("subject.mjs", [
   ");",
 ]);
 
-const importer = script("importer.mjs", [
+script("importer.mjs", [
   `import { isMainModule } from ${JSON.stringify(HELPER)};`,
   `await import(${JSON.stringify(pathToFileURL(subject).href)});`,
   "console.log(",
@@ -45,19 +58,18 @@ const importer = script("importer.mjs", [
   ");",
 ]);
 
-const run = (path) =>
-  execFileSync(process.execPath, [path], { encoding: "utf8" });
+const run = (name) =>
+  execFileSync(process.execPath, [join(linked, name)], { encoding: "utf8" });
 
 test("a script run through a symlinked path knows it is the program", () => {
-  assert.ok(
-    work.startsWith("/var/"),
-    `expected a symlinked tmpdir, got ${work}`,
+  assert.equal(
+    run("subject.mjs").trim(),
+    "subject realpath=program string=imported",
   );
-  assert.equal(run(subject).trim(), "subject realpath=program string=imported");
 });
 
 test("the same file, imported, is not the program", () => {
-  assert.deepEqual(run(importer).trim().split("\n"), [
+  assert.deepEqual(run("importer.mjs").trim().split("\n"), [
     "subject realpath=imported string=imported",
     "importer realpath=program",
   ]);
