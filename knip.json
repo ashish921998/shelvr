@@ -28,9 +28,12 @@
     ".": {
       "entry": [
         "tools/generate-localizations.mjs",
+        "tools/git-trailer.test.mjs",
         "tools/main-module.test.mjs",
         "tools/release-guards.test.mjs",
         "tools/verify-ci.cjs",
+        "tools/verify-convex-api.mjs",
+        "tools/verify-convex-api.test.mjs",
         "tools/verify-convex-codegen.mjs",
         "tools/verify-convex-codegen.test.mjs",
         "tools/verify-ios-submit.mjs",

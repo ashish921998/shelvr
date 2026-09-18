@@ -79,12 +79,11 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Deployment
 
-- `deploy.yml` runs after CI completes on `main`: the `production`-environment
-  job deploys Convex behind a required-reviewer approval, then an EAS Update
-  goes to the `internal-test` channel. One-time setup, in this order: add a
-  required reviewer to the GitHub `production` environment first (the
-  reviewer queues each backend deploy until they approve it), then add
-  the `CONVEX_DEPLOY_KEY` and `EXPO_TOKEN` repo secrets.
+- `deploy.yml` runs after CI completes on `main` and deploys Convex
+  production, nothing else. No approval gate: CI, each acting job's freshness
+  check, and the pull request's public-contract check hold the line. One-time
+  setup is the `CONVEX_DEPLOY_KEY` repo secret. Client updates ship only from
+  `release.yml`, which deploys the same commit's backend first.
 - `release.yml` is dispatched manually for EAS store builds (`--auto-submit`
   requires store credentials on EAS servers) or production-channel OTA.
   Both manual workflows require successful main push CI for the selected

@@ -8,6 +8,7 @@
     "typecheck": "turbo run typecheck",
     "verify:codegen": "node tools/verify-convex-codegen.mjs",
     "verify:fingerprint": "node tools/verify-native-fingerprint.mjs",
+    "verify:convex-api": "node tools/verify-convex-api.mjs",
     "verify:ota": "node tools/verify-ota-compatibility.mjs",
     "test:tools": "node --test tools/*.test.mjs",
     "test": "pnpm --filter native-app test && pnpm --filter web-app test",

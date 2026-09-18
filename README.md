@@ -201,19 +201,17 @@ command). Android waitlist signup needs `CONVEX_URL` at runtime:
 pnpm --filter web-app build
 ```
 
-**Convex production + tester OTA** run through the Deploy workflow
-(`.github/workflows/deploy.yml`). After CI completes on `main`, the workflow:
+**Convex production** deploys through the Deploy workflow
+(`.github/workflows/deploy.yml`). After CI completes on `main` it deploys the
+backend, and nothing else. It does not ask for approval: what holds the line is
+CI, the freshness check in every job that acts, and the public-contract check
+on the pull request that got the commit onto `main`. One-time setup is a deploy
+key from the Convex dashboard (production deployment → Settings → Deploy keys),
+added as the `CONVEX_DEPLOY_KEY` repo secret.
 
-1. Deploys Convex to production. One-time setup, in this order: add a
-   required reviewer to the GitHub `production` environment **before** adding
-   secrets, then add a deploy key from the Convex dashboard (production
-   deployment → Settings → Deploy keys) as the `CONVEX_DEPLOY_KEY` repo
-   secret. The required reviewer queues each backend deploy until they
-   approve it.
-2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
-   `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
-   get the update only after the approved deploy lands, so a client never
-   ships ahead of the backend it depends on.
+No client update ships from here. Testers and users get a build or an OTA from
+the Release workflow below, which deploys the same commit's backend first, so a
+client never reaches anyone ahead of the functions it calls.
 
 **Store builds and production OTA** run through the Release workflow
 (`.github/workflows/release.yml`), dispatched manually from `main`: mode

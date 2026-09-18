@@ -249,7 +249,14 @@ needed at runtime by the features that use them:
   later; store builds lag for weeks). Never change a public function's argument or return shape
   in the same release that moves the client. Expand first (add a new function or accept both
   shapes), deploy, move the client, then contract once the production update channel shows no
-  old bundle still calling it.
+  old bundle still calling it. CI enforces the first half: `tools/verify-convex-api.mjs`
+  resolves every public function's `args` and `returns` to their full text, following the
+  shared validators they reference, and fails a pull request that changes or removes one.
+  Withdrawing a function's `export`, or switching it between `query`, `mutation` and
+  `action`, counts the same way. Acknowledge a change an installed app survives, or the
+  expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
+  range. It cannot yet tell widening from narrowing, so an added field asks for the
+  trailer too.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
@@ -261,8 +268,10 @@ needed at runtime by the features that use them:
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
   no AI pass ever overwrites a user decision.
 - Deploy backend changes in a compatible order: the Convex deploy lands before
-  the client update that needs it (`.github/workflows/deploy.yml` enforces
-  this: approved production deploy, then tester OTA). Breaking changes ship as
+  the client update that needs it. `.github/workflows/deploy.yml` deploys the
+  backend alone, and `.github/workflows/release.yml` deploys the selected
+  commit's backend before it builds or publishes anything, so no client reaches
+  a person ahead of the functions it calls. Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
 - An OTA update only reaches installs whose store build shares its native fingerprint. A
