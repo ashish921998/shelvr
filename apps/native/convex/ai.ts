@@ -1263,7 +1263,7 @@ async function fetchInstagramHtml(url: string) {
 }
 
 type InstagramEmbed =
-  | { status: "ok"; html: string }
+  | { status: "ok"; html: string; truncated?: true }
   | { status: "missing" }
   | { status: "transient"; errorCategory: string };
 
@@ -1290,6 +1290,7 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     return {
       status: "ok",
       html: decodeWithContentType(result.bytes, result.contentType),
+      ...(result.truncated ? { truncated: true as const } : {}),
     };
   }
   return isTransientFetchFailure(result.code, result.status)
@@ -1368,6 +1369,9 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...(page.truncated || (embed.status === "ok" && embed.truncated)
+      ? { truncated: true as const }
+      : {}),
     ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
@@ -1509,6 +1513,25 @@ const PAGE_FETCH_OPTIONS = {
 } as const;
 
 /**
+ * The recipe a page declares in its own schema.org markup, or undefined when
+ * it declares none.
+ *
+ * A read cut off at `maxBytes` yields nothing, because a cut document still
+ * parses. Microdata's ingredient and step lists simply stop early, and a recipe
+ * whose method stops after step 1 reads exactly like a recipe with one step —
+ * `sanitizeRecipe` checks that the lists are non-empty and within budget, which
+ * a prefix satisfies. JSON-LD survives a cut only by accident, since
+ * `JSON.parse` rejects a half-written object, so the guard belongs here where
+ * both markup shapes pass through rather than inside the extractor.
+ */
+function recipeFromMarkup(
+  html: string,
+  truncated: true | undefined,
+): Recipe | undefined {
+  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
+}
+
+/**
  * A caption source (TikTok, X) carries only a caption, and the caption often
  * links to the full recipe write-up. Follow that one link and read its
  * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
@@ -1528,10 +1551,9 @@ async function withLinkedRecipe(page: PageData): Promise<PageData> {
     if (!result.ok) {
       return page;
     }
-    const recipe = sanitizeRecipe(
-      extractRecipeMarkup(
-        decodeWithContentType(result.bytes, result.contentType),
-      ),
+    const recipe = recipeFromMarkup(
+      decodeWithContentType(result.bytes, result.contentType),
+      result.truncated,
     );
     return recipe === undefined ? page : { ...page, recipe };
   } catch {
@@ -1596,7 +1618,7 @@ async function fetchPage(url: string): Promise<PageData> {
   const content = extractBodyText(html, finalUrl);
   // The page's own schema.org Recipe markup is the recipe: exact lines, no
   // prompt window, nothing invented. Absent for anything not a recipe.
-  const recipe = sanitizeRecipe(extractRecipeMarkup(html));
+  const recipe = recipeFromMarkup(html, result.truncated);
 
   return {
     title,
@@ -1605,6 +1627,9 @@ async function fetchPage(url: string): Promise<PageData> {
     heroAspectRatio,
     siteName,
     content,
+    // A page over the fetch cap gives us a prefix, so `content` ends early
+    // however long it looks.
+    ...(result.truncated ? { truncated: true as const } : {}),
     ...(recipe ? { recipe } : {}),
   };
 }

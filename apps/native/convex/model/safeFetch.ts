@@ -299,6 +299,12 @@ export type SafeFetchOk = {
   contentType: string;
   /** Bounded body bytes. Never larger than the requested maxBytes. */
   bytes: Uint8Array;
+  /** Set only when `onOverflow: "truncate"` actually fired, so `bytes` is a
+   * prefix of what the server sent. A caller that needs the whole document to
+   * be right — parsing structured markup, say — must refuse a truncated read
+   * instead of parsing the prefix, because a cut document can still parse into
+   * a plausible-looking partial answer. */
+  truncated?: true;
 };
 
 export type SafeFetchResult =
@@ -348,13 +354,16 @@ const DEFAULT_MAX_REDIRECTS = 3;
  *
  * When `onOverflow` is `"error"` (the default), exceeding the cap throws
  * `response_too_large`. When `"truncate"`, the reader stops at `maxBytes`,
- * dumps the remainder, and returns the bounded prefix as a successful result. */
+ * dumps the remainder, and returns the bounded prefix as a successful result.
+ *
+ * `truncated` reports which of those happened, so a caller that cannot use a
+ * prefix can tell a short page from a cut one. */
 async function readBounded(
   body: BodyReadable,
   maxBytes: number,
   signal: AbortSignal,
   onOverflow: "error" | "truncate" = "error",
-): Promise<Uint8Array> {
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of body as unknown as AsyncIterable<Buffer>) {
@@ -381,7 +390,10 @@ async function readBounded(
             "deadline exceeded while draining overflow",
           );
         }
-        return new Uint8Array(Buffer.concat(chunks));
+        return {
+          bytes: new Uint8Array(Buffer.concat(chunks)),
+          truncated: true,
+        };
       }
       // Over cap in error mode: cancel the body by dumping the remainder.
       await safeDump(body);
@@ -392,7 +404,7 @@ async function readBounded(
     }
     chunks.push(chunk);
   }
-  return new Uint8Array(Buffer.concat(chunks));
+  return { bytes: new Uint8Array(Buffer.concat(chunks)), truncated: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +582,7 @@ async function safeFetchThrowing(
       if (onOverflow === "error") {
         await rejectOversizeContentLength(response, maxBytes);
       }
-      const bytes = await readBounded(
+      const { bytes, truncated } = await readBounded(
         response.body,
         maxBytes,
         ac.signal,
@@ -581,6 +593,7 @@ async function safeFetchThrowing(
         status: response.statusCode,
         contentType,
         bytes,
+        ...(truncated ? { truncated: true as const } : {}),
       };
     }
   } finally {
