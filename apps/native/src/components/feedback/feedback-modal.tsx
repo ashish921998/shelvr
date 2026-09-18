@@ -104,6 +104,7 @@ export function FeedbackModal({
         <View style={styles.sheet}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.title} accessibilityRole="header">

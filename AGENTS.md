@@ -57,8 +57,9 @@ same steps, so the pre-commit hook and the remote gate cannot drift. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
-under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
-`newConvexTest()` from `convex/test.setup.ts`.
+under `apps/native/convex/**`, `apps/native/src/**`, and `apps/web/src/**`.
+Convex tests use `newConvexTest()` from `convex/test.setup.ts`; web tests use
+Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Observability
 

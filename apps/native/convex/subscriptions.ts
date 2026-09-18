@@ -1,10 +1,15 @@
 import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { isDevelopmentAnonymousUser, requireUserId } from "./model/auth";
-import { isEntitled, type SubscriptionStatus } from "./model/entitlement";
+import {
+  isEntitled,
+  isEntitledStatus,
+  type SubscriptionStatus,
+} from "./model/entitlement";
+import { saveError } from "./model/saveErrors";
 
 export const subscriptionStatusValidator = v.union(
   v.literal("trialing"),
@@ -45,16 +50,14 @@ export const getEntitlement = query({
   },
 });
 
-/** Sentinel error string the client recognizes to present the paywall instead
- * of a generic failure. Kept as a stable literal so client/server agree. */
-export const PRO_REQUIRED = "Pro required";
-
 /**
  * Server-side entitlement gate for Pro mutations. Reads the wall clock
  * (`Date.now()` is allowed in mutations) so a trial that expired between the
  * client's last fetch and this call is correctly rejected — the client's
- * `entitled` is advisory; this is the source of truth. Throws {@link PRO_REQUIRED}
- * when the user has no active trial or subscription.
+ * `entitled` is advisory; this is the source of truth. Throws
+ * {@link saveError}`("pro_required")` when the user has no active trial or
+ * subscription, which the client decodes to present the paywall instead of a
+ * generic failure.
  *
  * Pass the `userId` already derived via `requireUserId` so this never performs
  * a second auth lookup.
@@ -64,34 +67,67 @@ export async function requireProEntitlement(
   userId: Id<"users">,
 ): Promise<void> {
   if (!(await hasProEntitlement(ctx, userId))) {
-    throw new Error(PRO_REQUIRED);
+    throw saveError("pro_required");
   }
 }
 
 /**
- * The same rule as {@link requireProEntitlement}, as a boolean. For mutations
- * whose core write must succeed for every user but whose paid side effect
- * (an LLM pass) is Pro-only: the caller keeps the write and skips the spend.
+ * The same rule as {@link requireProEntitlement}, as a boolean. Mutations
+ * whose core write must succeed for every user can use this to skip a
+ * Pro-only side effect. Reads the wall clock, so it is mutation-only;
+ * queries use {@link hasProEntitlementAt} with a client-supplied clock,
+ * or {@link hasProEntitlementStatus} when no clock is available.
  */
 export async function hasProEntitlement(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<boolean> {
-  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
-  const sub = await ctx.db
+  return await hasProEntitlementAt(ctx, userId, Date.now());
+}
+
+/** The caller's one subscription row, or null when they never started one. */
+async function subscriptionFor(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<Doc<"subscriptions"> | null> {
+  return await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
-  if (sub === null) {
-    return false;
-  }
-  return isEntitled(sub.status, sub.expiresAt, Date.now());
+}
+
+/** Query-safe entitlement check. The caller supplies the current client time. */
+export async function hasProEntitlementAt(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+  now: number,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitled(sub.status, sub.expiresAt, now);
 }
 
 /**
- * Written by the RevenueCat webhook (`http.ts`). Lifetime-ness is decided once
- * at the webhook edge (from the product id) and arrives here as
- * `status: "lifetime"`; this handler never inspects product ids.
+ * Clock-free entitlement check for the legacy callers that predate the
+ * client-supplied `now` argument. The RevenueCat webhook marks the stored
+ * status `lapsed` when a subscription actually expires, so the status
+ * alone gates those callers without reading the wall clock. Unlike
+ * {@link hasProEntitlementAt}, a period that has ended but whose webhook
+ * event has not landed yet still reads as entitled — the rollout window
+ * where installed builds keep their widget instead of losing it.
+ */
+export async function hasProEntitlementStatus(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (await isDevelopmentAnonymousUser(ctx, userId)) return true;
+  const sub = await subscriptionFor(ctx, userId);
+  return sub !== null && isEntitledStatus(sub.status);
+}
+
+/**
+ * Written by the RevenueCat webhook (`http.ts`). This handler honours the
+ * supplied status and never infers access from product ids.
  *
  * Idempotent per user using the RevenueCat `event_timestamp_ms` as the ordering
  * key: a repeat or stale event whose `eventTimestampMs` is not newer than the
@@ -102,7 +138,8 @@ export async function hasProEntitlement(
  * `status` is optional — when omitted (e.g. a CANCELLATION that still has
  * access until period end) the existing status is preserved and only
  * `expiresAt` is refreshed. When `expiresAt` is 0 and no existing row is found,
- * the event is acknowledged but no row is created (there is nothing to lapse).
+ * the event is acknowledged but no row is created unless it is authoritative
+ * (a refund snapshot must record its timestamp to reject older purchases).
  */
 export const upsertSubscription = internalMutation({
   args: {
@@ -147,11 +184,12 @@ export const upsertSubscription = internalMutation({
       return null;
     }
 
-    // A lifetime row is sticky: once `lifetime`, no later event changes it — a
+    // A lifetime row is sticky unless an authoritative snapshot replaces it — a
     // stray CANCELLATION or an EXPIRATION for an unrelated product (this table
-    // is one row per user, not per-product) is preserved as-is. The webhook
-    // edge already decided lifetime-ness, so a fresh lifetime purchase arrives
-    // as `status: "lifetime"`.
+    // is one row per user, not per-product) is preserved as-is. Refunds and
+    // reversals reconcile the current Pro entitlement instead. The webhook
+    // uses this non-expiring status for developer access and authoritative
+    // permanent grants, not a purchasable lifetime plan.
     const stickyLifetime =
       !args.authoritative &&
       existing?.status === "lifetime" &&
@@ -171,7 +209,14 @@ export const upsertSubscription = internalMutation({
     // Nothing to record: an event with no expiry and no prior state (e.g. a
     // lapsed non-lifetime event). A lifetime purchase is exempt — it reports
     // `expiresAt: 0` (non-renewing) but is a real entitlement.
-    if (existing === null && args.expiresAt === 0 && status !== "lifetime") {
+    // An authoritative lapse records the ordering timestamp even before a
+    // purchase arrives, so a delayed purchase cannot resurrect refunded access.
+    if (
+      !args.authoritative &&
+      existing === null &&
+      args.expiresAt === 0 &&
+      status !== "lifetime"
+    ) {
       return null;
     }
 
@@ -188,7 +233,8 @@ export const upsertSubscription = internalMutation({
     const doc = {
       status,
       expiresAt,
-      ...(!stickyLifetime && args.productId !== undefined
+      ...(args.authoritative ||
+      (!stickyLifetime && args.productId !== undefined)
         ? { productId: args.productId }
         : {}),
       ...(args.eventTimestampMs !== undefined

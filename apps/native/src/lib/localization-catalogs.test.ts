@@ -27,7 +27,7 @@ import { resolveLocale } from "./i18n-core";
 import {
   notificationLocale,
   digestCopy,
-} from "../../convex/model/notificationDelivery";
+} from "../../convex/model/notificationFields";
 import { describe, expect, it } from "vitest";
 import config from "../../localization.config.json";
 import en from "@/locales/en.json";

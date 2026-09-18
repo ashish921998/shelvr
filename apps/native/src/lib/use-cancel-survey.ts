@@ -10,21 +10,13 @@ import { analytics } from "@/lib/analytics";
 import { isAnalyticsAvailable } from "@/lib/posthog";
 import { isHomeRootRoute } from "@/lib/feedback";
 import { isPaywallPending, readRcTrialCancellation } from "@/lib/entitlement";
-import {
-  cancelSurveyAnalytics,
-  type CancelSurveyReason,
-} from "@/lib/cancel-survey";
+import { cancelSurveyAnalytics } from "@/lib/cancel-survey";
+import type { CancelSurveyResponse } from "./pending-cancel-survey";
+import { useCancelSurveyResponse } from "./use-cancel-survey-response";
 
 /** Poll interval while a paywall sheet has the moment (feedback-invitation
  * uses the same cadence). */
 const PAYWALL_RECHECK_MS = 2000;
-
-/** The response `finish` records: a submission carries its bounded reason,
- * a dismissal stands alone. The shape passes straight through to the
- * respond mutation's args. */
-type CancelSurveyResponse =
-  | { outcome: "submitted"; reason: CancelSurveyReason }
-  | { outcome: "dismissed" };
 
 /**
  * Drives the next-visit cancel survey card.
@@ -43,10 +35,9 @@ type CancelSurveyResponse =
  * first) takes it down without emitting anything — only the call that
  * consumed the ask may count a `shown`.
  *
- * Failures never strand the ask: a failed markShown or respond logs via
- * captureError, takes the card down for the rest of the episode, and leaves
- * the row unwritten — so the next foreground episode re-detects the unspent
- * ask and re-asks.
+ * A failed markShown leaves the ask unspent for the next episode. Responses
+ * are persisted before sending and retried on foreground/relaunch, even
+ * after markShown has consumed the ask. Neither retry emits another shown.
  *
  * The ask is consumed only when the card actually renders (`presented`),
  * never at detection time — closing the app on Home's loading screen leaves
@@ -67,7 +58,7 @@ export function useCancelSurvey(): {
   const [appState, setAppState] = useState(AppState.currentState);
 
   const markShown = useMutation(api.cancelSurvey.markShown);
-  const respond = useMutation(api.cancelSurvey.respond);
+  const submitResponse = useCancelSurveyResponse(userId, appState);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", setAppState);
@@ -158,34 +149,11 @@ export function useCancelSurvey(): {
       });
   }, [userId, markShown]);
 
-  // One response ever per mount: two rapid taps (or a tap racing dismiss)
-  // must not emit duplicate events. Capture is gated on the server's verdict
-  // too — two devices can race the same ask, and only the response this row
-  // accepted may reach PostHog.
-  const responded = useRef(false);
   const finish = useCallback(
     (response: CancelSurveyResponse) => {
-      if (!userId || responded.current) return;
-      responded.current = true;
-      void respond(response)
-        .then((result) => {
-          if (!result.accepted) return;
-          if (response.outcome === "submitted") {
-            cancelSurveyAnalytics.submitted(response.reason);
-          } else {
-            cancelSurveyAnalytics.dismissed();
-          }
-        })
-        .catch((error: unknown) => {
-          // A rejected respond committed nothing: leave the card down and
-          // re-arm the one-response lock so the re-earned ask (re-detected
-          // on a later foreground episode) can still be answered.
-          analytics.captureError("cancel_survey_response_failed", error);
-          responded.current = false;
-        });
-      setVisible(false);
+      if (submitResponse(response)) setVisible(false);
     },
-    [userId, respond],
+    [submitResponse],
   );
 
   return { visible, presented, finish };

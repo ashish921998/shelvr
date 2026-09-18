@@ -36,6 +36,24 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const postMediaValidator = v.object({
+  kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
+  imageUrl: v.string(),
+  aspectRatio: v.number(),
+});
+
+export type PostMedia = Infer<typeof postMediaValidator>;
+
+// An image or video inside an article body. `paragraph` counts the body's
+// paragraphs (split on blank lines) that come before it, so the reader can
+// place it between them.
+export const articleMediaValidator = v.object({
+  ...postMediaValidator.fields,
+  paragraph: v.number(),
+});
+
+export type ArticleMedia = Infer<typeof articleMediaValidator>;
+
 // Why processing failed. `not_found` (missing page or missing/empty photo) and `image_too_large`
 // are terminal; `error` is a pipeline fault worth retrying. Only set with
 // `status: "failed"`.
@@ -44,6 +62,21 @@ export const failureReasonValidator = v.union(
   v.literal("error"),
   v.literal("image_too_large"),
 );
+
+// A structured recipe lifted during processing: from a recipe page's
+// schema.org markup, from the recipe page a video caption links to, or from
+// the classifier reading a caption or screenshot. Absent for every other
+// save; the client keeps rendering the plain article when absent. `servings` is a display string ("4 servings",
+// "12 cookies") because recipes quantify the yield in too many shapes for a
+// number field to be honest.
+export const recipeValidator = v.object({
+  name: v.optional(v.string()),
+  servings: v.optional(v.string()),
+  ingredients: v.array(v.string()),
+  steps: v.array(v.string()),
+});
+
+export type Recipe = Infer<typeof recipeValidator>;
 
 // How much of the item could be enriched. "partial" = classified from the URL
 // alone because the page body was unreadable (retryable); "no_article" = the
@@ -89,3 +122,12 @@ export function isStaleProcessing(
   const startedAt = item.processingStartedAt ?? item._creationTime;
   return startedAt < now - PROCESSING_STALE_MS;
 }
+
+/** Longest title a user can type for a save. The client's title field shares
+ * it, so the server never has to reject what the field allowed. */
+export const MAX_ITEM_TITLE_CHARS = 200;
+
+/** Longest note text a user can save by editing. Counted in UTF-16 units, so
+ * the UTF-8 bytes stay under 300 KB and the item document stays far below
+ * Convex's 1 MiB limit alongside its other fields. */
+export const MAX_NOTE_TEXT_CHARS = 100_000;

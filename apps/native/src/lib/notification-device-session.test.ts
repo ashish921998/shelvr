@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
 import { NotificationDeviceSession } from "./notification-device-session";
 
 function deferred() {
@@ -38,6 +39,90 @@ function setup(initial: string[] = [], getLocale?: () => string) {
 }
 
 describe("notification device session", () => {
+  it("blocks foreground retries for ownership rejection until a new session or token succeeds", async () => {
+    const { session, deps } = setup();
+    const conflict = new ConvexError({
+      code: "notification_token_owned_by_another_account",
+    });
+    deps.saveToken.mockRejectedValueOnce(conflict);
+    await expect(session.register()).rejects.toThrow();
+    expect(session.isRegistered()).toBe(false);
+    expect(session.shouldRetryRegistration()).toBe(false);
+    // A token-rotation event can still attempt a different token.
+    await session.register(async () => "token-b");
+    expect(session.isRegistered()).toBe(true);
+    deps.saveToken.mockRejectedValueOnce(conflict);
+    await expect(session.register(async () => "token-c")).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    session.stop();
+    session.start();
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("keeps token-acquisition failure retryable after a blocked token is rotated", async () => {
+    const { session, deps } = setup();
+    deps.saveToken.mockRejectedValueOnce(
+      new ConvexError({ code: "notification_token_owned_by_another_account" }),
+    );
+    await expect(session.register()).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(false);
+    await expect(
+      session.register(async () => {
+        throw new Error("offline");
+      }),
+    ).rejects.toThrow("offline");
+    expect(session.shouldRetryRegistration()).toBe(true);
+  });
+
+  it.each([
+    new Error("offline"),
+    new ConvexError({ code: "temporary_failure" }),
+  ])("keeps non-ownership server failures retryable: %s", async (error) => {
+    const { session, deps } = setup();
+    deps.saveToken.mockRejectedValueOnce(error);
+    await expect(session.register()).rejects.toThrow();
+    expect(session.shouldRetryRegistration()).toBe(true);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+  });
+
+  it("does not let an old account's rejection block the next session", async () => {
+    const { session, deps } = setup();
+    const pending = deferred();
+    deps.saveToken.mockImplementationOnce(async () => {
+      await pending.promise;
+      throw new ConvexError({
+        code: "notification_token_owned_by_another_account",
+      });
+    });
+    const failed = expect(session.register()).rejects.toThrow();
+    await vi.waitFor(() => expect(deps.saveToken).toHaveBeenCalledTimes(1));
+    session.stop();
+    session.start();
+    pending.resolve();
+    await failed;
+    expect(session.shouldRetryRegistration()).toBe(true);
+  });
+  it("tracks registration readiness across failures, denied permission, and restarts", async () => {
+    const { session, deps } = setup();
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    expect(session.isRegistered()).toBe(true);
+    deps.getToken.mockRejectedValueOnce(new Error("offline"));
+    await expect(session.register()).rejects.toThrow("offline");
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    deps.getToken.mockResolvedValueOnce(null);
+    await session.register();
+    expect(session.isRegistered()).toBe(false);
+    await session.register();
+    session.stop();
+    expect(session.isRegistered()).toBe(false);
+    session.start();
+    expect(session.isRegistered()).toBe(false);
+  });
   it("updates a stable token when its language changes", async () => {
     let locale = "en";
     const { session, deps } = setup([], () => locale);
@@ -178,6 +263,16 @@ describe("notification device session", () => {
     await session.setWeeklyShelf(false);
     expect(deps.setWeeklyShelf).toHaveBeenLastCalledWith(false);
     expect(deps.getToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces token registration failures separately from denied permission", async () => {
+    const { session, deps } = setup();
+    deps.getToken.mockRejectedValueOnce(new Error("token service unavailable"));
+
+    await expect(session.setWeeklyShelf(true)).rejects.toThrow(
+      "token service unavailable",
+    );
+    expect(deps.setWeeklyShelf).not.toHaveBeenCalled();
   });
 
   it("restores registration after failed account deletion without ending authentication", async () => {

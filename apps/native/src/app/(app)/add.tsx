@@ -1,4 +1,4 @@
-import { t, useAppLocale, localizeError } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import { AnimatedText } from "@/components/animated-text";
 import {
   BottomSheet,
@@ -7,12 +7,9 @@ import {
 } from "@expo/ui/community/bottom-sheet";
 import { parseExifDate } from "@/lib/date";
 import { resolvePickedImageLocation } from "@/lib/picked-image-location";
-import { usePaywallGuard } from "@/lib/entitlement";
-import {
-  type ImageSaveRequest,
-  reportSaveFailures,
-  useSaveImages,
-} from "@/lib/use-save-image";
+import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
+import { useSaveImageBatch } from "@/lib/use-save-image-batch";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -37,6 +34,26 @@ import { analytics } from "@/lib/analytics";
 
 type Mode = "menu" | "note" | "article";
 type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
+
+/** Shared by the up-front guard and by the server's `pro_required` refusal, so
+ * both land in the same paywall funnel. */
+const PAYWALL_PLACEMENT = "add";
+
+/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
+ * iOS-only, so Android reads the raw string and keeps it only when it parses as
+ * an http(s) URL. A failed read resolves to null instead of rejecting. */
+async function readClipboardUrl(): Promise<string | null> {
+  try {
+    if (Platform.OS === "ios") {
+      return (await Clipboard.getUrlAsync()) ?? null;
+    }
+    const text = (await Clipboard.getStringAsync()).trim();
+    if (text === "") return null;
+    return new URL(text).protocol.startsWith("http") ? text : null;
+  } catch {
+    return null;
+  }
+}
 
 function ActionButton({
   icon,
@@ -131,6 +148,7 @@ type AddContentProps = {
 function AddContent({ close, openCamera }: AddContentProps) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const router = useRouter();
   // Opened from inside a space: everything saved here is pre-pinned to it.
   const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
   const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
@@ -140,9 +158,9 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  const saveImages = useSaveImages();
   // Saving is Pro — route to the paywall before composing if not entitled.
-  const { guard, loading: entitlementLoading } = usePaywallGuard("add");
+  const { guard, loading: entitlementLoading } =
+    usePaywallGuard(PAYWALL_PLACEMENT);
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -151,7 +169,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   useEffect(() => {
     if (mode !== "article") return;
     let active = true;
-    Clipboard.getUrlAsync().then((url) => {
+    readClipboardUrl().then((url) => {
       if (active && url) setValue((current) => current || url);
     });
     return () => {
@@ -190,61 +208,39 @@ function AddContent({ close, openCamera }: AddContentProps) {
       }
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
-    } catch {
-      Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
+    } catch (error) {
       setSaving(false);
+      // Pro can lapse while the composer is open. The paywall is the only
+      // useful next step, so show it instead of a generic failure alert.
+      if (saveErrorCode(error) === "pro_required") {
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
+      Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
     }
   };
 
   // Runs a batch of image requests, closing on success or reporting a partial
-  // outcome. Only failed requests are retained (with their operation ids) for a
-  // retry; successful requests are never resubmitted.
-  const runImageRequests = async (requests: ImageSaveRequest[]) => {
-    if (requests.length === 0) {
-      success();
-      return;
-    }
-    setSaving(true);
-    try {
-      const results = await saveImages(requests, { spaceId: pinnedSpaceId });
-      const failed = results.filter((r) => r.status === "failed");
-      if (failed.length === 0) {
+  // outcome. The hook owns the retry (which replays each failed request's
+  // operation id rather than minting a new one), the `pro_required` paywall
+  // route, and the partial-failure alert.
+  const runImageRequests = useSaveImageBatch({
+    spaceId: pinnedSpaceId,
+    paywallPlacement: PAYWALL_PLACEMENT,
+    setBusy: setSaving,
+    onAllSaved: (results) => {
+      // Empty when there was nothing to save, which is not a save event.
+      if (results.length > 0) {
         analytics.capture("images_saved", { image_count: results.length });
-        success();
-        return;
       }
-      const savedCount = results.length - failed.length;
-      reportSaveFailures(results);
-      Alert.alert(
-        t("errors.batchSaveTitle"),
-        t("capture.partialFailure", {
-          reason: localizeError(failed[0].message),
-          saved: savedCount,
-          total: results.length,
-        }),
-        [
-          {
-            text: t("capture.retryFailed"),
-            onPress: () => {
-              void runImageRequests(
-                // Reuse each failed operation id on retry — never mint fresh ones.
-                failed.map((r) => ({
-                  image: r.image,
-                  operationId: r.operationId,
-                })),
-              );
-            },
-          },
-          { text: t("common.done"), onPress: close },
-        ],
-      );
-      setSaving(false);
-    } catch (err) {
-      analytics.captureError("image_upload_failed", err);
+      success();
+    },
+    onDismiss: close,
+    onUnexpectedError: (error) => {
+      analytics.captureError("image_upload_failed", error);
       Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
-      setSaving(false);
-    }
-  };
+    },
+  });
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

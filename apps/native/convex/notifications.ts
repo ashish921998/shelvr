@@ -1,5 +1,5 @@
-import { notificationLocale } from "./model/notificationDelivery";
-import { v } from "convex/values";
+import { notificationLocale } from "./model/notificationFields";
+import { ConvexError, v } from "convex/values";
 import {
   internalAction,
   internalMutation,
@@ -202,9 +202,11 @@ export const registerDevice = mutation({
       // The server cannot prove a token belongs to the caller's device, so an
       // enabled row owned by another account is never moved: that would let
       // anyone who learns a token redirect and silence its owner's digests.
-      throw new Error(
-        "This device is registered to another account. Sign out of that account on this device first.",
-      );
+      throw new ConvexError({
+        code: "notification_token_owned_by_another_account",
+        message:
+          "This device is registered to another account. Sign out of that account on this device first.",
+      });
     }
 
     const existingPreferences = await ctx.db

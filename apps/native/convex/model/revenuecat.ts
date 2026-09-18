@@ -4,6 +4,8 @@ export type RevenueCatEvent = {
   expiresAt?: number;
   productId?: string;
   periodType?: string;
+  cancelReason?: string;
+  expirationReason?: string;
   eventTimestampMs?: number;
   transferredFrom?: string[];
   transferredTo?: string[];
@@ -36,6 +38,8 @@ export function parseRevenueCatEvent(
     expiresAt,
     productId,
     periodType,
+    cancelReason: readString(event.cancel_reason),
+    expirationReason: readString(event.expiration_reason),
     eventTimestampMs,
     ...(type === "TRANSFER"
       ? {

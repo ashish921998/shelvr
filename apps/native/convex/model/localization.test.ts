@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { pluralRules } from "./localization";
-import { digestCopy } from "./notificationDelivery";
+import { digestCopy } from "./notificationFields";
 
 it.each([
   ["en", 0, "other"],

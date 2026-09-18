@@ -8,16 +8,21 @@ import { newConvexTest } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { pageGone } from "./ai";
+import { rateLimiter } from "./model/rateLimiter";
 import {
+  IMPORT_STAGGER_MS,
   LIST_PAGE_MAX,
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
 } from "./items";
 import {
+  IMAGE_EMPTY_MESSAGE,
+  IMAGE_TOO_LARGE_MESSAGE,
   MAX_PHOTOS_PER_ACCOUNT,
   PHOTO_LIMIT_MESSAGE,
 } from "./model/imagePolicy";
+import { saveErrorCode, type SaveErrorCode } from "./model/saveErrors";
 
 // The accessor returned by withIdentity (no further withIdentity/registerComponent).
 // Used as the shared param type for helpers that drive either a base or
@@ -224,6 +229,94 @@ describe("listItemsPage", () => {
 });
 
 describe("listRecentItems", () => {
+  it("returns no saves for users without active Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-free-user|session-1",
+    });
+    await seedFeed(t, "recent-free-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+    // The legacy no-clock path gates the same way.
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for an expired Pro subscription", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-expired-user|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-expired-user",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-expired-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("still serves a build that omits its clock while its status is active", async () => {
+    const t = await as("recent-user");
+    const ids = await seedFeed(t, "recent-user", 2);
+
+    // Rollout contract: installed builds predate the `now` argument, so the
+    // stored status gates them until the update reaches them.
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it("keeps serving a pre-clock build through the expiry webhook window", async () => {
+    // A period that ended before its webhook landed still says "pro", so
+    // the status-only fallback keeps the installed build's widget fed
+    // while a build that sends its clock is already cut off.
+    const t = newConvexTest().withIdentity({
+      subject: "recent-webhook-window|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-webhook-window",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-webhook-window", 1);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for a lapsed status when the client omits its clock", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-lapsed-legacy|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-lapsed-legacy",
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-lapsed-legacy", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns the newest ready items up to the limit, skipping unready ones", async () => {
     const t = await as("recent-user");
     const older = await seedFeed(t, "recent-user", 3);
@@ -232,7 +325,10 @@ describe("listRecentItems", () => {
     });
     const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 2 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 2,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([older[2], older[1]]);
     expect(recent.map((item) => item._id)).not.toContain(pending[0]);
     expect(recent.map((item) => item._id)).not.toContain(failed[0]);
@@ -246,7 +342,10 @@ describe("listRecentItems", () => {
     // window would cover. The widget must still show the older ready saves.
     await seedFeed(t, "recent-user", 30, { status: "processing" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([
       ready[2],
       ready[1],
@@ -259,7 +358,10 @@ describe("listRecentItems", () => {
     const ready = await seedFeed(t, "recent-user", 1);
     await seedFeed(t, "recent-user", 200, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([ready[0]]);
   });
 
@@ -268,14 +370,20 @@ describe("listRecentItems", () => {
     await seedFeed(t, "recent-user", RECENT_ITEMS_MAX + 5);
     await seedFeed(t, "someone-else", 2);
 
-    const capped = await t.query(api.items.listRecentItems, { limit: 1000 });
+    const capped = await t.query(api.items.listRecentItems, {
+      limit: 1000,
+      now: Date.now(),
+    });
     expect(capped).toHaveLength(RECENT_ITEMS_MAX);
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
     // A non-positive or fractional limit still yields at least one item.
-    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(
-      1,
-    );
+    expect(
+      await t.query(api.items.listRecentItems, {
+        limit: 0,
+        now: Date.now(),
+      }),
+    ).toHaveLength(1);
   });
 });
 
@@ -451,6 +559,26 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
   });
 }
 
+/** Asserts a refusal carries BOTH halves of the save-error contract: the code
+ * the current client routes on, and the sentence an already-installed bundle
+ * still matches in `localizeError`'s `ERROR_MESSAGES` table. A copy edit would
+ * silently downgrade old clients to the generic fallback, so the message is
+ * pinned here as well as in `model/saveErrors.test.ts`. */
+async function expectSaveRefusal(
+  call: Promise<unknown>,
+  code: SaveErrorCode,
+  message: string,
+): Promise<void> {
+  const error = await call.then(
+    () => {
+      throw new Error(`expected a ${code} refusal, but the call resolved`);
+    },
+    (thrown: unknown) => thrown,
+  );
+  expect(saveErrorCode(error)).toBe(code);
+  expect((error as { data: { message: string } }).data.message).toBe(message);
+}
+
 describe("photo quota", () => {
   it("refuses a new photo at the cap, reports usage, and frees the slot on delete", async () => {
     const t = await as("user-a");
@@ -487,9 +615,11 @@ describe("photo quota", () => {
       limit: MAX_PHOTOS_PER_ACCOUNT,
     });
 
-    await expect(
+    await expectSaveRefusal(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID_2 }),
-    ).rejects.toThrow(PHOTO_LIMIT_MESSAGE);
+      "photo_limit",
+      PHOTO_LIMIT_MESSAGE,
+    );
     // A completed operation still returns its item to a full account.
     expect(
       await t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
@@ -1474,15 +1604,23 @@ describe("Pro entitlement gate", () => {
   it("blocks saves for a user with no subscription", async () => {
     const t = newConvexTest().withIdentity({ subject: "no-sub" });
 
-    await expect(
+    // Both halves of the contract: the code the client routes to the paywall
+    // on, and the unchanged sentence an already-installed bundle still sees.
+    await expectSaveRefusal(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
-    ).rejects.toThrow(/Pro required/);
-    await expect(
+      "pro_required",
+      "Pro required",
+    );
+    await expectSaveRefusal(
       t.mutation(api.items.createNoteItem, { text: "hi" }),
-    ).rejects.toThrow(/Pro required/);
-    await expect(
+      "pro_required",
+      "Pro required",
+    );
+    await expectSaveRefusal(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
-    ).rejects.toThrow(/Pro required/);
+      "pro_required",
+      "Pro required",
+    );
   });
 
   it("blocks a lapsed user from retrying a pending image import", async () => {
@@ -2071,6 +2209,154 @@ describe("rate limiting", () => {
   });
 });
 
+describe("importLinks", () => {
+  const processRuns = (t: TestCtx) =>
+    t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect())
+        .filter((job) => job.name === "ai:processItem")
+        .sort((a, b) => a.scheduledTime - b.scheduledTime),
+    );
+
+  it("creates run-fenced items whose processing continues the stagger offset", async () => {
+    const t = await as("import-user");
+    const before = Date.now();
+    const res = await t.mutation(api.items.importLinks, {
+      urls: ["https://example.com/one", "example.com/two", " "],
+      staggerOffset: 5,
+    });
+    expect(res).toEqual({
+      created: 2,
+      skipped: 0,
+      invalid: 0,
+      notProcessed: 0,
+      rateLimited: false,
+    });
+    const items = await t.run((ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", "import-user"))
+        .collect(),
+    );
+    expect(items.map((item) => item.url)).toEqual([
+      "https://example.com/one",
+      "https://example.com/two",
+    ]);
+    const runs = await processRuns(t);
+    expect(runs).toHaveLength(2);
+    expect(runs[0].scheduledTime).toBeGreaterThanOrEqual(
+      before + 5 * IMPORT_STAGGER_MS,
+    );
+    expect(
+      runs[1].scheduledTime - runs[0].scheduledTime,
+    ).toBeGreaterThanOrEqual(IMPORT_STAGGER_MS);
+    for (const run of runs) {
+      const { itemId, runId } = run.args[0] as {
+        itemId: string;
+        runId: string;
+      };
+      expect(items.find((item) => item._id === itemId)?.processingRunId).toBe(
+        runId,
+      );
+    }
+  });
+
+  it("skips a link saved long before the latest 1,000 through the URL index", async () => {
+    const t = await as("import-dedup");
+    await seedFeed(t, "import-dedup", 1); // https://example.com/0, the oldest save
+    await t.run(async (ctx) => {
+      for (let i = 1; i <= 5; i++) {
+        await ctx.db.insert("items", {
+          userId: "import-dedup",
+          type: "link",
+          status: "ready",
+          url: `https://newer.example/${i}`,
+          tags: [],
+          searchText: "",
+        });
+      }
+    });
+    const res = await t.mutation(api.items.importLinks, {
+      urls: [
+        "https://EXAMPLE.com/0", // the old save; hosts compare case-insensitively
+        "https://example.com/Fresh",
+        "https://example.com/Fresh", // repeated within the batch
+        "https://example.com/fresh", // path case differs: a distinct link
+        "ftp://example.com/nope",
+      ],
+    });
+    expect(res).toEqual({
+      created: 2,
+      skipped: 2,
+      invalid: 1,
+      notProcessed: 0,
+      rateLimited: false,
+    });
+  });
+
+  it("rejects an oversized batch instead of truncating it", async () => {
+    const t = await as("import-cap");
+    const urls = Array.from(
+      { length: 51 },
+      (_, i) => `https://example.com/${i}`,
+    );
+    await expect(t.mutation(api.items.importLinks, { urls })).rejects.toThrow(
+      /at most 50 URLs/,
+    );
+  });
+
+  it("draws from its own bucket, not the single-save itemCreate burst", async () => {
+    const t = await as("import-own-bucket");
+    for (let i = 0; i < 30; i++) {
+      await t.mutation(api.items.createNoteItem, { text: `note ${i}` });
+    }
+    const res = await t.mutation(api.items.importLinks, {
+      urls: Array.from({ length: 50 }, (_, i) => `https://example.com/${i}`),
+    });
+    expect(res.created).toBe(50);
+    expect(res.rateLimited).toBe(false);
+  });
+
+  it("stops at the bulkImport limit and resumes free over saved links", async () => {
+    const t = await as("import-rate");
+    const batch = Array.from(
+      { length: 10 },
+      (_, i) => `https://example.com/${i}`,
+    );
+    await t.mutation(api.items.importLinks, { urls: batch });
+    // Drain the 600-token bucket down to 5 without inserting 600 rows.
+    await t.run(async (ctx) => {
+      const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
+        key: "import-rate",
+        count: 585,
+      });
+      expect(ok).toBe(true);
+    });
+    const limited = await t.mutation(api.items.importLinks, {
+      urls: [
+        ...batch,
+        ...Array.from({ length: 6 }, (_, i) => `https://more.example/${i}`),
+      ],
+    });
+    expect(limited).toEqual({
+      created: 0,
+      skipped: 10,
+      invalid: 0,
+      notProcessed: 6,
+      rateLimited: true,
+    });
+    const resumed = await t.mutation(api.items.importLinks, {
+      urls: [...batch, "https://more.example/0"],
+    });
+    expect(resumed).toEqual({
+      created: 1,
+      skipped: 10,
+      invalid: 0,
+      notProcessed: 0,
+      rateLimited: false,
+    });
+  });
+});
+
 describe("photo rejection before classification", () => {
   const OVERSIZED = 14 * 1024 * 1024 + 1;
 
@@ -2108,28 +2394,40 @@ describe("photo rejection before classification", () => {
     },
   );
 
-  it("blocks legacy oversized pending uploads at finalization", async () => {
-    const t = await as("legacy-oversized");
-    await t.run(async (ctx) => {
-      const storageId = await ctx.storage.store(
-        new Blob([new Uint8Array(OVERSIZED)]),
-      );
-      await ctx.db.insert("itemOperations", {
-        userId: "legacy-oversized",
-        operationId: OP_ID,
-        kind: "image",
-        status: "pending",
-        storageId,
-        updatedAt: Date.now(),
+  it.each([
+    {
+      size: OVERSIZED,
+      code: "image_too_large",
+      message: IMAGE_TOO_LARGE_MESSAGE,
+    },
+    { size: 0, code: "image_empty", message: IMAGE_EMPTY_MESSAGE },
+  ] as const)(
+    "blocks legacy $code pending uploads at finalization",
+    async ({ size, code, message }) => {
+      const t = await as(`legacy-${code}`);
+      await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array(size)]),
+        );
+        await ctx.db.insert("itemOperations", {
+          userId: `legacy-${code}`,
+          operationId: OP_ID,
+          kind: "image",
+          status: "pending",
+          storageId,
+          updatedAt: Date.now(),
+        });
       });
-    });
-    await expect(
-      t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
-    ).rejects.toThrow("too large");
-    expect(await t.run((ctx) => ctx.db.query("items").collect())).toHaveLength(
-      0,
-    );
-  });
+      await expectSaveRefusal(
+        t.mutation(api.items.finalizeImageImport, { operationId: OP_ID }),
+        code,
+        message,
+      );
+      expect(
+        await t.run((ctx) => ctx.db.query("items").collect()),
+      ).toHaveLength(0);
+    },
+  );
 
   it("does not charge or queue product-search retries for missing photos", async () => {
     const t = await as("missing-product-photo");
@@ -2428,6 +2726,57 @@ describe("stale processing runs", () => {
         status: "ready",
       }),
     ).resolves.toBe("missing");
+  });
+
+  it("finalizeItem persists a recipe extracted from a recipe page", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour", "2 eggs"],
+      steps: ["Whisk.", "Fry."],
+    };
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe,
+    });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
+  });
+
+  it("keeps the recipe off the feed card", async () => {
+    // `itemCardValidator` omits `recipe`, and Convex enforces the returns
+    // validator at runtime, so a card still carrying it fails the whole feed
+    // query rather than just shipping an extra field.
+    const t = await as("recipe-feed");
+    const itemId = await processingLink(t, "recipe-feed", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe: {
+        name: "Pancakes",
+        servings: "4 servings",
+        ingredients: ["2 cups flour", "2 eggs"],
+        steps: ["Whisk.", "Fry."],
+      },
+    });
+
+    const feed = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(feed.page.map((item) => item._id)).toContain(itemId);
+    expect(feed.page[0]).not.toHaveProperty("recipe");
   });
 
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {

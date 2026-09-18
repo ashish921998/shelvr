@@ -194,6 +194,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
+  - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
+    `google-services.json`; required by every Android EAS build, with a Firebase
+    client matching that variant's package, so `expo-notifications` can obtain an
+    FCM token. See [push notification builds and updates](docs/architecture/push-notifications.md)
+    for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
 
@@ -220,7 +225,8 @@ needed at runtime by the features that use them:
 - `REVENUECAT_WEBHOOK_SECRET` — shared bearer secret authenticating RevenueCat webhook posts.
   The route answers 500 when it is unset
 - `REVENUECAT_API_KEY` — RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER` webhook event
+  `TRANSFER`, refund, or `REFUND_REVERSED` webhook event. Refund reconciliation returns
+  503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
@@ -259,6 +265,26 @@ needed at runtime by the features that use them:
   this: approved production deploy, then tester OTA). Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
+- An OTA update only reaches installs whose store build shares its native fingerprint. A
+  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
+  `app.config.js`) strands every later OTA until a store build ships, and the diff does
+  not say so. Two layers cover it. On a pull request CI runs
+  `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
+  and never fails the check; acknowledge an intended move with the
+  `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
+  workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
+  compares the fingerprint the update is about to carry against
+  `apps/native/released-builds.json` and blocks the publish on anything but a match,
+  including a profile or platform with no recorded release. A blocked publish means
+  nothing published from this tree reaches the recorded binary, so the usual fix is a
+  store build, and recording the release afterwards. See
+  [push notification builds and updates](docs/architecture/push-notifications.md).
+- Adding a field to a table is a one-way door once rows carry it. Convex validates
+  every existing document against the new schema on deploy, and a table validator
+  rejects a field it does not declare, failing with an "Unexpected field" error
+  naming it. So reverting the commit that added the field fails the deploy instead
+  of rolling it back. To back a field out, stop writing it and leave it declared
+  `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 

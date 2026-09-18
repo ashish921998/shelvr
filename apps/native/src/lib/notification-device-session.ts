@@ -1,3 +1,16 @@
+import { ConvexError } from "convex/values";
+
+function isOwnershipConflict(error: unknown): boolean {
+  if (!(error instanceof ConvexError)) return false;
+  const data: unknown = error.data;
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "code" in data &&
+    data.code === "notification_token_owned_by_another_account"
+  );
+}
+
 type TokenStore = {
   read: () => Promise<string[]>;
   write: (tokens: string[]) => Promise<void>;
@@ -28,6 +41,7 @@ export class NotificationDeviceSession {
   private listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
   private registeredKey: string | null = null;
+  private registrationBlocked = false;
 
   constructor(
     private readonly store: TokenStore,
@@ -64,12 +78,26 @@ export class NotificationDeviceSession {
     this.generation++;
     this.paused = false;
     this.registeredKey = null;
+    this.registrationBlocked = false;
   }
 
   stop() {
     this.generation++;
     this.paused = true;
     this.registeredKey = null;
+    this.registrationBlocked = false;
+  }
+
+  isRegistered() {
+    return (
+      !this.paused &&
+      this.registeredKey !== null &&
+      this.registeredKey.endsWith(`\0${this.deps.getLocale?.() ?? ""}`)
+    );
+  }
+
+  shouldRetryRegistration() {
+    return !this.paused && !this.registrationBlocked && !this.isRegistered();
   }
 
   register(getToken = () => this.deps.getToken(false)): Promise<boolean> {
@@ -79,23 +107,42 @@ export class NotificationDeviceSession {
       this.operation !== "sign_out" &&
       this.operation !== "delete_account" &&
       generation === this.generation;
-    const operation = this.queue.then(async () => {
-      if (!current()) return false;
-      const token = await getToken();
-      if (!token || !current()) return false;
-      const locale = this.deps.getLocale?.();
-      const key = `${token}\0${locale ?? ""}`;
-      if (key === this.registeredKey) return true;
-      // Persist before the server write so a restart can still revoke an accepted token.
-      const tokens = await this.store.read();
-      if (!tokens.includes(token)) await this.store.write([...tokens, token]);
-      if (!current()) return false;
-      if (locale === undefined) await this.deps.saveToken(token);
-      else await this.deps.saveToken(token, locale);
-      if (!current()) return false;
-      this.registeredKey = key;
-      return true;
-    });
+    const operation = this.queue
+      .then(async () => {
+        if (!current()) return false;
+        // Foreground callers honor the block. Explicit attempts (including a
+        // token rotation) may retry, and their transient failures stay retryable.
+        this.registrationBlocked = false;
+        const token = await getToken();
+        if (!current()) return false;
+        if (!token) {
+          this.registeredKey = null;
+          this.registrationBlocked = false;
+          return false;
+        }
+        const locale = this.deps.getLocale?.();
+        const key = `${token}\0${locale ?? ""}`;
+        if (key === this.registeredKey) return true;
+        // Persist before the server write so a restart can still revoke an accepted token.
+        const tokens = await this.store.read();
+        if (!tokens.includes(token)) await this.store.write([...tokens, token]);
+        if (!current()) return false;
+        try {
+          if (locale === undefined) await this.deps.saveToken(token);
+          else await this.deps.saveToken(token, locale);
+        } catch (error) {
+          if (current()) this.registrationBlocked = isOwnershipConflict(error);
+          throw error;
+        }
+        if (!current()) return false;
+        this.registeredKey = key;
+        this.registrationBlocked = false;
+        return true;
+      })
+      .catch((error: unknown) => {
+        if (current()) this.registeredKey = null;
+        throw error;
+      });
     this.queue = operation.then(
       () => undefined,
       () => undefined,

@@ -134,6 +134,13 @@ export default function ProfileScreen() {
         Alert.alert(
           t("notifications.disabledTitle"),
           t("notifications.disabledBody"),
+          [
+            { text: t("common.cancel"), style: "cancel" },
+            {
+              text: t("permissions.openSettings"),
+              onPress: () => void Linking.openSettings(),
+            },
+          ],
         );
       }
     } catch (error) {
@@ -383,6 +390,19 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.linkGroup}>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t("import.fromX")}
+          onPress={() => router.push("/import")}
+        >
+          <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
+          <AppSymbolIcon
+            name="chevron.right"
+            size={16}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           accessibilityRole="button"

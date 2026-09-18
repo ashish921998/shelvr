@@ -13,7 +13,11 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import {
+  hasProEntitlementAt,
+  hasProEntitlementStatus,
+  requireProEntitlement,
+} from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -24,19 +28,25 @@ import {
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
   intentValidator,
   isStaleProcessing,
   isTerminalFailure,
+  MAX_ITEM_TITLE_CHARS,
+  MAX_NOTE_TEXT_CHARS,
+  postMediaValidator,
   PROCESSING_STALE_MS,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   imageSizeError,
+  imageSizeErrorCode,
   MAX_PHOTOS_PER_ACCOUNT,
-  PHOTO_LIMIT_MESSAGE,
 } from "./model/imagePolicy";
+import { saveError } from "./model/saveErrors";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -99,6 +109,7 @@ const itemFields = {
   type: itemTypeValidator,
   status: itemStatusValidator,
   title: v.optional(v.string()),
+  titleSource: v.optional(v.literal("user")),
   description: v.optional(v.string()),
   url: v.optional(v.string()),
   storageId: v.optional(v.id("_storage")),
@@ -109,9 +120,12 @@ const itemFields = {
   isSticker: v.optional(v.boolean()),
   tags: v.array(v.string()),
   content: v.optional(v.string()),
+  recipe: v.optional(recipeValidator),
   siteName: v.optional(v.string()),
   author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
+  media: v.optional(v.array(postMediaValidator)),
+  articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
@@ -182,6 +196,8 @@ const enrichedItemWithSpacesValidator = v.object({
 export const itemCardValidator = enrichedItemValidator.omit(
   "userId",
   "content",
+  "articleMedia",
+  "recipe",
   "searchText",
   "products",
   "productsStatus",
@@ -205,6 +221,8 @@ export async function toItemCard(
   const {
     userId: _userId,
     content: _content,
+    articleMedia: _articleMedia,
+    recipe: _recipe,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
@@ -213,13 +231,24 @@ export async function toItemCard(
   return card;
 }
 
+/** How much of a note's own text the search index carries. Notes are short;
+ * the cap keeps a pasted essay from bloating the index. */
+const MAX_SEARCH_NOTE_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
+  note?: string;
 }): string {
-  return [parts.title, parts.description, ...parts.tags, parts.siteName]
+  return [
+    parts.title,
+    parts.description,
+    ...parts.tags,
+    parts.siteName,
+    parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+  ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
     .toLowerCase();
@@ -279,15 +308,26 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves, for surfaces that show a handful of items and
- * must not subscribe to the feed (the home-screen widget). The status index
- * reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view. */
+/** The newest `ready` saves for the Pro-only home-screen widget. The status
+ * index reads exactly `limit` ready rows, so a burst of fresh imports still
+ * processing can never push older ready saves out of view.
+ *
+ * Pro is checked without ever reading the wall clock (a query is not rerun
+ * as time advances, so a Date.now() read could serve stale access). A
+ * caller that sends its refreshed clock gets an exact expiry check; a
+ * build that predates the `now` argument keeps its saves while the stored
+ * subscription status is active, and the RevenueCat webhook lapses that
+ * status when a subscription actually expires. */
 export const listRecentItems = query({
-  args: { limit: v.number() },
+  args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    const entitled =
+      args.now === undefined
+        ? await hasProEntitlementStatus(ctx, userId)
+        : await hasProEntitlementAt(ctx, userId, args.now);
+    if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
       RECENT_ITEMS_MAX,
@@ -611,7 +651,7 @@ async function countPhotos(ctx: QueryCtx, userId: string): Promise<number> {
 
 /** Concurrent finalizes at the cap both read the same index range and one
  * inserts into it, so Convex's serializable OCC retries the loser, which then
- * sees the full count and throws. ConvexError, not Error: production redacts
+ * sees the full count and throws. `saveError`, not Error: production redacts
  * plain Error messages to "Server Error", and this one is meant for the user. */
 async function requirePhotoQuota(
   ctx: MutationCtx,
@@ -619,7 +659,7 @@ async function requirePhotoQuota(
 ): Promise<number> {
   const count = await countPhotos(ctx, userId);
   if (count >= MAX_PHOTOS_PER_ACCOUNT) {
-    throw new ConvexError(PHOTO_LIMIT_MESSAGE);
+    throw saveError("photo_limit");
   }
   return count;
 }
@@ -900,8 +940,8 @@ export const finalizeImageImport = mutation({
     if (op?.storageId) {
       const metadata = await ctx.db.system.get("_storage", op.storageId);
       if (!metadata) throw new Error("Storage object not found");
-      const error = imageSizeError(metadata.size);
-      if (error) throw new ConvexError(error);
+      const sizeCode = imageSizeErrorCode(metadata.size);
+      if (sizeCode) throw saveError(sizeCode);
       storedBytes = metadata.size;
     }
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
@@ -1276,6 +1316,242 @@ export const createNoteItem = mutation({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Bulk link import (X bookmarks)
+// ---------------------------------------------------------------------------
+
+/** Most URLs one importLinks call accepts. Each created link is one insert and
+ * two scheduled functions, so a batch stays well inside a transaction; the
+ * client pages through longer lists. */
+const MAX_IMPORT_BATCH = 50;
+
+/** Gap between successive processItem runs of one import, so hundreds of page
+ * fetches and classifications do not start at once. */
+export const IMPORT_STAGGER_MS = 1000;
+
+/** Cap on the client-supplied stagger offset. The bulkImport bucket holds 600
+ * tokens, so an honest import never passes this; a larger value would only
+ * push processing further into the future. */
+const MAX_IMPORT_STAGGER_OFFSET = 1000;
+
+const importLinksResultValidator = v.object({
+  created: v.number(),
+  // Already saved, or repeated earlier in this batch.
+  skipped: v.number(),
+  // Not a URL the save policy accepts.
+  invalid: v.number(),
+  // New, valid links left uncreated because the bulkImport bucket was empty.
+  notProcessed: v.number(),
+  rateLimited: v.boolean(),
+});
+
+/** Whether the user already saved this link. Every link save stores the
+ * normalized URL, so the index lookup is exact and finds a save of any age. */
+async function hasSavedLink(
+  ctx: QueryCtx,
+  userId: string,
+  url: string,
+): Promise<boolean> {
+  const match = await ctx.db
+    .query("items")
+    .withIndex("by_user_and_url", (q) => q.eq("userId", userId).eq("url", url))
+    .first();
+  return match !== null;
+}
+
+/**
+ * Bulk-import link URLs, such as X bookmarks. Each new link goes through the
+ * same pipeline as a single save. Links already saved and repeats within the
+ * batch are skipped for free, so pasting the same list again resumes an
+ * import that stopped at the rate limit.
+ *
+ * The batch draws one `bulkImport` token per link it would create, all or
+ * nothing. When the bucket cannot cover the batch, nothing is created and
+ * `rateLimited` tells the client to stop paging.
+ */
+export const importLinks = mutation({
+  args: {
+    urls: v.array(v.string()),
+    // Links earlier calls of this import created, so the processing stagger
+    // continues across batches instead of restarting at zero.
+    staggerOffset: v.optional(v.number()),
+  },
+  returns: importLinksResultValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    if (args.urls.length > MAX_IMPORT_BATCH) {
+      throw new ConvexError(
+        `Import accepts at most ${MAX_IMPORT_BATCH} URLs per call`,
+      );
+    }
+
+    let skipped = 0;
+    let invalid = 0;
+    const fresh: string[] = [];
+    for (const raw of args.urls) {
+      const trimmed = raw.trim();
+      if (trimmed === "") continue;
+      let url: string;
+      try {
+        url = normalizeExternalUrl(trimmed);
+      } catch {
+        invalid++;
+        continue;
+      }
+      if (fresh.includes(url) || (await hasSavedLink(ctx, userId, url))) {
+        skipped++;
+        continue;
+      }
+      fresh.push(url);
+    }
+    if (fresh.length === 0) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: 0,
+        rateLimited: false,
+      };
+    }
+
+    const { ok } = await rateLimiter.limit(ctx, "bulkImport", {
+      key: userId,
+      count: fresh.length,
+    });
+    if (!ok) {
+      return {
+        created: 0,
+        skipped,
+        invalid,
+        notProcessed: fresh.length,
+        rateLimited: true,
+      };
+    }
+
+    const offset = Number.isFinite(args.staggerOffset)
+      ? Math.min(
+          Math.max(Math.floor(args.staggerOffset ?? 0), 0),
+          MAX_IMPORT_STAGGER_OFFSET,
+        )
+      : 0;
+    for (const [index, url] of fresh.entries()) {
+      const run = beginProcessingRun();
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        ...run,
+        url,
+        tags: [],
+        searchText: "",
+      });
+      await ctx.scheduler.runAfter(
+        (offset + index) * IMPORT_STAGGER_MS,
+        internal.ai.processItem,
+        { itemId, runId: run.processingRunId },
+      );
+      await scheduleSaveTelemetry(ctx, itemId);
+    }
+    return {
+      created: fresh.length,
+      skipped,
+      invalid,
+      notProcessed: 0,
+      rateLimited: false,
+    };
+  },
+});
+
+/** Delay before an edited note is re-classified. Each edit in the window
+ * supersedes the scheduled run, so a burst of typing costs one model call. */
+export const NOTE_REFRESH_DELAY_MS = 20_000;
+
+/**
+ * The owner edits a note's text and title. A typed title replaces the
+ * classifier's and survives later classification; an empty title hands naming
+ * back to the classifier. A text change on a ready note re-classifies it
+ * quietly after NOTE_REFRESH_DELAY_MS, so search and space suggestions follow
+ * the new words without the note ever showing as processing. The refresh keeps
+ * the title the note already has, so only an untitled note is renamed.
+ */
+export const updateNoteItem = mutation({
+  args: {
+    id: v.id("items"),
+    // Older clients send both fields. New editors send only what was edited.
+    title: v.optional(v.string()),
+    text: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    const item = await ctx.db.get(args.id);
+    if (item === null || item.userId !== userId || item.type !== "note") {
+      throw new Error("Item not found");
+    }
+    const text = args.text ?? item.note ?? "";
+    if (text.trim() === "") {
+      throw new Error("Note text is empty");
+    }
+    if (text.length > MAX_NOTE_TEXT_CHARS) {
+      throw new Error("Note text is too long");
+    }
+    const currentTypedTitle =
+      item.titleSource === "user" ? item.title : undefined;
+    const typedTitle = args.title?.trim() ?? currentTypedTitle ?? "";
+    if (typedTitle.length > MAX_ITEM_TITLE_CHARS) {
+      throw new Error("Title is too long");
+    }
+    const textChanged = text !== item.note;
+    const titleChanged = (typedTitle || undefined) !== currentTypedTitle;
+    if (!textChanged && !titleChanged) {
+      return null;
+    }
+    // Clearing a typed title leaves the note untitled until the classifier
+    // names it again; a classifier title stays until the user types one.
+    const title =
+      typedTitle !== ""
+        ? typedTitle
+        : item.titleSource === "user"
+          ? undefined
+          : item.title;
+    // A processing note must supersede its snapshot too. Its replacement
+    // completes initial classification; ready notes refresh quietly.
+    const refreshRunId =
+      (textChanged || (titleChanged && typedTitle === "")) &&
+      item.status !== "failed"
+        ? crypto.randomUUID()
+        : undefined;
+    await ctx.db.patch(item._id, {
+      note: text,
+      title,
+      titleSource: typedTitle !== "" ? "user" : undefined,
+      searchText: buildSearchText({
+        title,
+        description: item.description,
+        tags: item.tags,
+        note: text,
+      }),
+      ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
+      ...(refreshRunId !== undefined && item.status === "processing"
+        ? { processingStartedAt: Date.now() }
+        : {}),
+    });
+    if (refreshRunId !== undefined) {
+      await ctx.scheduler.runAfter(
+        NOTE_REFRESH_DELAY_MS,
+        internal.ai.processItem,
+        {
+          itemId: item._id,
+          runId: refreshRunId,
+          refresh: item.status === "ready",
+        },
+      );
+    }
+    return null;
+  },
+});
+
 /**
  * User-triggered product search ("Find links"). Explicit button = bounded
  * cost: one vision/text query + one SerpAPI call per press, never automatic.
@@ -1453,6 +1729,32 @@ function ownsRun(item: Doc<"items">, runId: string | undefined): boolean {
   return item.processingRunId === runId;
 }
 
+/**
+ * Gate for an edited note's quiet refresh (see updateNoteItem). Only the run
+ * the latest edit scheduled goes on to call the model, and it draws from the
+ * noteRefresh bucket without throwing: a refused refresh leaves the note as
+ * it is.
+ */
+export const claimNoteRefresh = internalMutation({
+  args: { itemId: v.id("items"), runId: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      item.type !== "note" ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId)
+    ) {
+      return false;
+    }
+    const { ok } = await rateLimiter.limit(ctx, "noteRefresh", {
+      key: item.userId,
+    });
+    return ok;
+  },
+});
+
 export const finalizeItem = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -1461,12 +1763,19 @@ export const finalizeItem = internalMutation({
     // passes it.
     runId: v.optional(v.string()),
     title: v.string(),
+    // An edited note's quiet refresh: a title the note already has stays, so
+    // re-classifying new words doesn't rename the note on every edit. A note
+    // with no title (its typed title was just cleared) still takes this one.
+    keepTitle: v.optional(v.boolean()),
     description: v.string(),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     // A poster copied into our storage (TikTok thumbnails expire). Only ever
     // set for links; image items keep the storageId they were uploaded with.
     storageId: v.optional(v.id("_storage")),
@@ -1492,20 +1801,31 @@ export const finalizeItem = internalMutation({
     }
     // Intents are actions, not descriptive text — deliberately kept out of
     // searchText so labels like "Open in X" don't skew search relevance.
+    // A title the owner typed outranks the classifier's, and so does the one a
+    // refreshed note already has; the rest of the classification still lands.
+    const title =
+      (item.titleSource === "user" || args.keepTitle === true) &&
+      item.title !== undefined
+        ? item.title
+        : args.title;
     const searchText = buildSearchText({
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       siteName: args.siteName,
+      note: item.note,
     });
     await ctx.db.patch(args.itemId, {
-      title: args.title,
+      title,
       description: args.description,
       tags: args.tags,
       content: args.content,
+      recipe: args.recipe,
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,
+      media: args.media,
+      articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents: args.intents,
@@ -1697,11 +2017,15 @@ export const setSpacesForItem = internalMutation({
   args: {
     itemId: v.id("items"),
     spaceIds: v.array(v.id("spaces")),
+    runId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (item === null) {
+    if (
+      item === null ||
+      (args.runId !== undefined && !ownsRun(item, args.runId))
+    ) {
       return null;
     }
     const wanted = new Set(args.spaceIds);

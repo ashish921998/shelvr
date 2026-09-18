@@ -1,9 +1,10 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
+import { onboardingLabel } from "@/lib/onboarding-labels";
 
 // Persisted store for onboarding state that must survive leaving the screen
 // (the demo step's inline OAuth) or an app kill: the picked library
-// categories, quiz answers, current step, and an in-flight demo save. The
+// categories, the picked save kinds, current step, and an in-flight demo save. The
 // same record later drives the post-sign-in replay in lib/replay-onboarding
 // .ts. Backed by SecureStore so the data survives an app kill (iOS can and
 // does kill backgrounded apps). Clears use setItem('') because SecureStore's
@@ -11,11 +12,17 @@ import * as SecureStore from "expo-secure-store";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
+// Older flows stored `step` as an index into a different step list, under the
+// same key. Their step and answers are ignored so progress restarts at the
+// opener; the replay fields (operationId, spaces, demoUrl) still apply.
+const PROGRESS_VERSION = 2;
+
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
- * for. Scoped to the demo step: the step clears it when it advances (or
- * skips), and `setPendingSpaces` — the finish path — drops it too, so a
- * completed save is never replayed or left behind in SecureStore. */
+ * for. It is kept after the demo step advances so a relaunch on the reveal
+ * step can re-attach to the same item. Cancelling the demo's sign-in clears
+ * it, and `setPendingSpaces` (the finish path) drops it, so a completed save
+ * is never replayed or left behind in SecureStore. */
 export type PendingDemo = {
   url: string;
   /** The demo's explicit single destination ("just my shelf" when null). */
@@ -26,16 +33,17 @@ type PendingRecord = {
   operationId: string;
   spaces: string[];
   demoUrl: string | null;
-  q1: string[];
-  q2: string[];
+  /** Absent on records written by an older flow. */
+  progressVersion: number | null;
+  saveKinds: string[];
   step: number | null;
   demo: PendingDemo | null;
+  spaceNames: Record<string, string>;
 };
 
 /** What onboarding.tsx restores on mount. */
 type OnboardingProgress = {
-  q1: string[];
-  q2: string[];
+  saveKinds: string[];
   spaces: string[];
   step: number | null;
   demo: PendingDemo | null;
@@ -75,8 +83,7 @@ function readPendingRecord(): PendingRecord | null {
         ? value
         : null;
     const spaces = stringArray(record.spaces);
-    const q1 = stringArray(record.q1) ?? [];
-    const q2 = stringArray(record.q2) ?? [];
+    const saveKinds = stringArray(record.saveKinds) ?? [];
     const step = typeof record.step === "number" ? record.step : null;
     const demo =
       record.demo !== null &&
@@ -98,14 +105,28 @@ function readPendingRecord(): PendingRecord | null {
       operationId: record.operationId,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
-      q1,
-      q2,
+      progressVersion:
+        typeof record.progressVersion === "number"
+          ? record.progressVersion
+          : null,
+      saveKinds,
       step,
       demo,
+      spaceNames: readSpaceNames(record.spaceNames),
     };
   } catch {
     return null;
   }
+}
+
+function readSpaceNames(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
 }
 
 function writePendingRecord(record: PendingRecord | null) {
@@ -123,10 +144,11 @@ function ensureOperationId(): string {
     operationId,
     spaces: [],
     demoUrl: null,
-    q1: [],
-    q2: [],
+    progressVersion: null,
+    saveKinds: [],
     step: null,
     demo: null,
+    spaceNames: {},
   });
   return operationId;
 }
@@ -148,10 +170,11 @@ function writePendingSpaces(
     operationId,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
-    q1: existing?.q1 ?? [],
-    q2: existing?.q2 ?? [],
+    progressVersion: existing?.progressVersion ?? null,
+    saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -198,20 +221,25 @@ export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
   }
 }
 
+function isCurrentProgress(record: PendingRecord | null): boolean {
+  return record?.progressVersion === PROGRESS_VERSION;
+}
+
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
+  if (record === null || !isCurrentProgress(record)) {
+    return { saveKinds: [], spaces: [], step: null, demo: null };
+  }
   return {
-    q1: record?.q1 ?? [],
-    q2: record?.q2 ?? [],
-    spaces: record?.spaces ?? [],
-    step: record?.step ?? null,
-    demo: record?.demo ?? null,
+    saveKinds: record.saveKinds,
+    spaces: record.spaces,
+    step: record.step,
+    demo: record.demo,
   };
 }
 
 export function setOnboardingProgress(progress: {
-  q1: string[];
-  q2: string[];
+  saveKinds: string[];
   spaces: string[];
   step: number;
 }) {
@@ -221,10 +249,12 @@ export function setOnboardingProgress(progress: {
     operationId,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
-    q1: progress.q1,
-    q2: progress.q2,
+    progressVersion: PROGRESS_VERSION,
+    saveKinds: progress.saveKinds,
     step: progress.step,
-    demo: existing?.demo ?? null,
+    // An older flow's in-flight demo belongs to a step this flow restarted.
+    demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -237,10 +267,11 @@ export function setPendingDemo(demo: PendingDemo | null) {
     operationId,
     spaces: existing?.spaces ?? [],
     demoUrl: existing?.demoUrl ?? null,
-    q1: existing?.q1 ?? [],
-    q2: existing?.q2 ?? [],
+    progressVersion: existing?.progressVersion ?? null,
+    saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
 }
@@ -250,6 +281,21 @@ export function hasPending(): boolean {
   return (
     record !== null && (record.spaces.length > 0 || record.demoUrl !== null)
   );
+}
+
+/** Freeze a preset's persisted name before its first creation. Display labels
+ * may change language, but demo and completion must use the same identity. */
+export function resolveOnboardingSpaceName(id: string): string {
+  ensureOperationId();
+  const record = readPendingRecord();
+  if (record === null) throw new Error("Onboarding state unavailable");
+  if (Object.hasOwn(record.spaceNames, id)) return record.spaceNames[id];
+  const name = onboardingLabel(id);
+  writePendingRecord({
+    ...record,
+    spaceNames: { ...record.spaceNames, [id]: name },
+  });
+  return name;
 }
 
 export function clearPending() {

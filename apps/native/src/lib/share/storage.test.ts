@@ -4,7 +4,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  allEntriesSettled,
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
@@ -51,7 +50,9 @@ const BATCH_B = [payload("https://b.example", "url")]; // different content
 describe("fingerprintSharePayloads", () => {
   it("encodes order and duplicates so identical-content distinct batches stay distinct", () => {
     // Two identical entries in one batch must NOT collapse with one entry.
-    expect(fingerprintSharePayloads([payload("x"), payload("x")])).not.toBe(fingerprintSharePayloads([payload("x")]));
+    expect(fingerprintSharePayloads([payload("x"), payload("x")])).not.toBe(
+      fingerprintSharePayloads([payload("x")]),
+    );
     // Order matters: a re-ordering is a different batch.
     expect(fingerprintSharePayloads([payload("a"), payload("b")])).not.toBe(
       fingerprintSharePayloads([payload("b"), payload("a")]),
@@ -67,13 +68,17 @@ describe("fingerprintSharePayloads", () => {
       fingerprintSharePayloads([{ value: "x", shareType: "url" }]),
     );
     expect(fingerprintSharePayloads([payload("x")])).not.toBe(
-      fingerprintSharePayloads([{ value: "x", shareType: "text", mimeType: "text/plain" }]),
+      fingerprintSharePayloads([
+        { value: "x", shareType: "text", mimeType: "text/plain" },
+      ]),
     );
   });
 
   it("treats undefined and omitted mimeType identically (no flapping)", () => {
     expect(fingerprintSharePayloads([{ value: "x", shareType: "text" }])).toBe(
-      fingerprintSharePayloads([{ value: "x", shareType: "text", mimeType: undefined }]),
+      fingerprintSharePayloads([
+        { value: "x", shareType: "text", mimeType: undefined },
+      ]),
     );
   });
 
@@ -104,7 +109,9 @@ describe("reconcileSession", () => {
     expect(result.session.entries[0].operationId).toBe("share:sess-1:0");
     expect(result.session.entries[0].status).toBe("pending");
     // Persisted.
-    expect(loadSession(store)?.fingerprint).toBe(fingerprintSharePayloads(BATCH_A));
+    expect(loadSession(store)?.fingerprint).toBe(
+      fingerprintSharePayloads(BATCH_A),
+    );
   });
 
   it("resumes an active session with the same fingerprint (does not reset entries)", () => {
@@ -213,7 +220,12 @@ describe("reconcileSession", () => {
   it("assigns distinct stable operation ids to duplicate entries in one batch", () => {
     // Two identical entries must each get their own id by raw index.
     const store = memoryStore();
-    const result = reconcileSession(store, USER, [payload("x"), payload("x")], id);
+    const result = reconcileSession(
+      store,
+      USER,
+      [payload("x"), payload("x")],
+      id,
+    );
     if (result.kind !== "new") throw new Error("expected new");
     const ids = result.session.entries.map((e) => e.operationId);
     expect(ids).toEqual(["share:sess-1:0", "share:sess-1:1"]);
@@ -269,7 +281,11 @@ describe("updateEntry", () => {
   it("applies a partial patch to the entry at the given index", () => {
     const store = memoryStore();
     reconcileSession(store, USER, BATCH_A, id);
-    updateEntry(store, 0, { status: "failed", kind: "image", message: "upload down" });
+    updateEntry(store, 0, {
+      status: "failed",
+      kind: "image",
+      message: "upload down",
+    });
     const entry = loadSession(store)?.entries[0];
     expect(entry?.status).toBe("failed");
     expect(entry?.kind).toBe("image");
@@ -282,10 +298,15 @@ describe("updateEntry", () => {
   });
 });
 
-describe("entriesToProcess / allEntriesSettled", () => {
+describe("entriesToProcess", () => {
   it("selects only pending and failed entries", () => {
     const store = memoryStore();
-    reconcileSession(store, USER, [payload("a"), payload("b"), payload("c")], id);
+    reconcileSession(
+      store,
+      USER,
+      [payload("a"), payload("b"), payload("c")],
+      id,
+    );
     updateEntry(store, 0, { status: "saved" });
     updateEntry(store, 1, { status: "failed" });
     // index 2 still pending
@@ -294,14 +315,14 @@ describe("entriesToProcess / allEntriesSettled", () => {
     expect(toProcess.map((e) => e.index)).toEqual([1, 2]);
   });
 
-  it("reports settled only when nothing is pending or failed", () => {
+  it("is empty once nothing is pending or failed", () => {
     const store = memoryStore();
     reconcileSession(store, USER, [payload("a"), payload("b")], id);
-    expect(allEntriesSettled(loadSession(store)!)).toBe(false);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(2);
     updateEntry(store, 0, { status: "saved" });
-    expect(allEntriesSettled(loadSession(store)!)).toBe(false);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(1);
     updateEntry(store, 1, { status: "unsupported" });
-    expect(allEntriesSettled(loadSession(store)!)).toBe(true);
+    expect(entriesToProcess(loadSession(store)!)).toHaveLength(0);
   });
 });
 
@@ -342,7 +363,12 @@ describe("user-scoped sessions (account switching)", () => {
     markComplete(store);
 
     // user-b reconciles identical content: must be a NEW session, not a clear.
-    const result = reconcileSession(store, "user-b", BATCH_A_DUP, () => "sess-b");
+    const result = reconcileSession(
+      store,
+      "user-b",
+      BATCH_A_DUP,
+      () => "sess-b",
+    );
     expect(result.kind).toBe("new");
     if (result.kind !== "new") return;
     expect(result.session.userId).toBe("user-b");
@@ -368,75 +394,105 @@ describe("user-scoped sessions (account switching)", () => {
 describe("entry validation in loadSession", () => {
   it("drops a session containing a malformed entry ({}) instead of trusting it", () => {
     const store = memoryStore();
-    store.set(SESSION_KEY, JSON.stringify({
-      version: SESSION_SCHEMA_VERSION,
-      fingerprint: "fp",
-      userId: USER,
-      sessionId: "sess-x",
-      phase: "active",
-      entries: [{}],
-    }));
+    store.set(
+      SESSION_KEY,
+      JSON.stringify({
+        version: SESSION_SCHEMA_VERSION,
+        fingerprint: "fp",
+        userId: USER,
+        sessionId: "sess-x",
+        phase: "active",
+        entries: [{}],
+      }),
+    );
     expect(loadSession(store)).toBeNull();
     expect(store.contains(SESSION_KEY)).toBe(false);
   });
 
   it("drops a session whose entry has an out-of-set status", () => {
     const store = memoryStore();
-    store.set(SESSION_KEY, JSON.stringify({
-      version: SESSION_SCHEMA_VERSION,
-      fingerprint: "fp",
-      userId: USER,
-      sessionId: "sess-x",
-      phase: "active",
-      entries: [
-        { index: 0, operationId: "share:sess-x:0", kind: "link", status: "bogus" },
-      ],
-    }));
+    store.set(
+      SESSION_KEY,
+      JSON.stringify({
+        version: SESSION_SCHEMA_VERSION,
+        fingerprint: "fp",
+        userId: USER,
+        sessionId: "sess-x",
+        phase: "active",
+        entries: [
+          {
+            index: 0,
+            operationId: "share:sess-x:0",
+            kind: "link",
+            status: "bogus",
+          },
+        ],
+      }),
+    );
     expect(loadSession(store)).toBeNull();
   });
 
   it("drops a session whose entry has a kind outside ENTRY_KINDS", () => {
     const store = memoryStore();
-    store.set(SESSION_KEY, JSON.stringify({
-      version: SESSION_SCHEMA_VERSION,
-      fingerprint: "fp",
-      userId: USER,
-      sessionId: "sess-x",
-      phase: "active",
-      entries: [
-        { index: 0, operationId: "share:sess-x:0", kind: "garbage", status: "pending" },
-      ],
-    }));
+    store.set(
+      SESSION_KEY,
+      JSON.stringify({
+        version: SESSION_SCHEMA_VERSION,
+        fingerprint: "fp",
+        userId: USER,
+        sessionId: "sess-x",
+        phase: "active",
+        entries: [
+          {
+            index: 0,
+            operationId: "share:sess-x:0",
+            kind: "garbage",
+            status: "pending",
+          },
+        ],
+      }),
+    );
     expect(loadSession(store)).toBeNull();
   });
 
   it("drops a session whose entry has a non-integer index", () => {
     const store = memoryStore();
-    store.set(SESSION_KEY, JSON.stringify({
-      version: SESSION_SCHEMA_VERSION,
-      fingerprint: "fp",
-      userId: USER,
-      sessionId: "sess-x",
-      phase: "active",
-      entries: [
-        { index: 1.5, operationId: "share:sess-x:0", kind: "link", status: "pending" },
-      ],
-    }));
+    store.set(
+      SESSION_KEY,
+      JSON.stringify({
+        version: SESSION_SCHEMA_VERSION,
+        fingerprint: "fp",
+        userId: USER,
+        sessionId: "sess-x",
+        phase: "active",
+        entries: [
+          {
+            index: 1.5,
+            operationId: "share:sess-x:0",
+            kind: "link",
+            status: "pending",
+          },
+        ],
+      }),
+    );
     expect(loadSession(store)).toBeNull();
   });
 
   it("drops a session whose entry has an empty operationId", () => {
     const store = memoryStore();
-    store.set(SESSION_KEY, JSON.stringify({
-      version: SESSION_SCHEMA_VERSION,
-      fingerprint: "fp",
-      userId: USER,
-      sessionId: "sess-x",
-      phase: "active",
-      entries: [
-        { index: 0, operationId: "", kind: "link", status: "pending" },
-      ],
-    }));
+    store.set(
+      SESSION_KEY,
+      JSON.stringify({
+        version: SESSION_SCHEMA_VERSION,
+        fingerprint: "fp",
+        userId: USER,
+        sessionId: "sess-x",
+        phase: "active",
+        entries: [
+          { index: 0, operationId: "", kind: "link", status: "pending" },
+        ],
+      }),
+    );
     expect(loadSession(store)).toBeNull();
   });
 });

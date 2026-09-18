@@ -142,6 +142,19 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="import"
+            options={{
+              presentation: "formSheet",
+              headerShown: true,
+              headerTransparent: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              headerBackButtonDisplayMode: "minimal",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
             name="camera"
             options={{
               presentation: "fullScreenModal",
@@ -149,20 +162,23 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="paywall"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
+        {/* The onboarding reveal opens the paywall fallback before onboarding
+            completes. Keep it last: the first available screen is the initial
+            route, so it must be (tabs) or onboarding. */}
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: "formSheet",
+            headerShown: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: "fitToContents",
+            contentStyle: { backgroundColor: theme.colors.background },
+          }}
+        />
       </Stack>
     </HomeFeedProvider>
   );

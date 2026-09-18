@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import type { ReactNode } from "react";
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 /**
  * Shared shell for the dismissible inline cards on Home (feedback
@@ -31,9 +31,9 @@ export function InlineCard({
 
 const styles = StyleSheet.create((theme) => ({
   card: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     borderRadius: theme.radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,

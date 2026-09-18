@@ -1,0 +1,19 @@
+/* Brand faces the native app registers with expo-font (see apps/native/app.json
+   plugins). Family names match theme.fonts in apps/native/src/unistyles.ts, which
+   the components reference by these exact names. */
+@font-face {
+  font-family: 'Satoshi-Regular';
+  src: url('../apps/native/assets/fonts/Satoshi-Regular.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Satoshi-Medium';
+  src: url('../apps/native/assets/fonts/Satoshi-Medium.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Satoshi-Bold';
+  src: url('../apps/native/assets/fonts/Satoshi-Bold.otf') format('opentype');
+}
+@font-face {
+  font-family: 'ExposureTrial-0';
+  src: url('../apps/native/assets/fonts/ExposureTrial-0.otf') format('opentype');
+}

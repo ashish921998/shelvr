@@ -1,303 +1,247 @@
-import { onboardingLabel } from "@/lib/onboarding-labels";
-import { t, useAppLocale } from "@/lib/i18n";
-import { BuildingStep } from "@/components/onboarding/building";
-import { LiveDemoStep } from "@/components/onboarding/live-demo";
-import { PermissionsStep } from "@/components/onboarding/permissions";
-import { PromiseStep } from "@/components/onboarding/promise";
-import { ReadyStep } from "@/components/onboarding/ready";
-import {
-  SpacePickerStep,
-  type SaveKind,
-  getSpacePresets,
-} from "@/components/onboarding/space-picker";
-import { SurveyStep } from "@/components/onboarding/survey";
-import type { FeedItem } from "@/components/item-card";
+import { useAppLocale } from "@/lib/i18n";
+import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
+import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
 import {
+  ONBOARDING_STEP_IDS,
+  ONBOARDING_STEPS,
+  restoreOnboardingStep,
+  type OnboardingStep,
+} from "@/lib/onboarding-steps";
+import {
+  clearPending,
   getOnboardingProgress,
+  resolveOnboardingSpaceName,
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
+import {
+  isPresetSpace,
+  isSaveKind,
+  spacesAfterKindToggle,
+  type SaveKind,
+} from "@/lib/save-kinds";
+import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { SignInView } from "@/components/sign-in-view";
+import {
+  LiveDemoStep,
+  type DemoSaved,
+} from "@/components/onboarding/live-demo";
+import { OpenerStep } from "@/components/onboarding/opener";
+import { RevealStep } from "@/components/onboarding/reveal";
+import { SetupStep } from "@/components/onboarding/setup";
+import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
+import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StyleSheet } from "react-native-unistyles";
-import { analytics } from "@/lib/analytics";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Onboarding v2 — an 8-step quiz-funnel flow.
-// This file is the step machine: a `step` index, lifted survey/space/demo state,
-// a thin progress bar, and step transitions between the step components.
-// Each step owns its own CTA copy and advance condition; the orchestrator
-// hands them `advance`/`finish` and the shared state.
-//
-// Order: promise → survey Q1 → survey Q2 → space picker → building → live demo
-// → permissions → ready → (paywall). Sign-in stays first (the route is
-// auth-gated); the paywall is the existing finish() verbatim.
-// App Store rating is NOT requested during onboarding — it is deferred to the
-// post-engagement useReviewPrompt hook that fires after 3+ ready items.
+const PROGRESS: Record<OnboardingStep, number | null> = {
+  opener: null,
+  setup: 0.25,
+  demo: 0.5,
+  reveal: 1,
+};
+const READING_PROGRESS = 0.625;
 
-// Step indices — named so the render switch reads as the funnel, not as numbers.
-const STEPS = {
-  promise: 0,
-  surveyQ1: 1,
-  surveyQ2: 2,
-  spaces: 3,
-  building: 4,
-  demo: 5,
-  permissions: 6,
-  ready: 7,
-} as const;
-type StepIndex = (typeof STEPS)[keyof typeof STEPS];
-
-const STEP_IDS = {
-  [STEPS.promise]: "promise",
-  [STEPS.surveyQ1]: "save_pileup",
-  [STEPS.surveyQ2]: "save_types",
-  [STEPS.spaces]: "spaces",
-  [STEPS.building]: "building",
-  [STEPS.demo]: "live_demo",
-  [STEPS.permissions]: "permissions",
-  [STEPS.ready]: "ready",
-} as const satisfies Record<(typeof STEPS)[keyof typeof STEPS], string>;
-
-function isStepIndex(value: number): value is StepIndex {
-  return value in STEP_IDS;
+// A share that arrived mid-onboarding and was not the demo save is still held
+// by expo-sharing. Flagging it lets the share screen pick it up in the app.
+function holdIncomingShare() {
+  try {
+    if (getSharedPayloads().length > 0) markPendingShareOnDevice();
+  } catch (err) {
+    analytics.captureError("onboarding_hold_share_failed", err);
+  }
 }
-
-// Q1 — "Where do your saves pile up today?" Analytics-only; no persistence, and
-// it doesn't seed anything downstream. Kept here (not in the component) because
-// the copy is product-wide, not a presentation detail.
-const Q1_OPTIONS = [
-  "X bookmarks",
-  "Instagram saved",
-  "Screenshots",
-  "Notes app",
-  "Browser tabs",
-  "Everywhere",
-] as const;
-
-// Q2 — "What do you save most?" Each answer is a SaveKind that seeds the space
-// picker presets, so the options here must stay in lockstep with that map.
-const Q2_OPTIONS: readonly SaveKind[] = [
-  "Articles",
-  "Recipes",
-  "Products",
-  "Home & decor",
-  "Travel",
-  "Fitness",
-  "Inspiration",
-  "Videos",
-];
-
-// The progress bar covers steps 2–7 (survey Q1 through permissions). Promise
-// (step 1) has no bar — it's the value screen, not the quiz — and ready shows
-// no bar since it's the recap.
-const FIRST_PROGRESS_STEP = STEPS.surveyQ1; // 1
-const LAST_PROGRESS_STEP = STEPS.permissions; // 6
 
 export default function OnboardingScreen() {
   useAppLocale();
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const { completeOnboarding } = useOnboarding();
+  const { isAuthenticated } = useConvexAuth();
 
-  // Read the persisted record ONCE, lazily, in the state initializers — a
-  // remount (e.g., after the inline sign-in re-renders this tree) re-reads it,
-  // but only into fresh state, never over live user changes.
   const [initialProgress] = useState(() => getOnboardingProgress());
-
-  // Always the persisted step. The demo record does not steer this: the demo
-  // step owns it (written on submit, cleared when the step advances), so an
-  // in-flight save can only exist while `step` is already the demo step. A
-  // relaunch on permissions/ready therefore lands there, not on a replay of a
-  // save that already finished.
-  const [step, setStep] = useState<StepIndex>(() =>
-    initialProgress.step !== null && isStepIndex(initialProgress.step)
-      ? initialProgress.step
-      : STEPS.promise,
+  const [initialStep] = useState(() =>
+    restoreOnboardingStep(initialProgress.step),
   );
-  const [q1, setQ1] = useState<string[]>(initialProgress.q1);
-  const [q2, setQ2] = useState<SaveKind[]>(
-    initialProgress.q2.filter((value): value is SaveKind =>
-      Q2_OPTIONS.some((option) => option === value),
-    ),
+  const [step, setStep] = useState<OnboardingStep>(initialStep);
+  const [kinds, setKinds] = useState<SaveKind[]>(() =>
+    initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  const [demoItem, setDemoItem] = useState<FeedItem | null>(null);
-  const spacesInitRef = useRef(initialProgress.spaces.length > 0);
-  const trackedStepsRef = useRef(new Set<number>());
+  const [saved, setSaved] = useState<DemoSaved | null>(null);
+  const [reading, setReading] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
-  const viewedStep = useRef<StepIndex | null>(null);
-  // An in-flight demo save captured before the inline sign-in; resumed (once)
-  // by the demo step if the user is already authenticated on arrival. Only
-  // meaningful while the restored step IS the demo step; anything else is a
-  // stale record from an interrupted advance, and finish() drops it.
-  const resumeDemo =
-    initialProgress.step === STEPS.demo ? initialProgress.demo : null;
+  const viewedStep = useRef<OnboardingStep | null>(null);
+  const stepIndex = ONBOARDING_STEPS.indexOf(step);
 
-  // Keep the persisted record in lockstep with the visible flow.
   useEffect(() => {
-    setOnboardingProgress({ q1, q2, spaces, step });
-  }, [q1, q2, spaces, step]);
+    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
+  }, [kinds, spaces, stepIndex]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
     analytics.capture("onboarding_step_viewed", {
-      step_id: STEP_IDS[step],
-      step_index: step,
+      step_id: ONBOARDING_STEP_IDS[step],
+      step_index: stepIndex,
     });
-  }, [q1, q2, spaces, step]);
+  }, [step, stepIndex]);
 
   const recordCurrentStep = useCallback(() => {
     if (trackedStepsRef.current.has(step)) return;
-
     analytics.capture("onboarding_step_completed", {
-      step_id: STEP_IDS[step],
-      step_index: step,
+      step_id: ONBOARDING_STEP_IDS[step],
+      step_index: stepIndex,
       duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
     });
     trackedStepsRef.current.add(step);
-  }, [step]);
+  }, [step, stepIndex]);
 
   const advance = useCallback(() => {
     recordCurrentStep();
-    setStep((current) => {
-      const next = current + 1;
-      return isStepIndex(next) ? next : STEPS.ready;
-    });
+    setStep(
+      (current) =>
+        ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(current) + 1] ?? current,
+    );
   }, [recordCurrentStep]);
 
-  // Pre-select spaces from Q2 presets when the user first reaches the spaces
-  // step. The ref guard ensures this runs only once, preserving subsequent
-  // user deselections.
+  // A returning account already has its spaces, so the setup answers are
+  // dropped instead of replayed onto it.
   useEffect(() => {
-    if (step === STEPS.spaces && !spacesInitRef.current) {
-      spacesInitRef.current = true;
-      setSpaces(getSpacePresets(q2));
-    }
-  }, [step, q2]);
+    if (!signedIn || !isAuthenticated) return;
+    holdIncomingShare();
+    clearPending();
+    completeOnboarding();
+  }, [signedIn, isAuthenticated, completeOnboarding]);
 
-  // Survey toggle helper — multi-select, order-independent. Shared by both Qs
-  // and the space picker. The setter accepts a subtype of string (SaveKind is a
-  // string union), so the generic keeps the element type narrow per state.
-  function toggle<T extends string>(
-    setter: React.Dispatch<React.SetStateAction<T[]>>,
-  ) {
-    return (option: T) =>
-      setter((prev) =>
-        prev.includes(option)
-          ? prev.filter((o) => o !== option)
-          : [...prev, option],
-      );
-  }
+  const toggleKind = (kind: SaveKind) => {
+    setSpaces(spacesAfterKindToggle(kinds, spaces, kind));
+    setKinds(
+      kinds.includes(kind)
+        ? kinds.filter((value) => value !== kind)
+        : [...kinds, kind],
+    );
+  };
 
-  // Persist the replay payload before flipping the onboarding route flag. The
-  // replay hook owns both the entitled and paywall paths, so there is one
-  // durable completion flow instead of two competing paywall presentations.
+  const toggleSpace = (name: string) =>
+    setSpaces((current) =>
+      current.includes(name)
+        ? current.filter((value) => value !== name)
+        : [...current, name],
+    );
+
+  const addSpace = (name: string) =>
+    setSpaces((current) =>
+      current.includes(name) ? current : [...current, name],
+    );
+
   const finish = () => {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     analytics.capture("onboarding_completed", {
-      save_pileup: q1,
-      save_types: q2,
+      save_pileup: [],
+      save_types: kinds,
       space_count: spaces.length,
-      space_names: spaces,
-      $set: { save_pileup: q1, save_types: q2 },
+      space_names: spaces.filter(isPresetSpace),
+      custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
+      $set: { save_pileup: [], save_types: kinds },
     });
     recordCurrentStep();
-    setPendingSpaces(spaces.map(onboardingLabel));
+    holdIncomingShare();
+    setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     completeOnboarding();
   };
 
-  // Progress bar value for the current step. Steps outside the quiz window
-  // (promise, ready) hide the bar entirely.
-  const showBar = step >= FIRST_PROGRESS_STEP && step <= LAST_PROGRESS_STEP;
+  if (showSignIn) {
+    return (
+      <SignInView
+        onBack={() => setShowSignIn(false)}
+        onCompleted={() => setSignedIn(true)}
+      />
+    );
+  }
+
   const progress =
-    (step - FIRST_PROGRESS_STEP) / (LAST_PROGRESS_STEP - FIRST_PROGRESS_STEP);
+    step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={[styles.barWrap, !showBar && styles.barHidden]}>
+      <View style={[styles.barWrap, progress === null && styles.barHidden]}>
         <View
-          style={[styles.bar, { width: `${Math.round(progress * 100)}%` }]}
+          style={[
+            styles.bar,
+            { width: `${Math.round((progress ?? 0) * 100)}%` },
+          ]}
         />
       </View>
 
-      <View style={styles.screen}>
+      {step === "opener" ? (
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom + theme.gap(1) },
+          ]}
+        >
+          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
+        </View>
+      ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: insets.bottom + 24 },
+            { paddingBottom: insets.bottom + theme.gap(3) },
           ]}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          {step === STEPS.promise && <PromiseStep onAdvance={advance} />}
-
-          {step === STEPS.surveyQ1 && (
-            <SurveyStep
-              headline={t("onboarding.pileupQuestion")}
-              support={t("onboarding.pileupHelp")}
-              options={Q1_OPTIONS}
-              selected={q1}
-              onToggle={toggle(setQ1)}
-              ctaLabel={t("common.continue")}
+          {step === "setup" && (
+            <SetupStep
+              kinds={kinds}
+              spaces={spaces}
+              onToggleKind={toggleKind}
+              onToggleSpace={toggleSpace}
+              onAddSpace={addSpace}
               onAdvance={advance}
             />
           )}
 
-          {step === STEPS.surveyQ2 && (
-            <SurveyStep
-              headline={t("onboarding.kindQuestion")}
-              support={t("onboarding.kindHelp")}
-              options={Q2_OPTIONS}
-              selected={q2}
-              onToggle={toggle(setQ2)}
-              ctaLabel={t("common.continue")}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === STEPS.spaces && (
-            <SpacePickerStep
-              answers={q2}
-              selected={spaces}
-              onToggle={toggle(setSpaces)}
-              onAdvance={advance}
-            />
-          )}
-
-          {step === STEPS.building && <BuildingStep onDone={advance} />}
-
-          {step === STEPS.demo && (
+          {step === "demo" && (
             <LiveDemoStep
-              selectedSpaces={spaces}
-              // The demo step reports the classified item up so the recap
-              // (ready step) can render the same card. If the user skips,
-              // demoItem stays null and ready shows the spaces only.
-              resumeDemo={resumeDemo}
-              onReady={setDemoItem}
+              samples={
+                Platform.OS === "ios"
+                  ? orderShareDemoSamples(kinds)
+                  : orderDemoSamples(kinds)
+              }
+              spaces={spaces}
+              resume={initialStep === "demo" ? initialProgress.demo : null}
+              onSaved={setSaved}
+              onReadingChange={setReading}
               onAdvance={advance}
             />
           )}
 
-          {step === STEPS.permissions && (
-            <PermissionsStep onAdvance={advance} />
-          )}
-
-          {step === STEPS.ready && (
-            <ReadyStep
-              spaceNames={spaces.map(onboardingLabel)}
-              demoItem={demoItem}
+          {step === "reveal" && (
+            <RevealStep
+              saved={saved}
+              restored={initialStep === "reveal"}
+              onSaved={setSaved}
               onFinish={finish}
             />
           )}
         </ScrollView>
-      </View>
+      )}
     </View>
   );
 }
@@ -313,11 +257,8 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 2,
     overflow: "hidden",
-    marginBottom: theme.gap(2),
   },
   barHidden: {
-    // Keep the layout slot so screens don't jump when the bar appears at Q1,
-    // but make the track invisible on the promise screen.
     opacity: 0,
   },
   bar: {
@@ -325,15 +266,11 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     borderRadius: 2,
   },
-  screen: {
-    flex: 1,
-  },
   scroll: {
     flex: 1,
   },
   content: {
     flexGrow: 1,
     paddingTop: theme.gap(3),
-    gap: theme.gap(2),
   },
 }));

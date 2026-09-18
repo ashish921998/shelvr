@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
@@ -9,6 +10,19 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | undefined;
 
 const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
+
+// Distributed builds report crashes; local development does not. A dev machine
+// crash on an unmerged branch would otherwise open an error issue next to
+// production traffic under the shared project token. Fail closed like replay: a
+// missing `extra` reads as "development" everywhere, so it never turns capture
+// on.
+const EXCEPTION_AUTOCAPTURE_VARIANTS = new Set<unknown>([
+  "production",
+  "preview",
+]);
+const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
+  Constants.expoConfig?.extra?.variant,
+);
 
 // Convex validation and network failures can interpolate user content (saved
 // URLs, note text) into Error.message, so only messages known to be fixed
@@ -48,6 +62,17 @@ function redactExceptionProperties(properties: unknown): void {
   }
 }
 
+// The SDK attaches the launch deep link to "Application Opened". That URL can
+// carry an OAuth callback code or saved content, so it never leaves the device.
+function dropLaunchUrl(event: {
+  event: string;
+  properties?: Record<string, unknown>;
+}): void {
+  if (event.event === "Application Opened" && event.properties) {
+    delete event.properties.url;
+  }
+}
+
 // Analytics is optional in local development and in builds that do not have
 // PostHog configured. The analytics boundary treats this as a no-op instead of
 // making the app fail during module initialization.
@@ -56,6 +81,15 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
+        // Both default to true in posthog-react-native >= 4.73 and activate
+        // through @posthog/react-native-plugin. The native SDK builds and sends
+        // `$push_notification_opened` itself, so `before_send` below never sees
+        // it and cannot apply the redaction this file exists to enforce. Push
+        // tokens are already owned by `notificationDevices` in Convex, so
+        // mirroring them into PostHog would widen what leaves the device for no
+        // product gain. Fail closed, as replay and exception autocapture do.
+        capturePushNotificationSubscriptions: false,
+        capturePushNotificationOpened: false,
         // Replay stays off in production until visual masking is verified on a
         // signed build. Fail closed: only builds that declare a non-production
         // variant record, so a missing `extra` can never turn replay on.
@@ -77,23 +111,64 @@ export const posthog =
         // autocapture" remote config.
         errorTracking: {
           autocapture: {
-            uncaughtExceptions: true,
-            unhandledRejections: true,
+            uncaughtExceptions: captureExceptions,
+            unhandledRejections: captureExceptions,
             console: [],
           },
         },
         // eslint-disable-next-line @typescript-eslint/naming-convention -- the SDK's option key is fixed snake_case
         before_send: (event) => {
-          if (event !== null) redactExceptionProperties(event.properties);
+          if (event !== null) {
+            redactExceptionProperties(event.properties);
+            dropLaunchUrl(event);
+          }
           return event;
         },
       })
     : undefined;
 
-posthog?.register({
-  environment: Constants.expoConfig?.extra?.variant ?? "development",
-  analytics_version: 1,
-});
+// `$app_build` stays the store build across OTA updates, so the running
+// update is recorded separately to tell which JS a user had.
+function updateProperties(): Record<string, string | boolean> {
+  try {
+    return {
+      ...(Updates.updateId ? { ota_update_id: Updates.updateId } : {}),
+      ...(Updates.channel ? { ota_channel: Updates.channel } : {}),
+      ota_embedded: Updates.isEmbeddedLaunch,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Properties registered on every event, and again after each reset. */
+export function superProperties(): Record<string, string | number | boolean> {
+  return {
+    environment: Constants.expoConfig?.extra?.variant ?? "development",
+    analytics_version: 1,
+    ...updateProperties(),
+  };
+}
+
+posthog?.register(superProperties());
+
+/** Clears the identity and restores the super properties a reset drops. */
+export function resetClient(client: PostHog): void {
+  client.reset();
+  client.register(superProperties());
+}
+
+/** Resets only when PostHog still holds an identified user, so a signed-out
+ * launch keeps its anonymous id and one person's onboarding stays on one
+ * profile. */
+export async function resetIfIdentified(client: PostHog): Promise<void> {
+  await client.ready();
+  const distinctId = client.getDistinctId();
+  const anonymousId = client.getAnonymousId();
+  if (distinctId && anonymousId && distinctId !== anonymousId) {
+    resetClient(client);
+  }
+}
 
 /** True when the client analytics boundary may capture. The single canonical
  * check — every analytics facade (feedback, cancel survey) delegates here

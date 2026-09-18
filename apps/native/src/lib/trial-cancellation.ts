@@ -11,10 +11,26 @@
  */
 
 /** The next-visit cancel survey shows only on `cancelled`. */
-export type TrialCancellationState =
-  | 'cancelled'
-  | 'none'
-  | 'unknown';
+export type TrialCancellationState = "cancelled" | "none" | "unknown";
+
+type TrialEntitlement = { periodType: string; willRenew: boolean };
+
+/** A foreground check must fetch after invalidation: even stale CustomerInfo
+ * may be returned from the SDK cache while it refreshes in the background. */
+export async function readFreshTrialCancellation(purchases: {
+  invalidateCustomerInfoCache: () => Promise<void>;
+  getCustomerInfo: () => Promise<{
+    entitlements: { active: Record<string, TrialEntitlement> };
+  }>;
+}): Promise<TrialCancellationState> {
+  try {
+    await purchases.invalidateCustomerInfoCache();
+    const info = await purchases.getCustomerInfo();
+    return classifyTrialCancellation(Object.values(info.entitlements.active));
+  } catch {
+    return "unknown";
+  }
+}
 
 /**
  * - `cancelled` — show the next-visit cancel survey.
@@ -25,14 +41,15 @@ export type TrialCancellationState =
  *   check simply runs again on the next launch.
  */
 export function classifyTrialCancellation(
-  activeEntitlements: { periodType: string; willRenew: boolean }[],
+  activeEntitlements: TrialEntitlement[],
 ): TrialCancellationState {
   // Any non-renewing trial means cancelled-in-window. Today the app has a
   // single entitlement so there is exactly one trial at most, but if RC
   // ever reports several active trials, a cancelled one must not be masked
   // by a renewing one (order-independent by construction).
   const cancelledTrial = activeEntitlements.some(
-    (entitlement) => entitlement.periodType === 'TRIAL' && !entitlement.willRenew,
+    (entitlement) =>
+      entitlement.periodType === "TRIAL" && !entitlement.willRenew,
   );
-  return cancelledTrial ? 'cancelled' : 'none';
+  return cancelledTrial ? "cancelled" : "none";
 }

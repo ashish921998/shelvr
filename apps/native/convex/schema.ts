@@ -1,11 +1,14 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { recipientValidator } from "./model/notificationDelivery";
+import { recipientValidator } from "./model/notificationFields";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  postMediaValidator,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   cancelSurveyOutcomeValidator,
@@ -38,6 +41,9 @@ export default defineSchema({
       v.literal("failed"),
     ),
     title: v.optional(v.string()),
+    // "user" once the owner typed the title. Classification then leaves
+    // `title` alone; absent means any title is the classifier's.
+    titleSource: v.optional(v.literal("user")),
     description: v.optional(v.string()),
     url: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
@@ -50,10 +56,18 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
-    // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
+    // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    // Images and videos inside `content`. Kept apart from `media`, which marks
+    // a save as a social post.
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
@@ -106,6 +120,9 @@ export default defineSchema({
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
     .index("by_user_and_type", ["userId", "type"])
+    // Bulk import skips links the user already saved. Link URLs are stored
+    // normalized, so an exact lookup finds a save of any age.
+    .index("by_user_and_url", ["userId", "url"])
     // Status-scoped reads for one user (e.g. the ready items a recommendation
     // pass samples) without over-reading and filtering in JS.
     .index("by_user_and_status", ["userId", "status"])
@@ -263,8 +280,9 @@ export default defineSchema({
     userId: v.string(),
     askedAt: v.number(),
     outcome: v.optional(cancelSurveyOutcomeValidator),
-    // Bounded reason id from the client survey (never free text); mirrored
-    // by CancelSurveyReason in apps/native/src/lib/analytics.ts.
+    // Bounded reason id from the client survey (never free text). The client's
+    // CancelSurveyReason derives from the same CANCEL_SURVEY_REASONS tuple this
+    // validator is built from, so the two cannot disagree.
     reason: v.optional(cancelSurveyReasonValidator),
     respondedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),

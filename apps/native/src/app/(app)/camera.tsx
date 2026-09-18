@@ -6,7 +6,9 @@ import {
   reportSaveFailures,
   useSaveImages,
 } from "@/lib/use-save-image";
+import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import type { Id } from "@convex/_generated/dataModel";
+import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -37,6 +39,11 @@ type CaptureMode = "photo" | "sticker";
 // The accent color matches theme.colors.primary (identical in both themes).
 const ACCENT = "#e6a23c";
 const INACTIVE = "rgba(255,255,255,0.55)";
+
+/** This screen is only reachable through add.tsx's entitlement guard, so a
+ * `pro_required` refusal here means Pro lapsed mid-session. There is no client
+ * gate to fall back on — route straight to the paywall. */
+const PAYWALL_PLACEMENT = "camera";
 
 export default function CameraScreen() {
   useAppLocale();
@@ -90,51 +97,19 @@ export default function CameraScreen() {
     color: interpolateColor(progress.value, [0, 1], [INACTIVE, ACCENT]),
   }));
 
-  // Runs a batch, closing on success or reporting a partial outcome. Failed
-  // requests keep their operation ids so a retry resubmits only them.
-  const runImageRequests = async (requests: ImageSaveRequest[]) => {
-    if (requests.length === 0) {
-      router.back();
-      return;
-    }
-    setBusy(true);
-    try {
-      const results = await saveImages(requests, pinnedSpace);
-      const failed = results.filter((r) => r.status === "failed");
-      if (failed.length === 0) {
-        router.back();
-        return;
-      }
-      const savedCount = results.length - failed.length;
-      reportSaveFailures(results);
-      Alert.alert(
-        t("errors.batchSaveTitle"),
-        t("capture.partialFailure", {
-          reason: localizeError(failed[0].message),
-          saved: savedCount,
-          total: results.length,
-        }),
-        [
-          {
-            text: t("capture.retryFailed"),
-            onPress: () => {
-              void runImageRequests(
-                failed.map((r) => ({
-                  image: r.image,
-                  operationId: r.operationId,
-                })),
-              );
-            },
-          },
-          { text: t("common.done"), onPress: () => router.back() },
-        ],
-      );
-      setBusy(false);
-    } catch {
+  // Runs a batch, closing on success or reporting a partial outcome. The hook
+  // owns the retry (failed requests keep their operation ids so it resubmits
+  // only them), the `pro_required` paywall route, and the alert.
+  const runImageRequests = useSaveImageBatch({
+    spaceId: pinnedSpace.spaceId,
+    paywallPlacement: PAYWALL_PLACEMENT,
+    setBusy,
+    onAllSaved: () => router.back(),
+    onDismiss: () => router.back(),
+    onUnexpectedError: () => {
       Alert.alert(t("errors.saveTitle"), t("errors.upload"));
-      setBusy(false);
-    }
-  };
+    },
+  });
 
   const pickFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -175,6 +150,11 @@ export default function CameraScreen() {
         return;
       }
       reportSaveFailures([result]);
+      if (result.code === "pro_required") {
+        setBusy(false);
+        await openPaywall(router, PAYWALL_PLACEMENT);
+        return;
+      }
       // Preserve the failed request (with its operation id) so the in-screen
       // retry replays it instead of generating a new one.
       const failed = { image: result.image, operationId: result.operationId };

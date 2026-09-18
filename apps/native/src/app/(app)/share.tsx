@@ -1,11 +1,19 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
+import { recordShareSaved } from "@/lib/first-share";
 import {
   classifyEntries,
   processSession,
-  resolvedFromRawPayloads,
   type ResolvedPayload,
   type ShareSaveDeps,
 } from "@/lib/share/process-share";
+import {
+  countPartial,
+  countProgress,
+  failedEntries,
+  hasRetryableEntries,
+  selectProcessorPayloads,
+  withEntry,
+} from "@/lib/share/session-view";
 import {
   deleteSession,
   loadSession,
@@ -169,28 +177,30 @@ export default function ShareScreen() {
     [createLinkItem, createNoteItem, saveImages],
   );
 
-  /** The payload list the processor runs against. Normal path: the natively
-   * resolved payloads. When resolution failed or its results no longer align
-   * with the raw payloads — the resolver probes shared URLs with a live
-   * request, so bot-hostile hosts (TikTok) can fail the whole resolution —
-   * fall back to the raw payloads: for url/text shares the raw value is
-   * everything the save needs, and entries the fallback cannot resolve
-   * (images) are reported as failed entries instead of killing the share. */
-  const processorPayloads = useMemo<ResolvedPayload[]>(() => {
-    if (
-      error === null &&
-      resolvedSharedPayloads.length === sharedPayloads.length
-    ) {
-      return toResolved(resolvedSharedPayloads);
-    }
-    return resolvedFromRawPayloads(
+  /** The raw payload batch, narrowed to the identity-bearing fields the session
+   * store and the processor's fallback read. Memoized because both the
+   * processor payloads and the reconcile effect run against the same list. */
+  const rawPayloads = useMemo<RawSharePayload[]>(
+    () =>
       sharedPayloads.map((p) => ({
         value: p.value,
         shareType: p.shareType,
         mimeType: p.mimeType,
       })),
-    );
-  }, [error, resolvedSharedPayloads, sharedPayloads]);
+    [sharedPayloads],
+  );
+
+  /** The payload list the processor runs against (see selectProcessorPayloads
+   * for the resolution-failure fallback). */
+  const processorPayloads = useMemo<ResolvedPayload[]>(
+    () =>
+      selectProcessorPayloads({
+        resolutionError: error,
+        resolved: resolvedSharedPayloads,
+        raw: rawPayloads,
+      }),
+    [error, rawPayloads, resolvedSharedPayloads],
+  );
 
   /** The single idempotent completion path used by all-success, continue, AND
    * cancel. Cancel reuses it deliberately so the same persist-complete → native
@@ -235,6 +245,13 @@ export default function ShareScreen() {
         // the user on this screen or prevent navigation home.
         analytics.captureError("clear_pending_share_failed", err);
       }
+      if (user && session.entries.some((entry) => entry.status === "saved")) {
+        try {
+          recordShareSaved(user._id);
+        } catch (err) {
+          analytics.captureError("record_first_share_failed", err);
+        }
+      }
       // 4. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === "saved")) {
         analytics.capture("shared_content_saved", {
@@ -244,7 +261,7 @@ export default function ShareScreen() {
       setPhase({ kind: "complete" });
       router.replace("/");
     },
-    [clearSharedPayloads, router],
+    [clearSharedPayloads, router, user],
   );
 
   /** Runs the processor for `session`, persisting each settled entry (scoped to
@@ -360,13 +377,7 @@ export default function ShareScreen() {
       return;
     }
 
-    const raw: RawSharePayload[] = sharedPayloads.map((p) => ({
-      value: p.value,
-      shareType: p.shareType,
-      mimeType: p.mimeType,
-    }));
-
-    const reconciled = reconcileSession(shareStore, userId, raw, () =>
+    const reconciled = reconcileSession(shareStore, userId, rawPayloads, () =>
       Crypto.randomUUID(),
     );
 
@@ -408,6 +419,7 @@ export default function ShareScreen() {
   }, [
     user,
     sharedPayloads,
+    rawPayloads,
     processorPayloads,
     isResolving,
     saveDeps,
@@ -517,7 +529,7 @@ export default function ShareScreen() {
     );
   }
   if (phase.kind === "saving") {
-    const { saved, total } = countProgress(phase.session);
+    const { saved, total } = countProgress(phase.session, processorPayloads);
     return (
       <Centered
         phaseKey="saving"
@@ -528,12 +540,13 @@ export default function ShareScreen() {
     );
   }
   if (phase.kind === "partial") {
-    const { saved, failed, total } = countPartial(phase.session);
+    const { saved, failed, total } = countPartial(
+      phase.session,
+      processorPayloads,
+    );
     // Show Retry only when there is at least one failed/pending entry left to
     // attempt. Unsupported entries have nothing to retry.
-    const hasRetryable = phase.session.entries.some(
-      (e) => e.status === "failed" || e.status === "pending",
-    );
+    const hasRetryable = hasRetryableEntries(phase.session);
     // failed counts only failed/unsupported terminal entries; the orchestration-
     // error catch path can land here with still-pending entries (failed===0), so
     // word the subtitle from the count rather than assuming at least one failed.
@@ -553,13 +566,11 @@ export default function ShareScreen() {
           style={styles.list}
           contentContainerStyle={styles.listContent}
         >
-          {phase.session.entries
-            .filter((e) => e.status === "failed" || e.status === "unsupported")
-            .map((e) => (
-              <Text key={e.operationId} style={styles.failedItem(theme)}>
-                {localizeError(e.message)}
-              </Text>
-            ))}
+          {failedEntries(phase.session, processorPayloads).map((e) => (
+            <Text key={e.operationId} style={styles.failedItem(theme)}>
+              {localizeError(e.message)}
+            </Text>
+          ))}
         </ScrollView>
         <View style={styles.actions}>
           <Button
@@ -630,49 +641,6 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   if (entry.itemId !== undefined) patch.itemId = entry.itemId;
   if (entry.message !== undefined) patch.message = entry.message;
   updateEntry(shareStore, entry.index, patch, sessionId);
-}
-
-/** Returns a copy of `session` with the entry matching `settled.index` replaced
- * by the settled version, so the saving phase can reflect incremental progress. */
-function withEntry(session: ShareSession, settled: ShareEntry): ShareSession {
-  return {
-    ...session,
-    entries: session.entries.map((e) =>
-      e.index === settled.index ? settled : e,
-    ),
-  };
-}
-
-/** Maps the SDK's resolved payloads to the processor's minimal slice. */
-function toResolved(
-  resolved: ReturnType<typeof useIncomingShare>["resolvedSharedPayloads"],
-): ResolvedPayload[] {
-  return resolved.map((p) => ({
-    contentType: p.contentType,
-    value: p.value,
-    contentUri: p.contentUri,
-    contentMimeType: p.contentMimeType,
-  }));
-}
-
-function countProgress(session: ShareSession): {
-  saved: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
-  return { saved, total: session.entries.length };
-}
-
-function countPartial(session: ShareSession): {
-  saved: number;
-  failed: number;
-  total: number;
-} {
-  const saved = session.entries.filter((e) => e.status === "saved").length;
-  const failed = session.entries.filter(
-    (e) => e.status === "failed" || e.status === "unsupported",
-  ).length;
-  return { saved, failed, total: session.entries.length };
 }
 
 // ---------------------------------------------------------------------------

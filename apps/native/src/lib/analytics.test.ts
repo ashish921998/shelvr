@@ -5,6 +5,11 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   captureException: vi.fn(),
   identify: vi.fn(),
+  reset: vi.fn(),
+  register: vi.fn(),
+  ready: vi.fn(async () => {}),
+  getDistinctId: vi.fn(() => "anon-1"),
+  getAnonymousId: vi.fn(() => "anon-1"),
   getSessionId: vi.fn(() => "session-1"),
 }));
 const posthogCtor = vi.hoisted(() => {
@@ -20,6 +25,11 @@ const posthogCtor = vi.hoisted(() => {
   return PostHogStub;
 });
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
+vi.mock("expo-updates", () => ({
+  updateId: null,
+  channel: null,
+  isEmbeddedLaunch: true,
+}));
 vi.mock("@/lib/posthog", async (importOriginal) => {
   // Spread the real module so captureError exercises the production
   // allowlist instead of a drift-prone hard-coded copy; swap only the client.
@@ -109,7 +119,9 @@ describe("captureError", () => {
     const error = new TypeError("Value: https://private.example/note text");
     analytics.captureError("share_save_failed", error, { entry_count: 2 });
     // Console diagnostics retain a known type, never the raw error.
-    expect(console.error).toHaveBeenCalledWith("share_save_failed", { error_type: "TypeError" });
+    expect(console.error).toHaveBeenCalledWith("share_save_failed", {
+      error_type: "TypeError",
+    });
     expect(console.error).not.toHaveBeenCalledWith("share_save_failed", error);
     expect(mock.captureException).toHaveBeenCalledTimes(1);
     const [reported, properties] = mock.captureException.mock.calls[0];
@@ -139,9 +151,15 @@ describe("captureError", () => {
     error.name = "private customer name";
     analytics.captureError("save_failed", error);
     analytics.captureError("save_failed", { secret: "private value" });
-    expect(console.error).toHaveBeenNthCalledWith(1, "save_failed", { error_type: "Error" });
-    expect(console.error).toHaveBeenNthCalledWith(2, "save_failed", { error_type: "Unknown" });
-    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private");
+    expect(console.error).toHaveBeenNthCalledWith(1, "save_failed", {
+      error_type: "Error",
+    });
+    expect(console.error).toHaveBeenNthCalledWith(2, "save_failed", {
+      error_type: "Unknown",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      "private",
+    );
   });
 
   it("reduces non-Error throws to their type", () => {
@@ -155,5 +173,31 @@ describe("captureError", () => {
       throw new Error("unavailable");
     });
     expect(() => analytics.captureError("x", new Error("y"))).not.toThrow();
+  });
+});
+
+describe("resetIfIdentified", () => {
+  it("keeps a signed-out launch on its anonymous id", async () => {
+    await analytics.resetIfIdentified();
+    expect(mock.ready).toHaveBeenCalledOnce();
+    expect(mock.reset).not.toHaveBeenCalled();
+  });
+
+  it("resets a device still identified as a previous account", async () => {
+    mock.getDistinctId.mockReturnValueOnce("user-1");
+    await analytics.resetIfIdentified();
+    expect(mock.reset).toHaveBeenCalledOnce();
+    expect(mock.register).toHaveBeenCalledWith({
+      environment: "development",
+      analytics_version: 1,
+      ota_embedded: true,
+    });
+  });
+
+  it("does nothing before the SDK has loaded its ids", async () => {
+    mock.getDistinctId.mockReturnValueOnce("");
+    mock.getAnonymousId.mockReturnValueOnce("");
+    await analytics.resetIfIdentified();
+    expect(mock.reset).not.toHaveBeenCalled();
   });
 });
