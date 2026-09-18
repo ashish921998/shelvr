@@ -35,7 +35,7 @@ describe("embedTexts", () => {
     // not normalize truncated output, and cosine scoring assumes unit length.
     embedMany.mockResolvedValue({ embeddings: [vector(7)] });
 
-    const [embedding] = await embedTexts(["something to embed"]);
+    const [embedding] = (await embedTexts(["something to embed"])).vectors;
 
     expect(embedding).toBeDefined();
     expect(magnitude(embedding!)).toBeCloseTo(1, 10);
@@ -56,7 +56,7 @@ describe("embedTexts", () => {
     secondAxis[1] = 5;
     embedMany.mockResolvedValue({ embeddings: [firstAxis, secondAxis] });
 
-    const result = await embedTexts(["first", "", "second", ""]);
+    const { vectors: result } = await embedTexts(["first", "", "second", ""]);
 
     expect(embedMany).toHaveBeenCalledTimes(1);
     expect(embedMany.mock.calls[0][0].values).toEqual(["first", "second"]);
@@ -70,7 +70,7 @@ describe("embedTexts", () => {
   });
 
   it("never calls the provider when every text is empty", async () => {
-    const result = await embedTexts(["", ""]);
+    const { vectors: result } = await embedTexts(["", ""]);
 
     expect(embedMany).not.toHaveBeenCalled();
     expect(result).toEqual([undefined, undefined]);
@@ -98,7 +98,10 @@ describe("embedTexts", () => {
       embeddings: [vector(1).slice(0, EMBEDDING_DIMENSIONS - 1)],
     });
 
-    expect(await embedTexts(["text"])).toEqual([undefined]);
+    expect(await embedTexts(["text"])).toEqual({
+      vectors: [undefined],
+      callFailed: false,
+    });
   });
 
   it("drops a vector carrying a non-finite component", async () => {
@@ -106,7 +109,10 @@ describe("embedTexts", () => {
     poisoned[0] = Number.NaN;
     embedMany.mockResolvedValue({ embeddings: [poisoned] });
 
-    expect(await embedTexts(["text"])).toEqual([undefined]);
+    expect(await embedTexts(["text"])).toEqual({
+      vectors: [undefined],
+      callFailed: false,
+    });
   });
 
   it("resolves instead of throwing when the provider fails", async () => {
@@ -114,16 +120,19 @@ describe("embedTexts", () => {
     // cost the user their save.
     embedMany.mockRejectedValue(new Error("provider exploded"));
 
-    await expect(embedTexts(["a", "b"])).resolves.toEqual([
-      undefined,
-      undefined,
-    ]);
+    await expect(embedTexts(["a", "b"])).resolves.toEqual({
+      callFailed: true,
+      vectors: [undefined, undefined],
+    });
   });
 
   it("resolves when the call times out", async () => {
     const timeout = new DOMException("timed out", "TimeoutError");
     embedMany.mockRejectedValue(timeout);
 
-    await expect(embedTexts(["a"])).resolves.toEqual([undefined]);
+    await expect(embedTexts(["a"])).resolves.toEqual({
+      vectors: [undefined],
+      callFailed: true,
+    });
   });
 });

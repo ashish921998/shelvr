@@ -1602,7 +1602,13 @@ export const updateNoteItem = mutation({
       // invalidates the vector. A text change also schedules a re-classify
       // that re-embeds, but a title-only edit does not — clearing the stamp
       // covers both by handing the row back to the sweep either way.
+      //
+      // The attempt count goes with it: it is a budget for embedding one
+      // particular text, and this is different text. Carried over, a row that
+      // had already failed four times would be stamped current after a single
+      // failure on the edited note, with no vector for what it now says.
       embeddingVersion: undefined,
+      embeddingAttempts: undefined,
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
         ? { processingStartedAt: Date.now() }
@@ -1937,7 +1943,13 @@ export const finalizeItem = internalMutation({
           // the generation stamp so the sweeper re-embeds it against the text
           // just written. Patching `embedding: undefined` instead would
           // delete a good vector over a transient provider failure.
-          { embeddingVersion: undefined }),
+          //
+          // The attempt count is cleared for the same reason it is on a
+          // success: the budget belongs to one particular text, and this
+          // classification just wrote new text. Carried over, a row with four
+          // prior attempts would be stamped current after one failure on the
+          // new text, keeping a vector that describes the old.
+          { embeddingVersion: undefined, embeddingAttempts: undefined }),
     });
     if (
       args.storageId !== undefined &&

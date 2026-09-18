@@ -170,6 +170,32 @@ describe("finalizeItem", () => {
     expect(stored?.embeddingVersion).toBeUndefined();
   });
 
+  it("resets the attempt budget when it writes text it could not embed", async () => {
+    // The budget belongs to one particular text. Carried across a
+    // reclassification, a row with MAX_EMBEDDING_ATTEMPTS - 1 prior failures
+    // would be stamped current after a single failure on the new text, keeping
+    // a vector that describes what the item used to say.
+    const t = await as("budget");
+    const itemId = await seedItem(t, "budget", {
+      status: "processing",
+      embedding: vector(0.05),
+      embeddingVersion: CURRENT_EMBEDDING_VERSION,
+      embeddingAttempts: MAX_EMBEDDING_ATTEMPTS - 1,
+    });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "Reclassified",
+      description: "New text, and this run could not embed it",
+      tags: [],
+      status: "ready",
+    });
+
+    const stored = await t.run((ctx) => ctx.db.get(itemId));
+    expect(stored?.embeddingVersion).toBeUndefined();
+    expect(stored?.embeddingAttempts).toBeUndefined();
+  });
+
   it("writes no vector for a superseded run", async () => {
     const t = await as("fenced");
     const itemId = await seedItem(t, "fenced", {
@@ -191,6 +217,44 @@ describe("finalizeItem", () => {
     expect(outcome).toBe("stale_run");
     const stored = await t.run((ctx) => ctx.db.get(itemId));
     expect(stored?.embedding).toBeUndefined();
+  });
+});
+
+describe("updateNoteItem invalidates the vector", () => {
+  async function readyNote(t: TestCtx, userId: string) {
+    return await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "note" as const,
+        status: "ready" as const,
+        title: "Shopping",
+        note: "Oat milk",
+        tags: [],
+        searchText: "shopping oat milk",
+        embedding: vector(0.06),
+        embeddingVersion: CURRENT_EMBEDDING_VERSION,
+        embeddingAttempts: MAX_EMBEDDING_ATTEMPTS - 1,
+      }),
+    );
+  }
+
+  it("clears the stamp and the attempt budget on a title-only edit", async () => {
+    // A title-only edit schedules no re-classify, so the sweep is the only
+    // thing that will re-embed this row — it has to be handed back to it. And
+    // the budget has to go with the stamp: kept, one failure on the edited
+    // note would reach the cap and stamp the row current with a vector
+    // describing the old title.
+    const t = await as("note-edit");
+    const id = await readyNote(t, "note-edit");
+
+    await t.mutation(api.items.updateNoteItem, { id, title: "Groceries" });
+
+    const stored = await t.run((ctx) => ctx.db.get(id));
+    expect(stored?.title).toBe("Groceries");
+    expect(stored?.embeddingVersion).toBeUndefined();
+    expect(stored?.embeddingAttempts).toBeUndefined();
+    // The old vector stays until the sweep replaces it: stale beats absent.
+    expect(stored?.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
   });
 });
 
