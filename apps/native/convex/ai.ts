@@ -604,15 +604,29 @@ function htmlToText(html: string): string {
  * HTML through htmlToText to get the paragraph-separated plain text the client
  * renders. Pages without a readable article do not store a body.
  */
+// Shortest extraction worth calling an article body. Under this a bot-hostile
+// or JS-rendered page has yielded only chrome, and the classifier writing a
+// description of that chrome is worse than it knowing there was no body: it
+// still has the title, the site and the page's own meta description. The
+// shortest text the tests deliberately keep is a little under 200 characters.
+const MIN_ARTICLE_CHARS = 120;
+
 export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
     // Remove explicit page chrome before parsing: the readerability preflight
     // rejects short articles, while parse() can retain chrome on sparse pages.
     for (const element of document.querySelectorAll(
-      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent, .skip-link, .skip-to-content, .skip-nav, .screen-reader-shortcut',
     )) {
       element.remove();
+    }
+    // A skip link is an in-page anchor, so it sits outside nav and banner and
+    // reads to Readability as ordinary body text.
+    for (const anchor of document.querySelectorAll('a[href^="#"]')) {
+      if (/^\s*skip\b/i.test(anchor.textContent ?? "")) {
+        anchor.remove();
+      }
     }
     for (const menu of document.querySelectorAll(".menu")) {
       const links = Array.from(menu.querySelectorAll("a"));
@@ -636,7 +650,7 @@ export function extractBodyText(html: string, url: string): string | undefined {
     const article = new Readability(document).parse();
     if (article?.content) {
       const text = htmlToText(article.content);
-      if (text.trim() !== "") {
+      if (text.trim().length >= MIN_ARTICLE_CHARS) {
         return text;
       }
     }
@@ -1343,7 +1357,7 @@ async function fetchInstagramHtml(url: string) {
 }
 
 type InstagramEmbed =
-  | { status: "ok"; html: string }
+  | { status: "ok"; html: string; truncated?: true }
   | { status: "missing" }
   | { status: "transient"; errorCategory: string };
 
@@ -1370,6 +1384,7 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     return {
       status: "ok",
       html: decodeWithContentType(result.bytes, result.contentType),
+      ...(result.truncated ? { truncated: true as const } : {}),
     };
   }
   return isTransientFetchFailure(result.code, result.status)
@@ -1448,6 +1463,9 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...(page.truncated || (embed.status === "ok" && embed.truncated)
+      ? { truncated: true as const }
+      : {}),
     ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
@@ -1589,6 +1607,25 @@ const PAGE_FETCH_OPTIONS = {
 } as const;
 
 /**
+ * The recipe a page declares in its own schema.org markup, or undefined when
+ * it declares none.
+ *
+ * A read cut off at `maxBytes` yields nothing, because a cut document still
+ * parses. Microdata's ingredient and step lists simply stop early, and a recipe
+ * whose method stops after step 1 reads exactly like a recipe with one step —
+ * `sanitizeRecipe` checks that the lists are non-empty and within budget, which
+ * a prefix satisfies. JSON-LD survives a cut only by accident, since
+ * `JSON.parse` rejects a half-written object, so the guard belongs here where
+ * both markup shapes pass through rather than inside the extractor.
+ */
+function recipeFromMarkup(
+  html: string,
+  truncated: true | undefined,
+): Recipe | undefined {
+  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
+}
+
+/**
  * A caption source (TikTok, X) carries only a caption, and the caption often
  * links to the full recipe write-up. Follow that one link and read its
  * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
@@ -1608,10 +1645,9 @@ async function withLinkedRecipe(page: PageData): Promise<PageData> {
     if (!result.ok) {
       return page;
     }
-    const recipe = sanitizeRecipe(
-      extractRecipeMarkup(
-        decodeWithContentType(result.bytes, result.contentType),
-      ),
+    const recipe = recipeFromMarkup(
+      decodeWithContentType(result.bytes, result.contentType),
+      result.truncated,
     );
     return recipe === undefined ? page : { ...page, recipe };
   } catch {
@@ -1676,7 +1712,7 @@ async function fetchPage(url: string): Promise<PageData> {
   const content = extractBodyText(html, finalUrl);
   // The page's own schema.org Recipe markup is the recipe: exact lines, no
   // prompt window, nothing invented. Absent for anything not a recipe.
-  const recipe = sanitizeRecipe(extractRecipeMarkup(html));
+  const recipe = recipeFromMarkup(html, result.truncated);
 
   return {
     title,
@@ -1685,6 +1721,9 @@ async function fetchPage(url: string): Promise<PageData> {
     heroAspectRatio,
     siteName,
     content,
+    // A page over the fetch cap gives us a prefix, so `content` ends early
+    // however long it looks.
+    ...(result.truncated ? { truncated: true as const } : {}),
     ...(recipe ? { recipe } : {}),
   };
 }
