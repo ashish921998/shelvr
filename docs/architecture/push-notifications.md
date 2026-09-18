@@ -66,12 +66,56 @@ The workflow is manual and checks both backend URLs plus the Firebase file for
 Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
-CI computes the fingerprint of every pull request and of its base branch in one
-environment (`tools/verify-native-fingerprint.mjs`) and fails the check when
-they differ, listing each source that moved. A commit in the range carrying the
-`Native-Fingerprint: changed` trailer acknowledges the move. Treat that trailer
-as a release note: the next update needs a store build first. The same
-comparison runs locally with `pnpm run verify:fingerprint origin/main HEAD`.
+### Two layers guard OTA compatibility
+
+**On a pull request, an early warning.** CI computes the fingerprint of the
+branch and of its base in one environment (`tools/verify-native-fingerprint.mjs
+--warn-only`) and lists each source that moved. It never fails the check. A
+native change is a legitimate thing to merge, and merging it harms nobody. A
+commit in the range carrying the `Native-Fingerprint: changed` trailer
+acknowledges the move and quiets the warning. Treat the warning as a release
+note: the next update needs a store build first. The same comparison runs
+locally with `pnpm run verify:fingerprint origin/main HEAD`.
+
+**At publish time, the enforcing gate.** The `before_update` hook in
+`native-update.yml` runs `tools/verify-ota-compatibility.mjs --profile <profile>
+--platform <platform>`, which compares the fingerprint the publish is about to
+be stamped with against `apps/native/released-builds.json`, the registry of
+builds users actually have. Anything but a match blocks the publish: a moved
+fingerprint, a profile or platform with no recorded release, or a fingerprint
+the toolchain could not compute. It runs inside the publishing job so the
+environment it fingerprints in is the one the update is stamped with, which a
+separate job would have to be kept identical to by hand.
+
+A blocked publish is not a problem to work around. When the fingerprints
+differ, **no update can reach the released binary at all**. Its runtime version
+is fixed at build time and an OTA only reaches installs whose runtime version
+matches exactly. Users on that binary stay where they are until they upgrade
+through the store, so the answer is a new store build, not a retry.
+
+### Recording a release
+
+`apps/native/released-builds.json` holds one entry per build profile and
+platform, or `null` when no release has been recorded. It starts null for every
+profile but `production`, because the newest successful EAS build is not
+evidence that anyone has it installed. The gate blocks until a maintainer
+records a real release, which is the intended behaviour.
+
+After a build reaches users, read the fingerprint it runs and record it:
+
+```sh
+cd apps/native
+npx eas-cli@24.6.0 fingerprint:compare --build-id <build-id> \
+  --environment <environment> --json
+```
+
+`<environment>` is the profile's environment from the table above. The output
+is `{fingerprint1, fingerprint2}`, where `fingerprint1.hash` is the
+build's and `fingerprint2.hash` is the local project's. Take `fingerprint1.hash`.
+Note that the command **exits 0 even when the two differ**, so read the hashes
+rather than the exit code. Then set `buildId`, `fingerprint`, and a `release`
+string naming the version, build number, store, and release date, so a later
+blocked publish says which binary it is blocked by.
 
 ## Device verification before release
 
