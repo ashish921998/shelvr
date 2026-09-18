@@ -16,6 +16,9 @@ same kind of claim and are labelled throughout:
 - **Verified** — checked against this repository, or against the installed
   package's own types and source. Cited where it matters.
 - **Platform constraint** — imposed by Apple, Google or Expo. Not negotiable.
+- **User feedback** — something a real user actually told us. Stronger than a
+  hypothesis and weaker than a measurement: people describe what they want far
+  more accurately than they predict what they will do.
 - **Hypothesis** — a belief about user behaviour that we have no data for
   yet. Every one of these is something the first release should measure, and
   none of them should be treated as settled.
@@ -213,11 +216,11 @@ here.
 
 ### Three buckets, one headline
 
-| Bucket                                                        | Who initiates         | Default | Ceiling                                             |
-| ------------------------------------------------------------- | --------------------- | ------- | --------------------------------------------------- |
-| **Unrequested** — `weekly_shelf`, `quiet_week`, `resurfacing` | Shelvr                | On      | **2 per 7 days, ≤1 per day**                        |
-| **Lifecycle** — `trial_ending`                                | A billing fact        | On      | **1 per trial**, ≤2 per account lifetime            |
-| **User-requested** — `nearby_place`, `intercept`              | The user turned it on | **Off** | Combined **≤1 per day**, user-settable down to zero |
+| Bucket                                                           | Who initiates         | Default | Ceiling                                             |
+| ---------------------------------------------------------------- | --------------------- | ------- | --------------------------------------------------- |
+| **Unrequested** — `weekly_shelf`, `quiet_week`, `resurfacing`    | Shelvr                | On      | **2 per 7 days, ≤1 per day**                        |
+| **Lifecycle** — `trial_ending`                                   | A billing fact        | On      | **1 per trial**, ≤2 per account lifetime            |
+| **User-requested** — `reading_time`, `nearby_place`, `intercept` | The user turned it on | **Off** | Combined **≤1 per day**, user-settable down to zero |
 
 > **A user who changes nothing receives at most two notifications a week, plus
 > at most one notification per trial.**
@@ -409,6 +412,28 @@ work, not a free signal.
 > **Your trial ends tomorrow**
 > _You saved 34 things in 7 days._
 
+### 5. `reading_time` — new, opt-in, off by default
+
+The rung-one answer to [Interrupting a scroll](#interrupting-a-scroll).
+
+- **Trigger** a time of day the user picks, on the days they pick.
+- **Condition** at least one unopened `ready` link that has an extracted
+  article body. Prefers shorter reads.
+- **Payload** the item's title and an estimated reading time.
+- **Lands on** `/item/{id}`.
+- **Silent when** nothing unopened qualifies. It never substitutes a photo or
+  a recipe for a nudge the user asked to be about reading.
+- **Bucket** user-requested. Off by default; counts against the combined
+  one-per-day requested cap.
+
+> **Something you saved**
+> _"How to read a balance sheet" — about 4 minutes._
+
+The reading estimate is computed, not guessed: `items.content` already holds
+the extracted article body, so a word count over a fixed words-per-minute rate
+is an observable number. Items without a body have no estimate and are not
+used for this kind.
+
 ### Not in the push catalogue
 
 **`space_suggestions` — cut.** The previous draft ranked it second, above
@@ -431,6 +456,75 @@ competes for the same two slots.
 | Save-failed push                      | Not selected this round. A terminal share-sheet failure while backgrounded is invisible, which is a real trust gap — better solved in-app |
 | Event reminders from `add_event`      | `intents[].value` holds a title only, no date                                                                                             |
 | Standing badge count                  | An unrepayable claim on attention                                                                                                         |
+
+## Interrupting a scroll
+
+**User feedback.** A user asked for exactly this: while scrolling Instagram or
+TikTok, a nudge to go read something they had saved. This is the first real
+user evidence in the document and it raises the idea's priority. It changes
+none of the constraints, and it is a stated preference — worth acting on,
+not worth treating as proven demand.
+
+The need underneath the request is not "detect TikTok". It is _"I am spending
+time on my phone in a way I don't endorse, and I would rather be doing the
+thing I chose. Interrupt me."_ That need can be served three ways at wildly
+different cost. Build them in order and let each one decide whether the next
+is justified.
+
+### Rung 1 — let the user set the time
+
+A switch — **"Nudge me to read something I saved"** — and a time they pick. A
+scheduled push naming one unopened article with its reading time. This is the
+`reading_time` kind above.
+
+- Ships in R2. No new permission, no Apple approval, no native build.
+- Days of work, not months.
+- Answers the question we most need answered: **does anyone actually want to
+  be interrupted?** How many switch it on, how many open it, how many still
+  have it on after four weeks.
+
+Rung 1 is a proxy and the gap is real: a nudge at 9pm arrives whether you are
+scrolling or cooking. It cannot test whether catching someone mid-scroll
+converts better than catching them at a fixed time. It can test whether the
+appetite exists at all, which is the more expensive thing to be wrong about.
+
+### Rung 2 — guess the time
+
+Replace the user-picked hour with their own habitual open hour (R3). Same
+mechanism, better aim, still no detection.
+
+### Rung 3 — actually detect it
+
+Screen Time: the precise version, and the only one that arrives while the user
+is genuinely in the failure mode. Scoped in the
+[Appendix](#screen-time-interception).
+
+### The decision rule
+
+Rung 3 costs an Apple entitlement, a new binary and an app extension, and is
+iOS only. Gate it on rung 1:
+
+- **Low opt-in** — few switch it on, or most switch it off within a month. The
+  appetite is not there and rung 3 is not justified, whatever one user said.
+- **Healthy opt-in, poor opens** — people want the idea and the fixed time is
+  wrong. That is precisely what rung 3 fixes, and it is justified.
+- **Healthy on both** — rung 3 is an optimisation rather than a rescue. Worth
+  doing, lower urgency.
+
+**Start the Apple entitlement request now, in parallel with R1.** It is
+paperwork rather than engineering, it is free, approval takes weeks, and it can
+be refused. Running it alongside rung 1 means a good rung-1 result is not
+followed by a two-month wait, and a refusal tells us early at no cost.
+
+### What the feedback says about the copy
+
+The user said _"read the article you saved"_ — an article, not a photo or a
+recipe. Two consequences that carry into every rung:
+
+- **Prefer readable items.** Links with an extracted article body, not images.
+- **Lead with the bound.** "About 4 minutes" is what makes the alternative to
+  an infinite feed feel finite. **Hypothesis**, and the one most worth testing
+  here.
 
 ## Permission
 
@@ -659,6 +753,11 @@ item, because their titles are guesses.
 notification-useful return, split by arm and by authorization type, on a
 matured cohort.
 
+**Running alongside, not blocking:** file the Apple `FamilyControls`
+entitlement request. Paperwork, not engineering; weeks of waiting; may be
+refused. Starting it now is what stops a good rung-one result in R2 from
+stalling for two months.
+
 ### R2 — Budget, controls, and one experiment
 
 - Outbox generalisation, with the migration sequence above.
@@ -668,6 +767,8 @@ matured cohort.
 - `quiet_week`.
 - **One** deterministic `resurfacing` experiment, holdout-controlled, on a
   fixed schedule — no habitual-hour timing yet.
+- `reading_time` — rung one of [Interrupting a scroll](#interrupting-a-scroll).
+  Opt-in, user-scheduled, off by default.
 
 **Exit:** the notified arm beats the holdout on useful returns per user per
 week, for at least one kind. If it does not, stop and reconsider rather than
@@ -683,10 +784,15 @@ proceeding.
 ### Later, separate projects
 
 Geofencing and Screen Time interception are scoped in the
-[Appendix](#appendix-two-later-projects). Neither belongs in this plan: both
-need new native binaries, new permissions and store declarations, and both
-should be evaluated only once R1 has established that Shelvr's notifications
-create value at all.
+[Appendix](#appendix-two-later-projects). Both need new native binaries, new
+permissions and store declarations, so neither ships inside R1–R3.
+
+They are no longer equally speculative, though. **Geofencing has no user
+asking for it** and rests on data we would first have to create by geocoding
+`open_maps` intents. **Screen Time has a user asking for it**, and a cheap
+in-plan experiment — `reading_time` in R2 — that decides whether to build it.
+Treat geofencing as research and Screen Time as gated work whose entitlement
+paperwork is already moving.
 
 Each release respects the deploy order in `CLAUDE.md`: the Convex deploy lands
 before the client update that needs it, public shapes expand before clients
@@ -695,8 +801,9 @@ calling it.
 
 ## Appendix: two later projects
 
-Research retained because it is load-bearing for scoping, not because either
-is scheduled.
+Research retained because it is load-bearing for scoping. Geofencing is not
+scheduled. Screen Time is gated on the rung-one result in R2 — see
+[The decision rule](#the-decision-rule).
 
 ### Places and geofencing
 
@@ -733,6 +840,10 @@ Not "and never went" — an unopened save is not evidence of a missed visit.
 
 ### Screen Time interception
 
+**Status:** wanted by a user, gated on `reading_time`'s opt-in and open rates
+in R2, entitlement request filed during R1. Not scheduled until the gate
+passes.
+
 Apple's `FamilyControls` / `DeviceActivity` / `ManagedSettings` stack.
 `react-native-device-activity` (0.6.1, February 2026, peer `expo >= 52`) wraps
 it with `requestAuthorization`, `DeviceActivitySelectionView`,
@@ -748,7 +859,8 @@ Four constraints that shape any estimate:
 - **The extension has no network and no JS runtime.** It cannot choose an item
   when it fires, so the app must pre-stage a candidate into the shared App
   Group container on every foreground. A stale or empty interruption is worse
-  than none.
+  than none. The candidate follows the same rule as `reading_time`: a readable
+  article with a computed reading time, never a photo.
 - **No Android equivalent.** `UsageStatsManager` needs the special
   `PACKAGE_USAGE_STATS` grant, which Play restricts to apps whose core purpose
   is usage management.
@@ -784,3 +896,8 @@ makes it an alternative.
    whether a lapsed user still gets `resurfacing` for saves they already own —
    plausibly the best win-back, plausibly a nag at someone who stopped paying.
 5. **Geocoding provider terms.** Blocks the places project, not this plan.
+6. **How widely is the interruption wanted?** One user asked for it. Before R2
+   is scoped it is worth asking a handful more, and worth asking specifically
+   whether they would keep it on after a fortnight — the failure mode for this
+   feature is enthusiastic adoption followed by quiet disabling, which looks
+   like success for the first two weeks.
