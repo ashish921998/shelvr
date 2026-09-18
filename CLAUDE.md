@@ -275,9 +275,9 @@ needed at runtime by the features that use them:
   workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
   compares the fingerprint the update is about to carry against
   `apps/native/released-builds.json` and blocks the publish on anything but a match,
-  including a profile or platform with no recorded release. A blocked publish means no
-  update can reach that binary at all, so the fix is a store build, and recording the
-  release afterwards. See
+  including a profile or platform with no recorded release. A blocked publish means
+  nothing published from this tree reaches the recorded binary, so the usual fix is a
+  store build, and recording the release afterwards. See
   [push notification builds and updates](docs/architecture/push-notifications.md).
 - Adding a field to a table is a one-way door once rows carry it. Convex validates
   every existing document against the new schema on deploy, and a table validator

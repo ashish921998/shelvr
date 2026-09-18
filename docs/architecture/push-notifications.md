@@ -88,12 +88,15 @@ environment it fingerprints in is the one the update is stamped with, which a
 separate job would have to be kept identical to by hand.
 
 A blocked publish is not a problem to work around. When the fingerprints
-differ, **no update can reach the released binary at all**. Its runtime version
-is fixed at build time and an OTA only reaches installs whose runtime version
-matches exactly. Users on that binary stay where they are until they upgrade
-through the store, so the answer is a new store build, not a retry. A mismatch
-has one other cause worth ruling out first: a store build may already have
-shipped and nobody recorded it. Check the registry before building again.
+differ, **nothing published from this tree reaches the recorded binary**. Its
+runtime version is fixed at build time and an OTA only reaches installs whose
+runtime version matches exactly. The usual answer is a new store build, and
+people on the recorded binary stay where they are until they take it. A
+mismatch has one other cause worth ruling out first. A store build may already
+have shipped and nobody recorded it, so check the registry before building
+again. Reaching people still on the recorded build without a store build is
+possible, but only by publishing from a tree that fingerprints to it, which the
+limits below cover.
 
 The gate only runs inside `native-update.yml`, so that workflow is the only
 sanctioned way to publish. An `eas update` from a laptop bypasses the check

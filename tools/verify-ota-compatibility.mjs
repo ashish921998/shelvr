@@ -153,10 +153,10 @@ const STATUS_DETAIL = {
     ...field("this tree is", result.localFingerprint),
     ...field(
       "next step",
-      `Ship a new store build for ${result.platform}. No update can reach the`,
-      "released binary, so users on it stay where they are until they",
-      "upgrade through the store. If one is already out, record it in",
-      `${BASELINE_PATH} instead.`,
+      `Ship a new store build for ${result.platform}. Nothing published from`,
+      "this tree reaches the recorded binary, so people on it stay",
+      "where they are until they take a store build. If a newer one",
+      `is already out, record it in ${BASELINE_PATH} instead.`,
     ),
   ],
   "missing-baseline": (result) => [
