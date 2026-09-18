@@ -156,6 +156,22 @@ jobs:
           --wait
           ${{ inputs.submit && (inputs.profile == 'internal-test' && '--auto-submit-with-profile production' || '--auto-submit') || '' }}
 
+      # The update carries this tree's fingerprint and a binary only accepts
+      # one that matches its own, so a publish that moves it reaches nobody and
+      # still reports success. env:exec runs the check under the same
+      # environment the publish resolves, which matters: without it
+      # GOOGLE_MAPS_API_KEY is absent and the Android hash is not the one the
+      # update gets stamped with. APP_VARIANT is set here for the same reason.
+      - name: Verify the update can reach the released build
+        if: inputs.mode == 'ota'
+        working-directory: apps/native
+        env:
+          APP_VARIANT: production
+        run: >-
+          eas env:exec production
+          "node ../../tools/verify-ota-compatibility.mjs
+          --profile production --platform all"
+
       - name: Publish production OTA
         if: inputs.mode == 'ota'
         working-directory: apps/native
