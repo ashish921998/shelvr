@@ -273,6 +273,9 @@ export default function SpaceScreen() {
                 mark: saveMark(item),
                 aspectRatio: item.aspectRatio,
                 accessibilityLabel: item.title ?? item.note,
+                testID: item.fixtureKey
+                  ? `fixture-item-${item.fixtureKey}`
+                  : undefined,
                 onPress: () =>
                   router.push({
                     pathname: "/item/[id]",

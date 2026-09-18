@@ -1,0 +1,18 @@
+# Signs in as the development anonymous user, unless the app already is.
+#
+# Development build only: the button renders when __DEV__ and
+# EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true, and the Convex deployment must also
+# have AUTH_ENABLE_ANONYMOUS="true" or the provider rejects the request.
+appId: app.shelvr.save.dev
+---
+- runFlow:
+    # A signed-in launch goes straight to Home, so the button is absent.
+    when:
+      visible: "Continue without account"
+    commands:
+      - tapOn: "Continue without account"
+      # The first authenticated render waits on Convex; the wordmark on Home is
+      # the signal that the session is live.
+      - assertVisible:
+          text: "shelvr"
+          timeout: 30000
