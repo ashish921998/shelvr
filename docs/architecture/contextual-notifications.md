@@ -4,8 +4,67 @@ What Shelvr sends, when it sends it, and how it is built.
 [Push notification builds and updates](push-notifications.md) stays the
 reference for credentials, EAS profiles and OTA fingerprints.
 
-Status: specification under review. Only the weekly shelf described in
-[What exists today](#what-exists-today) is implemented.
+Status: V1 scoped below. Everything under [Beyond V1](#beyond-v1) is parked
+research, not a plan of record.
+
+## V1
+
+**One notification — the one that already exists — made specific, and
+measured.** That is the whole of V1.
+
+### What changes
+
+1. **The Sunday notification names a save instead of counting them.**
+   Before: _3 saves waiting for you._
+   After: _"The 12-hour short rib" and 2 more you saved this week._
+2. **Four events, so we can see what happens:** permission result, sent,
+   opened, turned off.
+
+### What does not change
+
+The Sunday 09:00 local schedule, the three-unopened-saves floor, the digest
+screen, the single on/off switch, and the whole delivery machine. All of it
+already works and none of it is touched.
+
+### What we learn
+
+Two numbers: **do people open it, and do they turn it off?** Those decide
+everything else.
+
+### Why this small
+
+Shelvr exists because people save things and forget them. The notification is
+where the product either delivers on that or does not, and right now nobody
+knows which, because nothing measures it.
+
+Everything below this section is a way to send _better_ notifications. None of
+it is worth building before we know whether anyone opens a notification from
+Shelvr at all. That is one number, and V1 is the cheapest way to get it.
+
+### Explicitly not in V1
+
+Every other notification kind, the budget arbiter, per-kind switches, the
+outbox rewrite, holdout groups, rich images, geofencing, Screen Time. Parked
+below; none of it blocks V1.
+
+V1 is days of work. No new permission, no new native build, no change to any
+public function's shape.
+
+### Decisions taken
+
+- **Lapsed users keep getting it.** Someone whose subscription ended can still
+  read what they already saved. A reminder about their own save is the most
+  honest reason to come back, and the paywall is already there when they
+  arrive.
+- **File the Apple Screen Time request now.** Paperwork rather than
+  engineering, weeks of waiting, refusable, and free if we never build the
+  feature. Starting it now costs nothing and removes a two-month stall later.
+- **If V1 shows people do not open it, stop here.** Do not iterate on copy
+  indefinitely. The weekly shelf is the floor, not the opening move of a
+  campaign. Deciding this before seeing the number is the point.
+- **Holdout groups wait.** V1 asks "does anyone open this", which needs no
+  control group. A holdout is how you decide whether to _add_ kinds, and that
+  is V2's question. When it comes: 10% per kind, 8 weeks, then rotate in.
 
 ## Evidence status
 
@@ -28,7 +87,13 @@ system built to be humane is evaluated with a metric that cannot see whether
 it worked. [Measurement](#measurement) is therefore the first section that
 matters and the first phase that ships.
 
-## The decision in one paragraph
+## Beyond V1
+
+Everything from here on is parked. It is the research behind the V1 choice and
+the shape a later version might take — useful for deciding what comes next, and
+not a commitment to build any of it. Read it when V1's two numbers are in.
+
+## The long-run shape
 
 By default Shelvr sends **at most two notifications a week**, arbitrated
 server-side, with every one of them naming a specific thing the user saved.
@@ -937,20 +1002,14 @@ makes it an alternative.
 1. **Attribution undercount.** Lineage attribution will miss users who return
    later by another route. Size it in R1 by comparing against a time-window
    measure reported alongside, and report both.
-2. **Holdout ethics and size.** 10% per kind, stable per user. Long-running
-   holdouts on a paid product need a defensible cap — decide how long a user
-   may sit in one.
-3. **Does `resurfacing` need the model?** The scorer is deterministic and uses
+2. **Does `resurfacing` need the model?** The scorer is deterministic and uses
    existing fields. A `gemini-3.1-flash-lite` pass might pick better at a
    per-user-per-week cost. Ship deterministic, measure, then decide.
-4. **Non-Pro users.** Every save is gated on `requireProEntitlement`. Decide
-   whether a lapsed user still gets `resurfacing` for saves they already own —
-   plausibly the best win-back, plausibly a nag at someone who stopped paying.
-5. **Geocoding provider terms.** Blocks the places project, not this plan.
-6. **Does Shelvr ever send content the user did not save?** See
+3. **Geocoding provider terms.** Blocks the places project, not this plan.
+4. **Does Shelvr ever send content the user did not save?** See
    [The empty shelf](#the-empty-shelf). The largest open question here, because
    it decides what the product is rather than how it notifies.
-7. **How widely is the interruption wanted?** One user asked for it. Before R2
+5. **How widely is the interruption wanted?** One user asked for it. Before R2
    is scoped it is worth asking a handful more, and worth asking specifically
    whether they would keep it on after a fortnight — the failure mode for this
    feature is enthusiastic adoption followed by quiet disabling, which looks
