@@ -502,5 +502,11 @@
   "demo.shareOthers": "Or share one of these",
   "demo.pasteOwn": "Or paste your own link",
   "demo.pickShelvr": "That went to another app. Tap Share again and pick Shelvr.",
-  "demo.shareThis": "Share this post"
+  "demo.shareThis": "Share this post",
+  "home.headline": {
+    "one": "%{formattedCount} thing waiting.",
+    "other": "%{formattedCount} things waiting."
+  },
+  "home.sectionNew": "New this week",
+  "home.sectionEarlier": "Earlier"
 }

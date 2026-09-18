@@ -517,5 +517,12 @@
   "demo.shareOthers": "Ou compartilhe um destes",
   "demo.pasteOwn": "Ou cole seu próprio link",
   "demo.pickShelvr": "Isso foi para outro app. Toque em Compartilhar de novo e escolha Shelvr.",
-  "demo.shareThis": "Compartilhar este post"
+  "demo.shareThis": "Compartilhar este post",
+  "home.headline": {
+    "one": "%{formattedCount} coisa esperando.",
+    "many": "%{formattedCount} coisas esperando.",
+    "other": "%{formattedCount} coisas esperando."
+  },
+  "home.sectionNew": "Novo esta semana",
+  "home.sectionEarlier": "Antes"
 }

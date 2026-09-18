@@ -459,6 +459,9 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "home.headline": { count: number };
+  "home.sectionNew": undefined;
+  "home.sectionEarlier": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

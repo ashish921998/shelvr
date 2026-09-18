@@ -2,30 +2,56 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { SaveHowTo } from "@/components/home/save-how-to";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
-import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { ShelfRow, type ShelfCard } from "@/components/shelf/shelf-row";
+import { Display, Eyebrow, Gutter } from "@/components/shelf/typography";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { Wordmark } from "@/components/wordmark";
 import { useCurrentUser } from "@/lib/current-user";
+import { usePaywallGuard } from "@/lib/entitlement";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
+import { groupIntoShelves, type ShelfSection } from "@/lib/home-shelves";
+import { saveMark } from "@/lib/ink/save-mark";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import {
   useBusySaving,
   useFeedbackInvitation,
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
-import { ProgressiveBlurHeader } from "progressive-blur";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { ScrollView, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import type { PropKind } from "@/lib/ink/strokes";
+
+const SECTION_LABEL: Record<
+  ShelfSection,
+  "home.sectionNew" | "home.sectionEarlier"
+> = {
+  new: "home.sectionNew",
+  earlier: "home.sectionEarlier",
+};
+
+/** At most one prop per shelf, and a different one per row so a screen of
+ * shelves does not repeat itself. */
+const SHELF_PROPS: readonly PropKind[] = ["mug", "plant"];
 
 export default function HomeScreen() {
   useAppLocale();
-  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const { items, loadMore, canLoadMore } = useHomeFeed();
   useReviewPrompt(items);
+
+  // One clock for the screen: the hairline, the shelves and every mark on
+  // them draw from it, so the page reads as one hand working down it.
+  const clock = useInkClock();
 
   const cancelSurvey = useCancelSurvey();
   // The cancel survey owns the Home moment when visible; defer the feedback
@@ -35,14 +61,44 @@ export default function HomeScreen() {
   });
   const busySaving = useBusySaving(items);
   const { data: user } = useCurrentUser();
+  const { guard, loading: entitlementLoading } = usePaywallGuard("home");
+
   // The share screen records the first save while Home stays mounted below
   // it, so re-read the flag on focus.
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
 
-  // One element, two slots (empty feed and feed header) — the survey claims
-  // the Home moment when both prompts are eligible.
+  // Read once per mount: the week boundary must not move under the user
+  // mid-scroll, and a shelf's name would otherwise change as they read it.
+  const [openedAt] = useState(() => Date.now());
+  const shelves = useMemo(
+    () => groupIntoShelves(items ?? [], openedAt),
+    [items, openedAt],
+  );
+
+  const header = (
+    <ScreenHeader
+      clock={clock}
+      center={<Wordmark size={26} />}
+      left={
+        <HeaderIconButton
+          icon="person.fill"
+          label={t("navigation.profile")}
+          onPress={() => router.push("/profile")}
+        />
+      }
+      right={
+        <HeaderIconButton
+          icon="plus"
+          label={t("capture.add")}
+          disabled={entitlementLoading}
+          onPress={() => void guard(() => router.push("/add"))}
+        />
+      }
+    />
+  );
+
   const cancelSurveyCard = cancelSurvey.visible ? (
     <CancelSurveyCard
       onPresented={cancelSurvey.presented}
@@ -54,7 +110,12 @@ export default function HomeScreen() {
   ) : null;
 
   if (items === undefined) {
-    return <ScreenLoader label={t("loading.home")} />;
+    return (
+      <View style={styles.container}>
+        {header}
+        <ScreenLoader label={t("loading.home")} />
+      </View>
+    );
   }
 
   const showHowTo = shouldShowHowTo({
@@ -68,11 +129,9 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
+        {header}
         {showHowTo ? (
-          <ScrollView
-            contentInsetAdjustmentBehavior="automatic"
-            contentContainerStyle={styles.howToOnly}
-          >
+          <ScrollView contentContainerStyle={styles.howToOnly}>
             <SaveHowTo />
           </ScrollView>
         ) : (
@@ -81,43 +140,65 @@ export default function HomeScreen() {
             message={t("home.emptyBody")}
           />
         )}
-        {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
         {nudge}
       </View>
     );
   }
 
-  const howToHeader = showHowTo ? (
-    <View style={styles.howToHeader}>
-      <SaveHowTo />
-      <Text style={styles.shelfLabel}>{t("home.onYourShelf")}</Text>
-    </View>
-  ) : null;
-
   return (
     <View style={styles.container}>
-      <MasonryFeed
-        items={items}
-        numColumns={2}
-        source={{ from: "home" }}
-        onEndReached={canLoadMore ? loadMore : undefined}
-        loadingMore={loadingMore}
-        // Inside the feed so contentInsetAdjustmentBehavior clears the blur
-        // header on iOS and the invitation scrolls with the content. The
-        // cancel survey claims the slot when both are eligible.
-        ListHeaderComponent={
-          cancelSurveyCard ??
-          howToHeader ??
-          (feedback.invitationVisible && !busySaving ? (
+      {header}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        onMomentumScrollEnd={canLoadMore ? () => loadMore() : undefined}
+      >
+        <Gutter style={styles.headline}>
+          <Display>{t("home.headline", { count: items.length })}</Display>
+        </Gutter>
+
+        {cancelSurveyCard ??
+          (showHowTo ? (
+            <Gutter style={styles.howToHeader}>
+              <SaveHowTo />
+            </Gutter>
+          ) : feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
               onSendFeedback={feedback.openFeedbackFromInvitation}
               onDismiss={feedback.dismissInvitation}
             />
-          ) : undefined)
-        }
-      />
-      <ProgressiveBlurHeader />
+          ) : null)}
+
+        {shelves.map((shelf, index) => (
+          <View key={shelf.section} style={styles.shelf}>
+            <Gutter>
+              <Eyebrow>{`${t(SECTION_LABEL[shelf.section])} · ${shelf.items.length}`}</Eyebrow>
+            </Gutter>
+            <ShelfRow
+              width={width}
+              clock={clock}
+              seed={index}
+              prop={SHELF_PROPS[index % SHELF_PROPS.length]}
+              testID={`shelf-${shelf.section}`}
+              cards={shelf.items.map<ShelfCard>((item) => ({
+                key: item._id,
+                imageUrl: item.imageUrl ?? item.heroImageUrl,
+                title: item.title ?? item.note,
+                note: item.type === "note",
+                mark: saveMark(item),
+                aspectRatio: item.aspectRatio,
+                accessibilityLabel: item.title ?? item.note,
+                onPress: () =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item._id, from: "home" },
+                  }),
+              }))}
+            />
+          </View>
+        ))}
+      </ScrollView>
       {nudge}
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
@@ -127,22 +208,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-  },
-  howToOnly: {
-    padding: theme.gap(2),
-  },
-  howToHeader: {
-    gap: theme.gap(2.5),
-    paddingHorizontal: theme.gap(2),
-    paddingBottom: theme.gap(1.5),
-  },
-  shelfLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  content: { paddingBottom: 24 },
+  headline: { paddingTop: 20, paddingBottom: 24 },
+  howToOnly: { padding: theme.gap(2) },
+  howToHeader: { paddingBottom: theme.gap(2) },
+  // Shelf rows sit 14 apart.
+  shelf: { marginBottom: 14, gap: 8 },
 }));

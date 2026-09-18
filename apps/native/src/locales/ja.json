@@ -487,5 +487,10 @@
   "demo.shareOthers": "またはこちらを共有",
   "demo.pasteOwn": "または自分のリンクを貼り付け",
   "demo.pickShelvr": "別のアプリに送られました。もう一度共有をタップしてShelvrを選んでください。",
-  "demo.shareThis": "この投稿を共有"
+  "demo.shareThis": "この投稿を共有",
+  "home.headline": {
+    "other": "%{formattedCount}件が棚で待っています。"
+  },
+  "home.sectionNew": "今週の新着",
+  "home.sectionEarlier": "それ以前"
 }
