@@ -244,3 +244,65 @@ test("changing a query to a mutation is a change", () => {
   assert.deepEqual(diff.changed, ["items:listItems"]);
   assert.equal(isBreaking(diff), true);
 });
+
+test("a validator re-exported under a different name is still followed", () => {
+  const leaf = (extra) => `
+import { v } from "convex/values";
+export const tagValidator = v.object({ name: v.string()${extra} });
+`;
+  const relay = `
+import { tagValidator } from "./model/tags";
+export { tagValidator as publicTag };
+`;
+  const api = `
+import { v } from "convex/values";
+import { query } from "./_generated/server";
+import { publicTag } from "./tags";
+
+export const listTags = query({
+  args: {},
+  returns: v.array(publicTag),
+  handler: async () => [],
+});
+`;
+  const build = (extra) =>
+    signatures(tree({ "model/tags": leaf(extra), tags: relay, api }));
+  const diff = diffSignatures(build(""), build(", color: v.string()"));
+  assert.deepEqual(diff.changed, ["api:listTags"]);
+});
+
+test("a function exported under a different name is that name's contract", () => {
+  const head = tree({
+    "model/items": shared,
+    items: `${items}
+const pinItem = mutation({
+  args: { itemId: v.id("items") },
+  returns: v.null(),
+  handler: async () => null,
+});
+export { pinItem as favouriteItem };
+`,
+  });
+  const diff = diffSignatures(signatures(base), signatures(head));
+  assert.deepEqual(diff.added, ["items:favouriteItem"]);
+});
+
+// Whitespace between tokens is formatting. Whitespace inside a string is the
+// value, and the two must not be collapsed together.
+test("whitespace inside a literal is part of the contract", () => {
+  const withStatus = (status) => `
+import { v } from "convex/values";
+import { query } from "./_generated/server";
+
+export const listStates = query({
+  args: {},
+  returns: v.array(v.literal("${status}")),
+  handler: async () => [],
+});
+`;
+  const diff = diffSignatures(
+    signatures(tree({ api: withStatus("in  progress") })),
+    signatures(tree({ api: withStatus("in progress") })),
+  );
+  assert.deepEqual(diff.changed, ["api:listStates"]);
+});

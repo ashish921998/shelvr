@@ -176,6 +176,18 @@ function parseModule(path, source) {
     }
   }
 
+  // `export { x as y }` makes y the name every other module asks for, so the
+  // alias has to point at whatever x was, declared here or imported.
+  for (const [name, local] of exported) {
+    if (name === local) continue;
+    if (!declarations.has(name) && declarations.has(local)) {
+      declarations.set(name, declarations.get(local));
+    }
+    if (!imports.has(name) && imports.has(local)) {
+      imports.set(name, imports.get(local));
+    }
+  }
+
   // Dropping the `export` is how a function leaves the API with its body
   // untouched, which is a removal an installed app feels.
   const publics = new Map();
@@ -215,7 +227,12 @@ function referencedNames(node) {
   return names;
 }
 
-const normalize = (text) => text.replace(/\s+/g, " ").trim();
+// Formatting must not read as a contract change, and the value inside a string
+// must not read as formatting. Reprinting from the syntax tree gives one
+// canonical spelling per node while leaving every literal exactly as written.
+const printer = ts.createPrinter({ removeComments: true });
+const print = (node) =>
+  printer.printNode(ts.EmitHint.Unspecified, node, node.getSourceFile());
 
 /**
  * The text a public function's contract actually resolves to, including every
@@ -253,7 +270,7 @@ export function contractParts(modules, path, nodes) {
         const key = `${currentPath}#${name}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        parts.set(key, normalize(local.getText()));
+        parts.set(key, print(local));
         follow(currentPath, local);
         continue;
       }
@@ -262,12 +279,12 @@ export function contractParts(modules, path, nodes) {
       const key = `${imported.path}#${imported.name}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      parts.set(key, normalize(imported.declaration.getText()));
+      parts.set(key, print(imported.declaration));
       follow(imported.path, imported.declaration);
     }
   };
 
-  const own = nodes.map((node) => normalize(node.getText())).sort();
+  const own = nodes.map(print).sort();
   for (const node of nodes) follow(path, node);
   return [...own, ...[...parts].sort().map(([key, text]) => `${key} ${text}`)];
 }
