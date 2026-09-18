@@ -58,11 +58,14 @@ jobs:
         # leaves node a path that does not exist, so the publish still blocks.
         - name: Verify the update can reach the released build
           run: |
-            set -e
             root="$PWD"
             while [ ! -f "$root/tools/verify-ota-compatibility.mjs" ] && [ "$root" != "/" ]; do
               root="$(dirname "$root")"
             done
+            test -f "$root/tools/verify-ota-compatibility.mjs" || {
+              echo "No tools/verify-ota-compatibility.mjs at or above $PWD, so the update cannot be checked."
+              exit 1
+            }
             node "$root/tools/verify-ota-compatibility.mjs" \
               --profile "${{ inputs.profile }}" \
               --platform "${{ inputs.platform }}"

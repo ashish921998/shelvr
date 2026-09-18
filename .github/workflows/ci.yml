@@ -66,8 +66,10 @@ jobs:
         run: pnpm run coverage
 
   # An OTA update only reaches installs whose store build shares the native
-  # fingerprint, so a pull request that moves it is held until a commit in
-  # the range carries the "Native-Fingerprint: changed" trailer.
+  # fingerprint. This job reports a pull request that moves it and never fails,
+  # because merging a native change harms nobody; the OTA workflow's own gate
+  # refuses the publish. A commit carrying the "Native-Fingerprint: changed"
+  # trailer quiets the report.
   native-fingerprint:
     name: native fingerprint
     if: github.event_name == 'pull_request'
@@ -94,7 +96,11 @@ jobs:
       # needs no install of its own. --warn-only because a native change is a
       # legitimate thing to merge; the OTA workflow's own gate is what refuses
       # to publish an update no released binary can accept.
+      # continue-on-error covers the rest: --warn-only only softens the drift
+      # verdict, and an export or install flake inside the guard would still
+      # redden a pull request this job has no business failing.
       - name: Native fingerprint drift
+        continue-on-error: true
         env:
           BASE_REF: ${{ github.base_ref }}
           APP_VARIANT: production

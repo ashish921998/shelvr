@@ -108,6 +108,21 @@ test("a platform with no recorded release blocks and names the registry", async 
   assert.ok(report.includes("eas fingerprint:compare"), "names how to read it");
 });
 
+test("an entry with no usable hash has recorded nothing", async () => {
+  for (const entry of [{}, { buildId: "b" }, { fingerprint: "" }, "a-hash"]) {
+    const results = await checkCompatibility({
+      profile: "production",
+      platforms: ["ios"],
+      baselines: { production: { ios: entry } },
+      fingerprint: fingerprinter({ ios: RELEASED_IOS.fingerprint }),
+    });
+    assert.equal(results[0].status, "missing-baseline");
+    assert.equal(isBlocked(results), true);
+    // A mismatch would send a maintainer to ship a store build over a typo.
+    assert.doesNotMatch(formatReport(results), /new store build/);
+  }
+});
+
 test("an unrecognised profile blocks rather than passing unchecked", async () => {
   const results = await check("staging", ["ios"], { ios: "anyhash" });
   assert.equal(results[0].status, "missing-baseline");

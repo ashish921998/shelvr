@@ -15,27 +15,20 @@
  * produces against the fingerprint of the build users actually have, which
  * {@link BASELINE_FILE} records.
  *
- * The comparison runs inside the publishing job's own `before_update` hook
- * rather than in a separate `type: fingerprint` job. Expo's docs warn twice
- * that a separate job's `environment` and `env` must be kept identical to the
- * publishing job or the hashes diverge, and this workflow sets `APP_VARIANT`
- * and `ANDROID_BUILD_ARCHS` through `env:`. Running in-process makes the
- * environment identical by construction instead of by maintenance, needs no
- * authenticated CLI on the worker, and adds no second VM. That is why
- * {@link generateFingerprint} inherits the ambient environment untouched: on
- * the worker the ambient environment is the publishing job's own, which is what
- * the update will be stamped with.
+ * It runs inside the publishing job's own `before_update` hook rather than in
+ * a separate `type: fingerprint` job, because Expo's docs warn twice that such
+ * a job's `environment` and `env` must be kept identical to the publishing
+ * job's or the hashes diverge, and this workflow sets `APP_VARIANT` and
+ * `ANDROID_BUILD_ARCHS` through `env:`. So {@link generateFingerprint}
+ * inherits the ambient environment untouched: on the worker that environment
+ * is the publishing job's own. A local run therefore reads the shell it is run
+ * from, where `app.config.js` defaults `APP_VARIANT` to `development`, which is
+ * why the report ends by naming the variant it used.
  *
- * It follows that a local run reads the shell it is run from. `app.config.js`
- * defaults `APP_VARIANT` to `development`, so checking `--profile production`
- * from a shell that has not exported `APP_VARIANT=production` compares the
- * wrong variant. The report prints the variant it used so a mismatch cannot be
- * misread.
- *
- * Every failure mode blocks. An unreadable baseline file, an unresolvable
+ * Every failure mode blocks. An unreadable registry, an unresolvable
  * expo-updates CLI, a non-zero `fingerprint:generate`, and unparseable output
- * are all reported and exit 1, because none of them establishes that the update
- * can reach anyone.
+ * are all reported with their reason and exit 1, because none of them
+ * establishes that the update can reach anyone.
  *
  * Usage: node tools/verify-ota-compatibility.mjs --profile <profile> --platform <all|ios|android>
  */
@@ -78,6 +71,14 @@ function hashFailure(hash) {
   return `fingerprint:generate produced ${kind}, not a hash string`;
 }
 
+/** The verdict for one platform. Only the last line lets a publish through. */
+function statusFor({ reason, baseline, localFingerprint }) {
+  if (reason !== null) return "fingerprint-failed";
+  if (baseline === null) return "missing-baseline";
+  if (baseline.fingerprint !== localFingerprint) return "mismatch";
+  return "match";
+}
+
 /**
  * One record per platform, in the order given.
  *
@@ -94,7 +95,14 @@ export async function checkCompatibility({
 }) {
   return Promise.all(
     platforms.map(async (platform) => {
-      const baseline = baselineFor(baselines, profile, platform);
+      // An entry carrying no usable hash has recorded nothing. Calling that a
+      // mismatch would send a maintainer to ship a store build over a typo.
+      const recorded = baselineFor(baselines, profile, platform);
+      const baseline =
+        typeof recorded?.fingerprint === "string" && recorded.fingerprint !== ""
+          ? recorded
+          : null;
+
       let localFingerprint = null;
       let reason = null;
       try {
@@ -104,14 +112,8 @@ export async function checkCompatibility({
       } catch (error) {
         reason = error?.message ?? String(error);
       }
-      const status =
-        reason !== null
-          ? "fingerprint-failed"
-          : baseline === null
-            ? "missing-baseline"
-            : baseline.fingerprint === localFingerprint
-              ? "match"
-              : "mismatch";
+
+      const status = statusFor({ reason, baseline, localFingerprint });
       return { platform, profile, status, baseline, localFingerprint, reason };
     }),
   );
@@ -198,6 +200,16 @@ function firstLine(text) {
   return String(text).split("\n")[0].trim();
 }
 
+/** The last few meaningful lines, for an error whose detail is at the end. */
+function tail(text, lines = 3) {
+  return String(text)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .slice(-lines)
+    .join(" | ");
+}
+
 /**
  * The hash out of `fingerprint:generate` stdout.
  *
@@ -253,7 +265,7 @@ async function generateFingerprint(platform) {
       },
     );
   } catch (error) {
-    const stderr = firstLine(error.stderr ?? "");
+    const stderr = tail(error.stderr ?? "");
     throw new Error(
       `expo-updates fingerprint:generate --platform ${platform} failed: ` +
         `${firstLine(error.message)}${stderr === "" ? "" : ` (${stderr})`}`,
