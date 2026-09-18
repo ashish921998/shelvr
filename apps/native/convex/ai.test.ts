@@ -1421,6 +1421,39 @@ describe("linkEnrichment", () => {
       ).toBeUndefined();
     },
   );
+  it("does not turn a skip link into the article body", () => {
+    // The symptom this guards: a bot-hostile page yields only its skip link,
+    // the classifier describes that, and the reader shows "Skip to main
+    // content" as both the description and the whole body.
+    const content = extractBodyText(
+      '<html><head><title>Ultimate chocolate cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><a href="#content">Skip to content</a><div id="main"></div></body></html>',
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toBeUndefined();
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBe(
+      "no_article",
+    );
+  });
+
+  it("drops an extraction too thin to be a body", () => {
+    const content = extractBodyText(
+      "<html><head><title>Members only</title></head><body><article><p>Sign in to continue.</p></article></body></html>",
+      "https://example.com/paywalled",
+    );
+    expect(content).toBeUndefined();
+  });
+
+  it("keeps a skip link's own page body once the link is gone", () => {
+    const paragraph =
+      "The batter comes together in one bowl, which is the only reason this cake gets made on a weeknight at all. ";
+    const content = extractBodyText(
+      `<html><head><title>Cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><article id="main"><h1>Cake</h1><p>${paragraph.repeat(3)}</p></article></body></html>`,
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toContain("The batter comes together");
+    expect(content).not.toContain("Skip to main content");
+  });
+
   it("does not turn page chrome into an article body", () => {
     const content = extractBodyText(
       '<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>',

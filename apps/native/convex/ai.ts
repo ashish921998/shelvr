@@ -510,15 +510,29 @@ function htmlToText(html: string): string {
  * HTML through htmlToText to get the paragraph-separated plain text the client
  * renders. Pages without a readable article do not store a body.
  */
+// Shortest extraction worth calling an article body. Under this a bot-hostile
+// or JS-rendered page has yielded only chrome, and the classifier writing a
+// description of that chrome is worse than it knowing there was no body: it
+// still has the title, the site and the page's own meta description. The
+// shortest text the tests deliberately keep is a little under 200 characters.
+const MIN_ARTICLE_CHARS = 120;
+
 export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
     // Remove explicit page chrome before parsing: the readerability preflight
     // rejects short articles, while parse() can retain chrome on sparse pages.
     for (const element of document.querySelectorAll(
-      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent, .skip-link, .skip-to-content, .skip-nav, .screen-reader-shortcut',
     )) {
       element.remove();
+    }
+    // A skip link is an in-page anchor, so it sits outside nav and banner and
+    // reads to Readability as ordinary body text.
+    for (const anchor of document.querySelectorAll('a[href^="#"]')) {
+      if (/^\s*skip\b/i.test(anchor.textContent ?? "")) {
+        anchor.remove();
+      }
     }
     for (const menu of document.querySelectorAll(".menu")) {
       const links = Array.from(menu.querySelectorAll("a"));
@@ -542,7 +556,7 @@ export function extractBodyText(html: string, url: string): string | undefined {
     const article = new Readability(document).parse();
     if (article?.content) {
       const text = htmlToText(article.content);
-      if (text.trim() !== "") {
+      if (text.trim().length >= MIN_ARTICLE_CHARS) {
         return text;
       }
     }
