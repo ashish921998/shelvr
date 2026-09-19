@@ -380,19 +380,53 @@ async function presentPaywallImpl(
   }
 }
 
-let pendingPaywalls = 0;
+// A RevenueCat promise that never settles must not hold the latch for the
+// life of the process; past this age the sheet is presumed gone.
+const SHEET_STALE_MS = 5 * 60_000;
 
-export function isPaywallPending(): boolean {
-  return pendingPaywalls > 0;
+type OpenSheet = {
+  startedAt: number;
+  // null while the Customer Center holds the latch.
+  paywall: Promise<PaywallOutcome> | null;
+};
+let openSheet: OpenSheet | null = null;
+
+function liveSheet(): OpenSheet | null {
+  if (openSheet && Date.now() - openSheet.startedAt < SHEET_STALE_MS) {
+    return openSheet;
+  }
+  openSheet = null;
+  return null;
 }
 
-async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
-  pendingPaywalls += 1;
-  try {
-    return await presentPaywallImpl(placement);
-  } finally {
-    pendingPaywalls -= 1;
+/** True while a native RevenueCat sheet (paywall or Customer Center) is up. */
+export function isPaywallPending(): boolean {
+  return liveSheet() !== null;
+}
+
+/** `owned` is false when this call joined a presentation someone else opened. */
+type Presentation = { outcome: PaywallOutcome; owned: boolean };
+
+async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
+  // iOS presents one sheet at a time. A second presentation raced against a
+  // live one leaves both RevenueCat promises unsettled, so neither reports an
+  // outcome and the user sees at most one paywall. The `share` placement
+  // shipped 6 presentations and 2 outcomes this way. A duplicate caller joins
+  // the live presentation and receives its real outcome. Behind a Customer
+  // Center sheet it reports `cancelled` rather than `unavailable`, because
+  // the fallback route would stack a second screen behind the sheet.
+  const live = liveSheet();
+  if (live) {
+    const outcome = live.paywall ? await live.paywall : "cancelled";
+    return { outcome, owned: false };
   }
+  const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
+  sheet.paywall = presentPaywallImpl(placement).finally(() => {
+    // A stale sheet may already have been replaced; only release our own.
+    if (openSheet === sheet) openSheet = null;
+  });
+  openSheet = sheet;
+  return { outcome: await sheet.paywall, owned: true };
 }
 
 /**
@@ -405,8 +439,10 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const outcome = await presentPaywall(placement);
-  if (shouldOpenPaywallFallback(outcome)) {
+  const { outcome, owned } = await presentPaywall(placement);
+  // Only the caller that opened the sheet may route. Joined callers share the
+  // same `unavailable`, and a second push stacks a second paywall screen.
+  if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   return outcome === "success";
@@ -433,19 +469,26 @@ export async function openPaywall(
  * configured in the RevenueCat dashboard (Project Settings → Customer Center).
  */
 export async function presentCustomerCenter(): Promise<boolean> {
-  // Same identity-sync gate as presentPaywall: a restore or refund before login
-  // would be attributed to an anonymous RC user and not reflected in the
-  // subscriptions row keyed on the Convex user id.
-  if (!(await awaitRcSyncReady())) return false;
-
-  const rcui = getRCUI();
-  if (!rcui || typeof rcui.presentCustomerCenter !== "function") return false;
-  if (!(await syncRevenueCatUILocale(getPurchases()))) return false;
+  if (liveSheet()) return false;
+  const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
+  openSheet = sheet;
   try {
-    await rcui.presentCustomerCenter();
-    return true;
-  } catch {
-    return false;
+    // Same identity-sync gate as presentPaywall: a restore or refund before
+    // login would be attributed to an anonymous RC user and not reflected in
+    // the subscriptions row keyed on the Convex user id.
+    if (!(await awaitRcSyncReady())) return false;
+
+    const rcui = getRCUI();
+    if (!rcui || typeof rcui.presentCustomerCenter !== "function") return false;
+    if (!(await syncRevenueCatUILocale(getPurchases()))) return false;
+    try {
+      await rcui.presentCustomerCenter();
+      return true;
+    } catch {
+      return false;
+    }
+  } finally {
+    if (openSheet === sheet) openSheet = null;
   }
 }
 
