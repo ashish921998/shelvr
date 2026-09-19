@@ -3,6 +3,7 @@ import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
   parseRevenueCatSnapshot,
+  resolveExpiresAt,
 } from "./revenuecat";
 
 describe("parseRevenueCatEvent", () => {
@@ -101,6 +102,51 @@ describe("billing period classification", () => {
       transferredTo: ["new"],
       eventTimestampMs: 12,
     });
+  });
+});
+
+describe("billing grace periods", () => {
+  const expiry = 1_800_000_000_000;
+  const graceEnd = 1_800_086_400_000;
+
+  it("reads the grace period end off a BILLING_ISSUE body", () => {
+    expect(
+      parseRevenueCatEvent({
+        event: {
+          type: "BILLING_ISSUE",
+          app_user_id: "user-1",
+          expiration_at_ms: expiry,
+          grace_period_expiration_at_ms: graceEnd,
+        },
+      }),
+    ).toMatchObject({ expiresAt: expiry, gracePeriodExpiresAt: graceEnd });
+  });
+
+  it("extends a BILLING_ISSUE to the end of the grace period", () => {
+    expect(
+      resolveExpiresAt({
+        type: "BILLING_ISSUE",
+        expiresAt: expiry,
+        gracePeriodExpiresAt: graceEnd,
+      }),
+    ).toBe(graceEnd);
+  });
+
+  it("ignores a grace period arriving on any other event type", () => {
+    expect(
+      resolveExpiresAt({
+        type: "EXPIRATION",
+        expiresAt: expiry,
+        gracePeriodExpiresAt: graceEnd,
+      }),
+    ).toBe(expiry);
+  });
+
+  it("falls back to the event expiry, then to zero, without a grace period", () => {
+    expect(resolveExpiresAt({ type: "BILLING_ISSUE", expiresAt: expiry })).toBe(
+      expiry,
+    );
+    expect(resolveExpiresAt({ type: "BILLING_ISSUE" })).toBe(0);
   });
 });
 
