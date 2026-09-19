@@ -32,12 +32,19 @@ export function SplashMark({
   size,
   clock,
   color,
+  still = false,
 }: {
   size: number;
   /** Seconds elapsed since the animation started. */
   clock: SharedValue<number>;
   /** The mark's tint, from the active splash theme. */
   color: string;
+  /**
+   * Skip the pop and render the settled S from the first frame. Reduced
+   * motion still runs the clock, so the mark has to be told to ignore it
+   * rather than waiting out its beat.
+   */
+  still?: boolean;
 }) {
   const path = useMemo(() => {
     const parsed = Skia.Path.MakeFromSVGString(MARK_PATH);
@@ -48,17 +55,19 @@ export function SplashMark({
   const scaleToFit = size / MARK_VIEWBOX;
 
   const transform = useDerivedValue(() => {
-    const progress = cubicBezierEase(
-      span(
-        clock.get(),
-        TIMELINE.markFrom,
-        TIMELINE.markFrom + TIMELINE.markDuration,
-      ),
-      0.3,
-      0.9,
-      0.3,
-      1,
-    );
+    const progress = still
+      ? 1
+      : cubicBezierEase(
+          span(
+            clock.get(),
+            TIMELINE.markFrom,
+            TIMELINE.markFrom + TIMELINE.markDuration,
+          ),
+          0.3,
+          0.9,
+          0.3,
+          1,
+        );
     const toPeak = span(progress, 0, PEAK_AT);
     const settling = span(progress, PEAK_AT, 1);
     const scale =
@@ -84,11 +93,13 @@ export function SplashMark({
   // Opacity leads the transform, so the S is already visible while it is still
   // growing rather than snapping on at full size.
   const opacity = useDerivedValue(() =>
-    span(
-      clock.get(),
-      TIMELINE.markFrom,
-      TIMELINE.markFrom + TIMELINE.markDuration * PEAK_AT,
-    ),
+    still
+      ? 1
+      : span(
+          clock.get(),
+          TIMELINE.markFrom,
+          TIMELINE.markFrom + TIMELINE.markDuration * PEAK_AT,
+        ),
   );
 
   return (

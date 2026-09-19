@@ -3,6 +3,7 @@ import { Text, useWindowDimensions, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
+  ReduceMotion,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -45,9 +46,18 @@ const LOCKUP_EASE = [0.16, 0.84, 0.24, 1] as const;
 const FOOTER_EASE = [0.2, 0.8, 0.25, 1] as const;
 const FOOTER_RISE = 5;
 
-/** With reduced motion the lockup simply fades up, and the splash ends early. */
+/** With reduced motion the lockup simply fades up, in place. */
 const REDUCED_FADE_MS = 240;
-const REDUCED_HOLD_MS = 900;
+
+/**
+ * Reanimated disables `withTiming` outright when the system reduce-motion
+ * setting is on, snapping it to its end value. That is right for the
+ * choreography and wrong for the two timings below: the clock is the splash's
+ * duration, not an effect, and letting it complete on the first frame hands
+ * off to an app that has not hydrated. Motion is skipped in the style
+ * branches instead, where it is legible.
+ */
+const KEEP_TIMING = { reduceMotion: ReduceMotion.Never } as const;
 
 export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   useAppLocale();
@@ -68,21 +78,24 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   useEffect(() => {
     const finish = () => onFinish?.();
 
+    // Reduced motion drops the drawn layer and the lockup's choreography, not
+    // the splash itself: the clock still runs the full duration, so the app
+    // gets the same window to hydrate behind it and leaves by the same
+    // cross-fade. Ending early here would hand off to a half-built screen.
     if (reducedMotion) {
-      // Park the clock past the end so anything reading it — the mark, which
-      // has no reduced-motion branch of its own — renders in its settled
-      // state instead of at frame zero.
-      clock.set(SPLASH_DURATION);
-      reducedProgress.set(withTiming(1, { duration: REDUCED_FADE_MS }));
-      // The hold is what ends the splash here; the fade only brings it in.
-      const timer = setTimeout(finish, REDUCED_HOLD_MS);
-      return () => clearTimeout(timer);
+      reducedProgress.set(
+        withTiming(1, { duration: REDUCED_FADE_MS, ...KEEP_TIMING }),
+      );
     }
 
     clock.set(
       withTiming(
         SPLASH_DURATION,
-        { duration: SPLASH_DURATION * 1000, easing: Easing.linear },
+        {
+          duration: SPLASH_DURATION * 1000,
+          easing: Easing.linear,
+          ...KEEP_TIMING,
+        },
         (completed) => {
           "worklet";
           if (completed) runOnJS(finish)();
@@ -153,12 +166,9 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
 
   // The app is already mounted behind the splash, so the last beat is a
   // cross-fade rather than a cut.
-  const screenStyle = useAnimatedStyle(() => {
-    if (reducedMotion) return { opacity: 1 };
-    return {
-      opacity: 1 - span(clock.get(), SPLASH_EXIT_FROM, SPLASH_DURATION),
-    };
-  });
+  const screenStyle = useAnimatedStyle(() => ({
+    opacity: 1 - span(clock.get(), SPLASH_EXIT_FROM, SPLASH_DURATION),
+  }));
 
   return (
     <Animated.View style={[styles.screen, screenStyle]}>
@@ -191,7 +201,12 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
           accessibilityRole="image"
           accessibilityLabel="Shelvr"
         >
-          <SplashMark size={MARK_SIZE} clock={clock} color={splash.mark} />
+          <SplashMark
+            size={MARK_SIZE}
+            clock={clock}
+            color={splash.mark}
+            still={reducedMotion}
+          />
           {wordmarkWidth === null ? null : (
             <Animated.View style={[styles.wordmarkClip, wordmarkStyle]}>
               <View style={styles.wordmarkInset}>
