@@ -36,6 +36,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { clampRatio } from "@/lib/clamp-ratio";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -100,13 +101,6 @@ const OG_RATIO = 1.91;
 
 const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
 const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
-
-function clampRatio(ratio: number | undefined, fallback: number) {
-  const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
-  // Preserve the true aspect ratio so previews aren't cropped; only bound
-  // pathological extremes so one very tall/wide image can't hijack a column.
-  return Math.min(Math.max(value, 0.5), 2);
-}
 
 function cardMenuActions({
   isSuggested,

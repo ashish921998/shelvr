@@ -1,6 +1,5 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
-import { parseExifDate } from "@/lib/date";
-import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import {
   type ImageSaveRequest,
   reportSaveFailures,
@@ -10,7 +9,6 @@ import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import type { Id } from "@convex/_generated/dataModel";
 import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -114,30 +112,7 @@ export default function CameraScreen() {
     },
   });
 
-  const pickFromLibrary = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-      exif: true,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    await runImageRequests(
-      await Promise.all(
-        result.assets.map(async (asset) => ({
-          image: {
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            mimeType: asset.mimeType,
-            capturedAt: parseExifDate(asset.exif),
-            ...(await resolvePickedImageLocation(asset)),
-          },
-        })),
-      ),
-    );
-  };
+  const pickFromLibrary = () => pickAndSaveImages(runImageRequests);
 
   // Saves a single already-built request (used for the initial capture AND for
   // a retry), reusing the request's operation id verbatim. A retry never
