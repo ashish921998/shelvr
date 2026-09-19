@@ -68,19 +68,22 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         // Best-effort: Android needs ACCESS_MEDIA_LOCATION, and not every
         // photo has a GPS fix — a save must never fail over its location.
         const location = await asset.getLocation().catch(() => null);
-        const [result] = await saveImages([
-          {
-            image: {
-              uri,
-              width: photo.width ?? undefined,
-              height: photo.height ?? undefined,
-              mimeType: mimeFromUri(uri),
-              capturedAt: photo.creationTime ?? undefined,
-              latitude: location?.latitude,
-              longitude: location?.longitude,
+        const [result] = await saveImages(
+          [
+            {
+              image: {
+                uri,
+                width: photo.width ?? undefined,
+                height: photo.height ?? undefined,
+                mimeType: mimeFromUri(uri),
+                capturedAt: photo.creationTime ?? undefined,
+                latitude: location?.latitude,
+                longitude: location?.longitude,
+              },
             },
-          },
-        ]);
+          ],
+          { saveSource: "photo_import" },
+        );
         if (result.status === "saved") {
           // Plan 005 owns durable Tidy save state; here we return the created
           // itemId so undo can delete the item even mid-upload.
