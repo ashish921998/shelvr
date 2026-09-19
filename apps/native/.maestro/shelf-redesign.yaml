@@ -81,6 +81,17 @@ tags:
     id: "tab-map"
 - takeScreenshot: redesign/06-map
 
+# ── The Add sheet ───────────────────────────────────────────────────────────
+# Four mark cards saying what each way in makes. Saving is Pro-gated, so an
+# unentitled account lands on the paywall instead — the flow only opens it.
+- tapOn:
+    id: "tab-home"
+- tapOn: "Add save"
+- assertVisible: "Note"
+- assertVisible: "Article"
+- takeScreenshot: redesign/07-add
+- back
+
 # ── Settings ────────────────────────────────────────────────────────────────
 # Every control regrouped under eyebrows, appearance as one segmented pill.
 - tapOn:
@@ -88,7 +99,7 @@ tags:
 - tapOn: "Profile"
 - assertVisible: "Appearance"
 - assertVisible: "Sign out"
-- takeScreenshot: redesign/07-settings
+- takeScreenshot: redesign/08-settings
 - tapOn: "Close profile"
 
 # ── An item page ────────────────────────────────────────────────────────────
@@ -100,7 +111,7 @@ tags:
 - assertVisible:
     id: "fixture-item-detail-ramen"
     timeout: 20000
-- takeScreenshot: redesign/08-item-page
+- takeScreenshot: redesign/09-item-page
 - tapOn: "Back"
 - assertVisible:
     id: "shelf-new"
