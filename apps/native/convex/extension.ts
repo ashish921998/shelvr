@@ -38,9 +38,11 @@ import { saveLinkForConnectedClient } from "./items";
 import {
   formatPairingCode,
   generatePairingCode,
-  hashSecret,
+  hashPairingCode,
+  pairingCodeSecret,
   PAIRING_CODE_TTL_MS,
 } from "./model/extensionAuth";
+import { logEvent } from "./model/log";
 
 /** Expired pairing codes removed per cron pass. Codes are one row each and
  * live ten minutes, so this drains far faster than they accumulate; the bound
@@ -71,10 +73,19 @@ export const createPairingCode = action({
   returns: v.object({ code: v.string(), expiresAt: v.number() }),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
+    // Fail closed, the way the RevenueCat webhook does without its secret: a
+    // code minted under an unkeyed digest is one a database reader could
+    // recover, and handing the user a weaker credential silently is worse
+    // than telling them pairing is unavailable.
+    const secret = pairingCodeSecret();
+    if (secret === null) {
+      logEvent("error", "extension_pairing_secret_missing", {});
+      throw new Error("Pairing is unavailable");
+    }
     const code = generatePairingCode();
     const expiresAt: number = await ctx.runMutation(
       internal.extension.storePairingCode,
-      { userId, codeHash: await hashSecret(code) },
+      { userId, codeHash: await hashPairingCode(code, secret) },
     );
     return { code: formatPairingCode(code), expiresAt };
   },

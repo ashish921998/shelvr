@@ -8,9 +8,14 @@
  * code, the user types it into the extension, and the extension trades it for
  * a long-lived bearer token scoped to that one browser.
  *
- * Neither secret is ever stored in plaintext. The tables hold SHA-256 hashes
- * only, so a database read hands out nothing that can be replayed; lookups go
- * through the hash, which is what the indexes are keyed on.
+ * Neither secret is ever stored in plaintext; the tables hold digests only,
+ * and lookups go through the digest, which is what the indexes are keyed on.
+ * The two get different treatment, because they have different entropy. A
+ * connection token is 256 random bits, so a plain SHA-256 of it is already
+ * beyond reach. A pairing code is 40 bits — short enough to type, and short
+ * enough to brute-force offline against an unkeyed digest — so it is HMAC'd
+ * under a deployment secret that never lands in a row. See
+ * {@link hashPairingCode}.
  *
  * This module is runtime-agnostic (no Convex server imports) so it can be used
  * from HTTP actions, from plain actions, and from tests alike. Everything here
@@ -126,13 +131,16 @@ export function generateConnectionToken(): string {
 }
 
 /**
- * SHA-256 of a secret, lowercase hex — the only form either secret is stored
- * or looked up in.
+ * SHA-256 of a connection token, lowercase hex — the form tokens are stored
+ * and looked up in.
  *
- * A plain hash (no salt, no stretching) is the right primitive here and not a
- * password shortcut: both inputs are full-entropy random strings we generated,
- * so there is no guessable preimage for a rainbow table or a brute-force pass
- * to find. Salting would only break the index lookup this exists to serve.
+ * A plain hash (no salt, no stretching) is the right primitive for *this*
+ * input and not a password shortcut: a connection token is 256 random bits we
+ * generated, so no rainbow table or brute-force pass can find its preimage,
+ * and salting would only break the index lookup this exists to serve.
+ *
+ * A pairing code is a different animal — 40 bits, short enough to type — and
+ * must not come through here. {@link hashPairingCode} keys it instead.
  */
 export async function hashSecret(value: string): Promise<string> {
   const digest = await crypto.subtle.digest(
@@ -140,6 +148,54 @@ export async function hashSecret(value: string): Promise<string> {
     new TextEncoder().encode(value),
   );
   return toHex(new Uint8Array(digest));
+}
+
+/**
+ * HMAC-SHA-256 of a pairing code under the deployment secret, lowercase hex.
+ *
+ * The code is eight characters so a person can read it off a phone and type it
+ * into a browser, which caps it at 2^40 — and 2^40 unkeyed SHA-256 is minutes
+ * of commodity GPU work, well inside the code's ten-minute life. An unkeyed
+ * digest therefore protects the code only against someone who cannot compute,
+ * which is nobody: anyone who reads `extensionPairings` could recover the
+ * plaintext offline and redeem it once, without ever touching the redemption
+ * limiter that guards online guessing.
+ *
+ * Keying the digest removes that. The secret lives in the deployment
+ * environment and never in a row, so a database read — a leaked backup, a
+ * snapshot, a dashboard session — yields hashes that cannot be searched
+ * without also stealing the key from somewhere else entirely.
+ *
+ * Raising the entropy instead would not work: surviving ten minutes against an
+ * ASIC farm needs upwards of 70 bits, or fourteen typed characters, which
+ * gives up the thing the short code exists for.
+ */
+export async function hashPairingCode(
+  code: string,
+  secret: string,
+): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(code));
+  return toHex(new Uint8Array(signature));
+}
+
+/**
+ * The deployment's pairing-code key, or `null` when it is unset.
+ *
+ * Read through a function rather than captured at module load so a test can
+ * set it per case, and so a deployment that adds the variable does not need a
+ * cold start to pick it up.
+ */
+export function pairingCodeSecret(): string | null {
+  const secret = process.env.EXTENSION_PAIRING_SECRET;
+  return secret === undefined || secret === "" ? null : secret;
 }
 
 /**

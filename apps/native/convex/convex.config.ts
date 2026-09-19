@@ -19,6 +19,10 @@ const app = defineApp({
     SERPAPI_KEY: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),
+    // Keys the HMAC over browser-extension pairing codes. A code is only 40
+    // bits, so an unkeyed digest in `extensionPairings` would be recoverable
+    // offline; minting and redeeming both fail closed without this.
+    EXTENSION_PAIRING_SECRET: v.optional(v.string()),
   },
 });
 app.use(rateLimiter);

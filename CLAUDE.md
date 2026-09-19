@@ -168,7 +168,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Saves the current page from the toolbar, a keyboard shortcut, or the context menu, through
   the `/extension` HTTP routes rather than the Convex client
 - Authenticates with a connection token traded for a pairing code the app shows under
-  **Profile → Browser extension**. The server stores only the token's SHA-256, so the copy in
+  **Profile → Browser extension**. The server stores only digests — the token's SHA-256, and
+  the pairing code's HMAC under `EXTENSION_PAIRING_SECRET`, since a 40-bit code would
+  otherwise be recoverable offline from a database read — so the copy in
   the browser is the only one; revoking from either side is a row delete
 - `activeTab` rather than `tabs`, and no content script: it can read only the tab you invoked
   a save on, at that moment. See `apps/extension/README.md`
@@ -262,6 +264,13 @@ needed at runtime by the features that use them:
 - `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
   `unconfigured` until it is set
 - `RESEND_TOPIC_ID` — Resend topic the contact is opted into
+- `EXTENSION_PAIRING_SECRET` — HMAC key over browser-extension pairing codes. A code is
+  eight typed characters (2^40), so an unkeyed digest in `extensionPairings` could be
+  inverted offline from a leaked backup and redeemed inside its ten-minute life; keying it
+  puts the recovery behind a secret that never enters a row. Minting a code and redeeming
+  one both fail closed when it is unset — the app surfaces "couldn't create a code" and
+  `POST /extension/pair` answers 500 — so set it before the extension ships. Any long
+  random string works; it is never compared against anything but itself
 
 ## Working conventions
 

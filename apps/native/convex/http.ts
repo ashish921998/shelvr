@@ -16,8 +16,10 @@ import { errorName, logEvent } from "./model/log";
 import {
   bearerToken,
   generateConnectionToken,
+  hashPairingCode,
   hashSecret,
   normalizePairingCode,
+  pairingCodeSecret,
   sanitizeConnectionLabel,
 } from "./model/extensionAuth";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
@@ -355,9 +357,18 @@ http.route({
     if (code === null) {
       return extensionJson(req, { error: "invalid_code" }, 400);
     }
+    // Same fail-closed posture as minting: without the key this route cannot
+    // reproduce the stored digest anyway, so a 500 is both the honest answer
+    // and the one that keeps a misconfigured deployment from quietly falling
+    // back to a digest a database reader could invert.
+    const secret = pairingCodeSecret();
+    if (secret === null) {
+      logEvent("error", "extension_pairing_secret_missing", {});
+      return extensionJson(req, { error: "unavailable" }, 500);
+    }
     const token = generateConnectionToken();
     const result = await ctx.runMutation(internal.extension.redeemPairingCode, {
-      codeHash: await hashSecret(code),
+      codeHash: await hashPairingCode(code, secret),
       tokenHash: await hashSecret(token),
       label: sanitizeConnectionLabel(body.label),
     });

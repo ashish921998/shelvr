@@ -15,9 +15,11 @@ import {
   formatPairingCode,
   generateConnectionToken,
   generatePairingCode,
+  hashPairingCode,
   hashSecret,
   MAX_CONNECTION_LABEL_LENGTH,
   normalizePairingCode,
+  pairingCodeSecret,
   PAIRING_CODE_ALPHABET,
   PAIRING_CODE_LENGTH,
   sanitizeConnectionLabel,
@@ -33,12 +35,19 @@ type TestCtx = TestConvexForDataModel<DataModel>;
 // letting it fire would run the classifier during worker teardown. Queue the
 // jobs instead — the `_scheduled_functions` rows are still written. Date stays
 // real, because pairing expiry is judged against it.
+/** Minting and redeeming both fail closed without this, so every case that
+ * pairs needs it set. `vi.stubEnv` restores it in `afterEach`, which keeps the
+ * one case that asserts the unset behaviour from leaking into the rest. */
+const PAIRING_SECRET = "test-pairing-secret";
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  vi.stubEnv("EXTENSION_PAIRING_SECRET", PAIRING_SECRET);
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 /** A real users row plus the identity the app would sign in with. Convex Auth
@@ -184,6 +193,26 @@ describe("connection tokens", () => {
     expect(await hashSecret("shx_exampld")).not.toBe(first);
   });
 
+  it("keys the pairing-code digest to the deployment secret", async () => {
+    const first = await hashPairingCode("K7F29QTX", PAIRING_SECRET);
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    // Same code, same key: the lookup this feeds has to be reproducible.
+    expect(await hashPairingCode("K7F29QTX", PAIRING_SECRET)).toBe(first);
+    // A different code under the same key.
+    expect(await hashPairingCode("K7F29QTY", PAIRING_SECRET)).not.toBe(first);
+    // The point of the change: the same code under a different key is a
+    // different digest, so a stolen table is useless without the key.
+    expect(await hashPairingCode("K7F29QTX", "another-secret")).not.toBe(first);
+    // And it is not merely SHA-256 of the code with extra steps.
+    expect(await hashSecret("K7F29QTX")).not.toBe(first);
+  });
+
+  it("reads the pairing secret only when one is set", () => {
+    expect(pairingCodeSecret()).toBe(PAIRING_SECRET);
+    vi.stubEnv("EXTENSION_PAIRING_SECRET", "");
+    expect(pairingCodeSecret()).toBeNull();
+  });
+
   it("reads a bearer credential out of the header, or nothing", () => {
     expect(bearerToken("Bearer shx_abc")).toBe("shx_abc");
     expect(bearerToken("bearer shx_abc")).toBe("shx_abc");
@@ -251,6 +280,60 @@ describe("POST /extension/pair", () => {
     });
     expect(stored.tokenHash).toBe(await hashSecret(token));
     expect(JSON.stringify(stored)).not.toContain(token);
+  });
+
+  it("refuses to mint a code when the deployment has no pairing secret", async () => {
+    const t = newConvexTest();
+    const { identity, userId } = await seedUser(t, "owner@example.com");
+    vi.stubEnv("EXTENSION_PAIRING_SECRET", "");
+
+    await expect(
+      identity.action(api.extension.createPairingCode, {}),
+    ).rejects.toThrow();
+
+    // Nothing half-written: no row should carry a digest this deployment
+    // cannot reproduce on redemption.
+    const rows = await t.run(async (ctx) => {
+      return await ctx.db
+        .query("extensionPairings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("answers 500 on redemption when the deployment has no pairing secret", async () => {
+    const t = newConvexTest();
+    const { identity } = await seedUser(t, "owner@example.com");
+    // Mint while the secret is present, then lose it — the deployment that
+    // cannot reproduce the digest must say so rather than fall back.
+    const { code } = await identity.action(api.extension.createPairingCode, {});
+    vi.stubEnv("EXTENSION_PAIRING_SECRET", "");
+
+    const response = await t.fetch("/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, label: "Chrome" }),
+    });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "unavailable" });
+  });
+
+  it("will not redeem a code hashed under a different deployment secret", async () => {
+    const t = newConvexTest();
+    const { identity } = await seedUser(t, "owner@example.com");
+    const { code } = await identity.action(api.extension.createPairingCode, {});
+    // A stolen `extensionPairings` row is only useful with the key that made
+    // it; rotating the key retires every outstanding code.
+    vi.stubEnv("EXTENSION_PAIRING_SECRET", "rotated-secret");
+
+    const response = await t.fetch("/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, label: "Chrome" }),
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "invalid_code" });
   });
 
   it("consumes the code, so the same one cannot pair a second browser", async () => {
