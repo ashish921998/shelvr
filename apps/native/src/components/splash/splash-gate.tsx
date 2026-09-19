@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 
+import { analytics } from "@/lib/analytics";
 import { getNotificationUrl } from "@/lib/notifications";
 import {
   isDirectLaunch,
@@ -38,8 +39,11 @@ function launchedByNotificationRoute(): boolean {
     const response = Notifications.getLastNotificationResponse();
     if (!response?.notification) return false;
     return Boolean(getNotificationUrl(response.notification));
-  } catch {
-    // A missing or unavailable module must never cost us the splash.
+  } catch (error) {
+    // A missing or unavailable module must never cost us the splash. It does
+    // cost the user a 2.5s wait in front of a notification they tapped, so
+    // report it rather than degrade quietly.
+    analytics.captureError("splash_notification_probe_failed", error);
     return false;
   }
 }
