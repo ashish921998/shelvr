@@ -17,7 +17,9 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { TypeMark } from "@/components/ink/type-mark";
+import { displayHost } from "@/lib/url";
+import type { MarkKind } from "@/lib/ink/strokes";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -56,29 +58,27 @@ async function readClipboardUrl(): Promise<string | null> {
 }
 
 function ActionButton({
-  icon,
+  mark,
   label,
   onPress,
   disabled,
 }: {
-  icon: AppSymbolName;
+  mark: MarkKind;
   label: string;
   onPress: () => void;
   disabled?: boolean;
 }) {
-  const { theme } = useUnistyles();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={[styles.action, disabled && { opacity: 0.4 }]}
     >
       <View style={styles.actionIcon}>
-        <AppSymbolIcon
-          name={icon}
-          size={40}
-          tintColor={theme.colors.foreground}
-        />
+        <TypeMark kind={mark} size={34} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
@@ -165,12 +165,15 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
-  // Prefill the article field with a link already on the clipboard.
+  // A link already on the clipboard is offered on the picker and prefilled
+  // into the article field, so it is caught rather than retyped.
+  const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (mode !== "article") return;
     let active = true;
     readClipboardUrl().then((url) => {
-      if (active && url) setValue((current) => current || url);
+      if (!active || !url) return;
+      setClipboardUrl(url);
+      if (mode === "article") setValue((current) => current || url);
     });
     return () => {
       active = false;
@@ -344,36 +347,56 @@ function AddContent({ close, openCamera }: AddContentProps) {
           editable={!saving}
         />
       ) : (
-        <View style={styles.actions}>
-          <ActionButton
-            icon="square.and.pencil"
-            label={t("item.note")}
-            onPress={() => guard(() => openComposer("note"))}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            icon="link"
-            label={t("item.article")}
-            onPress={() => guard(() => openComposer("article"))}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            icon="photo.on.rectangle"
-            label={t("capture.photos")}
-            onPress={() => guard(pickImages)}
-            disabled={saving || entitlementLoading}
-          />
-          <ActionButton
-            icon="camera"
-            label={t("capture.camera")}
-            onPress={() =>
-              guard(() => {
-                openCamera(pinnedSpaceId);
-              })
-            }
-            disabled={saving || entitlementLoading}
-          />
-        </View>
+        <>
+          {clipboardUrl ? (
+            <Pressable
+              style={styles.catch}
+              onPress={() => guard(() => openComposer("article"))}
+              disabled={saving || entitlementLoading}
+              accessibilityRole="button"
+              accessibilityLabel={t("home.pasteLink")}
+              testID="clipboard-catch"
+            >
+              <TypeMark kind="article" size={22} />
+              <View style={styles.catchCopy}>
+                <Text style={styles.catchLabel}>{t("home.pasteLink")}</Text>
+                <Text style={styles.catchHost} numberOfLines={1}>
+                  {displayHost(clipboardUrl)}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+          <View style={styles.actions}>
+            <ActionButton
+              mark="note"
+              label={t("item.note")}
+              onPress={() => guard(() => openComposer("note"))}
+              disabled={saving || entitlementLoading}
+            />
+            <ActionButton
+              mark="article"
+              label={t("item.article")}
+              onPress={() => guard(() => openComposer("article"))}
+              disabled={saving || entitlementLoading}
+            />
+            <ActionButton
+              mark="photo"
+              label={t("capture.photos")}
+              onPress={() => guard(pickImages)}
+              disabled={saving || entitlementLoading}
+            />
+            <ActionButton
+              mark="camera"
+              label={t("capture.camera")}
+              onPress={() =>
+                guard(() => {
+                  openCamera(pinnedSpaceId);
+                })
+              }
+              disabled={saving || entitlementLoading}
+            />
+          </View>
+        </>
       )}
     </View>
   );
@@ -475,18 +498,45 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: theme.gap(2),
+    // Tighter than before: the four ways in are cards now, so they read as
+    // one row rather than four separate icons.
+    gap: theme.gap(1.25),
+  },
+  // The clipboard catch: a link already copied, offered before the tiles.
+  catch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.25),
+    marginBottom: theme.gap(1.5),
+    padding: theme.gap(1.5),
+    borderRadius: 14,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  catchCopy: { flex: 1 },
+  catchLabel: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  catchHost: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    color: theme.colors.muted,
   },
   action: {
+    flex: 1,
     alignItems: "center",
     gap: theme.gap(0.75),
     minWidth: 64,
+    paddingVertical: theme.gap(1.5),
+    borderRadius: 14,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
-  actionIcon: {
-    padding: theme.gap(1),
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  actionIcon: { alignItems: "center", justifyContent: "center" },
   actionLabel: {
     fontFamily: theme.fonts.medium,
     fontSize: 12,

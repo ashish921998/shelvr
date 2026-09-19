@@ -1,7 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
-import { AppSymbolIcon } from "@/components/symbol";
+import { Hairline } from "@/components/ink/hairline";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkShelf } from "@/components/ink/ink-shelf";
+import { ShelfThumbnail } from "@/components/shelf/shelf-thumbnail";
+import { cardTilt } from "@/lib/shelf-layout";
 import * as AppleAuthentication from "expo-apple-authentication";
 import {
   Linking,
@@ -9,6 +13,7 @@ import {
   Pressable,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -33,6 +38,7 @@ export function SignInView({
     interrupted,
   } = useOAuthSignIn();
   const colorScheme = useColorScheme();
+  const { width } = useWindowDimensions();
   const { theme } = useUnistyles();
 
   const handleOAuth = async (provider: OAuthProvider) => {
@@ -52,17 +58,32 @@ export function SignInView({
           hitSlop={12}
           style={styles.back}
         >
-          <AppSymbolIcon
+          <InkIcon
             name="chevron.left"
             size={20}
-            tintColor={theme.colors.foreground}
+            tint={theme.colors.foreground}
           />
         </Pressable>
       ) : null}
+      <View style={styles.hairline} pointerEvents="none">
+        <Hairline width={width} />
+      </View>
       <View style={styles.center}>
         <View style={styles.header}>
           <Text style={styles.title}>shelvr</Text>
           <Text style={styles.subtitle}>{t("account.signInTitle")}</Text>
+          <View
+            style={styles.waiting}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <View style={styles.thumbs}>
+              {[0, 1, 2, 3].map((index) => (
+                <ShelfThumbnail key={index} size={34} tilt={cardTilt(index)} />
+              ))}
+            </View>
+            <InkShelf width={200} seed={1} />
+          </View>
         </View>
 
         <View style={styles.buttons}>
@@ -77,7 +98,7 @@ export function SignInView({
                   ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                   : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
-              cornerRadius={theme.radius.md}
+              cornerRadius={12}
               style={[
                 styles.appleButton,
                 pending !== null && styles.buttonDisabled,
@@ -193,10 +214,23 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     gap: theme.gap(1),
   },
+  hairline: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: rt.insets.top + 46,
+  },
+  waiting: { alignItems: "center", paddingTop: theme.gap(3) },
+  thumbs: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    paddingBottom: 4,
+  },
   title: {
     fontFamily: theme.fonts.display,
     fontSize: 48,
-    color: theme.colors.primary,
+    color: theme.colors.foreground,
   },
   subtitle: {
     fontFamily: theme.fonts.regular,
@@ -216,7 +250,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.foreground,
     borderWidth: 1,
     borderColor: theme.colors.foreground,
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
@@ -231,7 +265,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     borderCurve: "continuous",
     alignItems: "center",
     justifyContent: "center",
