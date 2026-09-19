@@ -186,8 +186,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
     to show the passwordless dev-login button and fixture reset in development and preview
     builds (release-mode included); production builds never show either
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
-    non-production variant. `app.config.js` pins it to one exact value
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
+    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
+    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
+    to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
