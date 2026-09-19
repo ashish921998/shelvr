@@ -76,7 +76,7 @@ export type SplashPalette = {
   thread: string;
 };
 
-export type SplashTheme = {
+type SplashTheme = {
   /** The ground the whole splash is drawn on. */
   ground: string;
   /** The S. */
