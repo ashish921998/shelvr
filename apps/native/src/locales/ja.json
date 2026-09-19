@@ -495,5 +495,6 @@
   "home.sectionEarlier": "それ以前",
   "spaces.onTheShelf": "棚の中",
   "spaces.shelved": "棚に入れました。",
-  "spaces.ontoShelf": "%{space} へ"
+  "spaces.ontoShelf": "%{space} へ",
+  "tidy.shelved": "棚に入れた分"
 }

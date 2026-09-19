@@ -527,5 +527,6 @@
   "home.sectionEarlier": "Antes",
   "spaces.onTheShelf": "En el estante",
   "spaces.shelved": "Guardado.",
-  "spaces.ontoShelf": "En %{space}"
+  "spaces.ontoShelf": "En %{space}",
+  "tidy.shelved": "Guardadas"
 }

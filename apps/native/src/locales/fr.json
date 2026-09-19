@@ -527,5 +527,6 @@
   "home.sectionEarlier": "Avant",
   "spaces.onTheShelf": "Sur l’étagère",
   "spaces.shelved": "Rangé.",
-  "spaces.ontoShelf": "Dans %{space}"
+  "spaces.ontoShelf": "Dans %{space}",
+  "tidy.shelved": "Rangées"
 }

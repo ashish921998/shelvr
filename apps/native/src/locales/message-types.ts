@@ -465,6 +465,7 @@ export type MessageParams = {
   "spaces.onTheShelf": undefined;
   "spaces.shelved": undefined;
   "spaces.ontoShelf": { space: string };
+  "tidy.shelved": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

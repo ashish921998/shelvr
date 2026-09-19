@@ -511,5 +511,6 @@
   "home.sectionEarlier": "Früher",
   "spaces.onTheShelf": "Im Regal",
   "spaces.shelved": "Eingeräumt.",
-  "spaces.ontoShelf": "In %{space}"
+  "spaces.ontoShelf": "In %{space}",
+  "tidy.shelved": "Eingeräumt"
 }

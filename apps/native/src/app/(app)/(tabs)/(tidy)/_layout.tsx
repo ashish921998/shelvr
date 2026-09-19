@@ -1,35 +1,23 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { useAppLocale } from "@/lib/i18n";
 import { Stack } from "expo-router";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { useUnistyles } from "react-native-unistyles";
 
+// Tidy draws its own header: undo, the source and progress, the delete queue
+// and the album picker — with the ochre hairline under it like every root tab.
 export default function TidyStackLayout() {
   useAppLocale();
+  const { theme } = useUnistyles();
+
   return (
     <Stack
       screenOptions={{
-        headerTransparent: true,
-        headerShadowVisible: false,
-        headerTitleAlign: "center",
-        headerTitleStyle: styles.title,
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.colors.background },
       }}
     >
-      <Stack.Screen name="index" options={{ gestureEnabled: false }}>
-        <Stack.Title asChild>
-          <Text testID="tidy-screen-title" style={styles.title}>
-            {t("navigation.tidyHeader")}
-          </Text>
-        </Stack.Title>
-      </Stack.Screen>
+      {/* Tidy is swiped, so the back-swipe gesture stays off or a card
+          drag would pop the screen instead of sorting a photo. */}
+      <Stack.Screen name="index" options={{ gestureEnabled: false }} />
     </Stack>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 26,
-    letterSpacing: 0.5,
-    color: theme.colors.foreground,
-  },
-}));

@@ -63,9 +63,15 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     paddingHorizontal: 16,
   },
-  // Both sides reserve the same width so the title stays optically centred
-  // whether or not there is a button on each end.
-  side: { width: 40, alignItems: "flex-start", justifyContent: "center" },
+  // Both sides reserve at least a button's width so a lone title stays
+  // optically centred; Tidy puts two controls on the right and grows.
+  side: {
+    minWidth: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 6,
+  },
   sideRight: { alignItems: "flex-end" },
   centre: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: {

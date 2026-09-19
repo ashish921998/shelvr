@@ -76,6 +76,8 @@ vi.mock("react-native", () => {
     ),
     ActivityIndicator: vi.fn(() => null),
     TextInput: vi.fn(() => <input />),
+    // The redesigned screens size their drawn layer to the window.
+    useWindowDimensions: () => ({ width: 390, height: 844 }),
     StyleSheet: { flatten },
   };
 });
@@ -289,6 +291,12 @@ vi.mock("@tanstack/react-query", () => {
   ];
   return { useQuery: () => ({ data }) };
 });
+// The screens draw their own header now, which reads the safe area. Mock
+// the insets rather than the header itself, so header copy still reaches
+// the accessibility tree these tests read.
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("expo-maps", () => {

@@ -511,5 +511,6 @@
   "home.sectionEarlier": "Earlier",
   "spaces.onTheShelf": "On the shelf",
   "spaces.shelved": "Shelved.",
-  "spaces.ontoShelf": "Onto %{space}"
+  "spaces.ontoShelf": "Onto %{space}",
+  "tidy.shelved": "Shelved"
 }
