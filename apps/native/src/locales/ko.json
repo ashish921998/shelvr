@@ -499,5 +499,6 @@
   "tidy.shelved": "선반에 올림",
   "profile.groupYou": "내 계정",
   "profile.groupSends": "알림",
-  "profile.groupMore": "더 보기"
+  "profile.groupMore": "더 보기",
+  "onboarding.stepOf": "%{total}단계 중 %{count}단계"
 }

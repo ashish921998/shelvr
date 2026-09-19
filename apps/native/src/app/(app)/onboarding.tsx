@@ -1,4 +1,5 @@
-import { useAppLocale } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
+import { ReadingMeter } from "@/components/ink/reading-meter";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
@@ -34,7 +35,13 @@ import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -63,6 +70,7 @@ export default function OnboardingScreen() {
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
 
+  const { width } = useWindowDimensions();
   const [initialProgress] = useState(() => getOnboardingProgress());
   const [initialStep] = useState(() =>
     restoreOnboardingStep(initialProgress.step),
@@ -175,13 +183,18 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={[styles.barWrap, progress === null && styles.barHidden]}>
-        <View
-          style={[
-            styles.bar,
-            { width: `${Math.round((progress ?? 0) * 100)}%` },
-          ]}
-        />
+      {/* The progress bar is the hairline: the same ochre line that sits under
+          every header, filling as the steps are done. */}
+      <View style={progress === null && styles.barHidden}>
+        <ReadingMeter width={width - 48} progress={progress ?? 0} />
+        {progress === null ? null : (
+          <Text style={styles.stepCount}>
+            {t("onboarding.stepOf", {
+              count: Math.max(1, stepIndex),
+              total: ONBOARDING_STEPS.length - 1,
+            })}
+          </Text>
+        )}
       </View>
 
       {step === "opener" ? (
@@ -252,19 +265,15 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
-  barWrap: {
-    height: 3,
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
   barHidden: {
     opacity: 0,
   },
-  bar: {
-    height: 3,
-    backgroundColor: theme.colors.primary,
-    borderRadius: 2,
+  stepCount: {
+    marginTop: 6,
+    textAlign: "center",
+    fontFamily: theme.fonts.medium,
+    fontSize: 12,
+    color: theme.colors.muted,
   },
   scroll: {
     flex: 1,

@@ -515,5 +515,6 @@
   "tidy.shelved": "Shelved",
   "profile.groupYou": "You",
   "profile.groupSends": "Sends you",
-  "profile.groupMore": "More"
+  "profile.groupMore": "More",
+  "onboarding.stepOf": "%{count} of %{total}"
 }

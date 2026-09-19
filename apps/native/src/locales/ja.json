@@ -499,5 +499,6 @@
   "tidy.shelved": "棚に入れた分",
   "profile.groupYou": "アカウント",
   "profile.groupSends": "お知らせ",
-  "profile.groupMore": "その他"
+  "profile.groupMore": "その他",
+  "onboarding.stepOf": "%{total} 件中 %{count} 件目"
 }

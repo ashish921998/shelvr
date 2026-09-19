@@ -10,6 +10,7 @@
 
 import { shortFormSource } from "@convex/model/externalUrl";
 import type { PostMedia } from "@convex/model/itemFields";
+import type { SaveKind } from "@/lib/save-kinds";
 import type { MarkKind } from "@/lib/ink/strokes";
 
 /** Everything the mark is decided from. A subset of `FeedItem`. */
@@ -60,4 +61,28 @@ export function saveMark(item: MarkSource): MarkKind {
   if (taggedAs(item.tags, RECIPE_TAGS)) return "recipe";
   if (taggedAs(item.tags, PRODUCT_TAGS)) return "product";
   return "article";
+}
+
+/**
+ * The mark that stands for a save kind in onboarding's picker. Several kinds
+ * share a mark — there are more kinds than drawn shapes — so the tile's label
+ * carries the distinction and the mark carries the family.
+ */
+export function kindMark(kind: SaveKind): MarkKind {
+  switch (kind) {
+    case "Articles":
+      return "article";
+    case "Recipes":
+      return "recipe";
+    case "Products":
+    case "Home & decor":
+      return "product";
+    case "Travel":
+      return "photo";
+    case "Videos":
+      return "video";
+    case "Inspiration":
+    case "Fitness":
+      return "note";
+  }
 }

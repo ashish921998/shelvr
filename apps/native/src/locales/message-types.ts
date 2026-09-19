@@ -469,6 +469,7 @@ export type MessageParams = {
   "profile.groupYou": undefined;
   "profile.groupSends": undefined;
   "profile.groupMore": undefined;
+  "onboarding.stepOf": { count: number; total: number };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -22,7 +22,7 @@ import { EASE_OUT } from "@/lib/motion";
 const HEIGHT = 40;
 const PADDING = 3;
 
-export type Segment<T extends string> = { value: T; label: string };
+type Segment<T extends string> = { value: T; label: string };
 
 export function SegmentedControl<T extends string>({
   segments,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { saveMark } from "./save-mark";
+import { kindMark, saveMark } from "./save-mark";
+import { SAVE_KINDS } from "@/lib/save-kinds";
 
 describe("saveMark", () => {
   it("marks a note and a photo by what they are", () => {
@@ -67,5 +68,26 @@ describe("saveMark", () => {
     expect(
       saveMark({ type: "link", url: "https://a.test", tags: ["  Recipes "] }),
     ).toBe("recipe");
+  });
+});
+
+describe("kindMark", () => {
+  it("gives every save kind a mark", () => {
+    for (const kind of SAVE_KINDS) {
+      expect(kindMark(kind), kind).toBeTruthy();
+    }
+  });
+
+  it("matches the kind to its obvious mark where one exists", () => {
+    expect(kindMark("Articles")).toBe("article");
+    expect(kindMark("Recipes")).toBe("recipe");
+    expect(kindMark("Products")).toBe("product");
+    expect(kindMark("Travel")).toBe("photo");
+    expect(kindMark("Videos")).toBe("video");
+  });
+
+  it("shares a mark between kinds of the same family", () => {
+    expect(kindMark("Home & decor")).toBe(kindMark("Products"));
+    expect(kindMark("Fitness")).toBe(kindMark("Inspiration"));
   });
 });

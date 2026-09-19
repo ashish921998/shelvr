@@ -36,6 +36,9 @@ const DROP_EASING = Easing.bezier(0.2, 0.85, 0.25, 1);
 
 export type StandingCardProps = {
   imageUrl?: string | null;
+  /** A bundled asset, for the sample saves onboarding ships with. Takes
+   * precedence over `imageUrl`. */
+  imageSource?: number;
   /** Shown instead of an image for a note, and for a link with no picture. */
   title?: string;
   mark: MarkKind;
@@ -54,6 +57,7 @@ export type StandingCardProps = {
 
 export const StandingCard = memo(function StandingCard({
   imageUrl,
+  imageSource,
   title,
   mark,
   aspectRatio,
@@ -111,8 +115,10 @@ export const StandingCard = memo(function StandingCard({
     ],
   }));
 
+  const picture: number | { uri: string } | null =
+    imageSource ?? (imageUrl ? { uri: imageUrl } : null);
   const body =
-    note || !imageUrl ? (
+    note || !picture ? (
       <View style={[styles.face, note ? styles.noteFace : styles.textFace]}>
         <Text
           style={note ? styles.noteText : styles.faceText}
@@ -123,7 +129,7 @@ export const StandingCard = memo(function StandingCard({
       </View>
     ) : (
       <Image
-        source={{ uri: imageUrl }}
+        source={picture}
         style={styles.image}
         contentFit="cover"
         transition={160}

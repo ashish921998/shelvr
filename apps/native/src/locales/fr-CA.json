@@ -531,5 +531,6 @@
   "tidy.shelved": "Rangées",
   "profile.groupYou": "Vous",
   "profile.groupSends": "Vous recevez",
-  "profile.groupMore": "Plus"
+  "profile.groupMore": "Plus",
+  "onboarding.stepOf": "%{count} sur %{total}"
 }

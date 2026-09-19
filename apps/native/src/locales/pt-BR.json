@@ -531,5 +531,6 @@
   "tidy.shelved": "Guardadas",
   "profile.groupYou": "Você",
   "profile.groupSends": "Enviamos para você",
-  "profile.groupMore": "Mais"
+  "profile.groupMore": "Mais",
+  "onboarding.stepOf": "%{count} de %{total}"
 }
