@@ -387,6 +387,13 @@ export function isPaywallPending(): boolean {
 }
 
 async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
+  // iOS presents one sheet at a time. A second presentation raced against a
+  // live one leaves both RevenueCat promises unsettled, so neither reports an
+  // outcome and the user sees at most one paywall. The `share` placement
+  // shipped 6 presentations and 2 outcomes this way. Report it as `cancelled`
+  // rather than `unavailable`, because the fallback route would then stack a
+  // second screen behind the sheet that is already up.
+  if (pendingPaywalls > 0) return "cancelled";
   pendingPaywalls += 1;
   try {
     return await presentPaywallImpl(placement);
