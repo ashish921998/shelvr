@@ -96,6 +96,7 @@ export default function ImportScreen() {
             icon="xmark"
             label={t("common.close")}
             onPress={close}
+            testID="close-import"
           />
         }
       />

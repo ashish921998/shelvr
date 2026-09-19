@@ -165,6 +165,7 @@ function SpaceForm(props: SpaceFormProps) {
             icon="xmark"
             label={t("common.close")}
             onPress={close}
+            testID="close-new-shelf"
           />
         }
       />

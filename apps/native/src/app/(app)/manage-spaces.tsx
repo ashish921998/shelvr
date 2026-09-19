@@ -139,6 +139,7 @@ export default function ManageSpacesScreen() {
             icon="xmark"
             label={t("common.close")}
             onPress={close}
+            testID="close-manage-shelves"
           />
         }
       />

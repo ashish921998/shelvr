@@ -9,7 +9,8 @@ appId: app.shelvr.save.dev
 ---
 - tapOn:
     id: "tab-home"
-- tapOn: "Profile"
+- tapOn:
+    id: "open-profile"
 - tapOn: "Reset flow fixtures"
 - tapOn: "Reset"
 - assertVisible:
@@ -19,4 +20,5 @@ appId: app.shelvr.save.dev
 # button is supplied and localised by the OS. "OK" holds for an
 # English-locale simulator, which is what this flow targets.
 - tapOn: "OK"
-- tapOn: "Close profile"
+- tapOn:
+    id: "close-profile"

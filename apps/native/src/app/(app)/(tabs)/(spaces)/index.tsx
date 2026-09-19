@@ -88,6 +88,7 @@ export default function SpacesScreen() {
           icon="plus"
           label={t("spaces.newTitle")}
           onPress={() => router.push("/new-space")}
+          testID="new-shelf"
         />
       }
     />

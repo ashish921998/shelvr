@@ -86,21 +86,29 @@ tags:
 # unentitled account lands on the paywall instead — the flow only opens it.
 - tapOn:
     id: "tab-home"
-- tapOn: "Add save"
-- assertVisible: "Note"
-- assertVisible: "Article"
+- tapOn:
+    id: "open-add"
+- assertVisible:
+    id: "add-note"
+- assertVisible:
+    id: "add-article"
 - takeScreenshot: redesign/07-add
-- back
+- swipe:
+    direction: DOWN
+    from:
+      id: "add-note"
 
 # ── Settings ────────────────────────────────────────────────────────────────
 # Every control regrouped under eyebrows, appearance as one segmented pill.
 - tapOn:
     id: "tab-home"
-- tapOn: "Profile"
+- tapOn:
+    id: "open-profile"
 - assertVisible: "Appearance"
 - assertVisible: "Sign out"
 - takeScreenshot: redesign/08-settings
-- tapOn: "Close profile"
+- tapOn:
+    id: "close-profile"
 
 # ── An item page ────────────────────────────────────────────────────────────
 # The save lies on the table; no shelf is drawn under a single card.
@@ -122,25 +130,34 @@ tags:
 # committing — the paywall is RevenueCat's and not ours to screenshot.
 - tapOn:
     id: "tab-spaces"
-- tapOn: "New space"
+- tapOn:
+    id: "new-shelf"
 - assertVisible:
     id: "save-shelf"
 - inputText: "Weeknight"
 - takeScreenshot: redesign/10-new-shelf
-- tapOn: "Close"
+- tapOn:
+    id: "close-new-shelf"
 
 # ── Import ──────────────────────────────────────────────────────────────────
 # Reached from settings. The button is the progress here: stitches run along
 # it while a batch uploads, so there is no spinner to wait on.
 - tapOn:
     id: "tab-home"
-- tapOn: "Profile"
-- tapOn: "Import from X"
+- tapOn:
+    id: "open-profile"
+- tapOn:
+    id: "open-import"
 - assertVisible:
     id: "import-links"
 - assertVisible: "Importing X bookmarks"
 - takeScreenshot: redesign/11-import
-- tapOn: "Close"
+# Import is pushed OVER the settings sheet, which stays in the stack. Closing
+# only Import leaves settings covering the nav, so both come down here.
+- tapOn:
+    id: "close-import"
+- tapOn:
+    id: "close-profile"
 
 # ── The camera fallback ─────────────────────────────────────────────────────
 # Which state this lands in depends on the machine: a simulator has no camera,
@@ -151,9 +168,12 @@ tags:
 # of the three arrives; the screenshot is the record.
 - tapOn:
     id: "tab-home"
-- tapOn: "Add save"
-- tapOn: "Camera"
+- tapOn:
+    id: "open-add"
+- tapOn:
+    id: "add-camera"
 - takeScreenshot: redesign/12-camera
-# "Close" is the label on both the paper header and the preview's overlay
-# xmark, so this leaves whichever state arrived.
-- tapOn: "Close"
+# Both the paper fallback's header and the live preview's overlay carry this
+# id, so this leaves whichever of the three states arrived.
+- tapOn:
+    id: "close-camera"

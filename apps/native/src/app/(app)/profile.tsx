@@ -270,6 +270,7 @@ export default function ProfileScreen() {
             icon="xmark"
             label={t("profile.close")}
             onPress={closeProfile}
+            testID="close-profile"
           />
         }
       />
@@ -388,6 +389,7 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("import.fromX")}
             onPress={() => router.push("/import")}
+            testID="open-import"
           >
             <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
             <InkIcon name="chevron.right" size={16} tint={theme.colors.muted} />

@@ -75,6 +75,8 @@ function ActionButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
+      // Keyed by the mark rather than the label: the label is localized copy.
+      testID={`add-${mark}`}
       style={[styles.action, disabled && { opacity: 0.4 }]}
     >
       <View style={styles.actionIcon}>

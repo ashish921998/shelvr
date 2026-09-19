@@ -240,6 +240,7 @@ export default function CameraScreen() {
             icon="xmark"
             label={t("common.close")}
             onPress={() => router.back()}
+            testID="close-camera"
           />
         }
       />
@@ -302,6 +303,7 @@ export default function CameraScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("common.close")}
+              testID="close-camera"
               style={styles.roundButton}
               onPress={() => router.back()}
             >

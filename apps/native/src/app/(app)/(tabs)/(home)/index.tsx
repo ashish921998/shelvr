@@ -86,6 +86,7 @@ export default function HomeScreen() {
           icon="person.fill"
           label={t("navigation.profile")}
           onPress={() => router.push("/profile")}
+          testID="open-profile"
         />
       }
       right={
@@ -94,6 +95,7 @@ export default function HomeScreen() {
           label={t("capture.add")}
           disabled={entitlementLoading}
           onPress={() => void guard(() => router.push("/add"))}
+          testID="open-add"
         />
       }
     />

@@ -77,6 +77,11 @@ The keys are defined in `convex/devFixtures.ts`: saves `ramen`, `belem-tower`,
 `apartment-checklist`, `value-of-craft`; shelves `recipes`, `trips`,
 `apartment-shopping`.
 
+Chrome carries ids too, because a sheet opened over another sheet leaves both
+in the hierarchy and `Close` also matches `Close profile`: `open-profile`,
+`close-profile`, `open-add`, `add-<mark>`, `new-shelf`, `close-new-shelf`,
+`open-import`, `close-import`, `close-camera`, `close-manage-shelves`.
+
 Structural ids that are not fixture-derived: `tab-home`, `tab-spaces`,
 `tab-tidy`, `tab-map`, `tab-search`, `shelf-new`, `shelf-earlier`,
 `shelf-items`, `suggested-row`, `search-field`.

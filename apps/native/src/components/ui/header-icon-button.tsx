@@ -10,12 +10,17 @@ export function HeaderIconButton({
   badge,
   disabled,
   onPress,
+  testID,
 }: {
   icon: InkIconName;
   label: string;
   badge?: number;
   disabled?: boolean;
   onPress: () => void;
+  /** A stable handle for the end-to-end flows. Header labels are localized
+   * copy, and a sheet opened over another sheet leaves both in the hierarchy,
+   * where "Close" also matches "Close profile". */
+  testID?: string;
 }) {
   const { theme } = useUnistyles();
   return (
@@ -26,6 +31,7 @@ export function HeaderIconButton({
       disabled={disabled}
       hitSlop={8}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.button,
         pressed && styles.pressed,
