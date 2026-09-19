@@ -11,7 +11,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import ShareScreen from "./share";
+import ShareScreen from "@/app/(app)/share";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
