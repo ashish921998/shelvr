@@ -12,6 +12,18 @@
 export type SubscriptionStatus = "trialing" | "pro" | "lapsed" | "lifetime";
 
 /**
+ * True when the stored status alone says entitled, ignoring `expiresAt`.
+ * The clock-free fallback for callers that predate the client-supplied
+ * `now` argument: the RevenueCat webhook marks the row `lapsed` when a
+ * subscription actually expires, so the status is the best clock-free
+ * signal a query can read. Listed positively so a future status can never
+ * grant access by accident.
+ */
+export function isEntitledStatus(status: SubscriptionStatus | "none"): boolean {
+  return status === "trialing" || status === "pro" || status === "lifetime";
+}
+
+/**
  * True when the user has active access. `lifetime` is permanently entitled;
  * `lapsed`/`none` are not; `trialing`/`pro` are entitled until `expiresAt`.
  * `now` is passed in (never read here) so the server can use `Date.now()`
@@ -23,6 +35,6 @@ export function isEntitled(
   now: number,
 ): boolean {
   if (status === "lifetime") return true;
-  if (status === "none" || status === "lapsed") return false;
+  if (!isEntitledStatus(status)) return false;
   return (expiresAt ?? 0) > now;
 }

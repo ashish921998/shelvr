@@ -229,6 +229,94 @@ describe("listItemsPage", () => {
 });
 
 describe("listRecentItems", () => {
+  it("returns no saves for users without active Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-free-user|session-1",
+    });
+    await seedFeed(t, "recent-free-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+    // The legacy no-clock path gates the same way.
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for an expired Pro subscription", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-expired-user|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-expired-user",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-expired-user", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("still serves a build that omits its clock while its status is active", async () => {
+    const t = await as("recent-user");
+    const ids = await seedFeed(t, "recent-user", 2);
+
+    // Rollout contract: installed builds predate the `now` argument, so the
+    // stored status gates them until the update reaches them.
+    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it("keeps serving a pre-clock build through the expiry webhook window", async () => {
+    // A period that ended before its webhook landed still says "pro", so
+    // the status-only fallback keeps the installed build's widget fed
+    // while a build that sends its clock is already cut off.
+    const t = newConvexTest().withIdentity({
+      subject: "recent-webhook-window|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-webhook-window",
+        status: "pro",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-webhook-window", 1);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns no saves for a lapsed status when the client omits its clock", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "recent-lapsed-legacy|session-1",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptions", {
+        userId: "recent-lapsed-legacy",
+        status: "lapsed",
+        expiresAt: Date.now() - 1000,
+        updatedAt: Date.now(),
+      });
+    });
+    await seedFeed(t, "recent-lapsed-legacy", 2);
+
+    await expect(
+      t.query(api.items.listRecentItems, { limit: 5 }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns the newest ready items up to the limit, skipping unready ones", async () => {
     const t = await as("recent-user");
     const older = await seedFeed(t, "recent-user", 3);
@@ -237,7 +325,10 @@ describe("listRecentItems", () => {
     });
     const failed = await seedFeed(t, "recent-user", 1, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 2 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 2,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([older[2], older[1]]);
     expect(recent.map((item) => item._id)).not.toContain(pending[0]);
     expect(recent.map((item) => item._id)).not.toContain(failed[0]);
@@ -251,7 +342,10 @@ describe("listRecentItems", () => {
     // window would cover. The widget must still show the older ready saves.
     await seedFeed(t, "recent-user", 30, { status: "processing" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([
       ready[2],
       ready[1],
@@ -264,7 +358,10 @@ describe("listRecentItems", () => {
     const ready = await seedFeed(t, "recent-user", 1);
     await seedFeed(t, "recent-user", 200, { status: "failed" });
 
-    const recent = await t.query(api.items.listRecentItems, { limit: 5 });
+    const recent = await t.query(api.items.listRecentItems, {
+      limit: 5,
+      now: Date.now(),
+    });
     expect(recent.map((item) => item._id)).toEqual([ready[0]]);
   });
 
@@ -273,14 +370,20 @@ describe("listRecentItems", () => {
     await seedFeed(t, "recent-user", RECENT_ITEMS_MAX + 5);
     await seedFeed(t, "someone-else", 2);
 
-    const capped = await t.query(api.items.listRecentItems, { limit: 1000 });
+    const capped = await t.query(api.items.listRecentItems, {
+      limit: 1000,
+      now: Date.now(),
+    });
     expect(capped).toHaveLength(RECENT_ITEMS_MAX);
     expect(capped.every((item) => item.title?.startsWith("Save "))).toBe(true);
 
     // A non-positive or fractional limit still yields at least one item.
-    expect(await t.query(api.items.listRecentItems, { limit: 0 })).toHaveLength(
-      1,
-    );
+    expect(
+      await t.query(api.items.listRecentItems, {
+        limit: 0,
+        now: Date.now(),
+      }),
+    ).toHaveLength(1);
   });
 });
 
@@ -2623,6 +2726,57 @@ describe("stale processing runs", () => {
         status: "ready",
       }),
     ).resolves.toBe("missing");
+  });
+
+  it("finalizeItem persists a recipe extracted from a recipe page", async () => {
+    const t = newConvexTest();
+    const itemId = await processingLink(t, "recipe-persist", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour", "2 eggs"],
+      steps: ["Whisk.", "Fry."],
+    };
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe,
+    });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ recipe });
+  });
+
+  it("keeps the recipe off the feed card", async () => {
+    // `itemCardValidator` omits `recipe`, and Convex enforces the returns
+    // validator at runtime, so a card still carrying it fails the whole feed
+    // query rather than just shipping an extra field.
+    const t = await as("recipe-feed");
+    const itemId = await processingLink(t, "recipe-feed", FRESH_AGE);
+    const runId = (await t.run((ctx) => ctx.db.get(itemId)))!.processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      title: "Pancakes",
+      description: "Fluffy breakfast pancakes",
+      tags: ["breakfast"],
+      status: "ready",
+      recipe: {
+        name: "Pancakes",
+        servings: "4 servings",
+        ingredients: ["2 cups flour", "2 eggs"],
+        steps: ["Whisk.", "Fry."],
+      },
+    });
+
+    const feed = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(feed.page.map((item) => item._id)).toContain(itemId);
+    expect(feed.page[0]).not.toHaveProperty("recipe");
   });
 
   it("reprocessItem accepts a stale processing item and refuses a fresh one", async () => {

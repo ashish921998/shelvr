@@ -134,6 +134,13 @@ export default function ProfileScreen() {
         Alert.alert(
           t("notifications.disabledTitle"),
           t("notifications.disabledBody"),
+          [
+            { text: t("common.cancel"), style: "cancel" },
+            {
+              text: t("permissions.openSettings"),
+              onPress: () => void Linking.openSettings(),
+            },
+          ],
         );
       }
     } catch (error) {

@@ -163,6 +163,7 @@ export type MessageParams = {
   "share.success": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
+  "account.signInNotFinished": undefined;
   "account.apple": undefined;
   "account.google": undefined;
   "account.anonymous": undefined;
@@ -296,6 +297,9 @@ export type MessageParams = {
   "item.stalled": undefined;
   "item.partial": undefined;
   "item.noArticle": undefined;
+  "recipe.ingredients": undefined;
+  "recipe.steps": undefined;
+  "recipe.serves": { count: number };
   "presets.articles": undefined;
   "presets.recipes": undefined;
   "presets.products": undefined;
@@ -321,6 +325,8 @@ export type MessageParams = {
   "appearance.neutralDark": undefined;
   "widget.emptyTitle": undefined;
   "widget.emptyBody": undefined;
+  "widget.proTitle": undefined;
+  "widget.proBody": undefined;
   "item.savedItem": undefined;
   "item.link": undefined;
   "item.photo": undefined;
@@ -453,6 +459,7 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "splash.tagline": undefined;
   "extension.title": undefined;
   "extension.description": undefined;
   "extension.connect": undefined;

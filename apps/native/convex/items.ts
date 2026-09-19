@@ -13,7 +13,11 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import {
+  hasProEntitlementAt,
+  hasProEntitlementStatus,
+  requireProEntitlement,
+} from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   deleteMembership,
@@ -24,6 +28,7 @@ import {
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
@@ -32,7 +37,9 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  postMediaValidator,
   PROCESSING_STALE_MS,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   imageSizeError,
@@ -113,9 +120,12 @@ const itemFields = {
   isSticker: v.optional(v.boolean()),
   tags: v.array(v.string()),
   content: v.optional(v.string()),
+  recipe: v.optional(recipeValidator),
   siteName: v.optional(v.string()),
   author: v.optional(v.string()),
   heroImageUrl: v.optional(v.string()),
+  media: v.optional(v.array(postMediaValidator)),
+  articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
@@ -186,6 +196,8 @@ const enrichedItemWithSpacesValidator = v.object({
 export const itemCardValidator = enrichedItemValidator.omit(
   "userId",
   "content",
+  "articleMedia",
+  "recipe",
   "searchText",
   "products",
   "productsStatus",
@@ -209,6 +221,8 @@ export async function toItemCard(
   const {
     userId: _userId,
     content: _content,
+    articleMedia: _articleMedia,
+    recipe: _recipe,
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
@@ -294,15 +308,26 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves, for surfaces that show a handful of items and
- * must not subscribe to the feed (the home-screen widget). The status index
- * reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view. */
+/** The newest `ready` saves for the Pro-only home-screen widget. The status
+ * index reads exactly `limit` ready rows, so a burst of fresh imports still
+ * processing can never push older ready saves out of view.
+ *
+ * Pro is checked without ever reading the wall clock (a query is not rerun
+ * as time advances, so a Date.now() read could serve stale access). A
+ * caller that sends its refreshed clock gets an exact expiry check; a
+ * build that predates the `now` argument keeps its saves while the stored
+ * subscription status is active, and the RevenueCat webhook lapses that
+ * status when a subscription actually expires. */
 export const listRecentItems = query({
-  args: { limit: v.number() },
+  args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    const entitled =
+      args.now === undefined
+        ? await hasProEntitlementStatus(ctx, userId)
+        : await hasProEntitlementAt(ctx, userId, args.now);
+    if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
       RECENT_ITEMS_MAX,
@@ -1808,9 +1833,12 @@ export const finalizeItem = internalMutation({
     description: v.string(),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     // A poster copied into our storage (TikTok thumbnails expire). Only ever
     // set for links; image items keep the storageId they were uploaded with.
     storageId: v.optional(v.id("_storage")),
@@ -1855,9 +1883,12 @@ export const finalizeItem = internalMutation({
       description: args.description,
       tags: args.tags,
       content: args.content,
+      recipe: args.recipe,
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,
+      media: args.media,
+      articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
       intents: args.intents,

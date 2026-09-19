@@ -1,0 +1,345 @@
+{
+  "status": {
+    "type": "status",
+    "url": "https://x.com/pauldix/status/2006423514446749965",
+    "id": "2006423514446749965",
+    "text": "",
+    "raw_text": {
+      "text": "https://t.co/pE2pQ1isw8",
+      "display_text_range": [0, 23],
+      "facets": []
+    },
+    "author": {
+      "screen_name": "pauldix",
+      "url": "https://x.com/pauldix",
+      "id": "13826102",
+      "followers": 10595,
+      "following": 1117,
+      "likes": 1095,
+      "media_count": 141,
+      "statuses": 6664,
+      "name": "Paul Dix",
+      "description": "CTO of @InfluxDB (YC W13), founder of NYC Machine Learning, series editor for Addison Wesley's Data & Analytics, author of Service Oriented Design with Ruby.",
+      "raw_description": {
+        "text": "CTO of @InfluxDB (YC W13), founder of NYC Machine Learning, series editor for Addison Wesley's Data & Analytics, author of Service Oriented Design with Ruby.",
+        "facets": []
+      },
+      "location": "New York City, NY",
+      "banner_url": "https://pbs.twimg.com/profile_banners/13826102/1645558876",
+      "avatar_url": "https://pbs.twimg.com/profile_images/1469375526431346702/Cz_MQEVn_200x200.jpg",
+      "joined": "Fri Feb 22 16:50:28 +0000 2008",
+      "protected": false,
+      "website": {
+        "url": "http://influxdata.com",
+        "display_url": "influxdata.com"
+      },
+      "verification": {
+        "verified": true,
+        "verified_at": null,
+        "type": "individual"
+      },
+      "type": "profile"
+    },
+    "replies": 23,
+    "reposts": 69,
+    "likes": 568,
+    "bookmarks": 1166,
+    "quotes": 24,
+    "embed_card": "tweet",
+    "created_at": "Wed Dec 31 17:53:38 +0000 2025",
+    "created_timestamp": 1767203618,
+    "possibly_sensitive": false,
+    "views": 248794,
+    "is_note_tweet": false,
+    "community_note": null,
+    "lang": null,
+    "replying_to": null,
+    "media": {},
+    "source": "Twitter Web App",
+    "article": {
+      "created_at": "2025-12-31T17:53:37.000Z",
+      "modified_at": "2025-12-31T17:53:37.000Z",
+      "id": "2006422714513526785",
+      "title": "2026: The Great Engineering Divergence",
+      "preview_text": "2025 will go down as the year code became cheap and programming changed forever. With agentic development tools—Claude Code, Codex CLI, Gemini CLI—engineers can produce far more code than ever before:",
+      "cover_media": {},
+      "content": {
+        "blocks": [
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "227ke",
+            "text": "2025 will go down as the year code became cheap and programming changed forever. With agentic development tools—Claude Code, Codex CLI, Gemini CLI—engineers can produce far more code than ever before: prototypes, analysis scripts, migrations, refactors, bug fixes, tests, docs, and glue. But that doesn’t automatically translate into shipped value. In 2026 we’ll see the split: organizations that can adapt their processes and tooling to validate and deploy this new flood of changes will compound their advantage, while everyone else bottlenecks in review, testing, and release.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6unk8",
+            "text": "The reason is simple: once coding speed jumps, everything around it becomes the constraint. Your throughput gets capped by whatever is slowest—clarifying requirements, reviewing changes, validating correctness and performance, getting to production safely, and operating what you shipped. In 2026, the great engineering divergence will be determined by who raises that ceiling end-to-end.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "41e6i",
+            "text": "Based on the pace of the last year, it’s reasonable to expect a few more major capability jumps from each lab in 2026: better tool use, more reliable instruction following, and longer usable context. I used most of the different models and agentic tools as they shipped, and I felt the shift firsthand—less “I’m writing code” and more “I’m directing work.” At this point, I expect most new code in many orgs to be AI-generated, with humans increasingly setting intent and validating outcomes.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4vt8n",
+            "text": "The most effective software teams at the end of 2026 will be wildly more productive than even the most effective software teams from the beginning of 2025. In less than 24 calendar months we'll have gone from one paradigm for software development to a new one that yields vastly more software than before. A single developer with multiple agents running in parallel paired with a software delivery process optimized for agentic development will run circles around everyone else.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9b1v2",
+            "text": "Although the rise in team productivity inequality will be driven in some small part by variance in individual adoption and effectiveness with AI, it will mostly be driven by the organization's ability to take advantage of every developer suddenly getting the ability to produce 10x to 1,000x more code than at any point before. Individuals may slowly adopt the tools, but by the middle of next year the cacophony of voices exclaiming how they're able to do so much more than before will be impossible to ignore.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 39,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "93qrs",
+            "text": "Amdahl's Law rules everything around me",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "d1tjk",
+            "text": "Amdahl's Law states that \"the overall performance improvement gained by optimizing a single part of a system is limited by the fraction of time that the improved part is actually used.\" For those of us working on performance improvements in software systems (like InfluxDB), we're intimately familiar with this concept and use it to prioritize what optimizations to work on.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "cinpu",
+            "text": "Looking at software delivery, you could break it down into a number of things that have to happen: requirements gathering and customer feedback, writing issues, designs and specs, writing code, peer code review, performance testing and UX validation, safe production deployment, and monitoring the result. Code is only one aspect of this pipeline. If coding is 20% of the end-to-end cycle, making it 10x faster only yields ~1.25x overall speedup. To get 10x end-to-end, you have to speed up review, validation, release, and ops—not just typing.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "asq6o",
+            "text": "Put more succinctly: almost no organization's existing software delivery process is capable of taking in 10x more code produced by their developers. The code they produce will be put into the pipeline and they'll wait around for the slower parts to get it through. It is now possible to produce more code than you'd ever have time to review closely.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "bq6i9",
+            "text": "This is likely why you'll see estimates of developers saying they're 20-50% more productive. My guess is that if their software delivery pipeline could take it, they'd be 10x, 100x or more productive. But they can't, so for many developers in 2026, their lives will simply get easier. They'll get a little bit more done in far less time and spend more time on UX, customer discovery, and higher-leverage work.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7iudi",
+            "text": "For those who have doubts about all this, I'd suggest paying attention to what happens with the YC batches from Fall 25, Winter 26, and Spring 26. Anecdotally, a number of founders report that nearly all the code for the companies in this latest batch was written by AI, despite these companies having programmers in their founding teams. And because these are brand new companies with small new teams, they don't have processes in place to gate what gets done, by who and how quickly. It means they can apply AI force to optimize every part of software delivery, not just the code itself.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "371mm",
+            "text": "If it’s mostly slop, you’ll see high churn: flaky systems, slow iteration despite lots of PRs, and customer trust issues. If it’s real, you’ll see tighter loops: faster experiments, faster fixes, and surprisingly robust systems for the team size.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [
+              {
+                "length": 47,
+                "offset": 0,
+                "style": "Bold"
+              }
+            ],
+            "key": "d854f",
+            "text": "How to think about software development in 2026",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9ldmm",
+            "text": "Organizations that update their processes to improve the non-code chokepoints will reap the largest rewards. Specific focus on how to improve:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "ae8kk",
+            "text": "review bandwidth / ownership",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "cdpae",
+            "text": "testing and validation",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "85uv4",
+            "text": "release/rollback confidence",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "5a9af",
+            "text": "security/compliance gates",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "c1b96",
+            "text": "product decision latency (what to build next)",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "fa4i0",
+            "text": "The software delivery process should be updated to be accessible by agents. Software pipelines with these properties will be easier for agents to work in:",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "9vbjg",
+            "text": "deterministic tests + fast local runs",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "8u11r",
+            "text": "“one command” dev environment",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "dvdj7",
+            "text": "crisp module boundaries",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "6uhdj",
+            "text": "docs colocated with code, and how to change X directions",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "3g5ap",
+            "text": "golden datasets + perf harnesses",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "2n5n0",
+            "text": "agent accessible observability across CI, performance, deployment and production",
+            "type": "unordered-list-item"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "7fugo",
+            "text": "The tooling can be iterated on with agents and it will quickly become obvious where they get tripped up and what they need to get the context in their window to solve problems.",
+            "type": "unstyled"
+          },
+          {
+            "data": {},
+            "entityRanges": [],
+            "inlineStyleRanges": [],
+            "key": "4656i",
+            "text": "It'll be a lot of work, but thankfully, I'm guessing that the AI agents of 2026 will be able to help with all of this.",
+            "type": "unstyled"
+          }
+        ],
+        "entityMap": []
+      },
+      "media_entities": []
+    },
+    "provider": "twitter",
+    "reposted_by": null
+  },
+  "thread": null,
+  "author": {
+    "screen_name": "pauldix",
+    "url": "https://x.com/pauldix",
+    "id": "13826102",
+    "followers": 10595,
+    "following": 1117,
+    "likes": 1095,
+    "media_count": 141,
+    "statuses": 6664,
+    "name": "Paul Dix",
+    "description": "CTO of @InfluxDB (YC W13), founder of NYC Machine Learning, series editor for Addison Wesley's Data & Analytics, author of Service Oriented Design with Ruby.",
+    "raw_description": {
+      "text": "CTO of @InfluxDB (YC W13), founder of NYC Machine Learning, series editor for Addison Wesley's Data & Analytics, author of Service Oriented Design with Ruby.",
+      "facets": []
+    },
+    "location": "New York City, NY",
+    "banner_url": "https://pbs.twimg.com/profile_banners/13826102/1645558876",
+    "avatar_url": "https://pbs.twimg.com/profile_images/1469375526431346702/Cz_MQEVn_200x200.jpg",
+    "joined": "Fri Feb 22 16:50:28 +0000 2008",
+    "protected": false,
+    "website": {
+      "url": "http://influxdata.com",
+      "display_url": "influxdata.com"
+    },
+    "verification": {
+      "verified": true,
+      "verified_at": null,
+      "type": "individual"
+    },
+    "type": "profile"
+  },
+  "code": 200
+}

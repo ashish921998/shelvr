@@ -4,7 +4,8 @@ import { analytics } from "@/lib/analytics";
 import { useEntitlementSync } from "@/lib/entitlement";
 import { useCurrentUser } from "@/lib/current-user";
 import { posthog } from "@/lib/posthog";
-import { ConvexAuthProvider, type TokenStorage } from "@convex-dev/auth/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { authStorage } from "@/lib/auth-storage";
 import {
   convex,
   persister,
@@ -14,7 +15,6 @@ import {
 import { observeAuthQueryErrors } from "@/lib/query-auth-recovery";
 import { useConvexAuth } from "convex/react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import * as SecureStore from "expo-secure-store";
 import {
   DarkTheme,
   DefaultTheme,
@@ -37,22 +37,7 @@ import {
   NotificationSessionProvider,
   useNotificationObserver,
 } from "@/lib/notifications";
-
-// Convex Auth persists its JWT + refresh token client-side. In React Native we
-// must supply the storage ourselves — wrap Keychain-backed expo-secure-store
-// behind the awaitable TokenStorage interface the provider expects. Scope the
-// keys to the Convex deployment so a development refresh token can never be
-// presented to production (or leave auth initialization stuck while testing).
-const authStorageNamespace = (
-  process.env.EXPO_PUBLIC_CONVEX_URL ?? "default"
-).replace(/[^A-Za-z0-9._-]/g, "_");
-const authStorageKey = (key: string) => `${authStorageNamespace}_${key}`;
-
-const authStorage: TokenStorage = {
-  getItem: (key) => SecureStore.getItemAsync(authStorageKey(key)),
-  setItem: (key, value) => SecureStore.setItemAsync(authStorageKey(key), value),
-  removeItem: (key) => SecureStore.deleteItemAsync(authStorageKey(key)),
-};
+import { SplashGate, useSplashGate } from "@/components/splash/splash-gate";
 
 // Single source of truth for the native route background. The navigator paints
 // every screen's container with the navigation theme's `background`, so setting
@@ -61,14 +46,17 @@ const authStorage: TokenStorage = {
 // white flash on push / zoom transitions). `useColorScheme` is the reliable
 // system-appearance signal; the palette comes from Unistyles.
 function PostHogIdentity() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);
 
   useEffect(() => {
+    // Convex Auth reports signed out while it reads the stored token. Acting
+    // then would reset analytics on every cold start.
+    if (isLoading) return;
     if (!isAuthenticated) {
-      analytics.reset();
+      void analytics.resetIfIdentified();
       identifiedUserId.current = undefined;
       // Convex query keys don't include the authenticated user. Remove every
       // Convex entry once per unauthenticated interval so its subscription
@@ -93,7 +81,7 @@ function PostHogIdentity() {
     analytics.identify(user._id);
     analytics.capture("auth_completed");
     identifiedUserId.current = user._id;
-  }, [isAuthenticated, isFetching, user]);
+  }, [isAuthenticated, isLoading, isFetching, user]);
 
   return null;
 }
@@ -181,16 +169,27 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { rt } = useUnistyles();
+  // The launch animation plays once per process, over the booting app — and
+  // not at all when a share intent, deep link or notification is taking the
+  // user somewhere specific.
+  const { showSplash, finishSplash } = useSplashGate();
   // Contrast with the active app theme (not the OS scheme); camera stays light
-  // over the viewfinder.
+  // over the viewfinder. The splash picks its ground from the same theme, so
+  // while it is up the status bar follows the app after all.
   const appThemeIsDark = isDarkThemeName(rt.themeName);
   const statusBarStyle =
-    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
+    !showSplash && pathname === "/camera"
+      ? "light"
+      : appThemeIsDark
+        ? "light"
+        : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
-        <Slot />
+        <SplashGate active={showSplash} onFinish={finishSplash}>
+          <Slot />
+        </SplashGate>
         <StatusBar style={statusBarStyle} />
       </NavThemeProvider>
     </OnboardingProvider>

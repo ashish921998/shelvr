@@ -57,8 +57,9 @@ same steps, so the pre-commit hook and the remote gate cannot drift. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
-under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
-`newConvexTest()` from `convex/test.setup.ts`.
+under `apps/native/convex/**`, `apps/native/src/**`, and `apps/web/src/**`.
+Convex tests use `newConvexTest()` from `convex/test.setup.ts`; web tests use
+Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Observability
 
@@ -78,21 +79,25 @@ under `apps/native/convex/**` and `apps/native/src/**`; Convex tests use
 
 ## Deployment
 
-- `deploy.yml` runs after CI completes on `main`: the `production`-environment
-  job deploys Convex behind a required-reviewer approval, then an EAS Update
-  goes to the `internal-test` channel. One-time setup, in this order: add a
-  required reviewer to the GitHub `production` environment first (the
-  reviewer queues each backend deploy until they approve it), then add
-  the `CONVEX_DEPLOY_KEY` and `EXPO_TOKEN` repo secrets.
+- `deploy.yml` runs after CI completes on `main` and deploys Convex
+  production, nothing else. No approval gate: CI, each acting job's freshness
+  check, and the pull request's public-contract check hold the line. One-time
+  setup is the `CONVEX_DEPLOY_KEY` repo secret. Client updates ship only from
+  `release.yml`, which deploys the same commit's backend first.
 - `release.yml` is dispatched manually for EAS store builds (`--auto-submit`
   requires store credentials on EAS servers) or production-channel OTA.
-- Production OTA resolves `app.config.js` on EAS servers with the EAS
-  `production` environment's variables, and the production-value guards in
-  `app.config.js` only run during `eas build`. Both workflows therefore
-  verify that the EAS `production` environment declares
-  `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` before
-  publishing; set them with `eas env:set` (`--name`, `--value`,
-  `--environment production`).
+  Both manual workflows require successful main push CI for the selected
+  commit. Release deploys that commit's backend before the client and shares
+  Deploy's concurrency group; it also requires `CONVEX_DEPLOY_KEY`.
+  Non-main dispatches fail explicitly. iOS submissions verify the EAS key
+  assignment for the production bundle and Apple team before queueing builds.
+- OTA uses EAS production's plaintext/sensitive variables, never Secret
+  values. Both workflows validate readable production Convex URLs and both
+  RevenueCat public SDK keys before publishing. Set them with `eas env:set`
+  (`--name`, `--value`, `--environment production`, `--visibility sensitive`).
+  The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
+  `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
+  consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
   fingerprint (a native dependency added or removed, a native config change)
   makes new updates invisible to binaries built from the old fingerprint:

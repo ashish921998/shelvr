@@ -220,6 +220,11 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
+  - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
+    `google-services.json`; required by every Android EAS build, with a Firebase
+    client matching that variant's package, so `expo-notifications` can obtain an
+    FCM token. See [push notification builds and updates](docs/architecture/push-notifications.md)
+    for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
 
@@ -270,7 +275,14 @@ needed at runtime by the features that use them:
   later; store builds lag for weeks). Never change a public function's argument or return shape
   in the same release that moves the client. Expand first (add a new function or accept both
   shapes), deploy, move the client, then contract once the production update channel shows no
-  old bundle still calling it.
+  old bundle still calling it. CI enforces the first half: `tools/verify-convex-api.mjs`
+  resolves every public function's `args` and `returns` to their full text, following the
+  shared validators they reference, and fails a pull request that changes or removes one.
+  Withdrawing a function's `export`, or switching it between `query`, `mutation` and
+  `action`, counts the same way. Acknowledge a change an installed app survives, or the
+  expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
+  range. It cannot yet tell widening from narrowing, so an added field asks for the
+  trailer too.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
 - The `/extension` HTTP routes are a published contract with installed browser extensions,
@@ -286,10 +298,32 @@ needed at runtime by the features that use them:
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
   no AI pass ever overwrites a user decision.
 - Deploy backend changes in a compatible order: the Convex deploy lands before
-  the client update that needs it (`.github/workflows/deploy.yml` enforces
-  this: approved production deploy, then tester OTA). Breaking changes ship as
+  the client update that needs it. `.github/workflows/deploy.yml` deploys the
+  backend alone, and `.github/workflows/release.yml` deploys the selected
+  commit's backend before it builds or publishes anything, so no client reaches
+  a person ahead of the functions it calls. Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
+- An OTA update only reaches installs whose store build shares its native fingerprint. A
+  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
+  `app.config.js`) strands every later OTA until a store build ships, and the diff does
+  not say so. Two layers cover it. On a pull request CI runs
+  `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
+  and never fails the check; acknowledge an intended move with the
+  `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
+  workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
+  compares the fingerprint the update is about to carry against
+  `apps/native/released-builds.json` and blocks the publish on anything but a match,
+  including a profile or platform with no recorded release. A blocked publish means
+  nothing published from this tree reaches the recorded binary, so the usual fix is a
+  store build, and recording the release afterwards. See
+  [push notification builds and updates](docs/architecture/push-notifications.md).
+- Adding a field to a table is a one-way door once rows carry it. Convex validates
+  every existing document against the new schema on deploy, and a table validator
+  rejects a field it does not declare, failing with an "Unexpected field" error
+  naming it. So reverting the commit that added the field fails the deploy instead
+  of rolling it back. To back a field out, stop writing it and leave it declared
+  `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 

@@ -9,6 +9,7 @@ import {
 import {
   countPartial,
   countProgress,
+  failedEntries,
   hasRetryableEntries,
   selectProcessorPayloads,
   withEntry,
@@ -528,7 +529,7 @@ export default function ShareScreen() {
     );
   }
   if (phase.kind === "saving") {
-    const { saved, total } = countProgress(phase.session);
+    const { saved, total } = countProgress(phase.session, processorPayloads);
     return (
       <Centered
         phaseKey="saving"
@@ -539,7 +540,10 @@ export default function ShareScreen() {
     );
   }
   if (phase.kind === "partial") {
-    const { saved, failed, total } = countPartial(phase.session);
+    const { saved, failed, total } = countPartial(
+      phase.session,
+      processorPayloads,
+    );
     // Show Retry only when there is at least one failed/pending entry left to
     // attempt. Unsupported entries have nothing to retry.
     const hasRetryable = hasRetryableEntries(phase.session);
@@ -562,13 +566,11 @@ export default function ShareScreen() {
           style={styles.list}
           contentContainerStyle={styles.listContent}
         >
-          {phase.session.entries
-            .filter((e) => e.status === "failed" || e.status === "unsupported")
-            .map((e) => (
-              <Text key={e.operationId} style={styles.failedItem(theme)}>
-                {localizeError(e.message)}
-              </Text>
-            ))}
+          {failedEntries(phase.session, processorPayloads).map((e) => (
+            <Text key={e.operationId} style={styles.failedItem(theme)}>
+              {localizeError(e.message)}
+            </Text>
+          ))}
         </ScrollView>
         <View style={styles.actions}>
           <Button
