@@ -131,6 +131,9 @@ export function useReplayOnboarding() {
 
         if (legacyDemoUrl) {
           try {
+            // No saveSource: this replays an onboarding demo, but
+            // `onboarding_demo` is stamped server-side by createDemoItem and
+            // the client must not claim it. No other literal is truthful here.
             await createLinkItem({
               url: legacyDemoUrl,
               operationId: getOrCreatePendingOperationId(),

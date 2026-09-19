@@ -164,15 +164,19 @@ export default function ShareScreen() {
           url,
           operationId,
           analyticsSessionId: analytics.sessionId(),
+          saveSource: "share_extension",
         }),
       saveNote: ({ text, operationId }) =>
         createNoteItem({
           text,
           operationId,
           analyticsSessionId: analytics.sessionId(),
+          saveSource: "share_extension",
         }),
       saveImage: ({ image, operationId }) =>
-        saveImages([{ image, operationId }]).then((results) => results[0]),
+        saveImages([{ image, operationId }], {
+          saveSource: "share_extension",
+        }).then((results) => results[0]),
     }),
     [createLinkItem, createNoteItem, saveImages],
   );
