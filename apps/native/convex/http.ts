@@ -6,6 +6,7 @@ import { auth } from "./auth";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
+  resolveExpiresAt,
   type RevenueCatEvent,
 } from "./model/revenuecat";
 import {
@@ -102,8 +103,7 @@ http.route({
       return new Response(null, { status: 200 });
     }
 
-    const { type, userId, expiresAt, productId, periodType, eventTimestampMs } =
-      event;
+    const { type, userId, productId, periodType, eventTimestampMs } = event;
 
     if (requiresRefundReconciliation(event)) {
       try {
@@ -126,7 +126,7 @@ http.route({
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
       status,
-      expiresAt: expiresAt ?? 0,
+      expiresAt: resolveExpiresAt(event),
       productId,
       eventTimestampMs,
     });
