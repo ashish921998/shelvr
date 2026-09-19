@@ -174,14 +174,15 @@ export default function RootLayout() {
   // user somewhere specific.
   const { showSplash, finishSplash } = useSplashGate();
   // Contrast with the active app theme (not the OS scheme); camera stays light
-  // over the viewfinder. The splash pins its own warm paper ground regardless
-  // of theme, so while it is up the status bar has to match that, not the app.
+  // over the viewfinder. The splash picks its ground from the same theme, so
+  // while it is up the status bar follows the app after all.
   const appThemeIsDark = isDarkThemeName(rt.themeName);
-  const statusBarStyle = showSplash
-    ? "dark"
-    : pathname === "/camera" || appThemeIsDark
+  const statusBarStyle =
+    !showSplash && pathname === "/camera"
       ? "light"
-      : "dark";
+      : appThemeIsDark
+        ? "light"
+        : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />

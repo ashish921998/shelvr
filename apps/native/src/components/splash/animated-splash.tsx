@@ -9,8 +9,9 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { isDarkThemeName } from "@/lib/appearance";
 import { cubicBezierEase, span } from "@/lib/splash/composition";
 import { t, useAppLocale } from "@/lib/i18n";
 import { SplashMark } from "./splash-mark";
@@ -19,10 +20,7 @@ import {
   SPLASH_ANCHOR_Y,
   SPLASH_DURATION,
   SPLASH_EXIT_FROM,
-  SPLASH_FOOTER,
-  SPLASH_GROUND,
-  SPLASH_PALETTE,
-  SPLASH_WORDMARK,
+  splashTheme,
   TIMELINE,
 } from "./timeline";
 
@@ -55,6 +53,10 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   useAppLocale();
   const { width, height } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
+  // The drawn layer takes its colours as props, so they are resolved here
+  // rather than in the stylesheet, from the same theme name the sheet reads.
+  const { rt } = useUnistyles();
+  const splash = splashTheme(isDarkThemeName(rt.themeName));
 
   // The wordmark's natural width sets both how far the lockup slides and how
   // far the unfurl opens, so the composition waits on one measurement pass.
@@ -166,7 +168,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
             width={width}
             height={height}
             clock={clock}
-            palette={SPLASH_PALETTE}
+            palette={splash.palette}
           />
         </View>
       )}
@@ -189,7 +191,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
           accessibilityRole="image"
           accessibilityLabel="Shelvr"
         >
-          <SplashMark size={MARK_SIZE} clock={clock} />
+          <SplashMark size={MARK_SIZE} clock={clock} color={splash.mark} />
           {wordmarkWidth === null ? null : (
             <Animated.View style={[styles.wordmarkClip, wordmarkStyle]}>
               <View style={styles.wordmarkInset}>
@@ -209,64 +211,68 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
-  screen: {
-    ...StyleSheet.absoluteFillObject,
-    // Pinned literals, not theme tokens: the launch screen stays on warm paper
-    // even when the app is running in one of the dark themes.
-    backgroundColor: SPLASH_GROUND,
-  },
-  canvasLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  lockupLayer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: `${SPLASH_ANCHOR_Y * 100}%`,
-    alignItems: "center",
-    // Centre the lockup on the anchor rather than hanging it below the line.
-    transform: [{ translateY: -MARK_SIZE / 2 }],
-  },
-  lockup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  wordmarkClip: {
-    overflow: "hidden",
-    // The clip opens from the left, so the wordmark writes itself out from
-    // behind the mark instead of sliding in as a block.
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
-  // Inside the clip, so a closed clip contributes no width and the mark stays
-  // centred until the unfurl begins.
-  wordmarkInset: {
-    paddingLeft: LOCKUP_GAP,
-  },
-  wordmark: {
-    fontFamily: theme.fonts.display,
-    fontSize: WORDMARK_SIZE,
-    lineHeight: WORDMARK_SIZE,
-    letterSpacing: -0.2,
-    color: SPLASH_WORDMARK,
-  },
-  measure: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    opacity: 0,
-  },
-  footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 74,
-    textAlign: "center",
-    fontFamily: theme.fonts.medium,
-    fontSize: 11,
-    letterSpacing: 1.7,
-    textTransform: "uppercase",
-    color: SPLASH_FOOTER,
-  },
-}));
+const styles = StyleSheet.create((theme, rt) => {
+  const splash = splashTheme(isDarkThemeName(rt.themeName));
+  return {
+    screen: {
+      ...StyleSheet.absoluteFillObject,
+      // Pinned literals, not theme tokens, but chosen between two grounds: a
+      // warm paper launch in front of a dark app reads as a flash on the
+      // hand-off.
+      backgroundColor: splash.ground,
+    },
+    canvasLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    lockupLayer: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: `${SPLASH_ANCHOR_Y * 100}%`,
+      alignItems: "center",
+      // Centre the lockup on the anchor rather than hanging it below the line.
+      transform: [{ translateY: -MARK_SIZE / 2 }],
+    },
+    lockup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    wordmarkClip: {
+      overflow: "hidden",
+      // The clip opens from the left, so the wordmark writes itself out from
+      // behind the mark instead of sliding in as a block.
+      alignItems: "flex-start",
+      justifyContent: "center",
+    },
+    // Inside the clip, so a closed clip contributes no width and the mark stays
+    // centred until the unfurl begins.
+    wordmarkInset: {
+      paddingLeft: LOCKUP_GAP,
+    },
+    wordmark: {
+      fontFamily: theme.fonts.display,
+      fontSize: WORDMARK_SIZE,
+      lineHeight: WORDMARK_SIZE,
+      letterSpacing: -0.2,
+      color: splash.wordmark,
+    },
+    measure: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      opacity: 0,
+    },
+    footer: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 74,
+      textAlign: "center",
+      fontFamily: theme.fonts.medium,
+      fontSize: 11,
+      letterSpacing: 1.7,
+      textTransform: "uppercase",
+      color: splash.footer,
+    },
+  };
+});

@@ -65,16 +65,6 @@ export const SPLASH_EXIT_FROM = SPLASH_DURATION - SPLASH_EXIT;
  */
 export const SPLASH_ANCHOR_Y = 0.46;
 
-/**
- * Splash colours are pinned literals rather than theme tokens: the launch
- * screen is always the warm paper ground, even when the app itself is running
- * in one of the dark themes.
- */
-export const SPLASH_GROUND = "#faf6ee";
-export const SPLASH_MARK = "#e6a23c";
-export const SPLASH_WORDMARK = "#2b2418";
-export const SPLASH_FOOTER = "#6a6050";
-
 export type SplashPalette = {
   /** Most of the sketched saves, and every dust mote. */
   ink: string;
@@ -86,9 +76,57 @@ export type SplashPalette = {
   thread: string;
 };
 
-export const SPLASH_PALETTE: SplashPalette = {
-  ink: "#2b2418",
-  accent: "#c96a3a",
-  cool: "#6b7a8f",
-  thread: "#b8924a",
+export type SplashTheme = {
+  /** The ground the whole splash is drawn on. */
+  ground: string;
+  /** The S. */
+  mark: string;
+  /** The wordmark beside it. */
+  wordmark: string;
+  /** The strapline below the lockup. */
+  footer: string;
+  /** The drawn layer: saves, dust, thread. */
+  palette: SplashPalette;
 };
+
+/**
+ * Splash colours stay pinned literals rather than theme tokens, but there are
+ * two grounds rather than one. A warm paper launch in front of a dark app
+ * reads as a flash on the hand-off, which costs more than a fixed ground
+ * buys. Both dark themes share the dark pair; the neutral one is a reading
+ * preference, not a second brand.
+ *
+ * The amber mark is common to both — it carries against either ground, and it
+ * is the one colour a viewer is meant to recognise.
+ */
+export const SPLASH_THEMES: Record<"light" | "dark", SplashTheme> = {
+  light: {
+    ground: "#faf6ee",
+    mark: "#e6a23c",
+    wordmark: "#2b2418",
+    footer: "#6a6050",
+    palette: {
+      ink: "#2b2418",
+      accent: "#c96a3a",
+      cool: "#6b7a8f",
+      thread: "#b8924a",
+    },
+  },
+  dark: {
+    ground: "#191510",
+    mark: "#e6a23c",
+    wordmark: "#f4eddd",
+    footer: "#a2977f",
+    palette: {
+      ink: "#f4eddd",
+      accent: "#e08a5a",
+      cool: "#93a6bc",
+      thread: "#c9a45e",
+    },
+  },
+};
+
+/** The splash colours for the app's current theme. */
+export function splashTheme(isDark: boolean): SplashTheme {
+  return isDark ? SPLASH_THEMES.dark : SPLASH_THEMES.light;
+}

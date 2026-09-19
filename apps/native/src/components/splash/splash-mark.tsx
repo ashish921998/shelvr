@@ -3,11 +3,11 @@ import { useMemo } from "react";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
 import { cubicBezierEase, span } from "@/lib/splash/composition";
-import { SPLASH_MARK, TIMELINE } from "./timeline";
+import { TIMELINE } from "./timeline";
 
 // The Shelvr S, popped in over the settled row. Drawn through Skia rather than
-// scaled as a bitmap layer so the ribbon stays crisp at the overshoot, and
-// tinted from a literal because the splash ground never follows the theme.
+// scaled as a bitmap layer so the ribbon stays crisp at the overshoot. The
+// tint arrives as a prop so the mark reads against either splash ground.
 
 /**
  * The mark's outline, copied from `assets/shelvr-mark.svg` (viewBox 0 0 1024
@@ -31,10 +31,13 @@ const PEAK_AT = 0.6;
 export function SplashMark({
   size,
   clock,
+  color,
 }: {
   size: number;
   /** Seconds elapsed since the animation started. */
   clock: SharedValue<number>;
+  /** The mark's tint, from the active splash theme. */
+  color: string;
 }) {
   const path = useMemo(() => {
     const parsed = Skia.Path.MakeFromSVGString(MARK_PATH);
@@ -91,7 +94,7 @@ export function SplashMark({
   return (
     <Canvas style={{ width: size, height: size }} pointerEvents="none">
       <Group transform={transform} opacity={opacity}>
-        <Path path={path} color={SPLASH_MARK} />
+        <Path path={path} color={color} />
       </Group>
     </Canvas>
   );
