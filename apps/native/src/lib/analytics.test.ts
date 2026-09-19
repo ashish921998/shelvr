@@ -24,6 +24,7 @@ const posthogCtor = vi.hoisted(() => {
   }
   return PostHogStub;
 });
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
 vi.mock("expo-updates", () => ({
   updateId: null,
@@ -189,6 +190,7 @@ describe("resetIfIdentified", () => {
     expect(mock.reset).toHaveBeenCalledOnce();
     expect(mock.register).toHaveBeenCalledWith({
       environment: "development",
+      platform: "ios",
       analytics_version: 1,
       ota_embedded: true,
     });
