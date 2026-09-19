@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
 
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 type BeforeSend = (event: EventLike) => EventLike;
 type ExceptionListEntry = {
   type?: unknown;
@@ -200,9 +202,10 @@ describe("posthog exception autocapture gate", () => {
 });
 
 describe("superProperties", () => {
-  it("tags events with the running OTA update", () => {
+  it("tags events with the running OTA update and the store platform", () => {
     expect(superProperties()).toEqual({
       environment: "development",
+      platform: "ios",
       analytics_version: 1,
       ota_update_id: "update-7",
       ota_channel: "production",
