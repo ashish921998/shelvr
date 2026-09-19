@@ -34,6 +34,16 @@ crons.interval(
   {},
 );
 
+// Deliver feedback rows whose first attempt never ran or failed, and pick up
+// `unconfigured` rows once the support-inbox env vars appear. Bounded and
+// index-backed; capped rows stay `failed` for manual inspection.
+crons.interval(
+  "retry feedback inbox delivery",
+  { hours: 1 },
+  internal.feedback.retryFailedDeliveries,
+  {},
+);
+
 // Prepare and deliver eligible weekly shelves. The worker is bounded and
 // schedules one small transaction per due user.
 crons.interval(

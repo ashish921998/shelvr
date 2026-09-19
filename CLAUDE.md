@@ -75,6 +75,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads` — per-user read state, kept out of the item row
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `waitlistSignups` — waitlist source of truth, projected to Resend
+  - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
+    (see [feedback delivery](docs/architecture/feedback.md))
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -102,12 +104,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   claim/finish/recover delivery machine.
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
+- **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
+  claim/finish delivery machine that projects each submission to the Resend support inbox with an
+  hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
   the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
-  and weekly shelf delivery recovery.
+  weekly shelf delivery recovery, and hourly feedback inbox delivery retry.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
@@ -236,6 +241,9 @@ needed at runtime by the features that use them:
 - `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
   `unconfigured` until it is set
 - `RESEND_TOPIC_ID` — Resend topic the contact is opted into
+- `RESEND_FEEDBACK_INBOX_EMAIL` — Resend address in-app feedback is projected to. Submissions stay
+  `unconfigured` until it is set
+- `RESEND_FEEDBACK_FROM_EMAIL` — verified Resend sending address for feedback email
 
 ## Working conventions
 

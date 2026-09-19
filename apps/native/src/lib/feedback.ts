@@ -1,7 +1,6 @@
-import Constants from "expo-constants";
 import { createMMKV } from "react-native-mmkv";
 import { analytics } from "@/lib/analytics";
-import { isAnalyticsAvailable, posthog } from "@/lib/posthog";
+import { isAnalyticsAvailable } from "@/lib/posthog";
 
 /**
  * Lightweight in-app feedback.
@@ -9,8 +8,11 @@ import { isAnalyticsAvailable, posthog } from "@/lib/posthog";
  * Privacy rules baked in below:
  * - Automatic events (invitation shown/dismissed, form opened) never carry
  *   message text, URLs, or saved-item content.
- * - The typed message is only published by `submitFeedback`, which runs on an
- *   explicit Send tap. Replay masks all text inputs globally (posthog.ts).
+ * - The typed message is sent only through the Convex `submitFeedback`
+ *   mutation on an explicit Send tap; it never enters PostHog in any form.
+ *   Telemetry about a submission is bounded to surface, char count, and a
+ *   content-free delivery category. Replay masks all text inputs globally
+ *   (posthog.ts).
  */
 
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
@@ -187,7 +189,10 @@ export function sanitizeFeedbackMessage(raw: string): string {
 
 // --- analytics boundary -----------------------------------------------------
 
-type FeedbackSubmitResult = "queued" | "unavailable" | "failed";
+/** Content-free projection state of a persisted submission, returned by the
+ * Convex mutation: `scheduled` means an inbox is configured and delivery is
+ * queued; `unconfigured` means the row waits for operator setup. */
+type FeedbackDeliveryState = "scheduled" | "unconfigured";
 
 export const feedbackAnalytics = {
   isAvailable(): boolean {
@@ -210,37 +215,20 @@ export const feedbackAnalytics = {
   },
 
   /**
-   * Publishes the typed message — called ONLY on an explicit Send tap.
-   * 'queued' means captured into the local PostHog queue (best-effort flush
-   * attempted), not acknowledged by a server.
+   * Capture the submission event — called ONLY after Convex acknowledges
+   * that the row is durable (see use-submit-feedback.ts). The typed message
+   * lives in Convex and the operator's inbox; PostHog only ever sees the
+   * bounded shape metadata below.
    */
-  async submitFeedback(
+  submitted(
     surface: FeedbackSurface,
-    message: string,
-  ): Promise<FeedbackSubmitResult> {
-    // `!posthog` also narrows the client below; availability logic itself is
-    // the canonical check.
-    if (!posthog || !isAnalyticsAvailable()) return "unavailable";
-    const sanitized = sanitizeFeedbackMessage(message);
-    if (!sanitized) return "failed";
-    try {
-      posthog.capture("feedback_submitted", {
-        surface,
-        message: sanitized,
-        char_count: sanitized.length,
-        environment: Constants.expoConfig?.extra?.variant ?? "development",
-        analytics_version: 1,
-      });
-    } catch {
-      return "failed";
-    }
-    // Flush so feedback leaves the device promptly; a failed flush still
-    // leaves the event queued for the next batch.
-    try {
-      await posthog.flush();
-    } catch {
-      // Queued locally regardless.
-    }
-    return "queued";
+    charCount: number,
+    delivery: FeedbackDeliveryState,
+  ): void {
+    analytics.capture("feedback_submitted", {
+      surface,
+      char_count: charCount,
+      delivery,
+    });
   },
 };
