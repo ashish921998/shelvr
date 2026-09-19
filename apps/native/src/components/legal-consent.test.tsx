@@ -18,6 +18,7 @@ type Consent =
   | undefined;
 const mocks = vi.hoisted(() => ({
   authenticated: true,
+  loading: false,
   onboarded: true,
   platform: "ios",
   consent: null as Consent,
@@ -27,7 +28,10 @@ const mocks = vi.hoisted(() => ({
   openURL: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: mocks.authenticated }),
+  useConvexAuth: () => ({
+    isAuthenticated: mocks.authenticated,
+    isLoading: mocks.loading,
+  }),
   useQuery: () => mocks.consent,
   useMutation: (reference: Parameters<typeof getFunctionName>[0]) =>
     getFunctionName(reference) === "legalConsent:review"
@@ -83,6 +87,7 @@ vi.mock("react-native", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.authenticated = true;
+  mocks.loading = false;
   mocks.onboarded = true;
   mocks.platform = "ios";
   mocks.consent = null;
@@ -109,6 +114,13 @@ it.each(["signed_out", "onboarding", "android"])(
     expect(mocks.review).not.toHaveBeenCalled();
   },
 );
+it("does not mount routes while authentication is restoring", () => {
+  mocks.loading = true;
+  mocks.authenticated = false;
+  render(boundary());
+  expect(screen.getByText("loading")).toBeDefined();
+  expect(screen.queryByText("library")).toBeNull();
+});
 it("waits for consent state before mounting purchase-capable screens", () => {
   mocks.consent = undefined;
   render(boundary());

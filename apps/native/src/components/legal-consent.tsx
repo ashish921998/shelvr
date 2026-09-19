@@ -19,10 +19,11 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 
 /** Review follows sign-in/onboarding, before purchase UI can be presented. */
 export function LegalConsentBoundary({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const enabled = isAuthenticated && onboarded && Platform.OS === "ios";
   const consent = useQuery(api.legalConsent.get, enabled ? {} : "skip");
+  if (isLoading) return <ScreenLoader label={t("loading.app")} />;
   if (!enabled) return children;
   if (consent === undefined) return <ScreenLoader label={t("loading.app")} />;
   if (consent?.reviewedVersion !== TERMS_VERSION) return <LegalConsentReview />;

@@ -162,6 +162,43 @@ describe("recorded terms and refund consent", () => {
 });
 
 describe("consent delivery reliability", () => {
+  it.each(["before_claim", "during_send"])(
+    "revokes and removes orphaned consent when the owner disappears %s",
+    async (when) => {
+      const f = await fixture();
+      await f.review(true);
+      const grant = await f.row();
+      if (when === "before_claim")
+        await f.t.run((ctx) => ctx.db.delete(f.userId));
+      const fetchMock = vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          if (when === "during_send")
+            await f.t.run((ctx) => ctx.db.delete(f.userId));
+          return Response.json({});
+        })
+        .mockImplementation(async () => Response.json({}));
+      vi.stubGlobal("fetch", fetchMock);
+      await f.send();
+      if (when === "during_send") {
+        expect(await f.row()).toMatchObject({
+          deleting: true,
+          refundSharing: false,
+          syncState: "pending",
+        });
+        await f.send();
+      }
+      const attributes = JSON.parse(
+        fetchMock.mock.calls.at(-1)![1].body,
+      ).attributes;
+      expect(attributes.apple_refund_consent.value).toBe("false");
+      expect(attributes.apple_refund_consent.updated_at_ms).toBeGreaterThan(
+        grant!.changedAt,
+      );
+      expect(await f.row()).toBeNull();
+    },
+  );
+
   it("registers a customer when consent precedes the SDK login", async () => {
     const f = await fixture();
     const fetchMock = vi

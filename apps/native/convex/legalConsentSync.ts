@@ -22,12 +22,22 @@ export const claim = internalMutation({
   args: { id: v.id("legalConsents") },
   returns: v.union(v.null(), claimValidator),
   handler: async (ctx, { id }) => {
-    const row = await ctx.db.get(id);
+    let row = await ctx.db.get(id);
     if (!row || row.syncState !== "pending" || row.nextSyncAt > Date.now())
       return null;
     const lease = Date.now() + CONSENT_SYNC_LEASE_MS;
     await ctx.db.patch(id, { syncState: "syncing", nextSyncAt: lease });
     const owner = await ctx.db.get(row.userId);
+    if (!owner && !row.deleting) {
+      const revocation = {
+        deleting: true,
+        refundSharing: false,
+        revision: row.revision + 1,
+        changedAt: Math.max(Date.now(), row.changedAt + 1),
+      };
+      await ctx.db.patch(id, revocation);
+      row = { ...row, ...revocation };
+    }
     return {
       userId: row.userId,
       revision: row.revision,
@@ -55,6 +65,20 @@ export const finish = internalMutation({
     const row = await ctx.db.get(id);
     if (!row || row.syncState !== "syncing" || row.nextSyncAt !== lease)
       return null;
+    if (!row.deleting && !(await ctx.db.get(row.userId))) {
+      // A grant may already be remote; send a newer withdrawal first.
+      await ctx.db.patch(id, {
+        deleting: true,
+        refundSharing: false,
+        revision: row.revision + 1,
+        changedAt: Math.max(Date.now(), row.changedAt + 1),
+        syncState: "pending",
+        attempts: 0,
+        nextSyncAt: Date.now(),
+      });
+      await ctx.scheduler.runAfter(0, internal.legalConsentSync.send, { id });
+      return null;
+    }
     if (row.revision === revision && success) {
       if (row.deleting) await ctx.db.delete(id);
       else await ctx.db.patch(id, { syncState: "synced", attempts: 0 });
