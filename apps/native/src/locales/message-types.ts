@@ -459,6 +459,7 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "splash.tagline": undefined;
   "home.headline": { count: number };
   "home.sectionNew": undefined;
   "home.sectionEarlier": undefined;

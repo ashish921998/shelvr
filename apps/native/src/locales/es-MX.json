@@ -518,6 +518,7 @@
   "demo.pasteOwn": "O pega tu propio enlace",
   "demo.pickShelvr": "Eso se fue a otra app. Toca Compartir otra vez y elige Shelvr.",
   "demo.shareThis": "Compartir esta publicación",
+  "splash.tagline": "Guárdalo para después",
   "home.headline": {
     "one": "%{formattedCount} cosa esperando.",
     "many": "%{formattedCount} cosas esperando.",

@@ -488,6 +488,7 @@
   "demo.pasteOwn": "또는 내 링크 붙여넣기",
   "demo.pickShelvr": "다른 앱으로 전송됐어요. 공유를 다시 탭하고 Shelvr를 선택하세요.",
   "demo.shareThis": "이 게시물 공유",
+  "splash.tagline": "나중을 위해 저장하세요",
   "home.headline": {
     "other": "%{formattedCount}개가 기다리고 있어요."
   },

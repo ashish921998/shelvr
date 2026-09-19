@@ -37,6 +37,7 @@ import {
   NotificationSessionProvider,
   useNotificationObserver,
 } from "@/lib/notifications";
+import { SplashGate, useSplashGate } from "@/components/splash/splash-gate";
 
 // Single source of truth for the native route background. The navigator paints
 // every screen's container with the navigation theme's `background`, so setting
@@ -168,16 +169,27 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { rt } = useUnistyles();
+  // The launch animation plays once per process, over the booting app — and
+  // not at all when a share intent, deep link or notification is taking the
+  // user somewhere specific.
+  const { showSplash, finishSplash } = useSplashGate();
   // Contrast with the active app theme (not the OS scheme); camera stays light
-  // over the viewfinder.
+  // over the viewfinder. The splash picks its ground from the same theme, so
+  // while it is up the status bar follows the app after all.
   const appThemeIsDark = isDarkThemeName(rt.themeName);
   const statusBarStyle =
-    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
+    !showSplash && pathname === "/camera"
+      ? "light"
+      : appThemeIsDark
+        ? "light"
+        : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
-        <Slot />
+        <SplashGate active={showSplash} onFinish={finishSplash}>
+          <Slot />
+        </SplashGate>
         <StatusBar style={statusBarStyle} />
       </NavThemeProvider>
     </OnboardingProvider>

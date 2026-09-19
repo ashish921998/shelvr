@@ -30,7 +30,8 @@
  */
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, relative, basename } from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isMainModule } from "./main-module.mjs";
 
 const CONVEX_DIR = "apps/native/convex";
 const API_FILE = `${CONVEX_DIR}/_generated/api.d.ts`;
@@ -60,7 +61,8 @@ const ENTRY_POINT_EXTENSIONS = [
  */
 export function isEntryPoint(relPath, readSource) {
   const base = basename(relPath);
-  if (!ENTRY_POINT_EXTENSIONS.some((ext) => relPath.endsWith(ext))) return false;
+  if (!ENTRY_POINT_EXTENSIONS.some((ext) => relPath.endsWith(ext)))
+    return false;
   if (relPath.startsWith("_generated/")) return false;
   if (base.startsWith(".")) return false;
   if (base.startsWith("#")) return false;
@@ -92,7 +94,11 @@ export function declaredModules(source) {
 }
 
 /** Every module path Convex would bundle out of `dir`, extension stripped. */
-export function discoverModules(dir, readFile = readFileSync, exists = existsSync) {
+export function discoverModules(
+  dir,
+  readFile = readFileSync,
+  exists = existsSync,
+) {
   const found = [];
   const walk = (current) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -151,7 +157,7 @@ function main() {
   return 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   process.exit(main());
 }
 
