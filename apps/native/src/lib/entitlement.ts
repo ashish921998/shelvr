@@ -404,7 +404,10 @@ export function isPaywallPending(): boolean {
   return liveSheet() !== null;
 }
 
-async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
+/** `owned` is false when this call joined a presentation someone else opened. */
+type Presentation = { outcome: PaywallOutcome; owned: boolean };
+
+async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
   // iOS presents one sheet at a time. A second presentation raced against a
   // live one leaves both RevenueCat promises unsettled, so neither reports an
   // outcome and the user sees at most one paywall. The `share` placement
@@ -413,14 +416,17 @@ async function presentPaywall(placement = "pro_gate"): Promise<PaywallOutcome> {
   // Center sheet it reports `cancelled` rather than `unavailable`, because
   // the fallback route would stack a second screen behind the sheet.
   const live = liveSheet();
-  if (live) return live.paywall ?? "cancelled";
+  if (live) {
+    const outcome = live.paywall ? await live.paywall : "cancelled";
+    return { outcome, owned: false };
+  }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   sheet.paywall = presentPaywallImpl(placement).finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     if (openSheet === sheet) openSheet = null;
   });
   openSheet = sheet;
-  return sheet.paywall;
+  return { outcome: await sheet.paywall, owned: true };
 }
 
 /**
@@ -433,8 +439,10 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const outcome = await presentPaywall(placement);
-  if (shouldOpenPaywallFallback(outcome)) {
+  const { outcome, owned } = await presentPaywall(placement);
+  // Only the caller that opened the sheet may route. Joined callers share the
+  // same `unavailable`, and a second push stacks a second paywall screen.
+  if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
   return outcome === "success";

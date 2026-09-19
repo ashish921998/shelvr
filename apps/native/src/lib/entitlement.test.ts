@@ -135,6 +135,21 @@ describe("presentPaywall concurrency", () => {
     expect(await Promise.all([first, second])).toEqual([true, true]);
   });
 
+  it("routes to the fallback once when a shared presentation is unavailable", async () => {
+    const { openPaywall } = await loadReady();
+    const sheet = deferred<string>();
+    mock.presentPaywall.mockReturnValue(sheet.promise);
+
+    const first = openPaywall(router, "share");
+    const second = openPaywall(router, "share");
+    // ERROR maps to `unavailable`, the only outcome that opens the fallback.
+    sheet.resolve("ERROR");
+
+    expect(await Promise.all([first, second])).toEqual([false, false]);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
   it("presents again once the previous presentation settles", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("CANCELLED");
