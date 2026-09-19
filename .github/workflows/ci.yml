@@ -50,6 +50,13 @@ jobs:
       - name: Convex codegen drift
         run: pnpm run verify:codegen
 
+      # The localization generator projects the source catalogs into artifacts
+      # typecheck cannot see: the iOS/Android permission strings, the widget's
+      # xcstrings, and the notification copy Convex sends. Editing one of those
+      # strings without re-running the generator ships the old text.
+      - name: Localization codegen drift
+        run: pnpm run verify:localizations
+
       - name: Tooling tests
         run: pnpm run test:tools
 
