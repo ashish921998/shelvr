@@ -1,9 +1,9 @@
 {
   "production": {
     "ios": {
-      "buildId": "a32a658b-d52b-4a1f-8e75-766863232278",
-      "fingerprint": "d17342db4b4ba3d2744408bd88454b08f1f112e1",
-      "release": "1.0.3 (27), App Store, released 2026-09-15"
+      "buildId": "b08ff398-5646-4924-9cce-44102d5bd045",
+      "fingerprint": "9ecfd739fc9136ff56b21ccc044eea28ab65f237",
+      "release": "1.0.4 (32), App Store, submitted 2026-09-19, awaiting review"
     },
     "android": {
       "buildId": "8f60c55c-7001-4dd3-8251-a9ba352699de",
