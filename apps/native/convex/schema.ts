@@ -3,10 +3,12 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { recipientValidator } from "./model/notificationFields";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
   postMediaValidator,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   cancelSurveyOutcomeValidator,
@@ -54,11 +56,18 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
     // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
     media: v.optional(v.array(postMediaValidator)),
+    // Images and videos inside `content`. Kept apart from `media`, which marks
+    // a save as a social post.
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.

@@ -210,3 +210,15 @@ describe("superProperties", () => {
     });
   });
 });
+
+describe("push notification capture", () => {
+  // Both options default to true in the SDK, and the native side sends
+  // `$push_notification_opened` without consulting `before_send`, so the
+  // redaction above cannot reach it. Pinned off explicitly: an SDK bump must
+  // not widen what leaves the device.
+  it("stays off so no push data bypasses the redaction hook", () => {
+    const options = posthogCtor.options as Record<string, unknown>;
+    expect(options.capturePushNotificationSubscriptions).toBe(false);
+    expect(options.capturePushNotificationOpened).toBe(false);
+  });
+});

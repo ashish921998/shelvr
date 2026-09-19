@@ -296,6 +296,12 @@
   "item.stalled": "This is taking longer than it should.",
   "item.partial": "Saved from the link alone — the page wouldn't load, so these details are a guess.",
   "item.noArticle": "This page has no readable article — saved as a plain link.",
+  "recipe.ingredients": "Ingredients",
+  "recipe.steps": "Steps",
+  "recipe.serves": {
+    "one": "Serves %{formattedCount}",
+    "other": "Serves %{formattedCount}"
+  },
   "presets.articles": "Articles",
   "presets.recipes": "Recipes",
   "presets.products": "Products",

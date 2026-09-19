@@ -297,6 +297,9 @@ export type MessageParams = {
   "item.stalled": undefined;
   "item.partial": undefined;
   "item.noArticle": undefined;
+  "recipe.ingredients": undefined;
+  "recipe.steps": undefined;
+  "recipe.serves": { count: number };
   "presets.articles": undefined;
   "presets.recipes": undefined;
   "presets.products": undefined;

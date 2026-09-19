@@ -26,8 +26,14 @@ import {
   xStatusId,
 } from "./model/externalUrl";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { INTENT_KINDS, type PostMedia } from "./model/itemFields";
+import {
+  INTENT_KINDS,
+  type ArticleMedia,
+  type PostMedia,
+  type Recipe,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
+import { extractRecipeMarkup, type RecipeDraft } from "./model/recipeMarkup";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -223,6 +229,9 @@ const MAX_CONTENT_CHARS = 8000;
 // How much of the article body to store & render. Kept well under Convex's
 // 1MB document limit; long-form essays run tens of thousands of chars.
 const MAX_STORED_CONTENT_CHARS = 100000;
+// How much page text the classifier prompt actually carries. Anything longer
+// is cut, so the model never sees the tail.
+const PROMPT_CONTENT_CHARS = 6000;
 
 // ---------------------------------------------------------------------------
 // HTML extraction
@@ -501,15 +510,29 @@ function htmlToText(html: string): string {
  * HTML through htmlToText to get the paragraph-separated plain text the client
  * renders. Pages without a readable article do not store a body.
  */
+// Shortest extraction worth calling an article body. Under this a bot-hostile
+// or JS-rendered page has yielded only chrome, and the classifier writing a
+// description of that chrome is worse than it knowing there was no body: it
+// still has the title, the site and the page's own meta description. The
+// shortest text the tests deliberately keep is a little under 200 characters.
+const MIN_ARTICLE_CHARS = 120;
+
 export function extractBodyText(html: string, url: string): string | undefined {
   try {
     const { document } = parseHTML(html);
     // Remove explicit page chrome before parsing: the readerability preflight
     // rejects short articles, while parse() can retain chrome on sparse pages.
     for (const element of document.querySelectorAll(
-      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent',
+      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent, .skip-link, .skip-to-content, .skip-nav, .screen-reader-shortcut',
     )) {
       element.remove();
+    }
+    // A skip link is an in-page anchor, so it sits outside nav and banner and
+    // reads to Readability as ordinary body text.
+    for (const anchor of document.querySelectorAll('a[href^="#"]')) {
+      if (/^\s*skip\b/i.test(anchor.textContent ?? "")) {
+        anchor.remove();
+      }
     }
     for (const menu of document.querySelectorAll(".menu")) {
       const links = Array.from(menu.querySelectorAll("a"));
@@ -533,7 +556,7 @@ export function extractBodyText(html: string, url: string): string | undefined {
     const article = new Readability(document).parse();
     if (article?.content) {
       const text = htmlToText(article.content);
-      if (text.trim() !== "") {
+      if (text.trim().length >= MIN_ARTICLE_CHARS) {
         return text;
       }
     }
@@ -554,8 +577,56 @@ type PageData = {
   /** A best-effort part of the read failed transiently (e.g. the Instagram
    * caption), so a retry can still add content. Internal only. */
   incomplete?: true;
+  /** The source served a cut copy of its own text, so `content` ends early no
+   * matter how short it is. X does this for a long post (`note_tweet`) and for
+   * an Article preview. Internal only. */
+  truncated?: true;
   media?: PostMedia[];
+  articleMedia?: ArticleMedia[];
+  /** The recipe the page declares in schema.org markup (or, for a caption
+   * source, the recipe page its caption links to). Already sanitized. */
+  recipe?: Recipe;
+  /** The caption's first outside link, when the reader saw the real href
+   * rather than the display text. Readers that don't set it fall back to
+   * scanning the caption in `withLinkedRecipe`. */
+  linkedUrl?: string;
 };
+
+/** Hosts whose pages are link hubs or the social network itself — never the
+ * recipe write-up — so a caption pointing there is not worth a fetch. */
+const LINK_HUB_HOSTS = new Set([
+  "linktr.ee",
+  "linkin.bio",
+  "beacons.ai",
+  "bio.link",
+  "lnk.bio",
+  "tiktok.com",
+  "instagram.com",
+  "x.com",
+  "twitter.com",
+  "youtube.com",
+  "youtu.be",
+]);
+
+/** First http(s) URL in a caption worth following for a recipe, with trailing
+ * punctuation trimmed and link hubs skipped. Exported pure for unit testing. */
+export function firstLinkedUrl(text: string | undefined): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
+    const candidate = match[0].replace(/[.,;:!?]+$/, "");
+    try {
+      const host = new URL(candidate).hostname.replace(/^www\./, "");
+      if (!LINK_HUB_HOSTS.has(host)) {
+        return candidate;
+      }
+    } catch {
+      // Not a URL after all; keep scanning.
+    }
+  }
+  return undefined;
+}
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -631,12 +702,20 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
   };
   const html = str("html") ?? "";
   const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  const body = paragraph ? paragraph[1] : html;
   const content = decodeEntities(
-    (paragraph ? paragraph[1] : html)
+    body
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim(),
   );
+  // Post links are t.co redirects whose anchor text is the display URL;
+  // attached media links display as pic.twitter.com and lead nowhere useful.
+  const hrefs = Array.from(
+    body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi),
+  )
+    .filter(([, , label]) => !/^\s*pic\.(twitter|x)\.com/i.test(label))
+    .map(([, href]) => decodeEntities(href));
   // author_url carries the handle; author_name is the display name.
   const handle = str("author_url")?.match(
     /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
@@ -646,6 +725,7 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
     siteName: "X",
     author: handle ? `@${handle}` : str("author_name"),
     content: content || undefined,
+    linkedUrl: firstLinkedUrl(hrefs.join(" ")),
   };
 }
 
@@ -727,7 +807,11 @@ function xPostText(
   return post.note_tweet ? `${text}…` : text;
 }
 
-type XSyndicationRead = { page: PageData; isArticle: boolean };
+type XSyndicationRead = {
+  page: PageData;
+  isArticle: boolean;
+  sensitive: boolean;
+};
 
 function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   const parsed = xSyndicationSchema.safeParse(body);
@@ -746,11 +830,15 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
     const preview = post.article.preview_text?.trim();
     return {
       isArticle: true,
+      sensitive: post.possibly_sensitive === true,
       page: {
         title: post.article.title,
         siteName: "X",
         author,
         content: preview ? `${preview}…` : undefined,
+        // The preview is a cut copy; withXArticleBody swaps in the whole body
+        // when X's private API answers.
+        ...(preview ? { truncated: true as const } : {}),
         heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
         heroAspectRatio: cover
           ? cover.original_img_width / cover.original_img_height
@@ -778,11 +866,13 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
   }
   return {
     isArticle: false,
+    sensitive: post.possibly_sensitive === true,
     page: {
       title: content ? Array.from(content).slice(0, 100).join("") : undefined,
       siteName: "X",
       author,
       content,
+      ...(post.note_tweet ? { truncated: true as const } : {}),
       ...(media.length > 0
         ? {
             heroImageUrl: media[0].imageUrl,
@@ -821,18 +911,46 @@ const fxArticleSchema = z.object({
             key: z.string(),
             value: z.object({
               type: z.string(),
-              data: z.object({ url: z.string().optional() }),
+              data: z.object({
+                url: z.string().optional(),
+                // Parsed in blockMedia, so an odd shape skips the image
+                // rather than the whole body.
+                mediaItems: z.unknown().optional(),
+              }),
             }),
           }),
         ),
       }),
+      // Parsed one entry at a time (see articleMediaById), so a media type
+      // this schema does not know cannot cost the whole body.
+      media_entities: z.array(z.unknown()).default([]),
     }),
   }),
 });
 
-type FxArticleContent = z.infer<
-  typeof fxArticleSchema
->["status"]["article"]["content"];
+const fxMediaItemsSchema = z.array(
+  z.object({ mediaId: z.union([z.string(), z.number()]).transform(String) }),
+);
+
+const fxImageInfo = z.object({
+  original_img_url: z.url(),
+  original_img_width: xDimensions.width,
+  original_img_height: xDimensions.height,
+});
+
+const fxMediaEntitySchema = z.object({
+  media_id: z.coerce.string(),
+  media_info: z.discriminatedUnion("__typename", [
+    fxImageInfo.extend({ __typename: z.literal("ApiImage") }),
+    z.object({
+      __typename: z.enum(["ApiVideo", "ApiGif"]),
+      preview_image: fxImageInfo,
+    }),
+  ]),
+});
+
+type FxArticle = z.infer<typeof fxArticleSchema>["status"]["article"];
+type FxArticleContent = FxArticle["content"];
 
 const FXTWITTER_USER_AGENT = "Shelvr/1.0 (+https://shelvr.app)";
 
@@ -874,10 +992,59 @@ function articleBlockText(
     .trim();
 }
 
-/** The plain-text body the reader view renders: one paragraph per text
- * block. Images, embedded posts, and dividers are atomic blocks the reader
- * cannot show inline, so they are left out rather than marked. */
-function articleBodyText(content: FxArticleContent): string | undefined {
+/** Where to show an Article's images and videos, keyed by media id. */
+function articleMediaById(
+  entities: unknown[],
+): Map<string, Omit<ArticleMedia, "paragraph">> {
+  const byId = new Map<string, Omit<ArticleMedia, "paragraph">>();
+  for (const entity of entities) {
+    const parsed = fxMediaEntitySchema.safeParse(entity);
+    if (!parsed.success) {
+      continue;
+    }
+    const info = parsed.data.media_info;
+    const image = info.__typename === "ApiImage" ? info : info.preview_image;
+    byId.set(parsed.data.media_id, {
+      kind:
+        info.__typename === "ApiImage"
+          ? "photo"
+          : info.__typename === "ApiVideo"
+            ? "video"
+            : "gif",
+      imageUrl: xLargeImage(image.original_img_url),
+      aspectRatio: image.original_img_width / image.original_img_height,
+    });
+  }
+  return byId;
+}
+
+/** The readable media an atomic block points at. */
+function blockMedia(
+  block: FxArticleContent["blocks"][number],
+  content: FxArticleContent,
+  mediaById: Map<string, Omit<ArticleMedia, "paragraph">>,
+): Omit<ArticleMedia, "paragraph">[] {
+  return block.entityRanges.flatMap((range) => {
+    const entity = content.entityMap.find((e) => e.key === range.key);
+    const items = fxMediaItemsSchema.safeParse(entity?.value.data.mediaItems);
+    return (items.success ? items.data : []).flatMap((item) => {
+      const found = mediaById.get(item.mediaId);
+      return found ? [found] : [];
+    });
+  });
+}
+
+const MAX_ARTICLE_MEDIA = 50;
+
+type ArticleBody = { text: string; media: ArticleMedia[] };
+
+/** The plain-text body the reader view renders, one paragraph per text
+ * block, and the images and videos that sit between those paragraphs.
+ * Embedded posts and dividers are atomic blocks the reader cannot show, so
+ * they are left out rather than marked. */
+function articleBody(article: FxArticle): ArticleBody | undefined {
+  const { content } = article;
+  const mediaById = articleMediaById(article.media_entities);
   const links = new Map<string, string>();
   for (const entity of content.entityMap) {
     const url =
@@ -889,8 +1056,14 @@ function articleBodyText(content: FxArticleContent): string | undefined {
     }
   }
   const paragraphs: string[] = [];
+  const media: ArticleMedia[] = [];
   let listNumber = 0;
   for (const block of content.blocks) {
+    if (block.type === "atomic") {
+      for (const found of blockMedia(block, content, mediaById)) {
+        media.push({ ...found, paragraph: paragraphs.length });
+      }
+    }
     const text = block.type === "atomic" ? "" : articleBlockText(block, links);
     if (text === "") {
       continue;
@@ -904,12 +1077,24 @@ function articleBodyText(content: FxArticleContent): string | undefined {
           : text,
     );
   }
-  const body = paragraphs.join("\n\n").slice(0, MAX_STORED_CONTENT_CHARS);
-  return body === "" ? undefined : body;
+  const joined = paragraphs.join("\n\n");
+  const text = joined.slice(0, MAX_STORED_CONTENT_CHARS);
+  if (text === "") {
+    return undefined;
+  }
+  // A cut body loses its last paragraphs, and the media after them.
+  const kept =
+    text.length === joined.length
+      ? paragraphs.length
+      : text.split("\n\n").length - 1;
+  return {
+    text,
+    media: media.filter((m) => m.paragraph <= kept).slice(0, MAX_ARTICLE_MEDIA),
+  };
 }
 
 type ArticleBodyRead =
-  | { ok: true; body: string }
+  | { ok: true; body: ArticleBody }
   | { ok: false; category: string };
 
 async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
@@ -942,7 +1127,7 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
   if (parsed.data.status.id !== id) {
     return { ok: false, category: "id_mismatch" };
   }
-  const body = articleBodyText(parsed.data.status.article.content);
+  const body = articleBody(parsed.data.status.article);
   return body === undefined
     ? { ok: false, category: "empty_body" }
     : { ok: true, body };
@@ -950,10 +1135,28 @@ async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
 
 /** fxtwitter is an unofficial mirror of X's private web API, so the full body
  * is a bonus: any failure keeps the syndication preview. */
-async function withXArticleBody(id: string, page: PageData): Promise<PageData> {
+async function withXArticleBody(
+  id: string,
+  page: PageData,
+  sensitive: boolean,
+): Promise<PageData> {
   const read = await readXArticleBody(id);
   if (read.ok) {
-    return { ...page, content: read.body };
+    // Sensitive media stays hidden, as for posts. An Article that opens
+    // with its cover would show it twice.
+    const media = sensitive
+      ? []
+      : read.body.media.filter(
+          (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
+        );
+    // The whole body replaces the cut preview, so the read is no longer short
+    // of its source.
+    const { truncated: _preview, ...whole } = page;
+    return {
+      ...whole,
+      content: read.body.text,
+      ...(media.length > 0 ? { articleMedia: media } : {}),
+    };
   }
   logEvent("warn", "x_article_body_fallback", {
     error_category: read.category,
@@ -992,7 +1195,9 @@ export async function fetchXPost(url: string): Promise<PageData> {
     }
   }
   if (read) {
-    return read.isArticle ? await withXArticleBody(id, read.page) : read.page;
+    return read.isArticle
+      ? await withXArticleBody(id, read.page, read.sensitive)
+      : read.page;
   }
   logEvent("warn", "x_syndication_fallback", {
     error_category: result.ok
@@ -1058,7 +1263,7 @@ async function fetchInstagramHtml(url: string) {
 }
 
 type InstagramEmbed =
-  | { status: "ok"; html: string }
+  | { status: "ok"; html: string; truncated?: true }
   | { status: "missing" }
   | { status: "transient"; errorCategory: string };
 
@@ -1085,6 +1290,7 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     return {
       status: "ok",
       html: decodeWithContentType(result.bytes, result.contentType),
+      ...(result.truncated ? { truncated: true as const } : {}),
     };
   }
   return isTransientFetchFailure(result.code, result.status)
@@ -1163,6 +1369,9 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    ...(page.truncated || (embed.status === "ok" && embed.truncated)
+      ? { truncated: true as const }
+      : {}),
     ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
@@ -1283,25 +1492,77 @@ function summarizeError(error: unknown): string {
   return "unexpected_error";
 }
 
+/** Fetch policy for an HTML page read: the saved link itself, or the recipe
+ * page a caption links to. */
+const PAGE_FETCH_OPTIONS = {
+  timeoutMs: 15000,
+  // Hard cap on the streamed page body. Generous for real articles; bounded
+  // to deny a malicious/buggy server from exhausting memory. Truncate instead
+  // of failing — a large page's first 1 MiB is still enough for extraction.
+  maxBytes: 1024 * 1024,
+  onOverflow: "truncate",
+  allowContentType: (ct: string) =>
+    ct.startsWith("text/html") ||
+    ct.startsWith("application/xhtml+xml") ||
+    ct.startsWith("application/xml"),
+  headers: {
+    "User-Agent": BROWSER_USER_AGENT,
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+  },
+} as const;
+
+/**
+ * The recipe a page declares in its own schema.org markup, or undefined when
+ * it declares none.
+ *
+ * A read cut off at `maxBytes` yields nothing, because a cut document still
+ * parses. Microdata's ingredient and step lists simply stop early, and a recipe
+ * whose method stops after step 1 reads exactly like a recipe with one step —
+ * `sanitizeRecipe` checks that the lists are non-empty and within budget, which
+ * a prefix satisfies. JSON-LD survives a cut only by accident, since
+ * `JSON.parse` rejects a half-written object, so the guard belongs here where
+ * both markup shapes pass through rather than inside the extractor.
+ */
+function recipeFromMarkup(
+  html: string,
+  truncated: true | undefined,
+): Recipe | undefined {
+  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
+}
+
+/**
+ * A caption source (TikTok, X) carries only a caption, and the caption often
+ * links to the full recipe write-up. Follow that one link and read its
+ * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
+ * leaves the post exactly as it was.
+ */
+async function withLinkedRecipe(page: PageData): Promise<PageData> {
+  const caption = captionText(page);
+  if (caption === undefined) {
+    return page;
+  }
+  const linkedUrl = page.linkedUrl ?? firstLinkedUrl(caption);
+  if (linkedUrl === undefined) {
+    return page;
+  }
+  try {
+    const result = await safeFetch(linkedUrl, PAGE_FETCH_OPTIONS);
+    if (!result.ok) {
+      return page;
+    }
+    const recipe = recipeFromMarkup(
+      decodeWithContentType(result.bytes, result.contentType),
+      result.truncated,
+    );
+    return recipe === undefined ? page : { ...page, recipe };
+  } catch {
+    return page;
+  }
+}
+
 async function fetchPage(url: string): Promise<PageData> {
-  const result = await safeFetch(url, {
-    timeoutMs: 15000,
-    // Hard cap on the streamed page body. Generous for real articles; bounded
-    // to deny a malicious/buggy server from exhausting memory. Truncate instead
-    // of failing — a large page's first 1 MiB is still enough for extraction.
-    maxBytes: 1024 * 1024,
-    onOverflow: "truncate",
-    allowContentType: (ct) =>
-      ct.startsWith("text/html") ||
-      ct.startsWith("application/xhtml+xml") ||
-      ct.startsWith("application/xml"),
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
+  const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
   if (!result.ok) {
     // Surface only the policy code (+ status for http_error); readPage decides
     // whether the item can still be saved.
@@ -1355,6 +1616,9 @@ async function fetchPage(url: string): Promise<PageData> {
   }
 
   const content = extractBodyText(html, finalUrl);
+  // The page's own schema.org Recipe markup is the recipe: exact lines, no
+  // prompt window, nothing invented. Absent for anything not a recipe.
+  const recipe = recipeFromMarkup(html, result.truncated);
 
   return {
     title,
@@ -1363,6 +1627,10 @@ async function fetchPage(url: string): Promise<PageData> {
     heroAspectRatio,
     siteName,
     content,
+    // A page over the fetch cap gives us a prefix, so `content` ends early
+    // however long it looks.
+    ...(result.truncated ? { truncated: true as const } : {}),
+    ...(recipe ? { recipe } : {}),
   };
 }
 
@@ -1380,14 +1648,32 @@ type PageRead =
  * sanitized log rereads it. */
 type LinkRead = { status: "ok"; page: PageData } | { status: "unreadable" };
 
+/** True for saves whose readable text is a post caption rather than a page
+ * body. Only these let the model propose a recipe: a caption has no schema.org
+ * markup to read. Real web pages use their markup instead. */
+function isCaptionSource(url: string): boolean {
+  return isTikTokUrl(url) || xStatusId(url) !== undefined;
+}
+
+/** The page's text when the model receives all of it, which is what makes it a
+ * caption rather than a body. A longer read (an X Article, a blog post) is
+ * neither text whose one outbound link is the recipe it describes, nor text a
+ * model can transcribe a recipe from without inventing the part that was cut. */
+function captionText(page: PageData): string | undefined {
+  return page.content !== undefined &&
+    page.content.length <= PROMPT_CONTENT_CHARS
+    ? page.content
+    : undefined;
+}
+
 async function readPage(url: string): Promise<PageRead> {
   try {
     const page = isTikTokUrl(url)
-      ? await fetchTikTokOEmbed(url)
+      ? await withLinkedRecipe(await fetchTikTokOEmbed(url))
       : xStatusId(url)
-        ? await fetchXPost(url)
+        ? await withLinkedRecipe(await fetchXPost(url))
         : isInstagramUrl(url)
-          ? await fetchInstagram(url)
+          ? await withLinkedRecipe(await fetchInstagram(url))
           : await fetchPage(url);
     return { status: "ok", page };
   } catch (error) {
@@ -1446,6 +1732,35 @@ const itemAnalysisSchema = z.object({
     ),
 });
 
+const recipeSchema = z
+  .object({
+    name: z.string().optional().describe("The recipe's own name"),
+    servings: z
+      .string()
+      .optional()
+      .describe("Yield exactly as stated, e.g. '4 servings' or '12 cookies'"),
+    ingredients: z
+      .array(z.string())
+      .describe("Every ingredient line, quantities included, in source order"),
+    steps: z
+      .array(z.string())
+      .describe(
+        "Every instruction step, numbered or not in the source, in order, each one a complete instruction",
+      ),
+  })
+  .nullable()
+  .describe(
+    "If this item is a recipe, the complete ingredients and steps exactly as the source states them — the user wants the recipe itself, not the story around it. null for anything that is not a recipe, and never lines the source does not contain.",
+  );
+
+/** The classifier output for sources where the model is the only way to get
+ * a recipe: captions, screenshots, notes. Web pages classify with the base
+ * schema — their recipe comes from schema.org markup, so asking the model
+ * again would only cost output tokens and invite a truncated guess. */
+const itemAnalysisWithRecipeSchema = itemAnalysisSchema.extend({
+  recipe: recipeSchema,
+});
+
 type Intent = z.infer<typeof intentSchema>;
 
 const ALLOWED_INTENT_KINDS = new Set<string>(INTENT_KINDS);
@@ -1490,6 +1805,68 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
     .slice(0, 5);
 }
 
+// Bounds for a proposed recipe. Both reject the whole recipe rather than
+// shorten it, so they sit well above what a real recipe reaches: an elaborate
+// multi-component bake runs to a few thousand characters, not twenty thousand.
+const MAX_RECIPE_LINES = 120;
+const MAX_RECIPE_CHARS = 20000;
+const MAX_RECIPE_NAME_CHARS = 120;
+const MAX_RECIPE_SERVINGS_CHARS = 60;
+
+/** Clean a proposed recipe (page markup or model) before it's persisted: trim
+ * every line, drop the empty ones, and reject the whole recipe when a list
+ * comes back empty (the markup is incomplete or the model is guessing) or when
+ * it is too long to store.
+ *
+ * Nothing here shortens a recipe. The card replaces the article body, so a cut
+ * instruction is a wrong recipe the reader cannot tell from a right one and
+ * cannot read around; a recipe over budget is refused instead, which leaves the
+ * article in place. Repeated lines are kept for the same reason: a recipe in
+ * components lists the same quantity under each one, and a dough really does
+ * rest twice. A rejected recipe is simply omitted — never fails the whole
+ * finalize. */
+export function sanitizeRecipe(
+  raw: RecipeDraft | null | undefined,
+): Recipe | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const clean = (lines: string[] | undefined): string[] =>
+    (lines ?? []).map((line) => line.trim()).filter((line) => line !== "");
+  const ingredients = clean(raw.ingredients);
+  const steps = clean(raw.steps);
+  if (ingredients.length === 0 || steps.length === 0) {
+    return undefined;
+  }
+  if (
+    ingredients.length > MAX_RECIPE_LINES ||
+    steps.length > MAX_RECIPE_LINES
+  ) {
+    return undefined;
+  }
+  // Blank name/servings are left out entirely (not set to undefined) so the
+  // persisted document never carries an explicit undefined key. Both label the
+  // recipe rather than state it, so capping their length loses no instruction.
+  const name = raw.name?.trim().slice(0, MAX_RECIPE_NAME_CHARS);
+  const servings = raw.servings?.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS);
+  const recipe = {
+    ...(name ? { name } : {}),
+    ...(servings ? { servings } : {}),
+    ingredients,
+    steps,
+  };
+  return recipeChars(recipe) > MAX_RECIPE_CHARS ? undefined : recipe;
+}
+
+function recipeChars(recipe: Recipe): number {
+  return [
+    recipe.name ?? "",
+    recipe.servings ?? "",
+    ...recipe.ingredients,
+    ...recipe.steps,
+  ].reduce((total, line) => total + line.length, 0);
+}
+
 function spacesPromptBlock(
   spaces: { name: string; description?: string }[],
 ): string {
@@ -1517,7 +1894,10 @@ function spacesPromptBlock(
  * finalize step needs (always undefined for images and notes, which are fully
  * enriched by definition). */
 type Classification = {
-  result: z.infer<typeof itemAnalysisSchema>;
+  result: z.infer<typeof itemAnalysisSchema> & {
+    /** Present only when the source was classified with the recipe schema. */
+    recipe?: z.infer<typeof recipeSchema>;
+  };
   page?: PageData;
   linkRead?: LinkRead;
 };
@@ -1546,9 +1926,13 @@ function linkAnalysisPrompt(
   page: PageData | undefined,
   linkRead: LinkRead | undefined,
   spacesBlock: string,
+  askForRecipe: boolean,
 ): string {
   return [
     "You are helping organize a save-it-for-later app. Analyze this saved web page and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+    askForRecipe
+      ? "If the caption shares a recipe, also fill the recipe field with its complete ingredients and steps exactly as the caption states them (null otherwise). Never add lines the caption does not contain — a caption that only names a dish is not a recipe."
+      : "",
     spacesBlock,
     `URL: ${item.url}`,
     page?.title ? `Page title: ${page.title}` : "",
@@ -1556,7 +1940,7 @@ function linkAnalysisPrompt(
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
     page?.content
-      ? `${captionIntro(item.url)}\n${page.content.slice(0, 6000)}`
+      ? `${captionIntro(item.url)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
@@ -1607,14 +1991,28 @@ async function analyzeLinkItem(
     });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
-  const { object } = await generateObject({
+  // The model proposes a recipe only from a caption it can read in full, and
+  // only when the caption's own link did not already yield the structured
+  // recipe. Web pages and URL-only reads never ask: nothing to read exactly.
+  const askForRecipe =
+    page !== undefined &&
+    page.recipe === undefined &&
+    // A cut caption reads as complete at any length, so the length check alone
+    // would let the model transcribe a recipe that stops mid-ingredient.
+    page.truncated !== true &&
+    isCaptionSource(item.url) &&
+    captionText(page) !== undefined;
+  const call = {
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
-    schema: itemAnalysisSchema,
-    prompt: linkAnalysisPrompt(item, page, read, spacesBlock),
-  });
-  return { result: object, page, linkRead: read };
+    prompt: linkAnalysisPrompt(item, page, read, spacesBlock, askForRecipe),
+  };
+  const result = askForRecipe
+    ? (await generateObject({ ...call, schema: itemAnalysisWithRecipeSchema }))
+        .object
+    : (await generateObject({ ...call, schema: itemAnalysisSchema })).object;
+  return { result, page, linkRead: read };
 }
 
 async function analyzeImageItem(
@@ -1630,7 +2028,7 @@ async function analyzeImageItem(
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
-    schema: itemAnalysisSchema,
+    schema: itemAnalysisWithRecipeSchema,
     messages: [
       {
         role: "user",
@@ -1639,6 +2037,7 @@ async function analyzeImageItem(
             type: "text",
             text: [
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
+              "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
               spacesBlock,
               INTENTS_PROMPT_BLOCK,
             ].join("\n\n"),
@@ -1666,6 +2065,8 @@ async function analyzeNoteItem(
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
     system: SYSTEM_PROMPT,
+    // Notes never carry a recipe field: the note text itself is what the user
+    // wrote (and edits), so a lifted copy would only duplicate it.
     schema: itemAnalysisSchema,
     prompt: [
       "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
@@ -1678,6 +2079,17 @@ async function analyzeNoteItem(
     ].join("\n\n"),
   });
   return { result: object };
+}
+
+/** The recipe to persist: structured markup (the page's own, or the page a
+ * caption links to) wins; the model's proposal only exists for sources that
+ * were classified with the recipe schema (captions, images). Exported pure
+ * for unit testing. */
+export function finalRecipe(
+  page: { recipe?: Recipe } | undefined,
+  result: { recipe?: RecipeDraft | null },
+): Recipe | undefined {
+  return page?.recipe ?? sanitizeRecipe(result.recipe);
 }
 
 /** Map the model's returned space names back to ids (case-insensitive,
@@ -1892,12 +2304,14 @@ export const processItem = internalAction({
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
+        articleMedia: page?.articleMedia,
         storageId: posterStorageId,
         // Links: the OG image's shape. Images/notes: preserve the ratio the
         // client captured on upload (patching undefined would drop the field).
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
         intents: sanitizeIntents(result.intents),
+        recipe: finalRecipe(page, result),
         enrichment: linkEnrichment(linkRead),
         status: "ready",
       });

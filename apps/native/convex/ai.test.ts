@@ -15,13 +15,18 @@ import {
   fetchInstagram,
   fetchXoEmbed,
   fetchXPost,
+  finalRecipe,
+  firstLinkedUrl,
   linkEnrichment,
   parseInstagramEmbed,
+  sanitizeRecipe,
   storePoster,
 } from "./ai";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
 import fxArticle from "./testdata/xSyndication/fxArticle.json";
+import fxVideoArticle from "./testdata/xSyndication/fxVideoArticle.json";
+import videoArticleSyndication from "./testdata/xSyndication/videoArticle.json";
 import fxListArticle from "./testdata/xSyndication/fxListArticle.json";
 import gifSyndication from "./testdata/xSyndication/gif.json";
 import listArticleSyndication from "./testdata/xSyndication/listArticle.json";
@@ -34,7 +39,7 @@ import textSyndication from "./testdata/xSyndication/text.json";
 import tombstoneSyndication from "./testdata/xSyndication/tombstone.json";
 import videoSyndication from "./testdata/xSyndication/video.json";
 
-import type { PostMedia } from "./model/itemFields";
+import type { ArticleMedia, PostMedia } from "./model/itemFields";
 import { newConvexTest } from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
@@ -108,7 +113,7 @@ describe("fetchXoEmbed", () => {
 
   it("keeps the post paragraph and drops the attribution", async () => {
     parseJson.mockReturnValue({
-      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://t.co/x">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
+      html: '<blockquote class="twitter-tweet"><p lang="en">Hello &amp; <a href="https://twitter.com/hashtag/space?src=hash">#space</a></p>&mdash; NASA (@NASA) <a href="https://x.com">May 1</a></blockquote>',
       author_url: "https://twitter.com/NASA",
       author_name: "NASA",
     });
@@ -118,6 +123,61 @@ describe("fetchXoEmbed", () => {
       author: "@NASA",
       content: "Hello & #space",
     });
+  });
+
+  it("keeps the first outside link (a t.co redirect) and skips attached media and the attribution", async () => {
+    parseJson.mockReturnValue({
+      html: '<blockquote class="twitter-tweet"><p lang="en">Full recipe <a href="https://t.co/media1">pic.twitter.com/abc</a> <a href="https://t.co/recipe1">smittenkitchen.com/2023/03/spring…</a> <a href="https://t.co/second">other.com</a></p>&mdash; SK (@sk) <a href="https://twitter.com/sk/status/1">May 1</a></blockquote>',
+      author_url: "https://twitter.com/sk",
+    });
+    const page = await fetchXoEmbed("https://x.com/sk/status/1");
+    expect(page.linkedUrl).toBe("https://t.co/recipe1");
+  });
+});
+
+describe("firstLinkedUrl", () => {
+  it("trims trailing punctuation and skips link hubs and social hosts", () => {
+    expect(
+      firstLinkedUrl(
+        "Recipe in bio https://linktr.ee/cook or here: https://www.budgetbytes.com/dal/. Enjoy!",
+      ),
+    ).toBe("https://www.budgetbytes.com/dal/");
+    expect(
+      firstLinkedUrl("watch https://youtu.be/abc and https://x.com/a"),
+    ).toBe(undefined);
+    expect(firstLinkedUrl("no links here")).toBeUndefined();
+    expect(firstLinkedUrl(undefined)).toBeUndefined();
+  });
+
+  it("stops a URL at whitespace, quotes, and closing brackets", () => {
+    expect(firstLinkedUrl('(see https://example.com/a?b=1&c=2) "x"')).toBe(
+      "https://example.com/a?b=1&c=2",
+    );
+  });
+});
+
+describe("finalRecipe", () => {
+  const markup = { ingredients: ["1 cup rice"], steps: ["Cook it."] };
+  const proposed = { ingredients: ["  2 eggs "], steps: ["Fry."] };
+
+  it("prefers the page's structured recipe over the model's proposal", () => {
+    expect(finalRecipe({ recipe: markup }, { recipe: proposed })).toBe(markup);
+  });
+
+  it("falls back to the sanitized model proposal when the page has none", () => {
+    expect(finalRecipe({}, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+    expect(finalRecipe(undefined, { recipe: proposed })).toStrictEqual({
+      ingredients: ["2 eggs"],
+      steps: ["Fry."],
+    });
+  });
+
+  it("is absent when neither source produced one", () => {
+    expect(finalRecipe({}, { recipe: null })).toBeUndefined();
+    expect(finalRecipe(undefined, {})).toBeUndefined();
   });
 });
 
@@ -197,6 +257,9 @@ describe("fetchXPost", () => {
       heroImageUrl:
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
+      // X cut the preview itself, so no length check can tell it from a
+      // complete short post.
+      truncated: true,
     });
   });
 
@@ -394,15 +457,64 @@ const ARTICLE_URL = "https://x.com/adamtwtz/status/2097073557868056925";
 const ARTICLE_PREVIEW =
   "An app spent $21,418, generated 23.1M views and scaled from $2k -> $25k mrr within 4 months on Content Rewards.\nit's a GLP-1 tracking app, and they've been running one campaign since April.\nthe…";
 
-function withArticleContent(content: unknown) {
+function withArticleContent(content: unknown, mediaEntities: unknown[] = []) {
   return {
     ...fxArticle,
     status: {
       ...fxArticle.status,
-      article: { ...fxArticle.status.article, content },
+      article: {
+        ...fxArticle.status.article,
+        content,
+        media_entities: mediaEntities,
+      },
     },
   };
 }
+
+const VIDEO_ARTICLE_URL =
+  "https://x.com/jasonzhou1993/status/2099837130927427989?s=20";
+
+function mediaBlock(key: number) {
+  return {
+    type: "atomic",
+    text: " ",
+    entityRanges: [{ key, offset: 0, length: 1 }],
+  };
+}
+
+function mediaEntity(key: number, mediaId: string) {
+  return {
+    key: String(key),
+    value: {
+      type: "MEDIA",
+      mutability: "Immutable",
+      data: { mediaItems: [{ mediaId, mediaCategory: "DraftTweetImage" }] },
+    },
+  };
+}
+
+const PHOTO_ENTITY = {
+  media_id: "1",
+  media_info: {
+    __typename: "ApiImage",
+    original_img_url: "https://pbs.twimg.com/media/photo.jpg",
+    original_img_width: 2000,
+    original_img_height: 1000,
+  },
+};
+
+const VIDEO_ENTITY = {
+  media_id: "2",
+  media_info: {
+    __typename: "ApiVideo",
+    preview_image: {
+      original_img_url:
+        "https://pbs.twimg.com/amplify_video_thumb/2/img/poster.jpg",
+      original_img_width: 720,
+      original_img_height: 1280,
+    },
+  },
+};
 
 describe("fetchXPost for an Article's full body", () => {
   let warn: MockInstance<typeof console.warn>;
@@ -444,6 +556,8 @@ describe("fetchXPost for an Article's full body", () => {
         "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
       heroAspectRatio: 2.5,
     });
+    // The whole body replaced the cut preview, so the read is complete.
+    expect(read).not.toHaveProperty("truncated");
     expect(read).not.toHaveProperty("media");
     const paragraphs = read.content?.split("\n\n");
     expect(paragraphs).toHaveLength(60);
@@ -463,6 +577,223 @@ describe("fetchXPost for an Article's full body", () => {
     );
     expect(read.content).not.toMatch(/\n{3,}| \n|\n /);
     expect(loggedEvents()).toEqual([]);
+  });
+
+  it("places an Article's images and videos between its paragraphs", async () => {
+    serveX(
+      { status: 200, body: videoArticleSyndication },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const read = await fetchXPost(VIDEO_ARTICLE_URL);
+    expect(read).not.toHaveProperty("media");
+    expect(read.content?.split("\n\n")).toHaveLength(66);
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "0:video",
+      "2:photo",
+      "7:video",
+      "12:photo",
+      "17:photo",
+      "21:photo",
+      "22:photo",
+      "26:photo",
+      "27:photo",
+      "30:photo",
+      "40:photo",
+      "41:photo",
+      "56:photo",
+    ]);
+    expect(read.articleMedia?.slice(1, 3)).toEqual([
+      {
+        paragraph: 2,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/HSO3PBTa0AAFXp6.jpg?name=large",
+        aspectRatio: 2452 / 1334,
+      },
+      {
+        paragraph: 7,
+        kind: "video",
+        imageUrl:
+          "https://pbs.twimg.com/amplify_video_thumb/2099726256006918145/img/a-PSxh1BV--3EMR3.jpg?name=large",
+        aspectRatio: 720 / 1280,
+      },
+    ]);
+    expect(loggedEvents()).toEqual([]);
+  });
+
+  it("keeps a sensitive Article's text but not its media", async () => {
+    serveX(
+      {
+        status: 200,
+        body: { ...videoArticleSyndication, possibly_sensitive: true },
+      },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const read = await fetchXPost(VIDEO_ARTICLE_URL);
+    expect(read.content?.split("\n\n")).toHaveLength(66);
+    expect(read.heroImageUrl).toBeUndefined();
+    expect(read).not.toHaveProperty("articleMedia");
+  });
+
+  it("skips Article media it cannot read and keeps the rest in place", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+              mediaBlock(2),
+              { type: "unstyled", text: "Two", entityRanges: [] },
+              mediaBlock(3),
+            ],
+            entityMap: [
+              mediaEntity(0, "1"),
+              mediaEntity(1, "missing"),
+              mediaEntity(2, "2"),
+              mediaEntity(3, "3"),
+            ],
+          },
+          [
+            PHOTO_ENTITY,
+            VIDEO_ENTITY,
+            { media_id: "3", media_info: { __typename: "ApiAudio" } },
+          ],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("One\n\nTwo");
+    expect(read.articleMedia).toEqual([
+      {
+        paragraph: 0,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/photo.jpg?name=large",
+        aspectRatio: 2,
+      },
+      {
+        paragraph: 1,
+        kind: "video",
+        imageUrl:
+          "https://pbs.twimg.com/amplify_video_thumb/2/img/poster.jpg?name=large",
+        aspectRatio: 0.5625,
+      },
+    ]);
+  });
+
+  it("keeps the body when an Article's media reference is malformed", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [
+              {
+                key: "0",
+                value: { type: "MEDIA", data: { mediaItems: "broken" } },
+              },
+              mediaEntity(1, "1"),
+            ],
+          },
+          [PHOTO_ENTITY],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("One");
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "1:photo",
+    ]);
+  });
+
+  it("does not repeat a cover that opens the Article", async () => {
+    const cover = articleSyndication.article.cover_media.media_info;
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              mediaBlock(0),
+              { type: "unstyled", text: "One", entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [mediaEntity(0, "9"), mediaEntity(1, "9")],
+          },
+          [{ media_id: "9", media_info: { ...cover, __typename: "ApiImage" } }],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.heroImageUrl).toBe(
+      "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+    );
+    expect(read.articleMedia).toEqual([
+      {
+        paragraph: 1,
+        kind: "photo",
+        imageUrl: "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+        aspectRatio: 2.5,
+      },
+    ]);
+  });
+
+  it("drops media after the part of a long Article it cannot store", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent(
+          {
+            blocks: [
+              { type: "unstyled", text: "a".repeat(60_000), entityRanges: [] },
+              mediaBlock(0),
+              { type: "unstyled", text: "b".repeat(60_000), entityRanges: [] },
+              mediaBlock(1),
+            ],
+            entityMap: [mediaEntity(0, "1"), mediaEntity(1, "2")],
+          },
+          [PHOTO_ENTITY, VIDEO_ENTITY],
+        ),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content?.length).toBe(100_000);
+    expect(read.articleMedia?.map((m) => `${m.paragraph}:${m.kind}`)).toEqual([
+      "1:photo",
+    ]);
+  });
+
+  it("leaves out articleMedia when an Article has none", async () => {
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [{ type: "unstyled", text: "Only words", entityRanges: [] }],
+          entityMap: [],
+        }),
+      },
+    );
+    const read = await fetchXPost(ARTICLE_URL);
+    expect(read.content).toBe("Only words");
+    expect(read).not.toHaveProperty("articleMedia");
   });
 
   it("marks list items and leaves links to X profiles as plain text", async () => {
@@ -693,6 +1024,7 @@ describe("fetchXPost for an Article's full body", () => {
         heroImageUrl:
           "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
         heroAspectRatio: 2.5,
+        truncated: true,
       });
       expect(loggedEvents()).toEqual([
         { event: "x_article_body_fallback", error_category: category },
@@ -764,7 +1096,10 @@ describe("processItem for X posts", () => {
     vi.useRealTimers();
   });
 
-  async function saveLink(url: string, fields: { media?: PostMedia[] } = {}) {
+  async function saveLink(
+    url: string,
+    fields: { media?: PostMedia[]; articleMedia?: ArticleMedia[] } = {},
+  ) {
     const t = newConvexTest().withIdentity({ subject: "x-user|session-1" });
     const itemId = await t.run((ctx) =>
       ctx.db.insert("items", {
@@ -780,8 +1115,52 @@ describe("processItem for X posts", () => {
       }),
     );
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    return { item: await t.query(api.items.getItem, { id: itemId }) };
+    const cards = await t.query(api.items.listItemsPage, {
+      paginationOpts: { numItems: 1, cursor: null },
+    });
+    return {
+      item: await t.query(api.items.getItem, { id: itemId }),
+      card: cards.page[0],
+    };
   }
+
+  it("saves an Article's images and videos for the reader but not the feed card", async () => {
+    serveX(
+      { status: 200, body: videoArticleSyndication },
+      { status: 500 },
+      { status: 200, body: fxVideoArticle },
+    );
+    const { item, card } = await saveLink(VIDEO_ARTICLE_URL);
+    expect(item).toMatchObject({ status: "ready", author: "@jasonzhou1993" });
+    expect(item).not.toHaveProperty("media");
+    expect(item?.articleMedia).toHaveLength(13);
+    expect(item?.articleMedia?.[0]).toEqual({
+      paragraph: 0,
+      kind: "video",
+      imageUrl:
+        "https://pbs.twimg.com/amplify_video_thumb/2099832515431407616/img/Wp1ZhlvD-TyQAPiJ.jpg?name=large",
+      aspectRatio: 1920 / 1080,
+    });
+    expect(card?._id).toBe(item?._id);
+    expect(card).not.toHaveProperty("articleMedia");
+    expect(card).not.toHaveProperty("content");
+  });
+
+  it("clears Article media a retry could not read again", async () => {
+    serveX({ status: 200, body: videoArticleSyndication }, { status: 500 });
+    const { item } = await saveLink(VIDEO_ARTICLE_URL, {
+      articleMedia: [
+        {
+          paragraph: 0,
+          kind: "photo",
+          imageUrl: "https://pbs.twimg.com/media/stale.jpg?name=large",
+          aspectRatio: 1,
+        },
+      ],
+    });
+    expect(item?.status).toBe("ready");
+    expect(item).not.toHaveProperty("articleMedia");
+  });
 
   it("saves an Article post with its opening text and cover, classified from its title", async () => {
     serveX({ status: 200, body: articleSyndication }, { status: 500 });
@@ -804,6 +1183,102 @@ describe("processItem for X posts", () => {
     expect(generateObject.mock.calls[0][0].prompt).toContain(
       "Page title: How this GLP-1 app generated 20m+ views",
     );
+  });
+
+  /** Answer as the provider does: the model can only fill fields the chosen
+   * schema declares, and zod strips the rest. */
+  function offerRecipe() {
+    generateObject.mockImplementation(
+      async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
+        object: schema.parse({
+          title: "Pancake post",
+          description: "A post about pancakes.",
+          tags: ["food"],
+          spaceNames: [],
+          intents: [],
+          recipe: {
+            name: "Pancakes",
+            servings: "4 servings",
+            ingredients: ["2 cups flour"],
+            steps: ["Whisk."],
+          },
+        }),
+      }),
+    );
+  }
+
+  it("does not lift a recipe out of a long post X served cut short", async () => {
+    // `note_tweet` means the 280 characters on hand are a cut copy of the post,
+    // which no length check can tell from a post that is simply short.
+    offerRecipe();
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+
+    const { item } = await saveLink(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  it("does not lift a recipe out of an Article preview that stayed cut", async () => {
+    // fxtwitter did not answer, so the body is still the syndication preview.
+    offerRecipe();
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      { status: 500 },
+    );
+
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item?.content?.endsWith("…")).toBe(true);
+    expect(item?.recipe).toBeUndefined();
+  });
+
+  it("does not lift a recipe out of an Article longer than the prompt carries", async () => {
+    // A caption is text the model receives whole. An Article body runs to
+    // 100k chars while the prompt carries 6k, so a recipe transcribed from one
+    // would be missing every ingredient that fell after the cut.
+    const recipe = {
+      name: "Pancakes",
+      servings: "4 servings",
+      ingredients: ["2 cups flour"],
+      steps: ["Whisk."],
+    };
+    generateObject.mockImplementation(
+      async ({ schema }: { schema: { parse: (v: unknown) => unknown } }) => ({
+        // Zod strips a field the chosen schema does not declare, which is the
+        // one thing stopping the model from answering with a recipe here.
+        object: schema.parse({
+          title: "Pancake thread",
+          description: "A long post about pancakes.",
+          tags: ["food"],
+          spaceNames: [],
+          intents: [],
+          recipe,
+        }),
+      }),
+    );
+    serveX(
+      { status: 200, body: articleSyndication },
+      { status: 500 },
+      {
+        status: 200,
+        body: withArticleContent({
+          blocks: [
+            {
+              type: "unstyled",
+              text: "Pancakes ".repeat(800),
+              entityRanges: [],
+            },
+          ],
+          entityMap: [],
+        }),
+      },
+    );
+
+    const { item } = await saveLink(ARTICLE_URL);
+    expect(item?.content?.length).toBeGreaterThan(6000);
+    expect(item?.recipe).toBeUndefined();
   });
 
   it("saves an Article's full body and classifies from its opening", async () => {
@@ -946,6 +1421,39 @@ describe("linkEnrichment", () => {
       ).toBeUndefined();
     },
   );
+  it("does not turn a skip link into the article body", () => {
+    // The symptom this guards: a bot-hostile page yields only its skip link,
+    // the classifier describes that, and the reader shows "Skip to main
+    // content" as both the description and the whole body.
+    const content = extractBodyText(
+      '<html><head><title>Ultimate chocolate cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><a href="#content">Skip to content</a><div id="main"></div></body></html>',
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toBeUndefined();
+    expect(linkEnrichment({ status: "ok", page: { content } })).toBe(
+      "no_article",
+    );
+  });
+
+  it("drops an extraction too thin to be a body", () => {
+    const content = extractBodyText(
+      "<html><head><title>Members only</title></head><body><article><p>Sign in to continue.</p></article></body></html>",
+      "https://example.com/paywalled",
+    );
+    expect(content).toBeUndefined();
+  });
+
+  it("keeps a skip link's own page body once the link is gone", () => {
+    const paragraph =
+      "The batter comes together in one bowl, which is the only reason this cake gets made on a weeknight at all. ";
+    const content = extractBodyText(
+      `<html><head><title>Cake</title></head><body><a class="skip-link" href="#main">Skip to main content</a><article id="main"><h1>Cake</h1><p>${paragraph.repeat(3)}</p></article></body></html>`,
+      "https://example.com/recipes/cake",
+    );
+    expect(content).toContain("The batter comes together");
+    expect(content).not.toContain("Skip to main content");
+  });
+
   it("does not turn page chrome into an article body", () => {
     const content = extractBodyText(
       '<html><head><title>Home</title></head><body><nav>Home About</nav><div class="menu"><a href="/login">Sign in</a><a href="/pricing">Pricing</a></div><div class="cookie-banner">Accept cookies</div><footer>Copyright</footer></body></html>',
@@ -1097,6 +1605,33 @@ describe("fetchInstagram", () => {
       new TextDecoder().decode(bytes),
     );
   });
+
+  it.each(["page", "embed", "both"])(
+    "preserves truncation from the %s response",
+    async (source) => {
+      instagramAnswers(REEL_PAGE, REEL_EMBED);
+      const answer = safeFetch.getMockImplementation()!;
+      safeFetch.mockImplementation(async (url: string, options: unknown) => {
+        const result = await answer(url, options);
+        const isEmbed = url.includes("/embed/captioned/");
+        const isInstagram = url.startsWith("https://www.instagram.com/");
+        return isInstagram &&
+          (source === "both" || (source === "embed") === isEmbed)
+          ? { ...result, truncated: true }
+          : result;
+      });
+      const page = await fetchInstagram(
+        "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+      );
+      expect(page.truncated).toBe(true);
+      expect(page.content).toContain("Meet the National Geographic 33!");
+      expect(page.author).toBe("@natgeo");
+      expect(page.heroImageUrl).toBe(
+        "https://cdn.fbcdn.net/poster.jpg?x=1&y=2",
+      );
+      expect(page.incomplete).toBeUndefined();
+    },
+  );
 
   it("reads a reel as the crawler sees it, never the login shell", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
@@ -1354,5 +1889,221 @@ describe("processItem for Instagram links", () => {
       enrichment: "partial",
     });
     expect(item?.content).toBeUndefined();
+  });
+});
+
+describe("sanitizeRecipe", () => {
+  it("passes through a plausible recipe", () => {
+    expect(
+      sanitizeRecipe({
+        name: "Slow braised short ribs",
+        servings: "4 servings",
+        ingredients: ["3 lb short ribs", "2 cups beef stock"],
+        steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+      }),
+    ).toEqual({
+      name: "Slow braised short ribs",
+      servings: "4 servings",
+      ingredients: ["3 lb short ribs", "2 cups beef stock"],
+      steps: ["Sear the ribs.", "Braise at 325°F for 3 hours."],
+    });
+  });
+
+  it("rejects null and empty ingredient/step lists", () => {
+    expect(sanitizeRecipe(null)).toBeUndefined();
+    expect(sanitizeRecipe(undefined)).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: [], steps: ["Stir."] }),
+    ).toBeUndefined();
+    expect(
+      sanitizeRecipe({ ingredients: ["Salt"], steps: [] }),
+    ).toBeUndefined();
+  });
+
+  it("trims lines and drops the empty ones", () => {
+    expect(
+      sanitizeRecipe({
+        ingredients: ["  Salt ", "", "   ", " 2 eggs"],
+        steps: [" Whisk. ", ""],
+      }),
+    ).toStrictEqual({ ingredients: ["Salt", "2 eggs"], steps: ["Whisk."] });
+  });
+
+  it("keeps a long instruction whole rather than cutting it short", () => {
+    // The card replaces the article body, so a step cut mid-sentence loses its
+    // temperature or its timing with nothing left on screen to recover it.
+    const step = `Braise until fork-tender, ${"about three hours, ".repeat(30)}then glaze.`;
+    const recipe = sanitizeRecipe({
+      ingredients: ["3 lb short ribs"],
+      steps: [step],
+    });
+    expect(recipe?.steps).toStrictEqual([step]);
+  });
+
+  it("keeps a quantity that two components both call for", () => {
+    // `recipeIngredient` is one flat list, so a cake and its frosting each
+    // wanting a cup of sugar reads as a repeat. Dropping it changes the recipe.
+    expect(
+      sanitizeRecipe({
+        ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+        steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+      }),
+    ).toStrictEqual({
+      ingredients: ["1 cup sugar", "2 eggs", "1 cup sugar"],
+      steps: ["Mix.", "Rest 30 minutes.", "Fold.", "Rest 30 minutes."],
+    });
+  });
+
+  it("refuses a recipe too long to store instead of trimming it", () => {
+    // Refusing leaves the article body in place, which is readable; a recipe
+    // missing its last ten steps is not, and looks complete.
+    const steps = Array.from({ length: 40 }, () => "x".repeat(600));
+    expect(sanitizeRecipe({ ingredients: ["Salt"], steps })).toBeUndefined();
+    expect(
+      sanitizeRecipe({
+        ingredients: ["Salt"],
+        steps: Array.from({ length: 121 }, (_, i) => `Step ${i + 1}`),
+      }),
+    ).toBeUndefined();
+  });
+
+  it("drops blank name/servings after trimming", () => {
+    const recipe = sanitizeRecipe({
+      name: "   ",
+      servings: "  ",
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    // Strict: the keys must be absent, not present with an undefined value.
+    expect(recipe).toStrictEqual({
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+  });
+
+  it("caps name and servings length", () => {
+    const recipe = sanitizeRecipe({
+      name: "n".repeat(200),
+      servings: "s".repeat(100),
+      ingredients: ["Salt"],
+      steps: ["Add salt."],
+    });
+    expect(recipe?.name).toBe("n".repeat(120));
+    expect(recipe?.servings).toBe("s".repeat(60));
+  });
+});
+
+describe("processItem for a recipe page the fetch cap cut short", () => {
+  const RECIPE_URL = "https://recipes.test/miso-butter-roast-chicken";
+  const INGREDIENTS = [
+    "1 whole chicken, about 1.6kg",
+    "50g white miso paste",
+    "80g unsalted butter, softened",
+    "2 tbsp honey",
+    "1 lemon, halved",
+    "4 garlic cloves, crushed",
+    "1 tsp flaky sea salt",
+  ];
+  const STEPS = [
+    "Heat the oven to 200C/180C fan/gas 6.",
+    "Mash the miso, butter, honey and garlic into a paste.",
+    "Loosen the chicken skin and push half the paste underneath.",
+    "Rub the rest over the skin and season with the salt.",
+    "Stuff the lemon halves into the cavity.",
+    "Roast for 1 hr 20 mins, basting twice.",
+    "Rest for 15 mins before carving.",
+    "Carve and serve with the pan juices spooned over.",
+  ];
+
+  /** Microdata rather than JSON-LD on purpose: a cut JSON-LD block is rejected
+   * by `JSON.parse`, so microdata is the shape that survives a cut and needs
+   * the guard. */
+  function microdataHtml(): string {
+    return `<!DOCTYPE html><html><head><title>Miso butter roast chicken</title></head><body>
+<div itemscope itemtype="https://schema.org/Recipe">
+<h1 itemprop="name">Miso butter roast chicken</h1>
+<span itemprop="recipeYield">Serves 4</span>
+${INGREDIENTS.map((i) => `<li itemprop="recipeIngredient">${i}</li>`).join("\n")}
+<div itemprop="recipeInstructions">
+${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
+</div>
+</div></body></html>`;
+  }
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    decodeWithContentType.mockReset();
+    parseJson.mockReset();
+    generateObject.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+    parseJson.mockImplementation(actual.parseJson);
+    generateObject.mockResolvedValue({
+      object: {
+        title: "Miso butter chicken",
+        description: "A whole roast chicken with miso butter.",
+        tags: ["recipes"],
+        spaceNames: [],
+        intents: [],
+      },
+    });
+  });
+
+  async function save(html: string, truncated?: true) {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(html),
+      ...(truncated ? { truncated: true as const } : {}),
+    }));
+    const t = newConvexTest().withIdentity({ subject: "page-user|session-1" });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "page-user",
+        type: "link",
+        url: RECIPE_URL,
+        status: "processing",
+        processingRunId: "run-1",
+        processingStartedAt: Date.now(),
+        tags: [],
+        searchText: "",
+      }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    return await t.run((ctx) => ctx.db.get(itemId));
+  }
+
+  /** The document as the fetch cap would hand it over: everything before
+   * `marker`. What makes the read truncated is the flag `save` sets, so the cut
+   * only has to land at a known point in the markup. */
+  function cutAt(html: string, marker: string): string {
+    return html.slice(0, html.indexOf(marker));
+  }
+
+  it("reads the whole recipe when the page arrived whole", async () => {
+    const item = await save(microdataHtml());
+    expect(item?.recipe?.ingredients).toHaveLength(INGREDIENTS.length);
+    expect(item?.recipe?.steps).toHaveLength(STEPS.length);
+  });
+
+  it("refuses a recipe whose method the cap cut off after one step", async () => {
+    // The worst shape, because nothing about it looks wrong: a complete
+    // ingredient list and a method that simply stops. A reader would believe
+    // heating the oven is the whole recipe.
+    const item = await save(cutAt(microdataHtml(), STEPS[1]), true);
+    expect(item?.recipe).toBeUndefined();
+    // The article body still stands in for it, so the save is not wasted.
+    expect(item?.status).toBe("ready");
+  });
+
+  it("refuses a recipe cut mid-instruction", async () => {
+    const item = await save(cutAt(microdataHtml(), "the salt."), true);
+    expect(item?.recipe).toBeUndefined();
+    expect(item?.status).toBe("ready");
   });
 });
