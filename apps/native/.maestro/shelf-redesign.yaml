@@ -81,6 +81,16 @@ tags:
     id: "tab-map"
 - takeScreenshot: redesign/06-map
 
+# ── Settings ────────────────────────────────────────────────────────────────
+# Every control regrouped under eyebrows, appearance as one segmented pill.
+- tapOn:
+    id: "tab-home"
+- tapOn: "Profile"
+- assertVisible: "Appearance"
+- assertVisible: "Sign out"
+- takeScreenshot: redesign/07-settings
+- tapOn: "Close profile"
+
 # ── An item page ────────────────────────────────────────────────────────────
 # The save lies on the table; no shelf is drawn under a single card.
 - tapOn:
@@ -90,7 +100,7 @@ tags:
 - assertVisible:
     id: "fixture-item-detail-ramen"
     timeout: 20000
-- takeScreenshot: redesign/07-item-page
+- takeScreenshot: redesign/08-item-page
 - tapOn: "Back"
 - assertVisible:
     id: "shelf-new"
