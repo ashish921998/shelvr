@@ -25,7 +25,7 @@ export function imageSizeError(size: number): string | undefined {
   if (code === "image_too_large") return IMAGE_TOO_LARGE_MESSAGE;
 }
 
-/** Photos an account may hold at once; same for every Pro plan. Keeps a $19.99
+/** Photos an account may hold at once; same for every Pro plan. Keeps a
  * yearly seat from becoming a photo backup. Deleting a photo frees its slot. */
 export const MAX_PHOTOS_PER_ACCOUNT = 1000;
 export const PHOTO_LIMIT_MESSAGE = `Photo limit reached (${MAX_PHOTOS_PER_ACCOUNT.toLocaleString("en-US")}). Delete some photos to save more.`;
