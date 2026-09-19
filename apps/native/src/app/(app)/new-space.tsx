@@ -1,6 +1,15 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { AnimatedSwitch } from "@/components/ui/animated-switch";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { EmptyState } from "@/components/empty-state";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkShelf } from "@/components/ink/ink-shelf";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
+import { PrimaryButton } from "@/components/shelf/ink-button";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { Eyebrow } from "@/components/shelf/typography";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { api } from "@convex/_generated/api";
 import type { Doc, Id } from "@convex/_generated/dataModel";
@@ -12,32 +21,12 @@ import { ConvexError } from "convex/values";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import Animated, {
-  FadeIn,
-  FadeOut,
-  Keyframe,
-  useReducedMotion,
-} from "react-native-reanimated";
+import { Alert, ScrollView, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
-import { EASE_OUT } from "@/lib/motion";
 
-const SUBMIT_CONTENT_ENTER = new Keyframe({
-  0: { opacity: 0, transform: [{ scale: 0.97 }] },
-  100: { opacity: 1, transform: [{ scale: 1 }], easing: EASE_OUT },
-}).duration(150);
-const SUBMIT_CONTENT_EXIT = FadeOut.duration(100).easing(EASE_OUT);
-const SUBMIT_CONTENT_REDUCED_ENTER = FadeIn.duration(100).easing(EASE_OUT);
-const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(100).easing(EASE_OUT);
+/** The drawn shelf under the name field is the width of the content gutter. */
+const PREVIEW_WIDTH = 240;
 
 // One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
 // is keyed by the loaded space so its `useState` initializers seed once from
@@ -71,8 +60,11 @@ export default function NewSpaceScreen() {
   // settled null/error query would render the create form on the edit route.
   if (editing && (isError || space === null)) {
     return (
-      <View style={styles.loading}>
-        <Text>{t("spaces.unavailable")}</Text>
+      <View style={styles.screen}>
+        <EmptyState
+          title={t("common.unavailable")}
+          message={t("spaces.unavailable")}
+        />
       </View>
     );
   }
@@ -95,7 +87,7 @@ function SpaceForm(props: SpaceFormProps) {
   const editing = props.mode === "edit";
   const router = useRouter();
   const { theme } = useUnistyles();
-  const reducedMotion = useReducedMotion();
+  const clock = useInkClock();
   const createSpace = useMutation(api.spaces.createSpace);
   const updateSpace = useMutation(api.spaces.updateSpace);
   // Creating a space and enabling dynamic are Pro — route to the paywall if
@@ -154,98 +146,133 @@ function SpaceForm(props: SpaceFormProps) {
     }
   };
 
+  const trimmed = name.trim();
+
+  // A development reload or a direct link can restore this sheet as the root
+  // route, where there is no history entry to pop.
+  const close = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  };
+
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      automaticallyAdjustKeyboardInsets
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.content}
-    >
-      <Text style={styles.heading}>
-        {editing ? t("spaces.editTitle") : t("spaces.newTitle")}
-      </Text>
-      <Text style={styles.subheading}>{t("spaces.editorHelp")}</Text>
-
-      <TextInput
-        style={styles.nameInput}
-        placeholder={t("spaces.titlePlaceholder")}
-        placeholderTextColor={theme.colors.faint}
-        value={name}
-        onChangeText={setName}
-        maxLength={MAX_SPACE_NAME_LENGTH}
-        autoFocus={!editing}
+    <View style={styles.screen}>
+      <ScreenHeader
+        clock={clock}
+        title={editing ? t("spaces.editTitle") : t("spaces.newTitle")}
+        right={
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={close}
+          />
+        }
       />
-
-      <View style={styles.dynamicRow}>
-        <View style={styles.dynamicText}>
-          <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
-          <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
-        </View>
-        <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
-      </View>
-
-      <Pressable
-        onPress={save}
-        disabled={!name.trim() || saving}
-        style={({ pressed }) => [
-          styles.saveButton,
-          (!name.trim() || saving) && { opacity: 0.4 },
-          pressed && { opacity: 0.8 },
-        ]}
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
       >
-        <View style={styles.saveButtonContent}>
-          <Animated.View
-            key={saving ? "saving" : "idle"}
-            entering={
-              reducedMotion
-                ? SUBMIT_CONTENT_REDUCED_ENTER
-                : SUBMIT_CONTENT_ENTER
-            }
-            exiting={
-              reducedMotion ? SUBMIT_CONTENT_REDUCED_EXIT : SUBMIT_CONTENT_EXIT
-            }
-            collapsable={false}
-            style={styles.saveButtonState}
-          >
-            {saving ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryForeground}
-              />
-            ) : (
-              <Text style={styles.saveButtonText}>
-                {editing ? t("common.saveChanges") : t("spaces.create")}
-              </Text>
-            )}
-          </Animated.View>
+        {/* The shelf you are making, drawn, with the name on its label. It
+            follows the field as you type: the point of this screen is an
+            object, not a record. */}
+        <View style={styles.preview} {...INK_A11Y}>
+          <View style={styles.label}>
+            <Text
+              style={[styles.labelText, !trimmed && styles.labelPlaceholder]}
+              numberOfLines={1}
+            >
+              {trimmed || t("spaces.titlePlaceholder")}
+            </Text>
+          </View>
+          <InkShelf
+            width={PREVIEW_WIDTH}
+            clock={clock}
+            prop="books"
+            propAt={0.82}
+          />
         </View>
-      </Pressable>
-    </ScrollView>
+
+        <Eyebrow style={styles.eyebrow}>{t("spaces.nameEyebrow")}</Eyebrow>
+        <TextInput
+          style={styles.nameInput}
+          placeholder={t("spaces.titlePlaceholder")}
+          placeholderTextColor={theme.colors.faint}
+          value={name}
+          onChangeText={setName}
+          maxLength={MAX_SPACE_NAME_LENGTH}
+          autoFocus={!editing}
+        />
+        <Text style={styles.help}>{t("spaces.editorHelp")}</Text>
+
+        <View style={styles.dynamicRow}>
+          <InkIcon
+            name="sparkles"
+            size={18}
+            tint={theme.colors.primaryText}
+            clock={clock}
+          />
+          <View style={styles.dynamicText}>
+            <Text style={styles.dynamicLabel}>{t("spaces.dynamic")}</Text>
+            <Text style={styles.dynamicHint}>{t("spaces.dynamicHelp")}</Text>
+          </View>
+          <AnimatedSwitch value={dynamic} onValueChange={setDynamic} />
+        </View>
+
+        {/* The button says it is working by being stitched along — the app
+            has no spinners. */}
+        <PrimaryButton
+          label={editing ? t("common.saveChanges") : t("spaces.create")}
+          pendingLabel={editing ? t("spaces.saving") : t("spaces.building")}
+          state={saving ? "pending" : trimmed ? "idle" : "disabled"}
+          onPress={() => void save()}
+          style={styles.submit}
+          testID="save-shelf"
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  screen: { flex: 1, backgroundColor: theme.colors.background },
   content: {
-    padding: theme.gap(2.5),
+    paddingHorizontal: theme.gap(3),
+    paddingTop: theme.gap(2),
+    paddingBottom: theme.gap(5),
     gap: theme.gap(1.5),
   },
-  heading: {
-    fontFamily: theme.fonts.display,
-    fontSize: 24,
+  preview: { alignItems: "center", alignSelf: "center", marginBottom: 4 },
+  // The label stands on the board like any other save: bottom-anchored so the
+  // tilt pivots where it touches.
+  label: {
+    maxWidth: PREVIEW_WIDTH - 48,
+    marginBottom: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.sm,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    transform: [{ rotate: "-2deg" }],
+    transformOrigin: "bottom center",
+    shadowColor: "#2b2418",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  labelText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 14,
     color: theme.colors.foreground,
   },
-  subheading: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-  },
+  labelPlaceholder: { color: theme.colors.faint },
+  eyebrow: { alignSelf: "flex-start" },
   nameInput: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
@@ -256,6 +283,12 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 17,
     color: theme.colors.foreground,
+  },
+  help: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: theme.colors.muted,
   },
   dynamicRow: {
     flexDirection: "row",
@@ -268,10 +301,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     padding: theme.gap(1.5),
   },
-  dynamicText: {
-    flex: 1,
-    gap: 2,
-  },
+  dynamicText: { flex: 1, gap: 2 },
   dynamicLabel: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
@@ -283,25 +313,5 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
     color: theme.colors.muted,
   },
-  saveButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    paddingVertical: theme.gap(1.75),
-    alignItems: "center",
-  },
-  saveButtonContent: {
-    width: "100%",
-    height: 20,
-  },
-  saveButtonState: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  saveButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.primaryForeground,
-  },
+  submit: { alignSelf: "stretch", marginTop: theme.gap(1) },
 }));

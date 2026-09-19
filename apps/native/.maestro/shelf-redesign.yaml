@@ -71,9 +71,9 @@ tags:
 - takeScreenshot: redesign/04-search
 - hideKeyboard
 
-# ── The remaining tabs ──────────────────────────────────────────────────────
-# Tidy and Map are not redesigned, but they ride the new nav, so the flow walks
-# them to prove the pill routes to all five.
+# ── Tidy and Map ────────────────────────────────────────────────────────────
+# Both are on the redesign now, and walking them also proves the pill routes to
+# all five tabs.
 - tapOn:
     id: "tab-tidy"
 - takeScreenshot: redesign/05-tidy
@@ -115,3 +115,45 @@ tags:
 - tapOn: "Back"
 - assertVisible:
     id: "shelf-new"
+
+# ── The new-shelf sheet ─────────────────────────────────────────────────────
+# The shelf you are making is drawn under the field, with the name on its
+# label. Saving is Pro-gated, so the flow types a name and leaves without
+# committing — the paywall is RevenueCat's and not ours to screenshot.
+- tapOn:
+    id: "tab-spaces"
+- tapOn: "New space"
+- assertVisible:
+    id: "save-shelf"
+- inputText: "Weeknight"
+- takeScreenshot: redesign/10-new-shelf
+- tapOn: "Close"
+
+# ── Import ──────────────────────────────────────────────────────────────────
+# Reached from settings. The button is the progress here: stitches run along
+# it while a batch uploads, so there is no spinner to wait on.
+- tapOn:
+    id: "tab-home"
+- tapOn: "Profile"
+- tapOn: "Import from X"
+- assertVisible:
+    id: "import-links"
+- assertVisible: "Importing X bookmarks"
+- takeScreenshot: redesign/11-import
+- tapOn: "Close"
+
+# ── The camera fallback ─────────────────────────────────────────────────────
+# Which state this lands in depends on the machine: a simulator has no camera,
+# and a fresh device has no permission yet — both are the paper fallback, which
+# is the part worth capturing. With no viewfinder to darken for, the screen is
+# ordinary paper with the camera mark on it. Granted permission on real
+# hardware reaches the live preview instead, so nothing is asserted about which
+# of the three arrives; the screenshot is the record.
+- tapOn:
+    id: "tab-home"
+- tapOn: "Add save"
+- tapOn: "Camera"
+- takeScreenshot: redesign/12-camera
+# "Close" is the label on both the paper header and the preview's overlay
+# xmark, so this leaves whichever state arrived.
+- tapOn: "Close"

@@ -532,5 +532,11 @@
   "profile.groupYou": "Vous",
   "profile.groupSends": "Vous recevez",
   "profile.groupMore": "Plus",
-  "onboarding.stepOf": "%{count} sur %{total}"
+  "onboarding.stepOf": "%{count} sur %{total}",
+  "spaces.nameEyebrow": "L’étagère",
+  "spaces.building": "Installation…",
+  "spaces.saving": "Enregistrement…",
+  "share.readingIt": "Lecture en cours",
+  "capture.shutter": "Prendre une photo",
+  "capture.flipCamera": "Changer de caméra"
 }

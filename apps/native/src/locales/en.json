@@ -516,5 +516,11 @@
   "profile.groupYou": "You",
   "profile.groupSends": "Sends you",
   "profile.groupMore": "More",
-  "onboarding.stepOf": "%{count} of %{total}"
+  "onboarding.stepOf": "%{count} of %{total}",
+  "spaces.nameEyebrow": "The shelf",
+  "spaces.building": "Putting it up…",
+  "spaces.saving": "Saving…",
+  "share.readingIt": "Reading it",
+  "capture.shutter": "Take photo",
+  "capture.flipCamera": "Flip camera"
 }

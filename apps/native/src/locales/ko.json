@@ -500,5 +500,11 @@
   "profile.groupYou": "내 계정",
   "profile.groupSends": "알림",
   "profile.groupMore": "더 보기",
-  "onboarding.stepOf": "%{total}단계 중 %{count}단계"
+  "onboarding.stepOf": "%{total}단계 중 %{count}단계",
+  "spaces.nameEyebrow": "선반",
+  "spaces.building": "만드는 중…",
+  "spaces.saving": "저장 중…",
+  "share.readingIt": "읽는 중",
+  "capture.shutter": "사진 촬영",
+  "capture.flipCamera": "카메라 전환"
 }

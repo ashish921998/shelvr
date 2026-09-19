@@ -516,5 +516,11 @@
   "profile.groupYou": "Du",
   "profile.groupSends": "Benachrichtigungen",
   "profile.groupMore": "Mehr",
-  "onboarding.stepOf": "%{count} von %{total}"
+  "onboarding.stepOf": "%{count} von %{total}",
+  "spaces.nameEyebrow": "Das Regal",
+  "spaces.building": "Wird aufgestellt…",
+  "spaces.saving": "Wird gespeichert…",
+  "share.readingIt": "Wird gelesen",
+  "capture.shutter": "Foto aufnehmen",
+  "capture.flipCamera": "Kamera wechseln"
 }

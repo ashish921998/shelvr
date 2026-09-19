@@ -43,22 +43,22 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { createMMKV } from "react-native-mmkv";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { ThreadLoop } from "@/components/ink/ink-thread";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
 import {
-  EASE_OUT,
-  EASE_OUT_CSS,
-  REDUCED_FADE_IN,
-  REDUCED_FADE_OUT,
-} from "@/lib/motion";
+  PrimaryButton,
+  SecondaryButton,
+  TertiaryAction,
+} from "@/components/shelf/ink-button";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { Display, Headline } from "@/components/shelf/typography";
+import { Wordmark } from "@/components/wordmark";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
@@ -470,7 +470,7 @@ export default function ShareScreen() {
       <Centered
         phaseKey="checking-entitlement"
         label={t("pro.checking")}
-        spinner
+        thread
         theme={theme}
       />
     );
@@ -482,21 +482,18 @@ export default function ShareScreen() {
   if (phase.kind === "locked") {
     return (
       <PhaseSurface key="locked" phaseKey="locked">
-        <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
+        <Display style={styles.centreText}>{t("pro.unlockShelvr")}</Display>
         <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
         <View style={styles.actions}>
-          <Button
-            label={t("common.cancel")}
-            theme={theme}
-            onPress={() => abandon()}
-          />
-          <Button
+          <PrimaryButton
             label={t("pro.unlock")}
-            theme={theme}
-            primary
             onPress={() => {
               void openPaywall(router, "share");
             }}
+          />
+          <TertiaryAction
+            label={t("common.cancel")}
+            onPress={() => abandon()}
           />
         </View>
       </PhaseSurface>
@@ -510,8 +507,9 @@ export default function ShareScreen() {
     return (
       <Centered
         phaseKey="resolving"
-        label={t("share.reading")}
-        spinner
+        label={t("share.readingIt")}
+        detail={t("share.reading")}
+        thread
         theme={theme}
       />
     );
@@ -521,7 +519,6 @@ export default function ShareScreen() {
       <ErrorActions
         phaseKey="nothing-resolved"
         title={t("share.empty")}
-        theme={theme}
         retryLabel={t("common.done")}
         onRetry={abandon}
         single
@@ -533,8 +530,9 @@ export default function ShareScreen() {
     return (
       <Centered
         phaseKey="saving"
-        label={t("share.progress", { saved, total })}
-        spinner
+        label={t("share.readingIt")}
+        detail={t("share.progress", { saved, total })}
+        thread
         theme={theme}
       />
     );
@@ -556,9 +554,9 @@ export default function ShareScreen() {
         : t("share.failureCount", { count: failed });
     return (
       <PhaseSurface key="partial" phaseKey="partial">
-        <Text style={styles.title(theme)}>
+        <Display style={styles.centreText}>
           {t("share.savedCount", { saved, total })}
-        </Text>
+        </Display>
         <Text style={styles.subtitle(theme)}>
           {failedWording} {t("share.retryHelp")}
         </Text>
@@ -573,21 +571,9 @@ export default function ShareScreen() {
           ))}
         </ScrollView>
         <View style={styles.actions}>
-          <Button
-            label={t("common.cancel")}
-            theme={theme}
-            onPress={() => completeSession(phase.session)}
-          />
-          <Button
-            label={t("share.continueSaved")}
-            theme={theme}
-            onPress={() => completeSession(phase.session)}
-          />
           {hasRetryable ? (
-            <Button
+            <PrimaryButton
               label={t("capture.retryFailed")}
-              theme={theme}
-              primary
               onPress={() => {
                 const live = loadSession(shareStore);
                 if (live === null) return;
@@ -595,6 +581,14 @@ export default function ShareScreen() {
               }}
             />
           ) : null}
+          <SecondaryButton
+            label={t("share.continueSaved")}
+            onPress={() => completeSession(phase.session)}
+          />
+          <TertiaryAction
+            label={t("common.cancel")}
+            onPress={() => completeSession(phase.session)}
+          />
         </View>
       </PhaseSurface>
     );
@@ -607,7 +601,6 @@ export default function ShareScreen() {
       <ErrorActions
         phaseKey="clear-failed"
         title={t("share.finishFailed")}
-        theme={theme}
         cancelLabel={t("common.cancel")}
         onCancel={abandon}
         retryLabel={t("common.tryAgain")}
@@ -615,12 +608,14 @@ export default function ShareScreen() {
       />
     );
   }
-  // complete: brief spinner before navigation lands.
+  // complete: the save has landed, so the stitch closes it — one word and a
+  // full stop, the way every confirmation in the app reads.
   return (
     <Centered
       phaseKey="complete"
-      label={t("share.success")}
-      spinner
+      label={t("spaces.shelved")}
+      detail={t("share.success")}
+      landed
       theme={theme}
     />
   );
@@ -644,10 +639,20 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Presentational pieces (existing theme typography/buttons — no design system)
+// Presentational pieces
+//
+// This is the screen the design board calls the save landing: the wordmark
+// over the ochre hairline, the thread running while Shelvr reads what you
+// sent it, and a stitch closing the moment when it lands. Nothing spins here
+// — a thread that keeps going is how the app says it is still working.
 // ---------------------------------------------------------------------------
 
 type Theme = ReturnType<typeof useUnistyles>["theme"];
+
+/** The wordmark + hairline every phase of the landing wears. */
+function LandingChrome() {
+  return <ScreenHeader center={<Wordmark size={26} />} />;
+}
 
 /** Phase chrome with enter/exit transitions. The Reanimated drivers fire on
  * mount/unmount, so a phase change only animates if React remounts the
@@ -666,28 +671,47 @@ function PhaseSurface({
       entering={reducedMotion ? REDUCED_FADE_IN : PHASE_ENTER}
       exiting={reducedMotion ? REDUCED_FADE_OUT : PHASE_EXIT}
       collapsable={false}
-      style={styles.container}
+      style={styles.screen}
     >
-      {children}
+      <LandingChrome />
+      <View style={styles.container}>{children}</View>
     </Animated.View>
   );
 }
 
+/** The waiting and landed states: a headline in Exposure with the thread
+ * looping above it, or — once it has landed — a stitch drawn underneath. */
 function Centered({
   phaseKey,
   label,
-  spinner,
+  detail,
+  thread,
+  landed,
   theme,
 }: {
   phaseKey: string;
   label: string;
-  spinner?: boolean;
+  detail?: string;
+  /** Still working: the ochre thread runs a loop that never closes. */
+  thread?: boolean;
+  /** It landed: stitches close the moment instead. */
+  landed?: boolean;
   theme: Theme;
 }) {
   return (
     <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
-      {spinner ? <ActivityIndicator color={theme.colors.primary} /> : null}
-      <Text style={styles.label(theme)}>{label}</Text>
+      {thread ? (
+        <View {...INK_A11Y}>
+          <ThreadLoop width={200} height={120} />
+        </View>
+      ) : null}
+      <Display style={styles.centreText}>{label}</Display>
+      {detail ? <Text style={styles.label(theme)}>{detail}</Text> : null}
+      {landed ? (
+        <View style={styles.landedStitch} {...INK_A11Y}>
+          <StitchLine width={140} />
+        </View>
+      ) : null}
     </PhaseSurface>
   );
 }
@@ -695,7 +719,6 @@ function Centered({
 function ErrorActions({
   phaseKey,
   title,
-  theme,
   cancelLabel,
   onCancel,
   retryLabel,
@@ -704,7 +727,6 @@ function ErrorActions({
 }: {
   phaseKey: string;
   title: string;
-  theme: Theme;
   cancelLabel?: string;
   onCancel?: () => void;
   retryLabel: string;
@@ -713,85 +735,38 @@ function ErrorActions({
 }) {
   return (
     <PhaseSurface key={phaseKey} phaseKey={phaseKey}>
-      <Text style={styles.title(theme)}>{title}</Text>
+      <Headline style={styles.centreText}>{title}</Headline>
       <View style={styles.actions}>
+        <PrimaryButton label={retryLabel} onPress={onRetry} />
         {single ||
         cancelLabel === undefined ||
         onCancel === undefined ? null : (
-          <Button label={cancelLabel} theme={theme} onPress={onCancel} />
+          <TertiaryAction label={cancelLabel} onPress={onCancel} />
         )}
-        <Button label={retryLabel} theme={theme} primary onPress={onRetry} />
       </View>
     </PhaseSurface>
   );
 }
 
-function Button({
-  label,
-  theme,
-  primary,
-  onPress,
-}: {
-  label: string;
-  theme: Theme;
-  primary?: boolean;
-  onPress: () => void;
-}) {
-  const [pressed, setPressed] = useState(false);
-  const reducedMotion = useReducedMotion();
-  const scale = pressed ? (reducedMotion ? 0.99 : 0.97) : 1;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
-      pressRetentionOffset={16}
-    >
-      <Animated.View
-        style={[
-          styles.button(theme),
-          primary && styles.buttonPrimary(theme),
-          {
-            transform: [{ scale }],
-            transitionProperty: "transform",
-            transitionDuration: "120ms",
-            transitionTimingFunction: EASE_OUT_CSS,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            styles.buttonText(theme),
-            primary && styles.buttonTextPrimary(theme),
-          ]}
-        >
-          {label}
-        </Text>
-      </Animated.View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
+  screen: { flex: 1, backgroundColor: theme.colors.background },
   container: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: theme.gap(1.5),
-    backgroundColor: theme.colors.background,
+    gap: theme.gap(1),
     paddingHorizontal: theme.gap(3),
+    // The header sits above this box, so measured centre reads low. Pulling
+    // the content up by roughly the header's height puts it back on the
+    // optical centre of the page.
+    paddingBottom: theme.gap(6),
   },
+  centreText: { textAlign: "center" },
+  landedStitch: { marginTop: theme.gap(1) },
   label: (theme: Theme) => ({
     fontFamily: theme.fonts.medium,
     fontSize: 15,
     color: theme.colors.muted,
-  }),
-  title: (theme: Theme) => ({
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    color: theme.colors.foreground,
-    textAlign: "center",
   }),
   subtitle: (theme: Theme) => ({
     fontFamily: theme.fonts.regular,
@@ -814,30 +789,9 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   }),
   actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: theme.gap(1.5),
+    alignItems: "center",
+    alignSelf: "stretch",
+    gap: theme.gap(1),
     marginTop: theme.gap(2),
   },
-  button: (theme: Theme) => ({
-    paddingVertical: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2.5),
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  }),
-  buttonPrimary: (theme: Theme) => ({
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  }),
-  buttonText: (theme: Theme) => ({
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  }),
-  buttonTextPrimary: (theme: Theme) => ({
-    color: theme.colors.primaryForeground,
-  }),
 }));

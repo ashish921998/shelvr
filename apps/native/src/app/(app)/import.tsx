@@ -1,7 +1,14 @@
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
-import { Stack, useRouter } from "expo-router";
-import { AppSymbolIcon } from "@/components/symbol";
+import { useRouter } from "expo-router";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkRing } from "@/components/ink/ink-ring";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
+import { PrimaryButton, SecondaryButton } from "@/components/shelf/ink-button";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { Headline, Eyebrow } from "@/components/shelf/typography";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
@@ -12,22 +19,19 @@ import {
   type ImportSummary,
 } from "@/lib/import-links";
 import { useCallback, useMemo, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ScrollView, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type ImportPhase = "idle" | "importing" | "done";
+
+/** The stitch that closes the result panel, drawn at the panel's inner width. */
+const RESULT_STITCH_WIDTH = 240;
 
 export default function ImportScreen() {
   useAppLocale();
   const { theme } = useUnistyles();
   const router = useRouter();
+  const clock = useInkClock();
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<ImportPhase>("idle");
   const [result, setResult] = useState<ImportSummary | null>(null);
@@ -83,151 +87,144 @@ export default function ImportScreen() {
   };
 
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Stack.Screen
-        options={{
-          title: t("import.title"),
-          headerBackButtonDisplayMode: "minimal",
-          headerLeft: () =>
-            Platform.OS === "android" ? (
-              <HeaderIconButton
-                icon="xmark"
-                label={t("common.close")}
-                onPress={close}
-              />
-            ) : undefined,
-        }}
+    <View style={styles.screen}>
+      <ScreenHeader
+        clock={clock}
+        title={t("import.title")}
+        right={
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={close}
+          />
+        }
       />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.description}>{t("import.description")}</Text>
 
-      <Text style={styles.description}>{t("import.description")}</Text>
-
-      <View style={styles.hintBox}>
-        <View style={styles.hintHeader}>
-          <AppSymbolIcon name="link" size={16} tintColor={theme.colors.muted} />
-          <Text style={styles.hintTitle}>{t("import.xHintTitle")}</Text>
-        </View>
-        <Text style={styles.hintText}>{t("import.xHintBody")}</Text>
-      </View>
-
-      {phase !== "done" ? (
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder={t("import.placeholder")}
-          placeholderTextColor={theme.colors.muted}
-          multiline
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={phase !== "importing"}
-        />
-      ) : null}
-
-      {urls.length > 0 && phase !== "done" ? (
-        <Text style={styles.urlCount}>
-          {t("import.urlReady", { count: urls.length })}
-        </Text>
-      ) : null}
-
-      {phase === "importing" ? (
-        <View style={styles.progressBox}>
-          <Text style={styles.progressText}>
-            {t("import.progress", { count: urls.length })}
-          </Text>
-        </View>
-      ) : null}
-
-      {phase === "done" && result ? (
-        <View style={styles.resultBox}>
-          <View style={styles.resultRow}>
-            <AppSymbolIcon
-              name="checkmark.circle.fill"
-              size={28}
-              tintColor={theme.colors.primary}
+        <View style={styles.hintBox}>
+          <View style={styles.hintHeader}>
+            <InkIcon
+              name="link"
+              size={16}
+              tint={theme.colors.muted}
+              clock={clock}
             />
-            <Text style={styles.resultTitle}>
-              {t("import.resultCount", { count: result.created })}
-            </Text>
+            <Text style={styles.hintTitle}>{t("import.xHintTitle")}</Text>
           </View>
-          {result.skipped > 0 ? (
-            <Text style={styles.resultDetail}>
-              {t("import.skipped", { count: result.skipped })}
-            </Text>
-          ) : null}
-          {result.invalid > 0 ? (
-            <Text style={styles.resultDetail}>
-              {t("import.invalid", { count: result.invalid })}
-            </Text>
-          ) : null}
-          {result.stopped ? (
-            <>
-              <Text style={styles.resultDetail}>
-                {t("import.notProcessed", { count: result.notProcessed })}
-              </Text>
-              <Text style={styles.resultDetail}>
-                {result.stopped === "rate_limited"
-                  ? t("import.rateLimited")
-                  : t("import.failed")}
-              </Text>
-            </>
-          ) : null}
-          <View style={styles.resultActions}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && { opacity: 0.7 },
-              ]}
-              accessibilityRole="button"
-              onPress={reset}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {result.stopped ? t("common.tryAgain") : t("import.more")}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && { opacity: 0.7 },
-              ]}
-              accessibilityRole="button"
-              onPress={close}
-            >
-              <Text style={styles.primaryButtonText}>{t("common.done")}</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.hintText}>{t("import.xHintBody")}</Text>
         </View>
-      ) : null}
 
-      {phase === "idle" ? (
-        <Pressable
-          style={({ pressed }) => [
-            styles.importButton,
-            pressed && { opacity: 0.7 },
-            !canImport && { opacity: 0.4 },
-          ]}
-          accessibilityRole="button"
-          disabled={!canImport}
-          onPress={handleImport}
-        >
-          <Text style={styles.importButtonText}>{t("import.action")}</Text>
-        </Pressable>
-      ) : null}
-    </ScrollView>
+        {phase !== "done" ? (
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder={t("import.placeholder")}
+            placeholderTextColor={theme.colors.faint}
+            multiline
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            editable={phase !== "importing"}
+          />
+        ) : null}
+
+        {urls.length > 0 && phase !== "done" ? (
+          <Eyebrow style={styles.urlCount}>
+            {t("import.urlReady", { count: urls.length })}
+          </Eyebrow>
+        ) : null}
+
+        {phase === "done" && result ? (
+          <View style={styles.resultBox}>
+            <View style={styles.resultRow}>
+              {/* A drawn tick in a ring is how the app says a batch landed. */}
+              <View style={styles.tick} {...INK_A11Y}>
+                <View style={styles.tickRing} pointerEvents="none">
+                  <InkRing width={34} height={34} clock={clock} />
+                </View>
+                <InkIcon name="checkmark" size={18} clock={clock} />
+              </View>
+              <Headline style={styles.resultTitle}>
+                {t("import.resultCount", { count: result.created })}
+              </Headline>
+            </View>
+            {result.skipped > 0 ? (
+              <Text style={styles.resultDetail}>
+                {t("import.skipped", { count: result.skipped })}
+              </Text>
+            ) : null}
+            {result.invalid > 0 ? (
+              <Text style={styles.resultDetail}>
+                {t("import.invalid", { count: result.invalid })}
+              </Text>
+            ) : null}
+            {result.stopped ? (
+              <>
+                <Text style={styles.resultDetail}>
+                  {t("import.notProcessed", { count: result.notProcessed })}
+                </Text>
+                <Text style={styles.resultDetail}>
+                  {result.stopped === "rate_limited"
+                    ? t("import.rateLimited")
+                    : t("import.failed")}
+                </Text>
+              </>
+            ) : null}
+            <View style={styles.resultStitch} {...INK_A11Y}>
+              <StitchLine width={RESULT_STITCH_WIDTH} clock={clock} />
+            </View>
+            <View style={styles.resultActions}>
+              <SecondaryButton
+                label={result.stopped ? t("common.tryAgain") : t("import.more")}
+                onPress={reset}
+                style={styles.resultAction}
+              />
+              <PrimaryButton
+                label={t("common.done")}
+                onPress={close}
+                style={styles.resultAction}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {phase !== "done" ? (
+          // The button is the progress: stitches run along it while the
+          // batch uploads. Nothing spins.
+          <PrimaryButton
+            label={t("import.action")}
+            pendingLabel={t("import.progress", { count: urls.length })}
+            state={
+              phase === "importing"
+                ? "pending"
+                : canImport
+                  ? "idle"
+                  : "disabled"
+            }
+            onPress={handleImport}
+            style={styles.importButton}
+            testID="import-links"
+          />
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  screen: { flex: 1, backgroundColor: theme.colors.background },
   content: {
     flexGrow: 1,
-    padding: theme.gap(3),
+    paddingHorizontal: theme.gap(3),
     paddingTop: theme.gap(2),
-    paddingBottom: theme.gap(4),
+    paddingBottom: theme.gap(5),
     gap: theme.gap(2),
   },
   description: {
@@ -237,11 +234,9 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.muted,
   },
   hintBox: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     padding: theme.gap(2),
     gap: theme.gap(1),
   },
@@ -267,27 +262,14 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     minHeight: 160,
     padding: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
     textAlignVertical: "top",
   },
-  urlCount: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    color: theme.colors.primary,
-  },
-  progressBox: {
-    alignItems: "center",
-    paddingVertical: theme.gap(3),
-  },
-  progressText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 16,
-    color: theme.colors.foreground,
-  },
+  urlCount: { color: theme.colors.primaryText },
   resultBox: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
@@ -302,59 +284,25 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.gap(1.5),
   },
-  resultTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 18,
-    color: theme.colors.foreground,
+  tick: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  tickRing: { position: "absolute", left: 0, top: 0 },
+  resultTitle: { flex: 1 },
   resultDetail: {
     fontFamily: theme.fonts.regular,
     fontSize: 14,
+    lineHeight: 20,
     color: theme.colors.muted,
   },
+  resultStitch: { alignItems: "center" },
   resultActions: {
     flexDirection: "row",
     gap: theme.gap(1.5),
-    marginTop: theme.gap(1),
   },
-  secondaryButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  secondaryButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  primaryButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  primaryButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: "#fff",
-  },
-  importButton: {
-    alignItems: "center",
-    paddingVertical: theme.gap(1.75),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  importButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: "#fff",
-  },
+  resultAction: { flex: 1 },
+  importButton: { alignSelf: "stretch", marginTop: "auto" },
 }));

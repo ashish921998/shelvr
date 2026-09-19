@@ -1,29 +1,34 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { SketchSkeleton } from "@/components/ink/sketch-skeleton";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { Eyebrow } from "@/components/shelf/typography";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useLocalSearchParams } from "expo-router";
-import { useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Fragment, useMemo, useRef, useState } from "react";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+
+/** The width the stitched dividers are drawn at inside the list card. */
+const DIVIDER_WIDTH = 280;
 
 // Per-space membership toggles for one item. Every write here is the user's
 // hand — `saved` rows only; flipping a space on also overrides a dismissal.
 export default function ManageSpacesScreen() {
   useAppLocale();
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  const clock = useInkClock();
   const id = itemId as Id<"items">;
 
   const { data: spaces } = useQuery(convexQuery(api.spaces.listSpaces, {}));
@@ -117,111 +122,152 @@ export default function ManageSpacesScreen() {
   // all-off switch list, since every toggle would fire a failing mutation.
   const loading = spaces === undefined || item === undefined;
 
+  // A development reload or a direct link can restore this sheet as the root
+  // route, where there is no history entry to pop.
+  const close = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  };
+
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
-    >
-      <Text style={styles.heading}>{t("navigation.spaces")}</Text>
-      <Text style={styles.subheading}>{t("spaces.membershipHelp")}</Text>
-      <Text style={styles.subheading}>{t("spaces.dismissedHelp")}</Text>
+    <View style={styles.screen}>
+      <ScreenHeader
+        clock={clock}
+        title={t("spaces.changeMembership")}
+        right={
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={close}
+          />
+        }
+      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <Text style={styles.help}>{t("spaces.membershipHelp")}</Text>
+        <Text style={styles.help}>{t("spaces.dismissedHelp")}</Text>
 
-      {lastChange?.itemId === id ? (
-        <View style={styles.undoRow} accessibilityLiveRegion="polite">
-          <Text style={styles.rowLabel}>
-            {t(lastChange.added ? "spaces.addedTo" : "spaces.removedFrom", {
-              space: lastChange.name,
-            })}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("spaces.undoChange")}
-            accessibilityState={{ disabled: busy }}
-            disabled={busy}
-            style={styles.undoButton}
-            onPress={() =>
-              void toggle(lastChange.spaceId, !lastChange.added, true)
-            }
-          >
-            <Text style={styles.undoText}>{t("common.undo")}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {lastChange?.itemId === id ? (
+          <View style={styles.undoRow} accessibilityLiveRegion="polite">
+            <Text style={styles.undoLabel} numberOfLines={1}>
+              {t(lastChange.added ? "spaces.addedTo" : "spaces.removedFrom", {
+                space: lastChange.name,
+              })}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("spaces.undoChange")}
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              style={styles.undoButton}
+              onPress={() =>
+                void toggle(lastChange.spaceId, !lastChange.added, true)
+              }
+            >
+              <Text style={styles.undoText}>{t("common.undo")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-      {loading ? (
-        <ActivityIndicator style={styles.spinner} />
-      ) : item === null ? (
-        <EmptyState
-          title={t("common.unavailable")}
-          message={t("item.unavailable")}
-        />
-      ) : spaces.length === 0 ? (
-        <Text style={styles.empty}>{t("spaces.noneAvailable")}</Text>
-      ) : (
-        <View style={styles.list}>
-          {spaces.map((space) => (
-            <View key={space._id} style={styles.row}>
-              <Text style={styles.rowLabel} numberOfLines={1}>
-                {space.name}
-              </Text>
-              <Switch
-                accessibilityLabel={space.name}
-                disabled={busy}
-                value={members.has(space._id)}
-                onValueChange={(next) => toggle(space._id, next)}
-              />
+        {loading ? (
+          // Loading draws what is coming, in place: three rows sketched at the
+          // size the real ones will be.
+          <View style={styles.list} {...INK_A11Y}>
+            {[0, 1, 2].map((row) => (
+              <View key={row} style={styles.row}>
+                <SketchSkeleton width={140} height={16} />
+              </View>
+            ))}
+          </View>
+        ) : item === null ? (
+          <EmptyState
+            title={t("common.unavailable")}
+            message={t("item.unavailable")}
+          />
+        ) : spaces.length === 0 ? (
+          <EmptyState
+            title={t("spaces.listEmptyTitle")}
+            message={t("spaces.noneAvailable")}
+            prop="books"
+          />
+        ) : (
+          <>
+            <Eyebrow style={styles.eyebrow}>{t("spaces.onTheShelf")}</Eyebrow>
+            <View style={styles.list}>
+              {spaces.map((space, index) => (
+                <Fragment key={space._id}>
+                  {index > 0 ? (
+                    <View style={styles.divider} {...INK_A11Y}>
+                      <StitchLine
+                        width={DIVIDER_WIDTH}
+                        clock={clock}
+                        seed={index}
+                      />
+                    </View>
+                  ) : null}
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel} numberOfLines={1}>
+                      {space.name}
+                    </Text>
+                    <Switch
+                      accessibilityLabel={space.name}
+                      disabled={busy}
+                      value={members.has(space._id)}
+                      onValueChange={(next) => void toggle(space._id, next)}
+                      trackColor={{
+                        false: theme.colors.border,
+                        true: theme.colors.primary,
+                      }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                </Fragment>
+              ))}
             </View>
-          ))}
-        </View>
-      )}
-    </ScrollView>
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  screen: { flex: 1, backgroundColor: theme.colors.background },
   content: {
     flexGrow: 1,
-    padding: theme.gap(2.5),
-    paddingBottom: theme.gap(4),
+    paddingHorizontal: theme.gap(3),
+    paddingTop: theme.gap(2),
+    paddingBottom: theme.gap(5),
     gap: theme.gap(1.5),
   },
-  heading: {
-    fontFamily: theme.fonts.display,
-    fontSize: 24,
-    color: theme.colors.foreground,
-  },
-  subheading: {
+  help: {
     fontFamily: theme.fonts.regular,
     fontSize: 14,
     lineHeight: 20,
     color: theme.colors.muted,
   },
-  spinner: {
-    marginVertical: theme.gap(3),
-  },
-  empty: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    color: theme.colors.muted,
-    marginVertical: theme.gap(2),
-  },
+  eyebrow: { alignSelf: "flex-start", paddingTop: theme.gap(1) },
   list: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
+    overflow: "hidden",
   },
+  // Rows are divided by a drawn stitch, not a rule.
+  divider: { alignItems: "center" },
   row: {
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.gap(1.5),
-    paddingVertical: theme.gap(1.5),
+    paddingVertical: theme.gap(1.25),
     paddingHorizontal: theme.gap(1.5),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
   },
   rowLabel: {
     flex: 1,
@@ -233,9 +279,16 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    paddingHorizontal: theme.gap(1.5),
+    paddingLeft: theme.gap(1.5),
     borderRadius: theme.radius.md,
+    borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
+  },
+  undoLabel: {
+    flex: 1,
+    fontFamily: theme.fonts.medium,
+    fontSize: 14,
+    color: theme.colors.foreground,
   },
   undoButton: {
     minHeight: 44,

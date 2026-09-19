@@ -8,11 +8,11 @@ Syncpack and audit — no device).
 
 ## What is here
 
-| Flow                         | Covers                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `shelf-redesign.yaml`        | Home, the Shelves tab, a shelf page, Search, the nav across all five tabs, and an item page |
-| `helpers/sign-in.yaml`       | Development anonymous sign-in, skipped when already signed in                               |
-| `helpers/seed-fixtures.yaml` | Resets the account to the deterministic fixture library                                     |
+| Flow                         | Covers                                                                                                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shelf-redesign.yaml`        | Home, the Shelves tab, a shelf page, Search, Tidy, Map, the Add sheet, settings, an item page, the new-shelf sheet, Import and the camera fallback — plus the nav across all five tabs |
+| `helpers/sign-in.yaml`       | Development anonymous sign-in, skipped when already signed in                                                                                                                          |
+| `helpers/seed-fixtures.yaml` | Resets the account to the deterministic fixture library                                                                                                                                |
 
 Helpers are subflows. They are pulled in with `runFlow` and are not meant to be
 run on their own.

@@ -532,5 +532,11 @@
   "profile.groupYou": "Tú",
   "profile.groupSends": "Te envía",
   "profile.groupMore": "Más",
-  "onboarding.stepOf": "%{count} de %{total}"
+  "onboarding.stepOf": "%{count} de %{total}",
+  "spaces.nameEyebrow": "El estante",
+  "spaces.building": "Colocándolo…",
+  "spaces.saving": "Guardando…",
+  "share.readingIt": "Leyéndolo",
+  "capture.shutter": "Tomar foto",
+  "capture.flipCamera": "Cambiar cámara"
 }

@@ -470,6 +470,12 @@ export type MessageParams = {
   "profile.groupSends": undefined;
   "profile.groupMore": undefined;
   "onboarding.stepOf": { count: number; total: number };
+  "spaces.nameEyebrow": undefined;
+  "spaces.building": undefined;
+  "spaces.saving": undefined;
+  "share.readingIt": undefined;
+  "capture.shutter": undefined;
+  "capture.flipCamera": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -12,9 +12,16 @@ import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { AppSymbolIcon } from "@/components/symbol";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { TypeMark } from "@/components/ink/type-mark";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
+import { PrimaryButton, SecondaryButton } from "@/components/shelf/ink-button";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { Display } from "@/components/shelf/typography";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
@@ -59,6 +66,7 @@ export default function CameraScreen() {
   const saveImages = useSaveImages();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<CaptureMode>("photo");
+  const clock = useInkClock();
 
   // Slides the active-label highlight between Photo (0) and Sticker (1).
   const progress = useSharedValue(0);
@@ -215,21 +223,38 @@ export default function CameraScreen() {
     }
   };
 
+  // With no camera there is no viewfinder to darken for, so the fallback is
+  // an ordinary paper screen: the camera mark, a headline, and the two ways
+  // out. The dark chrome belongs to the live preview only.
   const renderFallback = (
     title: string,
     message: string,
     action?: React.ReactNode,
   ) => (
     <View style={styles.fallback}>
-      <AppSymbolIcon name="camera" size={40} tintColor="#8d8271" />
-      <Text style={styles.fallbackTitle}>{title}</Text>
-      <Text style={styles.fallbackMessage}>{message}</Text>
-      {action}
-      <Pressable style={styles.fallbackButton} onPress={pickFromLibrary}>
-        <Text style={styles.fallbackButtonText}>
-          {t("capture.pickFromLibrary")}
-        </Text>
-      </Pressable>
+      <ScreenHeader
+        clock={clock}
+        title={t("capture.camera")}
+        left={
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={() => router.back()}
+          />
+        }
+      />
+      <View style={styles.fallbackBody}>
+        <View {...INK_A11Y}>
+          <TypeMark kind="camera" size={52} clock={clock} />
+        </View>
+        <Display style={styles.fallbackTitle}>{title}</Display>
+        <Text style={styles.fallbackMessage}>{message}</Text>
+        {action}
+        <SecondaryButton
+          label={t("capture.pickFromLibrary")}
+          onPress={() => void pickFromLibrary()}
+        />
+      </View>
     </View>
   );
 
@@ -238,14 +263,10 @@ export default function CameraScreen() {
     body = renderFallback(
       t("capture.cameraAccessTitle"),
       t("capture.cameraAccessBody"),
-      <Pressable
-        style={[styles.fallbackButton, styles.fallbackPrimary]}
-        onPress={requestPermission}
-      >
-        <Text style={[styles.fallbackButtonText, styles.fallbackPrimaryText]}>
-          {t("permissions.allowCamera")}
-        </Text>
-      </Pressable>,
+      <PrimaryButton
+        label={t("permissions.allowCamera")}
+        onPress={() => void requestPermission()}
+      />,
     );
   } else if (device == null) {
     body = renderFallback(
@@ -272,33 +293,38 @@ export default function CameraScreen() {
         <View style={styles.preview}>{body}</View>
       </GestureDetector>
 
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <Pressable style={styles.roundButton} onPress={() => router.back()}>
-          <AppSymbolIcon
-            name="xmark"
-            size={17}
-            tintColor="#fff"
-            weight="semibold"
-          />
-        </Pressable>
-        {showControls ? (
-          <Pressable
-            style={styles.roundButton}
-            onPress={() =>
-              setPosition((p) => (p === "back" ? "front" : "back"))
-            }
-          >
-            <AppSymbolIcon
-              name="arrow.triangle.2.circlepath.camera"
-              size={17}
-              tintColor="#fff"
-            />
-          </Pressable>
-        ) : null}
-      </View>
-
+      {/* The dark overlay chrome belongs to the live preview. The fallback
+          is a paper screen and carries its own header, so this whole bar
+          stays off when there is nothing to look through. */}
       {showControls ? (
         <>
+          <View style={[styles.topBar, { top: insets.top + 8 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("common.close")}
+              style={styles.roundButton}
+              onPress={() => router.back()}
+            >
+              <InkIcon name="xmark" size={18} tint="#fff" clock={clock} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("capture.flipCamera")}
+              style={styles.roundButton}
+              onPress={() =>
+                setPosition((p) => (p === "back" ? "front" : "back"))
+              }
+            >
+              <InkIcon
+                name="arrow.2.circlepath"
+                size={18}
+                tint="#fff"
+                seed={1}
+                clock={clock}
+              />
+            </Pressable>
+          </View>
+
           {stickerLiftAvailable ? (
             <View
               style={[styles.modeSelector, { bottom: insets.bottom + 118 }]}
@@ -318,22 +344,31 @@ export default function CameraScreen() {
 
           <View style={[styles.bottomBar, { bottom: insets.bottom + 24 }]}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("capture.pickFromLibrary")}
               style={styles.libraryButton}
               onPress={pickFromLibrary}
               disabled={busy}
             >
-              <AppSymbolIcon
+              <InkIcon
                 name="photo.on.rectangle"
                 size={20}
-                tintColor="#fff"
+                tint="#fff"
+                seed={2}
+                clock={clock}
               />
             </Pressable>
-            <Pressable style={styles.shutter} onPress={capture} disabled={busy}>
-              {busy ? (
-                <ActivityIndicator color="#1a1712" />
-              ) : (
-                <View style={styles.shutterInner} />
-              )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("capture.shutter")}
+              accessibilityState={{ busy, disabled: busy }}
+              style={styles.shutter}
+              onPress={capture}
+              disabled={busy}
+            >
+              {/* Working is shown by the shutter closing in on itself, not by
+                  a spinner. */}
+              <View style={[styles.shutterInner, busy && styles.shutterBusy]} />
             </Pressable>
             <View style={styles.libraryButton} />
           </View>
@@ -416,41 +451,30 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.primary,
     backgroundColor: "#fff",
   },
+  shutterBusy: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   fallback: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  fallbackBody: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.gap(4),
+    paddingHorizontal: theme.gap(4),
+    paddingBottom: theme.gap(6),
     gap: theme.gap(1.5),
-    backgroundColor: "#12100c",
   },
-  fallbackTitle: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
-    color: "#f4eddd",
-  },
+  fallbackTitle: { textAlign: "center", marginTop: theme.gap(1) },
   fallbackMessage: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     lineHeight: 21,
-    color: "#a2977f",
+    color: theme.colors.muted,
     textAlign: "center",
-  },
-  fallbackButton: {
-    paddingVertical: theme.gap(1.25),
-    paddingHorizontal: theme.gap(2.5),
-    borderRadius: 50,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  fallbackPrimary: {
-    backgroundColor: theme.colors.primary,
-  },
-  fallbackPrimaryText: {
-    color: theme.colors.primaryForeground,
-  },
-  fallbackButtonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: "#f4eddd",
+    marginBottom: theme.gap(1),
   },
 }));

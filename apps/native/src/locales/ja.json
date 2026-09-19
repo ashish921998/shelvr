@@ -500,5 +500,11 @@
   "profile.groupYou": "アカウント",
   "profile.groupSends": "お知らせ",
   "profile.groupMore": "その他",
-  "onboarding.stepOf": "%{total} 件中 %{count} 件目"
+  "onboarding.stepOf": "%{total} 件中 %{count} 件目",
+  "spaces.nameEyebrow": "棚",
+  "spaces.building": "設置中…",
+  "spaces.saving": "保存中…",
+  "share.readingIt": "読み取り中",
+  "capture.shutter": "写真を撮る",
+  "capture.flipCamera": "カメラを切り替える"
 }
