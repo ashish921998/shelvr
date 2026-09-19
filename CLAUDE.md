@@ -184,7 +184,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the dev-only passwordless button
+    to show the passwordless dev-login button and fixture reset in development and preview
+    builds (release-mode included); production builds never show either
   - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
     non-production variant. `app.config.js` pins it to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public

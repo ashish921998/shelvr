@@ -1,3 +1,4 @@
+import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
@@ -15,8 +16,10 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /**
  * Full-page Convex Auth sign-in, shown by the (auth) route and by the
- * onboarding opener. The "Dev login" button is only shown when Anonymous is
- * enabled on the deployment (AUTH_ENABLE_ANONYMOUS=true).
+ * onboarding opener. The "Dev login" button renders when
+ * isAnonymousAuthEnabled() passes (the build-time flag plus a development or
+ * preview variant); the server independently refuses anonymous sign-in unless
+ * the deployment sets AUTH_ENABLE_ANONYMOUS=true.
  */
 export function SignInView({
   onCompleted,
@@ -39,8 +42,7 @@ export function SignInView({
     if ((await signInWith(provider)) === "completed") onCompleted?.();
   };
 
-  const anonEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
+  const anonEnabled = isAnonymousAuthEnabled();
 
   return (
     <View style={styles.container}>
