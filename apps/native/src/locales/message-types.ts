@@ -466,6 +466,9 @@ export type MessageParams = {
   "spaces.shelved": undefined;
   "spaces.ontoShelf": { space: string };
   "tidy.shelved": undefined;
+  "profile.groupYou": undefined;
+  "profile.groupSends": undefined;
+  "profile.groupMore": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

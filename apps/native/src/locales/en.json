@@ -512,5 +512,8 @@
   "spaces.onTheShelf": "On the shelf",
   "spaces.shelved": "Shelved.",
   "spaces.ontoShelf": "Onto %{space}",
-  "tidy.shelved": "Shelved"
+  "tidy.shelved": "Shelved",
+  "profile.groupYou": "You",
+  "profile.groupSends": "Sends you",
+  "profile.groupMore": "More"
 }

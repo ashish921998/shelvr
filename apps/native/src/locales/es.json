@@ -528,5 +528,8 @@
   "spaces.onTheShelf": "En el estante",
   "spaces.shelved": "Guardado.",
   "spaces.ontoShelf": "En %{space}",
-  "tidy.shelved": "Guardadas"
+  "tidy.shelved": "Guardadas",
+  "profile.groupYou": "Tú",
+  "profile.groupSends": "Te envía",
+  "profile.groupMore": "Más"
 }

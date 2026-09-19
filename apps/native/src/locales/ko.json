@@ -496,5 +496,8 @@
   "spaces.onTheShelf": "선반에",
   "spaces.shelved": "선반에 올렸어요.",
   "spaces.ontoShelf": "%{space}(으)로",
-  "tidy.shelved": "선반에 올림"
+  "tidy.shelved": "선반에 올림",
+  "profile.groupYou": "내 계정",
+  "profile.groupSends": "알림",
+  "profile.groupMore": "더 보기"
 }

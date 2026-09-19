@@ -496,5 +496,8 @@
   "spaces.onTheShelf": "棚の中",
   "spaces.shelved": "棚に入れました。",
   "spaces.ontoShelf": "%{space} へ",
-  "tidy.shelved": "棚に入れた分"
+  "tidy.shelved": "棚に入れた分",
+  "profile.groupYou": "アカウント",
+  "profile.groupSends": "お知らせ",
+  "profile.groupMore": "その他"
 }

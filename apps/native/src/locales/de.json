@@ -512,5 +512,8 @@
   "spaces.onTheShelf": "Im Regal",
   "spaces.shelved": "Eingeräumt.",
   "spaces.ontoShelf": "In %{space}",
-  "tidy.shelved": "Eingeräumt"
+  "tidy.shelved": "Eingeräumt",
+  "profile.groupYou": "Du",
+  "profile.groupSends": "Benachrichtigungen",
+  "profile.groupMore": "Mehr"
 }
