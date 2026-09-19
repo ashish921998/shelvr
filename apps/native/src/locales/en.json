@@ -503,5 +503,17 @@
   "demo.pasteOwn": "Or paste your own link",
   "demo.pickShelvr": "That went to another app. Tap Share again and pick Shelvr.",
   "demo.shareThis": "Share this post",
-  "splash.tagline": "Save it for later"
+  "splash.tagline": "Save it for later",
+  "refundConsent.title": "Updated terms",
+  "refundConsent.disclosure": "We have updated our terms to cover Apple refund reviews. By agreeing below, you accept the updated terms and allow Shelvr, through RevenueCat, to share purchase and delivery information with Apple when you request a refund. Apple makes the final decision. Your saved links, notes, and photos are not shared.",
+  "refundConsent.optional": "Sharing is optional. You can keep using Shelvr and request refunds without agreeing to share. You can change your choice in Profile.",
+  "refundConsent.accept": "Agree and allow sharing",
+  "refundConsent.later": "Not now",
+  "refundConsent.error": "Your choice could not be saved. Please try again.",
+  "refundConsent.setting": "Apple refund data sharing",
+  "refundConsent.enabled": "You allow purchase and delivery information to be shared with Apple for refund reviews.",
+  "refundConsent.disabled": "Refund data sharing is off.",
+  "refundConsent.syncPending": "Your choice is saved. Updating RevenueCat; the previous setting may apply until this finishes.",
+  "refundConsent.withdraw": "Turn off sharing",
+  "refundConsent.review": "Review updated terms"
 }
