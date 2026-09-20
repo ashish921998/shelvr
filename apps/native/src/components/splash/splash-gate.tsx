@@ -4,7 +4,7 @@ import { View } from "react-native";
 
 import { analytics } from "@/lib/analytics";
 import { getNotificationUrl } from "@/lib/notifications";
-import { hasUnreadSharedPayloads } from "@/lib/share/unread-payloads";
+import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 import {
   isDirectLaunch,
   subscribeDirectLaunch,
@@ -76,9 +76,11 @@ export function useSplashGate() {
       !launchedByNotificationRoute() &&
       // A share the OS just delivered — or one left over from a launch that
       // died before the share screen consumed it — is a launch heading
-      // somewhere specific. The same native-store read the resume path uses
-      // settles the question synchronously at gate init.
-      !hasUnreadSharedPayloads();
+      // somewhere specific. The same resumable-batch read the resume path
+      // uses settles the question synchronously at gate init, and a batch
+      // the user explicitly discarded is not "heading somewhere": it stays
+      // home, with its splash.
+      !hasResumableSharedPayloads();
     // Either way this process has now had its one chance.
     hasPlayed = true;
     return play;

@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   clearPendingShareInStore,
+  clearShareDiscardedInStore,
   decidePostAuthRoute,
   decideShareRoute,
   hasPendingShareInStore,
   markPendingShareInStore,
+  markShareDiscardedInStore,
+  shareWasDiscardedInStore,
+  DISCARDED_SHARE_KEY,
   PENDING_SHARE_KEY,
   type PendingShareStore,
 } from "@/lib/share/pending-share";
@@ -35,6 +39,35 @@ describe("pending share flag", () => {
     markPendingShareInStore(store);
     clearPendingShareInStore(store);
     expect(hasPendingShareInStore(store)).toBe(false);
+  });
+});
+
+describe("discarded share record", () => {
+  const batchA =
+    '[{"value":"https://a.test/x","shareType":"url","mimeType":null}]';
+  const batchB =
+    '[{"value":"https://b.test/y","shareType":"url","mimeType":null}]';
+
+  it("matches exactly the batch recorded at discard time", () => {
+    const store = memoryStore();
+    expect(shareWasDiscardedInStore(store, batchA)).toBe(false);
+
+    markShareDiscardedInStore(store, batchA);
+    expect(shareWasDiscardedInStore(store, batchA)).toBe(true);
+    expect(store.getItem(DISCARDED_SHARE_KEY)).toBe(batchA);
+  });
+
+  it("does not suppress a different, superseding batch", () => {
+    const store = memoryStore();
+    markShareDiscardedInStore(store, batchA);
+    expect(shareWasDiscardedInStore(store, batchB)).toBe(false);
+  });
+
+  it("clearShareDiscardedInStore lets a later identical re-share resume", () => {
+    const store = memoryStore();
+    markShareDiscardedInStore(store, batchA);
+    clearShareDiscardedInStore(store);
+    expect(shareWasDiscardedInStore(store, batchA)).toBe(false);
   });
 });
 
@@ -70,7 +103,7 @@ describe("decidePostAuthRoute", () => {
     expect(
       decidePostAuthRoute({
         hasPendingShare: true,
-        hasUnreadSharePayloads: false,
+        hasResumableSharePayloads: false,
       }),
     ).toBe("/share");
   });
@@ -81,7 +114,7 @@ describe("decidePostAuthRoute", () => {
     expect(
       decidePostAuthRoute({
         hasPendingShare: false,
-        hasUnreadSharePayloads: true,
+        hasResumableSharePayloads: true,
       }),
     ).toBe("/share");
   });
@@ -90,7 +123,7 @@ describe("decidePostAuthRoute", () => {
     expect(
       decidePostAuthRoute({
         hasPendingShare: true,
-        hasUnreadSharePayloads: true,
+        hasResumableSharePayloads: true,
       }),
     ).toBe("/share");
   });
@@ -99,7 +132,7 @@ describe("decidePostAuthRoute", () => {
     expect(
       decidePostAuthRoute({
         hasPendingShare: false,
-        hasUnreadSharePayloads: false,
+        hasResumableSharePayloads: false,
       }),
     ).toBe("/");
   });

@@ -16,6 +16,7 @@ import {
 } from "@/lib/share/session-view";
 import {
   deleteSession,
+  fingerprintSharePayloads,
   loadSession,
   markComplete,
   reconcileSession,
@@ -25,7 +26,11 @@ import {
   type ShareEntry,
   type ShareSession,
 } from "@/lib/share/storage";
-import { clearPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import {
+  clearPendingShareOnDevice,
+  clearShareDiscardedOnDevice,
+  markShareDiscardedOnDevice,
+} from "@/lib/share/pending-share-store";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
@@ -239,6 +244,15 @@ export default function ShareScreen() {
         setPhase({ kind: "clearFailed", session });
         return;
       }
+      // The native store is empty now — a discard record from an earlier
+      // failed abandon no longer describes anything and must not wrongly
+      // suppress a later identical re-share.
+      try {
+        clearShareDiscardedOnDevice();
+      } catch (err) {
+        // Best-effort: the share itself is already durable.
+        analytics.captureError("clear_share_discarded_failed", err);
+      }
       // 3. Delete the local session ONLY after a successful clear — otherwise a
       //    later identical re-share would match a stale completed record and be
       //    silently dropped. Scoped so a stale in-flight run can't delete the
@@ -449,11 +463,14 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
-  /** Clears native payloads (best-effort), drops any persisted session, and
-   * returns Home. Used by the terminal error/empty states. Deleting the
-   * session is essential: a session may already exist (e.g. counts diverged
-   * after the record was created), and leaving it would let a later identical
-   * share resume the canceled work instead of starting fresh. */
+  /** Drops any persisted session and pending flag, clears native payloads, and
+   * returns Home. Used by the terminal error/empty states and Cancel. Deleting
+   * the session is essential: a session may already exist (e.g. counts
+   * diverged after the record was created), and leaving it would let a later
+   * identical share resume the canceled work instead of starting fresh. A
+   * THROWING native clear is no longer merely best-effort: it leaves the
+   * discarded payload in the store, so the batch is fingerprinted as discarded
+   * to keep the resume path from resurrecting it (see below). */
   const abandon = useCallback(() => {
     deleteSession(shareStore);
     // Explicit user discard — the deferred-share flag must not resurrect this.
@@ -466,11 +483,36 @@ export default function ShareScreen() {
     }
     try {
       clearSharedPayloads();
-    } catch {
-      // best-effort; the share extension has nothing durable to lose here
+    } catch (err) {
+      // The native clear failed, so this explicitly discarded batch is still
+      // sitting in the store — and the resume path treats an unread batch as
+      // owed. Record the fingerprint so the leftover is not routed straight
+      // back here and re-saved under new operation ids; in the clearFailed
+      // window the entries may already be saved, so a resurrection would
+      // duplicate them. completeSession owns the other half of that window:
+      // its retained completed session reconciles as a clear, not a fresh
+      // save, so only this explicit discard needs the marker.
+      analytics.captureError("clear_shared_payloads_failed", err);
+      try {
+        markShareDiscardedOnDevice(fingerprintSharePayloads(rawPayloads));
+      } catch (discardErr) {
+        analytics.captureError("mark_share_discarded_failed", discardErr);
+      }
+      router.replace("/");
+      return;
+    }
+    // The native store is empty: any discard record from an earlier failed
+    // clear is moot, and a later deliberate re-share of the same content must
+    // not be suppressed by it.
+    try {
+      clearShareDiscardedOnDevice();
+    } catch (err) {
+      // Best-effort: a stale record can only wrongly suppress a future
+      // identical re-share.
+      analytics.captureError("clear_share_discarded_failed", err);
     }
     router.replace("/");
-  }, [clearSharedPayloads, router]);
+  }, [clearSharedPayloads, rawPayloads, router]);
 
   // --- Phase render ---------------------------------------------------------
 

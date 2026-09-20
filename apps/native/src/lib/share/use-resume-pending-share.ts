@@ -1,6 +1,6 @@
 import { decidePostAuthRoute } from "@/lib/share/pending-share";
 import { hasPendingShareOnDevice } from "@/lib/share/pending-share-store";
-import { hasUnreadSharedPayloads } from "@/lib/share/unread-payloads";
+import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 import { markDirectLaunch } from "@/lib/splash/launch-intent";
 import { useOnboarding } from "@/lib/onboarding";
 import { useConvexAuth } from "convex/react";
@@ -16,14 +16,16 @@ import { useEffect, useRef } from "react";
  * app dies between this navigation and that point, the flag survives and the
  * share resumes on the next launch instead of being silently dropped.
  *
- * The unread payload batch is a second, independent signal with the same
+ * The resumable payload batch is a second, independent signal with the same
  * destination. On Android, a cold start from the share sheet can lose its
  * launch URL: Expo Router races `Linking.getInitialURL()` against a 150ms
  * timeout, and on a lost race the launch falls back to the plain root path —
  * no `/share` route, no deferred flag, and no `url` event later, because RN
  * emits that only from a warm `onNewIntent`. The shared payloads themselves
- * survive in the native store, so when they are still unread this hook
- * recovers the route the launch URL was supposed to carry.
+ * survive in the native store, so when they are still owed this hook recovers
+ * the route the launch URL was supposed to carry. A batch the user explicitly
+ * discarded (whose native clear failed) is not resumable — the predicate
+ * consults the discard record — so Cancel's leftover never routes back.
  */
 export function useResumePendingShare(): void {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -41,7 +43,7 @@ export function useResumePendingShare(): void {
     }
     const href = decidePostAuthRoute({
       hasPendingShare: hasPendingShareOnDevice(),
-      hasUnreadSharePayloads: hasUnreadSharedPayloads(),
+      hasResumableSharePayloads: hasResumableSharedPayloads(),
     });
     if (href !== "/share") {
       navigatedRef.current = false;

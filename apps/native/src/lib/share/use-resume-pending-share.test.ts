@@ -11,7 +11,7 @@ const mock = vi.hoisted(() => ({
   replace: vi.fn(),
   markDirectLaunch: vi.fn(),
   hasPendingShare: false,
-  hasUnreadPayloads: false,
+  hasResumablePayloads: false,
 }));
 
 vi.mock("convex/react", () => ({
@@ -27,8 +27,8 @@ vi.mock("@/lib/onboarding", () => ({
 vi.mock("@/lib/share/pending-share-store", () => ({
   hasPendingShareOnDevice: () => mock.hasPendingShare,
 }));
-vi.mock("@/lib/share/unread-payloads", () => ({
-  hasUnreadSharedPayloads: () => mock.hasUnreadPayloads,
+vi.mock("@/lib/share/resumable-payloads", () => ({
+  hasResumableSharedPayloads: () => mock.hasResumablePayloads,
 }));
 vi.mock("@/lib/splash/launch-intent", () => ({
   markDirectLaunch: mock.markDirectLaunch,
@@ -41,7 +41,7 @@ beforeEach(() => {
   mock.replace.mockReset();
   mock.markDirectLaunch.mockReset();
   mock.hasPendingShare = false;
-  mock.hasUnreadPayloads = false;
+  mock.hasResumablePayloads = false;
 });
 
 function renderResume() {
@@ -55,7 +55,7 @@ describe("useResumePendingShare", () => {
     // launch landed on Home, no deferred flag was set, and the payloads are
     // the only record that a share is owed.
     mock.auth = { isAuthenticated: false, isLoading: true };
-    mock.hasUnreadPayloads = true;
+    mock.hasResumablePayloads = true;
     const { rerender } = renderResume();
 
     // Auth still restoring: nothing routes yet.
@@ -78,7 +78,7 @@ describe("useResumePendingShare", () => {
 
   it("waits for onboarding and sign-in before recovering either signal", () => {
     mock.onboarded = false;
-    mock.hasUnreadPayloads = true;
+    mock.hasResumablePayloads = true;
     const { rerender } = renderResume();
     expect(mock.replace).not.toHaveBeenCalled();
 
@@ -92,20 +92,34 @@ describe("useResumePendingShare", () => {
     expect(mock.replace).toHaveBeenCalledWith("/share");
   });
 
+  it("stays home over the leftover of an explicitly discarded share", () => {
+    // The P2 review case: Cancel tolerated a throwing native clear and left
+    // the payload behind. The batch is unread but not resumable — the
+    // predicate (see resumable-payloads.test.ts) reports it as such — so the
+    // hook must not route back to /share and re-save it. Routing stays off
+    // until a genuinely new share flips the predicate.
+    const { rerender } = renderResume();
+    expect(mock.replace).not.toHaveBeenCalled();
+
+    mock.hasResumablePayloads = true;
+    rerender();
+    expect(mock.replace).toHaveBeenCalledWith("/share");
+  });
+
   it("stays on home when nothing is owed, and recovers a later share", () => {
     const { rerender } = renderResume();
     expect(mock.replace).not.toHaveBeenCalled();
 
     // A share arrives later in the same session (the warm onNewIntent path
-    // routed it; this hook stays out of the way). Nothing left unread, the
+    // routed it; this hook stays out of the way). Nothing left owed, the
     // guard resets, so the NEXT recovered share still routes.
-    mock.hasUnreadPayloads = true;
+    mock.hasResumablePayloads = true;
     rerender();
     expect(mock.replace).toHaveBeenCalledWith("/share");
   });
 
   it("navigates only once per recovered share", () => {
-    mock.hasUnreadPayloads = true;
+    mock.hasResumablePayloads = true;
     const { rerender } = renderResume();
     expect(mock.replace).toHaveBeenCalledTimes(1);
 
@@ -120,7 +134,7 @@ describe("useResumePendingShare", () => {
 
   it("leaves the share screen alone when the launch URL already routed it", () => {
     mock.pathname = "/share";
-    mock.hasUnreadPayloads = true;
+    mock.hasResumablePayloads = true;
     renderResume();
 
     expect(mock.replace).not.toHaveBeenCalled();
