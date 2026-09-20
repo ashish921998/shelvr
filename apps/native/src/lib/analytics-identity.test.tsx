@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAnalyticsIdentity } from "./analytics-identity";
@@ -95,13 +95,14 @@ describe("useAnalyticsIdentity", () => {
     expect(mock.removeQueries).toHaveBeenCalledOnce();
   });
 
-  it("resets when the session expires without a user action", () => {
+  it("resets when the session expires without a user action", async () => {
     // Convex reports an expired session as the same unauthenticated edge as
     // an explicit sign-out. The retired device-session reset never covered
     // this path; the auth edge does.
     mock.isAuthenticated = true;
     mock.user = { _id: "user_1" };
     const hook = renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
     expect(mock.identify).toHaveBeenCalledWith("user_1");
 
     mock.isAuthenticated = false;
@@ -111,12 +112,13 @@ describe("useAnalyticsIdentity", () => {
     expect(mock.removeQueries).toHaveBeenCalledOnce();
   });
 
-  it("re-identifies a different account after the reset", () => {
+  it("re-identifies a different account after the reset", async () => {
     // Account switch on one device: reset on the edge, then a fresh identify
     // for the new user id once its record is fetched.
     mock.isAuthenticated = true;
     mock.user = { _id: "user_1" };
     const hook = renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
 
     mock.isAuthenticated = false;
     mock.user = undefined;
@@ -125,13 +127,14 @@ describe("useAnalyticsIdentity", () => {
     mock.isAuthenticated = true;
     mock.user = { _id: "user_2" };
     hook.rerender();
+    await act(async () => {});
     expect(mock.resetIfIdentified).toHaveBeenCalledOnce();
     expect(mock.identify).toHaveBeenNthCalledWith(1, "user_1");
     expect(mock.identify).toHaveBeenNthCalledWith(2, "user_2");
     expect(mock.identify).toHaveBeenCalledTimes(2);
   });
 
-  it("identifies once per account once the user query reconnects", () => {
+  it("identifies once per account once the user query reconnects", async () => {
     mock.isAuthenticated = true;
     mock.isFetching = true;
     mock.user = { _id: "user_1" };
@@ -139,10 +142,33 @@ describe("useAnalyticsIdentity", () => {
     expect(mock.identify).not.toHaveBeenCalled();
     mock.isFetching = false;
     hook.rerender();
+    await act(async () => {});
     expect(mock.identify).toHaveBeenCalledWith("user_1");
     expect(mock.capture).toHaveBeenCalledWith("auth_completed");
     hook.rerender();
+    await act(async () => {});
     expect(mock.identify).toHaveBeenCalledOnce();
+  });
+
+  it("identifies only after a pending sign-out reset settles", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mock.resetIfIdentified.mockReturnValue(gate);
+    mock.isAuthenticated = false;
+    const hook = renderHook(() => useAnalyticsIdentity());
+    mock.isAuthenticated = true;
+    mock.isFetching = false;
+    mock.user = { _id: "user_1" };
+    hook.rerender();
+    await act(async () => {});
+    // The reset is still pending: identifying now would let its deferred
+    // continuation wipe the new identity.
+    expect(mock.identify).not.toHaveBeenCalled();
+    release();
+    await act(async () => {});
+    expect(mock.identify).toHaveBeenCalledWith("user_1");
   });
 
   it("does not identify without a fetched user record", () => {

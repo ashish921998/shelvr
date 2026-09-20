@@ -17,13 +17,14 @@ export function useAnalyticsIdentity(): null {
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);
+  const pendingReset = useRef<Promise<void> | undefined>(undefined);
 
   useEffect(() => {
     // Convex Auth reports signed out while it reads the stored token. Acting
     // then would reset analytics on every cold start.
     if (isLoading) return;
     if (!isAuthenticated) {
-      void analytics.resetIfIdentified();
+      pendingReset.current = analytics.resetIfIdentified();
       identifiedUserId.current = undefined;
       // Convex query keys don't include the authenticated user. Remove every
       // Convex entry once per unauthenticated interval so its subscription
@@ -45,9 +46,18 @@ export function useAnalyticsIdentity(): null {
       return;
     }
 
-    analytics.identify(user._id);
-    analytics.capture("auth_completed");
-    identifiedUserId.current = user._id;
+    // A sign-out reset still waiting on PostHog readiness must land first, or
+    // its deferred continuation can wipe the identity set here.
+    let cancelled = false;
+    void Promise.resolve(pendingReset.current).then(() => {
+      if (cancelled || identifiedUserId.current === user._id) return;
+      analytics.identify(user._id);
+      analytics.capture("auth_completed");
+      identifiedUserId.current = user._id;
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, isLoading, isFetching, user]);
 
   return null;

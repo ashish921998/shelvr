@@ -93,6 +93,9 @@ export function NotificationSessionProvider({
           }),
         signOut,
         deleteAccount: () => deleteAccount({}),
+        // Fallback for a failed post-deletion sign-out: no auth edge may fire
+        // promptly, so clear the identity here (idempotent with the hook's).
+        resetAnalytics: () => void analytics.resetIfIdentified(),
         reportError: (error) =>
           analytics.captureError("notification_session_cleanup_failed", error),
       }),
