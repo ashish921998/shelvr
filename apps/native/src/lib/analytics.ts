@@ -154,6 +154,10 @@ type AnalyticsEventProperties = {
     reason: CancelSurveyReason;
     survey_source: "next_visit_card";
   };
+  // Tidy and Map left primary navigation; these track their new entry points so
+  // the move stays measurable. `source` names where the tap came from.
+  tidy_opened: { source: string };
+  map_opened: { source: string };
 };
 
 type AnalyticsEvent = keyof AnalyticsEventProperties;

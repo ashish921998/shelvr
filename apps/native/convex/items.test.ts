@@ -434,6 +434,37 @@ describe("listLocatedItems", () => {
   });
 });
 
+describe("hasLocatedItems", () => {
+  it("is true only once the caller has a geotagged photo", async () => {
+    const t = await as("map-user");
+    expect(await t.query(api.items.hasLocatedItems, {})).toBe(false);
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "map-user",
+        type: "image",
+        status: "ready",
+        tags: [],
+        searchText: "",
+      });
+    });
+    expect(await t.query(api.items.hasLocatedItems, {})).toBe(false);
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "map-user",
+        type: "image",
+        status: "ready",
+        latitude: 38.6916,
+        longitude: -9.216,
+        tags: [],
+        searchText: "",
+      });
+    });
+    expect(await t.query(api.items.hasLocatedItems, {})).toBe(true);
+  });
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const t = await as("telemetry-user");

@@ -50,7 +50,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 
-// The Android and web tab bar: a floating pill of four tabs beside a round
+// The Android and web tab bar: a floating pill of two tabs beside a round
 // search button. A finger can scrub across the pill, with a tick as it crosses
 // each tab, and the pill stretches when pulled past its edge. Opening Search
 // collapses the pill into a single button back to the last tab and grows the
@@ -70,20 +70,6 @@ const PILL_TABS = [
     label: "navigation.spaces",
     icon: "rectangle.stack",
     testID: "tab-spaces",
-  },
-  {
-    name: "(tidy)",
-    href: "/(app)/(tabs)/(tidy)",
-    label: "navigation.tidy",
-    icon: "photo.stack",
-    testID: "tab-tidy",
-  },
-  {
-    name: "(map)",
-    href: "/(app)/(tabs)/(map)",
-    label: "navigation.map",
-    icon: "map",
-    testID: "tab-map",
   },
 ] as const;
 
@@ -191,10 +177,8 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   // One call per route rather than a loop, so the hook order never changes.
   const home = useTabTrigger({ name: PILL_TABS[0].name });
   const spaces = useTabTrigger({ name: PILL_TABS[1].name });
-  const tidy = useTabTrigger({ name: PILL_TABS[2].name });
-  const map = useTabTrigger({ name: PILL_TABS[3].name });
   const search = useTabTrigger({ name: SEARCH_TAB.name });
-  const pillTriggers = [home, spaces, tidy, map];
+  const pillTriggers = [home, spaces];
 
   const focusedIndex = pillTriggers.findIndex(
     (trigger) => trigger.triggerProps.isFocused,

@@ -33,6 +33,13 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
+  // The display-font title Tidy and Map carried as their own tab stacks.
+  const toolHeaderTitleStyle = {
+    fontFamily: theme.fonts.display,
+    fontSize: 26,
+    color: theme.colors.foreground,
+  };
+
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
@@ -76,6 +83,24 @@ export default function AppLayout() {
             options={{
               title: "",
               headerBackButtonDisplayMode: "minimal",
+            }}
+          />
+          <Stack.Screen
+            name="tidy"
+            options={{
+              title: t("navigation.tidyHeader"),
+              headerTitleAlign: "center",
+              headerBackButtonDisplayMode: "minimal",
+              headerTitleStyle: toolHeaderTitleStyle,
+            }}
+          />
+          <Stack.Screen
+            name="map"
+            options={{
+              title: t("navigation.mapHeader"),
+              headerTitleAlign: "center",
+              headerBackButtonDisplayMode: "minimal",
+              headerTitleStyle: toolHeaderTitleStyle,
             }}
           />
           <Stack.Screen

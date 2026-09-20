@@ -385,6 +385,25 @@ export const listLocatedItems = query({
   },
 });
 
+// Whether the caller has any geotagged photo. The map entry point reads this
+// instead of `listLocatedItems` so it never resolves storage URLs it discards.
+export const hasLocatedItems = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const photos = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_type", (q) =>
+        q.eq("userId", userId).eq("type", "image"),
+      )
+      .take(MAX_PHOTOS_PER_ACCOUNT);
+    return photos.some(
+      (item) => item.latitude !== undefined && item.longitude !== undefined,
+    );
+  },
+});
+
 export const getItem = query({
   args: { id: v.id("items") },
   returns: v.union(enrichedItemWithSpacesValidator, v.null()),

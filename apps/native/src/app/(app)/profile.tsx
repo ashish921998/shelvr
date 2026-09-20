@@ -43,11 +43,17 @@ export default function ProfileScreen() {
   const { data: user } = useCurrentUser();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { status, loading } = useEntitlement();
+  const { status, loading, entitled } = useEntitlement();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
+  // Map is only worth an entry point once the user has a geotagged photo to
+  // show on it. This check skips resolving image URLs the map screen needs.
+  const { data: hasLocatedItems } = useQuery({
+    ...convexQuery(api.items.hasLocatedItems, {}),
+    enabled: entitled,
+  });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
@@ -71,6 +77,14 @@ export default function ProfileScreen() {
     // A development reload or direct link can restore Profile as the root
     // route. In that state there is no history entry for Android Back to pop.
     router.replace("/");
+  };
+
+  // Dismiss the sheet before pushing the full-screen route, so Back from Tidy
+  // or Map returns to the library rather than reopening this sheet.
+  const openTool = async (href: "/tidy" | "/map") => {
+    router.back();
+    await waitForSheetTransition();
+    router.push(href);
   };
 
   const proLabel =
@@ -390,6 +404,43 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.linkGroup}>
+        <Pressable
+          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t("navigation.tidy")}
+          onPress={() => {
+            analytics.capture("tidy_opened", { source: "profile" });
+            void openTool("/tidy");
+          }}
+        >
+          <Text style={styles.linkLabel}>{t("navigation.tidy")}</Text>
+          <AppSymbolIcon
+            name="chevron.right"
+            size={16}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
+        {hasLocatedItems ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t("navigation.map")}
+            onPress={() => {
+              analytics.capture("map_opened", { source: "profile" });
+              void openTool("/map");
+            }}
+          >
+            <Text style={styles.linkLabel}>{t("navigation.map")}</Text>
+            <AppSymbolIcon
+              name="chevron.right"
+              size={16}
+              tintColor={theme.colors.muted}
+            />
+          </Pressable>
+        ) : null}
         <Pressable
           style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
           accessibilityRole="button"
