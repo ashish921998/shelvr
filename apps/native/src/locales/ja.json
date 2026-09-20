@@ -34,7 +34,7 @@
   "notifications.weeklyShelf": "今週のシェルフ",
   "errors.searchTitle": "検索できませんでした",
   "loading.app": "Shelvrを開いています",
-  "capture.backToLibrary": "ライブラリに戻る",
+  "digest.backHome": "ホームに戻る",
   "capture.backToOptions": "保存方法に戻る",
   "common.save": "保存",
   "errors.saveTitle": "保存できませんでした",
