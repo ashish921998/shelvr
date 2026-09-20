@@ -1,4 +1,4 @@
-import { RateLimiter, HOUR, MINUTE } from "@convex-dev/rate-limiter";
+import { DAY, HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 
 // Per-user token buckets on the mutations that each schedule real paid work
@@ -77,4 +77,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 100,
   },
+  // In-app feedback submissions (one email to the support inbox each). The
+  // row is authenticated, but unbounded submissions would still turn the
+  // feedback button into a spam relay to the operator's inbox. Generous for
+  // a person (3 covers an immediate follow-up burst, 6/day sustained);
+  // fatal to a looped or scripted client.
+  feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
 });

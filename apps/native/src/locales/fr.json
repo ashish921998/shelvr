@@ -179,6 +179,7 @@
   "support.email": "Écrire à l'assistance",
   "common.close": "Fermer",
   "feedback.prompt": "Que cherchiez-vous à faire et qu'est-ce qui vous en a empêché ?",
+  "feedback.replyNotice": "Shelvr peut vous répondre via l’e-mail de votre compte.",
   "feedback.messageLabel": "Message de l'avis",
   "feedback.placeholder": "Votre avis…",
   "feedback.cancel": "Annuler l'avis",
