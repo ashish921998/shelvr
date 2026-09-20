@@ -135,6 +135,15 @@ const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .map((arch) => arch.trim())
   .filter(Boolean);
 
+// The Android window background under a dark theme is taken from the dark
+// launch screen, so the surface a rebuilt Activity shows can never disagree
+// with the one the app launched on. Reading it here rather than repeating the
+// literal means dropping the dark splash fails the build instead of silently
+// restoring a cream window (see plugins/with-android-night-background).
+const darkLaunchBackgroundColor = (appConfig.expo.plugins ?? []).find(
+  (plugin) => Array.isArray(plugin) && plugin[0] === "expo-splash-screen",
+)?.[1]?.dark?.backgroundColor;
+
 module.exports = ({ config }) => ({
   ...appConfig.expo,
   ...config,
@@ -184,6 +193,10 @@ module.exports = ({ config }) => ({
     // Keep the static plugins from app.json — an inline array here would
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),
+    [
+      "./plugins/with-android-night-background",
+      { backgroundColor: darkLaunchBackgroundColor },
+    ],
     [
       "expo-build-properties",
       {

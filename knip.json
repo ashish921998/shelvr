@@ -15,6 +15,7 @@
         "metro.config.js",
         "generateKeys.mjs",
         "goldie/goldie.config.ts",
+        "plugins/with-android-night-background.js",
         "plugins/with-widget-localization.js"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
