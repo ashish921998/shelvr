@@ -65,7 +65,7 @@ export default function AppLayout() {
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("capture.backToLibrary")}
+                    label={t("digest.backHome")}
                     onPress={() => router.replace("/")}
                   />
                 ),
