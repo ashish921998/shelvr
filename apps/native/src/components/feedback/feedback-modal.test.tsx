@@ -14,11 +14,17 @@ const mocks = vi.hoisted(() => ({
   user: { _id: "user-1" } as { _id: string } | null,
   markSubmitted: vi.fn(),
   capture: vi.fn(),
+  captureError: vi.fn(),
   openURL: vi.fn(),
 }));
 
-vi.mock("@/lib/use-submit-feedback", () => ({
-  useSubmitFeedback: () => mocks.submit,
+// The modal owns the submit path directly (the single-caller hook was
+// inlined), so the mutation is mocked the way the hook's return used to be.
+vi.mock("convex/react", () => ({
+  useMutation: () => mocks.submit,
+}));
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { version: "1.2.3", extra: { variant: "dev" } } },
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mocks.user }),
@@ -30,7 +36,7 @@ vi.mock("@/lib/feedback", async (importOriginal) => ({
   markFeedbackSubmitted: mocks.markSubmitted,
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mocks.capture },
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/posthog", () => ({
   posthog: undefined,
@@ -120,7 +126,10 @@ beforeEach(() => {
 
 describe("FeedbackModal", () => {
   it("reports success only after Convex persists, then marks the invitation submitted", async () => {
-    mocks.submit.mockResolvedValue("accepted");
+    mocks.submit.mockResolvedValue({
+      submissionId: "s-1",
+      deliveryState: "scheduled",
+    });
     render(<FeedbackModal surface="home" onClose={() => {}} />);
     typeDraft("Love the app");
     fireEvent.click(screen.getByLabelText("feedback.open"));
@@ -129,10 +138,20 @@ describe("FeedbackModal", () => {
     );
     expect(mocks.markSubmitted).toHaveBeenCalledWith("user-1");
     expect(mocks.submit).toHaveBeenCalledOnce();
+    // Only bounded shape metadata reaches analytics — never the message.
+    expect(mocks.capture).toHaveBeenCalledWith("feedback_submitted", {
+      surface: "home",
+      char_count: 12,
+      delivery: "scheduled",
+    });
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "feedback_submitted",
+      expect.objectContaining({ message: expect.anything() }),
+    );
   });
 
   it("keeps the draft on screen with the support fallback when persistence fails", async () => {
-    mocks.submit.mockResolvedValue("failed");
+    mocks.submit.mockRejectedValue(new Error("boom"));
     render(<FeedbackModal surface="profile" onClose={() => {}} />);
     typeDraft("The thing I typed");
     fireEvent.click(screen.getByLabelText("feedback.open"));
@@ -147,23 +166,33 @@ describe("FeedbackModal", () => {
     // ...and Contact Support is still offered. The invitation is NOT marked.
     expect(screen.getByLabelText("support.email")).toBeTruthy();
     expect(mocks.markSubmitted).not.toHaveBeenCalled();
+    // The failure reaches error tracking as a fixed, content-free error.
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "feedback_submit_failed",
+      expect.any(Error),
+    );
   });
 
   it("does not submit twice from rapid duplicate taps", async () => {
-    let resolve!: (value: "accepted" | "failed") => void;
-    mocks.submit.mockImplementation(
-      () =>
-        new Promise<"accepted" | "failed">((r) => {
-          resolve = r;
-        }),
-    );
+    let resolve!: (value: {
+      submissionId: string;
+      deliveryState: "scheduled" | "unconfigured";
+    }) => void;
+    mocks.submit.mockImplementation(() => {
+      return new Promise<{
+        submissionId: string;
+        deliveryState: "scheduled" | "unconfigured";
+      }>((r) => {
+        resolve = r;
+      });
+    });
     render(<FeedbackModal surface="home" onClose={() => {}} />);
     typeDraft("One submission");
     const send = screen.getByLabelText("feedback.open");
     fireEvent.click(send);
     fireEvent.click(send);
     await act(async () => {
-      resolve("accepted");
+      resolve({ submissionId: "s-1", deliveryState: "scheduled" });
     });
     expect(mocks.submit).toHaveBeenCalledOnce();
     expect(mocks.markSubmitted).toHaveBeenCalledOnce();
@@ -178,7 +207,7 @@ describe("FeedbackModal", () => {
   });
 
   it("opens the support address from the fallback row", async () => {
-    mocks.submit.mockResolvedValue("failed");
+    mocks.submit.mockRejectedValue(new Error("boom"));
     render(<FeedbackModal surface="home" onClose={() => {}} />);
     typeDraft("x");
     fireEvent.click(screen.getByLabelText("feedback.open"));

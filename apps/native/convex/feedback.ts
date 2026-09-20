@@ -26,8 +26,8 @@ import {
 } from "./model/resend";
 
 /**
- * Authenticated in-app feedback (the client boundary is
- * apps/native/src/lib/use-submit-feedback.ts and the shared modal).
+ * Authenticated in-app feedback (the client boundary is the shared
+ * apps/native/src/components/feedback/feedback-modal.tsx).
  *
  * Convex is the source of truth: `submitFeedback` persists the row first,
  * then the support-inbox email is projected out of it. A Resend outage,

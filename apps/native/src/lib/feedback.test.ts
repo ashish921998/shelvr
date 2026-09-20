@@ -233,47 +233,6 @@ describe("review prompt coordination", () => {
   });
 });
 
-describe("feedbackAnalytics.submitted", () => {
-  it("captures bounded metadata once Convex has persisted the submission", () => {
-    feedbackAnalytics.submitted("home", 12, "scheduled");
-    expect(posthogMock.capture).toHaveBeenCalledWith("feedback_submitted", {
-      surface: "home",
-      char_count: 12,
-      delivery: "scheduled",
-      environment: "development",
-      analytics_version: 1,
-    });
-    // The old transport flushed the typed message into PostHog. That capture
-    // no longer exists: nothing about the submission reaches PostHog except
-    // the bounded shape metadata above.
-    expect(posthogMock.flush).not.toHaveBeenCalled();
-  });
-
-  it("records the unconfigured projection state as content-free metadata", () => {
-    feedbackAnalytics.submitted("profile", 5, "unconfigured");
-    expect(posthogMock.capture).toHaveBeenCalledWith(
-      "feedback_submitted",
-      expect.objectContaining({ delivery: "unconfigured" }),
-    );
-  });
-
-  it("never carries the message, email, or any submission content", () => {
-    const secret = "the words the user actually typed";
-    feedbackAnalytics.submitted("home", secret.length, "scheduled");
-    const properties = posthogMock.capture.mock.calls.at(-1)![1] as Record<
-      string,
-      unknown
-    >;
-    expect(Object.keys(properties)).not.toContain("message");
-    for (const value of Object.values(properties)) {
-      if (typeof value === "string") {
-        expect(value).not.toContain(secret);
-        expect(value).not.toContain("user-1");
-      }
-    }
-  });
-});
-
 describe("feedbackAnalytics automatic events", () => {
   it("carries surface metadata but never message content", () => {
     feedbackAnalytics.invitationShown("home", 3);

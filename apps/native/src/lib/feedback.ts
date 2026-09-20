@@ -189,11 +189,6 @@ export function sanitizeFeedbackMessage(raw: string): string {
 
 // --- analytics boundary -----------------------------------------------------
 
-/** Content-free projection state of a persisted submission, returned by the
- * Convex mutation: `scheduled` means an inbox is configured and delivery is
- * queued; `unconfigured` means the row waits for operator setup. */
-type FeedbackDeliveryState = "scheduled" | "unconfigured";
-
 export const feedbackAnalytics = {
   isAvailable(): boolean {
     return isAnalyticsAvailable();
@@ -212,23 +207,5 @@ export const feedbackAnalytics = {
 
   feedbackOpened(surface: FeedbackSurface): void {
     analytics.capture("feedback_opened", { surface });
-  },
-
-  /**
-   * Capture the submission event — called ONLY after Convex acknowledges
-   * that the row is durable (see use-submit-feedback.ts). The typed message
-   * lives in Convex and the operator's inbox; PostHog only ever sees the
-   * bounded shape metadata below.
-   */
-  submitted(
-    surface: FeedbackSurface,
-    charCount: number,
-    delivery: FeedbackDeliveryState,
-  ): void {
-    analytics.capture("feedback_submitted", {
-      surface,
-      char_count: charCount,
-      delivery,
-    });
   },
 };

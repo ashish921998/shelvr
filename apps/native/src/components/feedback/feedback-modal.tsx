@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { useEffect, useRef, useState } from "react";
+import Constants from "expo-constants";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Linking,
@@ -12,16 +13,38 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { AppSymbolIcon } from "@/components/symbol";
+import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import {
   FEEDBACK_MESSAGE_MAX_LENGTH,
   feedbackAnalytics,
   markFeedbackSubmitted,
+  sanitizeFeedbackMessage,
   type FeedbackSurface,
 } from "@/lib/feedback";
-import { useSubmitFeedback } from "@/lib/use-submit-feedback";
 import { SUPPORT_URL } from "@/lib/legal";
+
+/** Bounded app context for the support reply, supplied as bounded values the
+ * backend re-validates (platform is a closed union; the version strings are
+ * capped server-side). Never user content. */
+function submissionContext() {
+  const version = Constants.expoConfig?.version;
+  const variant = Constants.expoConfig?.extra?.variant;
+  return {
+    ...(Platform.OS === "ios" || Platform.OS === "android"
+      ? { platform: Platform.OS }
+      : {}),
+    ...(typeof version === "string" && version.length > 0
+      ? { appVersion: version }
+      : {}),
+    ...(variant !== undefined && variant !== null
+      ? { buildVariant: String(variant) }
+      : {}),
+  };
+}
 
 /**
  * The one feedback form, reused by the Home invitation and the permanent
@@ -43,7 +66,7 @@ export function FeedbackModal({
   useAppLocale();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const submitFeedback = useSubmitFeedback(surface);
+  const submitFeedback = useMutation(api.feedback.submitFeedback);
   const [message, setMessage] = useState("");
   const [flow, setFlow] = useState<"idle" | "sending" | "failed" | "sent">(
     "idle",
@@ -67,13 +90,52 @@ export function FeedbackModal({
   // Wait for the user id so a send is always recorded against the account.
   const canSend = flow !== "sending" && !!user && message.trim().length > 0;
 
+  /** Send through Convex. "accepted" means ONLY that Convex persisted the
+   * submission — the support inbox email is a server-side projection the
+   * client never claims as sent. Any failure (offline, validation, rate
+   * limit) returns "failed" so the draft stays editable and the support
+   * channel is offered; nothing is captured beyond the bounded shape
+   * metadata, and the invitation is only marked submitted on success. */
+  const sendFeedback = useCallback(
+    async (rawMessage: string): Promise<"accepted" | "failed"> => {
+      const message = sanitizeFeedbackMessage(rawMessage);
+      if (!message) return "failed";
+      try {
+        const { deliveryState } = await submitFeedback({
+          message,
+          surface,
+          ...submissionContext(),
+        });
+        // Capture the content-free projection state only after Convex
+        // acknowledges the row is durable: surface, char count, and the
+        // delivery category — never the message.
+        analytics.capture("feedback_submitted", {
+          surface,
+          char_count: message.length,
+          delivery: deliveryState,
+        });
+        return "accepted";
+      } catch {
+        // A raw Convex error can carry server text in its stack, and
+        // captureError ships the stack to PostHog. The stable event name is
+        // the triage signal; the failure details stay client-side.
+        analytics.captureError(
+          "feedback_submit_failed",
+          new Error("Feedback submission failed"),
+        );
+        return "failed";
+      }
+    },
+    [submitFeedback, surface],
+  );
+
   const send = async () => {
     if (sendingRef.current || !user) return;
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
     sendingRef.current = true;
     setFlow("sending");
-    const result = await submitFeedback(trimmed);
+    const result = await sendFeedback(trimmed);
     sendingRef.current = false;
     if (result === "accepted") {
       markFeedbackSubmitted(user._id);
