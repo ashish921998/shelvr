@@ -166,10 +166,15 @@ describe("FeedbackModal", () => {
     // ...and Contact Support is still offered. The invitation is NOT marked.
     expect(screen.getByLabelText("support.email")).toBeTruthy();
     expect(mocks.markSubmitted).not.toHaveBeenCalled();
-    // The failure reaches error tracking as a fixed, content-free error.
+    // The failure reaches error tracking as the fixed, content-free Error —
+    // exactly the sanitized message, never the raw reject reason ("boom").
     expect(mocks.captureError).toHaveBeenCalledWith(
       "feedback_submit_failed",
-      expect.any(Error),
+      expect.objectContaining({ message: "Feedback submission failed" }),
+    );
+    expect(mocks.captureError).not.toHaveBeenCalledWith(
+      "feedback_submit_failed",
+      expect.objectContaining({ message: expect.stringContaining("boom") }),
     );
   });
 
