@@ -229,9 +229,12 @@ describe("RecentSavesWidgetSync", () => {
     expect(tanstack.args).toBe("skip");
   });
 
-  it("subscribes with real arguments once Pro is confirmed", () => {
+  // The entitlement clock ticks every minute while a subscription has an
+  // expiry. In the query key that was a new subscription per tick, each held
+  // for gcTime.
+  it("keeps one query key regardless of the entitlement clock", () => {
     renderSync([link]);
-    expect(tanstack.args).toMatchObject({ limit: 5 });
+    expect(tanstack.args).toEqual({ limit: 5 });
   });
 
   it("does not sync until entitlement is known", async () => {

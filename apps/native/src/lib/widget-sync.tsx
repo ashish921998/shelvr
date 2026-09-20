@@ -137,22 +137,23 @@ let syncChain: Promise<void> = Promise.resolve();
  */
 export function RecentSavesWidgetSync() {
   const locale = useAppLocale();
-  const {
-    entitled,
-    loading: entitlementLoading,
-    now: entitlementNow,
-  } = useEntitlement();
+  const { entitled, loading: entitlementLoading } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter opens its
   // subscription from the query cache's "added" event and only drops it after
   // gcTime, so an `enabled: false` query keeps a live server subscription that
   // outlives sign-out and is then re-evaluated with no identity. The sentinel
   // changes the query key, which is the only guard the adapter reads.
+  //
+  // The entitlement clock is deliberately not an argument. It ticks every
+  // minute while a subscription has an expiry, and every tick would be a new
+  // query key, so a trialing user would mint a subscription a minute and hold
+  // each for gcTime. The server falls back to the stored subscription status,
+  // which the RevenueCat webhook lapses, and the widget still locks on time
+  // because `entitled` below is computed from that same ticking clock.
   const { data: recent } = useQuery(
     convexQuery(
       api.items.listRecentItems,
-      !entitlementLoading && entitled
-        ? { limit: WIDGET_ITEM_COUNT, now: entitlementNow }
-        : "skip",
+      !entitlementLoading && entitled ? { limit: WIDGET_ITEM_COUNT } : "skip",
     ),
   );
   const lastKey = useRef<string | null>(null);
