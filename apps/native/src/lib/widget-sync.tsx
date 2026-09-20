@@ -142,13 +142,19 @@ export function RecentSavesWidgetSync() {
     loading: entitlementLoading,
     now: entitlementNow,
   } = useEntitlement();
-  const { data: recent } = useQuery({
-    ...convexQuery(api.items.listRecentItems, {
-      limit: WIDGET_ITEM_COUNT,
-      now: entitlementNow,
-    }),
-    enabled: !entitlementLoading && entitled,
-  });
+  // "skip" rather than TanStack's `enabled`: the Convex adapter opens its
+  // subscription from the query cache's "added" event and only drops it after
+  // gcTime, so an `enabled: false` query keeps a live server subscription that
+  // outlives sign-out and is then re-evaluated with no identity. The sentinel
+  // changes the query key, which is the only guard the adapter reads.
+  const { data: recent } = useQuery(
+    convexQuery(
+      api.items.listRecentItems,
+      !entitlementLoading && entitled
+        ? { limit: WIDGET_ITEM_COUNT, now: entitlementNow }
+        : "skip",
+    ),
+  );
   const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
