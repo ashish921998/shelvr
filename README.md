@@ -201,19 +201,17 @@ command). Android waitlist signup needs `CONVEX_URL` at runtime:
 pnpm --filter web-app build
 ```
 
-**Convex production + tester OTA** run through the Deploy workflow
-(`.github/workflows/deploy.yml`). After CI completes on `main`, the workflow:
+**Convex production** deploys through the Deploy workflow
+(`.github/workflows/deploy.yml`). After CI completes on `main` it deploys the
+backend, and nothing else. It does not ask for approval: what holds the line is
+CI, the freshness check in every job that acts, and the public-contract check
+on the pull request that got the commit onto `main`. One-time setup is a deploy
+key from the Convex dashboard (production deployment → Settings → Deploy keys),
+added as the `CONVEX_DEPLOY_KEY` repo secret.
 
-1. Deploys Convex to production. One-time setup, in this order: add a
-   required reviewer to the GitHub `production` environment **before** adding
-   secrets, then add a deploy key from the Convex dashboard (production
-   deployment → Settings → Deploy keys) as the `CONVEX_DEPLOY_KEY` repo
-   secret. The required reviewer queues each backend deploy until they
-   approve it.
-2. Publishes an EAS Update to the `internal-test` channel (one-time setup:
-   `EXPO_TOKEN` repo secret from a robot access token at expo.dev). Testers
-   get the update only after the approved deploy lands, so a client never
-   ships ahead of the backend it depends on.
+No client update ships from here. Testers and users get a build or an OTA from
+the Release workflow below, which deploys the same commit's backend first, so a
+client never reaches anyone ahead of the functions it calls.
 
 **Store builds and production OTA** run through the Release workflow
 (`.github/workflows/release.yml`), dispatched manually from `main`: mode
@@ -221,13 +219,30 @@ pnpm --filter web-app build
 once store credentials are configured on EAS; Android submits also need the
 `EAS_GOOGLE_SERVICE_ACCOUNT_KEY` repo secret — the base64 of the Play API
 JSON key), mode `ota` publishes an EAS Update to the `production` channel.
+Both manual workflows require successful push CI for the selected `main`
+commit. Release deploys that commit's Convex backend before building or
+publishing, and shares Deploy's concurrency group to prevent interleaving.
+Release therefore also requires `CONVEX_DEPLOY_KEY`.
+Non-main dispatches fail with a branch-selection error. Before queueing any
+build with iOS submission enabled, Release verifies that EAS has a submission
+API key assigned to the production bundle and Apple team. Configure it with
+`eas credentials --platform ios` under the production profile's App Store
+Connect / EAS Submit settings. This checks the assignment, not revocation
+or permissions on Apple's servers.
 
 **OTA publishes require the EAS `production` environment.** With
-`--environment production`, `app.config.js` is resolved on EAS servers with
-that environment's variables, and the production-value guards in
-`app.config.js` only run during `eas build`. Both workflows fail fast unless
-`EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` are declared
-there (`eas env:set --name <name> --value <value> --environment production`).
+`--environment production`, updates use that environment's plaintext and
+sensitive variables; Secret values are unavailable. Both workflows pull the
+readable values into a temporary file and validate the production Convex
+deployment/site URLs and the iOS/Android RevenueCat public keys before
+publishing. Set them with `eas env:set --name <name> --value <value>
+--environment production --visibility sensitive`. The temporary file is
+deleted after validation, and validation errors never include values.
+The verifier also requires readable, nonempty `GOOGLE_MAPS_API_KEY`,
+`POSTHOG_PROJECT_TOKEN`, and an HTTPS `POSTHOG_HOST`. Set these explicitly
+with plaintext or sensitive visibility in EAS production so builds and
+updates use the same config inputs. Both environment validation and OTA
+publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native
@@ -253,3 +268,16 @@ pnpm --filter native-app add mypackage@latest
 - Native routes live under `apps/native/src/app`
 - Web is marketing only at `/` — no authenticated `/app` product surface
 - See root `CLAUDE.md` for architecture guidance when working with agents
+- `assets/splash-blank.png` is a 1x1 transparent PNG and is meant to stay that
+  way. On iOS the `expo-splash-screen` plugin applies `backgroundColor` only
+  from inside `applyImageToSplashScreenXML`, which it calls only when `image`
+  is set (`withIosSplashScreenStoryboardImage.js`, `Boolean(splash.image)`).
+  With no `image` the generated storyboard keeps the bare template's
+  `systemBackgroundColor` — white or black — and the configured colour is
+  silently ignored, even though the colorset is still written. Shelvr wants the
+  brand ground with no mark, because the animated splash draws its own S at
+  1.05s and a static one here would appear, vanish, then pop back. The blank
+  image buys the background; `imageWidth: 1` keeps it invisible. Verify after
+  changing it: the generated `ios/Shelvr/SplashScreen.storyboard` must say
+  `<color key="backgroundColor" name="SplashScreenBackground"/>`, not
+  `systemBackgroundColor`.

@@ -36,10 +36,12 @@ import type * as model_notificationSchedule from "../model/notificationSchedule.
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
+import type * as model_recipeMarkup from "../model/recipeMarkup.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_revenuecatTransfer from "../model/revenuecatTransfer.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as model_saveErrors from "../model/saveErrors.js";
+import type * as model_saveSource from "../model/saveSource.js";
 import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
@@ -87,10 +89,12 @@ declare const fullApi: ApiFromModules<{
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/posthogCapture": typeof model_posthogCapture;
   "model/rateLimiter": typeof model_rateLimiter;
+  "model/recipeMarkup": typeof model_recipeMarkup;
   "model/revenuecat": typeof model_revenuecat;
   "model/revenuecatTransfer": typeof model_revenuecatTransfer;
   "model/safeFetch": typeof model_safeFetch;
   "model/saveErrors": typeof model_saveErrors;
+  "model/saveSource": typeof model_saveSource;
   "model/secureCompare": typeof model_secureCompare;
   "model/spaceName": typeof model_spaceName;
   "model/storage": typeof model_storage;

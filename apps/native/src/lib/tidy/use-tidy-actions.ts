@@ -1,13 +1,13 @@
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useMutation } from 'convex/react';
-import { Asset } from 'expo-media-library';
-import { useCallback, useRef, useState } from 'react';
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import { Asset } from "expo-media-library";
+import { useCallback, useRef, useState } from "react";
 
-import type { TidyAction } from './card-animation';
-import { isReviewed, markReviewed, unmarkReviewed } from './storage';
-import type { TidyPhoto } from './use-photo-batch';
-import { useSaveImages } from '@/lib/use-save-image';
+import type { TidyAction } from "./card-animation";
+import { isReviewed, markReviewed, unmarkReviewed } from "./storage";
+import type { TidyPhoto } from "./use-photo-batch";
+import { useSaveImages } from "@/lib/use-save-image";
 
 type HistoryEntry = {
   index: number;
@@ -15,7 +15,7 @@ type HistoryEntry = {
   action: TidyAction;
   /** For saves: resolves to the created item id (null if the upload failed),
    * so undo can delete the item even while the upload is still in flight. */
-  itemId?: Promise<Id<'items'> | null>;
+  itemId?: Promise<Id<"items"> | null>;
 };
 
 export type TidyCounts = {
@@ -26,10 +26,10 @@ export type TidyCounts = {
 
 const mimeFromUri = (uri: string): string => {
   const lower = uri.toLowerCase();
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  return 'image/jpeg';
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
+  if (lower.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
 };
 
 type Params = {
@@ -50,34 +50,41 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
 
   const [topIndex, setTopIndex] = useState(batch.length - 1);
   const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
-  const [counts, setCounts] = useState<TidyCounts>({ kept: 0, deleted: 0, saved: 0 });
+  const [counts, setCounts] = useState<TidyCounts>({
+    kept: 0,
+    deleted: 0,
+    saved: 0,
+  });
   const [canUndo, setCanUndo] = useState(false);
 
   const pendingDeletesRef = useRef<TidyPhoto[]>([]);
   const historyRef = useRef<HistoryEntry[]>([]);
 
   const startSave = useCallback(
-    (photo: TidyPhoto): Promise<Id<'items'> | null> =>
+    (photo: TidyPhoto): Promise<Id<"items"> | null> =>
       (async () => {
         const asset = new Asset(photo.id);
         const uri = await asset.getUri();
         // Best-effort: Android needs ACCESS_MEDIA_LOCATION, and not every
         // photo has a GPS fix — a save must never fail over its location.
         const location = await asset.getLocation().catch(() => null);
-        const [result] = await saveImages([
-          {
-            image: {
-              uri,
-              width: photo.width ?? undefined,
-              height: photo.height ?? undefined,
-              mimeType: mimeFromUri(uri),
-              capturedAt: photo.creationTime ?? undefined,
-              latitude: location?.latitude,
-              longitude: location?.longitude,
+        const [result] = await saveImages(
+          [
+            {
+              image: {
+                uri,
+                width: photo.width ?? undefined,
+                height: photo.height ?? undefined,
+                mimeType: mimeFromUri(uri),
+                capturedAt: photo.creationTime ?? undefined,
+                latitude: location?.latitude,
+                longitude: location?.longitude,
+              },
             },
-          },
-        ]);
-        if (result.status === 'saved') {
+          ],
+          { saveSource: "photo_import" },
+        );
+        if (result.status === "saved") {
           // Plan 005 owns durable Tidy save state; here we return the created
           // itemId so undo can delete the item even mid-upload.
           return result.itemId;
@@ -86,11 +93,11 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         // result instead), so restore the prior behavior explicitly: unmark the
         // photo so it resurfaces in a future batch, and resolve to null so undo
         // no-ops. The result carries the stable operation id for plan 005.
-        console.warn('Tidy save failed', result.stage, result.operationId);
+        console.warn("Tidy save failed", result.stage, result.operationId);
         unmarkReviewed(photo.id);
         return null;
       })().catch((error) => {
-        console.warn('Tidy save failed', error);
+        console.warn("Tidy save failed", error);
         unmarkReviewed(photo.id);
         return null;
       }),
@@ -105,15 +112,15 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       const entry: HistoryEntry = { index, photo, action };
 
       switch (action) {
-        case 'keep':
+        case "keep":
           markReviewed([photo.id]);
           setCounts((c) => ({ ...c, kept: c.kept + 1 }));
           break;
-        case 'delete':
+        case "delete":
           pendingDeletesRef.current.push(photo);
           setPendingDeleteCount(pendingDeletesRef.current.length);
           break;
-        case 'save':
+        case "save":
           markReviewed([photo.id]);
           setCounts((c) => ({ ...c, saved: c.saved + 1 }));
           entry.itemId = startSave(photo);
@@ -134,15 +141,15 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
     if (!entry) return null;
 
     switch (entry.action) {
-      case 'keep':
+      case "keep":
         unmarkReviewed(entry.photo.id);
         setCounts((c) => ({ ...c, kept: c.kept - 1 }));
         break;
-      case 'delete':
+      case "delete":
         pendingDeletesRef.current.pop();
         setPendingDeleteCount(pendingDeletesRef.current.length);
         break;
-      case 'save':
+      case "save":
         // The upload may still be running — chain the revert onto it.
         if (isReviewed(entry.photo.id)) {
           unmarkReviewed(entry.photo.id);
@@ -181,14 +188,14 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
       // Only after a successful commit are deletes (and their history) final.
       // Remove delete entries from history, keeping keep/save entries undoable.
       historyRef.current = historyRef.current.filter(
-        (h) => h.action !== 'delete',
+        (h) => h.action !== "delete",
       );
       setCanUndo(historyRef.current.length > 0);
     } catch (error) {
       // User canceled the system dialog (or deletion failed): restore the
       // queue so the photos stay unreviewed and resurface in a future batch.
       // Prior undo history is preserved.
-      console.warn('Tidy delete commit skipped', error);
+      console.warn("Tidy delete commit skipped", error);
       pendingDeletesRef.current = queue;
       setPendingDeleteCount(queue.length);
     }

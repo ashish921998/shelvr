@@ -280,6 +280,7 @@ describe("onboarding demo allowance", () => {
       userId: "demo-user",
       itemType: "link",
       sessionId: "demo-session",
+      saveSource: "onboarding_demo",
     });
     expect(JSON.stringify(telemetry[0].args[0])).not.toContain("bbcgoodfood");
   });

@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
+import { Platform } from "react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -81,6 +82,15 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
+        // Both default to true in posthog-react-native >= 4.73 and activate
+        // through @posthog/react-native-plugin. The native SDK builds and sends
+        // `$push_notification_opened` itself, so `before_send` below never sees
+        // it and cannot apply the redaction this file exists to enforce. Push
+        // tokens are already owned by `notificationDevices` in Convex, so
+        // mirroring them into PostHog would widen what leaves the device for no
+        // product gain. Fail closed, as replay and exception autocapture do.
+        capturePushNotificationSubscriptions: false,
+        capturePushNotificationOpened: false,
         // Replay stays off in production until visual masking is verified on a
         // signed build. Fail closed: only builds that declare a non-production
         // variant record, so a missing `extra` can never turn replay on.
@@ -136,6 +146,7 @@ function updateProperties(): Record<string, string | boolean> {
 export function superProperties(): Record<string, string | number | boolean> {
   return {
     environment: Constants.expoConfig?.extra?.variant ?? "development",
+    platform: Platform.OS,
     analytics_version: 1,
     ...updateProperties(),
   };

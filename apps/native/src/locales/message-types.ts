@@ -459,6 +459,7 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "splash.tagline": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
