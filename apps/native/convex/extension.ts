@@ -49,6 +49,16 @@ import { logEvent } from "./model/log";
  * is what keeps the sweep a small, predictable transaction. */
 const PAIRING_CLEANUP_BATCH = 200;
 
+/** Draws allowed before minting gives up. Each clash is a 2^-40 event, so
+ * reaching the end of this means the generator is broken, not unlucky. */
+const PAIRING_CODE_MINT_ATTEMPTS = 5;
+
+/** What {@link storePairingCode} answers a mint with. Declared here so the
+ * action can annotate its `runMutation` result rather than infer it. */
+type StoredPairingCode =
+  | { status: "stored"; expiresAt: number }
+  | { status: "collision" };
+
 const connectionValidator = v.object({
   id: v.id("extensionConnections"),
   label: v.string(),
@@ -71,7 +81,11 @@ const connectionValidator = v.object({
 export const createPairingCode = action({
   args: {},
   returns: v.object({ code: v.string(), expiresAt: v.number() }),
-  handler: async (ctx) => {
+  // The return type is written out, not inferred: this handler calls a mutation
+  // in its own module, so inferring it closes a cycle through the generated
+  // `api` types (TS7022/7023) that collapses them to `{}` — and the errors then
+  // surface in unrelated files rather than here.
+  handler: async (ctx): Promise<{ code: string; expiresAt: number }> => {
     const userId = await requireUserId(ctx);
     // Fail closed, the way the RevenueCat webhook does without its secret: a
     // code minted under an unkeyed digest is one a database reader could
@@ -82,12 +96,28 @@ export const createPairingCode = action({
       logEvent("error", "extension_pairing_secret_missing", {});
       throw new Error("Pairing is unavailable");
     }
-    const code = generatePairingCode();
-    const expiresAt: number = await ctx.runMutation(
-      internal.extension.storePairingCode,
-      { userId, codeHash: await hashPairingCode(code, secret) },
-    );
-    return { code: formatPairingCode(code), expiresAt };
+    // Draw until the digest is free. A clash is a 2^-40 draw against each live
+    // row, so the first attempt all but always takes it; the loop exists so
+    // that the one-in-forever case costs a user a redraw instead of a browser
+    // paired to someone else's account.
+    for (let attempt = 0; attempt < PAIRING_CODE_MINT_ATTEMPTS; attempt += 1) {
+      const code = generatePairingCode();
+      // Annotated because this calls a function in its own module, as the
+      // Convex guidelines require; the cycle itself is broken by the handler's
+      // return type above.
+      const stored: StoredPairingCode = await ctx.runMutation(
+        internal.extension.storePairingCode,
+        { userId, codeHash: await hashPairingCode(code, secret) },
+      );
+      if (stored.status === "stored") {
+        return { code: formatPairingCode(code), expiresAt: stored.expiresAt };
+      }
+    }
+    // Every attempt clashing is not chance — it is a broken generator handing
+    // out one value, which must never be papered over with a working-looking
+    // code.
+    logEvent("error", "extension_pairing_code_exhausted", {});
+    throw new Error("Pairing is unavailable");
   },
 });
 
@@ -136,13 +166,36 @@ export const revokeConnection = mutation({
 // Internal: called by the /extension HTTP routes
 // ---------------------------------------------------------------------------
 
-/** Store the hash of a freshly minted code and return when it expires. One
- * live code per user: minting again invalidates the code still on screen,
- * which is what a user who taps "new code" expects. */
+/**
+ * Store the hash of a freshly minted code and return when it expires. One live
+ * code per user: minting again invalidates the code still on screen, which is
+ * what a user who taps "new code" expects.
+ *
+ * Refuses rather than stores when the digest is already in the table, so no two
+ * live rows can share one. Redemption looks a code up by hash alone and has no
+ * other way to tell whose it is, so a second row under the same digest would
+ * hand the browser whichever row came back first — possibly the *other* user's
+ * account. Regenerating is the whole fix: the caller simply draws another code.
+ *
+ * Checked before the limiter is charged, since a refusal writes nothing and
+ * should not spend the user's budget for a mint they never saw. Nobody can
+ * steer a request down this path to dodge the limiter — the digest is over a
+ * code this server generated.
+ */
 export const storePairingCode = internalMutation({
   args: { userId: v.id("users"), codeHash: v.string() },
-  returns: v.number(),
+  returns: v.union(
+    v.object({ status: v.literal("stored"), expiresAt: v.number() }),
+    v.object({ status: v.literal("collision") }),
+  ),
   handler: async (ctx, args) => {
+    const clash = await ctx.db
+      .query("extensionPairings")
+      .withIndex("by_code_hash", (q) => q.eq("codeHash", args.codeHash))
+      .first();
+    if (clash !== null) {
+      return { status: "collision" as const };
+    }
     await rateLimiter.limit(ctx, "extensionPairCode", {
       key: args.userId,
       throws: true,
@@ -162,7 +215,7 @@ export const storePairingCode = internalMutation({
       codeHash: args.codeHash,
       expiresAt,
     });
-    return expiresAt;
+    return { status: "stored" as const, expiresAt };
   },
 });
 

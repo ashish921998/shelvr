@@ -433,16 +433,21 @@ export default defineSchema({
   // it for a connection token. Single use and short-lived: `redeemPairingCode`
   // deletes the row in the same transaction that mints the connection, so a
   // replay finds nothing, and an hourly cron sweeps codes nobody redeemed.
-  // Only the SHA-256 of the displayed code is stored (model/extensionAuth.ts),
-  // so the table hands out nothing replayable and the lookup index is keyed on
-  // the hash rather than the secret.
+  // Only a digest of the displayed code is stored (model/extensionAuth.ts):
+  // HMAC-SHA-256 under `EXTENSION_PAIRING_SECRET`, not a plain hash, because a
+  // code is eight typed characters and a bare digest of 2^40 possibilities is
+  // recoverable offline from a database read. The lookup index is keyed on that
+  // digest rather than the secret.
   extensionPairings: defineTable({
     userId: v.string(),
     codeHash: v.string(),
     expiresAt: v.number(),
   })
-    // The redemption lookup. Not unique by construction — a collision across
-    // two live codes is a 2^-40 event that redeeming resolves either way.
+    // The redemption lookup. Convex indexes cannot be declared unique, so
+    // `storePairingCode` enforces it instead: a draw whose digest is already
+    // here is refused and redrawn. Redemption knows a code only by its hash,
+    // so two rows sharing one would let it pair a browser to whichever row
+    // came back — possibly the other user's account.
     .index("by_code_hash", ["codeHash"])
     // One live code per user: minting a new one clears the old.
     .index("by_user", ["userId"])

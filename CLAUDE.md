@@ -104,9 +104,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`extension.ts`** — browser-extension pairing and saves. The app mints a code
   (`createPairingCode`), the extension redeems it for a bearer token, and every later
   request resolves through the token's hash. Public: `createPairingCode`, `listConnections`,
-  `revokeConnection`. The internals (`redeemPairingCode`, `describeConnection`, `saveLink`,
-  `disconnect`, `cleanupExpiredPairings`) are called only by the `/extension` HTTP routes and
-  take a hash, never a userId. Saves go through `items.saveLinkForConnectedClient`, which is
+  `revokeConnection`. The internals `redeemPairingCode`, `describeConnection`, `saveLink` and
+  `disconnect` are called only by the `/extension` HTTP routes and take a hash, never a
+  userId; `storePairingCode` is called by `createPairingCode`, and `cleanupExpiredPairings`
+  by the hourly cron. Saves go through `items.saveLinkForConnectedClient`, which is
   the in-app save path plus duplicate detection — the extension can never save something the
   app would refuse. Credential helpers live in `model/extensionAuth.ts`.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional

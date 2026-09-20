@@ -498,6 +498,70 @@ describe("POST /extension/pair", () => {
     });
     expect(stale.status).toBe(401);
   });
+
+  it("refuses to store a digest another live code already holds", async () => {
+    const t = newConvexTest();
+    const { userId: holder } = await seedUser(t, "holder@example.com");
+    const { userId: minter } = await seedUser(t, "minter@example.com");
+    const codeHash = await hashPairingCode("K7F29QTX", PAIRING_SECRET);
+    const holderRow = await t.run(async (ctx) =>
+      ctx.db.insert("extensionPairings", {
+        userId: holder,
+        codeHash,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      }),
+    );
+
+    const stored = await t.mutation(internal.extension.storePairingCode, {
+      userId: minter,
+      codeHash,
+    });
+    expect(stored).toEqual({ status: "collision" });
+
+    // The refusal writes nothing: the row that owns the digest is untouched,
+    // and no second row was added under it. Two rows here would let redemption
+    // pair a browser to whichever came back first.
+    const rows = await t.run(async (ctx) =>
+      ctx.db
+        .query("extensionPairings")
+        .withIndex("by_code_hash", (q) => q.eq("codeHash", codeHash))
+        .collect(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!._id).toBe(holderRow);
+    expect(rows[0]!.userId).toBe(holder);
+  });
+
+  it("keeps the code on screen when a mint is refused for a collision", async () => {
+    const t = newConvexTest();
+    const { userId, identity } = await seedUser(t, "owner@example.com");
+    const mine = await identity.action(api.extension.createPairingCode, {});
+
+    // Someone else's row under a digest this user is about to draw.
+    const { userId: other } = await seedUser(t, "other@example.com");
+    const taken = await hashPairingCode("K7F29QTX", PAIRING_SECRET);
+    await t.run(async (ctx) =>
+      ctx.db.insert("extensionPairings", {
+        userId: other,
+        codeHash: taken,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      }),
+    );
+    const refused = await t.mutation(internal.extension.storePairingCode, {
+      userId,
+      codeHash: taken,
+    });
+    expect(refused).toEqual({ status: "collision" });
+
+    // The user's own live code survives the refusal — a redraw must not cost
+    // them the code already on screen.
+    const still = await t.fetch("/extension/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: mine.code }),
+    });
+    expect(still.status).toBe(200);
+  });
 });
 
 describe("GET /extension/session", () => {
