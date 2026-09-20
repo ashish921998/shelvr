@@ -65,10 +65,16 @@ export function decideShareRoute(state: {
 /**
  * After onboarding completes and/or the user signs in, choose the next route.
  * A pending share wins over the default home landing so the Share Sheet is not
- * silently dropped.
+ * silently dropped. An unread payload batch wins for the same reason: on an
+ * Android cold start the launch URL can be lost to Expo Router's initial-URL
+ * race, and a relaunch after a mid-share process death can find the batch
+ * still sitting in the native store. Either way the share screen is owed a
+ * visit — its own session reconciliation decides whether the batch is a new
+ * save, a resume of an interrupted one, or a stale completed record to clear.
  */
 export function decidePostAuthRoute(state: {
   hasPendingShare: boolean;
+  hasUnreadSharePayloads: boolean;
 }): "/" | "/share" {
-  return state.hasPendingShare ? "/share" : "/";
+  return state.hasPendingShare || state.hasUnreadSharePayloads ? "/share" : "/";
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
 import {
   clearPendingShareInStore,
@@ -8,7 +8,7 @@ import {
   markPendingShareInStore,
   PENDING_SHARE_KEY,
   type PendingShareStore,
-} from '@/lib/share/pending-share';
+} from "@/lib/share/pending-share";
 
 function memoryStore(initial: Record<string, string> = {}): PendingShareStore {
   const map = new Map(Object.entries(initial));
@@ -20,17 +20,17 @@ function memoryStore(initial: Record<string, string> = {}): PendingShareStore {
   };
 }
 
-describe('pending share flag', () => {
-  it('marks and reports a pending share', () => {
+describe("pending share flag", () => {
+  it("marks and reports a pending share", () => {
     const store = memoryStore();
     expect(hasPendingShareInStore(store)).toBe(false);
 
     markPendingShareInStore(store);
     expect(hasPendingShareInStore(store)).toBe(true);
-    expect(store.getItem(PENDING_SHARE_KEY)).toBe('1');
+    expect(store.getItem(PENDING_SHARE_KEY)).toBe("1");
   });
 
-  it('clearPendingShareInStore drops the flag', () => {
+  it("clearPendingShareInStore drops the flag", () => {
     const store = memoryStore();
     markPendingShareInStore(store);
     clearPendingShareInStore(store);
@@ -38,39 +38,69 @@ describe('pending share flag', () => {
   });
 });
 
-describe('decideShareRoute', () => {
-  it('opens the share screen when the user is onboarded and signed in', () => {
+describe("decideShareRoute", () => {
+  it("opens the share screen when the user is onboarded and signed in", () => {
     expect(
       decideShareRoute({ onboarded: true, isAuthenticated: true }),
-    ).toEqual({ action: 'open-share' });
+    ).toEqual({ action: "open-share" });
   });
 
-  it('defers during onboarding so the share can resume after finish', () => {
+  it("defers during onboarding so the share can resume after finish", () => {
     expect(
       decideShareRoute({ onboarded: false, isAuthenticated: false }),
-    ).toEqual({ action: 'defer-onboarding', markPending: true });
+    ).toEqual({ action: "defer-onboarding", markPending: true });
     expect(
       decideShareRoute({ onboarded: false, isAuthenticated: true }),
-    ).toEqual({ action: 'defer-onboarding', markPending: true });
+    ).toEqual({ action: "defer-onboarding", markPending: true });
   });
 
-  it('defers to sign-in when onboarded but signed out', () => {
+  it("defers to sign-in when onboarded but signed out", () => {
     expect(
       decideShareRoute({ onboarded: true, isAuthenticated: false }),
     ).toEqual({
-      action: 'defer-sign-in',
+      action: "defer-sign-in",
       markPending: true,
-      href: '/(auth)/sign-in',
+      href: "/(auth)/sign-in",
     });
   });
 });
 
-describe('decidePostAuthRoute', () => {
-  it('resumes the share flow when a pending share exists', () => {
-    expect(decidePostAuthRoute({ hasPendingShare: true })).toBe('/share');
+describe("decidePostAuthRoute", () => {
+  it("resumes the share flow when a pending share exists", () => {
+    expect(
+      decidePostAuthRoute({
+        hasPendingShare: true,
+        hasUnreadSharePayloads: false,
+      }),
+    ).toBe("/share");
   });
 
-  it('lands on home when nothing is pending', () => {
-    expect(decidePostAuthRoute({ hasPendingShare: false })).toBe('/');
+  it("resumes the share flow when payloads sit unread in the native store", () => {
+    // The Android cold-start case: the launch URL was lost before the router
+    // could route it, so only the unconsumed payloads record the share.
+    expect(
+      decidePostAuthRoute({
+        hasPendingShare: false,
+        hasUnreadSharePayloads: true,
+      }),
+    ).toBe("/share");
+  });
+
+  it("resumes when both signals are present", () => {
+    expect(
+      decidePostAuthRoute({
+        hasPendingShare: true,
+        hasUnreadSharePayloads: true,
+      }),
+    ).toBe("/share");
+  });
+
+  it("lands on home when nothing is pending", () => {
+    expect(
+      decidePostAuthRoute({
+        hasPendingShare: false,
+        hasUnreadSharePayloads: false,
+      }),
+    ).toBe("/");
   });
 });
