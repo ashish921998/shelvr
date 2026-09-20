@@ -11,6 +11,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -274,6 +275,9 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Light over the viewfinder in both themes; the root layout owns the
+          theme-driven bar for every other screen. */}
+      <StatusBar style="light" />
       <GestureDetector gesture={swipe}>
         <View style={styles.preview}>{body}</View>
       </GestureDetector>

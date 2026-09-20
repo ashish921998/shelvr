@@ -24,7 +24,6 @@ type SessionDependencies = {
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
-  resetAnalytics: () => void;
   reportError: (error: unknown) => void;
 };
 
@@ -183,14 +182,13 @@ export class NotificationDeviceSession {
           throw error;
         }
         this.stop();
-        // Once the account is deleted, local cleanup cannot turn it into a failed deletion.
-        const cleanup =
-          operation === "delete_account"
-            ? [this.deps.signOut, this.deps.resetAnalytics]
-            : [this.deps.resetAnalytics];
-        for (const action of cleanup) {
+        // After a successful account deletion the server has already ended the
+        // session; clear the local Convex Auth credentials too. Analytics
+        // reset belongs to the session boundary (useAnalyticsIdentity) on the
+        // auth edge, not here.
+        if (operation === "delete_account") {
           try {
-            await action();
+            await this.deps.signOut();
           } catch (error) {
             this.deps.reportError(error);
           }

@@ -22,7 +22,6 @@ function setup(initial: string[] = [], getLocale?: () => string) {
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
     deleteAccount: vi.fn(async () => {}),
-    resetAnalytics: vi.fn(),
     reportError: vi.fn(),
   };
   const session = new NotificationDeviceSession(
@@ -282,7 +281,6 @@ describe("notification device session", () => {
     await session.register();
     expect(deps.saveToken).toHaveBeenCalledWith("token-a");
     expect(deps.signOut).not.toHaveBeenCalled();
-    expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
   });
 
@@ -292,7 +290,6 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
-    expect(deps.resetAnalytics).toHaveBeenCalledOnce();
     expect(deps.reportError).toHaveBeenCalledOnce();
     expect(await session.register()).toBe(false);
     expect(deps.saveToken).not.toHaveBeenCalled();
