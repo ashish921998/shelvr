@@ -1,4 +1,4 @@
-import { analytics } from "@/lib/analytics";
+import { analytics, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
@@ -25,7 +25,28 @@ type OAuthSignInOutcome = "completed" | "cancelled" | "failed";
 
 type SignInStage = "request" | "browser" | "exchange";
 
-export function useOAuthSignIn() {
+/**
+ * The native module resolves every failed auth session with the OS error in
+ * the result dictionary, but `WebBrowserAuthSessionResult` does not declare
+ * the field, so it is read through a widened type rather than a cast to `any`.
+ *
+ * Only the NSError domain and code are kept. They are what separate a person
+ * backing out (`canceledLogin`, 1) from a session that could not present
+ * (`presentationContextNotProvided`, 2 / `presentationContextInvalid`, 3), and
+ * unlike the description they carry no free-form text.
+ */
+function nativeError(result: WebBrowser.WebBrowserAuthSessionResult) {
+  const description = (result as { error?: unknown }).error;
+  if (typeof description !== "string") return {};
+  const domain = /\(([A-Za-z0-9.]+) error/.exec(description)?.[1];
+  const code = /error (-?\d+)/.exec(description)?.[1];
+  return {
+    ...(domain === undefined ? {} : { native_error_domain: domain }),
+    ...(code === undefined ? {} : { native_error_code: Number(code) }),
+  };
+}
+
+export function useOAuthSignIn(surface: OAuthSurface) {
   const { signIn } = useAuthActions();
   const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(
     null,
@@ -38,7 +59,7 @@ export function useOAuthSignIn() {
 
   const signInWith = useCallback(
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
-      analytics.capture("auth_started", { provider });
+      analytics.capture("auth_started", { provider, surface });
       setPendingProvider(provider);
       setLastError(null);
       setInterrupted(false);
@@ -58,6 +79,7 @@ export function useOAuthSignIn() {
         if (!redirect) {
           analytics.capture("auth_succeeded", {
             provider,
+            surface,
             elapsed_ms: elapsedMs(),
           });
           return "completed";
@@ -70,11 +92,16 @@ export function useOAuthSignIn() {
         );
         if (result.type === "cancel" || result.type === "dismiss") {
           // A person needs seconds to back out; a sheet that ends in well under
-          // one is the system failing to present it. The timings tell them apart.
+          // one is the system failing to present it. Until the OS error below
+          // reaches enough sessions, the timings are the only thing telling
+          // those apart.
           analytics.capture("auth_cancelled", {
             provider,
+            surface,
+            result: result.type,
             elapsed_ms: elapsedMs(),
             browser_ms: Date.now() - browserStartedAt,
+            ...nativeError(result),
           });
           setInterrupted(true);
           return "cancelled";
@@ -95,25 +122,31 @@ export function useOAuthSignIn() {
         }
         analytics.capture("auth_succeeded", {
           provider,
+          surface,
           elapsed_ms: elapsedMs(),
         });
         return "completed";
       } catch (err) {
         analytics.capture("auth_failed", {
           provider,
+          surface,
           stage,
           elapsed_ms: elapsedMs(),
         });
         const detail =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-        analytics.captureError("auth_failed", err, { provider, stage });
+        analytics.captureError("auth_failed", err, {
+          provider,
+          stage,
+          surface,
+        });
         setLastError(detail);
         return "failed";
       } finally {
         setPendingProvider(null);
       }
     },
-    [signIn],
+    [signIn, surface],
   );
 
   return { signInWith, pendingProvider, lastError, interrupted };

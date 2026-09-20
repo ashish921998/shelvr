@@ -30,8 +30,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-async function run(provider: "apple" | "google" | "anonymous") {
-  const hook = renderHook(() => useOAuthSignIn());
+async function run(
+  provider: "apple" | "google" | "anonymous",
+  surface: "sign_in_view" | "demo_sheet" = "sign_in_view",
+) {
+  const hook = renderHook(() => useOAuthSignIn(surface));
   let outcome: string | undefined;
   await act(async () => {
     outcome = await hook.result.current.signInWith(provider);
@@ -54,10 +57,54 @@ describe("useOAuthSignIn", () => {
     expect(hook.result.current.interrupted).toBe(true);
     expect(captured("auth_cancelled")).toEqual({
       provider: "apple",
+      surface: "sign_in_view",
+      result: "cancel",
       elapsed_ms: expect.any(Number),
       browser_ms: expect.any(Number),
     });
     expect(captured("auth_succeeded")).toBeUndefined();
+  });
+
+  it("carries the OS error domain and code off a cancel", async () => {
+    mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+    mock.openAuthSessionAsync.mockResolvedValueOnce({
+      type: "cancel",
+      error:
+        "The operation couldn’t be completed. " +
+        "(com.apple.AuthenticationServices.WebAuthenticationSession error 3.)",
+    });
+
+    await run("google", "demo_sheet");
+
+    expect(captured("auth_cancelled")).toMatchObject({
+      surface: "demo_sheet",
+      result: "cancel",
+      native_error_domain:
+        "com.apple.AuthenticationServices.WebAuthenticationSession",
+      native_error_code: 3,
+    });
+  });
+
+  it("sends no error fields when the session reports no error", async () => {
+    mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+    mock.openAuthSessionAsync.mockResolvedValueOnce({ type: "cancel" });
+
+    await run("google");
+
+    expect(captured("auth_cancelled")).not.toHaveProperty(
+      "native_error_domain",
+    );
+    expect(captured("auth_cancelled")).not.toHaveProperty("native_error_code");
+  });
+
+  it("keeps a dismiss distinct from a cancel", async () => {
+    mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+    mock.openAuthSessionAsync.mockResolvedValueOnce({ type: "dismiss" });
+
+    const { outcome } = await run("google");
+
+    expect(outcome).toBe("cancelled");
+    expect(captured("auth_cancelled")).toMatchObject({ result: "dismiss" });
   });
 
   it("records a finished sign-in once", async () => {
@@ -76,6 +123,7 @@ describe("useOAuthSignIn", () => {
     expect(hook.result.current.interrupted).toBe(false);
     expect(captured("auth_succeeded")).toEqual({
       provider: "google",
+      surface: "sign_in_view",
       elapsed_ms: expect.any(Number),
     });
   });
@@ -95,6 +143,7 @@ describe("useOAuthSignIn", () => {
     expect(hook.result.current.lastError).not.toBeNull();
     expect(captured("auth_failed")).toEqual({
       provider: "google",
+      surface: "sign_in_view",
       stage: "exchange",
       elapsed_ms: expect.any(Number),
     });
@@ -111,7 +160,7 @@ describe("useOAuthSignIn", () => {
     expect(mock.captureError).toHaveBeenCalledWith(
       "auth_failed",
       expect.any(Error),
-      { provider: "apple", stage: "request" },
+      { provider: "apple", stage: "request", surface: "sign_in_view" },
     );
   });
 
