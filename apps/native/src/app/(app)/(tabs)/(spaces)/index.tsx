@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -17,7 +18,6 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { clampRatio } from "@/lib/clamp-ratio";
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured. Mirrors item-card so covers match the feed.
@@ -79,11 +79,7 @@ function CoverStack({
   useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? // Keep the pile's footprint sane without cropping the cover.
-      clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1, {
-        min: 0.6,
-        max: 1.9,
-      })
+    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1, 0.6, 1.9)
     : 1;
   const position = CARD_POSITION;
 

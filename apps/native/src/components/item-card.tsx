@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
 import { displayHost } from "@/lib/url";
@@ -36,7 +37,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
-import { clampRatio } from "@/lib/clamp-ratio";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -178,6 +178,8 @@ function CardMedia({
               aspectRatio: clampRatio(
                 item.aspectRatio,
                 isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+                0.5,
+                2,
               ),
             },
           ]}

@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      lastUpdated="September 3, 2026"
+      lastUpdated="September 19, 2026"
       footerHref="/terms"
       footerLabel="Terms of Service"
     >
@@ -73,15 +73,15 @@ export default function PrivacyPage() {
             to understand feature usage (for example onboarding completion and
             save events). In the app, analytics include a random device
             identifier and are tied to your account id after sign-in. On this
-            website, we record a random anonymous identifier in your browser’s
-            local storage and send basic usage events (such as page views, store
-            CTA clicks, waitlist form interactions, and the page URL) to PostHog
-            before you have an account. Website identifiers are not linked to
-            your account or to your saved content, and no analytics data is used
-            for advertising. We also use sampled session recordings in the app
-            to investigate onboarding and purchase difficulties. Text and images
-            are masked, and recording of console logs and network requests is
-            disabled.
+            website, we record a random anonymous identifier in your
+            browser’s local storage and send basic usage events (such as page
+            views, store CTA clicks, waitlist form interactions, and the page
+            URL) to PostHog before you have an account. Website identifiers are
+            not linked to your account or to your saved content, and no
+            analytics data is used for advertising. We also use sampled session
+            recordings in the app to investigate onboarding and purchase
+            difficulties. Text and images are masked, and recording of console
+            logs and network requests is disabled.
           </li>{" "}
         </ul>
         <p className="mt-3">
@@ -107,13 +107,24 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-ink text-lg">Sharing and selling</h2>
+        <h2 className="font-semibold text-ink text-lg">
+          Sharing and selling
+        </h2>
         <p className="mt-2">
           We never sell your data. We share it only with the service providers
           needed to operate Shelvr (including Convex, RevenueCat, our AI
-          provider, product-search provider, Resend, PostHog, and
-          ActivationPal), strictly to run the product, and where required by
-          law.
+          provider, product-search provider, Resend, PostHog, and ActivationPal),
+          strictly to run the product, and where required by law.
+        </p>
+        <p className="mt-2">
+          If you opt in through Shelvr’s updated-terms screen, RevenueCat may
+          share purchase identifiers, delivery status, and whether sample
+          content was provided with Apple to help review a refund request. This
+          does not include your saved links, notes, photos, or product analytics
+          events. We record your choice, the accepted terms version, and the
+          time of your decision. You can turn sharing off in Profile. Changes
+          are sent to RevenueCat; the app shows when an update is pending.
+          Previously shared information cannot be recalled.
         </p>
       </section>
 
@@ -136,6 +147,11 @@ export default function PrivacyPage() {
           a new identifier. Deleting your Shelvr account does not cancel an App
           Store subscription — manage that in your Apple ID settings. You can
           also email <strong>support@shelvr.app</strong> for help.
+        </p>
+        <p className="mt-2">
+          Account deletion also requests that refund data sharing stop. A
+          minimal record of the account identifier and pending withdrawal
+          remains until RevenueCat confirms the update, then is deleted.
         </p>
       </section>
 

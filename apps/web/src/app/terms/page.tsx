@@ -10,7 +10,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      lastUpdated="August 7, 2026"
+      lastUpdated="September 19, 2026"
       footerHref="/privacy"
       footerLabel="Privacy Policy"
     >
@@ -53,6 +53,18 @@ export default function TermsPage() {
           may change with notice. Refunds are handled by Apple under App Store
           policies. Pro includes storage for up to 1,000 photos per account;
           links and notes are not limited.
+        </p>
+        <p className="mt-2">
+          Apple refund data sharing is optional. If you choose “Agree and allow
+          sharing” on the updated-terms screen in Shelvr, you consent to
+          Shelvr, through RevenueCat, sharing purchase identifiers, delivery
+          status, and whether sample content was provided with Apple when
+          reviewing your refund request. Apple makes the final refund decision.
+          Your saved links, notes, and photos are not shared for this purpose.
+          Using the app or making a purchase alone does not enable this sharing.
+          Declining does not restrict app access or your ability to request a
+          refund. You can withdraw this consent in Profile under Apple refund
+          data sharing.
         </p>
       </section>
 

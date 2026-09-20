@@ -154,6 +154,11 @@ export default function ShareScreen() {
   // must NOT auto-restart on every re-render; only an explicit "Retry failed"
   // press re-runs it. A NEW session (different id) bypasses this and starts.
   const partialSessionId = useRef<string | null>(null);
+  // The session already routed to the paywall. The locked branch returns before
+  // any await, so the running claim cannot cover it, and the effect re-runs for
+  // the same session as soon as native resolution settles. Cleared when a run
+  // starts so a later lapse gates the session again.
+  const lockedSessionId = useRef<string | null>(null);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. */
@@ -286,6 +291,8 @@ export default function ShareScreen() {
       // the locked phase BEFORE presenting so a cancel lands on the explicit
       // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
       if (!entitled) {
+        if (lockedSessionId.current === session.sessionId) return;
+        lockedSessionId.current = session.sessionId;
         setPhase({ kind: "locked" });
         void openPaywall(router, "share");
         return;
@@ -294,6 +301,7 @@ export default function ShareScreen() {
       // Starting (or retrying) a run clears the partial-settled marker for this
       // session so the effect won't block a future legitimate restart.
       partialSessionId.current = null;
+      lockedSessionId.current = null;
       const sid = session.sessionId;
 
       try {

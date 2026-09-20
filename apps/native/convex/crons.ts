@@ -3,6 +3,13 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
+crons.interval(
+  "retry refund consent sync",
+  { minutes: 1 },
+  internal.legalConsent.retry,
+  {},
+);
+
 // Sweep a bounded page of stale pending image operations (their attached upload
 // was never finalized) so unreferenced storage objects don't accumulate. The
 // mutation processes at most 100 rows per run; unbounded scans are avoided.
@@ -31,6 +38,16 @@ crons.interval(
   "retry waitlist resend sync",
   { hours: 1 },
   internal.waitlist.retryFailedResendSyncs,
+  {},
+);
+
+// Deliver feedback rows whose first attempt never ran or failed, and pick up
+// `unconfigured` rows once the support-inbox env vars appear. Bounded and
+// index-backed; capped rows stay `failed` for manual inspection.
+crons.interval(
+  "retry feedback inbox delivery",
+  { hours: 1 },
+  internal.feedback.retryFailedDeliveries,
   {},
 );
 
