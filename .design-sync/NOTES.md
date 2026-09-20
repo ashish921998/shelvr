@@ -9,7 +9,7 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
 
 - Scope (first sync, 2026-09-13): tokens and fonts plus reusable building blocks
   only. Whole screens (item detail, masonry feed, reader, onboarding) are out.
-- The display face is `FacultyGlyphic-Regular.ttf`, licensed under SIL OFL 1.1.
+- The display face is `Spectral-Regular.ttf`, licensed under SIL OFL 1.1.
   Re-sync fonts and components to update previously uploaded design previews.
 - Synced components are listed in `.design-sync/web-entry.ts`: `AppSymbolIcon`,
   `EmptyState`, `HeaderIconButton`, `InlineCard`, `IntentChip`, `ScreenLoader`,

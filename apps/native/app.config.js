@@ -254,7 +254,7 @@ module.exports = ({ config }) => ({
       },
     },
     // Ship the full font license with the native app's Expo manifest.
-    fontLicenses: require("./assets/fonts/faculty-glyphic-license.json"),
+    fontLicenses: require("./assets/fonts/spectral-license.json"),
     // Public ingestion key for Shelvr; development stays opt-in via env.
     posthogProjectToken:
       process.env.POSTHOG_PROJECT_TOKEN ??
