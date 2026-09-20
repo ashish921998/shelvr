@@ -183,15 +183,17 @@ export class NotificationDeviceSession {
           throw error;
         }
         this.stop();
-        // Once the account is deleted, local cleanup cannot turn it into a failed deletion.
-        const cleanup =
-          operation === "delete_account"
-            ? [this.deps.signOut, this.deps.resetAnalytics]
-            : [this.deps.resetAnalytics];
-        for (const action of cleanup) {
+        // After a successful account deletion the server has already ended the
+        // session; clear the local Convex Auth credentials too.
+        if (operation === "delete_account") {
           try {
-            await action();
+            await this.deps.signOut();
           } catch (error) {
+            // Local sign-out failed, so no unauthenticated auth edge may
+            // follow promptly and the identity hook would not fire — clear
+            // the PostHog identity here so events stop attributing to the
+            // deleted account.
+            this.deps.resetAnalytics();
             this.deps.reportError(error);
           }
         }
