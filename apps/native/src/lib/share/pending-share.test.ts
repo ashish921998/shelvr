@@ -99,41 +99,14 @@ describe("decideShareRoute", () => {
 });
 
 describe("decidePostAuthRoute", () => {
-  it("resumes the share flow when a pending share exists", () => {
-    expect(
-      decidePostAuthRoute({
-        hasPendingShare: true,
-        hasResumableSharePayloads: false,
-      }),
-    ).toBe("/share");
+  it("resumes the share flow when a share is owed", () => {
+    // The two owed signals (deferred flag, resumable payload batch) merge
+    // into hasOwedShare at the call site, so the matrix collapses to the
+    // outcome itself.
+    expect(decidePostAuthRoute({ hasOwedShare: true })).toBe("/share");
   });
 
-  it("resumes the share flow when payloads sit unread in the native store", () => {
-    // The Android cold-start case: the launch URL was lost before the router
-    // could route it, so only the unconsumed payloads record the share.
-    expect(
-      decidePostAuthRoute({
-        hasPendingShare: false,
-        hasResumableSharePayloads: true,
-      }),
-    ).toBe("/share");
-  });
-
-  it("resumes when both signals are present", () => {
-    expect(
-      decidePostAuthRoute({
-        hasPendingShare: true,
-        hasResumableSharePayloads: true,
-      }),
-    ).toBe("/share");
-  });
-
-  it("lands on home when nothing is pending", () => {
-    expect(
-      decidePostAuthRoute({
-        hasPendingShare: false,
-        hasResumableSharePayloads: false,
-      }),
-    ).toBe("/");
+  it("lands on home when nothing is owed", () => {
+    expect(decidePostAuthRoute({ hasOwedShare: false })).toBe("/");
   });
 });

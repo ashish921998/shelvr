@@ -9,7 +9,6 @@ const mock = vi.hoisted(() => ({
   onboarded: true,
   pathname: "/",
   replace: vi.fn(),
-  markDirectLaunch: vi.fn(),
   hasPendingShare: false,
   hasResumablePayloads: false,
 }));
@@ -30,16 +29,12 @@ vi.mock("@/lib/share/pending-share-store", () => ({
 vi.mock("@/lib/share/resumable-payloads", () => ({
   hasResumableSharedPayloads: () => mock.hasResumablePayloads,
 }));
-vi.mock("@/lib/splash/launch-intent", () => ({
-  markDirectLaunch: mock.markDirectLaunch,
-}));
 
 beforeEach(() => {
   mock.auth = { isAuthenticated: true, isLoading: false };
   mock.onboarded = true;
   mock.pathname = "/";
   mock.replace.mockReset();
-  mock.markDirectLaunch.mockReset();
   mock.hasPendingShare = false;
   mock.hasResumablePayloads = false;
 });
@@ -65,7 +60,6 @@ describe("useResumePendingShare", () => {
     rerender();
 
     expect(mock.replace).toHaveBeenCalledWith("/share");
-    expect(mock.markDirectLaunch).toHaveBeenCalledTimes(1);
   });
 
   it("resumes a share deferred by the pending flag", () => {
@@ -73,7 +67,6 @@ describe("useResumePendingShare", () => {
     renderResume();
 
     expect(mock.replace).toHaveBeenCalledWith("/share");
-    expect(mock.markDirectLaunch).toHaveBeenCalledTimes(1);
   });
 
   it("waits for onboarding and sign-in before recovering either signal", () => {
@@ -138,6 +131,5 @@ describe("useResumePendingShare", () => {
     renderResume();
 
     expect(mock.replace).not.toHaveBeenCalled();
-    expect(mock.markDirectLaunch).not.toHaveBeenCalled();
   });
 });

@@ -110,21 +110,18 @@ export function decideShareRoute(state: {
 
 /**
  * After onboarding completes and/or the user signs in, choose the next route.
- * A pending share wins over the default home landing so the Share Sheet is not
- * silently dropped. A resumable payload batch wins for the same reason: on an
- * Android cold start the launch URL can be lost to Expo Router's initial-URL
- * race, and a relaunch after a mid-share process death can find the batch
- * still sitting in the native store. Either way the share screen is owed a
- * visit — its own session reconciliation decides whether the batch is a new
- * save, a resume of an interrupted one, or a stale completed record to clear.
- * A batch whose explicit discard left it behind is not resumable (see the
- * discard record), so the hook stays home over it.
+ * `hasOwedShare` merges the two signals that both mean "a share is waiting":
+ * the deferred flag (the launch routed but sign-in/onboarding was not done)
+ * and a resumable payload batch (the launch URL was lost to Expo Router's
+ * Android initial-URL race, or a relaunch after a mid-share process death
+ * found the batch still in the native store). An owed share wins over the
+ * default home landing; its session reconciliation then decides whether the
+ * batch is a new save, a resume of an interrupted one, or a stale completed
+ * record to clear. A batch whose explicit discard left it behind is not
+ * resumable (see the discard record), so it is not owed anything.
  */
 export function decidePostAuthRoute(state: {
-  hasPendingShare: boolean;
-  hasResumableSharePayloads: boolean;
+  hasOwedShare: boolean;
 }): "/" | "/share" {
-  return state.hasPendingShare || state.hasResumableSharePayloads
-    ? "/share"
-    : "/";
+  return state.hasOwedShare ? "/share" : "/";
 }

@@ -245,14 +245,8 @@ export default function ShareScreen() {
         return;
       }
       // The native store is empty now — a discard record from an earlier
-      // failed abandon no longer describes anything and must not wrongly
-      // suppress a later identical re-share.
-      try {
-        clearShareDiscardedOnDevice();
-      } catch (err) {
-        // Best-effort: the share itself is already durable.
-        analytics.captureError("clear_share_discarded_failed", err);
-      }
+      // failed abandon no longer describes anything.
+      clearDiscardedRecord();
       // 3. Delete the local session ONLY after a successful clear — otherwise a
       //    later identical re-share would match a stale completed record and be
       //    silently dropped. Scoped so a stale in-flight run can't delete the
@@ -501,16 +495,9 @@ export default function ShareScreen() {
       router.replace("/");
       return;
     }
-    // The native store is empty: any discard record from an earlier failed
-    // clear is moot, and a later deliberate re-share of the same content must
-    // not be suppressed by it.
-    try {
-      clearShareDiscardedOnDevice();
-    } catch (err) {
-      // Best-effort: a stale record can only wrongly suppress a future
-      // identical re-share.
-      analytics.captureError("clear_share_discarded_failed", err);
-    }
+    // The native store is empty: any discard record it still describes is
+    // moot.
+    clearDiscardedRecord();
     router.replace("/");
   }, [clearSharedPayloads, rawPayloads, router]);
 
@@ -695,6 +682,18 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   if (entry.itemId !== undefined) patch.itemId = entry.itemId;
   if (entry.message !== undefined) patch.message = entry.message;
   updateEntry(shareStore, entry.index, patch, sessionId);
+}
+
+/** Drops any discard record once the native store is confirmed empty — a
+ * stale record can only wrongly suppress a later identical re-share.
+ * Best-effort: the share is already durable (completeSession) or the screen
+ * is leaving (abandon), so a SecureStore failure is reported, not fatal. */
+function clearDiscardedRecord(): void {
+  try {
+    clearShareDiscardedOnDevice();
+  } catch (err) {
+    analytics.captureError("clear_share_discarded_failed", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
