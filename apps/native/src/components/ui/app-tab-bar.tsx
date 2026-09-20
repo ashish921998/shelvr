@@ -149,6 +149,13 @@ function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
 
 export function AppTabs() {
   useAppLocale();
+  // `Tabs` is a third-party view, so the Unistyles babel plugin never
+  // instruments it and cannot repaint it natively when the theme changes.
+  // Subscribing here re-renders this component on a switch, and the colour is
+  // passed inline so the new theme's value reaches that view. Without it the
+  // backdrop the bar floats over keeps the outgoing theme's background — a
+  // cream band under a dark theme.
+  const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const restingBottom = Math.max(insets.bottom, 10);
 
@@ -162,7 +169,10 @@ export function AppTabs() {
       behavior="height"
       enabled={Platform.OS === "android"}
     >
-      <Tabs style={styles.root} options={{ backBehavior: "history" }}>
+      <Tabs
+        style={[styles.root, { backgroundColor: theme.colors.background }]}
+        options={{ backBehavior: "history" }}
+      >
         <TabSlot
           style={[
             styles.slot,
