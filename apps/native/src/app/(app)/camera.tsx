@@ -102,6 +102,9 @@ export default function CameraScreen() {
   // only them), the `pro_required` paywall route, and the alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpace.spaceId,
+    // The batch backs `pickFromLibrary` only; a capture goes through
+    // `saveSingle` and counts as `camera`.
+    saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy,
     onAllSaved: () => router.back(),
@@ -143,7 +146,10 @@ export default function CameraScreen() {
   const saveSingle = async (request: ImageSaveRequest) => {
     setBusy(true);
     try {
-      const [result] = await saveImages([request], pinnedSpace);
+      const [result] = await saveImages([request], {
+        ...pinnedSpace,
+        saveSource: "camera",
+      });
       if (result.status === "saved") {
         analytics.capture("photo_captured", { capture_mode: mode });
         router.back();

@@ -11,6 +11,13 @@ import type { Id } from "./_generated/dataModel";
 import ipaddr from "ipaddr.js";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
+import {
+  ResendResponseError,
+  classifyResendError,
+  formatResendError,
+  resendErrorCategoryValidator,
+  resendRequest,
+} from "./model/resend";
 
 export const CONSENT_VERSION = "shelvr-waitlist-v1";
 export const CONSENT_TEXT =
@@ -40,22 +47,12 @@ const resendStatusValidator = v.union(
   v.literal("unconfigured"),
 );
 
-// Why a Resend sync failed, without the provider's message. Resend echoes the
-// submitted address inside its error text, so the message is never stored or
-// logged; the category plus HTTP status is enough to triage an outage.
-const resendErrorCategoryValidator = v.union(
-  v.literal("rate_limited"),
-  v.literal("invalid_recipient"),
-  v.literal("auth_error"),
-  v.literal("provider_error"),
-  v.literal("timeout"),
-  v.literal("network_error"),
-);
-export type ResendErrorCategory = Infer<typeof resendErrorCategoryValidator>;
-
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_IP_LENGTH = 64;
 const RESEND_RETRY_SCAN = 100;
+/** Provider-side requests identify this surface so Resend metrics can split
+ * waitlist syncs from feedback sends. */
+const RESEND_USER_AGENT = "Shelvr-Waitlist/1.0";
 // A row that fails this many Resend syncs stays `failed` for manual
 // inspection instead of occupying the retry cron window forever.
 export const RESEND_MAX_ATTEMPTS = 10;
@@ -178,19 +175,6 @@ export const upsertSignup = internalMutation({
   },
 });
 
-/**
- * Serialize a failure into the `resendError` column. The column predates the
- * category split and is a plain string, so the two parts are joined as
- * `<category>:<status>` (status omitted when the failure never got an HTTP
- * response). Nothing from the provider's response body is included.
- */
-export function formatResendError(
-  category: ResendErrorCategory,
-  status: number | undefined,
-): string {
-  return status === undefined ? category : `${category}:${status}`;
-}
-
 export const updateResendStatus = internalMutation({
   args: {
     id: v.id("waitlistSignups"),
@@ -292,64 +276,6 @@ export const listSignupsNeedingResendSync = internalQuery({
   },
 });
 
-/**
- * A Resend call that returned a non-success HTTP status. Carries only the
- * status and which step failed; the response body (which can echo the
- * address) is never read into the error.
- */
-class ResendResponseError extends Error {
-  constructor(
-    readonly step: "create" | "lookup" | "segment" | "topic",
-    readonly status: number,
-  ) {
-    super(`Resend ${step} failed (${status}).`);
-    this.name = "ResendResponseError";
-  }
-}
-
-/**
- * Reduce any failure from the sync path to a fixed category and, when there
- * was an HTTP response, its status code. Exported for testing.
- */
-export function classifyResendError(error: unknown): {
-  category: ResendErrorCategory;
-  status: number | undefined;
-} {
-  if (error instanceof ResendResponseError) {
-    const { status } = error;
-    if (status === 429) return { category: "rate_limited", status };
-    if (status === 401 || status === 403)
-      return { category: "auth_error", status };
-    if (status === 400 || status === 422) {
-      return { category: "invalid_recipient", status };
-    }
-    return { category: "provider_error", status };
-  }
-  // `AbortSignal.timeout` rejects with a DOMException named TimeoutError (or
-  // AbortError on older runtimes).
-  if (
-    error instanceof Error &&
-    (error.name === "TimeoutError" || error.name === "AbortError")
-  ) {
-    return { category: "timeout", status: undefined };
-  }
-  return { category: "network_error", status: undefined };
-}
-
-async function resendRequest(apiKey: string, path: string, init: RequestInit) {
-  return await fetch(`https://api.resend.com${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "User-Agent": "Shelvr-Waitlist/1.0",
-      ...init.headers,
-    },
-    // A hung Resend socket must not stall the join action or the retry cron.
-    signal: AbortSignal.timeout(15_000),
-  });
-}
-
 async function syncResendContact(
   apiKey: string,
   email: string,
@@ -360,15 +286,22 @@ async function syncResendContact(
       ? env.RESEND_ANDROID_SEGMENT_ID
       : env.RESEND_SEGMENT_ID;
   const topicId = env.RESEND_TOPIC_ID;
-  const createResponse = await resendRequest(apiKey, "/contacts", {
-    method: "POST",
-    body: JSON.stringify({
-      email,
-      unsubscribed: false,
-      ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
-      ...(topicId ? { topics: [{ id: topicId, subscription: "opt_in" }] } : {}),
-    }),
-  });
+  const createResponse = await resendRequest(
+    apiKey,
+    RESEND_USER_AGENT,
+    "/contacts",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        unsubscribed: false,
+        ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
+        ...(topicId
+          ? { topics: [{ id: topicId, subscription: "opt_in" }] }
+          : {}),
+      }),
+    },
+  );
 
   let contactId: string | undefined;
   if (createResponse.ok) {
@@ -377,6 +310,7 @@ async function syncResendContact(
   } else if (createResponse.status === 409) {
     const getResponse = await resendRequest(
       apiKey,
+      RESEND_USER_AGENT,
       `/contacts/${encodeURIComponent(email)}`,
       { method: "GET" },
     );
@@ -389,6 +323,7 @@ async function syncResendContact(
     if (segmentId) {
       const segmentResponse = await resendRequest(
         apiKey,
+        RESEND_USER_AGENT,
         `/contacts/${encodeURIComponent(email)}/segments/${segmentId}`,
         { method: "POST" },
       );
@@ -399,6 +334,7 @@ async function syncResendContact(
     if (topicId) {
       const topicResponse = await resendRequest(
         apiKey,
+        RESEND_USER_AGENT,
         `/contacts/${encodeURIComponent(email)}/topics`,
         {
           method: "PATCH",
@@ -450,8 +386,11 @@ async function persistResendSync(
   } catch (error) {
     // Log and persist only the shape of the failure. The provider message (and
     // the email it can echo) stays out of both the database and the logs.
-    const { category, status } = classifyResendError(error);
-    const step = error instanceof ResendResponseError ? error.step : undefined;
+    const { category, status } = classifyResendError(
+      error,
+      "invalid_recipient",
+    );
+    const step = error instanceof ResendResponseError ? error.label : undefined;
     logEvent("error", "waitlist_resend_sync_failed", {
       category,
       status,

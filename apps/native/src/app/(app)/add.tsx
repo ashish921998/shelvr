@@ -198,6 +198,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
           url: trimmed,
           spaceId: pinnedSpaceId,
           analyticsSessionId: analytics.sessionId(),
+          saveSource: "manual_link",
         });
       } else {
         await createNoteItem({
@@ -226,6 +227,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   // route, and the partial-failure alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpaceId,
+    saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy: setSaving,
     onAllSaved: (results) => {

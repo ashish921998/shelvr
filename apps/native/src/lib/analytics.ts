@@ -131,10 +131,17 @@ type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
-  // Feedback events never carry message text; see lib/feedback.ts.
+  // Feedback events never carry message text; see lib/feedback.ts. The
+  // submission event fires only after Convex acknowledges persistence — the
+  // message itself lives in Convex and the support inbox, never in PostHog.
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
   feedback_opened: { surface: string };
+  feedback_submitted: {
+    surface: string;
+    char_count: number;
+    delivery: "scheduled" | "unconfigured";
+  };
   // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;

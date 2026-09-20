@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -21,13 +22,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured. Mirrors item-card so covers match the feed.
 const OG_RATIO = 1.91;
-
-function clampRatio(ratio: number | undefined, fallback: number) {
-  const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
-  // Respect the cover's real proportions; only bound pathological panoramas /
-  // slivers so the stack keeps a sane footprint inside its square cell.
-  return Math.min(Math.max(value, 0.6), 1.9);
-}
 
 // Stable pseudo-random in [-1, 1) derived from a seed string (FNV-1a), so each
 // card's jitter is fixed per space and doesn't reshuffle on every re-render.
@@ -85,7 +79,7 @@ function CoverStack({
   useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1)
+    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1, 0.6, 1.9)
     : 1;
   const position = CARD_POSITION;
 

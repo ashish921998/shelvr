@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { useEffect, useRef, useState } from "react";
+import Constants from "expo-constants";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Linking,
@@ -12,25 +13,48 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { AppSymbolIcon } from "@/components/symbol";
+import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import {
   FEEDBACK_MESSAGE_MAX_LENGTH,
   feedbackAnalytics,
   markFeedbackSubmitted,
+  sanitizeFeedbackMessage,
   type FeedbackSurface,
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
 
-type Phase = "compose" | "queued" | "error";
+/** Bounded app context for the support reply, supplied as bounded values the
+ * backend re-validates (platform is a closed union; the version strings are
+ * capped server-side). Never user content. */
+function submissionContext() {
+  const version = Constants.expoConfig?.version;
+  const variant = Constants.expoConfig?.extra?.variant;
+  return {
+    ...(Platform.OS === "ios" || Platform.OS === "android"
+      ? { platform: Platform.OS }
+      : {}),
+    ...(typeof version === "string" && version.length > 0
+      ? { appVersion: version }
+      : {}),
+    ...(variant !== undefined && variant !== null
+      ? { buildVariant: String(variant) }
+      : {}),
+  };
+}
 
 /**
  * The one feedback form, reused by the Home invitation and the permanent
  * Profile entry. Callers conditionally mount it (open = mounted), so compose
- * state resets naturally on close. Nothing is published until the user taps
- * Send; the typed message is masked in session replays via the global posthog
- * config (maskAllTextInputs in lib/posthog.ts). Success is reported honestly —
- * the capture is queued locally, never presented as server-acknowledged.
+ * state resets naturally on close. Nothing is sent until the user taps Send;
+ * the typed message goes to Convex (never PostHog) and is masked in session
+ * replays via the global posthog config (maskAllTextInputs in lib/posthog.ts).
+ * Success is reported honestly: "accepted" means Convex persisted the row —
+ * inbox delivery is a server-side projection the client never claims as sent.
+ * A failed send keeps the draft on screen with the support channel offered.
  */
 export function FeedbackModal({
   surface,
@@ -42,16 +66,20 @@ export function FeedbackModal({
   useAppLocale();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
+  const submitFeedback = useMutation(api.feedback.submitFeedback);
   const [message, setMessage] = useState("");
-  const [sending, setSending] = useState(false);
+  const [flow, setFlow] = useState<"idle" | "sending" | "failed" | "sent">(
+    "idle",
+  );
+  // Mirror of `flow` that survives the async submit gap, so a double-tap
+  // cannot start two sends before the state update lands.
   const sendingRef = useRef(false);
-  const [phase, setPhase] = useState<Phase>("compose");
   const openedRef = useRef(false);
 
-  const analyticsAvailable = feedbackAnalytics.isAvailable();
-  // A resolved-but-null user has no account to record the send against, so
-  // the form offers the support channel instead of a Send that does nothing.
-  const available = analyticsAvailable && user !== null;
+  // A resolved-but-null user has no account to submit against, so the form
+  // offers the support channel instead of a Send that does nothing. Analytics
+  // availability is irrelevant here — feedback goes to Convex, not PostHog.
+  const available = user !== null;
 
   useEffect(() => {
     if (openedRef.current) return;
@@ -59,29 +87,65 @@ export function FeedbackModal({
     feedbackAnalytics.feedbackOpened(surface);
   }, [surface]);
 
-  // Wait for the user id so a queued send is always recorded against the account.
-  const canSend = !sending && !!user && message.trim().length > 0;
+  // Wait for the user id so a send is always recorded against the account.
+  const canSend = flow !== "sending" && !!user && message.trim().length > 0;
+
+  /** Send through Convex. "accepted" means ONLY that Convex persisted the
+   * submission — the support inbox email is a server-side projection the
+   * client never claims as sent. Any failure (offline, validation, rate
+   * limit) returns "failed" so the draft stays editable and the support
+   * channel is offered; nothing is captured beyond the bounded shape
+   * metadata, and the invitation is only marked submitted on success. */
+  const sendFeedback = useCallback(
+    async (rawMessage: string): Promise<"accepted" | "failed"> => {
+      const message = sanitizeFeedbackMessage(rawMessage);
+      if (!message) return "failed";
+      try {
+        const { deliveryState } = await submitFeedback({
+          message,
+          surface,
+          ...submissionContext(),
+        });
+        // Capture the content-free projection state only after Convex
+        // acknowledges the row is durable: surface, char count, and the
+        // delivery category — never the message.
+        analytics.capture("feedback_submitted", {
+          surface,
+          char_count: message.length,
+          delivery: deliveryState,
+        });
+        return "accepted";
+      } catch {
+        // A raw Convex error can carry server text in its stack, and
+        // captureError ships the stack to PostHog. The stable event name is
+        // the triage signal; the failure details stay client-side.
+        analytics.captureError(
+          "feedback_submit_failed",
+          new Error("Feedback submission failed"),
+        );
+        return "failed";
+      }
+    },
+    [submitFeedback, surface],
+  );
 
   const send = async () => {
     if (sendingRef.current || !user) return;
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
     sendingRef.current = true;
-    setSending(true);
-    const result = await feedbackAnalytics.submitFeedback(surface, trimmed);
-    if (result === "queued") {
-      markFeedbackSubmitted(user._id);
-    }
-    setSending(false);
+    setFlow("sending");
+    const result = await sendFeedback(trimmed);
     sendingRef.current = false;
-    // 'unavailable' is honest too: without analytics there is nothing to
-    // queue, so the form offers the support channel instead of pretending.
-    if (result === "queued") setPhase("queued");
-    else setPhase("error");
-  };
-
-  const openSupport = () => {
-    void Linking.openURL(SUPPORT_URL);
+    if (result === "accepted") {
+      markFeedbackSubmitted(user._id);
+      setFlow("sent");
+    } else {
+      // The draft stays on screen, editable and re-sendable, with the
+      // support channel offered — and the invitation is not marked
+      // submitted, so nothing pretends the feedback landed.
+      setFlow("failed");
+    }
   };
 
   return (
@@ -111,7 +175,7 @@ export function FeedbackModal({
               {t("feedback.open")}
             </Text>
 
-            {phase === "queued" ? (
+            {flow === "sent" ? (
               <>
                 <Text style={styles.body}>{t("feedback.thanks")}</Text>
                 <View style={styles.buttonRow}>
@@ -130,50 +194,25 @@ export function FeedbackModal({
                   </Pressable>
                 </View>
               </>
-            ) : phase === "error" || !available ? (
+            ) : !available ? (
               <>
                 <Text style={styles.body}>
-                  {available
-                    ? t("feedback.sendFailedContact")
-                    : t("feedback.unavailableContact")}
+                  {t("feedback.unavailableContact")}
                 </Text>
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel={t("support.email")}
-                  style={({ pressed }) => [
-                    styles.supportRow,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={openSupport}
-                >
-                  <Text style={styles.supportText}>{t("support.contact")}</Text>
-                  <AppSymbolIcon
-                    name="arrow.up.right"
-                    size={14}
-                    tintColor={theme.colors.muted}
-                  />
-                </Pressable>
-                {available ? (
-                  <View style={styles.buttonRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("common.close")}
-                      style={({ pressed }) => [
-                        styles.secondaryButton,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={onClose}
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {t("common.close")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : null}
+                <SupportLink />
               </>
             ) : (
               <>
+                {flow === "failed" ? (
+                  <>
+                    <Text style={styles.body}>
+                      {t("feedback.sendFailedContact")}
+                    </Text>
+                    <SupportLink />
+                  </>
+                ) : null}
                 <Text style={styles.body}>{t("feedback.prompt")}</Text>
+                <Text style={styles.notice}>{t("feedback.replyNotice")}</Text>
                 <TextInput
                   accessibilityLabel={t("feedback.messageLabel")}
                   style={styles.input}
@@ -197,7 +236,7 @@ export function FeedbackModal({
                       styles.secondaryButton,
                       pressed && { opacity: 0.7 },
                     ]}
-                    disabled={sending}
+                    disabled={flow === "sending"}
                     onPress={onClose}
                   >
                     <Text style={styles.secondaryButtonText}>
@@ -217,7 +256,9 @@ export function FeedbackModal({
                     onPress={() => void send()}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {sending ? t("feedback.sending") : t("feedback.send")}
+                      {flow === "sending"
+                        ? t("feedback.sending")
+                        : t("feedback.send")}
                     </Text>
                   </Pressable>
                 </View>
@@ -227,6 +268,28 @@ export function FeedbackModal({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/** The Contact Support fallback row, shared by the no-account and
+ * failed-send states: direct email is the channel that works when the
+ * in-app form cannot serve the user. */
+function SupportLink() {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t("support.email")}
+      style={({ pressed }) => [styles.supportRow, pressed && { opacity: 0.7 }]}
+      onPress={() => void Linking.openURL(SUPPORT_URL)}
+    >
+      <Text style={styles.supportText}>{t("support.contact")}</Text>
+      <AppSymbolIcon
+        name="arrow.up.right"
+        size={14}
+        tintColor={theme.colors.muted}
+      />
+    </Pressable>
   );
 }
 
@@ -264,6 +327,13 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 14,
     lineHeight: 20,
     color: theme.colors.muted,
+    marginBottom: theme.gap(1),
+  },
+  notice: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.colors.faint,
     marginBottom: theme.gap(1),
   },
   input: {

@@ -7,6 +7,7 @@ import {
   useSaveImages,
 } from "@/lib/use-save-image";
 import type { Id } from "@convex/_generated/dataModel";
+import type { SaveSource } from "@convex/model/saveSource";
 import { useRouter } from "expo-router";
 import { Alert } from "react-native";
 
@@ -22,7 +23,7 @@ type BatchAlertButton = { text: string; onPress?: () => void };
 export type ImageBatchDeps = {
   saveImages: (
     requests: ImageSaveRequest[],
-    options?: { spaceId?: Id<"spaces"> },
+    options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
   ) => Promise<ImageSaveResult[]>;
   /** `Alert.alert`, injected so a test can drive the retry button. */
   alert: (title: string, message: string, buttons: BatchAlertButton[]) => void;
@@ -41,6 +42,8 @@ export type ImageBatchDeps = {
   /** Pins every save in the batch to a space (set when the flow was opened
    * from inside one). */
   spaceId?: Id<"spaces">;
+  /** Which entry point the host screen ran this batch from. */
+  saveSource?: SaveSource;
 };
 
 /**
@@ -66,7 +69,10 @@ export async function runImageBatch(
   }
   deps.setBusy(true);
   try {
-    const results = await deps.saveImages(requests, { spaceId: deps.spaceId });
+    const results = await deps.saveImages(requests, {
+      spaceId: deps.spaceId,
+      saveSource: deps.saveSource,
+    });
     const failed = results.filter((r) => r.status === "failed");
     const savedSoFar = [
       ...alreadySaved,
