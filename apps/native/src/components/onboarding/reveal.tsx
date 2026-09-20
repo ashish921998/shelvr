@@ -172,7 +172,7 @@ export function RevealStep({
 
       <View style={styles.foot}>
         <CtaButton
-          label={t("reveal.keepSaving")}
+          label={t(entitled ? "common.continue" : "reveal.keepSaving")}
           onPress={() => void keepSaving()}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
