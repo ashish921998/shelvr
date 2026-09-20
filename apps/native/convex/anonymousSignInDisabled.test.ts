@@ -14,7 +14,7 @@ afterEach(() => {
 // flip after first load still sees the pinned list.
 describe("anonymous sign-in with AUTH_ENABLE_ANONYMOUS unset", () => {
   it("is rejected by the server before any account is created", async () => {
-    expect(process.env.AUTH_ENABLE_ANONYMOUS).toBeUndefined();
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", undefined);
     const backend = newConvexTest();
 
     await expect(
