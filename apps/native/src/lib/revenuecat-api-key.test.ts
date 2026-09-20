@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const constantsMock = vi.hoisted(() => ({
   constants: { expoConfig: { extra: { variant: "development" as unknown } } },
+  platform: { OS: "ios" as "ios" | "android" | "web" },
 }));
+vi.mock("react-native", () => ({ Platform: constantsMock.platform }));
 vi.mock("expo-constants", () => ({ default: constantsMock.constants }));
 
 function setVariant(variant: unknown): void {
@@ -10,18 +12,18 @@ function setVariant(variant: unknown): void {
 }
 
 async function loadKey(
-  platform: "ios" | "android",
+  platform: "ios" | "android" | "web",
 ): Promise<string | undefined> {
-  const module =
-    platform === "ios"
-      ? await import("./revenuecat-api-key.ios")
-      : await import("./revenuecat-api-key.android");
+  constantsMock.platform.OS = platform;
+  vi.resetModules();
+  const module = await import("./revenuecat-api-key");
   return module.REVENUECAT_API_KEY;
 }
 
 beforeEach(() => {
   vi.resetModules();
   setVariant("development");
+  constantsMock.platform.OS = "ios";
 });
 
 afterEach(() => {
@@ -74,5 +76,13 @@ describe("REVENUECAT_API_KEY", () => {
     vi.stubGlobal("__DEV__", false);
     vi.stubEnv("EXPO_PUBLIC_REVENUECAT_TEST_KEY", "test_dev");
     await expect(loadKey("ios")).resolves.toBeUndefined();
+  });
+
+  it("does not configure RevenueCat on web", async () => {
+    setVariant("production");
+    vi.stubGlobal("__DEV__", false);
+    vi.stubEnv("EXPO_PUBLIC_REVENUECAT_IOS_KEY", "appl_prod");
+    vi.stubEnv("EXPO_PUBLIC_REVENUECAT_ANDROID_KEY", "goog_prod");
+    await expect(loadKey("web")).resolves.toBeUndefined();
   });
 });
