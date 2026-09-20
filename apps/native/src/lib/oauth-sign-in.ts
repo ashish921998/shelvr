@@ -34,15 +34,28 @@ type SignInStage = "request" | "browser" | "exchange";
  * backing out (`canceledLogin`, 1) from a session that could not present
  * (`presentationContextNotProvided`, 2 / `presentationContextInvalid`, 3), and
  * unlike the description they carry no free-form text.
+ *
+ * What arrives is `localizedDescription`, which renders as
+ * "… (<domain> <label> <code>.)". The domain and the code are stable, but the
+ * label between them is Foundation's own and follows the device language, so
+ * matching the English word "error" would drop the diagnostic on exactly the
+ * devices hardest to get a second look at. Step over the label instead, and
+ * allow the full-width parentheses a CJK locale can render.
  */
+const NATIVE_ERROR =
+  /[(（]([A-Za-z][A-Za-z0-9.]*[A-Za-z0-9])[^()（）]*?(-?\d+)[^()（）]*[)）]/;
+
 function nativeError(result: WebBrowser.WebBrowserAuthSessionResult) {
   const description = (result as { error?: unknown }).error;
   if (typeof description !== "string") return {};
-  const domain = /\(([A-Za-z0-9.]+) error/.exec(description)?.[1];
-  const code = /error (-?\d+)/.exec(description)?.[1];
+  const match = NATIVE_ERROR.exec(description);
+  // Anything that does not render as an NSError is dropped rather than
+  // guessed at. A missing field says "unparsed", which is honest; a wrong
+  // domain or code would send the next person chasing the wrong failure.
+  if (match === null) return {};
   return {
-    ...(domain === undefined ? {} : { native_error_domain: domain }),
-    ...(code === undefined ? {} : { native_error_code: Number(code) }),
+    native_error_domain: match[1],
+    native_error_code: Number(match[2]),
   };
 }
 
