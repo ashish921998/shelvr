@@ -24,6 +24,25 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
+  legalConsents: defineTable({
+    userId: v.id("users"),
+    reviewedVersion: v.string(),
+    acceptedVersion: v.optional(v.string()),
+    acceptedAt: v.optional(v.number()),
+    refundSharing: v.boolean(),
+    changedAt: v.number(),
+    deleting: v.optional(v.boolean()),
+    syncState: v.union(
+      v.literal("pending"),
+      v.literal("syncing"),
+      v.literal("synced"),
+    ),
+    nextSyncAt: v.number(),
+    attempts: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_syncState_and_nextSyncAt", ["syncState", "nextSyncAt"]),
+
   paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index(
     "by_event",
     ["eventId"],

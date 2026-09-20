@@ -537,5 +537,17 @@
   "extension.disconnect": "Desconectar",
   "extension.disconnectTitle": "Desconectar %{browser}?",
   "extension.disconnectBody": "Esse navegador deixará de poder salvar no Shelvr. Você pode conectá-lo de novo com um código novo.",
-  "extension.disconnectFailed": "Não foi possível desconectar"
+  "extension.disconnectFailed": "Não foi possível desconectar",
+  "refundConsent.title": "Termos atualizados",
+  "refundConsent.disclosure": "Atualizamos nossos termos sobre análises de reembolso da Apple. Ao concordar abaixo, você aceita os termos atualizados e permite que o Shelvr, por meio do RevenueCat, compartilhe informações de compra e entrega com a Apple quando você solicitar um reembolso. A Apple toma a decisão final. Seus links, notas e fotos salvos não são compartilhados.",
+  "refundConsent.optional": "O compartilhamento é opcional. Você pode continuar usando o Shelvr e solicitar reembolsos sem concordar em compartilhar. Você pode mudar sua escolha no Perfil.",
+  "refundConsent.accept": "Concordar e permitir compartilhamento",
+  "refundConsent.later": "Agora não",
+  "refundConsent.error": "Não foi possível salvar sua escolha. Tente novamente.",
+  "refundConsent.setting": "Dados para reembolsos da Apple",
+  "refundConsent.enabled": "Você permite compartilhar informações de compra e entrega com a Apple para analisar reembolsos.",
+  "refundConsent.disabled": "O compartilhamento de dados para reembolsos está desativado.",
+  "refundConsent.syncPending": "Sua escolha foi salva. Atualizando o RevenueCat; a configuração anterior pode valer até a conclusão.",
+  "refundConsent.withdraw": "Desativar compartilhamento",
+  "refundConsent.review": "Revisar termos atualizados"
 }

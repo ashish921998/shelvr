@@ -1,3 +1,4 @@
+import { LegalConsentBoundary } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { OnboardingProvider } from "@/lib/onboarding";
 import { analytics } from "@/lib/analytics";
@@ -188,7 +189,9 @@ export default function RootLayout() {
       <EntitlementSync />
       <NavThemeProvider>
         <SplashGate active={showSplash} onFinish={finishSplash}>
-          <Slot />
+          <LegalConsentBoundary>
+            <Slot />
+          </LegalConsentBoundary>
         </SplashGate>
         <StatusBar style={statusBarStyle} />
       </NavThemeProvider>

@@ -107,6 +107,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   take a hash, never a userId. Saves go through `items.saveLinkForConnectedClient`, which is
   the in-app save path plus duplicate detection — the extension can never save something the
   app would refuse. Credential helpers live in `model/extensionAuth.ts`.
+- **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
+  Apple refund-data sharing, delivered to RevenueCat with retries. See
+  [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
 - **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
   `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
   plus internal digest preparation and send. `notificationDelivery.ts` holds the

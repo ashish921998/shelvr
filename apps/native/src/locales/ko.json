@@ -507,5 +507,17 @@
   "extension.disconnect": "연결 해제",
   "extension.disconnectTitle": "%{browser} 연결을 해제할까요?",
   "extension.disconnectBody": "해당 브라우저에서는 더 이상 Shelvr에 저장할 수 없습니다. 새 코드로 언제든 다시 연결할 수 있습니다.",
-  "extension.disconnectFailed": "연결을 해제하지 못했습니다"
+  "extension.disconnectFailed": "연결을 해제하지 못했습니다",
+  "refundConsent.title": "업데이트된 약관",
+  "refundConsent.disclosure": "Apple 환불 심사에 관한 약관이 업데이트되었습니다. 아래에서 동의하면 업데이트된 약관을 수락하고, 환불 요청 시 Shelvr가 RevenueCat을 통해 구매 및 제공 정보를 Apple과 공유하도록 허용합니다. 최종 결정은 Apple이 내립니다. 저장한 링크, 메모, 사진은 공유되지 않습니다.",
+  "refundConsent.optional": "공유는 선택 사항입니다. 공유에 동의하지 않아도 Shelvr를 계속 사용하고 환불을 요청할 수 있습니다. 프로필에서 선택을 변경할 수 있습니다.",
+  "refundConsent.accept": "동의하고 공유 허용",
+  "refundConsent.later": "나중에",
+  "refundConsent.error": "선택을 저장하지 못했습니다. 다시 시도해 주세요.",
+  "refundConsent.setting": "Apple 환불 데이터 공유",
+  "refundConsent.enabled": "환불 심사를 위해 구매 및 제공 정보를 Apple과 공유하도록 허용했습니다.",
+  "refundConsent.disabled": "환불 데이터 공유가 꺼져 있습니다.",
+  "refundConsent.syncPending": "선택이 저장되었습니다. RevenueCat을 업데이트하는 중이며, 완료될 때까지 이전 설정이 적용될 수 있습니다.",
+  "refundConsent.withdraw": "공유 끄기",
+  "refundConsent.review": "업데이트된 약관 검토"
 }

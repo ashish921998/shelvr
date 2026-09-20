@@ -3,6 +3,13 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
+crons.interval(
+  "retry refund consent sync",
+  { minutes: 1 },
+  internal.legalConsent.retry,
+  {},
+);
+
 // Sweep a bounded page of stale pending image operations (their attached upload
 // was never finalized) so unreferenced storage objects don't accumulate. The
 // mutation processes at most 100 rows per run; unbounded scans are avoided.

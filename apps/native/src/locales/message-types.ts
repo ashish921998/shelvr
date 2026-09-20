@@ -479,6 +479,18 @@ export type MessageParams = {
   "extension.disconnectTitle": { browser: string };
   "extension.disconnectBody": undefined;
   "extension.disconnectFailed": undefined;
+  "refundConsent.title": undefined;
+  "refundConsent.disclosure": undefined;
+  "refundConsent.optional": undefined;
+  "refundConsent.accept": undefined;
+  "refundConsent.later": undefined;
+  "refundConsent.error": undefined;
+  "refundConsent.setting": undefined;
+  "refundConsent.enabled": undefined;
+  "refundConsent.disabled": undefined;
+  "refundConsent.syncPending": undefined;
+  "refundConsent.withdraw": undefined;
+  "refundConsent.review": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

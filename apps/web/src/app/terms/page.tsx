@@ -16,7 +16,9 @@ export default function TermsPage() {
         <h1 className="mt-10 font-display text-3xl sm:text-4xl text-ink">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: August 7, 2026</p>
+        <p className="mt-2 text-sm text-muted">
+          Last updated: September 19, 2026
+        </p>
 
         <div className="mt-8 space-y-8 text-[15px] leading-7 text-ink/90">
           <section>
@@ -49,17 +51,27 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-ink text-lg">
-              4. Subscriptions
-            </h2>
+            <h2 className="font-semibold text-ink text-lg">4. Subscriptions</h2>
             <p className="mt-2">
               Shelvr Pro is an auto-renewing subscription purchased through the
               App Store. Plans may include a free trial; you can cancel anytime
-              in your App Store subscription settings, and cancelling before
-              the trial ends means you won&rsquo;t be charged. Prices are shown
-              before purchase and may change with notice. Refunds are handled
-              by Apple under App Store policies. Pro includes storage for up to
+              in your App Store subscription settings, and cancelling before the
+              trial ends means you won&rsquo;t be charged. Prices are shown
+              before purchase and may change with notice. Refunds are handled by
+              Apple under App Store policies. Pro includes storage for up to
               1,000 photos per account; links and notes are not limited.
+            </p>
+            <p className="mt-2">
+              Apple refund data sharing is optional. If you choose “Agree and
+              allow sharing” on the updated-terms screen in Shelvr, you consent
+              to Shelvr, through RevenueCat, sharing purchase identifiers,
+              delivery status, and whether sample content was provided with
+              Apple when reviewing your refund request. Apple makes the final
+              refund decision. Your saved links, notes, and photos are not
+              shared for this purpose. Using the app or making a purchase alone
+              does not enable this sharing. Declining does not restrict app
+              access or your ability to request a refund. You can withdraw this
+              consent in Profile under Apple refund data sharing.
             </p>
           </section>
 
@@ -81,28 +93,28 @@ export default function TermsPage() {
               You can stop using Shelvr and delete your account from Profile in
               the app at any time. Deleting your Shelvr account removes your
               saves and sign-in identity from our backend (see the Privacy
-              Policy for how third-party analytics data is handled); it does
-              not cancel an App Store subscription. We may suspend or
-              terminate accounts that violate these terms.
+              Policy for how third-party analytics data is handled); it does not
+              cancel an App Store subscription. We may suspend or terminate
+              accounts that violate these terms.
             </p>
           </section>
 
           <section>
             <h2 className="font-semibold text-ink text-lg">7. Disclaimers</h2>
             <p className="mt-2">
-              Shelvr is provided &ldquo;as is.&rdquo; AI-generated titles,
-              tags, and classifications can be wrong. To the maximum extent
-              permitted by law, we disclaim warranties and limit our liability
-              to the amount you paid us in the twelve months before a claim.
+              Shelvr is provided &ldquo;as is.&rdquo; AI-generated titles, tags,
+              and classifications can be wrong. To the maximum extent permitted
+              by law, we disclaim warranties and limit our liability to the
+              amount you paid us in the twelve months before a claim.
             </p>
           </section>
 
           <section>
             <h2 className="font-semibold text-ink text-lg">8. Changes</h2>
             <p className="mt-2">
-              We may update these terms; material changes will be posted on
-              this page with an updated date. Continuing to use Shelvr after
-              changes take effect means you accept them.
+              We may update these terms; material changes will be posted on this
+              page with an updated date. Continuing to use Shelvr after changes
+              take effect means you accept them.
             </p>
           </section>
 

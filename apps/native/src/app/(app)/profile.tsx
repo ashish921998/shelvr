@@ -1,3 +1,4 @@
+import { LegalConsentPreference } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { Wordmark } from "@/components/wordmark";
@@ -330,6 +331,8 @@ export default function ProfileScreen() {
           tintColor={theme.colors.muted}
         />
       </Pressable>
+
+      <LegalConsentPreference />
 
       <View
         style={styles.linkGroup}

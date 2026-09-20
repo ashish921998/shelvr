@@ -47,6 +47,7 @@ import {
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -909,6 +910,7 @@ export const finalizeImageImport = mutation({
   args: {
     operationId: v.string(),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
     aspectRatio: v.optional(v.number()),
     isSticker: v.optional(v.boolean()),
     capturedAt: v.optional(v.number()),
@@ -990,7 +992,9 @@ export const finalizeImageImport = mutation({
       itemId,
       runId: run.processingRunId,
     });
-    await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId, {
+    await scheduleSaveTelemetry(ctx, itemId, {
+      sessionId: args.analyticsSessionId,
+      saveSource: args.saveSource,
       photoCount: photoCount + 1,
       storedBytes,
     });
@@ -1105,6 +1109,7 @@ async function createItemWithOperation(
     operationId?: string;
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
+    saveSource?: SaveSource;
   },
 ): Promise<Id<"items">> {
   const now = Date.now();
@@ -1142,14 +1147,7 @@ async function createItemWithOperation(
     // so a retry of an already-finished operation is never billed a token —
     // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-    const itemId = await insertLinkOrNote(
-      ctx,
-      userId,
-      kind,
-      payload,
-      options.spaceId,
-      options.analyticsSessionId,
-    );
+    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
         userId,
@@ -1175,14 +1173,7 @@ async function createItemWithOperation(
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-  return await insertLinkOrNote(
-    ctx,
-    userId,
-    kind,
-    payload,
-    options.spaceId,
-    options.analyticsSessionId,
-  );
+  return await insertLinkOrNote(ctx, userId, kind, payload, options);
 }
 
 /** Throws if a link/note payload is empty/invalid. Validation is shared by the
@@ -1216,8 +1207,11 @@ async function insertLinkOrNote(
   userId: string,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
-  spaceId?: Id<"spaces">,
-  analyticsSessionId?: string,
+  options: {
+    spaceId?: Id<"spaces">;
+    analyticsSessionId?: string;
+    saveSource?: SaveSource;
+  },
 ): Promise<Id<"items">> {
   const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
@@ -1229,22 +1223,29 @@ async function insertLinkOrNote(
     tags: [],
     searchText: "",
   });
-  if (spaceId !== undefined) {
-    await saveIntoSpace(ctx, userId, itemId, spaceId);
+  if (options.spaceId !== undefined) {
+    await saveIntoSpace(ctx, userId, itemId, options.spaceId);
   }
   await ctx.scheduler.runAfter(0, internal.ai.processItem, {
     itemId,
     runId: run.processingRunId,
   });
-  await scheduleSaveTelemetry(ctx, itemId, analyticsSessionId);
+  await scheduleSaveTelemetry(ctx, itemId, {
+    sessionId: options.analyticsSessionId,
+    saveSource: options.saveSource,
+  });
   return itemId;
 }
 
 async function scheduleSaveTelemetry(
   ctx: MutationCtx,
   itemId: Id<"items">,
-  sessionId?: string,
-  photo?: { photoCount: number; storedBytes?: number },
+  telemetry?: {
+    sessionId?: string;
+    saveSource?: SaveSource;
+    photoCount?: number;
+    storedBytes?: number;
+  },
 ): Promise<void> {
   const item = await ctx.db.get(itemId);
   if (!item) return;
@@ -1253,8 +1254,8 @@ async function scheduleSaveTelemetry(
     userId: item.userId,
     itemType: item.type,
     savedAt: item._creationTime,
-    sessionId: sessionId?.slice(0, 128),
-    ...photo,
+    ...telemetry,
+    sessionId: telemetry?.sessionId?.slice(0, 128),
   });
 }
 
@@ -1264,6 +1265,7 @@ export const createLinkItem = mutation({
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -1287,6 +1289,7 @@ export const createLinkItem = mutation({
         operationId: args.operationId,
         spaceId: args.spaceId,
         analyticsSessionId: args.analyticsSessionId,
+        saveSource: args.saveSource,
       },
     );
   },
@@ -1298,6 +1301,7 @@ export const createNoteItem = mutation({
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -1314,6 +1318,11 @@ export const createNoteItem = mutation({
         operationId: args.operationId,
         spaceId: args.spaceId,
         analyticsSessionId: args.analyticsSessionId,
+        // Defaulted server-side so a client that sends nothing still reports
+        // `note`, while share.tsx can override with `share_extension`: a note
+        // shared through the extension is extension use, and counting it as an
+        // ordinary note would understate the extension's adoption.
+        saveSource: args.saveSource ?? "note",
       },
     );
   },
@@ -1513,6 +1522,8 @@ export const importLinks = mutation({
         internal.ai.processItem,
         { itemId, runId: run.processingRunId },
       );
+      // No saveSource: the closed union has no literal for a bulk import, and
+      // a wrong one would pollute the funnel worse than an absent one does.
       await scheduleSaveTelemetry(ctx, itemId);
     }
     return {
