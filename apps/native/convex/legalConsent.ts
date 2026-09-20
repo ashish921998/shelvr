@@ -62,7 +62,6 @@ export const review = mutation({
       ...(accepted ? { acceptedVersion: version, acceptedAt: now } : {}),
       refundSharing: accepted,
       changedAt: Math.max(now, (existing?.changedAt ?? 0) + 1),
-      revision: (existing?.revision ?? 0) + 1,
     };
     if (existing) {
       await ctx.db.patch(existing._id, values);
@@ -116,7 +115,6 @@ export async function revoke(
     refundSharing: false,
     deleting,
     changedAt: Math.max(Date.now(), row.changedAt + 1),
-    revision: row.revision + 1,
   });
   await queueSync(ctx, row._id);
 }

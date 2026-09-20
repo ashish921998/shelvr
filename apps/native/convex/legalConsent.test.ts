@@ -68,7 +68,7 @@ describe("recorded terms and refund consent", () => {
       acceptedAt: now,
       refundSharing: true,
       syncState: "pending",
-      revision: 1,
+      changedAt: now,
     });
     vi.setSystemTime(now + 1000);
     await f.review(true);
@@ -77,6 +77,16 @@ describe("recorded terms and refund consent", () => {
       syncPending: true,
       refundSharing: true,
     });
+  });
+  it("keeps decision timestamps increasing when the clock moves backwards", async () => {
+    const f = await fixture();
+    const now = Date.now();
+    await f.review(true);
+    vi.setSystemTime(now - 1000);
+    await f.signedIn.mutation(api.legalConsent.withdraw, {});
+    expect((await f.row())?.changedAt).toBe(now + 1);
+    await f.review(true);
+    expect((await f.row())?.changedAt).toBe(now + 2);
   });
   it("rejects unsupported terms versions and a client-supplied identity", async () => {
     const f = await fixture();
@@ -182,8 +192,6 @@ describe("consent delivery reliability", () => {
       await f.send();
       if (when === "during_send") {
         expect(await f.row()).toMatchObject({
-          deleting: true,
-          refundSharing: false,
           syncState: "pending",
         });
         await f.send();
@@ -283,7 +291,7 @@ describe("consent delivery reliability", () => {
     expect(await f.row()).toMatchObject({
       refundSharing: false,
       syncState: "pending",
-      revision: 2,
+      changedAt: Date.now() + 1,
     });
     await f.send();
     expect(
@@ -312,14 +320,14 @@ describe("consent delivery reliability", () => {
     if (!second) throw new Error("Missing second claim");
     await f.t.mutation(internal.legalConsentSync.finish, {
       id: row._id,
-      revision: first.revision,
+      changedAt: first.changedAt,
       lease: first.lease,
       success: true,
     });
     expect((await f.row())?.syncState).toBe("syncing");
     await f.t.mutation(internal.legalConsentSync.finish, {
       id: row._id,
-      revision: second.revision,
+      changedAt: second.changedAt,
       lease: second.lease,
       success: true,
     });

@@ -31,7 +31,6 @@ export default defineSchema({
     acceptedAt: v.optional(v.number()),
     refundSharing: v.boolean(),
     changedAt: v.number(),
-    revision: v.number(),
     deleting: v.optional(v.boolean()),
     syncState: v.union(
       v.literal("pending"),

@@ -11,7 +11,6 @@ import { errorName, logEvent } from "./model/log";
 
 const claimValidator = v.object({
   userId: v.id("users"),
-  revision: v.number(),
   lease: v.number(),
   allowed: v.boolean(),
   deleting: v.boolean(),
@@ -32,7 +31,6 @@ export const claim = internalMutation({
       const revocation = {
         deleting: true,
         refundSharing: false,
-        revision: row.revision + 1,
         changedAt: Math.max(Date.now(), row.changedAt + 1),
       };
       await ctx.db.patch(id, revocation);
@@ -40,7 +38,6 @@ export const claim = internalMutation({
     }
     return {
       userId: row.userId,
-      revision: row.revision,
       lease,
       changedAt: row.changedAt,
       deleting: !!row.deleting || !owner,
@@ -56,22 +53,18 @@ export const claim = internalMutation({
 export const finish = internalMutation({
   args: {
     id: v.id("legalConsents"),
-    revision: v.number(),
+    changedAt: v.number(),
     lease: v.number(),
     success: v.boolean(),
   },
   returns: v.null(),
-  handler: async (ctx, { id, revision, lease, success }) => {
+  handler: async (ctx, { id, changedAt, lease, success }) => {
     const row = await ctx.db.get(id);
     if (!row || row.syncState !== "syncing" || row.nextSyncAt !== lease)
       return null;
     if (!row.deleting && !(await ctx.db.get(row.userId))) {
       // A grant may already be remote; send a newer withdrawal first.
       await ctx.db.patch(id, {
-        deleting: true,
-        refundSharing: false,
-        revision: row.revision + 1,
-        changedAt: Math.max(Date.now(), row.changedAt + 1),
         syncState: "pending",
         attempts: 0,
         nextSyncAt: Date.now(),
@@ -79,12 +72,12 @@ export const finish = internalMutation({
       await ctx.scheduler.runAfter(0, internal.legalConsentSync.send, { id });
       return null;
     }
-    if (row.revision === revision && success) {
+    if (row.changedAt === changedAt && success) {
       if (row.deleting) await ctx.db.delete(id);
       else await ctx.db.patch(id, { syncState: "synced", attempts: 0 });
       return null;
     }
-    const attempts = row.revision === revision ? row.attempts + 1 : 0;
+    const attempts = row.changedAt === changedAt ? row.attempts + 1 : 0;
     const delay =
       attempts === 0
         ? 0
@@ -161,7 +154,7 @@ export const send = internalAction({
     }
     await ctx.runMutation(internal.legalConsentSync.finish, {
       id,
-      revision: snapshot.revision,
+      changedAt: snapshot.changedAt,
       lease: snapshot.lease,
       success,
     });

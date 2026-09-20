@@ -21,7 +21,7 @@ clear that RevenueCat can still use the previous setting until sync completes.
 ## Source of truth and delivery
 
 `legalConsent.review` derives the user from authentication and records the
-server timestamp, reviewed/accepted version, desired preference, and revision.
+server timestamp, reviewed/accepted version, and desired preference.
 Only the exact displayed version is accepted. Never backfill acceptance for
 existing users. Future versions must preserve the public API contract for older
 installed clients; add a compatible version or a new endpoint rather than
@@ -36,7 +36,8 @@ replacing the existing literal validator.
 No saved content or product analytics is sent. RevenueCat's built-in Apple
 response uses purchase/delivery information and the sample-content flag.
 
-Writes use monotonically increasing `updated_at_ms` values. RevenueCat ignores
+The monotonic `changedAt` timestamp identifies each decision for stale-worker
+checks and supplies RevenueCat’s `updated_at_ms` value. RevenueCat ignores
 older attribute updates. One claimed worker per record also serializes delivery;
 a changed decision schedules another pass after the current worker finishes.
 Failures remain pending with backoff. A bounded minute cron recovers lost jobs
