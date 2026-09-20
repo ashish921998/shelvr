@@ -16,6 +16,7 @@ import {
 } from "./model/cancelSurveyFields";
 import {
   feedbackDeliveryStatusValidator,
+  feedbackPlatformValidator,
   feedbackSurfaceValidator,
 } from "./model/feedbackFields";
 
@@ -305,7 +306,7 @@ export default defineSchema({
     // Bounded app context so the operator can reply with the right build in
     // mind. Platform is a closed union; the version strings are capped at
     // write time.
-    platform: v.optional(v.union(v.literal("ios"), v.literal("android"))),
+    platform: v.optional(feedbackPlatformValidator),
     appVersion: v.optional(v.string()),
     buildVariant: v.optional(v.string()),
     status: feedbackDeliveryStatusValidator,

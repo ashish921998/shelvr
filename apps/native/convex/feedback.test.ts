@@ -6,10 +6,9 @@ import { api, internal } from "./_generated/api";
 import {
   FEEDBACK_MESSAGE_MAX_LENGTH,
   MAX_DELIVERY_ATTEMPTS,
-  classifyFeedbackSendError,
-  formatFeedbackError,
   isFeedbackInboxConfigured,
 } from "./feedback";
+import { classifyResendError, formatResendError } from "./model/resend";
 import { newConvexTest } from "./test.setup";
 import type { Id } from "./_generated/dataModel";
 
@@ -363,23 +362,26 @@ describe("delivery retries", () => {
   });
 });
 
-describe("classifyFeedbackSendError", () => {
+describe("classifyResendError", () => {
   it("maps non-HTTP failures to a bounded category", () => {
-    expect(classifyFeedbackSendError(new TypeError("fetch failed"))).toEqual({
+    expect(
+      classifyResendError(new TypeError("fetch failed"), "invalid_request"),
+    ).toEqual({
       category: "network_error",
       status: undefined,
     });
     expect(
-      classifyFeedbackSendError(new DOMException("aborted", "AbortError")),
+      classifyResendError(
+        new DOMException("aborted", "AbortError"),
+        "invalid_request",
+      ),
     ).toEqual({ category: "timeout", status: undefined });
-    expect(classifyFeedbackSendError("string")).toEqual({
+    expect(classifyResendError("string", "invalid_request")).toEqual({
       category: "network_error",
       status: undefined,
     });
-    expect(formatFeedbackError("provider_error", 500)).toBe(
-      "provider_error:500",
-    );
-    expect(formatFeedbackError("timeout", undefined)).toBe("timeout");
+    expect(formatResendError("provider_error", 500)).toBe("provider_error:500");
+    expect(formatResendError("timeout", undefined)).toBe("timeout");
   });
 
   it("maps provider statuses into fixed categories", async () => {

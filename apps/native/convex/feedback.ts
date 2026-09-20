@@ -12,10 +12,18 @@ import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
 import {
   feedbackDeliveryStatusValidator,
+  feedbackPlatformValidator,
   feedbackSurfaceValidator,
 } from "./model/feedbackFields";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
+import {
+  classifyResendError,
+  formatResendError,
+  ResendResponseError,
+  resendErrorCategoryValidator,
+  resendRequest,
+} from "./model/resend";
 
 /**
  * Authenticated in-app feedback (the client boundary is
@@ -25,8 +33,8 @@ import { rateLimiter } from "./model/rateLimiter";
  * then the support-inbox email is projected out of it. A Resend outage,
  * timeout, or missing operator configuration can never lose feedback — the
  * row simply waits (status `pending` / `failed` / `unconfigured`) for the
- * bounded, index-backed retry worker, following the same
- * provider-independent pattern as `waitlist.ts`.
+ * bounded, index-backed retry worker, sharing its provider boundary with the
+ * waitlist (`model/resend.ts`).
  *
  * Privacy boundary: the message is user content. It lives in Convex and —
  * once delivered — in the operator's inbox (the authorized feedback
@@ -46,29 +54,12 @@ const RETRY_SCAN = 100;
  * the reply, so an over-long value is truncated rather than rejected. */
 const MAX_CONTEXT_LENGTH = 64;
 
-const platformValidator = v.union(v.literal("ios"), v.literal("android"));
-
-// Why a send failed, without the provider's message. Resend can echo the
-// submitted content inside its error text, so the response body is never
-// read; the category plus HTTP status is enough to triage an outage.
-const feedbackErrorCategoryValidator = v.union(
-  v.literal("rate_limited"),
-  v.literal("auth_error"),
-  v.literal("invalid_request"),
-  v.literal("provider_error"),
-  v.literal("timeout"),
-  v.literal("network_error"),
-);
-export type FeedbackErrorCategory = Infer<
-  typeof feedbackErrorCategoryValidator
->;
-
 const claimedDeliveryValidator = v.object({
   attempt: v.number(),
   submittedAt: v.number(),
   message: v.string(),
   surface: feedbackSurfaceValidator,
-  platform: v.optional(platformValidator),
+  platform: v.optional(feedbackPlatformValidator),
   appVersion: v.optional(v.string()),
   buildVariant: v.optional(v.string()),
   accountEmail: v.optional(v.string()),
@@ -125,7 +116,7 @@ export const submitFeedback = mutation({
   args: {
     message: v.string(),
     surface: feedbackSurfaceValidator,
-    platform: v.optional(platformValidator),
+    platform: v.optional(feedbackPlatformValidator),
     appVersion: v.optional(v.string()),
     buildVariant: v.optional(v.string()),
   },
@@ -236,7 +227,7 @@ export const finishDelivery = internalMutation({
   args: {
     submissionId: v.id("feedbackSubmissions"),
     status: v.union(v.literal("delivered"), v.literal("failed")),
-    errorCategory: v.optional(feedbackErrorCategoryValidator),
+    errorCategory: v.optional(resendErrorCategoryValidator),
     errorStatus: v.optional(v.number()),
   },
   returns: v.null(),
@@ -253,7 +244,7 @@ export const finishDelivery = internalMutation({
     }
     await ctx.db.patch(args.submissionId, {
       status: "failed",
-      deliveryError: formatFeedbackError(
+      deliveryError: formatResendError(
         args.errorCategory ?? "network_error",
         args.errorStatus,
       ),
@@ -261,55 +252,6 @@ export const finishDelivery = internalMutation({
     return null;
   },
 });
-
-/**
- * Serialize a failure into the `deliveryError` column as `<category>` or
- * `<category>:<status>` (status omitted when the failure never got an HTTP
- * response). Nothing from the provider's response body is included.
- */
-export function formatFeedbackError(
-  category: FeedbackErrorCategory,
-  status: number | undefined,
-): string {
-  return status === undefined ? category : `${category}:${status}`;
-}
-
-/** A Resend send that returned a non-success HTTP status. */
-class ResendSendError extends Error {
-  constructor(readonly status: number) {
-    super(`Resend send failed (${status}).`);
-    this.name = "ResendSendError";
-  }
-}
-
-/**
- * Reduce any failure from the send path to a fixed category and, when there
- * was an HTTP response, its status code. Exported for testing.
- */
-export function classifyFeedbackSendError(error: unknown): {
-  category: FeedbackErrorCategory;
-  status: number | undefined;
-} {
-  if (error instanceof ResendSendError) {
-    const { status } = error;
-    if (status === 429) return { category: "rate_limited", status };
-    if (status === 401 || status === 403)
-      return { category: "auth_error", status };
-    if (status === 400 || status === 422) {
-      return { category: "invalid_request", status };
-    }
-    return { category: "provider_error", status };
-  }
-  // `AbortSignal.timeout` rejects with a DOMException named TimeoutError (or
-  // AbortError on older runtimes).
-  if (
-    error instanceof Error &&
-    (error.name === "TimeoutError" || error.name === "AbortError")
-  ) {
-    return { category: "timeout", status: undefined };
-  }
-  return { category: "network_error", status: undefined };
-}
 
 /** The support email. The message is included — this is the authorized
  * feedback channel — but the subject stays content-free (a bounded surface
@@ -347,27 +289,24 @@ async function sendFeedbackEmail(
   claimed: ClaimedDelivery,
 ): Promise<void> {
   const { subject, text, replyTo } = buildFeedbackEmail(submissionId, claimed);
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-      "User-Agent": "Shelvr-Feedback/1.0",
+  const response = await resendRequest(
+    config.apiKey,
+    "Shelvr-Feedback/1.0",
+    "/emails",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        from: config.from,
+        to: config.to,
+        subject,
+        text,
+        ...(replyTo === undefined ? {} : { reply_to: replyTo }),
+      }),
     },
-    body: JSON.stringify({
-      from: config.from,
-      to: config.to,
-      subject,
-      text,
-      ...(replyTo === undefined ? {} : { reply_to: replyTo }),
-    }),
-    // A hung Resend socket must not stall the delivery action or the
-    // retry worker.
-    signal: AbortSignal.timeout(15_000),
-  });
+  );
   if (!response.ok) {
     // The response body can echo the submitted message, so it is never read.
-    throw new ResendSendError(response.status);
+    throw new ResendResponseError("send", response.status);
   }
 }
 
@@ -399,7 +338,7 @@ async function attemptDelivery(
   } catch (error) {
     // Log and persist only the shape of the failure — never the message,
     // account email, or provider text.
-    const { category, status } = classifyFeedbackSendError(error);
+    const { category, status } = classifyResendError(error, "invalid_request");
     logEvent("error", "feedback_delivery_failed", {
       submission_id: submissionId,
       category,

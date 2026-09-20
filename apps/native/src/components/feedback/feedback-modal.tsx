@@ -23,8 +23,6 @@ import {
 import { useSubmitFeedback } from "@/lib/use-submit-feedback";
 import { SUPPORT_URL } from "@/lib/legal";
 
-type Phase = "compose" | "accepted";
-
 /**
  * The one feedback form, reused by the Home invitation and the permanent
  * Profile entry. Callers conditionally mount it (open = mounted), so compose
@@ -47,10 +45,12 @@ export function FeedbackModal({
   const { data: user } = useCurrentUser();
   const submitFeedback = useSubmitFeedback(surface);
   const [message, setMessage] = useState("");
-  const [sending, setSending] = useState(false);
+  const [flow, setFlow] = useState<"idle" | "sending" | "failed" | "sent">(
+    "idle",
+  );
+  // Mirror of `flow` that survives the async submit gap, so a double-tap
+  // cannot start two sends before the state update lands.
   const sendingRef = useRef(false);
-  const [sendFailed, setSendFailed] = useState(false);
-  const [phase, setPhase] = useState<Phase>("compose");
   const openedRef = useRef(false);
 
   // A resolved-but-null user has no account to submit against, so the form
@@ -65,25 +65,24 @@ export function FeedbackModal({
   }, [surface]);
 
   // Wait for the user id so a send is always recorded against the account.
-  const canSend = !sending && !!user && message.trim().length > 0;
+  const canSend = flow !== "sending" && !!user && message.trim().length > 0;
 
   const send = async () => {
     if (sendingRef.current || !user) return;
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
     sendingRef.current = true;
-    setSending(true);
+    setFlow("sending");
     const result = await submitFeedback(trimmed);
-    setSending(false);
     sendingRef.current = false;
     if (result === "accepted") {
       markFeedbackSubmitted(user._id);
-      setPhase("accepted");
+      setFlow("sent");
     } else {
       // The draft stays on screen, editable and re-sendable, with the
       // support channel offered — and the invitation is not marked
       // submitted, so nothing pretends the feedback landed.
-      setSendFailed(true);
+      setFlow("failed");
     }
   };
 
@@ -114,7 +113,7 @@ export function FeedbackModal({
               {t("feedback.open")}
             </Text>
 
-            {phase === "accepted" ? (
+            {flow === "sent" ? (
               <>
                 <Text style={styles.body}>{t("feedback.thanks")}</Text>
                 <View style={styles.buttonRow}>
@@ -142,7 +141,7 @@ export function FeedbackModal({
               </>
             ) : (
               <>
-                {sendFailed ? (
+                {flow === "failed" ? (
                   <>
                     <Text style={styles.body}>
                       {t("feedback.sendFailedContact")}
@@ -175,7 +174,7 @@ export function FeedbackModal({
                       styles.secondaryButton,
                       pressed && { opacity: 0.7 },
                     ]}
-                    disabled={sending}
+                    disabled={flow === "sending"}
                     onPress={onClose}
                   >
                     <Text style={styles.secondaryButtonText}>
@@ -195,7 +194,9 @@ export function FeedbackModal({
                     onPress={() => void send()}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {sending ? t("feedback.sending") : t("feedback.send")}
+                      {flow === "sending"
+                        ? t("feedback.sending")
+                        : t("feedback.send")}
                     </Text>
                   </Pressable>
                 </View>

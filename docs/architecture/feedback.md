@@ -14,8 +14,8 @@ observe.
 ## Projection to the support inbox
 
 Each new submission is scheduled into the internal `deliver` action, one
-claim → send → finish cycle following the waitlist pattern
-(`convex/waitlist.ts`):
+claim → send → finish cycle sharing its Resend boundary with the waitlist
+(`convex/model/resend.ts`):
 
 - `claimDelivery` loads the row and its safe reply context. There is no
   in-flight lease: a row already `delivered`, at the attempt cap, or awaiting

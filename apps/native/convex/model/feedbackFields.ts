@@ -8,6 +8,14 @@ export const feedbackSurfaceValidator = v.union(
   v.literal("profile"),
 );
 
+/** The client platform the submission came from. A closed union, shared by
+ * the schema and the submit path, so a new client platform is a deliberate
+ * change rather than an open string. */
+export const feedbackPlatformValidator = v.union(
+  v.literal("ios"),
+  v.literal("android"),
+);
+
 /** Delivery state of a feedback submission row. `unconfigured` means the
  * support-inbox env vars are missing — an operator condition, not a row
  * failure; the retry cron picks the row up once they are set. */
