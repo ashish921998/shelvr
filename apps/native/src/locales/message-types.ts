@@ -180,6 +180,7 @@ export type MessageParams = {
   "support.email": undefined;
   "common.close": undefined;
   "feedback.prompt": undefined;
+  "feedback.replyNotice": undefined;
   "feedback.messageLabel": undefined;
   "feedback.placeholder": undefined;
   "feedback.cancel": undefined;

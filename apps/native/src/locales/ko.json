@@ -181,6 +181,7 @@
   "support.email": "지원팀에 이메일 보내기",
   "common.close": "닫기",
   "feedback.prompt": "무엇을 하려고 했고, 어떤 점이 방해가 됐나요?",
+  "feedback.replyNotice": "필요한 경우 Shelvr가 계정 이메일로 회신할 수 있어요.",
   "feedback.messageLabel": "의견 내용",
   "feedback.placeholder": "의견을 적어 주세요…",
   "feedback.cancel": "의견 취소",

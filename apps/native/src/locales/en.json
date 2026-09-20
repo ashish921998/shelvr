@@ -179,6 +179,7 @@
   "support.email": "Email support",
   "common.close": "Close",
   "feedback.prompt": "What were you trying to do, and what got in your way?",
+  "feedback.replyNotice": "Shelvr may reply using your account email.",
   "feedback.messageLabel": "Feedback message",
   "feedback.placeholder": "Your feedback…",
   "feedback.cancel": "Cancel feedback",

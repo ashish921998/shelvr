@@ -179,6 +179,7 @@
   "support.email": "Escribir a soporte",
   "common.close": "Cerrar",
   "feedback.prompt": "¿Qué intentabas hacer y qué te lo impidió?",
+  "feedback.replyNotice": "Shelvr puede responderte usando el correo electrónico de tu cuenta.",
   "feedback.messageLabel": "Mensaje de comentarios",
   "feedback.placeholder": "Tus comentarios…",
   "feedback.cancel": "Cancelar comentarios",

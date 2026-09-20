@@ -179,6 +179,7 @@
   "support.email": "Enviar e-mail ao suporte",
   "common.close": "Fechar",
   "feedback.prompt": "O que você estava tentando fazer e o que atrapalhou?",
+  "feedback.replyNotice": "A Shelvr pode responder usando o e-mail da sua conta.",
   "feedback.messageLabel": "Mensagem de comentários",
   "feedback.placeholder": "Seus comentários…",
   "feedback.cancel": "Cancelar comentários",

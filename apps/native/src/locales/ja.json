@@ -181,6 +181,7 @@
   "support.email": "サポートにメール",
   "common.close": "閉じる",
   "feedback.prompt": "何をしようとして、どこで困りましたか？",
+  "feedback.replyNotice": "返信が必要な場合、Shelvrがアカウントのメールアドレスを使ってご連絡することがあります。",
   "feedback.messageLabel": "フィードバック内容",
   "feedback.placeholder": "ご意見を入力…",
   "feedback.cancel": "フィードバックをキャンセル",
