@@ -6,6 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
+import { revoke } from "./legalConsent";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -67,6 +68,7 @@ export const deleteCurrentUserAccount = mutation({
   returns: v.null(),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
+    await revoke(ctx, userId, true);
     await deleteAccountBatch(ctx, userId);
     return null;
   },

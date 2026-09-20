@@ -503,5 +503,17 @@
   "demo.pasteOwn": "Oder füge deinen eigenen Link ein",
   "demo.pickShelvr": "Das ging an eine andere App. Tippe nochmal auf Teilen und wähle Shelvr.",
   "demo.shareThis": "Diesen Beitrag teilen",
-  "splash.tagline": "Für später aufbewahren"
+  "splash.tagline": "Für später aufbewahren",
+  "refundConsent.title": "Aktualisierte Bedingungen",
+  "refundConsent.disclosure": "Wir haben unsere Bedingungen für Rückerstattungsprüfungen durch Apple aktualisiert. Wenn du unten zustimmst, akzeptierst du die aktualisierten Bedingungen und erlaubst Shelvr, über RevenueCat Kauf- und Bereitstellungsinformationen an Apple weiterzugeben, wenn du eine Rückerstattung beantragst. Apple trifft die endgültige Entscheidung. Deine gespeicherten Links, Notizen und Fotos werden nicht weitergegeben.",
+  "refundConsent.optional": "Die Weitergabe ist freiwillig. Du kannst Shelvr weiterhin nutzen und Rückerstattungen beantragen, ohne zuzustimmen. Du kannst deine Entscheidung im Profil ändern.",
+  "refundConsent.accept": "Zustimmen und Weitergabe erlauben",
+  "refundConsent.later": "Jetzt nicht",
+  "refundConsent.error": "Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.",
+  "refundConsent.setting": "Datenweitergabe für Apple-Rückerstattungen",
+  "refundConsent.enabled": "Du erlaubst die Weitergabe von Kauf- und Bereitstellungsinformationen an Apple zur Prüfung von Rückerstattungen.",
+  "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
+  "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
+  "refundConsent.withdraw": "Weitergabe ausschalten",
+  "refundConsent.review": "Aktualisierte Bedingungen ansehen"
 }

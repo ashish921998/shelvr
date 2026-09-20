@@ -96,6 +96,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
   RevenueCat webhook.
+- **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
+  Apple refund-data sharing, delivered to RevenueCat with retries. See
+  [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
 - **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
   `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
   plus internal digest preparation and send. `notificationDelivery.ts` holds the

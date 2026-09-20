@@ -460,6 +460,18 @@ export type MessageParams = {
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
   "splash.tagline": undefined;
+  "refundConsent.title": undefined;
+  "refundConsent.disclosure": undefined;
+  "refundConsent.optional": undefined;
+  "refundConsent.accept": undefined;
+  "refundConsent.later": undefined;
+  "refundConsent.error": undefined;
+  "refundConsent.setting": undefined;
+  "refundConsent.enabled": undefined;
+  "refundConsent.disabled": undefined;
+  "refundConsent.syncPending": undefined;
+  "refundConsent.withdraw": undefined;
+  "refundConsent.review": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
