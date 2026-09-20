@@ -18,7 +18,6 @@ export function NavThemeProvider({ children }: { children: React.ReactNode }) {
 
   const navTheme = {
     ...base,
-    dark: appThemeIsDark,
     colors: {
       ...base.colors,
       background: theme.colors.background,
