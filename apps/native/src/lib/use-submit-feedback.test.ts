@@ -108,9 +108,11 @@ describe("useSubmitFeedback", () => {
     const submit = mount("home");
     const result = await submit("Love the app");
     expect(result).toBe("failed");
+    // The raw Convex error (and its stack) never crosses into PostHog —
+    // only the stable event name and a fixed, content-free error shape.
     expect(mock.captureError).toHaveBeenCalledWith(
       "feedback_submit_failed",
-      expect.any(Error),
+      new Error("Feedback submission failed"),
     );
     expect(mock.submitted).not.toHaveBeenCalled();
   });

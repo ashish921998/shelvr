@@ -241,9 +241,11 @@ needed at runtime by the features that use them:
 - `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
   `unconfigured` until it is set
 - `RESEND_TOPIC_ID` — Resend topic the contact is opted into
-- `RESEND_FEEDBACK_INBOX_EMAIL` — Resend address in-app feedback is projected to. Submissions stay
-  `unconfigured` until it is set
-- `RESEND_FEEDBACK_FROM_EMAIL` — verified Resend sending address for feedback email
+- `RESEND_FEEDBACK_INBOX_EMAIL` — Resend address in-app feedback is projected to. Together with
+  `RESEND_FEEDBACK_FROM_EMAIL` and `RESEND_API_KEY` it gates configured delivery; submissions stay
+  `unconfigured` until all three are set
+- `RESEND_FEEDBACK_FROM_EMAIL` — verified Resend sending address for feedback email, required with
+  the inbox address and `RESEND_API_KEY` for delivery
 
 ## Working conventions
 

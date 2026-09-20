@@ -37,8 +37,8 @@ import { rateLimiter } from "./model/rateLimiter";
 
 /** Mirrors the client's FEEDBACK_MESSAGE_MAX_LENGTH (src/lib/feedback.ts). */
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
-/** A row that fails this many sends stays `failed` for manual inspection
- * instead of occupying the retry window forever. */
+/** A row that starts this many deliveries stays `failed` for manual
+ * inspection instead of occupying the retry window forever. */
 export const MAX_DELIVERY_ATTEMPTS = 10;
 /** Rows scanned per retryable status per retry run. */
 const RETRY_SCAN = 100;
@@ -177,10 +177,13 @@ export const submitFeedback = mutation({
 /**
  * Load one deliverable row plus the safe context the email needs. No lease:
  * the immediate post-submit action runs once per row and the retry worker
- * walks a bounded page serially, so the only concurrent-claim window is a
- * retry racing a still-queued immediate action — a rare duplicate email to
- * the operator, never a lost row or a user-visible failure. Unconfigured
- * spends no attempt (an operator condition is not a row failure).
+ * schedules one bounded action per row, so the only concurrent-claim window
+ * is a retry racing a still-queued immediate action — a rare duplicate email
+ * to the operator, never a lost row or a user-visible failure. Claiming
+ * spends the attempt immediately (persisted before the send), so a delivery
+ * that crashes mid-flight still counts toward the cap instead of retrying
+ * for free forever. Unconfigured spends no attempt (an operator condition
+ * is not a row failure).
  */
 export const claimDelivery = internalMutation({
   args: { submissionId: v.id("feedbackSubmissions") },
@@ -200,11 +203,16 @@ export const claimDelivery = internalMutation({
       }
       return null;
     }
+    // The attempt is spent the moment the delivery starts, not when it
+    // finishes: an action that dies between the send and finishDelivery
+    // must not leave the row retryable for free.
+    const attempt = row.attempts + 1;
+    await ctx.db.patch(args.submissionId, { attempts: attempt });
     // The authenticated account's email is safe reply context, read from the
     // users table — never a client-supplied address.
     const user = await ctx.db.get(row.userId as Id<"users">);
     return {
-      attempt: row.attempts + 1,
+      attempt,
       submittedAt: row._creationTime,
       message: row.message,
       surface: row.surface,
@@ -219,9 +227,10 @@ export const claimDelivery = internalMutation({
 });
 
 /**
- * Advance a row's delivery state. Only `deliver`/`retryFailedDeliveries`
- * call this, so a crashed attempt simply leaves the row as it was for the
- * retry worker. `failed` spends one attempt; `delivered` is terminal.
+ * Advance a row's delivery state. Only `deliver` calls this, so a crashed
+ * attempt simply leaves the row as it was for the retry worker (the attempt
+ * was already spent at claim time). `failed` records why; `delivered` is
+ * terminal.
  */
 export const finishDelivery = internalMutation({
   args: {
@@ -244,7 +253,6 @@ export const finishDelivery = internalMutation({
     }
     await ctx.db.patch(args.submissionId, {
       status: "failed",
-      attempts: row.attempts + 1,
       deliveryError: formatFeedbackError(
         args.errorCategory ?? "network_error",
         args.errorStatus,
@@ -363,9 +371,10 @@ async function sendFeedbackEmail(
   }
 }
 
-/** One claim → send → finish cycle. Persisted state only ever advances
- * through `finishDelivery`, so a crashed attempt leaves the row exactly as
- * it was for the retry worker. */
+/** One claim → send → finish cycle. Delivery state only ever advances
+ * through `claimDelivery` (the attempt) and `finishDelivery` (the outcome),
+ * so a crash in between leaves a spent attempt and an unchanged status for
+ * the retry worker. */
 async function attemptDelivery(
   ctx: ActionCtx,
   submissionId: Id<"feedbackSubmissions">,
@@ -406,7 +415,9 @@ async function attemptDelivery(
   }
 }
 
-/** Immediate delivery for a fresh submission, scheduled by `submitFeedback`. */
+/** One bounded delivery of a single row, scheduled by `submitFeedback`
+ * (immediately after the row is durable) and by the retry worker (one
+ * scheduled action per row, so each send gets its own timeout budget). */
 export const deliver = internalAction({
   args: { submissionId: v.id("feedbackSubmissions") },
   returns: v.null(),
@@ -444,7 +455,11 @@ export const listSubmissionsNeedingDelivery = internalQuery({
 });
 
 /** Retry worker: deliver rows whose first attempt never ran or failed, so a
- * Resend outage does not leave feedback unrecoverable. Runs from crons.ts. */
+ * Resend outage does not leave feedback unrecoverable. Runs from crons.ts.
+ * Each row is scheduled as its own `deliver` action rather than awaited
+ * serially: a full page of rows at the 15-second send timeout would hold
+ * one action open past the Convex runtime's 30-minute limit, while the
+ * scheduled deliveries each get their own timeout budget. */
 export const retryFailedDeliveries = internalAction({
   args: {},
   returns: v.null(),
@@ -454,7 +469,9 @@ export const retryFailedDeliveries = internalAction({
       {},
     );
     for (const submissionId of submissionIds) {
-      await attemptDelivery(ctx, submissionId);
+      await ctx.scheduler.runAfter(0, internal.feedback.deliver, {
+        submissionId,
+      });
     }
     return null;
   },

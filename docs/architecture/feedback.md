@@ -4,8 +4,8 @@ The Home invitation and the Profile entry open the same `FeedbackModal`
 (`apps/native/src/components/feedback/feedback-modal.tsx`). Sending is
 persist-first: the client calls the public `submitFeedback` mutation in
 `convex/feedback.ts`, which writes a `feedbackSubmissions` row and returns
-`deliveryState` (`scheduled` when the inbox is configured, `unconfigured` when
-it is not — the row's internal status is `pending` either way at that point).
+`deliveryState` — `scheduled` when the inbox is configured (the row starts
+`pending`), `unconfigured` when it is not (the row starts `unconfigured`).
 Only then does the client treat the send as accepted — the modal says
 "thanks" because Convex persisted the submission, never because an email went
 out. The projection to the support inbox is server-side work the client cannot
@@ -20,15 +20,19 @@ claim → send → finish cycle following the waitlist pattern
 - `claimDelivery` loads the row and its safe reply context. There is no
   in-flight lease: a row already `delivered`, at the attempt cap, or awaiting
   operator configuration (`unconfigured`, spending no attempt) returns
-  nothing to send. The rare retry racing a still-queued immediate action can
-  at worst duplicate one email to the operator — never lose a row.
+  nothing to send. Claiming persists the attempt immediately, so a delivery
+  that crashes mid-flight still counts toward the cap instead of retrying for
+  free. The rare retry racing a still-queued immediate action can at worst
+  duplicate one email to the operator — never lose a row.
 - The action sends the email through Resend and calls `finishDelivery` with
-  the result. Persisted state only advances through `finishDelivery`, so a
-  crashed attempt leaves the row exactly as it was for the retry worker.
+  the result. The outcome only ever lands through `finishDelivery`, so a
+  crash in between leaves a spent attempt and an unchanged status for the
+  retry worker.
 - The hourly cron `retry feedback inbox delivery` (`convex/crons.ts`) scans
   `pending`, `failed`, and `unconfigured` rows via the `by_status_attempts`
-  index and retries them below `MAX_DELIVERY_ATTEMPTS` (10). A Resend outage
-  or missing operator configuration can never lose feedback; the row simply
+  index and schedules one `deliver` action per row, each with its own
+  timeout budget, below `MAX_DELIVERY_ATTEMPTS` (10). A Resend outage or
+  missing operator configuration can never lose feedback; the row simply
   waits.
 - The email's `reply_to` is the sender's account email, so the operator
   replies directly from the inbox. The subject line carries only the surface
@@ -40,9 +44,9 @@ Operator configuration lives in the Convex deployment environment
 - `RESEND_FEEDBACK_INBOX_EMAIL` — where feedback lands.
 - `RESEND_FEEDBACK_FROM_EMAIL` — the verified sending address.
 
-With either missing (or no `RESEND_API_KEY`), submissions are stored with
-status `unconfigured` and no attempt is spent; the retry worker delivers them
-once configuration appears.
+With any of the three missing (including no `RESEND_API_KEY`), submissions
+are stored with status `unconfigured` and no attempt is spent; the retry
+worker delivers them once configuration appears.
 
 ## Privacy boundary
 

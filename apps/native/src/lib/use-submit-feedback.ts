@@ -56,8 +56,14 @@ export function useSubmitFeedback(surface: FeedbackSurface) {
         });
         feedbackAnalytics.submitted(surface, message.length, deliveryState);
         return "accepted";
-      } catch (error) {
-        analytics.captureError("feedback_submit_failed", error);
+      } catch {
+        // A raw Convex error can carry server text in its stack, and
+        // captureError ships the stack to PostHog. The stable event name is
+        // the triage signal; the failure details stay client-side.
+        analytics.captureError(
+          "feedback_submit_failed",
+          new Error("Feedback submission failed"),
+        );
         return "failed";
       }
     },

@@ -130,7 +130,9 @@ describe("submitFeedback", () => {
       appVersion: "1.2.3",
       buildVariant: "production",
       status: "delivered",
-      attempts: 0,
+      // The attempt is spent at claim time, so a first-try delivery shows
+      // attempts already advanced.
+      attempts: 1,
     });
     expect(row?.deliveredAt).toBeGreaterThan(0);
 
@@ -215,17 +217,19 @@ describe("submitFeedback", () => {
     const row = await getSubmission(t, result.submissionId);
     expect(row).toMatchObject({ status: "unconfigured", attempts: 0 });
 
-    // The operator configures the inbox; the retry worker delivers the
-    // waiting row without spending an attempt on the unconfigured window.
+    // The operator configures the inbox; the retry worker schedules one
+    // delivery action per waiting row, and it delivers without ever having
+    // spent an attempt on the unconfigured window.
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("RESEND_FEEDBACK_INBOX_EMAIL", INBOX);
     vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", SENDER);
     expect(isFeedbackInboxConfigured()).toBe(true);
     await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
-      attempts: 0,
+      attempts: 1,
     });
   });
 });
@@ -262,13 +266,15 @@ describe("delivery retries", () => {
     expect(logged).not.toContain("secret words");
     expect(logged).not.toContain("person@example.com");
 
-    // The provider recovers; the retry worker delivers the same row.
+    // The provider recovers; the retry worker delivers the same row (the
+    // second claim spends the second attempt).
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
-      attempts: 1,
+      attempts: 2,
     });
   });
 
@@ -276,6 +282,7 @@ describe("delivery retries", () => {
     const t = setup();
     const fetchMock = okFetch();
     vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
 
     const pending = await insertSubmission(t, { status: "pending" });
     const failed = await insertSubmission(t, {
@@ -305,6 +312,7 @@ describe("delivery retries", () => {
     expect(due).not.toContain(capped);
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     for (const id of [pending, failed, unconfigured]) {
@@ -333,6 +341,26 @@ describe("delivery retries", () => {
       attempts: MAX_DELIVERY_ATTEMPTS,
     });
   });
+
+  it("spends the attempt at claim time, so a crashed send still counts", async () => {
+    const t = setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const id = await insertSubmission(t, { status: "pending" });
+
+    // Claim exactly as the delivery action would, then "crash" before the
+    // send or finishDelivery: the attempt must already be persisted, or
+    // repeated crashes could duplicate emails for free forever.
+    const claimed = await t.mutation(internal.feedback.claimDelivery, {
+      submissionId: id,
+    });
+    expect(claimed).toMatchObject({ attempt: 1, message: "seeded" });
+    expect(await getSubmission(t, id)).toMatchObject({
+      status: "pending",
+      attempts: 1,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("classifyFeedbackSendError", () => {
@@ -358,9 +386,11 @@ describe("classifyFeedbackSendError", () => {
     const t = setup();
     const fetchMock = statusFetch(429);
     vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
     const id = await insertSubmission(t, { status: "pending" });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     expect(await getSubmission(t, id)).toMatchObject({
       status: "failed",

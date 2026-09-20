@@ -309,10 +309,11 @@ export default defineSchema({
     appVersion: v.optional(v.string()),
     buildVariant: v.optional(v.string()),
     status: feedbackDeliveryStatusValidator,
-    // Delivery attempts actually spent on a Resend failure. `unconfigured`
-    // retries are free, and a row that reaches the attempt cap stays
-    // `failed` for manual inspection instead of occupying the retry window
-    // forever.
+    // Delivery attempts started, spent at claim time before the send so a
+    // delivery that crashes mid-flight still counts toward the cap.
+    // `unconfigured` claims are free, and a row that reaches the attempt
+    // cap stays `failed` for manual inspection instead of occupying the
+    // retry window forever.
     attempts: v.number(),
     // `<category>[:<http status>]` — why the last delivery failed, without
     // any provider text (which can echo the message back).
