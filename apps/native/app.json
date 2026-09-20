@@ -3,7 +3,7 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,9 @@
       "usesAppleSignIn": true,
       "supportsTablet": false,
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       },
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
@@ -37,11 +39,15 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           },
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
-            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
           }
         ],
         "NSPrivacyCollectedDataTypes": [
@@ -148,7 +154,9 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ],
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "predictiveBackGestureEnabled": false,
       "package": "app.shelvr.save"
     },
@@ -176,6 +184,18 @@
         }
       ],
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#faf6ee",
+          "image": "./assets/splash-blank.png",
+          "imageWidth": 1,
+          "dark": {
+            "backgroundColor": "#191510",
+            "image": "./assets/splash-blank.png"
+          }
+        }
+      ],
       "expo-status-bar",
       [
         "expo-secure-store",
@@ -198,7 +218,9 @@
           "photosPermission": "Shelvr lets you tidy your photo library \u2014 keep, delete, or save photos into your hub.",
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": true,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
         }
       ],
       [
@@ -214,8 +236,13 @@
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["image/*", "text/*"],
-            "multipleShareMimeTypes": ["image/*"]
+            "singleShareMimeTypes": [
+              "image/*",
+              "text/*"
+            ],
+            "multipleShareMimeTypes": [
+              "image/*"
+            ]
           }
         }
       ],

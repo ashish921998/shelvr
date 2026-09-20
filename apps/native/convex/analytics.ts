@@ -5,6 +5,7 @@ import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { logEvent } from "./model/log";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
+import { saveSourceValidator } from "./model/saveSource";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -88,6 +89,7 @@ export const captureSave = internalAction({
     itemType: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
     savedAt: v.number(),
     sessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
     // Image saves only: photos held after this save, and the stored file size.
     photoCount: v.optional(v.number()),
     storedBytes: v.optional(v.number()),
@@ -109,6 +111,7 @@ export const captureSave = internalAction({
         item_type: args.itemType,
         saved_at: args.savedAt,
         save_session_id: args.sessionId,
+        save_source: args.saveSource,
         photo_count: args.photoCount,
         stored_bytes: args.storedBytes,
         analytics_version: 1,

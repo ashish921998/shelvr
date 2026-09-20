@@ -1,0 +1,119 @@
+name: Deploy
+
+on:
+  # Runs after CI on main and deploys without asking. The production
+  # environment below is where a required reviewer would attach, and none is
+  # configured, so do not read it as an approval gate. What holds the line is
+  # CI passing, the freshness checks in every job that acts, and the
+  # convex-api contract check on the pull request that got the commit here.
+  # Only the backend deploys here. A client update ships from release.yml,
+  # which deploys the same commit's backend before publishing, so a client can
+  # never reach anyone ahead of the functions it calls.
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  # Manual re-deploy of main (e.g. after a flaky run) without pushing again.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # Never cancel a deploy halfway; queue the next one instead.
+  group: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.run_id || 'deploy' }}
+  cancel-in-progress: false
+
+jobs:
+  reject-non-main:
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject dispatch from a non-main ref
+        run: |
+          echo '::error::Deploy must be dispatched from main. Select main in the Run workflow branch selector.'
+          exit 1
+
+  # Separate from the deploy so a commit that must not deploy never reaches the
+  # production environment. That environment asks a human to approve before any
+  # step runs, so deciding this inside the deploy job would request approval for
+  # a run whose first step then refuses it.
+  selected-commit:
+    name: Check the selected commit
+    if: |
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    outputs:
+      deployable: ${{ steps.verify.outputs.deployable }}
+    steps:
+      - name: Check out the selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify CI and that main has not moved past it
+        id: verify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./tools/verify-ci.cjs')({ github, context, core });
+
+  convex-production:
+    name: Deploy Convex production
+    needs: selected-commit
+    if: needs.selected-commit.outputs.deployable == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      # The approval this job just waited on has no time limit, and queueing a
+      # later run does not invalidate this one, so main may have moved since the
+      # verdict that let this job start.
+      - name: Confirm main did not move while approval was pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./tools/verify-ci.cjs').requireTip({ github, context, core });
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The deploy key identifies the production deployment to the CLI. The
+      # job fails fast with setup instructions rather than a CLI auth error.
+      - name: Verify deploy key
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "CONVEX_DEPLOY_KEY is not set. Create one in the Convex dashboard (production deployment, Settings > Deploy Keys) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Deploy to Convex production
+        working-directory: apps/native
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: pnpm exec convex deploy

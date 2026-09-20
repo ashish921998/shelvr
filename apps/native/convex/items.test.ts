@@ -463,6 +463,7 @@ describe("canonical save telemetry", () => {
         itemType: "note",
         savedAt: item?._creationTime,
         sessionId: "save-session",
+        saveSource: "note",
       },
     ]);
   });
@@ -506,9 +507,46 @@ describe("canonical save telemetry", () => {
         }),
       ]),
     );
-    expect(
-      telemetry.find((job) => job.args[0].itemType === "link")?.args[0],
-    ).not.toHaveProperty("photoCount");
+    const linkJob = telemetry.find((job) => job.args[0].itemType === "link")
+      ?.args[0];
+    expect(linkJob).not.toHaveProperty("photoCount");
+    // An installed build that predates save_source sends no source, and the
+    // property must then be absent rather than present and empty.
+    expect(linkJob).not.toHaveProperty("saveSource");
+  });
+
+  it("forwards a client-supplied source, and lets it override the note default", async () => {
+    const t = await as("telemetry-user");
+    const linkId = await t.mutation(api.items.createLinkItem, {
+      url: "https://example.com",
+      saveSource: "manual_link",
+    });
+    const noteId = await t.mutation(api.items.createNoteItem, {
+      text: "Shared through the extension",
+      saveSource: "share_extension",
+    });
+    await t.mutation(api.items.beginImageImport, { operationId: OP_ID });
+    await t.mutation(api.items.attachImageUpload, {
+      operationId: OP_ID,
+      storageId: await storeBlob(t),
+    });
+    const imageId = await t.mutation(api.items.finalizeImageImport, {
+      operationId: OP_ID,
+      saveSource: "camera",
+    });
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const sourceById = new Map(
+      jobs
+        .filter((job) => job.name === "analytics:captureSave")
+        .map((job) => [job.args[0].itemId, job.args[0].saveSource]),
+    );
+    expect(sourceById.get(linkId)).toBe("manual_link");
+    expect(sourceById.get(imageId)).toBe("camera");
+    // A note shared through the extension counts as extension use. If someone
+    // turns the server-side `note` default into an override, this is what fails.
+    expect(sourceById.get(noteId)).toBe("share_extension");
   });
 });
 
