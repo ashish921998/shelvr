@@ -140,10 +140,8 @@ async function syncWidget(
   );
 
   // A sign-out may have cleared the widget while the thumbnails downloaded.
-  // Drop anything this stale sync wrote and leave the cleared snapshot standing
-  // rather than republishing the previous account's saves.
+  // The session-boundary clear waits for this work and owns its final cleanup.
   if (generation !== syncGeneration) {
-    deleteThumbnails(dir);
     return false;
   }
 
@@ -182,12 +180,42 @@ async function syncWidget(
 export async function clearRecentSavesWidget(): Promise<boolean> {
   syncGeneration += 1;
   if (Platform.OS !== "ios") return false;
-  const clearing = clearWidgetSnapshot(syncGeneration);
+  const clearing = clearWidgetAndPendingThumbnails(syncGeneration, syncChain);
   // Clear immediately, but make subsequent sessions wait for both the clear
   // (including its retry) and any old thumbnail work before publishing.
   // Keep failures observable to the caller without poisoning the sync queue.
-  syncChain = Promise.all([syncChain, clearing.catch(() => false)]);
+  syncChain = clearing.catch(() => false);
   return clearing;
+}
+
+async function clearWidgetAndPendingThumbnails(
+  generation: number,
+  pendingSync: Promise<unknown>,
+): Promise<boolean> {
+  try {
+    return await clearWidgetSnapshot(generation);
+  } finally {
+    await pendingSync;
+    // Old native image work can write files after the immediate clear. Include
+    // its final cleanup in the result observed by telemetry and newer sessions.
+    try {
+      await clearWidgetThumbnails(generation);
+    } catch {
+      await clearWidgetThumbnails(generation);
+    }
+  }
+}
+
+async function clearWidgetThumbnails(generation: number): Promise<void> {
+  if (
+    generation !== syncGeneration ||
+    !requireOptionalNativeModule("ExpoWidgets")
+  )
+    return;
+  const { widgetsDirectory } = await import("expo-widgets");
+  if (generation !== syncGeneration) return;
+  const dir = new Directory(widgetsDirectory);
+  if (dir.exists) deleteThumbnails(dir);
 }
 
 async function clearWidgetSnapshot(generation: number): Promise<boolean> {

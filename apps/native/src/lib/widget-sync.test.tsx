@@ -23,6 +23,7 @@ const fsx = vi.hoisted(() => ({
   failSnapshot: false,
   snapshotFailuresRemaining: 0,
   snapshotAttempts: 0,
+  onImageSaved: null as (() => void) | null,
   // When set, a thumbnail decode blocks on this gate so a test can interleave a
   // session-boundary clear with an in-flight sync.
   imageGate: null as Promise<void> | null,
@@ -60,6 +61,7 @@ vi.mock("expo-file-system", () => {
     delete() {
       fsx.deletes.push(this.uri);
       this.exists = false;
+      fsx.listed = fsx.listed.filter((entry) => entry !== this);
     }
     static async downloadFileAsync(url: string, target: File) {
       fsx.downloads.push(url);
@@ -113,7 +115,9 @@ vi.mock("react-native-nitro-image", () => ({
           return {
             width,
             height,
-            async saveToFileAsync() {},
+            async saveToFileAsync() {
+              fsx.onImageSaved?.();
+            },
           };
         },
       };
@@ -190,6 +194,7 @@ beforeEach(() => {
   fsx.failSnapshot = false;
   fsx.snapshotFailuresRemaining = 0;
   fsx.snapshotAttempts = 0;
+  fsx.onImageSaved = null;
   fsx.imageGate = null;
   fsx.files.clear();
   fsx.listed = [];
@@ -414,19 +419,79 @@ describe("RecentSavesWidgetSync", () => {
     expect(fsx.snapshots).toHaveLength(0);
 
     // A session boundary clears the widget while the sync is blocked.
-    expect(await clearRecentSavesWidget()).toBe(true);
-    expect(fsx.snapshots).toHaveLength(1);
+    const clearing = clearRecentSavesWidget();
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
     expect(fsx.snapshots[0]).toMatchObject({ items: [], locked: true });
 
     // The stale sync unblocks but must not republish the previous account's
     // content over the cleared snapshot.
     release();
+    expect(await clearing).toBe(true);
     await act(async () => {});
     expect(fsx.snapshots).toHaveLength(1);
   });
 });
 
 describe("clearRecentSavesWidget", () => {
+  it.each([false, true])(
+    "includes late thumbnail cleanup in the clear result (persistent failure: %s)",
+    async (persistentFailure) => {
+      let release!: () => void;
+      fsx.imageGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const thumbnail = new File("file:///widgets", "recent-saves-i1.jpg");
+      const deletion = vi.spyOn(thumbnail, "delete");
+      const failDelete = () => {
+        throw new Error("private file path");
+      };
+      if (persistentFailure) deletion.mockImplementation(failDelete);
+      else deletion.mockImplementationOnce(failDelete);
+      fsx.onImageSaved = () => {
+        thumbnail.exists = true;
+        fsx.listed = [thumbnail];
+      };
+
+      const oldSession = renderSync([link]);
+      await waitFor(() => expect(fsx.downloads).toHaveLength(1));
+      oldSession.unmount();
+      let settled = false;
+      const clearing = clearRecentSavesWidget().then(
+        (value) => {
+          settled = true;
+          return value;
+        },
+        (error: unknown) => {
+          settled = true;
+          return error;
+        },
+      );
+      await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+      expect(fsx.snapshots[0]).toMatchObject({ items: [], locked: true });
+      expect(settled).toBe(false);
+      renderSync([{ ...note, title: "Next account" }]);
+      await act(async () => {});
+      expect(fsx.snapshots).toHaveLength(1);
+
+      release();
+      if (persistentFailure) {
+        expect(await clearing).toEqual(
+          new Error("widget_thumbnail_cleanup_failed"),
+        );
+        expect(thumbnail.exists).toBe(true);
+      } else {
+        expect(await clearing).toBe(true);
+        expect(thumbnail.exists).toBe(false);
+      }
+      expect(deletion).toHaveBeenCalledTimes(2);
+      await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+      expect(fsx.snapshots.at(-1)).toMatchObject({
+        locked: false,
+        items: [{ title: "Next account" }],
+      });
+    },
+  );
+
   it("retries a failed thumbnail deletion before reporting success", async () => {
     const thumbnail = new File("file:///widgets", "recent-saves-private.jpg");
     thumbnail.exists = true;
@@ -455,7 +520,7 @@ describe("clearRecentSavesWidget", () => {
     await expect(clearRecentSavesWidget()).rejects.toThrow(
       "widget_thumbnail_cleanup_failed",
     );
-    expect(deletion).toHaveBeenCalledTimes(2);
+    expect(deletion).toHaveBeenCalledTimes(4);
     expect(retained.exists).toBe(true);
     expect(removed.exists).toBe(false);
     expect(fsx.snapshots.at(-1)).toMatchObject({ items: [], locked: true });
