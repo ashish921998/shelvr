@@ -1856,17 +1856,22 @@ export const listReadyItemsByIdInternal = internalQuery({
         break;
       }
       const item = await ctx.db.get(itemId);
-      if (
-        item === null ||
-        item.userId !== args.userId ||
-        item.status !== "ready"
-      ) {
+      if (item === null) {
+        continue;
+      }
+      // Charged before the row is judged, not after: the read has already
+      // happened by this point, and it is reads the budget exists to bound.
+      // A dropped hit costs the transaction exactly what a kept one does, so
+      // a run of large non-`ready` rows would otherwise walk straight past
+      // the budget and into Convex's own limit.
+      //
+      // Approximate, like the sweep's budget: the body dominates, and this
+      // only has to keep the transaction clear of that limit.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (item.userId !== args.userId || item.status !== "ready") {
         continue;
       }
       rows.push(item);
-      // Approximate, like the sweep's budget: the body dominates, and this
-      // only has to keep the transaction clear of its limit.
-      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
     }
     // Same reason as listReadyItemsInternal: vectors stay out of the action,
     // and the rows stay inside `itemFields`.

@@ -280,15 +280,24 @@ matches are already filed does not arrive at the prompt short-handed. And
 hydration stops at a 2 MB read budget as well as at 100 rows, because one
 `ready` link can carry 100k characters of extracted article; truncating is safe
 here only because the ids arrive in descending relevance order, so the budget
-drops the least relevant tail.
+drops the least relevant tail. That budget is charged for every document the
+query reads, including the ones it then drops — the read is what costs the
+transaction, and a run of large stale-vector rows would otherwise sail past
+the budget with it still reading zero.
 
-**Fallback is mandatory**, and is implemented. If the query cannot be embedded,
-or the search returns nothing, or nothing survives hydration — backfill still
-running, a user whose items all failed to embed, a provider outage — the action
-falls through to the original `listReadyItemsInternal` path. Without it the
-feature would regress from "newest 100" to nothing for every pre-backfill user.
-Which path ran is logged as `recommend_candidates` with `source: vector | recent`,
-so the rollout is observable without touching user content.
+**Recency is mandatory underneath, not merely beside.** The ranked list is
+topped up from the original `listReadyItemsInternal` read whenever it comes
+back shorter than 100 — the query could not be embedded, the search returned
+nothing, nothing survived hydration, or, the case that is easy to miss, the
+index simply does not cover the shelf yet. Partial coverage is the normal
+state for the whole length of a backfill: a user with 600 saves and 25 vectors
+can only ever be offered 25 hits, and handing the prompt those alone would be
+_worse_ than the newest-100 read this replaced, for exactly the users the
+feature exists for. Ranked hits lead the list, recency fills the remainder,
+and ids already supplied by the ranking are not repeated. Which halves ran is
+logged as `recommend_candidates` with `source: vector | mixed | recent` plus
+the ranked count, so backfill progress is observable without touching user
+content.
 
 `listReadyItemsByIdInternal` exists because `ctx.vectorSearch` returns only
 `{_id, _score}` and is action-only: the ids have to come back through a query
@@ -399,8 +408,9 @@ Harnesses go through `newConvexTest()` (`convex/test.setup.ts`), never bare
 - Embedding failure still produces a `ready` item with no `embedding`.
 - `recommendForSpace` ranks by relevance rather than recency, embeds its query
   as `RETRIEVAL_QUERY`, drops members and rows whose vector outlived their
-  `ready` status, and falls back to the recency path on an unembeddable query,
-  an empty search, or a search that throws — still writing `suggested` rows only
+  `ready` status, falls back to the recency path on an unembeddable query, an
+  empty search, or a search that throws, and tops a short ranked list up from
+  recency without repeating it — still writing `suggested` rows only
   (`aiRecommendForSpace.test.ts`).
 - `listReadyItemsByIdInternal` preserves the caller's ranking order, strips
   vectors, and stops at both the row limit and the byte budget

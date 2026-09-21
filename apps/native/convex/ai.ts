@@ -2774,11 +2774,15 @@ async function searchCandidates(
  * when someone finally makes a "Recipes" space are the old ones they have
  * forgotten, and those are exactly the ones a recency read cannot see.
  *
- * Recency is the fallback, and it is not optional. A user whose backfill has
- * not drained yet, or whose items all failed to embed, or whose query text
- * could not be embedded at all, has no vectors to match; without the fallback
- * the feature would regress from "newest 100" to nothing for every one of
- * them. Both paths return the same shape and feed the same prompt.
+ * Recency is not an alternative to that, it is the floor underneath it, and
+ * it is not optional. A user whose backfill has not drained, whose items all
+ * failed to embed, or whose query text could not be embedded at all has no
+ * vectors — or too few — to match; unaided, the feature would hand such a
+ * user a shorter list than the "newest 100" read it replaced. So the two are
+ * combined rather than chosen between: ranked hits first, recency filling
+ * whatever is left of the candidate budget. Both halves return the same shape
+ * and feed the same prompt, and when the index covers the shelf the recency
+ * read is never reached.
  */
 async function recommendationCandidates(
   ctx: GenericActionCtx<DataModel>,
@@ -2792,31 +2796,42 @@ async function recommendationCandidates(
     description: space.description,
   });
   const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
+  const ranked =
+    vector === undefined
+      ? []
+      : await searchCandidates(ctx, space, vector, memberIds);
 
-  if (vector !== undefined) {
-    const hydrated = await searchCandidates(ctx, space, vector, memberIds);
-    if (hydrated.length > 0) {
-      logEvent("info", "recommend_candidates", {
-        space_id: space._id,
-        source: "vector",
-        count: hydrated.length,
-      });
-      return hydrated;
-    }
+  if (ranked.length >= RECOMMEND_CANDIDATES) {
+    logEvent("info", "recommend_candidates", {
+      space_id: space._id,
+      source: "vector",
+      count: ranked.length,
+    });
+    return ranked;
   }
 
+  // A short ranked list does not mean the shelf is short. While the sweep is
+  // draining, a user can have a thousand saves and fifty vectors, and the
+  // index can only ever offer the fifty. Returning those alone would hand the
+  // prompt less than the newest-100 read this replaced, so partial coverage
+  // would be a regression for exactly the users the feature is for. The
+  // ranked hits lead — they are the relevant ones, and the prompt numbers
+  // what it is given — and recency fills the rest of the list behind them.
+  const seen = new Set(ranked.map((item) => item._id));
   const recent = (
     await ctx.runQuery(internal.items.listReadyItemsInternal, {
       userId: space.userId,
       limit: RECOMMEND_CANDIDATES,
     })
-  ).filter((item) => !memberIds.has(item._id));
+  ).filter((item) => !memberIds.has(item._id) && !seen.has(item._id));
+  const candidates = [...ranked, ...recent].slice(0, RECOMMEND_CANDIDATES);
   logEvent("info", "recommend_candidates", {
     space_id: space._id,
-    source: "recent",
-    count: recent.length,
+    source: ranked.length === 0 ? "recent" : "mixed",
+    count: candidates.length,
+    ranked: ranked.length,
   });
-  return recent;
+  return candidates;
 }
 
 /**

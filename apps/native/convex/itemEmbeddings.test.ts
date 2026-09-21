@@ -785,6 +785,43 @@ describe("listReadyItemsByIdInternal", () => {
     expect("embedding" in rows[0]).toBe(false);
   });
 
+  it("charges the budget for rows it reads and then drops", async () => {
+    const t = newConvexTest();
+    const ids = await t.run(async (ctx) => {
+      const out: Id<"items">[] = [];
+      // A vector outlives its item's flip to `failed`, so these two hits are
+      // read in full and then dropped. The read has already cost the
+      // transaction by then, which is what the budget is there to bound.
+      for (const title of ["Stale one", "Stale two", "Small"]) {
+        out.push(
+          await ctx.db.insert("items", {
+            userId: "stale",
+            type: "link" as const,
+            status:
+              title === "Small" ? ("ready" as const) : ("failed" as const),
+            title,
+            tags: [],
+            searchText: title.toLowerCase(),
+            content: title === "Small" ? "tiny" : "x".repeat(1_100_000),
+            embedding: vector(),
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          }),
+        );
+      }
+      return out;
+    });
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "stale",
+      itemIds: ids,
+      limit: 100,
+    });
+
+    // Counting only surviving rows would have walked past 2.2 MB of reads
+    // with the budget still reading zero, and kept going.
+    expect(rows).toEqual([]);
+  });
+
   it("stops reading once the byte budget is spent", async () => {
     const t = newConvexTest();
     const ids = await t.run(async (ctx) => {

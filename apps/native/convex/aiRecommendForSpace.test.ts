@@ -44,6 +44,8 @@ type SeedItem = {
   title: string;
   embedding?: number[];
   status?: "ready" | "failed" | "processing";
+  /** Only set where a test is about the hydration byte budget. */
+  content?: string;
 };
 
 /**
@@ -70,6 +72,7 @@ async function seed(items: SeedItem[]) {
         title: item.title,
         tags: [],
         searchText: item.title.toLowerCase(),
+        ...(item.content === undefined ? {} : { content: item.content }),
         ...(item.embedding === undefined
           ? {}
           : {
@@ -258,6 +261,40 @@ describe("recommendForSpace candidate selection", () => {
       "Carbonara",
     ]);
     expect(await suggestedTitles(t)).toEqual(["Not yet embedded"]);
+  });
+
+  it("fills a short ranked list out with recent items", async () => {
+    // Hydration's byte budget is the reachable stand-in for a half-drained
+    // sweep: either way the index hands back fewer candidates than the shelf
+    // holds, and the prompt must not shrink to match. Two bodies cross the
+    // 2 MB budget, so the third hit never survives hydration.
+    const { t, spaceId } = await seed([
+      {
+        title: "Carbonara",
+        embedding: ON_TOPIC,
+        content: "x".repeat(1_100_000),
+      },
+      { title: "Pesto", embedding: NEARBY, content: "x".repeat(1_100_000) },
+      { title: "Kubernetes", embedding: OFF_TOPIC },
+    ]);
+
+    await t.action(internal.ai.recommendForSpace, { spaceId });
+
+    // Ranked hits lead; recency supplies what the ranking could not reach.
+    // Without the top-up the prompt would have been the first two alone.
+    expect(promptedTitles()).toEqual(["Carbonara", "Pesto", "Kubernetes"]);
+  });
+
+  it("does not repeat an item that the ranked half already supplied", async () => {
+    const { t, spaceId } = await seed([
+      { title: "Carbonara", embedding: ON_TOPIC },
+      { title: "Pesto", embedding: NEARBY },
+    ]);
+
+    await t.action(internal.ai.recommendForSpace, { spaceId });
+
+    // Both reads see both items; the prompt must still number them once.
+    expect(promptedTitles()).toEqual(["Carbonara", "Pesto"]);
   });
 
   it("never reaches across accounts", async () => {
