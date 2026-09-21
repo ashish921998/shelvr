@@ -72,6 +72,7 @@ function widgetSubtitle(item: FeedItem): string {
 // entries not in the set go (the running-total cleanup after a sync); without
 // it, every thumbnail goes (the session-boundary clear).
 function deleteThumbnails(dir: Directory, keep?: Set<string>) {
+  let failed = false;
   for (const entry of dir.list()) {
     if (
       entry instanceof File &&
@@ -80,10 +81,16 @@ function deleteThumbnails(dir: Directory, keep?: Set<string>) {
     ) {
       try {
         entry.delete();
+        if (entry.exists) failed = true;
       } catch {
-        // Best effort; a stale thumbnail is harmless.
+        failed = true;
       }
     }
+  }
+  // Normal pruning is best effort. A full privacy clear must surface failures
+  // after trying every file so the caller retries and cannot report success.
+  if (keep === undefined && failed) {
+    throw new Error("widget_thumbnail_cleanup_failed");
   }
 }
 
@@ -168,9 +175,9 @@ async function syncWidget(
  * disk in the shared container — until a later sign-in. Bumps the sync
  * generation first so a `syncWidget` queued or in flight before this boundary
  * cannot republish the cleared snapshot, then publishes the empty locked
- * snapshot (which also drops every thumbnail). Resolves to `true` once that
- * snapshot is published (iOS with the widget module linked), so the caller can
- * record the boundary.
+ * snapshot (which also drops every thumbnail). Resolves to `true` once the
+ * snapshot is published and thumbnail cleanup succeeds (iOS with the widget
+ * module linked), so the caller can record the boundary.
  */
 export async function clearRecentSavesWidget(): Promise<boolean> {
   syncGeneration += 1;

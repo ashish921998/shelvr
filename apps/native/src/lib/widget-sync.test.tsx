@@ -427,6 +427,51 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("retries a failed thumbnail deletion before reporting success", async () => {
+    const thumbnail = new File("file:///widgets", "recent-saves-private.jpg");
+    thumbnail.exists = true;
+    fsx.listed = [thumbnail];
+    const deletion = vi
+      .spyOn(thumbnail, "delete")
+      .mockImplementationOnce(() => {
+        throw new Error("private file path");
+      });
+
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(deletion).toHaveBeenCalledTimes(2);
+    expect(thumbnail.exists).toBe(false);
+  });
+
+  it("reports persistent deletion failures while still removing other thumbnails", async () => {
+    const retained = new File("file:///widgets", "recent-saves-private.jpg");
+    const removed = new File("file:///widgets", "recent-saves-other.jpg");
+    retained.exists = true;
+    removed.exists = true;
+    fsx.listed = [retained, removed];
+    const deletion = vi.spyOn(retained, "delete").mockImplementation(() => {
+      throw new Error("private file path");
+    });
+
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+    expect(deletion).toHaveBeenCalledTimes(2);
+    expect(retained.exists).toBe(true);
+    expect(removed.exists).toBe(false);
+    expect(fsx.snapshots.at(-1)).toMatchObject({ items: [], locked: true });
+  });
+
+  it("verifies that deletion actually removed the thumbnail", async () => {
+    const thumbnail = new File("file:///widgets", "recent-saves-private.jpg");
+    thumbnail.exists = true;
+    fsx.listed = [thumbnail];
+    vi.spyOn(thumbnail, "delete").mockImplementation(() => {});
+
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+  });
+
   it.each([0, 1])(
     "publishes a new session after a clear with %i transient failures",
     async (failures) => {
