@@ -152,10 +152,20 @@ async function syncWidget(
   }
 
   try {
+    // The locked Pro copy is shared by the locked snapshot and the dated lock
+    // entry below, so it is defined once here.
+    const proEmpty = {
+      emptyTitle: t("widget.proTitle"),
+      emptyHint: t("widget.proBody"),
+    };
     const current = {
       items: widgetItems,
-      emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
-      emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
+      ...(locked
+        ? proEmpty
+        : {
+            emptyTitle: t("widget.emptyTitle"),
+            emptyHint: t("widget.emptyBody"),
+          }),
       locked,
       validUntil,
     };
@@ -169,12 +179,7 @@ async function syncWidget(
         { date: new Date(), props: current },
         {
           date: new Date(validUntil),
-          props: {
-            items: [],
-            emptyTitle: t("widget.proTitle"),
-            emptyHint: t("widget.proBody"),
-            locked: true,
-          },
+          props: { items: [], ...proEmpty, locked: true },
         },
       ]);
     } else {
