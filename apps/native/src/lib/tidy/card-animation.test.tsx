@@ -8,6 +8,7 @@ import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as Haptics from "expo-haptics";
+import { cancelAnimation } from "react-native-reanimated";
 import { CardAnimationProvider, useCardAnimation } from "./card-animation";
 import { DeckAnimationProvider, useDeckAnimation } from "./deck-animation";
 
@@ -36,6 +37,7 @@ vi.mock("react-native-reanimated", () => ({
   useSharedValue: (initial: unknown) => shared.make(initial),
   withSpring: (value: number) => ({ driver: "spring", value }),
   withTiming: (value: number) => ({ driver: "timing", value }),
+  cancelAnimation: vi.fn(),
 }));
 vi.mock("react-native-gesture-handler", () => ({
   // eslint-disable-next-line @typescript-eslint/naming-convention -- key mirrors the SDK export it stubs
@@ -44,7 +46,7 @@ vi.mock("react-native-gesture-handler", () => ({
     // eslint-disable-next-line @typescript-eslint/naming-convention -- key mirrors the SDK export it stubs
     Pan: () => {
       const g: Record<string, unknown> = {};
-      for (const name of ["onBegin", "onChange", "onEnd"]) {
+      for (const name of ["onBegin", "onChange", "onEnd", "onFinalize"]) {
         g[name] = (fn: (e: unknown) => unknown) => {
           gesture.handlers[name] = fn;
           return g;
@@ -76,10 +78,11 @@ function Probe({ cardSink, deckSink }: { cardSink: Card[]; deckSink: Deck[] }) {
   return null;
 }
 
-function fire(name: string, event: unknown) {
+function fire(name: string, ...args: unknown[]) {
   const handler = gesture.handlers[name];
   expect(handler, `${name} handler was registered`).toBeTruthy();
-  return handler(event);
+  // onFinalize is called with (event, success), so handlers take rest args.
+  return (handler as (...handlerArgs: unknown[]) => unknown)(...args);
 }
 
 function flushDecision() {
@@ -223,5 +226,58 @@ describe("CardAnimationProvider", () => {
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
+  });
+
+  it("cancels in-flight animations and resumes from the card's offset on begin", () => {
+    const { card, deck } = setup(0);
+    // A card mid-settle, 120px out with some vertical drift.
+    card.panX.value = 120;
+    card.panY.value = 40;
+    fire("onBegin", { absoluteY: 437 });
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card.panX);
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(card.panY);
+    expect(vi.mocked(cancelAnimation)).toHaveBeenCalledWith(deck.animatedIndex);
+    // A 30px drag continues from 120px, and deck shift uses the full 150px
+    // of travel (past the 100px threshold) rather than the grab-relative 30.
+    fire("onChange", { translationX: 30, translationY: 0 });
+    expect(card.panX.value).toBe(150);
+    expect(card.panY.value).toBe(40);
+    expect(deck.animatedIndex.value).toBe(0);
+  });
+
+  it("commits on release from a re-grab whose own translation is short", () => {
+    const { card, onDecision } = setup(0);
+    card.panX.value = 120;
+    fire("onBegin", { absoluteY: 400 });
+    // The second grab's own translation never crosses the threshold, but
+    // the card's full travel does.
+    fire("onEnd", { translationX: 0, translationY: 0 });
+    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
+    expect(flushDecision()).toBe("keep");
+    expect(onDecision).toHaveBeenCalledWith(0, "keep");
+  });
+
+  it("returns a cancelled pan home without deciding", () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    const { card, deck, onDecision } = setup(0);
+    fire("onBegin", { absoluteY: 400 });
+    fire("onChange", { translationX: 250, translationY: 0 });
+    // The OS stole the gesture: onEnd never runs, onFinalize reports failure.
+    fire("onFinalize", { translationX: 250 }, false);
+    expect(deck.isDragging.value).toBe(false);
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck.animatedIndex.value).toEqual({ driver: "timing", value: 1 });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
+  });
+
+  it("leaves a committed fling untouched when finalize reports success", () => {
+    const { card, deck } = setup(0);
+    fire("onEnd", { translationX: 250, translationY: 0 });
+    fire("onFinalize", { translationX: 250 }, true);
+    expect(deck.isDragging.value).toBe(false);
+    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
   });
 });
