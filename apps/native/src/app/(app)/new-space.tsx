@@ -22,14 +22,13 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  FadeIn,
   FadeOut,
   Keyframe,
   useReducedMotion,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
-import { motion } from "@/lib/motion";
+import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: motion.scale.pressed }] },
@@ -42,12 +41,6 @@ const SUBMIT_CONTENT_ENTER = new Keyframe({
 const SUBMIT_CONTENT_EXIT = FadeOut.duration(motion.duration.exit).easing(
   motion.easing.out,
 );
-const SUBMIT_CONTENT_REDUCED_ENTER = FadeIn.duration(
-  motion.duration.feedback,
-).easing(motion.easing.out);
-const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(
-  motion.duration.feedback,
-).easing(motion.easing.out);
 
 // One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
 // is keyed by the loaded space so its `useState` initializers seed once from
@@ -207,14 +200,8 @@ function SpaceForm(props: SpaceFormProps) {
         <View style={styles.saveButtonContent}>
           <Animated.View
             key={saving ? "saving" : "idle"}
-            entering={
-              reducedMotion
-                ? SUBMIT_CONTENT_REDUCED_ENTER
-                : SUBMIT_CONTENT_ENTER
-            }
-            exiting={
-              reducedMotion ? SUBMIT_CONTENT_REDUCED_EXIT : SUBMIT_CONTENT_EXIT
-            }
+            entering={reducedMotion ? REDUCED_FADE_IN : SUBMIT_CONTENT_ENTER}
+            exiting={reducedMotion ? REDUCED_FADE_OUT : SUBMIT_CONTENT_EXIT}
             collapsable={false}
             style={styles.saveButtonState}
           >

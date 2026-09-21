@@ -8,7 +8,7 @@
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cancelAnimation } from "react-native-reanimated";
+import { cancelAnimation, withSpring } from "react-native-reanimated";
 import { CardAnimationProvider, useCardAnimation } from "./card-animation";
 import { DeckAnimationProvider, useDeckAnimation } from "./deck-animation";
 
@@ -40,7 +40,10 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-reanimated", () => ({
   useSharedValue: (initial: unknown) => shared.make(initial),
-  withSpring: (value: number) => ({ driver: "spring", value }),
+  withSpring: vi.fn((value: number, _config?: unknown) => ({
+    driver: "spring",
+    value,
+  })),
   withTiming: (value: number) => ({ driver: "timing", value }),
   cancelAnimation: vi.fn(),
 }));
@@ -233,7 +236,7 @@ describe("CardAnimationProvider", () => {
     const { onDecision } = setup(0);
     // The up-commit demands strictly more upward travel than horizontal;
     // the side commit accepts a tie, so a perfect diagonal deletes.
-    drag({ x: -250, y: -250 });
+    drag({ x: -250, y: -400 });
     expect(flushDecision()).toBe("delete");
     expect(onDecision).toHaveBeenCalledWith(0, "delete");
   });
@@ -256,6 +259,18 @@ describe("CardAnimationProvider", () => {
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
     // The latch fires on commit even though the drag never crossed.
     expect(haptics.commit).toHaveBeenCalledTimes(1);
+    expect(withSpring).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ velocity: -20, overshootClamping: true }),
+    );
+    expect(withSpring).toHaveBeenCalledWith(
+      500,
+      expect.objectContaining({ velocity: 2000, overshootClamping: true }),
+    );
+    expect(withSpring).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ velocity: 0, overshootClamping: true }),
+    );
   });
 
   it("cancels in-flight animations and resumes from the card's offset on begin", () => {

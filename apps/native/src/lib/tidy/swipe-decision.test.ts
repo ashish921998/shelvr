@@ -51,7 +51,7 @@ describe("swipeDecision", () => {
 
   it("keeps the horizontal axis dominant on a projected diagonal tie", () => {
     // Both projected axes cross; horizontal wins the tie.
-    expect(swipeDecision(-250, -250, 0, 0, TX, TY)).toBe("delete");
+    expect(swipeDecision(-250, -400, 0, 0, TX, TY)).toBe("delete");
   });
 
   it("prefers save when the projected upward axis dominates", () => {

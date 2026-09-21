@@ -79,8 +79,8 @@ const lightTheme = {
     // surfaceMuted #f3ecdd (4.92:1), where tag labels and captions sit; the
     // paper background clears 5.37:1.
     muted: "#6f6455",
-    // Darkened from #b5aa97 (3.06:1) to clear the AA large-text bar (4.54:1).
-    faint: "#978c7a",
+    // Small captions need AA normal-text contrast on secondary surfaces too.
+    faint: "#6f6455",
     primary: "#e6a23c",
     primaryForeground: "#2b2418",
     primarySoft: "#f7e8cd",

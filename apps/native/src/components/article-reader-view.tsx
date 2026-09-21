@@ -73,6 +73,7 @@ export function ArticleReaderView({
   useLayoutEffect(() => {
     if (scrolledItemRef.current === item._id) return;
     scrolledItemRef.current = item._id;
+    setTagsExpanded(false);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [item._id]);
 

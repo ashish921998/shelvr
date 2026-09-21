@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
+import { Button } from "./ui/button";
+import { Pressable } from "react-native";
 import { TidyDone } from "./tidy/tidy-done";
 import { SetupStep } from "@/components/onboarding/setup";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -337,4 +339,24 @@ it("refreshes loaded map fallback titles without changing saved titles", async (
 it("keeps long header glyphs inside the available title width", () => {
   render(<AnimatedText text="Long header" width={40} truncate />);
   expect(screen.getByTestId("canvas").textContent).toBe("Lon…");
+});
+
+it("preserves caller accessibility state alongside loading and disabled state", () => {
+  const { rerender } = render(
+    <Button
+      title="Continue"
+      loading
+      accessibilityState={{ selected: true, busy: false, disabled: false }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: true, disabled: true });
+  rerender(<Button title="Continue" accessibilityState={{ selected: true }} />);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: false, disabled: false });
 });

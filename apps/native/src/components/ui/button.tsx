@@ -8,7 +8,7 @@ import {
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { motion, motionCSS } from "@/lib/motion";
-import { ThemedText } from "./themed-text";
+import { ThemedText } from "@/components/ui/themed-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -26,6 +26,7 @@ export function Button({
   style,
   onPressIn,
   onPressOut,
+  accessibilityState,
   ...props
 }: Props) {
   const { theme } = useUnistyles();
@@ -37,7 +38,11 @@ export function Button({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityState={{ disabled: !!inactive, busy: loading }}
+      accessibilityState={{
+        ...accessibilityState,
+        disabled: !!inactive,
+        busy: loading,
+      }}
       pressRetentionOffset={theme.control.pressRetentionOffset}
       {...props}
       disabled={inactive}

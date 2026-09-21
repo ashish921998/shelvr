@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_MORPH_GLYPHS,
   advanceMorphTransition,
+  includeMorphExits,
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
@@ -12,6 +13,18 @@ import {
 const advance10 = () => 10;
 
 describe("layoutMorphText", () => {
+  it("preserves the full glyph budget when no ellipsis is requested", () => {
+    expect(
+      layoutMorphText("a".repeat(49), 1000, 0, advance10, false),
+    ).toHaveLength(48);
+  });
+
+  it("preserves fitting text when the ellipsis cannot fit", () => {
+    const cells = layoutMorphText("abc", 20, 0, (char) =>
+      char === "…" ? 30 : 10,
+    );
+    expect(cells.map((cell) => cell.char).join("")).toBe("ab");
+  });
   it("returns no cells for an unusable slot", () => {
     expect(layoutMorphText("abc", 0, 0, advance10)).toEqual([]);
     expect(layoutMorphText("abc", -5, 0, advance10)).toEqual([]);
@@ -209,6 +222,34 @@ describe("advanceMorphTransition", () => {
   // glyph count, while an interrupted transition lands on a flat short timing.
   const durationFor = (glyphs: number, interrupted: boolean) =>
     interrupted ? 120 : 120 + Math.max(0, glyphs - 1) * 25 + 550;
+
+  it("interrupts while a settled long title exits behind a short replacement", () => {
+    const previous = layoutMorphText("a".repeat(48), 1000, 0, advance10);
+    const present = layoutMorphText("b", 1000, 0, advance10);
+    const change = advanceMorphTransition(
+      { text: "a".repeat(48), deadline: null },
+      "b",
+      1,
+      0,
+      durationFor,
+    );
+    const cells = reconcileMorphCells(previous, present, 0, 240, 25);
+    const active = includeMorphExits(change.next, cells);
+    expect(active.deadline).toBe(1415);
+    const next = advanceMorphTransition(active, "c", 1, 800, durationFor);
+    expect(next.interrupted).toBe(true);
+    const interruptedCells = reconcileMorphCells(
+      cells,
+      layoutMorphText("c", 1000, 0, advance10),
+      800,
+      240,
+      25,
+      next.interrupted,
+    );
+    expect(includeMorphExits(next.next, interruptedCells).deadline).toBe(920);
+    expect(interruptedCells).toHaveLength(1);
+    expect(interruptedCells[0]?.animateIn).toBe(false);
+  });
 
   it("treats unchanged text as no transition at all", () => {
     const previous = { text: "abc", deadline: 900 };

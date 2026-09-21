@@ -2,6 +2,7 @@ import { motion } from "@/lib/motion";
 import { needsNativeText } from "@/lib/text-shaping";
 import {
   advanceMorphTransition,
+  includeMorphExits,
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
@@ -329,7 +330,6 @@ function MorphText({
       now,
       morphDuration,
     );
-    lastChange.current = transition;
     const next = reconcileMorphCells(
       scene.current,
       present,
@@ -339,6 +339,7 @@ function MorphText({
       interrupted,
     );
     scene.current = next;
+    lastChange.current = includeMorphExits(transition, next);
     // Reconciling a stateful transition against the previous glyph scene is
     // not a pure render derivation, so state is set from the effect by design.
     setTransition({ cells: next, interrupted });

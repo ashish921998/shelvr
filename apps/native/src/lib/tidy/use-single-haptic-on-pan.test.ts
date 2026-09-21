@@ -1,0 +1,59 @@
+// @vitest-environment jsdom
+import { renderHook } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import * as Haptics from "expo-haptics";
+import { useSingleHapticOnPan } from "./use-single-haptic-on-pan";
+
+vi.mock("expo-haptics", () => ({
+  impactAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: "light" },
+}));
+vi.mock("react-native-reanimated", async () => {
+  const { useRef } = await import("react");
+  return {
+    useSharedValue: (initial: boolean) =>
+      useRef({
+        value: initial,
+        get() {
+          return this.value;
+        },
+        set(value: boolean) {
+          this.value = value;
+        },
+      }).current,
+  };
+});
+vi.mock("react-native-worklets", () => ({
+  scheduleOnRN: (fn: () => void) => fn(),
+}));
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.clearAllMocks();
+});
+
+it("fires once per pan, stays latched after retreat, and rearms on grab", () => {
+  vi.stubEnv("EXPO_OS", "ios");
+  const { result, rerender } = renderHook(() =>
+    useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
+  );
+  result.current.singleHapticOnChange(120, 0);
+  result.current.singleHapticOnChange(0, 0);
+  rerender();
+  result.current.singleHapticOnChange(0, -200);
+  result.current.commitHaptic();
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+  result.current.resetHaptic();
+  result.current.singleHapticOnChange(20, 0);
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+  result.current.commitHaptic();
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(2);
+});
+
+it("does not dispatch an iOS impact on Android", () => {
+  vi.stubEnv("EXPO_OS", "android");
+  const { result } = renderHook(() =>
+    useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
+  );
+  result.current.commitHaptic();
+  expect(Haptics.impactAsync).not.toHaveBeenCalled();
+});

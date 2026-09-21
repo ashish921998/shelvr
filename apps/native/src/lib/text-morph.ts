@@ -47,8 +47,8 @@ export function layoutMorphText(
     glyphs.push({ char, width: advance });
     total += advance;
   }
-  if (truncated) {
-    const ellipsisWidth = ellipsis ? Math.max(0, measure("…")) : 0;
+  const ellipsisWidth = ellipsis ? Math.max(0, measure("…")) : 0;
+  if (truncated && ellipsis && ellipsisWidth <= width) {
     while (
       glyphs.length > 0 &&
       (total + ellipsisWidth > width || glyphs.length === MAX_MORPH_GLYPHS)
@@ -57,10 +57,8 @@ export function layoutMorphText(
       if (!removed) break;
       total -= removed.width;
     }
-    if (ellipsis && ellipsisWidth <= width) {
-      glyphs.push({ char: "…", width: ellipsisWidth });
-      total += ellipsisWidth;
-    }
+    glyphs.push({ char: "…", width: ellipsisWidth });
+    total += ellipsisWidth;
   }
   let cursor = overscan + (width - total) / 2;
   const counts = new Map<string, number>();
@@ -82,6 +80,20 @@ export function layoutMorphText(
 
 /** The transition a morph is currently running, and when it settles. */
 export type MorphTransition = { text: string; deadline: number | null };
+
+/** Keeps a transition active until both its incoming and outgoing glyphs settle. */
+export function includeMorphExits(
+  transition: MorphTransition,
+  cells: MorphCell[],
+): MorphTransition {
+  const deadline = cells.reduce(
+    (latest, cell) => Math.max(latest, cell.exitAt ?? 0),
+    transition.deadline ?? 0,
+  );
+  return deadline > (transition.deadline ?? 0)
+    ? { ...transition, deadline }
+    : transition;
+}
 
 /**
  * Decides whether a text change lands on a transition that is still running,
