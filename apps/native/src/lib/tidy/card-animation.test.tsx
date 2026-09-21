@@ -126,7 +126,7 @@ function drag(translation: { x: number; y: number }) {
     translationX: translation.x,
     translationY: translation.y,
   });
-  fire("onEnd", { velocityX: 0, velocityY: 0 });
+  fire("onEnd", { velocityX: 0, velocityY: 0 }, true);
 }
 
 beforeEach(() => {
@@ -254,7 +254,7 @@ describe("CardAnimationProvider", () => {
     const { onDecision } = setup(0);
     // 30px of travel, but the projected momentum clears the threshold.
     fire("onChange", { translationX: 30, translationY: 0 });
-    fire("onEnd", { velocityX: 2000, velocityY: 0 });
+    fire("onEnd", { velocityX: 2000, velocityY: 0 }, true);
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
     // The latch fires on commit even though the drag never crossed.
@@ -295,12 +295,16 @@ describe("CardAnimationProvider", () => {
     // A card mid-settle, 120px out; the re-grab's own translation is zero.
     card.panX.value = 120;
     fire("onBegin", { absoluteY: 400 });
-    fire("onEnd", {
-      translationX: 0,
-      translationY: 0,
-      velocityX: 0,
-      velocityY: 0,
-    });
+    fire(
+      "onEnd",
+      {
+        translationX: 0,
+        translationY: 0,
+        velocityX: 0,
+        velocityY: 0,
+      },
+      true,
+    );
     // The parked offset alone clears the threshold.
     expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
     expect(flushDecision()).toBe("keep");
@@ -317,6 +321,22 @@ describe("CardAnimationProvider", () => {
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
     expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(haptics.commit).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
+  });
+
+  it("ignores a failed onEnd even when the travel would commit", () => {
+    const { card, deck, onDecision } = setup(0);
+    fire("onBegin", { absoluteY: 400 });
+    fire("onChange", { translationX: 250, translationY: 0 });
+    // RNGH reports a failed or cancelled pan through onEnd's success flag
+    // too; the parked full-travel offset must not turn that into a decision.
+    fire("onEnd", { velocityX: 0, velocityY: 0 }, false);
+    expect(deck.isDragging.value).toBe(false);
+    // No commit spring and no spring home either — recovery is onFinalize's.
+    expect(card.panX.value).toBe(250);
+    expect(deck.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);

@@ -128,8 +128,13 @@ export const CardAnimationProvider: FC<Props> = ({
 
           singleHapticOnChange(x, y);
         })
-        .onEnd((event) => {
+        .onEnd((event, success) => {
           isDragging.set(false);
+          // RNGH also calls onEnd for a FAILED or CANCELLED pan, with
+          // success=false. Deciding from one would delete or keep a photo the
+          // person never released, and onFinalize cannot recall a scheduled
+          // decision — so leave a cancelled pan to its recovery below.
+          if (!success) return;
 
           // onChange already parked the full-travel offsets on the pan values,
           // so the decision reads from there and folds in release velocity.
