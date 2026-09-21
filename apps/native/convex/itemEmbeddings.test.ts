@@ -785,6 +785,41 @@ describe("listReadyItemsByIdInternal", () => {
     expect("embedding" in rows[0]).toBe(false);
   });
 
+  it("drops a hit whose vector belongs to an older generation", async () => {
+    const t = newConvexTest();
+    const ids = await t.run(async (ctx) => {
+      const out: Id<"items">[] = [];
+      for (const title of ["Previous generation", "Current"]) {
+        out.push(
+          await ctx.db.insert("items", {
+            userId: "mixed",
+            type: "link" as const,
+            status: "ready" as const,
+            title,
+            tags: [],
+            searchText: title.toLowerCase(),
+            embedding: vector(),
+            embeddingVersion:
+              title === "Current"
+                ? CURRENT_EMBEDDING_VERSION
+                : CURRENT_EMBEDDING_VERSION - 1,
+          }),
+        );
+      }
+      return out;
+    });
+
+    const rows = await t.query(internal.items.listReadyItemsByIdInternal, {
+      userId: "mixed",
+      itemIds: ids,
+      limit: 100,
+    });
+
+    // The index serves the old vector until the sweep replaces it; scoring a
+    // current query against it ranks two different embeddings together.
+    expect(rows.map((row) => row.title)).toEqual(["Current"]);
+  });
+
   it("charges the budget for rows it reads and then drops", async () => {
     const t = newConvexTest();
     const ids = await t.run(async (ctx) => {

@@ -2711,10 +2711,18 @@ const RECOMMEND_CANDIDATES = 100;
  *
  * Wider than RECOMMEND_CANDIDATES because the hits are thinned afterwards:
  * items already in the space drop out, and so do items whose stored vector
- * outlived a change of status. The headroom keeps a space whose strongest
- * matches are already filed from arriving at the prompt short-handed.
+ * outlived a change of status or belongs to an older generation. The headroom
+ * keeps a space whose strongest matches are already filed from arriving at the
+ * prompt short-handed.
+ *
+ * 256 is the most Convex will return from one `vectorSearch`, and a hit is an
+ * id and a score rather than a document, so the widest window the platform
+ * offers costs almost nothing here; the document reads are bounded separately,
+ * by `listReadyItemsByIdInternal`'s row and byte limits. Past 256 filed
+ * stronger matches the ranking cannot see further, and the recency half of
+ * `recommendationCandidates` is what fills the list instead.
  */
-const RECOMMEND_VECTOR_LIMIT = 150;
+const RECOMMEND_VECTOR_LIMIT = 256;
 
 type RecommendationCandidate = FunctionReturnType<
   typeof internal.items.listReadyItemsInternal

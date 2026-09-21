@@ -264,19 +264,24 @@ The highest-value change, and it needed **no client release**.
    `RETRIEVAL_DOCUMENT`, and Gemini retrieval is asymmetric. `embedTexts` and
    `embedQuery` are now thin wrappers over one `embedBatch`, so the pairing is
    picked by choosing a function rather than by passing a string.
-2. `ctx.vectorSearch("items", "by_embedding", { vector, limit: 150, filter: q => q.eq("userId", space.userId) })`
+2. `ctx.vectorSearch("items", "by_embedding", { vector, limit: 256, filter: q => q.eq("userId", space.userId) })`
 3. Drop existing members from the hit ids, then hydrate the rest through
    `items.listReadyItemsByIdInternal`, which preserves the ranking order, drops
-   non-`ready` rows, re-checks the owner, strips vectors, and takes 100.
+   non-`ready` rows and older-generation vectors, re-checks the owner, strips
+   vectors, and takes 100.
 4. Hand to the **same** `generateObject` prompt, unchanged.
 
 Same model, same token cost, same output contract, same `suggested`-only write
 rule. The only difference is that the 100 candidates are the 100 most relevant
 instead of the 100 most recent.
 
-Two bounds worth naming. The search asks for 150 to leave headroom for the
-members and stale-status rows that step 3 removes, so a space whose strongest
-matches are already filed does not arrive at the prompt short-handed. And
+Two bounds worth naming. The search asks for 256 — the most one Convex
+`vectorSearch` returns — to leave headroom for the members, stale-status rows
+and older-generation vectors that step 3 removes, so a space whose strongest
+matches are already filed does not arrive at the prompt short-handed. A hit is
+an id and a score rather than a document, so the widest window the platform
+offers is close to free; past 256 filed stronger matches the ranking cannot
+see further and recency fills the list instead. And
 hydration stops at a 2 MB read budget as well as at 100 rows, because one
 `ready` link can carry 100k characters of extracted article; truncating is safe
 here only because the ids arrive in descending relevance order, so the budget
@@ -304,7 +309,12 @@ content.
 to become rows. The status drop in that query is not belt-and-braces — the
 vector index carries `userId` as its sole filter field (Convex vector filters
 cannot AND across fields), so a vector that outlived its item's flip to
-`failed` will still match.
+`failed` will still match. The same query drops rows stamped with an older
+generation: a version bump means the stored vectors describe different text, a
+different model, or both, and the index keeps serving them until the sweep
+catches up, so scoring a current query against them produces a ranking that is
+not weaker so much as meaningless — and silent about it. Recency covers the
+gap for as long as the re-embed takes.
 
 ## Phase 3 — hybrid search (expand/contract)
 

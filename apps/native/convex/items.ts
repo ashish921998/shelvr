@@ -1839,6 +1839,14 @@ const MAX_HYDRATE_READ_BYTES = 2_000_000;
  * still match. The `userId` re-check is defence in depth — the search is
  * already filtered to one owner, and this is the one field whose failure would
  * cross accounts.
+ *
+ * Rows stamped with an older generation are dropped for the same reason. A
+ * version bump means the vectors describe different text, a different model,
+ * or both, and the index keeps serving the old ones until the sweep replaces
+ * them. Scoring a current query against them is not a weaker ranking so much
+ * as a meaningless one, and the ranking is silent about it either way. The
+ * caller's recency half covers the gap while the sweep drains, so refusing to
+ * mix generations costs candidates only where they would have been misranked.
  */
 export const listReadyItemsByIdInternal = internalQuery({
   args: {
@@ -1868,7 +1876,11 @@ export const listReadyItemsByIdInternal = internalQuery({
       // Approximate, like the sweep's budget: the body dominates, and this
       // only has to keep the transaction clear of that limit.
       bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
-      if (item.userId !== args.userId || item.status !== "ready") {
+      if (
+        item.userId !== args.userId ||
+        item.status !== "ready" ||
+        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
+      ) {
         continue;
       }
       rows.push(item);
