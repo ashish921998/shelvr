@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   resetIfIdentified: vi.fn(),
   removeQueries: vi.fn(),
+  clearRecentSavesWidget: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("convex/react", () => ({
@@ -33,6 +34,9 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/query-client", () => ({
   queryClient: { removeQueries: mock.removeQueries },
+}));
+vi.mock("@/lib/widget-sync", () => ({
+  clearRecentSavesWidget: mock.clearRecentSavesWidget,
 }));
 
 describe("useAnalyticsIdentity", () => {
@@ -62,6 +66,22 @@ describe("useAnalyticsIdentity", () => {
     expect(predicate({ queryKey: ["convexQuery"] })).toBe(true);
     expect(predicate({ queryKey: ["otherKey"] })).toBe(false);
     expect(mock.identify).not.toHaveBeenCalled();
+  });
+
+  it("clears the Home Screen widget and records the boundary when signed out", async () => {
+    renderHook(() => useAnalyticsIdentity());
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
+    // The capture waits for the async clear to resolve.
+    await act(async () => {});
+    expect(mock.capture).toHaveBeenCalledWith("widget_cleared");
+  });
+
+  it("does not record the boundary when there is no widget to clear", async () => {
+    // A non-iOS or old client clears nothing, so the boundary is not recorded.
+    mock.clearRecentSavesWidget.mockResolvedValueOnce(false);
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
   });
 
   it("clears the Convex cache again after a later sign-out", () => {

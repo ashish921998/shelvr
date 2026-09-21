@@ -78,6 +78,9 @@ type AnalyticsEventProperties = {
     surface: OAuthSurface;
   };
   auth_completed: Record<string, never>;
+  // The session boundary cleared the Home Screen widget on sign-out. Content-
+  // free: it marks the boundary so the previously untracked clear is observable.
+  widget_cleared: Record<string, never>;
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
     placement: string;

@@ -3,6 +3,7 @@ import { useConvexAuth } from "convex/react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { queryClient } from "@/lib/query-client";
+import { clearRecentSavesWidget } from "@/lib/widget-sync";
 
 /**
  * The one session boundary for analytics identity, reacting to the Convex
@@ -33,6 +34,13 @@ export function useAnalyticsIdentity(): null {
         clearedUnauthenticatedUserCache.current = true;
         queryClient.removeQueries({
           predicate: (query) => query.queryKey[0] === "convexQuery",
+        });
+        // The Home Screen widget snapshot and its thumbnails outlive the app
+        // and the auth session. Clear them on the same boundary so a later
+        // account can never see the previous user's saves. Fire-and-forget: a
+        // widget clear must never block or fail the sign-out edge.
+        void clearRecentSavesWidget().then((cleared) => {
+          if (cleared) analytics.capture("widget_cleared");
         });
       }
       return;

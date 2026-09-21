@@ -68,15 +68,47 @@ function widgetSubtitle(item: FeedItem): string {
   return t("item.photo");
 }
 
-async function syncWidget(items: FeedItem[], locked: boolean) {
+// Drop `recent-saves-` thumbnails from the shared container. With `keep`, only
+// entries not in the set go (the running-total cleanup after a sync); without
+// it, every thumbnail goes (the session-boundary clear).
+function deleteThumbnails(dir: Directory, keep?: Set<string>) {
+  for (const entry of dir.list()) {
+    if (
+      entry instanceof File &&
+      entry.name.startsWith(THUMB_PREFIX) &&
+      !keep?.has(entry.name)
+    ) {
+      try {
+        entry.delete();
+      } catch {
+        // Best effort; a stale thumbnail is harmless.
+      }
+    }
+  }
+}
+
+// Publishes one widget snapshot for `items` (empty + `locked` clears it) and
+// prunes thumbnails the snapshot no longer references. Resolves to `true` once
+// the snapshot is published, or `false` if it bailed — the widget module is
+// missing, or a session boundary bumped the generation past this call.
+async function syncWidget(
+  items: FeedItem[],
+  locked: boolean,
+  generation: number,
+): Promise<boolean> {
+  // A sign-out between this sync being queued and running owns the widget now;
+  // don't rebuild the previous account's snapshot over the cleared one.
+  if (generation !== syncGeneration) return false;
   // Metro can evaluate a dynamic import eagerly. Check the native registry
   // before touching expo-widgets so older development clients degrade safely
   // instead of crashing in ExpoWidgets.ios.js at startup.
-  if (!requireOptionalNativeModule("ExpoWidgets")) return;
+  if (!requireOptionalNativeModule("ExpoWidgets")) return false;
 
-  const { widgetsDirectory } = await import("expo-widgets");
-  const { default: RecentSavesWidget } =
-    await import("@/widgets/recent-saves-widget");
+  const [{ widgetsDirectory }, { default: RecentSavesWidget }] =
+    await Promise.all([
+      import("expo-widgets"),
+      import("@/widgets/recent-saves-widget"),
+    ]);
 
   const dir = new Directory(widgetsDirectory);
   if (!dir.exists) dir.create({ intermediates: true });
@@ -100,6 +132,14 @@ async function syncWidget(items: FeedItem[], locked: boolean) {
     }),
   );
 
+  // A sign-out may have cleared the widget while the thumbnails downloaded.
+  // Drop anything this stale sync wrote and leave the cleared snapshot standing
+  // rather than republishing the previous account's saves.
+  if (generation !== syncGeneration) {
+    deleteThumbnails(dir);
+    return false;
+  }
+
   RecentSavesWidget.updateSnapshot({
     items: widgetItems,
     emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
@@ -111,23 +151,34 @@ async function syncWidget(items: FeedItem[], locked: boolean) {
   // doesn't grow forever. Run after updateSnapshot so the old snapshot's
   // referenced files stay valid until the new one is live.
   const keep = new Set(items.map((item) => `${THUMB_PREFIX}${item._id}.jpg`));
-  for (const entry of dir.list()) {
-    if (
-      entry instanceof File &&
-      entry.name.startsWith(THUMB_PREFIX) &&
-      !keep.has(entry.name)
-    ) {
-      try {
-        entry.delete();
-      } catch {
-        // Best effort; a stale thumbnail is harmless.
-      }
-    }
-  }
+  deleteThumbnails(dir, keep);
+  return true;
+}
+
+/**
+ * The session-boundary widget clear, owned by `useAnalyticsIdentity` and run
+ * when Convex Auth reports signed out. A widget snapshot and its thumbnails
+ * outlive both the app and the auth session, so without this the previous
+ * account's saved titles and photos stay readable on the Home Screen — and on
+ * disk in the shared container — until a later sign-in. Bumps the sync
+ * generation first so a `syncWidget` queued or in flight before this boundary
+ * cannot republish the cleared snapshot, then publishes the empty locked
+ * snapshot (which also drops every thumbnail). Resolves to `true` once that
+ * snapshot is published (iOS with the widget module linked), so the caller can
+ * record the boundary.
+ */
+export async function clearRecentSavesWidget(): Promise<boolean> {
+  syncGeneration += 1;
+  if (Platform.OS !== "ios") return false;
+  return syncWidget([], true, syncGeneration);
 }
 
 // Serialize syncs so a fast series of Convex pushes can't interleave file work.
-let syncChain: Promise<void> = Promise.resolve();
+let syncChain: Promise<unknown> = Promise.resolve();
+// Bumped by clearRecentSavesWidget at the session boundary. A sync captures the
+// value when it is queued and bails if it no longer matches, so a sign-out can
+// never be overwritten by a sync that started before it.
+let syncGeneration = 0;
 
 /**
  * Keeps the "Recent Saves" home screen widget fed with the latest ready items.
@@ -175,8 +226,9 @@ export function RecentSavesWidgetSync() {
     if (key === lastKey.current) return;
     lastKey.current = key;
 
+    const generation = syncGeneration;
     syncChain = syncChain
-      .then(() => syncWidget(items, !entitled))
+      .then(() => syncWidget(items, !entitled, generation))
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { File } from "expo-file-system";
 
-import { RecentSavesWidgetSync } from "./widget-sync";
+import { clearRecentSavesWidget, RecentSavesWidgetSync } from "./widget-sync";
 import ja from "@/locales/ja.json";
 
 const fsx = vi.hoisted(() => ({
@@ -21,6 +21,9 @@ const fsx = vi.hoisted(() => ({
   nativeModulePresent: true,
   failImages: false,
   failSnapshot: false,
+  // When set, a thumbnail decode blocks on this gate so a test can interleave a
+  // session-boundary clear with an in-flight sync.
+  imageGate: null as Promise<void> | null,
   files: new Map<string, boolean>(),
   listed: [] as unknown[],
   snapshots: [] as unknown[],
@@ -91,6 +94,7 @@ vi.mock("@/widgets/recent-saves-widget", () => ({
 vi.mock("react-native-nitro-image", () => ({
   Images: {
     async loadFromFileAsync() {
+      if (fsx.imageGate) await fsx.imageGate;
       if (fsx.failImages) throw new Error("decode failed");
       return {
         width: 1024,
@@ -166,6 +170,7 @@ beforeEach(() => {
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
   fsx.failSnapshot = false;
+  fsx.imageGate = null;
   fsx.files.clear();
   fsx.listed = [];
   fsx.snapshots = [];
@@ -350,5 +355,60 @@ describe("RecentSavesWidgetSync", () => {
     rerender(<RecentSavesWidgetSync />);
     await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
     spy.mockRestore();
+  });
+
+  it("does not republish when a sign-out clear lands mid-sync", async () => {
+    let release!: () => void;
+    fsx.imageGate = new Promise<void>((r) => (release = r));
+    renderSync([link]);
+    // The sync starts and blocks decoding the thumbnail.
+    await act(async () => {});
+    expect(fsx.downloads).toEqual(["https://cdn.example/a.jpg"]);
+    expect(fsx.snapshots).toHaveLength(0);
+
+    // A session boundary clears the widget while the sync is blocked.
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(fsx.snapshots).toHaveLength(1);
+    expect(fsx.snapshots[0]).toMatchObject({ items: [], locked: true });
+
+    // The stale sync unblocks but must not republish the previous account's
+    // content over the cleared snapshot.
+    release();
+    await act(async () => {});
+    expect(fsx.snapshots).toHaveLength(1);
+  });
+});
+
+describe("clearRecentSavesWidget", () => {
+  it("publishes the locked snapshot and drops every thumbnail on iOS", async () => {
+    fsx.listed = [
+      new File("file:///widgets", "recent-saves-i1.jpg"),
+      new File("file:///widgets", "recent-saves-i2.jpg"),
+      new File("file:///widgets", "keep-me.txt"),
+    ];
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(fsx.snapshots).toHaveLength(1);
+    expect(fsx.snapshots[0]).toMatchObject({
+      items: [],
+      emptyTitle: "Recent saves are a Pro feature",
+      emptyHint: "Subscribe to Shelvr Pro to see your saves here",
+      locked: true,
+    });
+    expect(fsx.deletes).toEqual([
+      "file:///widgets/recent-saves-i1.jpg",
+      "file:///widgets/recent-saves-i2.jpg",
+    ]);
+  });
+
+  it("does nothing off iOS", async () => {
+    fsx.platformOs = "android";
+    expect(await clearRecentSavesWidget()).toBe(false);
+    expect(fsx.snapshots).toHaveLength(0);
+  });
+
+  it("does nothing when the widget native module is missing", async () => {
+    fsx.nativeModulePresent = false;
+    expect(await clearRecentSavesWidget()).toBe(false);
+    expect(fsx.snapshots).toHaveLength(0);
   });
 });
