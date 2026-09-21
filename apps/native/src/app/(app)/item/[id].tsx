@@ -17,7 +17,13 @@ import { useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
 import * as Haptics from "expo-haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -82,6 +88,70 @@ function pagerEndReached(
 export default function ItemScreen() {
   useAppLocale();
   return <ItemScreenContent />;
+}
+
+// Owns the item pager's route-param sync: deduped writes through the owning
+// screen's navigation, a blur-cancelled pending write, and a refocus resync.
+// expo-router's generated param types don't cover imperative setParams, and
+// @react-navigation/native isn't a direct dependency — owning writes only
+// need these two members.
+function usePagerParamSync(initialId: string) {
+  const navigation = useNavigation() as {
+    setParams: (params: { id?: string }) => void;
+    isFocused: () => boolean;
+  };
+  const activeIdRef = useRef(initialId);
+  const lastWrittenId = useRef(initialId);
+  const paramTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const writeParams = useCallback(
+    (nextId: string) => {
+      if (lastWrittenId.current === nextId) return;
+      lastWrittenId.current = nextId;
+      // Write through this screen's navigation: the owning route takes the
+      // update even while a pushed screen holds focus, where router.setParams
+      // would retarget the modal.
+      navigation.setParams({ id: nextId });
+    },
+    [navigation],
+  );
+
+  useEffect(
+    () => () => {
+      if (paramTimer.current) clearTimeout(paramTimer.current);
+    },
+    [],
+  );
+
+  // A pending write is stale the moment the screen loses focus; on the way
+  // back, resync the URL to the page the user is actually on. The first
+  // focus is a no-op: writeParams dedupes against the pushed id.
+  useFocusEffect(
+    useCallback(() => {
+      writeParams(activeIdRef.current);
+      return () => {
+        if (paramTimer.current) clearTimeout(paramTimer.current);
+      };
+    }, [writeParams]),
+  );
+
+  const scheduleParamWrite = useCallback(
+    (nextId: string) => {
+      if (paramTimer.current) clearTimeout(paramTimer.current);
+      paramTimer.current = setTimeout(() => writeParams(nextId), 350);
+    },
+    [writeParams],
+  );
+
+  return {
+    navigation,
+    activeIdRef,
+    writeParams,
+    scheduleParamWrite,
+    cancelParamWrite: useCallback(() => {
+      if (paramTimer.current) clearTimeout(paramTimer.current);
+    }, []),
+  };
 }
 
 function ItemScreenContent() {
@@ -170,31 +240,39 @@ function ItemScreenContent() {
   // so swiping (which rewrites the `id` param) never re-pairs the transition.
   const [pushedId] = useState(id);
   const [activeId, setActiveId] = useState(id);
+  const {
+    navigation,
+    activeIdRef,
+    writeParams,
+    scheduleParamWrite,
+    cancelParamWrite,
+  } = usePagerParamSync(id);
+  const goTo = useCallback(
+    (nextId: string) => {
+      activeIdRef.current = nextId;
+      setActiveId(nextId);
+    },
+    [activeIdRef],
+  );
 
   // Keeping the route `id` param in sync writes navigation state, which
   // re-renders the entire native-stack tree — a ~16ms cascade profiled as the
   // single most expensive JS event per swipe. `activeId` (local state) already
   // drives the header/toolbar/actions, so only the deep-link/restore URL needs
-  // the param. Debounce it so a run of swipes writes once, after it settles,
-  // instead of paying the cascade on every page.
-  const paramTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // the param (debounced so a run of swipes writes once, after it settles).
   const onViewable = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<DetailItem>[] }) => {
       const first = viewableItems[0]?.item as DetailItem | undefined;
       if (!first) return;
-      setActiveId(first._id);
-      if (paramTimer.current) clearTimeout(paramTimer.current);
-      paramTimer.current = setTimeout(() => {
-        router.setParams({ id: first._id });
-      }, 350);
+      // Offscreen layout passes and scroll corrections re-emit viewability
+      // for the page already shown — and while a pushed screen or a dismiss
+      // animation holds focus, position changes aren't the user's intent.
+      if (first._id === activeIdRef.current) return;
+      if (!navigation.isFocused()) return;
+      goTo(first._id);
+      scheduleParamWrite(first._id);
     },
-    [router],
-  );
-  useEffect(
-    () => () => {
-      if (paramTimer.current) clearTimeout(paramTimer.current);
-    },
-    [],
+    [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 60 }),
@@ -321,7 +399,7 @@ function ItemScreenContent() {
     if (!spaceId || !activeId || !items) return;
     // Cancel any pending debounced setParams so it doesn't revert the
     // immediate param write below to the just-dismissed item.
-    if (paramTimer.current) clearTimeout(paramTimer.current);
+    cancelParamWrite();
     // The dismissed item leaves the space's list; slide to a neighbour first,
     // mirroring delete, so the pager never lands on a vanished page.
     const idx = items.findIndex((i) => i._id === activeId);
@@ -332,8 +410,8 @@ function ItemScreenContent() {
         index: items.indexOf(neighbor),
         animated: true,
       });
-      setActiveId(neighbor._id);
-      router.setParams({ id: neighbor._id });
+      goTo(neighbor._id);
+      writeParams(neighbor._id);
     } else {
       router.back();
     }
@@ -342,19 +420,28 @@ function ItemScreenContent() {
       spaceId: spaceId as Id<"spaces">,
     });
     if (changed) analytics.capture("suggestion_dismissed");
-  }, [spaceId, activeId, items, dismissSuggestion, router]);
+  }, [
+    spaceId,
+    activeId,
+    items,
+    dismissSuggestion,
+    router,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  ]);
 
   const onDelete = useCallback(async () => {
     if (!activeItem || !items) return;
-    if (paramTimer.current) clearTimeout(paramTimer.current);
+    cancelParamWrite();
     const idx = items.findIndex((item) => item._id === activeItem._id);
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
       analytics.capture("item_deleted", { item_type: activeItem.type });
       if (neighbor) {
-        setActiveId(neighbor._id);
-        router.setParams({ id: neighbor._id });
+        goTo(neighbor._id);
+        writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
           animated: true,
@@ -364,7 +451,15 @@ function ItemScreenContent() {
     } catch {
       Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
     }
-  }, [activeItem, items, deleteItem, router]);
+  }, [
+    activeItem,
+    items,
+    deleteItem,
+    router,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  ]);
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;

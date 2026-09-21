@@ -24,7 +24,14 @@ import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -144,6 +151,16 @@ export const ItemDetail = memo(function ItemDetail({
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
+  // FlashList can recycle this page instance for a different item; a
+  // recycled page must open at the top, not at the previous item's offset.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
+
   // A social save's "content" is its caption, not an article: keep the
   // poster layout.
   const social = socialPost(item);
@@ -204,6 +221,7 @@ export const ItemDetail = memo(function ItemDetail({
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
+      recyclingKey={item._id}
       contentFit="contain"
       style={
         item.isSticker
@@ -241,6 +259,7 @@ export const ItemDetail = memo(function ItemDetail({
             >
               <Image
                 source={{ uri: media.imageUrl }}
+                recyclingKey={`${item._id}-media-${index}`}
                 contentFit="contain"
                 style={[styles.heroImage, frameSize(media.aspectRatio)]}
               />
@@ -262,7 +281,10 @@ export const ItemDetail = memo(function ItemDetail({
     </>
   ) : null;
 
+  // FlashList can recycle this page instance for a different item; a
+  // recycled page must open at the top, not at the previous item's offset.
   const scrollProps = {
+    ref: scrollRef,
     testID: item.fixtureKey
       ? `fixture-item-detail-${item.fixtureKey}`
       : undefined,

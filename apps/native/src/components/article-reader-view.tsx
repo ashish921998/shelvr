@@ -12,7 +12,7 @@ import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { Id } from "@convex/_generated/dataModel";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -67,6 +67,15 @@ export function ArticleReaderView({
     return byParagraph;
   }, [item.articleMedia, paragraphs.length]);
 
+  // A recycled reader instance must open at the top of its article.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
+
   const openSource = () => openItemSource(item);
 
   // Full body width, but a tall video poster stops at 60% of the screen.
@@ -83,6 +92,7 @@ export function ArticleReaderView({
       const image = (
         <Image
           source={{ uri: media.imageUrl }}
+          recyclingKey={`${item._id}-media-${index}`}
           contentFit="cover"
           style={[styles.articleMedia, mediaFrame(media.aspectRatio)]}
         />
@@ -118,6 +128,7 @@ export function ArticleReaderView({
   const thumbnail = heroUri ? (
     <Image
       source={{ uri: heroUri }}
+      recyclingKey={item._id}
       contentFit="cover"
       style={styles.thumbnailImage}
     />
@@ -133,6 +144,7 @@ export function ArticleReaderView({
 
   return (
     <ScrollView
+      ref={scrollRef}
       testID={
         item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
       }
