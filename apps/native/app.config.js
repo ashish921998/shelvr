@@ -137,12 +137,29 @@ const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
 
 // The Android window background under a dark theme is taken from the dark
 // launch screen, so the surface a rebuilt Activity shows can never disagree
-// with the one the app launched on. Reading it here rather than repeating the
-// literal means dropping the dark splash fails the build instead of silently
-// restoring a cream window (see plugins/with-android-night-background).
-const darkLaunchBackgroundColor = (appConfig.expo.plugins ?? []).find(
+// with the one the app launched on. Resolved the way expo-splash-screen
+// resolves it, where an Android override wins over the cross-platform value,
+// so both shapes stay in step (see plugins/with-android-night-background).
+const splashOptions = (appConfig.expo.plugins ?? []).find(
   (plugin) => Array.isArray(plugin) && plugin[0] === "expo-splash-screen",
-)?.[1]?.dark?.backgroundColor;
+)?.[1];
+const darkLaunchBackgroundColor =
+  splashOptions?.android?.dark?.backgroundColor ??
+  splashOptions?.dark?.backgroundColor;
+
+// The night window plugin runs during config evaluation for every platform
+// and command, so failing unconditionally would let an Android-only guard
+// strand iOS builds and local dev. Only Android store builds fail when the
+// dark splash goes missing; everywhere else the plugin is just not registered.
+if (
+  !darkLaunchBackgroundColor &&
+  buildPlatform === "android" &&
+  process.env.EAS_BUILD === "true"
+) {
+  throw new Error(
+    "Android builds require the expo-splash-screen dark backgroundColor for the night window background.",
+  );
+}
 
 module.exports = ({ config }) => ({
   ...appConfig.expo,
@@ -193,10 +210,14 @@ module.exports = ({ config }) => ({
     // Keep the static plugins from app.json — an inline array here would
     // silently replace them (expo-font, expo-router, expo-sharing, …).
     ...(appConfig.expo.plugins ?? []),
-    [
-      "./plugins/with-android-night-background",
-      { backgroundColor: darkLaunchBackgroundColor },
-    ],
+    ...(darkLaunchBackgroundColor
+      ? [
+          [
+            "./plugins/with-android-night-background",
+            { backgroundColor: darkLaunchBackgroundColor },
+          ],
+        ]
+      : []),
     [
       "expo-build-properties",
       {
