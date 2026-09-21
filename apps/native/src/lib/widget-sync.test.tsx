@@ -31,7 +31,10 @@ const fsx = vi.hoisted(() => ({
   deletes: [] as string[],
   created: [] as string[],
 }));
-const tanstack = vi.hoisted(() => ({ data: undefined as unknown }));
+const tanstack = vi.hoisted(() => ({
+  data: undefined as unknown,
+  args: undefined as unknown,
+}));
 
 vi.mock("react-native", () => ({
   Platform: {
@@ -110,10 +113,18 @@ vi.mock("react-native-nitro-image", () => ({
     },
   },
 }));
-vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("@convex-dev/react-query", () => ({
+  convexQuery: (fn: unknown, args: unknown) => {
+    tanstack.args = args;
+    return { queryKey: ["convexQuery", fn, args] };
+  },
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { enabled?: boolean }) => ({
-    data: options.enabled === false ? undefined : tanstack.data,
+    data:
+      tanstack.args === "skip" || options.enabled === false
+        ? undefined
+        : tanstack.data,
   }),
 }));
 vi.mock("@convex/_generated/api", () => ({
@@ -178,6 +189,7 @@ beforeEach(() => {
   fsx.deletes = [];
   fsx.created = [];
   tanstack.data = undefined;
+  tanstack.args = undefined;
 });
 
 describe("RecentSavesWidgetSync", () => {
@@ -202,6 +214,32 @@ describe("RecentSavesWidgetSync", () => {
     await act(async () => {});
     expect(fsx.snapshots).toHaveLength(0);
     expect(fsx.downloads).toHaveLength(0);
+  });
+
+  // The Convex subscription outlives the component: the adapter opens it on the
+  // query cache's "added" event and only drops it on "removed", which waits out
+  // gcTime (24h here). TanStack's `enabled` never reaches that layer, so a
+  // subscription held open across sign-out is re-evaluated without an identity
+  // and the server throws "Not authenticated". The "skip" sentinel is the only
+  // guard the adapter honours, because it changes the query key.
+  it("opens no Convex subscription while the shelf is locked", () => {
+    fsx.entitled = false;
+    renderSync([link]);
+    expect(tanstack.args).toBe("skip");
+  });
+
+  it("opens no Convex subscription before entitlement is known", () => {
+    fsx.entitlementLoading = true;
+    renderSync([link]);
+    expect(tanstack.args).toBe("skip");
+  });
+
+  // The entitlement clock ticks every minute while a subscription has an
+  // expiry. In the query key that was a new subscription per tick, each held
+  // for gcTime.
+  it("keeps one query key regardless of the entitlement clock", () => {
+    renderSync([link]);
+    expect(tanstack.args).toEqual({ limit: 5 });
   });
 
   it("does not sync until entitlement is known", async () => {
