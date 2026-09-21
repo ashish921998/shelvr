@@ -92,7 +92,7 @@ into `ReduceMotion.Never` to keep state changes legible.
 
 `Button` is the primary action component: it exposes `accessibilityRole`,
 `accessibilityLabel`, and `accessibilityState` (disabled/busy), keeps its
-label rendered while loading behind the spinner, consumes the control and
+label rendered while loading beside the spinner, consumes the control and
 opacity tokens, and scales/opacity-shifts on press with a Reduce Motion
 branch. `ThemedText` maps the type ramp. Prefer both over raw `Pressable`/
 `Text` in new UI; raw components are for cases the primitives genuinely
