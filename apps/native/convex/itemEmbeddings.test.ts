@@ -13,6 +13,7 @@ import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_SWEEP_PAGE,
   MAX_EMBEDDING_ATTEMPTS,
+  MAX_HYDRATE_READ_BYTES,
   MAX_SWEEP_READ_BYTES,
 } from "./model/embedding";
 
@@ -673,6 +674,15 @@ describe("similar items", () => {
   });
 });
 
+/**
+ * A body just over half the hydration budget, so two of them cross it. Derived
+ * rather than hard-coded: retuning the budget must move these fixtures with it
+ * or the tests stop asserting the boundary they were written for.
+ */
+function overBudgetHalf(): string {
+  return "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
+}
+
 describe("listReadyItemsByIdInternal", () => {
   async function seedReady(userId: string, titles: string[]) {
     const t = newConvexTest();
@@ -837,7 +847,7 @@ describe("listReadyItemsByIdInternal", () => {
             title,
             tags: [],
             searchText: title.toLowerCase(),
-            content: title === "Small" ? "tiny" : "x".repeat(1_100_000),
+            content: title === "Small" ? "tiny" : overBudgetHalf(),
             embedding: vector(),
             embeddingVersion: CURRENT_EMBEDDING_VERSION,
           }),
@@ -852,8 +862,8 @@ describe("listReadyItemsByIdInternal", () => {
       limit: 100,
     });
 
-    // Counting only surviving rows would have walked past 2.2 MB of reads
-    // with the budget still reading zero, and kept going.
+    // Counting only surviving rows would have walked past the whole budget
+    // in dropped reads with it still reading zero, and kept going.
     expect(rows).toEqual([]);
   });
 
@@ -861,7 +871,7 @@ describe("listReadyItemsByIdInternal", () => {
     const t = newConvexTest();
     const ids = await t.run(async (ctx) => {
       const out: Id<"items">[] = [];
-      // Two rows are enough to cross the 2 MB budget; the third is never read.
+      // Two rows are enough to cross the budget; the third is never read.
       for (const title of ["Big one", "Big two", "Small"]) {
         out.push(
           await ctx.db.insert("items", {
@@ -871,7 +881,7 @@ describe("listReadyItemsByIdInternal", () => {
             title,
             tags: [],
             searchText: title.toLowerCase(),
-            content: title === "Small" ? "tiny" : "x".repeat(1_100_000),
+            content: title === "Small" ? "tiny" : overBudgetHalf(),
             embedding: vector(),
             embeddingVersion: CURRENT_EMBEDDING_VERSION,
           }),

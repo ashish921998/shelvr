@@ -46,6 +46,7 @@ import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_SWEEP_PAGE,
   isValidEmbedding,
+  MAX_HYDRATE_READ_BYTES,
   MAX_EMBEDDING_ATTEMPTS,
   MAX_SWEEP_READ_BYTES,
 } from "./model/embedding";
@@ -1810,18 +1811,6 @@ export const listReadyItemsInternal = internalQuery({
     return rows.map(stripEmbedding);
   },
 });
-
-/**
- * Byte budget for one `listReadyItemsByIdInternal` read.
- *
- * Page size alone is not a bound, for the same reason it is not one in the
- * embedding sweep: a single `ready` link can carry 100k characters of
- * extracted article, so a full page of worst-case rows would be megabytes
- * inside one Convex transaction. Truncating is safe here specifically because
- * the ids arrive in descending relevance order — the budget drops the least
- * relevant tail, never a strong match.
- */
-const MAX_HYDRATE_READ_BYTES = 2_000_000;
 
 /**
  * Hydrates vector-search hits back into item documents, preserving the order
