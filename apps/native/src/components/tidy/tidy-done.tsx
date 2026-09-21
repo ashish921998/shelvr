@@ -4,7 +4,7 @@ import { Text } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-import { fadeIn } from "@/lib/motion";
+import { fadeIn, fadeOut } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import type { TidyCounts } from "@/lib/tidy/use-tidy-actions";
 
@@ -38,7 +38,7 @@ export const TidyDone: FC<Props> = ({
   ].join("  ·  ");
 
   return (
-    <Animated.View entering={fadeIn} style={styles.container}>
+    <Animated.View entering={fadeIn} exiting={fadeOut} style={styles.container}>
       <Text style={styles.title}>
         {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
       </Text>
