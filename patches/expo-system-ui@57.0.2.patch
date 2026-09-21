@@ -1,0 +1,23 @@
+diff --git a/android/src/main/java/expo/modules/systemui/SystemUIReactActivityLifecycleListener.kt b/android/src/main/java/expo/modules/systemui/SystemUIReactActivityLifecycleListener.kt
+index 1c50d0ac8a5da0f53471761611e6cbc34459076d..496a7d35701a5071719bdf9e46107b5826698409 100644
+--- a/android/src/main/java/expo/modules/systemui/SystemUIReactActivityLifecycleListener.kt
++++ b/android/src/main/java/expo/modules/systemui/SystemUIReactActivityLifecycleListener.kt
+@@ -9,6 +9,18 @@ import expo.modules.systemui.singletons.SystemUI
+ class SystemUIReactActivityLifecycleListener : ReactActivityLifecycleListener {
+   override fun onCreate(activity: Activity, savedInstanceState: Bundle?) {
+     SystemUI.setUserInterfaceStyle(getUserInterfaceStyle(activity))
++    restoreBackgroundColor(activity)
++  }
++
++  // The module persists the JS-applied background under PREFERENCE_KEY but
++  // never reads it back, so a recreated Activity starts on the window
++  // resource again until JS repaints. Restore it as soon as the Activity
++  // exists. The store name and key must match SystemUIModule's.
++  private fun restoreBackgroundColor(activity: Activity) {
++    val prefs = activity.getSharedPreferences("expo_ui_preferences", Context.MODE_PRIVATE)
++    if (prefs.contains(PREFERENCE_KEY)) {
++      activity.window.decorView.setBackgroundColor(prefs.getInt(PREFERENCE_KEY, 0))
++    }
+   }
+ 
+   private fun getUserInterfaceStyle(context: Context): String =

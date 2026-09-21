@@ -13,3 +13,4 @@ allowBuilds:
 nodeLinker: hoisted
 patchedDependencies:
   expo-dev-launcher@57.0.11: patches/expo-dev-launcher@57.0.11.patch
+  expo-system-ui@57.0.2: patches/expo-system-ui@57.0.2.patch
