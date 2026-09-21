@@ -78,6 +78,10 @@ type AnalyticsEventProperties = {
     surface: OAuthSurface;
   };
   auth_completed: Record<string, never>;
+  // Widget snapshot and file cleanup completed, including signed-out startup
+  // and foreground recovery. This counts cleanup operations, not sign-outs or
+  // confirmed WidgetKit redraws.
+  widget_cleared: Record<string, never>;
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
     placement: string;
