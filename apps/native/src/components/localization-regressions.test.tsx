@@ -76,6 +76,7 @@ vi.mock("react-native", () => {
     ),
     ActivityIndicator: vi.fn(() => null),
     TextInput: vi.fn(() => <input />),
+    useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844 }),
     StyleSheet: { flatten },
   };
 });
@@ -152,6 +153,7 @@ vi.mock("react-native-reanimated", async () => {
     cubicBezier: () => ({}),
     ReduceMotion: { System: "system", Never: "never", Always: "always" },
     useReducedMotion: () => false,
+    cancelAnimation: () => undefined,
     useSharedValue: (initial: number) =>
       useRef({
         value: initial,
