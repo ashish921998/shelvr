@@ -100,9 +100,17 @@ function useItemDetailData(item: DetailItem) {
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
+  // Conditional queries use the 'skip' sentinel, not `enabled` (see the
+  // pager): a disabled React Query still subscribes through the Convex
+  // adapter. The short gcTime ends each visited page's subscription soon
+  // after it unmounts instead of holding one for the session-long default.
+  const similarReady = item.status === "ready" && item.type !== "note";
   const { data: similar } = useQuery({
-    ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === "ready" && item.type !== "note",
+    ...convexQuery(
+      api.items.similarItems,
+      similarReady ? { id: item._id } : "skip",
+    ),
+    gcTime: 30_000,
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;

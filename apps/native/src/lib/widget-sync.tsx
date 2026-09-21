@@ -143,11 +143,14 @@ export function RecentSavesWidgetSync() {
     now: entitlementNow,
   } = useEntitlement();
   const { data: recent } = useQuery({
-    ...convexQuery(api.items.listRecentItems, {
-      limit: WIDGET_ITEM_COUNT,
-      now: entitlementNow,
-    }),
-    enabled: !entitlementLoading && entitled,
+    ...convexQuery(
+      api.items.listRecentItems,
+      // 'skip', not `enabled`: a disabled React Query still subscribes
+      // through the Convex adapter (see the pager).
+      !entitlementLoading && entitled
+        ? { limit: WIDGET_ITEM_COUNT, now: entitlementNow }
+        : "skip",
+    ),
   });
   const lastKey = useRef<string | null>(null);
 

@@ -28,8 +28,12 @@ export function WeeklyNudgeSheet({
     useCallback(() => setPending(isWeeklyNudgePending(userId)), [userId]),
   );
   const { data: preferences } = useQuery({
-    ...convexQuery(api.notifications.getPreferences, {}),
-    enabled: pending,
+    ...convexQuery(
+      api.notifications.getPreferences,
+      // 'skip', not `enabled`: a disabled React Query still subscribes
+      // through the Convex adapter (see the pager).
+      pending ? {} : "skip",
+    ),
   });
   const alreadyOn = preferences?.weeklyShelfEnabled === true;
 
