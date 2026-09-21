@@ -11,6 +11,7 @@ const mock = vi.hoisted(() => ({
   user: undefined as { _id: string } | undefined,
   identify: vi.fn(),
   capture: vi.fn(),
+  captureError: vi.fn(),
   resetIfIdentified: vi.fn(),
   removeQueries: vi.fn(),
   clearRecentSavesWidget: vi.fn(() => Promise.resolve(true)),
@@ -29,6 +30,7 @@ vi.mock("@/lib/analytics", () => ({
   analytics: {
     identify: mock.identify,
     capture: mock.capture,
+    captureError: mock.captureError,
     resetIfIdentified: mock.resetIfIdentified,
   },
 }));
@@ -82,6 +84,20 @@ describe("useAnalyticsIdentity", () => {
     renderHook(() => useAnalyticsIdentity());
     await act(async () => {});
     expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
+  });
+
+  it("handles a failed clear without reporting success or exposing native errors", async () => {
+    mock.clearRecentSavesWidget.mockRejectedValueOnce(
+      new Error("private native file path"),
+    );
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.removeQueries).toHaveBeenCalledOnce();
+    expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "widget_clear_failed",
+      new Error("widget_clear_failed"),
+    );
   });
 
   it("clears the Convex cache again after a later sign-out", () => {

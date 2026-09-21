@@ -21,6 +21,8 @@ const fsx = vi.hoisted(() => ({
   nativeModulePresent: true,
   failImages: false,
   failSnapshot: false,
+  snapshotFailuresRemaining: 0,
+  snapshotAttempts: 0,
   // When set, a thumbnail decode blocks on this gate so a test can interleave a
   // session-boundary clear with an in-flight sync.
   imageGate: null as Promise<void> | null,
@@ -89,6 +91,11 @@ vi.mock("expo-widgets", () => ({ widgetsDirectory: "/widgets" }));
 vi.mock("@/widgets/recent-saves-widget", () => ({
   default: {
     updateSnapshot: (snapshot: unknown) => {
+      fsx.snapshotAttempts += 1;
+      if (fsx.snapshotFailuresRemaining > 0) {
+        fsx.snapshotFailuresRemaining -= 1;
+        throw new Error("widget unavailable");
+      }
       if (fsx.failSnapshot) throw new Error("widget unavailable");
       fsx.snapshots.push(snapshot);
     },
@@ -181,6 +188,8 @@ beforeEach(() => {
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
   fsx.failSnapshot = false;
+  fsx.snapshotFailuresRemaining = 0;
+  fsx.snapshotAttempts = 0;
   fsx.imageGate = null;
   fsx.files.clear();
   fsx.listed = [];
@@ -418,6 +427,26 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("retries a transient snapshot failure", async () => {
+    fsx.snapshotFailuresRemaining = 1;
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(fsx.snapshotAttempts).toBe(2);
+    expect(fsx.snapshots).toEqual([
+      expect.objectContaining({ items: [], locked: true }),
+    ]);
+  });
+
+  it("still deletes private thumbnails when snapshot publication keeps failing", async () => {
+    fsx.failSnapshot = true;
+    fsx.listed = [new File("file:///widgets", "recent-saves-i1.jpg")];
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget unavailable",
+    );
+    expect(fsx.snapshotAttempts).toBe(2);
+    expect(fsx.snapshots).toHaveLength(0);
+    expect(fsx.deletes).toContain("file:///widgets/recent-saves-i1.jpg");
+  });
+
   it("publishes the locked snapshot and drops every thumbnail on iOS", async () => {
     fsx.listed = [
       new File("file:///widgets", "recent-saves-i1.jpg"),

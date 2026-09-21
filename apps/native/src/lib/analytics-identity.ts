@@ -39,9 +39,16 @@ export function useAnalyticsIdentity(): null {
         // and the auth session. Clear them on the same boundary so a later
         // account can never see the previous user's saves. Fire-and-forget: a
         // widget clear must never block or fail the sign-out edge.
-        void clearRecentSavesWidget().then((cleared) => {
-          if (cleared) analytics.capture("widget_cleared");
-        });
+        void clearRecentSavesWidget()
+          .then((cleared) => {
+            if (cleared) analytics.capture("widget_cleared");
+          })
+          .catch(() => {
+            analytics.captureError(
+              "widget_clear_failed",
+              new Error("widget_clear_failed"),
+            );
+          });
       }
       return;
     }

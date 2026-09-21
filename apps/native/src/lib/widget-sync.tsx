@@ -140,18 +140,23 @@ async function syncWidget(
     return false;
   }
 
-  RecentSavesWidget.updateSnapshot({
-    items: widgetItems,
-    emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
-    emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
-    locked,
-  });
+  try {
+    RecentSavesWidget.updateSnapshot({
+      items: widgetItems,
+      emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
+      emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
+      locked,
+    });
+  } finally {
+    // Clearing private files must not depend on publishing the locked snapshot.
+    if (locked) deleteThumbnails(dir);
+  }
 
   // Drop thumbnails for items that left the widget so the shared container
   // doesn't grow forever. Run after updateSnapshot so the old snapshot's
   // referenced files stay valid until the new one is live.
   const keep = new Set(items.map((item) => `${THUMB_PREFIX}${item._id}.jpg`));
-  deleteThumbnails(dir, keep);
+  if (!locked) deleteThumbnails(dir, keep);
   return true;
 }
 
@@ -170,7 +175,14 @@ async function syncWidget(
 export async function clearRecentSavesWidget(): Promise<boolean> {
   syncGeneration += 1;
   if (Platform.OS !== "ios") return false;
-  return syncWidget([], true, syncGeneration);
+  const generation = syncGeneration;
+  try {
+    return await syncWidget([], true, generation);
+  } catch {
+    // Retry once for a transient native failure, retaining the boundary's
+    // generation so a newer clear can still invalidate this attempt.
+    return syncWidget([], true, generation);
+  }
 }
 
 // Serialize syncs so a fast series of Convex pushes can't interleave file work.
