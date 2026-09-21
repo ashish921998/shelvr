@@ -12,6 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { motion } from "@/lib/motion";
 import { useCardAnimation } from "@/lib/tidy/card-animation";
 
 // Direction hint overlay, adapted from the Slack Catch Up recreation's
@@ -21,9 +22,6 @@ import { useCardAnimation } from "@/lib/tidy/card-animation";
 const BADGE_SIZE = 60;
 const STROKE_WIDTH = 3;
 const ICON_SIZE = 24;
-
-const KEEP_TINT = "#34d399";
-const KEEP_ACCENT = "#065f46";
 
 type Direction = "keep" | "delete" | "save";
 
@@ -85,12 +83,15 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
   const rCircleStyle = useAnimatedStyle(() => ({
     backgroundColor: withTiming(
       progress.get() + buffer > 1 ? "white" : "transparent",
-      { duration: 50 },
+      motion.timing.fade,
     ),
   }));
 
   const rAccentIconStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(progress.get() + buffer > 1 ? 1 : 0, { duration: 200 }),
+    opacity: withTiming(
+      progress.get() + buffer > 1 ? 1 : 0,
+      motion.timing.fade,
+    ),
   }));
 
   const arcPath = useDerivedValue(() => {
@@ -145,7 +146,7 @@ export const TidyHints: FC = () => {
 
   return (
     <View style={styles.container} pointerEvents="none">
-      <Tint direction="keep" color={KEEP_TINT} />
+      <Tint direction="keep" color={theme.colors.keep} />
       <Tint direction="delete" color={theme.colors.danger} />
       <Tint direction="save" color={theme.colors.primary} />
       <View style={styles.topRow}>
@@ -159,7 +160,7 @@ export const TidyHints: FC = () => {
           direction="keep"
           label={t("tidy.keep")}
           icon="checkmark"
-          accentColor={KEEP_ACCENT}
+          accentColor={theme.colors.onKeep}
         />
       </View>
       <View style={styles.bottomRow}>

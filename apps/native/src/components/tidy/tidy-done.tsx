@@ -1,9 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { type FC } from "react";
-import { ActivityIndicator, Pressable, Text } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { Text } from "react-native";
+import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
+import { fadeIn } from "@/lib/motion";
+import { Button } from "@/components/ui/button";
 import type { TidyCounts } from "@/lib/tidy/use-tidy-actions";
 
 type Props = {
@@ -36,7 +38,7 @@ export const TidyDone: FC<Props> = ({
   ].join("  ·  ");
 
   return (
-    <Animated.View entering={FadeIn.duration(250)} style={styles.container}>
+    <Animated.View entering={fadeIn} style={styles.container}>
       <Text style={styles.title}>
         {empty ? t("tidy.completeTitle") : t("tidy.batchTitle")}
       </Text>
@@ -53,17 +55,12 @@ export const TidyDone: FC<Props> = ({
         </Text>
       )}
       {!empty && (
-        <Pressable
-          style={styles.button}
+        <Button
+          title={t("tidy.continue")}
+          loading={loading}
           onPress={onContinue}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>{t("tidy.continue")}</Text>
-          )}
-        </Pressable>
+          style={styles.button}
+        />
       )}
     </Animated.View>
   );
@@ -98,16 +95,5 @@ const styles = StyleSheet.create((theme) => ({
   button: {
     marginTop: theme.gap(2),
     minWidth: 160,
-    alignItems: "center",
-    paddingHorizontal: theme.gap(3),
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  buttonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: "white",
   },
 }));

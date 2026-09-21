@@ -2,12 +2,12 @@
 // Tests for the per-card pan gesture commit logic. The gesture handler and
 // animation drivers are stubbed, so the tests drive the recorded onBegin /
 // onChange / onEnd callbacks directly and assert the commit contract: the
-// dominant axis wins, a committed fling walks the deck index and schedules
-// the decision on the JS thread, and anything less springs back.
+// dominant projected axis wins (velocity included), a committed card rides a
+// velocity-carrying spring off-screen, the deck index walks, the haptic latch
+// commits once, and anything less springs back.
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as Haptics from "expo-haptics";
 import { cancelAnimation } from "react-native-reanimated";
 import { CardAnimationProvider, useCardAnimation } from "./card-animation";
 import { DeckAnimationProvider, useDeckAnimation } from "./deck-animation";
@@ -17,6 +17,11 @@ const gesture = vi.hoisted(() => ({
 }));
 const worklets = vi.hoisted(() => ({
   scheduled: [] as [unknown, ...unknown[]][],
+}));
+const haptics = vi.hoisted(() => ({
+  change: vi.fn(),
+  reset: vi.fn(),
+  commit: vi.fn(),
 }));
 const shared = vi.hoisted(() => ({
   make: (initial: unknown) => ({
@@ -38,6 +43,9 @@ vi.mock("react-native-reanimated", () => ({
   withSpring: (value: number) => ({ driver: "spring", value }),
   withTiming: (value: number) => ({ driver: "timing", value }),
   cancelAnimation: vi.fn(),
+}));
+vi.mock("@/lib/motion", () => ({
+  motion: { spring: { drag: {}, settle: {} }, timing: { fade: {} } },
 }));
 vi.mock("react-native-gesture-handler", () => ({
   // eslint-disable-next-line @typescript-eslint/naming-convention -- key mirrors the SDK export it stubs
@@ -61,12 +69,12 @@ vi.mock("react-native-worklets", () => ({
     worklets.scheduled.push([fn, ...args]);
   },
 }));
-vi.mock("expo-haptics", () => ({
-  impactAsync: vi.fn(),
-  ImpactFeedbackStyle: { Light: "light" },
-}));
 vi.mock("./use-single-haptic-on-pan", () => ({
-  useSingleHapticOnPan: () => ({ singleHapticOnChange: vi.fn() }),
+  useSingleHapticOnPan: () => ({
+    singleHapticOnChange: haptics.change,
+    resetHaptic: haptics.reset,
+    commitHaptic: haptics.commit,
+  }),
 }));
 
 type Card = ReturnType<typeof useCardAnimation>;
@@ -108,14 +116,24 @@ function setup(index: number) {
   return { card: cardSink[0], deck: deckSink[0], onDecision };
 }
 
+// A real pan always changes (onChange) before it ends, and onChange is what
+// parks the full-travel offsets the commit decision reads.
+function drag(translation: { x: number; y: number }) {
+  fire("onChange", {
+    translationX: translation.x,
+    translationY: translation.y,
+  });
+  fire("onEnd", { velocityX: 0, velocityY: 0 });
+}
+
 beforeEach(() => {
   gesture.handlers = {};
   worklets.scheduled = [];
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.clearAllMocks();
 });
 
 describe("CardAnimationProvider", () => {
@@ -128,11 +146,12 @@ describe("CardAnimationProvider", () => {
     expect(card.panY.value).toBe(0);
   });
 
-  it("marks dragging and records the grab point on begin", () => {
+  it("marks dragging, records the grab point, and re-arms the haptic on begin", () => {
     const { card, deck } = setup(0);
     fire("onBegin", { absoluteY: 437 });
     expect(deck.isDragging.value).toBe(true);
     expect(card.absoluteYAnchor.value).toBe(437);
+    expect(haptics.reset).toHaveBeenCalled();
   });
 
   it("advances animatedIndex by the dominant-axis shift while dragging", () => {
@@ -141,6 +160,8 @@ describe("CardAnimationProvider", () => {
     fire("onChange", { translationX: 250, translationY: 0 });
     expect(deck.animatedIndex.value).toBe(0);
     expect(card.panX.value).toBe(250);
+    // The haptic latch sees the same full-travel coordinates.
+    expect(haptics.change).toHaveBeenCalledWith(250, 0);
   });
 
   it("never advances a downward drag", () => {
@@ -149,63 +170,61 @@ describe("CardAnimationProvider", () => {
     expect(deck.animatedIndex.value).toBe(1);
   });
 
-  it("commits a right fling as keep", () => {
-    vi.stubEnv("EXPO_OS", "ios");
+  it("commits a right fling as keep on a velocity spring", () => {
     const { card, deck, onDecision } = setup(0);
-    fire("onEnd", { translationX: 250, translationY: 0 });
+    drag({ x: 250, y: 0 });
     expect(deck.currentIndex.value).toBe(0);
     expect(deck.prevIndex.value).toBe(1);
-    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
+    // 125% of the screen width, off the right edge.
+    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 0 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
-    expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+    expect(haptics.commit).toHaveBeenCalledTimes(1);
   });
 
   it("commits a left fling as delete", () => {
     const { card, onDecision } = setup(0);
-    fire("onEnd", { translationX: -250, translationY: 0 });
-    expect(card.panX.value).toEqual({ driver: "timing", value: -500 });
+    drag({ x: -250, y: 0 });
+    expect(card.panX.value).toEqual({ driver: "spring", value: -500 });
     expect(flushDecision()).toBe("delete");
     expect(onDecision).toHaveBeenCalledWith(0, "delete");
   });
 
   it("commits an upward fling as save", () => {
     const { card, onDecision } = setup(0);
-    fire("onEnd", { translationX: 0, translationY: -200 });
+    drag({ x: 0, y: -200 });
     // 115% of the screen height, off the top.
-    expect(card.panY.value).toEqual({ driver: "timing", value: -800 * 1.15 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: -800 * 1.15 });
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(flushDecision()).toBe("save");
     expect(onDecision).toHaveBeenCalledWith(0, "save");
   });
 
   it("springs back without deciding when the fling is short", () => {
-    vi.stubEnv("EXPO_OS", "ios");
     const { card, deck, onDecision } = setup(0);
-    fire("onEnd", { translationX: 30, translationY: 10 });
+    drag({ x: 30, y: 10 });
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "timing", value: 1 });
+    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
     expect(deck.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
-    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
   });
 
-  it("commits a save on a diagonal fling where the vertical axis dominates", () => {
-    const { card, onDecision } = setup(0);
+  it("commits a save on a diagonal where the vertical axis dominates", () => {
+    const { onDecision } = setup(0);
     // Both axes cross their thresholds; the larger travel wins.
-    fire("onEnd", { translationX: 150, translationY: -400 });
-    expect(card.panY.value).toEqual({ driver: "timing", value: -800 * 1.15 });
-    expect(card.panX.value).toEqual({ driver: "timing", value: 0 });
+    drag({ x: 150, y: -400 });
     expect(flushDecision()).toBe("save");
     expect(onDecision).toHaveBeenCalledWith(0, "save");
   });
 
-  it("commits a keep on a diagonal fling where the horizontal axis dominates", () => {
-    const { card, onDecision } = setup(0);
-    fire("onEnd", { translationX: 250, translationY: -200 });
-    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
-    expect(card.panY.value).toEqual({ driver: "timing", value: 0 });
+  it("commits a keep on a diagonal where the horizontal axis dominates", () => {
+    const { onDecision } = setup(0);
+    drag({ x: 250, y: -200 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
   });
@@ -214,18 +233,29 @@ describe("CardAnimationProvider", () => {
     const { onDecision } = setup(0);
     // The up-commit demands strictly more upward travel than horizontal;
     // the side commit accepts a tie, so a perfect diagonal deletes.
-    fire("onEnd", { translationX: -250, translationY: -250 });
+    drag({ x: -250, y: -250 });
     expect(flushDecision()).toBe("delete");
     expect(onDecision).toHaveBeenCalledWith(0, "delete");
   });
 
   it("springs back on a diagonal where neither axis crosses its threshold", () => {
     const { card, onDecision } = setup(0);
-    fire("onEnd", { translationX: 80, translationY: -120 });
+    drag({ x: 80, y: -120 });
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
     expect(onDecision).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
+  });
+
+  it("commits a fast flick whose own translation is sub-threshold", () => {
+    const { onDecision } = setup(0);
+    // 30px of travel, but the projected momentum clears the threshold.
+    fire("onChange", { translationX: 30, translationY: 0 });
+    fire("onEnd", { velocityX: 2000, velocityY: 0 });
+    expect(flushDecision()).toBe("keep");
+    expect(onDecision).toHaveBeenCalledWith(0, "keep");
+    // The latch fires on commit even though the drag never crossed.
+    expect(haptics.commit).toHaveBeenCalledTimes(1);
   });
 
   it("cancels in-flight animations and resumes from the card's offset on begin", () => {
@@ -247,18 +277,22 @@ describe("CardAnimationProvider", () => {
 
   it("commits on release from a re-grab whose own translation is short", () => {
     const { card, onDecision } = setup(0);
+    // A card mid-settle, 120px out; the re-grab's own translation is zero.
     card.panX.value = 120;
     fire("onBegin", { absoluteY: 400 });
-    // The second grab's own translation never crosses the threshold, but
-    // the card's full travel does.
-    fire("onEnd", { translationX: 0, translationY: 0 });
-    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
+    fire("onEnd", {
+      translationX: 0,
+      translationY: 0,
+      velocityX: 0,
+      velocityY: 0,
+    });
+    // The parked offset alone clears the threshold.
+    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
   });
 
   it("returns a cancelled pan home without deciding", () => {
-    vi.stubEnv("EXPO_OS", "ios");
     const { card, deck, onDecision } = setup(0);
     fire("onBegin", { absoluteY: 400 });
     fire("onChange", { translationX: 250, translationY: 0 });
@@ -267,17 +301,17 @@ describe("CardAnimationProvider", () => {
     expect(deck.isDragging.value).toBe(false);
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
-    expect(deck.animatedIndex.value).toEqual({ driver: "timing", value: 1 });
+    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
     expect(onDecision).not.toHaveBeenCalled();
-    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
   });
 
   it("leaves a committed fling untouched when finalize reports success", () => {
     const { card, deck } = setup(0);
-    fire("onEnd", { translationX: 250, translationY: 0 });
-    fire("onFinalize", { translationX: 250 }, true);
+    drag({ x: 250, y: 0 });
+    fire("onFinalize", { velocityX: 0, velocityY: 0 }, true);
     expect(deck.isDragging.value).toBe(false);
-    expect(card.panX.value).toEqual({ driver: "timing", value: 500 });
+    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
   });
 });
