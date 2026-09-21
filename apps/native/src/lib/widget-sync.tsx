@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/components/item-card";
+import { analytics } from "@/lib/analytics";
 import { useEntitlement } from "@/lib/entitlement";
 import { displayHost } from "@/lib/url";
 import { api } from "@convex/_generated/api";
@@ -15,6 +16,13 @@ const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
 const DOWNLOAD_PREFIX = "widget-download-";
 const THUMB_MAX_DIM = 512;
+// A stalled download or a wedged native decode must never hang a thumbnail
+// forever. The sign-out clear waits on the in-flight sync, so one unbounded
+// thumbnail leaves the widget stuck empty until the app relaunches. Bound the
+// work so a timed-out thumbnail degrades to the text tile like any other
+// failure.
+const THUMBNAIL_TIMEOUT_MS = 30_000;
+const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
 
 // Widget extensions have a hard memory cap (~30 MB), so full-size photos are
 // downsized to widget-friendly JPEGs before they enter the shared container.
@@ -30,24 +38,43 @@ async function ensureThumbnail(
   const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${item._id}`);
   try {
     if (download.exists) download.delete();
-    await File.downloadFileAsync(url, download);
-    const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
-    const scale = Math.min(
-      1,
-      THUMB_MAX_DIM / Math.max(image.width, image.height),
-    );
-    const resized =
-      scale < 1
-        ? await image.resizeAsync(
-            Math.round(image.width * scale),
-            Math.round(image.height * scale),
-          )
-        : image;
-    await resized.saveToFileAsync(toPlainPath(thumb.uri), "jpg", 80);
+    await withThumbnailDeadline(buildThumbnail(url, download, thumb));
     return thumb.uri;
   } finally {
     if (download.exists) download.delete();
   }
+}
+
+async function buildThumbnail(
+  url: string,
+  download: File,
+  thumb: File,
+): Promise<void> {
+  await File.downloadFileAsync(url, download);
+  const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
+  const scale = Math.min(1, THUMB_MAX_DIM / Math.max(image.width, image.height));
+  const resized =
+    scale < 1
+      ? await image.resizeAsync(
+          Math.round(image.width * scale),
+          Math.round(image.height * scale),
+        )
+      : image;
+  await resized.saveToFileAsync(toPlainPath(thumb.uri), "jpg", 80);
+}
+
+// Reject once the deadline passes. The losing side of the race keeps running
+// but is orphaned; a later rejection stays handled because Promise.race keeps
+// its handler on both inputs.
+function withThumbnailDeadline<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(THUMBNAIL_TIMEOUT)),
+      THUMBNAIL_TIMEOUT_MS,
+    );
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
 function toPlainPath(uri: string): string {
@@ -130,7 +157,13 @@ async function syncWidget(
         imageUri = await ensureThumbnail(dir, item);
       } catch (error) {
         // A failed thumbnail falls back to the text tile; never block the sync.
-        console.warn(`Widget thumbnail failed for ${item._id}`, error);
+        // Record the reason so the timeout path is measurable in production.
+        analytics.capture("widget_sync_failed", {
+          reason:
+            error instanceof Error && error.message === THUMBNAIL_TIMEOUT
+              ? "timeout"
+              : "error",
+        });
       }
       return {
         id: item._id as string,

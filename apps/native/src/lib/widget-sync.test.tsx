@@ -43,6 +43,8 @@ const tanstack = vi.hoisted(() => ({
   data: undefined as unknown,
   args: undefined as unknown,
 }));
+const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
 
 vi.mock("react-native", () => ({
   Platform: {
@@ -211,6 +213,7 @@ beforeEach(async () => {
   fsx.created = [];
   tanstack.data = undefined;
   tanstack.args = undefined;
+  analyticsMock.capture.mockClear();
   await retryPendingWidgetClear();
   fsx.snapshots = [];
   fsx.snapshotAttempts = 0;
@@ -380,7 +383,6 @@ describe("RecentSavesWidgetSync", () => {
   });
 
   it("keeps the sync alive when a thumbnail fails", async () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     fsx.failImages = true;
     renderSync([link, note]);
     await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
@@ -390,7 +392,35 @@ describe("RecentSavesWidgetSync", () => {
     // The failing image degrades to the text tile; its sibling still syncs.
     expect(snapshot.items[0].imageUri).toBeUndefined();
     expect(snapshot.items[1].id).toBe("i2");
-    spy.mockRestore();
+    expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
+      reason: "error",
+    });
+  });
+
+  it("degrades a stalled thumbnail to the text tile after the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      // The decode never settles, so only the deadline can end the thumbnail.
+      fsx.imageGate = new Promise<void>(() => {});
+      renderSync([link, note]);
+      // Advance past the 30s deadline: the stalled thumbnail is abandoned and
+      // the sync still lands with the failing item on its text tile.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(fsx.downloads).toEqual(["https://cdn.example/a.jpg"]);
+      expect(fsx.snapshots).toHaveLength(1);
+      const snapshot = fsx.snapshots[0] as {
+        items: { id: string; imageUri?: string }[];
+      };
+      expect(snapshot.items[0].imageUri).toBeUndefined();
+      expect(snapshot.items[1].id).toBe("i2");
+      expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
+        reason: "timeout",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("resets the dedupe key on failure so a later render retries", async () => {
