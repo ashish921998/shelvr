@@ -314,4 +314,15 @@ describe("notification device session", () => {
       new Error("widget_clear_failed"),
     );
   });
+
+  it("preserves the safe file-cleanup category after account deletion", async () => {
+    const { session, deps } = setup();
+    deps.clearWidget.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    await session.deleteAccount();
+    expect(deps.reportError).toHaveBeenCalledWith(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+  });
 });

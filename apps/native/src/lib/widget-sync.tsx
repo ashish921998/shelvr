@@ -7,7 +7,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 import { Images } from "react-native-nitro-image";
 
@@ -181,9 +181,27 @@ async function syncWidget(
  * module linked), so the caller can record the boundary.
  */
 export async function clearRecentSavesWidget(): Promise<boolean> {
-  syncGeneration += 1;
   if (Platform.OS !== "ios") return false;
-  const clearing = clearWidgetAndPendingThumbnails(syncGeneration, syncChain);
+  syncGeneration += 1;
+  setPendingCleanup(syncGeneration);
+  return startWidgetClear(syncGeneration);
+}
+
+export function retryPendingWidgetClear(): Promise<boolean> {
+  if (pendingCleanup === null) return Promise.resolve(false);
+  return activeClear ?? startWidgetClear(pendingCleanup);
+}
+
+function startWidgetClear(generation: number): Promise<boolean> {
+  const clearing = clearWidgetAndPendingThumbnails(generation, syncChain)
+    .then((cleared) => {
+      if (pendingCleanup === generation) setPendingCleanup(null);
+      return cleared;
+    })
+    .finally(() => {
+      if (activeClear === clearing) activeClear = null;
+    });
+  activeClear = clearing;
   // Clear immediately, but make subsequent sessions wait for both the clear
   // (including its retry) and any old thumbnail work before publishing.
   // Keep failures observable to the caller without poisoning the sync queue.
@@ -250,6 +268,25 @@ let syncChain: Promise<unknown> = Promise.resolve();
 // value when it is queued and bails if it no longer matches, so a sign-out can
 // never be overwritten by a sync that started before it.
 let syncGeneration = 0;
+let pendingCleanup: number | null = null;
+let activeClear: Promise<boolean> | null = null;
+const cleanupListeners = new Set<() => void>();
+
+function setPendingCleanup(generation: number | null) {
+  pendingCleanup = generation;
+  for (const listener of cleanupListeners) listener();
+}
+
+function subscribeCleanup(listener: () => void) {
+  cleanupListeners.add(listener);
+  return () => {
+    cleanupListeners.delete(listener);
+  };
+}
+
+function hasPendingCleanup() {
+  return pendingCleanup !== null;
+}
 
 /**
  * Keeps the "Recent Saves" home screen widget fed with the latest ready items.
@@ -258,6 +295,11 @@ let syncGeneration = 0;
  * never re-sends the whole feed here.
  */
 export function RecentSavesWidgetSync() {
+  const cleanupPending = useSyncExternalStore(
+    subscribeCleanup,
+    hasPendingCleanup,
+    hasPendingCleanup,
+  );
   const locale = useAppLocale();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
@@ -310,13 +352,22 @@ export function RecentSavesWidgetSync() {
     lastKey.current = key;
 
     const generation = syncGeneration;
+    // A new session must finish a failed previous clear before publishing.
+    // Recovery keeps the generation, so it cannot invalidate the new snapshot.
+    void retryPendingWidgetClear().catch(() => {});
     syncChain = syncChain
-      .then(() => syncWidget(items, !entitled, generation))
+      .then(() => {
+        if (pendingCleanup !== null) {
+          lastKey.current = null;
+          return false;
+        }
+        return syncWidget(items, !entitled, generation);
+      })
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [entitled, entitlementLoading, recent, locale]);
+  }, [entitled, entitlementLoading, recent, locale, cleanupPending]);
 
   return null;
 }

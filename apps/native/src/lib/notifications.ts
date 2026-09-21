@@ -98,8 +98,14 @@ export function NotificationSessionProvider({
         // Fallback for a failed post-deletion sign-out: no auth edge may fire
         // promptly, so clear the identity here (idempotent with the hook's).
         resetAnalytics: () => void analytics.resetIfIdentified(),
-        reportError: (error) =>
-          analytics.captureError("notification_session_cleanup_failed", error),
+        reportError: (error) => {
+          const event =
+            error instanceof Error &&
+            error.message === "widget_thumbnail_cleanup_failed"
+              ? "widget_thumbnail_cleanup_failed"
+              : "notification_session_cleanup_failed";
+          analytics.captureError(event, error);
+        },
       }),
     [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
   );

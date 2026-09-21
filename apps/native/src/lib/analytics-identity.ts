@@ -3,34 +3,38 @@ import { useConvexAuth } from "convex/react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { queryClient } from "@/lib/query-client";
-import { clearRecentSavesWidget } from "@/lib/widget-sync";
-import { AppState } from "react-native";
+import {
+  clearRecentSavesWidget,
+  retryPendingWidgetClear,
+} from "@/lib/widget-sync";
+import { widgetClearErrorEvent } from "@/lib/widget-clear-error";
+import { AppState, Platform } from "react-native";
 
-function useSignedOutWidgetCleanup(
-  isAuthenticated: boolean,
-  isLoading: boolean,
-) {
+function useWidgetCleanup(isAuthenticated: boolean, isLoading: boolean) {
   useEffect(() => {
-    if (isLoading || isAuthenticated) return;
+    if (isLoading || Platform.OS !== "ios") return;
     let active = true;
     let pending = false;
     let completed = false;
-    const clear = async () => {
-      if (!active || pending || completed) return;
+    const clear = async (beginBoundary = false) => {
+      if (!active || pending || (completed && !isAuthenticated)) return;
       pending = true;
       try {
-        completed = await clearRecentSavesWidget();
-        if (completed) analytics.capture("widget_cleared");
-      } catch {
-        analytics.captureError(
-          "widget_clear_failed",
-          new Error("widget_clear_failed"),
-        );
+        const cleared = await (beginBoundary
+          ? clearRecentSavesWidget()
+          : retryPendingWidgetClear());
+        if (!active) return;
+        completed = true;
+        if (cleared && !isAuthenticated) analytics.capture("widget_cleared");
+      } catch (error) {
+        if (!active) return;
+        const event = widgetClearErrorEvent(error);
+        analytics.captureError(event, new Error(event));
       } finally {
         pending = false;
       }
     };
-    void clear();
+    void clear(!isAuthenticated);
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void clear();
     });
@@ -51,7 +55,7 @@ function useSignedOutWidgetCleanup(
  */
 export function useAnalyticsIdentity(): null {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  useSignedOutWidgetCleanup(isAuthenticated, isLoading);
+  useWidgetCleanup(isAuthenticated, isLoading);
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);

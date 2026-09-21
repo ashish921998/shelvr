@@ -15,10 +15,17 @@ const mock = vi.hoisted(() => ({
   resetIfIdentified: vi.fn(),
   removeQueries: vi.fn(),
   clearRecentSavesWidget: vi.fn(() => Promise.resolve(true)),
+  retryPendingWidgetClear: vi.fn(() => Promise.resolve(true)),
+  platform: "ios",
   appStateListeners: new Set<(state: string) => void>(),
 }));
 
 vi.mock("react-native", () => ({
+  Platform: {
+    get OS() {
+      return mock.platform;
+    },
+  },
   AppState: {
     addEventListener: (_event: string, listener: (state: string) => void) => {
       mock.appStateListeners.add(listener);
@@ -49,6 +56,7 @@ vi.mock("@/lib/query-client", () => ({
 }));
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearRecentSavesWidget,
+  retryPendingWidgetClear: mock.retryPendingWidgetClear,
 }));
 
 describe("useAnalyticsIdentity", () => {
@@ -58,6 +66,7 @@ describe("useAnalyticsIdentity", () => {
     mock.isLoading = false;
     mock.isFetching = false;
     mock.user = undefined;
+    mock.platform = "ios";
   });
 
   it("does nothing while Convex Auth restores the stored token", () => {
@@ -77,16 +86,16 @@ describe("useAnalyticsIdentity", () => {
     await act(async () => {
       for (const listener of mock.appStateListeners) listener("active");
     });
-    expect(mock.clearRecentSavesWidget).toHaveBeenCalledTimes(2);
+    expect(mock.retryPendingWidgetClear).toHaveBeenCalledOnce();
     expect(mock.removeQueries).toHaveBeenCalledOnce();
     expect(mock.capture).toHaveBeenCalledWith("widget_cleared");
     await act(async () => {
       for (const listener of mock.appStateListeners) listener("active");
     });
-    expect(mock.clearRecentSavesWidget).toHaveBeenCalledTimes(2);
+    expect(mock.retryPendingWidgetClear).toHaveBeenCalledOnce();
   });
 
-  it("does not overlap pending clears or retry after sign-in", async () => {
+  it("joins pending cleanup at sign-in and retries failed cleanup on foreground", async () => {
     let reject!: (error: Error) => void;
     mock.clearRecentSavesWidget.mockImplementationOnce(
       () =>
@@ -100,6 +109,9 @@ describe("useAnalyticsIdentity", () => {
     });
     expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
     mock.isAuthenticated = true;
+    mock.retryPendingWidgetClear.mockRejectedValueOnce(
+      new Error("unavailable"),
+    );
     hook.rerender();
     await act(async () => {
       reject(new Error("unavailable"));
@@ -108,7 +120,47 @@ describe("useAnalyticsIdentity", () => {
       for (const listener of mock.appStateListeners) listener("active");
     });
     expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
+    expect(mock.retryPendingWidgetClear).toHaveBeenCalledTimes(2);
+    expect(mock.appStateListeners.size).toBe(1);
+    expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
+  });
+
+  it("does not start or retry widget cleanup on Android", async () => {
+    mock.platform = "android";
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.clearRecentSavesWidget).not.toHaveBeenCalled();
+    expect(mock.retryPendingWidgetClear).not.toHaveBeenCalled();
     expect(mock.appStateListeners.size).toBe(0);
+  });
+
+  it("reports known cleanup failures with a safe category", async () => {
+    mock.clearRecentSavesWidget.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "widget_thumbnail_cleanup_failed",
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+  });
+
+  it("does not attribute a late signed-out success to the new account", async () => {
+    let resolve!: (result: boolean) => void;
+    mock.clearRecentSavesWidget.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((done) => {
+          resolve = done;
+        }),
+    );
+    const hook = renderHook(() => useAnalyticsIdentity());
+    mock.isAuthenticated = true;
+    hook.rerender();
+    await act(async () => {
+      resolve(true);
+    });
+    expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
   });
 
   it("resets analytics and clears only Convex cache entries when signed out", () => {

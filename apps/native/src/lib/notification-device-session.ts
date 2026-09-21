@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { widgetClearErrorEvent } from "./widget-clear-error";
 
 function isOwnershipConflict(error: unknown): boolean {
   if (!(error instanceof ConvexError)) return false;
@@ -188,8 +189,8 @@ export class NotificationDeviceSession {
         // session; clear the local Convex Auth credentials too.
         if (operation === "delete_account") {
           // Server deletion succeeded even if local auth cleanup fails next.
-          void this.deps.clearWidget().catch(() => {
-            this.deps.reportError(new Error("widget_clear_failed"));
+          void this.deps.clearWidget().catch((error) => {
+            this.deps.reportError(new Error(widgetClearErrorEvent(error)));
           });
           try {
             await this.deps.signOut();

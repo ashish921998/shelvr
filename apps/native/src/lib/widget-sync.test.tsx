@@ -10,7 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { File } from "expo-file-system";
 
-import { clearRecentSavesWidget, RecentSavesWidgetSync } from "./widget-sync";
+import {
+  clearRecentSavesWidget,
+  retryPendingWidgetClear,
+  RecentSavesWidgetSync,
+} from "./widget-sync";
 import ja from "@/locales/ja.json";
 
 const fsx = vi.hoisted(() => ({
@@ -186,7 +190,7 @@ vi.mock("expo-localization", () => ({
   useLocales: () => [{ languageTag: fsx.locale }],
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   fsx.platformOs = "ios";
   fsx.locale = "en-US";
   fsx.entitled = true;
@@ -207,6 +211,9 @@ beforeEach(() => {
   fsx.created = [];
   tanstack.data = undefined;
   tanstack.args = undefined;
+  await retryPendingWidgetClear();
+  fsx.snapshots = [];
+  fsx.snapshotAttempts = 0;
 });
 
 describe("RecentSavesWidgetSync", () => {
@@ -436,6 +443,24 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("retries an already-failed clear before a newly mounted account publishes", async () => {
+    fsx.snapshotFailuresRemaining = 2;
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget unavailable",
+    );
+    renderSync([{ ...note, title: "New account" }]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+    expect(fsx.snapshots[0]).toMatchObject({ items: [], locked: true });
+    expect(fsx.snapshots[1]).toMatchObject({
+      items: [{ title: "New account" }],
+      locked: false,
+    });
+    await act(async () => {
+      expect(await retryPendingWidgetClear()).toBe(false);
+    });
+    expect(fsx.snapshots).toHaveLength(2);
+  });
+
   it("removes interrupted full-size downloads without touching other cache files", async () => {
     const download = new File("file:///cache", "widget-download-old-item");
     const unrelated = new File("file:///cache", "unrelated-image.jpg");
@@ -519,7 +544,16 @@ describe("clearRecentSavesWidget", () => {
         expect(thumbnail.exists).toBe(false);
       }
       expect(deletion).toHaveBeenCalledTimes(2);
-      await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+      if (persistentFailure) {
+        expect(fsx.snapshots).toHaveLength(1);
+        deletion.mockRestore();
+        await act(async () => {
+          await retryPendingWidgetClear();
+        });
+      }
+      await waitFor(() =>
+        expect(fsx.snapshots).toHaveLength(persistentFailure ? 3 : 2),
+      );
       expect(fsx.snapshots.at(-1)).toMatchObject({
         locked: false,
         items: [{ title: "Next account" }],
@@ -596,19 +630,27 @@ describe("clearRecentSavesWidget", () => {
     },
   );
 
-  it("allows a new session to sync even when both clear attempts fail", async () => {
+  it("keeps a new session behind failed cleanup and resumes after recovery", async () => {
     fsx.snapshotFailuresRemaining = 2;
     const clearing = clearRecentSavesWidget();
     renderSync([{ ...note, title: "New account" }]);
     await act(async () => {
       await expect(clearing).rejects.toThrow("widget unavailable");
     });
-    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
-    expect(fsx.snapshots[0]).toMatchObject({
+    expect(fsx.snapshots).toHaveLength(0);
+    await act(async () => {
+      expect(await retryPendingWidgetClear()).toBe(true);
+    });
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+    expect(fsx.snapshots[1]).toMatchObject({
       items: [{ title: "New account" }],
       locked: false,
     });
-    expect(fsx.snapshotAttempts).toBe(3);
+    expect(fsx.snapshotAttempts).toBe(4);
+    await act(async () => {
+      expect(await retryPendingWidgetClear()).toBe(false);
+    });
+    expect(fsx.snapshots).toHaveLength(2);
   });
 
   it("retries a transient snapshot failure", async () => {

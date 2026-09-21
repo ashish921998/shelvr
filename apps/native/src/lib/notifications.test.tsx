@@ -93,6 +93,22 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("reports the safe file-cleanup category from account deletion", async () => {
+    mock.clearWidget.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    await act(async () => {
+      await result.current.session.deleteAccount();
+    });
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "widget_thumbnail_cleanup_failed",
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+  });
   it("clears the widget after successful server account deletion", async () => {
     const { result } = renderSession();
     await waitFor(() =>
