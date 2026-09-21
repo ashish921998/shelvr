@@ -28,6 +28,7 @@ import {
   View,
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
+import { ProgressiveBlurHeader } from "progressive-blur";
 import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -386,6 +387,13 @@ function ItemScreenContent() {
           headerBackButtonDisplayMode: "minimal",
           ...(Platform.OS === "android"
             ? {
+                // Android has no progressive-blur band, so a transparent
+                // header leaves scrolled content running through the title
+                // text. Give the toolbar the opaque treatment the space
+                // screen uses; content then starts below it natively.
+                headerTransparent: false,
+                headerStyle: { backgroundColor: theme.colors.background },
+                headerTitleAlign: "center",
                 headerRight: () => (
                   <HeaderActionMenu
                     icon="ellipsis"
@@ -483,6 +491,19 @@ function ItemScreenContent() {
         onEndReached={onEndReached}
         onEndReachedThreshold={2}
       />
+
+      {/* A pinned blur band behind the transparent iOS header: without it,
+          scrolled article text and photos pass right through the header's
+          title and date. Android has no blur band, so it gets the opaque
+          toolbar below instead.
+
+          This header stacks a title over a date, filling the band down to its
+          bottom edge, so the default fade (which dissolves inside the band)
+          would leave that text in front of barely-blurred content. Carry the
+          blur across the whole band and land the fade where the reader
+          layout's content begins — the same gap(1.5) — so nothing at rest is
+          hazed. */}
+      <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />
 
       {activeIsSuggested ? (
         // SlideInDown (not a fade) so the bar never mounts at opacity 0 — a
