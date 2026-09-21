@@ -36,7 +36,7 @@ import Animated, {
   ZoomOut,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -99,8 +99,12 @@ export type ItemSource =
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
 
-const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
-const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
+const PROCESSING_ENTER = FadeIn.duration(motion.duration.feedback).easing(
+  motion.easing.out,
+);
+const PROCESSING_EXIT = FadeOut.duration(motion.duration.feedback).easing(
+  motion.easing.out,
+);
 
 function cardMenuActions({
   isSuggested,

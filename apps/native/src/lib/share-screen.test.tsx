@@ -62,8 +62,12 @@ vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mock.user }),
 }));
 vi.mock("@/lib/motion", () => ({
-  EASE_OUT: {},
-  EASE_OUT_CSS: "",
+  motion: {
+    duration: { feedback: 120, state: 180, enter: 250, exit: 200 },
+    easing: { out: {} },
+    scale: { pressed: 0.97, enter: 0.95 },
+  },
+  motionCSS: { out: "" },
   REDUCED_FADE_IN: {},
   REDUCED_FADE_OUT: {},
 }));

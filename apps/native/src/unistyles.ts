@@ -1,24 +1,70 @@
 import { StyleSheet } from "react-native-unistyles";
 import { Appearance } from "react-native";
+import { motion } from "@/lib/motion";
 import {
   readStoredAppearanceMode,
   resolveThemeName,
   type AppThemeName,
 } from "@/lib/appearance";
 
+const fonts = {
+  regular: "Satoshi-Regular",
+  medium: "Satoshi-Medium",
+  bold: "Satoshi-Bold",
+  display: "ExposureTrial-0",
+} as const;
+
 const shared = {
-  fonts: {
-    regular: "Satoshi-Regular",
-    medium: "Satoshi-Medium",
-    bold: "Satoshi-Bold",
-    display: "ExposureTrial-0",
+  fonts,
+  // The shared type ramp. Existing layouts keep their literal styles; new UI
+  // reaches for these names so type stays consistent (see
+  // docs/architecture/design-system.md).
+  type: {
+    hero: { fontFamily: fonts.display, fontSize: 48 },
+    largeTitle: { fontFamily: fonts.display, fontSize: 26 },
+    sheetTitle: { fontFamily: fonts.display, fontSize: 24 },
+    title: { fontFamily: fonts.display, fontSize: 22 },
+    header: { fontFamily: fonts.display, fontSize: 19 },
+    displaySmall: { fontFamily: fonts.display, fontSize: 18 },
+    reader: { fontFamily: fonts.regular, fontSize: 18 },
+    headline: { fontFamily: fonts.bold, fontSize: 17 },
+    body: { fontFamily: fonts.regular, fontSize: 16 },
+    bodyLabel: { fontFamily: fonts.medium, fontSize: 16 },
+    button: { fontFamily: fonts.bold, fontSize: 16 },
+    subhead: { fontFamily: fonts.regular, fontSize: 15 },
+    subheadLabel: { fontFamily: fonts.medium, fontSize: 15 },
+    subheadStrong: { fontFamily: fonts.bold, fontSize: 15 },
+    footnote: { fontFamily: fonts.regular, fontSize: 14 },
+    secondaryLabel: { fontFamily: fonts.medium, fontSize: 14 },
+    caption: { fontFamily: fonts.regular, fontSize: 13 },
+    label: { fontFamily: fonts.medium, fontSize: 13 },
+    labelStrong: { fontFamily: fonts.bold, fontSize: 13 },
+    captionLabel: { fontFamily: fonts.medium, fontSize: 12 },
+    captionStrong: { fontFamily: fonts.bold, fontSize: 12 },
+    finePrint: { fontFamily: fonts.regular, fontSize: 11 },
+    badge: { fontFamily: fonts.bold, fontSize: 10 },
   },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+    huge: 48,
+  },
+  // Existing layouts use this 8pt helper; new styles use named 4pt steps above.
   gap: (v: number) => v * 8,
+  motion,
+  opacity: { pressed: 0.7, disabled: 0.4 },
+  control: { minHeight: 48, pressRetentionOffset: 12 },
   radius: {
     sm: 8,
     md: 11,
     lg: 16,
     xl: 24,
+    full: 9999,
   },
 } as const;
 
@@ -32,15 +78,24 @@ const lightTheme = {
     // Darkened from #8d8271 for WCAG AA contrast (4.57:1) on the paper
     // background; captions use it at 13-14pt.
     muted: "#7a6f5f",
-    faint: "#b5aa97",
+    // Darkened from #b5aa97 (3.06:1) to clear the AA large-text bar (4.54:1).
+    faint: "#978c7a",
     primary: "#e6a23c",
     primaryForeground: "#2b2418",
     primarySoft: "#f7e8cd",
-    primaryText: "#9a6416",
+    // Darkened from #9a6416; amber-toned text must clear 4.5:1 on paper.
+    primaryText: "#935d09",
     border: "#ece3d1",
     imageBorder: "rgba(0, 0, 0, 0.07)",
-    danger: "#c05a3a",
+    // Darkened from #c05a3a so destructive labels clear 4.5:1 (4.51:1).
+    danger: "#b75232",
     overlay: "rgba(43, 36, 24, 0.45)",
+    // Dark label on the amber fill; white on #e6a23c is 2.19:1.
+    onTint: "#2b2418",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    tabTint: "#bf8114",
   },
 } as const;
 
@@ -61,6 +116,12 @@ const darkTheme = {
     imageBorder: "rgba(255, 255, 255, 0.07)",
     danger: "#e07a58",
     overlay: "rgba(0, 0, 0, 0.55)",
+    // The amber fill is shared, so the dark label is too.
+    onTint: "#2b2418",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    tabTint: "#e6a23c",
   },
 } as const;
 
@@ -84,6 +145,12 @@ const darkNeutralTheme = {
     imageBorder: "rgba(255, 255, 255, 0.08)",
     danger: "#ff6f5e",
     overlay: "rgba(0, 0, 0, 0.6)",
+    onTint: "#111417",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    // Matches the previous hard-coded dark tab tint on this theme.
+    tabTint: "#e6a23c",
   },
 } as const;
 

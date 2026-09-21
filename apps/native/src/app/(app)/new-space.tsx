@@ -29,15 +29,25 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
-import { EASE_OUT } from "@/lib/motion";
+import { motion } from "@/lib/motion";
 
 const SUBMIT_CONTENT_ENTER = new Keyframe({
-  0: { opacity: 0, transform: [{ scale: 0.97 }] },
-  100: { opacity: 1, transform: [{ scale: 1 }], easing: EASE_OUT },
-}).duration(150);
-const SUBMIT_CONTENT_EXIT = FadeOut.duration(100).easing(EASE_OUT);
-const SUBMIT_CONTENT_REDUCED_ENTER = FadeIn.duration(100).easing(EASE_OUT);
-const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(100).easing(EASE_OUT);
+  0: { opacity: 0, transform: [{ scale: motion.scale.pressed }] },
+  100: {
+    opacity: 1,
+    transform: [{ scale: 1 }],
+    easing: motion.easing.out,
+  },
+}).duration(motion.duration.state);
+const SUBMIT_CONTENT_EXIT = FadeOut.duration(motion.duration.exit).easing(
+  motion.easing.out,
+);
+const SUBMIT_CONTENT_REDUCED_ENTER = FadeIn.duration(
+  motion.duration.feedback,
+).easing(motion.easing.out);
+const SUBMIT_CONTENT_REDUCED_EXIT = FadeOut.duration(
+  motion.duration.feedback,
+).easing(motion.easing.out);
 
 // One form, two jobs: `/new-space` creates, `/new-space?id=…` edits. The form
 // is keyed by the loaded space so its `useState` initializers seed once from

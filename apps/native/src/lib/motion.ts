@@ -3,13 +3,132 @@ import {
   Easing,
   FadeIn,
   FadeOut,
-} from 'react-native-reanimated';
+  ReduceMotion,
+} from "react-native-reanimated";
 
-// Shared motion vocabulary for state-driven UI. Keep the JS and CSS forms in
-// sync so layout animations and Reanimated CSS transitions feel identical.
-export const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-export const EASE_OUT_CSS = cubicBezier(0.23, 1, 0.32, 1);
+// Shared motion vocabulary. Durations form a budget: feedback (press/hover
+// swaps), state (in-place content changes), enter/exit (layout animations).
+// Curves match Expo's easing exactly, in both worklet and CSS form, so layout
+// animations and Reanimated CSS transitions feel identical.
+const curves = {
+  out: [0.23, 1, 0.32, 1],
+  inOut: [0.77, 0, 0.175, 1],
+  sheet: [0.32, 0.72, 0, 1],
+} as const;
+
+const duration = { feedback: 120, state: 180, enter: 250, exit: 200 } as const;
+const easing = {
+  out: Easing.bezier(...curves.out),
+  inOut: Easing.bezier(...curves.inOut),
+  sheet: Easing.bezier(...curves.sheet),
+  linear: Easing.linear,
+};
+
+// CSS easing objects are class instances. Keep them outside `motion` so a
+// gesture capturing motion.spring never tries to serialize them to the UI runtime.
+export const motionCSS = {
+  out: cubicBezier(...curves.out),
+  inOut: cubicBezier(...curves.inOut),
+  sheet: cubicBezier(...curves.sheet),
+};
+
+// Pure fades/color changes remain gentle with Reduce Motion enabled. Spatial
+// motion uses System or an explicit reduced-motion branch at the call site.
+export const motion = {
+  duration,
+  easing,
+  timing: {
+    feedback: {
+      duration: duration.feedback,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    state: {
+      duration: duration.state,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    enter: {
+      duration: duration.enter,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    exit: {
+      duration: duration.exit,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    fade: {
+      duration: duration.feedback,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.Never,
+    },
+  },
+  // The header text morph is a deliberate, staggered signature effect. Keep
+  // its choreography separate from the short press/feedback budget.
+  textMorph: {
+    stagger: 25,
+    enterDelay: 120,
+    glideDelay: 140,
+    enterRise: 14,
+    exitUp: 12,
+    exitRight: 8,
+    scale: 0.7,
+    blur: 6,
+    enter: {
+      duration: 550,
+      dampingRatio: 1,
+      reduceMotion: ReduceMotion.System,
+    },
+    reveal: {
+      duration: 260,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    exit: {
+      duration: 240,
+      easing: easing.out,
+      reduceMotion: ReduceMotion.System,
+    },
+    glide: {
+      duration: 320,
+      easing: easing.inOut,
+      reduceMotion: ReduceMotion.System,
+    },
+  },
+  spring: {
+    settle: {
+      duration: 400,
+      dampingRatio: 1,
+      reduceMotion: ReduceMotion.System,
+    },
+    drag: {
+      duration: 400,
+      dampingRatio: 0.8,
+      reduceMotion: ReduceMotion.System,
+    },
+    sheet: {
+      duration: 300,
+      dampingRatio: 0.8,
+      reduceMotion: ReduceMotion.System,
+    },
+  },
+  scale: { pressed: 0.97, enter: 0.95 },
+} as const;
+
+// Builders stay outside render; these only animate opacity, including under
+// Reduce Motion. Don't attach entrances to recycled list rows.
+export const fadeIn = FadeIn.duration(duration.enter)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.Never);
+export const fadeOut = FadeOut.duration(duration.exit)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.Never);
 
 // Reduced motion keeps the state change legible without translation or scale.
-export const REDUCED_FADE_IN = FadeIn.duration(120).easing(EASE_OUT);
-export const REDUCED_FADE_OUT = FadeOut.duration(120).easing(EASE_OUT);
+export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.Never);
+export const REDUCED_FADE_OUT = FadeOut.duration(duration.feedback)
+  .easing(easing.out)
+  .reduceMotion(ReduceMotion.Never);
