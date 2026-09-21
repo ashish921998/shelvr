@@ -14,6 +14,7 @@ const mock = vi.hoisted(() => ({
   register: vi.fn(),
   otherMutation: vi.fn(),
   signOut: vi.fn(),
+  clearWidget: vi.fn(async () => true),
   captureError: vi.fn(),
   appState: null as null | ((state: string) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
@@ -26,6 +27,9 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError },
 }));
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
+vi.mock("@/lib/widget-sync", () => ({
+  clearRecentSavesWidget: mock.clearWidget,
+}));
 vi.mock("@convex/_generated/api", () => ({
   api: {
     notifications: {
@@ -89,6 +93,17 @@ function renderSession() {
 }
 
 describe("notification session lifecycle", () => {
+  it("clears the widget after successful server account deletion", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    await act(async () => {
+      await result.current.session.deleteAccount();
+    });
+    expect(mock.clearWidget).toHaveBeenCalledOnce();
+    expect(mock.signOut).toHaveBeenCalledOnce();
+  });
   it("does not repeat token requests or server mutations on foreground after ownership rejection", async () => {
     mock.register.mockRejectedValueOnce(
       new ConvexError({ code: "notification_token_owned_by_another_account" }),

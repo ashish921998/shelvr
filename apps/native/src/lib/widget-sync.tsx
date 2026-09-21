@@ -13,6 +13,7 @@ import { Images } from "react-native-nitro-image";
 
 const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
+const DOWNLOAD_PREFIX = "widget-download-";
 const THUMB_MAX_DIM = 512;
 
 // Widget extensions have a hard memory cap (~30 MB), so full-size photos are
@@ -26,7 +27,7 @@ async function ensureThumbnail(
   const thumb = new File(dir, `${THUMB_PREFIX}${item._id}.jpg`);
   if (thumb.exists) return thumb.uri;
 
-  const download = new File(Paths.cache, `widget-download-${item._id}`);
+  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${item._id}`);
   try {
     if (download.exists) download.delete();
     await File.downloadFileAsync(url, download);
@@ -68,15 +69,17 @@ function widgetSubtitle(item: FeedItem): string {
   return t("item.photo");
 }
 
-// Drop `recent-saves-` thumbnails from the shared container. With `keep`, only
-// entries not in the set go (the running-total cleanup after a sync); without
-// it, every thumbnail goes (the session-boundary clear).
-function deleteThumbnails(dir: Directory, keep?: Set<string>) {
+// Full clears surface failures; routine pruning with a keep set is best effort.
+function deleteWidgetFiles(
+  dir: Directory,
+  keep?: Set<string>,
+  prefix = THUMB_PREFIX,
+) {
   let failed = false;
   for (const entry of dir.list()) {
     if (
       entry instanceof File &&
-      entry.name.startsWith(THUMB_PREFIX) &&
+      entry.name.startsWith(prefix) &&
       !keep?.has(entry.name)
     ) {
       try {
@@ -154,14 +157,14 @@ async function syncWidget(
     });
   } finally {
     // Clearing private files must not depend on publishing the locked snapshot.
-    if (locked) deleteThumbnails(dir);
+    if (locked) deleteWidgetFiles(dir);
   }
 
   // Drop thumbnails for items that left the widget so the shared container
   // doesn't grow forever. Run after updateSnapshot so the old snapshot's
   // referenced files stay valid until the new one is live.
   const keep = new Set(items.map((item) => `${THUMB_PREFIX}${item._id}.jpg`));
-  if (!locked) deleteThumbnails(dir, keep);
+  if (!locked) deleteWidgetFiles(dir, keep);
   return true;
 }
 
@@ -199,14 +202,14 @@ async function clearWidgetAndPendingThumbnails(
     // Old native image work can write files after the immediate clear. Include
     // its final cleanup in the result observed by telemetry and newer sessions.
     try {
-      await clearWidgetThumbnails(generation);
+      await clearWidgetFiles(generation);
     } catch {
-      await clearWidgetThumbnails(generation);
+      await clearWidgetFiles(generation);
     }
   }
 }
 
-async function clearWidgetThumbnails(generation: number): Promise<void> {
+async function clearWidgetFiles(generation: number): Promise<void> {
   if (
     generation !== syncGeneration ||
     !requireOptionalNativeModule("ExpoWidgets")
@@ -215,7 +218,20 @@ async function clearWidgetThumbnails(generation: number): Promise<void> {
   const { widgetsDirectory } = await import("expo-widgets");
   if (generation !== syncGeneration) return;
   const dir = new Directory(widgetsDirectory);
-  if (dir.exists) deleteThumbnails(dir);
+  const cache = new Directory(Paths.cache);
+  // Try both locations even if one fails. Never delete unrelated app cache.
+  const failures: unknown[] = [];
+  for (const [directory, prefix] of [
+    [dir, THUMB_PREFIX],
+    [cache, DOWNLOAD_PREFIX],
+  ] as const) {
+    try {
+      if (directory.exists) deleteWidgetFiles(directory, undefined, prefix);
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length > 0) throw failures[0];
 }
 
 async function clearWidgetSnapshot(generation: number): Promise<boolean> {

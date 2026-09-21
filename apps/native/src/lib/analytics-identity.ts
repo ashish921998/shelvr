@@ -4,6 +4,42 @@ import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { queryClient } from "@/lib/query-client";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
+import { AppState } from "react-native";
+
+function useSignedOutWidgetCleanup(
+  isAuthenticated: boolean,
+  isLoading: boolean,
+) {
+  useEffect(() => {
+    if (isLoading || isAuthenticated) return;
+    let active = true;
+    let pending = false;
+    let completed = false;
+    const clear = async () => {
+      if (!active || pending || completed) return;
+      pending = true;
+      try {
+        completed = await clearRecentSavesWidget();
+        if (completed) analytics.capture("widget_cleared");
+      } catch {
+        analytics.captureError(
+          "widget_clear_failed",
+          new Error("widget_clear_failed"),
+        );
+      } finally {
+        pending = false;
+      }
+    };
+    void clear();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void clear();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [isAuthenticated, isLoading]);
+}
 
 /**
  * The one session boundary for analytics identity, reacting to the Convex
@@ -15,6 +51,7 @@ import { clearRecentSavesWidget } from "@/lib/widget-sync";
  */
 export function useAnalyticsIdentity(): null {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  useSignedOutWidgetCleanup(isAuthenticated, isLoading);
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);
@@ -35,20 +72,6 @@ export function useAnalyticsIdentity(): null {
         queryClient.removeQueries({
           predicate: (query) => query.queryKey[0] === "convexQuery",
         });
-        // The Home Screen widget snapshot and its thumbnails outlive the app
-        // and the auth session. Clear them on the same boundary so a later
-        // account can never see the previous user's saves. Fire-and-forget: a
-        // widget clear must never block or fail the sign-out edge.
-        void clearRecentSavesWidget()
-          .then((cleared) => {
-            if (cleared) analytics.capture("widget_cleared");
-          })
-          .catch(() => {
-            analytics.captureError(
-              "widget_clear_failed",
-              new Error("widget_clear_failed"),
-            );
-          });
       }
       return;
     }

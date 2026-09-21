@@ -29,6 +29,7 @@ const fsx = vi.hoisted(() => ({
   imageGate: null as Promise<void> | null,
   files: new Map<string, boolean>(),
   listed: [] as unknown[],
+  cacheListed: [] as unknown[],
   snapshots: [] as unknown[],
   downloads: [] as string[],
   deletes: [] as string[],
@@ -62,6 +63,7 @@ vi.mock("expo-file-system", () => {
       fsx.deletes.push(this.uri);
       this.exists = false;
       fsx.listed = fsx.listed.filter((entry) => entry !== this);
+      fsx.cacheListed = fsx.cacheListed.filter((entry) => entry !== this);
     }
     static async downloadFileAsync(url: string, target: File) {
       fsx.downloads.push(url);
@@ -71,8 +73,8 @@ vi.mock("expo-file-system", () => {
   class Directory {
     uri: string;
     exists: boolean;
-    constructor(path: string) {
-      this.uri = `file://${path}`;
+    constructor(path: string | { uri: string }) {
+      this.uri = typeof path === "string" ? `file://${path}` : path.uri;
       this.exists = fsx.files.get(this.uri) ?? true;
     }
     create() {
@@ -80,7 +82,7 @@ vi.mock("expo-file-system", () => {
       this.exists = true;
     }
     list() {
-      return fsx.listed;
+      return this.uri === "file:///cache" ? fsx.cacheListed : fsx.listed;
     }
   }
   return { File, Directory, Paths: { cache: { uri: "file:///cache" } } };
@@ -198,6 +200,7 @@ beforeEach(() => {
   fsx.imageGate = null;
   fsx.files.clear();
   fsx.listed = [];
+  fsx.cacheListed = [];
   fsx.snapshots = [];
   fsx.downloads = [];
   fsx.deletes = [];
@@ -433,6 +436,38 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("removes interrupted full-size downloads without touching other cache files", async () => {
+    const download = new File("file:///cache", "widget-download-old-item");
+    const unrelated = new File("file:///cache", "unrelated-image.jpg");
+    download.exists = true;
+    unrelated.exists = true;
+    fsx.cacheListed = [download, unrelated];
+    const deletion = vi.spyOn(download, "delete").mockImplementationOnce(() => {
+      throw new Error("temporary cache failure");
+    });
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(deletion).toHaveBeenCalledTimes(2);
+    expect(download.exists).toBe(false);
+    expect(unrelated.exists).toBe(true);
+  });
+
+  it("reports failed download cleanup and still removes shared thumbnails", async () => {
+    const download = new File("file:///cache", "widget-download-old-item");
+    const thumbnail = new File("file:///widgets", "recent-saves-old-item.jpg");
+    download.exists = true;
+    thumbnail.exists = true;
+    fsx.cacheListed = [download];
+    fsx.listed = [thumbnail];
+    vi.spyOn(download, "delete").mockImplementation(() => {
+      throw new Error("private path");
+    });
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+    expect(thumbnail.exists).toBe(false);
+    expect(download.exists).toBe(true);
+  });
+
   it.each([false, true])(
     "includes late thumbnail cleanup in the clear result (persistent failure: %s)",
     async (persistentFailure) => {

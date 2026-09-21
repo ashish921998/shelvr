@@ -24,6 +24,7 @@ type SessionDependencies = {
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
+  clearWidget: () => Promise<unknown>;
   resetAnalytics: () => void;
   reportError: (error: unknown) => void;
 };
@@ -186,6 +187,10 @@ export class NotificationDeviceSession {
         // After a successful account deletion the server has already ended the
         // session; clear the local Convex Auth credentials too.
         if (operation === "delete_account") {
+          // Server deletion succeeded even if local auth cleanup fails next.
+          void this.deps.clearWidget().catch(() => {
+            this.deps.reportError(new Error("widget_clear_failed"));
+          });
           try {
             await this.deps.signOut();
           } catch (error) {

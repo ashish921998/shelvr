@@ -15,6 +15,16 @@ const mock = vi.hoisted(() => ({
   resetIfIdentified: vi.fn(),
   removeQueries: vi.fn(),
   clearRecentSavesWidget: vi.fn(() => Promise.resolve(true)),
+  appStateListeners: new Set<(state: string) => void>(),
+}));
+
+vi.mock("react-native", () => ({
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      mock.appStateListeners.add(listener);
+      return { remove: () => mock.appStateListeners.delete(listener) };
+    },
+  },
 }));
 
 vi.mock("convex/react", () => ({
@@ -56,6 +66,49 @@ describe("useAnalyticsIdentity", () => {
     expect(mock.resetIfIdentified).not.toHaveBeenCalled();
     expect(mock.removeQueries).not.toHaveBeenCalled();
     expect(mock.identify).not.toHaveBeenCalled();
+    expect(mock.clearRecentSavesWidget).not.toHaveBeenCalled();
+  });
+
+  it("retries failed clearing on foreground without clearing queries again", async () => {
+    mock.clearRecentSavesWidget.mockRejectedValueOnce(new Error("unavailable"));
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
+    await act(async () => {
+      for (const listener of mock.appStateListeners) listener("active");
+    });
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledTimes(2);
+    expect(mock.removeQueries).toHaveBeenCalledOnce();
+    expect(mock.capture).toHaveBeenCalledWith("widget_cleared");
+    await act(async () => {
+      for (const listener of mock.appStateListeners) listener("active");
+    });
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not overlap pending clears or retry after sign-in", async () => {
+    let reject!: (error: Error) => void;
+    mock.clearRecentSavesWidget.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    const hook = renderHook(() => useAnalyticsIdentity());
+    await act(async () => {
+      for (const listener of mock.appStateListeners) listener("active");
+    });
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
+    mock.isAuthenticated = true;
+    hook.rerender();
+    await act(async () => {
+      reject(new Error("unavailable"));
+    });
+    await act(async () => {
+      for (const listener of mock.appStateListeners) listener("active");
+    });
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
+    expect(mock.appStateListeners.size).toBe(0);
   });
 
   it("resets analytics and clears only Convex cache entries when signed out", () => {
