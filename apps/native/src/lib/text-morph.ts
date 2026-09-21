@@ -80,6 +80,33 @@ export function layoutMorphText(
   });
 }
 
+/** The transition a morph is currently running, and when it settles. */
+export type MorphTransition = { text: string; deadline: number | null };
+
+/**
+ * Decides whether a text change lands on a transition that is still running,
+ * and returns the bookkeeping for the one it starts. The verdict comes from
+ * the deadline the running transition recorded for itself, because a window
+ * derived from the incoming title is wrong in both directions: a short title
+ * replacing a long one would compute a window shorter than the morph it lands
+ * on and miss the interruption entirely. `durationFor` maps the incoming glyph
+ * count, and whether the new transition is itself interrupted, to its span.
+ */
+export function advanceMorphTransition(
+  previous: MorphTransition,
+  text: string,
+  glyphs: number,
+  now: number,
+  durationFor: (glyphs: number, interrupted: boolean) => number,
+): { interrupted: boolean; next: MorphTransition } {
+  if (text === previous.text) return { interrupted: false, next: previous };
+  const interrupted = previous.deadline !== null && now < previous.deadline;
+  return {
+    interrupted,
+    next: { text, deadline: now + durationFor(glyphs, interrupted) },
+  };
+}
+
 /**
  * Reconciles the previous scene against a freshly laid-out one: glyphs whose
  * key survives stay in place (never re-staggered), glyphs new to the scene

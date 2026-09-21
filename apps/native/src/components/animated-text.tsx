@@ -1,9 +1,11 @@
 import { motion } from "@/lib/motion";
 import { needsNativeText } from "@/lib/text-shaping";
 import {
+  advanceMorphTransition,
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
+  type MorphTransition,
 } from "@/lib/text-morph";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -58,6 +60,19 @@ const CANVAS_HEIGHT = 56;
 const DEFAULT_WIDTH = 240;
 const DEFAULT_FONT_SIZE = 24;
 
+// How long a started transition stays active: the slowest of its staggered
+// entrance and its delayed position glide. An interrupted transition drops the
+// stagger, so it settles on the short feedback timing instead.
+function morphDuration(glyphs: number, interrupted: boolean) {
+  if (interrupted) return motion.timing.feedback.duration;
+  return Math.max(
+    morph.enterDelay +
+      Math.max(0, glyphs - 1) * morph.stagger +
+      morph.enter.duration,
+    morph.glideDelay + morph.glide.duration,
+  );
+}
+
 type CharGlyphProps = {
   char: string;
   x: number;
@@ -105,6 +120,11 @@ const CharGlyph = memo(function CharGlyph({
         ? withTiming(x, motion.timing.feedback)
         : withDelay(morph.glideDelay, withTiming(x, morph.glide)),
     );
+    // Rapid paging unmounts glyphs mid-glide, and withDelay keeps its timer
+    // running until the delay elapses. Stop it with the glyph.
+    return () => {
+      cancelAnimation(gx);
+    };
   }, [x, interrupted, gx]);
 
   const firstAppearance = useRef(true);
@@ -296,25 +316,20 @@ function MorphText({
     interrupted: false,
   }));
   const scene = useRef(cells);
-  const lastChange = useRef<{ text: string; at: number | null }>({
-    text,
-    at: null,
-  });
+  const lastChange = useRef<MorphTransition>({ text, deadline: null });
 
   useEffect(() => {
     let cancelled = false;
     const now = performance.now();
     const present = layoutMorphText(text, width, overscan, measure, truncate);
-    const textChanged = text !== lastChange.current.text;
-    const morphWindow =
-      morph.enterDelay +
-      Math.max(0, present.length - 1) * morph.stagger +
-      morph.enter.duration;
-    const interrupted =
-      textChanged &&
-      lastChange.current.at !== null &&
-      now - lastChange.current.at < morphWindow;
-    if (textChanged) lastChange.current = { text, at: now };
+    const { interrupted, next: transition } = advanceMorphTransition(
+      lastChange.current,
+      text,
+      present.length,
+      now,
+      morphDuration,
+    );
+    lastChange.current = transition;
     const next = reconcileMorphCells(
       scene.current,
       present,

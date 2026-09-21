@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_MORPH_GLYPHS,
+  advanceMorphTransition,
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
@@ -200,5 +201,78 @@ describe("pruneMorphCells", () => {
     expect(pruneMorphCells(cells, 1200).map((cell) => cell.key)).toEqual([
       "a#0",
     ]);
+  });
+});
+
+describe("advanceMorphTransition", () => {
+  // Mirrors the runtime choreography: a staggered entrance grows with the
+  // glyph count, while an interrupted transition lands on a flat short timing.
+  const durationFor = (glyphs: number, interrupted: boolean) =>
+    interrupted ? 120 : 120 + Math.max(0, glyphs - 1) * 25 + 550;
+
+  it("treats unchanged text as no transition at all", () => {
+    const previous = { text: "abc", deadline: 900 };
+    const { interrupted, next } = advanceMorphTransition(
+      previous,
+      "abc",
+      3,
+      500,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+    expect(next).toBe(previous);
+  });
+
+  it("does not interrupt the very first change", () => {
+    const { interrupted, next } = advanceMorphTransition(
+      { text: "abc", deadline: null },
+      "xyz",
+      3,
+      500,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+    expect(next).toEqual({ text: "xyz", deadline: 500 + 720 });
+  });
+
+  it("does not interrupt a change after the running transition settles", () => {
+    const { interrupted } = advanceMorphTransition(
+      { text: "abc", deadline: 1000 },
+      "xyz",
+      3,
+      1000,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+  });
+
+  it("interrupts a change inside the running transition", () => {
+    const { interrupted, next } = advanceMorphTransition(
+      { text: "abc", deadline: 1000 },
+      "xyz",
+      3,
+      800,
+      durationFor,
+    );
+    expect(interrupted).toBe(true);
+    // An interrupted transition settles on the short timing, not another
+    // stagger, so the deadline it records is correspondingly short.
+    expect(next).toEqual({ text: "xyz", deadline: 800 + 120 });
+  });
+
+  it("judges a short title against the long morph it lands on", () => {
+    // A 24-glyph entrance runs 1245ms; a 3-glyph one only 720ms. Recomputing
+    // the window from the incoming title would clear this change at 800ms and
+    // stack a second stagger on the unfinished morph.
+    const long = advanceMorphTransition(
+      { text: "", deadline: null },
+      "a".repeat(24),
+      24,
+      0,
+      durationFor,
+    );
+    expect(long.next.deadline).toBe(1245);
+    const short = advanceMorphTransition(long.next, "xyz", 3, 800, durationFor);
+    expect(short.interrupted).toBe(true);
   });
 });
