@@ -263,6 +263,29 @@ describe("recommendForSpace candidate selection", () => {
     expect(await suggestedTitles(t)).toEqual(["Not yet embedded"]);
   });
 
+  it("fills the whole candidate budget from the ranking alone", async () => {
+    // The headline path, and the only one the small fixtures above never
+    // reach: enough embedded items that the ranking fills the budget by
+    // itself and the recency half is never consulted. Cosine against
+    // vec({0: 1}) falls monotonically with the index.
+    const shelf = Array.from({ length: 101 }, (_, index) => ({
+      title: `Save ${index}`,
+      embedding: vec({ 0: 1 - index * 0.001, 1: index * 0.001 }),
+    }));
+    const { t, spaceId } = await seed(shelf);
+
+    await t.action(internal.ai.recommendForSpace, { spaceId });
+
+    const prompted = promptedTitles();
+    // Exactly the cap, in relevance order, and the 101st — the weakest match
+    // — is the one left out. A recency top-up would have put it back, and a
+    // truncated search window would have cost one of the strong ones.
+    expect(prompted).toHaveLength(100);
+    expect(prompted[0]).toBe("Save 0");
+    expect(prompted[99]).toBe("Save 99");
+    expect(prompted).not.toContain("Save 100");
+  });
+
   it("fills a short ranked list out with recent items", async () => {
     // Hydration's byte budget is the reachable stand-in for a half-drained
     // sweep: either way the index hands back fewer candidates than the shelf
