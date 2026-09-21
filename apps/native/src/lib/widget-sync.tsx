@@ -175,7 +175,15 @@ async function syncWidget(
 export async function clearRecentSavesWidget(): Promise<boolean> {
   syncGeneration += 1;
   if (Platform.OS !== "ios") return false;
-  const generation = syncGeneration;
+  const clearing = clearWidgetSnapshot(syncGeneration);
+  // Clear immediately, but make subsequent sessions wait for both the clear
+  // (including its retry) and any old thumbnail work before publishing.
+  // Keep failures observable to the caller without poisoning the sync queue.
+  syncChain = Promise.all([syncChain, clearing.catch(() => false)]);
+  return clearing;
+}
+
+async function clearWidgetSnapshot(generation: number): Promise<boolean> {
   try {
     return await syncWidget([], true, generation);
   } catch {

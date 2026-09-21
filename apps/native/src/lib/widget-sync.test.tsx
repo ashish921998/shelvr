@@ -427,6 +427,45 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it.each([0, 1])(
+    "publishes a new session after a clear with %i transient failures",
+    async (failures) => {
+      fsx.snapshotFailuresRemaining = failures;
+      const clearing = clearRecentSavesWidget();
+      const { rerender } = renderSync([{ ...note, title: "New account" }]);
+      await act(async () => {
+        expect(await clearing).toBe(true);
+      });
+      await waitFor(() => expect(fsx.snapshots).toHaveLength(2));
+      expect(fsx.snapshots).toEqual([
+        expect.objectContaining({ items: [], locked: true }),
+        expect.objectContaining({
+          items: [expect.objectContaining({ title: "New account" })],
+          locked: false,
+        }),
+      ]);
+      tanstack.data = [{ ...note, title: "New account" }];
+      rerender(<RecentSavesWidgetSync />);
+      await act(async () => {});
+      expect(fsx.snapshots).toHaveLength(2);
+    },
+  );
+
+  it("allows a new session to sync even when both clear attempts fail", async () => {
+    fsx.snapshotFailuresRemaining = 2;
+    const clearing = clearRecentSavesWidget();
+    renderSync([{ ...note, title: "New account" }]);
+    await act(async () => {
+      await expect(clearing).rejects.toThrow("widget unavailable");
+    });
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.snapshots[0]).toMatchObject({
+      items: [{ title: "New account" }],
+      locked: false,
+    });
+    expect(fsx.snapshotAttempts).toBe(3);
+  });
+
   it("retries a transient snapshot failure", async () => {
     fsx.snapshotFailuresRemaining = 1;
     expect(await clearRecentSavesWidget()).toBe(true);
