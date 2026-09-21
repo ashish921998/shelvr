@@ -426,7 +426,7 @@ export const ItemCard = memo(function ItemCard({
         href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
         asChild
       >
-        <Link.Trigger withAppleZoom>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable
             // `role`, not `accessibilityRole`: Link spreads its own role="link"
             // onto this trigger, and React Native reads `role` first on both
