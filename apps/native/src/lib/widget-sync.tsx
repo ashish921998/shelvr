@@ -36,9 +36,21 @@ async function ensureThumbnail(
   if (thumb.exists) return thumb.uri;
 
   const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${item._id}`);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     if (download.exists) download.delete();
-    await withThumbnailDeadline(buildThumbnail(url, download, thumb));
+    // Race the work against the deadline. The losing side keeps running but is
+    // orphaned; its later rejection stays handled because Promise.race keeps a
+    // handler on both inputs.
+    await Promise.race([
+      buildThumbnail(url, download, thumb),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(THUMBNAIL_TIMEOUT)),
+          THUMBNAIL_TIMEOUT_MS,
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
     return thumb.uri;
   } finally {
     if (download.exists) download.delete();
@@ -61,20 +73,6 @@ async function buildThumbnail(
         )
       : image;
   await resized.saveToFileAsync(toPlainPath(thumb.uri), "jpg", 80);
-}
-
-// Reject once the deadline passes. The losing side of the race keeps running
-// but is orphaned; a later rejection stays handled because Promise.race keeps
-// its handler on both inputs.
-function withThumbnailDeadline<T>(work: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(THUMBNAIL_TIMEOUT)),
-      THUMBNAIL_TIMEOUT_MS,
-    );
-  });
-  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
 function toPlainPath(uri: string): string {
