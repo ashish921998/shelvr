@@ -75,9 +75,10 @@ const lightTheme = {
     surface: "#fffdf8",
     surfaceMuted: "#f3ecdd",
     foreground: "#2b2418",
-    // Darkened from #8d8271 for WCAG AA contrast (4.57:1) on the paper
-    // background; captions use it at 13-14pt.
-    muted: "#7a6f5f",
+    // Darkened from #8d8271 for WCAG AA contrast. The binding surface is
+    // surfaceMuted #f3ecdd (4.92:1), where tag labels and captions sit; the
+    // paper background clears 5.37:1.
+    muted: "#6f6455",
     // Darkened from #b5aa97 (3.06:1) to clear the AA large-text bar (4.54:1).
     faint: "#978c7a",
     primary: "#e6a23c",
