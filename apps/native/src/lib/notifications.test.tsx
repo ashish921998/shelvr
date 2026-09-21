@@ -23,7 +23,7 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => mock.locale,
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { captureError: mock.captureError, reset: vi.fn() },
+  analytics: { captureError: mock.captureError },
 }));
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
 vi.mock("@convex/_generated/api", () => ({

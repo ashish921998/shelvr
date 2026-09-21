@@ -155,7 +155,7 @@ export function superProperties(): Record<string, string | number | boolean> {
 posthog?.register(superProperties());
 
 /** Clears the identity and restores the super properties a reset drops. */
-export function resetClient(client: PostHog): void {
+function resetClient(client: PostHog): void {
   client.reset();
   client.register(superProperties());
 }

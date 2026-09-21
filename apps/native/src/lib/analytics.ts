@@ -1,7 +1,6 @@
 import {
   SAFE_ERROR_MESSAGES,
   posthog,
-  resetClient,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
@@ -298,19 +297,14 @@ function identify(userId: string): void {
   }
 }
 
-function reset(): void {
-  if (!posthog) return;
-
-  try {
-    resetClient(posthog);
-  } catch {
-    // Analytics must never block sign-out.
-  }
-}
-
-/** Resets only when PostHog still holds an identified user. A signed-out
- * launch keeps its anonymous id, while a session that expired stops
- * attributing events to the previous account once Convex reports it. */
+/** The only reset. Resets only when PostHog still holds an identified user:
+ * a signed-out launch keeps its anonymous id, while an explicit sign-out, an
+ * account deletion, or an expired session stops attributing events to the
+ * previous account once Convex reports it. A device that was never
+ * identified has no link to break, so rotating its anonymous id would only
+ * split one person's onboarding across two profiles. Invoked solely from
+ * `useAnalyticsIdentity` on the auth edge; sign-out flows must not reset
+ * analytics themselves. */
 async function resetIfIdentified(): Promise<void> {
   if (!posthog) return;
 
@@ -336,7 +330,6 @@ export const analytics = {
   capture,
   captureError,
   identify,
-  reset,
   resetIfIdentified,
   sessionId,
   screen,

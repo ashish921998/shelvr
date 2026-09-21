@@ -20,8 +20,9 @@ import {
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
+import { readConvexUrl } from "@/lib/convex-url";
 
-const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
   read: async () => {
     const stored = await SecureStore.getItemAsync(tokenStorageKey);
@@ -51,15 +52,6 @@ export function useNotificationSession() {
   );
   return { session, operation };
 }
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 function getNotificationTimezone(): string | undefined {
   return (
@@ -101,7 +93,9 @@ export function NotificationSessionProvider({
           }),
         signOut,
         deleteAccount: () => deleteAccount({}),
-        resetAnalytics: analytics.reset,
+        // Fallback for a failed post-deletion sign-out: no auth edge may fire
+        // promptly, so clear the identity here (idempotent with the hook's).
+        resetAnalytics: () => void analytics.resetIfIdentified(),
         reportError: (error) =>
           analytics.captureError("notification_session_cleanup_failed", error),
       }),

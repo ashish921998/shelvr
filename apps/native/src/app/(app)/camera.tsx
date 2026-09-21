@@ -9,7 +9,8 @@ import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import type { Id } from "@convex/_generated/dataModel";
 import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
@@ -57,6 +58,15 @@ export default function CameraScreen() {
   const saveImages = useSaveImages();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<CaptureMode>("photo");
+  // The light status bar belongs to the viewfinder; any route pushed above
+  // (paywall fallback) must get the root layout's theme-driven bar back.
+  const [cameraFocused, setCameraFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setCameraFocused(true);
+      return () => setCameraFocused(false);
+    }, []),
+  );
 
   // Slides the active-label highlight between Photo (0) and Sticker (1).
   const progress = useSharedValue(0);
@@ -249,6 +259,10 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Light over the viewfinder only while no route stacks above (e.g. the
+          paywall fallback): on unmount expo-status-bar falls back to the
+          root layout's theme-driven bar. */}
+      {cameraFocused && <StatusBar style="light" />}
       <GestureDetector gesture={swipe}>
         <View style={styles.preview}>{body}</View>
       </GestureDetector>

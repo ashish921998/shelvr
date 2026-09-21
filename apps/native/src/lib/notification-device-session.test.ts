@@ -292,6 +292,8 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    // signOut failed after a successful deletion, so no auth edge will fire
+    // promptly — the fallback must have cleared the identity itself.
     expect(deps.resetAnalytics).toHaveBeenCalledOnce();
     expect(deps.reportError).toHaveBeenCalledOnce();
     expect(await session.register()).toBe(false);
