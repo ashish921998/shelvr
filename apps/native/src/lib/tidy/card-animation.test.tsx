@@ -340,6 +340,14 @@ describe("CardAnimationProvider", () => {
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
+    // The full RNGH failure sequence chains onFinalize after the failed
+    // onEnd; it is what returns the card home once the commit is refused.
+    fire("onFinalize", { velocityX: 0, velocityY: 0 }, false);
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
   });
 
   it("leaves a committed fling untouched when finalize reports success", () => {
