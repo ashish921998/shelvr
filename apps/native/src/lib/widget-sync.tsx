@@ -97,14 +97,17 @@ function deleteWidgetFiles(
   }
 }
 
-// Publishes one widget snapshot for `items` (empty + `locked` clears it) and
-// prunes thumbnails the snapshot no longer references. Resolves to `true` once
-// the snapshot is published, or `false` if it bailed — the widget module is
-// missing, or a session boundary bumped the generation past this call.
+// Publishes the widget for `items` (empty + `locked` clears it) and prunes
+// thumbnails the snapshot no longer references. With a `validUntil` it schedules
+// a timeline that locks itself at the expiry instead of a single snapshot.
+// Resolves to `true` once the widget is published, or `false` if it bailed — the
+// widget module is missing, or a session boundary bumped the generation past
+// this call.
 async function syncWidget(
   items: FeedItem[],
   locked: boolean,
   generation: number,
+  validUntil?: number,
 ): Promise<boolean> {
   // A sign-out between this sync being queued and running owns the widget now;
   // don't rebuild the previous account's snapshot over the cleared one.
@@ -149,12 +152,34 @@ async function syncWidget(
   }
 
   try {
-    RecentSavesWidget.updateSnapshot({
+    const current = {
       items: widgetItems,
       emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
       emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
       locked,
-    });
+      validUntil,
+    };
+    if (!locked && validUntil !== undefined) {
+      // A snapshot outlives the app, so a Pro entitlement that lapses while
+      // the app stays closed would keep the last saves on the Home Screen.
+      // Schedule a second, dated entry so WidgetKit swaps to the locked Pro
+      // state at the expiry with no app launch. The live entry also carries
+      // `validUntil`, so it fails closed on the widget's own clock.
+      RecentSavesWidget.updateTimeline([
+        { date: new Date(), props: current },
+        {
+          date: new Date(validUntil),
+          props: {
+            items: [],
+            emptyTitle: t("widget.proTitle"),
+            emptyHint: t("widget.proBody"),
+            locked: true,
+          },
+        },
+      ]);
+    } else {
+      RecentSavesWidget.updateSnapshot(current);
+    }
   } finally {
     // Clearing private files must not depend on publishing the locked snapshot.
     if (locked) deleteWidgetFiles(dir);
@@ -301,7 +326,7 @@ export function RecentSavesWidgetSync() {
     hasPendingCleanup,
   );
   const locale = useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const { entitled, loading: entitlementLoading, expiresAt } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
   // `enabled` entirely. It opens its subscription from the query cache's
   // "added" event and drops it on "removed", so an `enabled: false` query
@@ -338,10 +363,14 @@ export function RecentSavesWidgetSync() {
     // subscription lapses or the user signs out so old Pro content is not
     // left visible on the Home Screen.
     const items = entitled ? (recent ?? []) : [];
+    // A finite expiry lets the widget lock itself after the app closes; a
+    // lifetime entitlement has none, so it never locks.
+    const validUntil = entitled ? expiresAt : undefined;
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
       (entitled ? "open" : "locked") +
+      `@${validUntil ?? ""}` +
       items
         .map(
           (item) =>
@@ -361,13 +390,13 @@ export function RecentSavesWidgetSync() {
           lastKey.current = null;
           return false;
         }
-        return syncWidget(items, !entitled, generation);
+        return syncWidget(items, !entitled, generation, validUntil);
       })
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [entitled, entitlementLoading, recent, locale, cleanupPending]);
+  }, [entitled, entitlementLoading, expiresAt, recent, locale, cleanupPending]);
 
   return null;
 }
