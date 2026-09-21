@@ -8,6 +8,7 @@ import type { Id } from "./_generated/dataModel";
 import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_DIMENSIONS,
+  MAX_HYDRATE_READ_BYTES,
 } from "./model/embedding";
 
 const embedMany = vi.hoisted(() => vi.fn());
@@ -289,15 +290,13 @@ describe("recommendForSpace candidate selection", () => {
   it("fills a short ranked list out with recent items", async () => {
     // Hydration's byte budget is the reachable stand-in for a half-drained
     // sweep: either way the index hands back fewer candidates than the shelf
-    // holds, and the prompt must not shrink to match. Two bodies cross the
-    // 2 MB budget, so the third hit never survives hydration.
+    // holds, and the prompt must not shrink to match. Two bodies of just over
+    // half the budget cross it, so the third hit never survives hydration —
+    // sized from the constant so retuning it moves this fixture too.
+    const half = "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
     const { t, spaceId } = await seed([
-      {
-        title: "Carbonara",
-        embedding: ON_TOPIC,
-        content: "x".repeat(1_100_000),
-      },
-      { title: "Pesto", embedding: NEARBY, content: "x".repeat(1_100_000) },
+      { title: "Carbonara", embedding: ON_TOPIC, content: half },
+      { title: "Pesto", embedding: NEARBY, content: half },
       { title: "Kubernetes", embedding: OFF_TOPIC },
     ]);
 
