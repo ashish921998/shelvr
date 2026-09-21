@@ -137,21 +137,30 @@ let syncChain: Promise<void> = Promise.resolve();
  */
 export function RecentSavesWidgetSync() {
   const locale = useAppLocale();
-  const {
-    entitled,
-    loading: entitlementLoading,
-    now: entitlementNow,
-  } = useEntitlement();
-  const { data: recent } = useQuery({
-    ...convexQuery(
+  const { entitled, loading: entitlementLoading } = useEntitlement();
+  // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
+  // `enabled` entirely. It opens its subscription from the query cache's
+  // "added" event and drops it on "removed", so an `enabled: false` query
+  // still holds a live server subscription. The sentinel changes the query
+  // key, which is the only guard the adapter reads, so no subscription is
+  // opened at all. Switching to it does not close a subscription already
+  // open under real arguments; sign-out clears those through the
+  // removeQueries call in analytics-identity.ts.
+  //
+  // The entitlement clock is deliberately not an argument. It ticks every
+  // minute whenever a subscription carries an expiry, and the adapter hashes
+  // the whole argument object, so every tick would mint another key and
+  // another subscription, each held for gcTime. Dropping it moves the server
+  // to the stored subscription status, which the RevenueCat webhook lapses,
+  // so an expired row still reads as Pro until that webhook lands. Passing
+  // the clock did not close that window either, since it was the client's
+  // own clock.
+  const { data: recent } = useQuery(
+    convexQuery(
       api.items.listRecentItems,
-      // 'skip', not `enabled`: a disabled React Query still subscribes
-      // through the Convex adapter (see the pager).
-      !entitlementLoading && entitled
-        ? { limit: WIDGET_ITEM_COUNT, now: entitlementNow }
-        : "skip",
+      !entitlementLoading && entitled ? { limit: WIDGET_ITEM_COUNT } : "skip",
     ),
-  });
+  );
   const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
