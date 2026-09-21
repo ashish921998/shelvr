@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  View,
   type PressableProps,
 } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -17,7 +18,7 @@ type Props = Omit<PressableProps, "children" | "style"> & {
   style?: React.ComponentProps<typeof AnimatedPressable>["style"];
 };
 
-/** Primary action. Content and label remain available while loading. */
+/** Primary action. The label stays mounted and visible beside the spinner. */
 export function Button({
   title,
   loading = false,
@@ -71,13 +72,12 @@ export function Button({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={theme.colors.onTint} />
-      ) : (
+      <View style={styles.content}>
+        {loading ? <ActivityIndicator color={theme.colors.onTint} /> : null}
         <ThemedText variant="button" style={styles.label}>
           {title}
         </ThemedText>
-      )}
+      </View>
     </AnimatedPressable>
   );
 }
@@ -92,6 +92,11 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
   },
   label: { color: theme.colors.onTint, textAlign: "center" },
 }));
