@@ -29,6 +29,17 @@ describe("swipeDecision", () => {
     expect(swipeDecision(0, 400, 0, 2000, TX, TY)).toBeNull();
   });
 
+  it("refuses a downward gesture carrying horizontal release noise", () => {
+    // 300 pt/s projects to ~150 horizontal points, past thresholdX on its own.
+    // The downward travel still dominates, so the photo stays unreviewed.
+    expect(swipeDecision(0, 400, 300, 0, TX, TY)).toBeNull();
+    expect(swipeDecision(0, 400, -300, 0, TX, TY)).toBeNull();
+  });
+
+  it("still commits sideways when a downward drift is the smaller axis", () => {
+    expect(swipeDecision(250, 60, 0, 0, TX, TY)).toBe("keep");
+  });
+
   it("commits a short flick through velocity projection", () => {
     // 30px of travel plus ~1000px of projected momentum clears the threshold.
     expect(swipeDecision(30, 0, 2000, 0, TX, TY)).toBe("keep");

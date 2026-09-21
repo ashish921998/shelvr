@@ -25,8 +25,12 @@ export function swipeDecision(
   const projectedY = y + project(velocityY);
   const horizontal = Math.abs(projectedX) / thresholdX;
   const upward = -projectedY / thresholdY;
+  // Dominance compares magnitudes. Weighing horizontal against the signed
+  // upward score let a downward gesture score negative, so any horizontal
+  // release noise won the axis outright and committed.
+  const vertical = Math.abs(projectedY) / thresholdY;
   if (upward > 1 && upward > horizontal) return "save";
-  if (horizontal > 1 && horizontal >= upward) {
+  if (horizontal > 1 && horizontal >= vertical) {
     return projectedX >= 0 ? "keep" : "delete";
   }
   return null;
