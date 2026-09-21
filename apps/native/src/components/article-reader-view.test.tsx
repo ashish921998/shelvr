@@ -9,11 +9,24 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: vi.fn(),
   formattingLocale: () => "en-US",
 }));
+const scroll = vi.hoisted(() => ({ to: vi.fn() }));
+
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
+  // Forwards the ref the reader scrolls through (React 19 passes it as a prop),
+  // so the recycle effect's scroll-to-top actually runs against a handle.
+  ScrollView: vi.fn(
+    ({
+      children,
+      ref,
+    }: {
+      children: ReactNode;
+      ref?: { current: { scrollTo: typeof scroll.to } | null };
+    }) => {
+      if (ref) ref.current = { scrollTo: scroll.to };
+      return <div>{children}</div>;
+    },
+  ),
   Text: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
   )),
@@ -72,7 +85,7 @@ vi.mock("@/components/item-source-link", () => ({
   openItemSource: vi.fn(),
 }));
 
-it("collapses tags on a recycled item but preserves expansion on the same item", () => {
+it("resets scroll and tags on a recycled item but preserves expansion on the same item", () => {
   type Props = ComponentProps<typeof ArticleReaderView>;
   const item = {
     _id: "article-a",
@@ -100,6 +113,7 @@ it("collapses tags on a recycled item but preserves expansion on the same item",
     />,
   );
   expect(screen.getByRole("button", { expanded: true })).toBeTruthy();
+  expect(scroll.to).not.toHaveBeenCalled();
   rerender(
     <ArticleReaderView
       {...props}
@@ -112,4 +126,5 @@ it("collapses tags on a recycled item but preserves expansion on the same item",
   );
   expect(screen.getByRole("button", { expanded: false })).toBeTruthy();
   expect(screen.queryAllByTestId("tag")).toHaveLength(0);
+  expect(scroll.to).toHaveBeenCalledWith({ y: 0, animated: false });
 });
