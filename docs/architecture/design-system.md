@@ -41,14 +41,14 @@ uses the paired `on*` role: `onTint` on `primary` (a dark label — white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
 `tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon
 and its label with it, so it carries normal-size text: the light theme darkens
-it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The light theme's text colors are deliberately darkened to
-clear WCAG AA (`muted` 4.92:1 on `surfaceMuted`, the darkest surface it
-renders on; `faint` uses the same accessible color for small captions;
-`primaryText` and `danger` just over 4.5:1 — the rationale sits in comments
-next to each value). Any new light-theme text color must clear 4.5:1 for body
-text or 3:1 for large text against every surface it renders on — including
-`surfaceMuted` and `primarySoft`, not the paper background alone; check the
-dark themes for legibility too.
+it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
+light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
+4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
+same accessible color for small captions; `primaryText` and `danger` just over
+4.5:1 — the rationale sits in comments next to each value). Any new light-theme
+text color must clear 4.5:1 for body text or 3:1 for large text against every
+surface it renders on — including `surfaceMuted` and `primarySoft`, not the
+paper background alone; check the dark themes for legibility too.
 
 ## Themes and appearance
 
