@@ -29,9 +29,10 @@ const lightTheme = {
     surface: "#fffdf8",
     surfaceMuted: "#f3ecdd",
     foreground: "#2b2418",
-    // Darkened from #8d8271 for WCAG AA contrast (4.57:1) on the paper
-    // background; captions use it at 13-14pt.
-    muted: "#7a6f5f",
+    // Darkened from #8d8271 to clear 4.5:1 on every light surface it paints
+    // on (design-system.md, Color): 5.37:1 paper, 4.92:1 surfaceMuted,
+    // 4.79:1 primarySoft; captions use it at 13-14pt.
+    muted: "#6f6455",
     faint: "#b5aa97",
     primary: "#e6a23c",
     primaryForeground: "#2b2418",
