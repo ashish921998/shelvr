@@ -31,12 +31,11 @@ import {
 } from "react-native";
 import Animated, {
   FadeIn,
-  FadeOut,
   useReducedMotion,
   ZoomOut,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -98,13 +97,6 @@ export type ItemSource =
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
-
-const PROCESSING_ENTER = FadeIn.duration(motion.duration.feedback).easing(
-  motion.easing.out,
-);
-const PROCESSING_EXIT = FadeOut.duration(motion.duration.feedback).easing(
-  motion.easing.out,
-);
 
 function cardMenuActions({
   isSuggested,
@@ -281,16 +273,14 @@ function CardCaption({
 function CardStatusCorner({
   item,
   theme,
-  reducedMotion,
 }: {
   item: FeedItem;
   theme: UnistylesTheme;
-  reducedMotion: boolean;
 }) {
   return (
     <Animated.View
-      entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
-      exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+      entering={REDUCED_FADE_IN}
+      exiting={REDUCED_FADE_OUT}
       collapsable={false}
       style={styles.processing}
     >
@@ -467,11 +457,7 @@ export const ItemCard = memo(function ItemCard({
             )}
 
             {(item.status === "processing" || item.status === "failed") && (
-              <CardStatusCorner
-                item={item}
-                theme={theme}
-                reducedMotion={reducedMotion}
-              />
+              <CardStatusCorner item={item} theme={theme} />
             )}
           </Pressable>
         </Link.Trigger>

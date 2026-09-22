@@ -24,7 +24,7 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -116,16 +116,10 @@ function usePagerParamSync(initialId: string) {
     [navigation],
   );
 
-  useEffect(
-    () => () => {
-      if (paramTimer.current) clearTimeout(paramTimer.current);
-    },
-    [],
-  );
-
   // A pending write is stale the moment the screen loses focus; on the way
   // back, resync the URL to the page the user is actually on. The first
-  // focus is a no-op: writeParams dedupes against the pushed id.
+  // focus is a no-op: writeParams dedupes against the pushed id. The
+  // cleanup runs on blur and unmount alike, so it owns the pending timer.
   useFocusEffect(
     useCallback(() => {
       writeParams(activeIdRef.current);
