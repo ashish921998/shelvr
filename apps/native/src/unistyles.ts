@@ -29,7 +29,10 @@ const lightTheme = {
     surface: "#fffdf8",
     surfaceMuted: "#f3ecdd",
     foreground: "#2b2418",
-    muted: "#8d8271",
+    // Clears 4.5:1 on every light surface it paints on
+    // (design-system.md, Color): 5.37:1 paper, 4.92:1 surfaceMuted,
+    // 4.79:1 primarySoft; captions use it at 13-14pt.
+    muted: "#6f6455",
     faint: "#b5aa97",
     primary: "#e6a23c",
     primaryForeground: "#2b2418",
