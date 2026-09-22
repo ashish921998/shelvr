@@ -185,13 +185,26 @@ if (
   );
 }
 // The window opens on a blank band by contract, so the first frame's modal
-// value is the page itself; ink is measured against it, mirrored to bright
-// writing on a dark page.
+// bucket is the page itself; its mean is the ink baseline. Ink is each
+// pixel's distance past a small gate from that level. Fixed cutoffs cannot
+// know where the page sits: the shipped dark surfaces measure grayscale
+// 22-41, so a near-black cutoff counted a blank dark header as ink and
+// left stagger mode without its hold frame.
 const histogram = new Array(16).fill(0);
 for (let i = 0; i < FRAME; i++) histogram[raw[i] >> 4]++;
-const light = histogram.indexOf(Math.max(...histogram)) >= 8;
-const skip = light ? (v) => v >= 235 : (v) => v <= 20;
-const amount = light ? (v) => 235 - v : (v) => v - 20;
+const bucket = histogram.indexOf(Math.max(...histogram));
+let bgSum = 0;
+let bgPixels = 0;
+for (let i = 0; i < FRAME; i++) {
+  if (raw[i] >> 4 === bucket) {
+    bgSum += raw[i];
+    bgPixels++;
+  }
+}
+const bg = Math.round(bgSum / bgPixels);
+const light = bg >= 128;
+const skip = (v) => Math.abs(v - bg) <= 20;
+const amount = (v) => Math.abs(v - bg);
 const frames = [];
 for (let f = 0; f < total; f++) {
   const base = f * FRAME;
