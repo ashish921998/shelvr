@@ -79,7 +79,12 @@ function CoverStack({
   useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1, 0.6, 1.9)
+    ? clampRatio(
+        cover.aspectRatio,
+        cover.type === "link" ? OG_RATIO : 1,
+        0.6,
+        1.9,
+      )
     : 1;
   const position = CARD_POSITION;
 

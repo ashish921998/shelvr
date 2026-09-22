@@ -21,13 +21,15 @@ for Shelvr.
 - Vercel AI SDK with the direct Google provider (`gemini-3.1-flash-lite`)
 - [Vitest](https://vitest.dev/) + [`convex-test`](https://docs.convex.dev/testing/convex-test)
   for the native app and the Convex backend
+- A plain Manifest V3 browser extension (`apps/extension`) — no build step
 
 ## What’s inside
 
-| Path          | Purpose                                            |
-| ------------- | -------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site                   |
-| `apps/native` | Expo native client (full product) + Convex backend |
+| Path             | Purpose                                                   |
+| ---------------- | --------------------------------------------------------- |
+| `apps/web`       | Next.js marketing / landing site                          |
+| `apps/native`    | Expo native client (full product) + Convex backend        |
+| `apps/extension` | Browser extension for saving links from a desktop browser |
 
 ## Quick start
 
@@ -183,13 +185,33 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 - **`notificationDevices`** / **`notificationPreferences`** / **`weeklyDigests`** /
   **`itemReads`** — push tokens, weekly shelf settings, shelves, and read state
 - **`waitlistSignups`** — platform availability waitlists and prior launch records
+- **`extensionPairings`** / **`extensionConnections`** — browser-extension pairing codes and
+  the browsers they connected, both stored as hashes only
 
 Public product APIs live in `items.ts`, `spaces.ts`, `subscriptions.ts`,
-`notifications.ts`, and `users.ts`. The Node action pipeline is in `ai.ts`
+`notifications.ts`, `extension.ts`, and `users.ts`. The Node action pipeline is in `ai.ts`
 (`processItem`, `recommendForSpace`, `steerItemForSpace`, `findProductLinks`).
 Auth always derives `userId` from Convex Auth via
 `model/auth.ts` (the stable users-table id extracted from the session-bearing
 JWT `sub`) — never from a client argument.
+
+## Browser extension
+
+`apps/extension` is a Manifest V3 extension that saves the page you're reading —
+from the toolbar, `Ctrl/Cmd+Shift+S`, or the right-click menu — through the same
+pipeline as a save from the phone. There is nothing to install or build: load the
+directory unpacked from `chrome://extensions`.
+
+It cannot sign in the way the app does, so the signed-in app vouches for the
+browser instead. **Profile → Browser extension** shows an eight-character code,
+good for ten minutes and usable once; typing it into the extension's popup trades
+it for a bearer token at `POST /extension/pair`. The server keeps only a SHA-256
+of that token, so the copy in the browser is the only one — a lost token is
+re-paired, never recovered. Revoke a browser from the app's list or from the
+popup's **Disconnect**.
+
+See [`apps/extension/README.md`](apps/extension/README.md) for the permissions it
+asks for and how to point it at a dev deployment.
 
 ## Deploying
 

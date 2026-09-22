@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shelvr</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <img class="mark" src="../icons/icon-32.png" alt="" width="24" height="24" />
+      <span class="wordmark">Shelvr</span>
+      <span class="account" id="account" hidden></span>
+    </header>
+
+    <!-- Pairing. Shown until this browser holds a connection token. -->
+    <section class="panel" id="connect" hidden>
+      <h1 class="title">Connect this browser</h1>
+      <ol class="steps">
+        <li>Open Shelvr on your phone.</li>
+        <li>Go to <strong>Profile → Browser extension</strong>.</li>
+        <li>Type the code it shows below.</li>
+      </ol>
+      <form id="pair-form" novalidate>
+        <label class="field-label" for="code">Pairing code</label>
+        <input
+          class="code-input"
+          id="code"
+          name="code"
+          type="text"
+          inputmode="latin"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          maxlength="9"
+          placeholder="XXXX-XXXX"
+          aria-describedby="pair-status"
+        />
+        <button class="button primary" id="pair-submit" type="submit">
+          Connect
+        </button>
+      </form>
+      <p class="status" id="pair-status" role="status"></p>
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <label class="field-label" for="endpoint">Backend</label>
+        <input
+          class="text-input"
+          id="endpoint"
+          type="url"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="hint">
+          Only change this to point at your own Shelvr deployment.
+        </p>
+      </details>
+    </section>
+
+    <!-- Saving. Shown once paired. -->
+    <section class="panel" id="save" hidden>
+      <div class="page-card">
+        <p class="page-title" id="page-title"></p>
+        <p class="page-url" id="page-url"></p>
+      </div>
+      <button class="button primary" id="save-button" type="button">
+        Save this page
+      </button>
+      <p class="status" id="save-status" role="status"></p>
+
+      <section class="recent" id="recent" hidden>
+        <h2 class="recent-heading">Recently saved</h2>
+        <ul class="recent-list" id="recent-list"></ul>
+      </section>
+
+      <footer class="footer">
+        <span class="shortcut" id="shortcut"></span>
+        <button class="button link" id="disconnect" type="button">
+          Disconnect
+        </button>
+      </footer>
+    </section>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

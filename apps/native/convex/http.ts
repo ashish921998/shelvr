@@ -14,7 +14,19 @@ import {
   reconcileRevenueCatTransfer,
 } from "./model/revenuecatTransfer";
 import { errorName, logEvent } from "./model/log";
+import {
+  bearerToken,
+  generateConnectionToken,
+  hashPairingCode,
+  hashSecret,
+  normalizePairingCode,
+  pairingCodeSecret,
+  sanitizeConnectionLabel,
+} from "./model/extensionAuth";
+import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
+import { OPERATION_ID_MAX, OPERATION_ID_MIN } from "./items";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
+import { saveErrorCode } from "./model/saveErrors";
 import { secureCompare } from "./model/secureCompare";
 import {
   WaitlistInputError,
@@ -231,6 +243,269 @@ http.route({
       });
       return json({ message: "Could not join right now." }, 500);
     }
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// Browser extension
+// ---------------------------------------------------------------------------
+
+/**
+ * Browsers that may call the `/extension` routes cross-origin. A packed
+ * extension's origin is its own id, which we cannot know ahead of time, so the
+ * pattern is by scheme: only pages already running as an extension qualify,
+ * never an ordinary web page.
+ *
+ * Echoing the origin back is safe here because these routes are bearer-only.
+ * No cookie rides along (`Access-Control-Allow-Credentials` is deliberately
+ * never set), so the header grants a caller nothing it could not get from a
+ * plain server-side request — it exists so the extension's own popup and
+ * service worker are not blocked by the browser on the way out.
+ */
+const EXTENSION_ORIGIN = /^(?:chrome|moz|safari-web)-extension:\/\/[\w.-]+$/i;
+
+function extensionCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin");
+  if (origin === null || !EXTENSION_ORIGIN.test(origin)) {
+    return {};
+  }
+  // `Vary` so a cache can never serve one extension's allowance to another.
+  return { "access-control-allow-origin": origin, vary: "origin" };
+}
+
+function extensionJson(
+  req: Request,
+  body: unknown,
+  status: number,
+  headers: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+      ...extensionCorsHeaders(req),
+      ...headers,
+    },
+  });
+}
+
+const extensionPreflight = httpAction(async (_ctx, req) => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...extensionCorsHeaders(req),
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type",
+      "access-control-max-age": "86400",
+    },
+  });
+});
+
+/** Read a JSON object body, or null for anything that is not one. */
+async function readJsonObject(
+  req: Request,
+): Promise<Record<string, unknown> | null> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return null;
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return null;
+  }
+  return body as Record<string, unknown>;
+}
+
+/** The connection token's hash, or null when the request carries no usable
+ * bearer credential. Hashing here means the plaintext token never reaches a
+ * mutation, a log, or the database. */
+async function connectionTokenHash(req: Request): Promise<string | null> {
+  const token = bearerToken(req.headers.get("authorization"));
+  return token === null ? null : await hashSecret(token);
+}
+
+// One preflight handler for all four routes: the browser sends an OPTIONS
+// before any request carrying an `Authorization` header, and Convex routes
+// each method explicitly.
+for (const path of [
+  "/extension/pair",
+  "/extension/session",
+  "/extension/save",
+  "/extension/disconnect",
+]) {
+  http.route({ path, method: "OPTIONS", handler: extensionPreflight });
+}
+
+/**
+ * Trade a pairing code shown in the app for this browser's connection token.
+ *
+ * The token is returned exactly once, here; only its hash is stored, so a lost
+ * token is re-paired rather than recovered. Malformed and unknown codes answer
+ * with the same `invalid_code`, differing only in status, because telling a
+ * guesser that a code *exists* is most of what the code is protecting.
+ */
+http.route({
+  path: "/extension/pair",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const body = await readJsonObject(req);
+    if (body === null) {
+      return extensionJson(req, { error: "invalid_request" }, 400);
+    }
+    const code = normalizePairingCode(body.code);
+    if (code === null) {
+      return extensionJson(req, { error: "invalid_code" }, 400);
+    }
+    // Same fail-closed posture as minting: without the key this route cannot
+    // reproduce the stored digest anyway, so a 500 is both the honest answer
+    // and the one that keeps a misconfigured deployment from quietly falling
+    // back to a digest a database reader could invert.
+    const secret = pairingCodeSecret();
+    if (secret === null) {
+      logEvent("error", "extension_pairing_secret_missing", {});
+      return extensionJson(req, { error: "unavailable" }, 500);
+    }
+    const token = generateConnectionToken();
+    const result = await ctx.runMutation(internal.extension.redeemPairingCode, {
+      codeHash: await hashPairingCode(code, secret),
+      tokenHash: await hashSecret(token),
+      label: sanitizeConnectionLabel(body.label),
+    });
+    if (result.status === "rate_limited") {
+      return extensionJson(req, { error: "rate_limited" }, 429);
+    }
+    if (result.status === "invalid_code") {
+      return extensionJson(req, { error: "invalid_code" }, 401);
+    }
+    return extensionJson(
+      req,
+      {
+        token,
+        label: result.label,
+        connectedAt: result.connectedAt,
+      },
+      200,
+    );
+  }),
+});
+
+/** Who this browser is paired to. The extension calls it on open to confirm
+ * its token still works and to show the account it saves into. */
+http.route({
+  path: "/extension/session",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const tokenHash = await connectionTokenHash(req);
+    if (tokenHash === null) {
+      return extensionJson(req, { error: "unauthorized" }, 401);
+    }
+    const connection = await ctx.runQuery(
+      internal.extension.describeConnection,
+      { tokenHash },
+    );
+    if (connection === null) {
+      return extensionJson(req, { error: "unauthorized" }, 401);
+    }
+    return extensionJson(req, connection, 200);
+  }),
+});
+
+/**
+ * Save the page the browser is on.
+ *
+ * URL policy runs here rather than in the mutation: `normalizeExternalUrl`
+ * throws a plain Error, whose class and message do not survive the function
+ * boundary (production redacts them), and "this page can't be saved" is worth
+ * far more to the extension than a redacted 500. The refusals that DO survive
+ * — `pro_required` and the rate limiter, both `ConvexError`s with structured
+ * data — are caught below and mapped to a status the extension can act on.
+ */
+http.route({
+  path: "/extension/save",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const tokenHash = await connectionTokenHash(req);
+    if (tokenHash === null) {
+      return extensionJson(req, { error: "unauthorized" }, 401);
+    }
+    const body = await readJsonObject(req);
+    if (body === null || typeof body.url !== "string") {
+      return extensionJson(req, { error: "invalid_request" }, 400);
+    }
+    // Retries of a flaky save reuse one id so a dropped response cannot become
+    // a second card. Bounded against the ledger's own limits so a malformed id
+    // is a 400 here, not a redacted 500 from inside the mutation.
+    const { operationId } = body;
+    if (
+      operationId !== undefined &&
+      (typeof operationId !== "string" ||
+        operationId.length < OPERATION_ID_MIN ||
+        operationId.length > OPERATION_ID_MAX)
+    ) {
+      return extensionJson(req, { error: "invalid_request" }, 400);
+    }
+
+    let url: string;
+    try {
+      url = normalizeExternalUrl(body.url);
+    } catch (error) {
+      if (isUrlPolicyError(error)) {
+        return extensionJson(
+          req,
+          { error: "invalid_url", reason: error.code },
+          400,
+        );
+      }
+      throw error;
+    }
+
+    try {
+      const result = await ctx.runMutation(internal.extension.saveLink, {
+        tokenHash,
+        url,
+        operationId,
+      });
+      if (result.status === "unauthorized") {
+        return extensionJson(req, { error: "unauthorized" }, 401);
+      }
+      return extensionJson(
+        req,
+        { status: result.status, itemId: result.itemId },
+        200,
+      );
+    } catch (error) {
+      if (saveErrorCode(error) === "pro_required") {
+        return extensionJson(req, { error: "pro_required" }, 402);
+      }
+      if (isRateLimitError(error)) {
+        return extensionJson(req, { error: "rate_limited" }, 429, {
+          "retry-after": String(
+            Math.max(1, Math.ceil(error.data.retryAfter / 1000)),
+          ),
+        });
+      }
+      // The message can echo the URL back; log the class only.
+      logEvent("error", "extension_save_failed", {
+        error_name: errorName(error),
+      });
+      return extensionJson(req, { error: "save_failed" }, 500);
+    }
+  }),
+});
+
+/** Unpair this browser from the extension's own side. Holding the token is
+ * the authorization: it can only ever drop itself. */
+http.route({
+  path: "/extension/disconnect",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const tokenHash = await connectionTokenHash(req);
+    if (tokenHash === null) {
+      return extensionJson(req, { error: "unauthorized" }, 401);
+    }
+    await ctx.runMutation(internal.extension.disconnect, { tokenHash });
+    return extensionJson(req, { status: "disconnected" }, 200);
   }),
 });
 

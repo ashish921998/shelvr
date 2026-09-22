@@ -557,9 +557,12 @@ async function saveIntoSpace(
 // blob permanently; it is documented and accepted, not eliminated.
 
 /** Operation IDs are opaque client UUIDs (optionally prefixed for logs). This
- * bounds length so a stray empty/huge string can't pollute the index. */
-const OPERATION_ID_MIN = 8;
-const OPERATION_ID_MAX = 200;
+ * bounds length so a stray empty/huge string can't pollute the index. Exported
+ * because the browser-extension HTTP route checks the same bounds before
+ * calling in, so a malformed id is a 400 rather than a redacted 500 from
+ * `requireOperationId`. */
+export const OPERATION_ID_MIN = 8;
+export const OPERATION_ID_MAX = 200;
 
 function requireOperationId(operationId: string): void {
   if (
@@ -1356,16 +1359,76 @@ const importLinksResultValidator = v.object({
 
 /** Whether the user already saved this link. Every link save stores the
  * normalized URL, so the index lookup is exact and finds a save of any age. */
+async function findSavedLink(
+  ctx: QueryCtx,
+  userId: string,
+  url: string,
+): Promise<Doc<"items"> | null> {
+  return await ctx.db
+    .query("items")
+    .withIndex("by_user_and_url", (q) => q.eq("userId", userId).eq("url", url))
+    .first();
+}
+
 async function hasSavedLink(
   ctx: QueryCtx,
   userId: string,
   url: string,
 ): Promise<boolean> {
-  const match = await ctx.db
-    .query("items")
-    .withIndex("by_user_and_url", (q) => q.eq("userId", userId).eq("url", url))
-    .first();
-  return match !== null;
+  return (await findSavedLink(ctx, userId, url)) !== null;
+}
+
+/** What a link save on behalf of a paired client did. `duplicate` carries the
+ * item that already holds the URL, so the caller can point at the existing
+ * save instead of reporting a no-op. */
+export type ConnectedLinkSave =
+  | { status: "saved"; itemId: Id<"items"> }
+  | { status: "duplicate"; itemId: Id<"items"> };
+
+/**
+ * Save a link for a user who was authenticated by something other than Convex
+ * Auth — today, the browser extension's bearer-token HTTP route
+ * (`convex/extension.ts`), whose caller holds a connection token rather than a
+ * session JWT.
+ *
+ * Everything downstream of that difference is deliberately the in-app path:
+ * the same entitlement gate, the same `normalizeExternalUrl` policy, the same
+ * rate-limit accounting and idempotency ledger inside
+ * `createItemWithOperation`, and the same single `processItem` schedule. A
+ * second implementation would drift, and the drift would be invisible until a
+ * save arrived through the extension that the app would have refused.
+ *
+ * The one addition is duplicate detection: a browser button gets pressed on a
+ * page the user already saved far more often than the share sheet does, and
+ * re-saving would put a second card in the feed and pay for a second
+ * classification. `importLinks` skips known URLs for the same reason.
+ *
+ * Throws exactly what the in-app save throws: `saveError("pro_required")`,
+ * `UrlPolicyErrorClass` for a URL the policy refuses, and the rate limiter's
+ * error once the account's create budget is spent.
+ */
+export async function saveLinkForConnectedClient(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  rawUrl: string,
+  options: { operationId?: string } = {},
+): Promise<ConnectedLinkSave> {
+  await requireProEntitlement(ctx, userId);
+  // Before the ledger and before any spend: a refused URL must not create a
+  // half-finished operation, and a duplicate must not cost a rate-limit token.
+  const url = normalizeExternalUrl(rawUrl);
+  const existing = await findSavedLink(ctx, userId, url);
+  if (existing !== null) {
+    return { status: "duplicate", itemId: existing._id };
+  }
+  const itemId = await createItemWithOperation(
+    ctx,
+    userId,
+    "link",
+    { url },
+    { operationId: options.operationId },
+  );
+  return { status: "saved", itemId };
 }
 
 /**

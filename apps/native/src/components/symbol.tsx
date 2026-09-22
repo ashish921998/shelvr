@@ -44,6 +44,7 @@ const SF_TO_MATERIAL = {
   "rectangle.stack": "collections_bookmark",
   "rectangle.stack.fill": "collections_bookmark",
   link: "link",
+  "puzzlepiece.extension": "extension",
   safari: "language",
   map: "map",
   magnifyingglass: "search",
