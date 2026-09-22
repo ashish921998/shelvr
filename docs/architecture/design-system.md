@@ -102,7 +102,10 @@ of the swap. `tools/measure-header-morph.mjs` crops the title band out of a
 screen recording and re-checks the contract (no double paint, left-to-right
 stagger, ramp budget, monotonic ink, bounded blank hold, no post-settle
 baseline shift), with a swap mode that reports the native-to-canvas step; run
-it before moving the hold or the morph timings.
+it before moving the hold or the morph timings. The ink measure follows the
+recording's own theme, detected from the blank band that opens the window, and
+frames are timed by their presentation timestamps: a recording whose spacing
+leaves its nominal rate exits INCONCLUSIVE rather than being timed by index.
 
 Reduce Motion is `System` by default on the timing objects except the `fade`
 token and the fade builders, which use `Never`. Screens add explicit branches
