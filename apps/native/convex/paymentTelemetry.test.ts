@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { newConvexTest } from "./test.setup";
 import { internal } from "./_generated/api";
+import { RECEIPT_RETENTION_MS } from "./paymentTelemetry";
 
 const event = {
   id: "rc-event-1",
@@ -500,5 +501,38 @@ describe("cancellation lifecycle telemetry", () => {
       event: "subscription_uncancelled",
       payment_kind: "subscription",
     });
+  });
+});
+
+describe("receipt retention", () => {
+  it("purges rows past the retention window and keeps live ones", async () => {
+    const t = newConvexTest();
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "old" }),
+    );
+    vi.advanceTimersByTime(30 * 24 * 60 * 60 * 1000);
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "live" }),
+    );
+    vi.advanceTimersByTime(RECEIPT_RETENTION_MS);
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    const remaining = await t.run((ctx) =>
+      ctx.db.query("paymentAnalyticsReceipts").collect(),
+    );
+    expect(remaining.map((row) => row.eventId)).toEqual(["live"]);
+  });
+
+  it("keeps live rows when run before the retention window passes", async () => {
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const payment = parsePaymentTelemetry({
+      event: { ...event, app_user_id: userId },
+    });
+    if (!payment) throw new Error("Invalid fixture");
+    await t.mutation(internal.paymentTelemetry.enqueue, { payment });
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    expect(
+      await t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect()),
+    ).toHaveLength(1);
   });
 });

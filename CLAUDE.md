@@ -114,8 +114,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
   the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
-- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
-  weekly shelf delivery recovery, and hourly feedback inbox delivery retry.
+- **`crons.ts`** — stale image import cleanup, stale processing-item failure, waitlist Resend retry,
+  weekly shelf preparation, weekly shelf delivery recovery, hourly feedback inbox delivery retry, and
+  daily payment-receipt retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
