@@ -99,7 +99,11 @@ const lightTheme = {
     onOverlay: "#ffffff",
     keep: "#34d399",
     onKeep: "#065f46",
-    tabTint: "#bf8114",
+    // NativeTabs paints the selected tab's icon AND its label with this one
+    // color, so it carries small normal-size text and owes 4.5:1. Darkened
+    // from #bf8114, which cleared only 3.06:1 on background, 3.25:1 on
+    // surface and 2.80:1 on surfaceMuted: now 5.49, 5.82 and 5.03:1.
+    tabTint: "#8a5a0b",
   },
 } as const;
 

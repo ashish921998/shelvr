@@ -39,8 +39,9 @@ are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `onTint`, `keep`, `onKeep`, and `tabTint`. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label — white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` is the tab bar tint, darkened on the light theme to hold contrast
-against the bar. The light theme's text colors are deliberately darkened to
+`tabTint` is the tab bar tint. iOS `NativeTabs` paints the selected tab's icon
+and its label with it, so it carries normal-size text: the light theme darkens
+it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The light theme's text colors are deliberately darkened to
 clear WCAG AA (`muted` 4.92:1 on `surfaceMuted`, the darkest surface it
 renders on; `faint` uses the same accessible color for small captions;
 `primaryText` and `danger` just over 4.5:1 — the rationale sits in comments
