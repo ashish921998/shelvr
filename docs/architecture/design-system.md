@@ -86,15 +86,21 @@ a font asynchronously and caches nothing, so a slot holds blank for one screen
 transition rather than painting native text it would then have to animate away:
 `resolveMorphRender` staggers a first scene in only while nothing has been
 painted, and once native text has shown, every later canvas mount is opaque.
-`FONT_HOLD_MS` is budgeted from measurement rather than taste: the font
-resolves in 33ms for a session's first slot and 67ms warm over Metro's fetch,
-which a production build's bundled read only beats. When the hold does lose,
-the canvas replaces native text with a 1.8pt baseline step and no entrance,
-which is the graceful outcome the latch exists to produce.
-`tools/measure-header-morph.mjs` crops the title band out of a screen recording
-and re-checks the contract (no double paint, left-to-right stagger, ramp
-budget, monotonic ink, bounded blank hold), with a swap mode that reports the
-native-to-canvas step; run it before moving the hold or the morph timings.
+`FONT_HOLD_MS` is budgeted from measurement rather than taste. Timed from mount
+to resolve on an iOS simulator over Metro's fetch, the font arrives in 53ms for
+a session's first slot and 30ms warm, so the budget has room; the figure is a
+simulator one, and a real device or Android still pays a typeface parse a
+bundled read does not remove. The title's first ink lands later than the font
+by roughly `morph.enterDelay`, so a recording's blank band is not the font
+latency and must not be read as one. When the hold does lose, the canvas
+replaces native text with a 2pt baseline step and no entrance, which is the
+graceful outcome the latch exists to produce; that step is a real misalignment
+between the canvas baseline and where iOS puts a native title, not an artifact
+of the swap. `tools/measure-header-morph.mjs` crops the title band out of a
+screen recording and re-checks the contract (no double paint, left-to-right
+stagger, ramp budget, monotonic ink, bounded blank hold, no post-settle
+baseline shift), with a swap mode that reports the native-to-canvas step; run
+it before moving the hold or the morph timings.
 
 Reduce Motion is `System` by default on every timing object. Screens add
 explicit branches where spatial motion would carry meaning: navigation stacks
