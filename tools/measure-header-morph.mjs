@@ -28,12 +28,27 @@ if (!video) {
   console.error(usage);
   process.exit(2);
 }
-const arg = (name, fallback) => {
+// --from anchors the window past the push transition. Defaulting it to frame 0
+// analyzed that transition instead, whose overlapping screens defeat ink-based
+// anchoring and yield a confident but meaningless verdict, so it is required.
+const integerArg = (name, { fallback, min }) => {
   const at = rest.indexOf(`--${name}`);
-  return at === -1 ? fallback : Number(rest[at + 1]);
+  if (at === -1) {
+    if (fallback === undefined) {
+      console.error(`${usage}\n--${name} is required`);
+      process.exit(2);
+    }
+    return fallback;
+  }
+  const value = Number(rest[at + 1]);
+  if (!Number.isInteger(value) || value < min) {
+    console.error(`--${name} must be an integer of at least ${min}`);
+    process.exit(2);
+  }
+  return value;
 };
-const from = arg("from", 0);
-const window = arg("window", 120);
+const from = integerArg("from", { min: 0 });
+const window = integerArg("window", { fallback: 120, min: 1 });
 const modeAt = rest.indexOf("--mode");
 const mode = modeAt === -1 ? "stagger" : rest[modeAt + 1];
 if (mode !== "stagger" && mode !== "swap") {
@@ -50,19 +65,28 @@ const COLUMNS = 6;
 // size before trusting a number off this harness.
 const BAND = { x: 0.227, y: 0.062, width: 0.545, height: 0.035 };
 
-// The blank band may not outlast the component's hold budget. Read from the
-// motion token so the gate follows FONT_HOLD_MS instead of drifting from it,
-// plus two frames of capture slack.
+// Budgets the blank band is judged against, read from the motion tokens so the
+// gate follows them instead of drifting. Each lookup is scoped to its own
+// object: `enter` names both a duration and a spring.
 const motionSource = await readFile(
   new URL("../apps/native/src/lib/motion.ts", import.meta.url),
   "utf8",
 );
-const enterMs = Number(/\benter:\s*(\d+)/.exec(motionSource)?.[1]);
-if (!Number.isFinite(enterMs)) {
-  console.error("could not read motion.duration.enter from apps/native/src/lib/motion.ts");
-  process.exit(2);
-}
-const HOLD_LIMIT_MS = enterMs + 67;
+const token = (object, key, path) => {
+  const body = new RegExp(`${object}\\s*\\{([^}]*)`).exec(motionSource)?.[1];
+  const ms = Number(new RegExp(`\\b${key}:\\s*(\\d+)`).exec(body ?? "")?.[1]);
+  if (!Number.isFinite(ms)) {
+    console.error(`could not read ${path} from apps/native/src/lib/motion.ts`);
+    process.exit(2);
+  }
+  return ms;
+};
+const enterMs = token("duration\\s*=", "enter", "motion.duration.enter");
+const enterDelayMs = token(
+  "textMorph:",
+  "enterDelay",
+  "motion.textMorph.enterDelay",
+);
 
 const run = (cmd, args, binary) =>
   new Promise((resolve, reject) => {
@@ -87,6 +111,13 @@ const probe = await run("ffprobe", [
 const [width, height, rate] = probe.trim().split("\n");
 const [num, den] = rate.split("/").map(Number);
 const fps = num / (den || 1);
+// The blank band may not outlast the hold budget plus the entrance's own delay:
+// the count starts once the incoming header covers the band, and the first ink
+// trails the resolved font by textMorph.enterDelay, so a limit without it fails
+// a recording whose font arrived on time. Two frames of sampling slack, taken
+// from this recording's rate so the allowance means the same at 30fps as at 60
+// rather than the four frames a fixed 67ms bought at one of them.
+const HOLD_LIMIT_MS = Math.round(enterMs + enterDelayMs + 2000 / fps);
 const even = (n) => Math.max(2, Math.round(n / 2) * 2);
 const cw = even(Number(width) * BAND.width);
 const ch = even(Number(height) * BAND.height);
@@ -189,7 +220,10 @@ if (mode === "stagger") {
   // several frames, so order alone is not enough to pass.
   const ordered = lit.every((ms, i) => i === 0 || ms >= lit[i - 1]);
   const spread = lit.length > 1 ? lit[lit.length - 1] - lit[0] : 0;
-  const staggered = ordered && lit.length > 1 && spread >= 67;
+  // Four frames of this recording, not a fixed 67ms that means four frames at
+  // 60fps and two at 30.
+  const spreadMinMs = Math.round(4000 / fps);
+  const staggered = ordered && lit.length > 1 && spread >= spreadMinMs;
   const ramp = settled.ms - frames[appear].ms;
 
   // Post-settle layout drift. A native-to-canvas swap moves glyphs after the
@@ -228,7 +262,7 @@ if (mode === "stagger") {
   console.log("");
   verdict("P1 no double paint", drift <= 0.02, `max post-settle column drift ${(drift * 100).toFixed(1)}% (limit 2%)`);
   verdict("P1 baseline holds", baselineShift <= 3, `max post-settle baseline shift ${baselineShift.toFixed(1)}px (limit 3px)`);
-  verdict("P2 entrance staggered", staggered, `${ordered ? "left to right" : "out of order"} across ${lit.length} columns, spread ${spread}ms (want 67ms or more)`);
+  verdict("P2 entrance staggered", staggered, `${ordered ? "left to right" : "out of order"} across ${lit.length} columns, spread ${spread}ms (want ${spreadMinMs}ms or more)`);
   verdict("P2 ramp in budget", ramp >= 300 && ramp <= 1200, `${ramp}ms (want 300-1200ms)`);
   verdict("P2 ink monotonic", dips === 0, `${dips} frames dipped more than 2%`);
   verdict("P4 bounded absence", holdMs <= HOLD_LIMIT_MS, `blank band ${holdMs}ms (limit ${HOLD_LIMIT_MS}ms, and this is not the font latency)`);
