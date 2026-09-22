@@ -6,14 +6,14 @@
 //
 // The title band is cropped, converted to grayscale, and split into vertical
 // columns. Ink is measured against the page itself: the blank band that opens
-// the window is detected as light or dark, and a dark page flips the measure
-// to bright writing. Stagger mode anchors on the blank band frame, then
-// judges the entrance on saturation order, ramp length, monotonicity, and
-// whether the baseline holds once settled. Swap mode starts on a screen whose
-// title already painted and reports the largest single-frame column step,
-// which is the native-to-canvas shift P1 exists to catch. The window must not
-// contain the push transition, whose overlapping screens defeat ink-based
-// anchoring.
+// the window sets the baseline, and ink is each pixel's contrast past a gate
+// from that level in either direction, so a dark page needs no special case.
+// Stagger mode anchors on the blank band frame, then judges the entrance on
+// saturation order, ramp length, monotonicity, and whether the baseline holds
+// once settled. Swap mode starts on a screen whose title already painted and
+// reports the largest single-frame column step, which is the native-to-canvas
+// shift P1 exists to catch. The window must not contain the push transition,
+// whose overlapping screens defeat ink-based anchoring.
 //
 // The blank band is not the font-resolve latency, and no number off this
 // harness should be reported as one: the count starts only once the incoming
@@ -203,8 +203,9 @@ for (let i = 0; i < FRAME; i++) {
 }
 const bg = Math.round(bgSum / bgPixels);
 const light = bg >= 128;
-const skip = (v) => Math.abs(v - bg) <= 20;
-const amount = (v) => Math.abs(v - bg);
+const INK_GATE = 20;
+const skip = (v) => Math.abs(v - bg) <= INK_GATE;
+const amount = (v) => Math.abs(v - bg) - INK_GATE;
 const frames = [];
 for (let f = 0; f < total; f++) {
   const base = f * FRAME;
