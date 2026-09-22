@@ -88,7 +88,10 @@ const lightTheme = {
     primaryText: "#935d09",
     border: "#ece3d1",
     imageBorder: "rgba(0, 0, 0, 0.07)",
-    // Darkened from #c05a3a so destructive labels clear 4.5:1 (4.51:1).
+    // Darkened from #c05a3a so destructive text clears 4.5:1 on paper
+    // (4.84:1) and the background (4.57:1); on surfaceMuted (4.18:1) and
+    // primarySoft (4.07:1) it stays under AA, so destructive labels must
+    // not render on those surfaces.
     danger: "#b75232",
     overlay: "rgba(43, 36, 24, 0.45)",
     // Dark label on the amber fill; white on #e6a23c is 2.19:1.

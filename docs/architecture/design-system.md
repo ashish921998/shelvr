@@ -70,8 +70,9 @@ and the curves (`out`, `inOut`, `sheet`) match Expo's easing exactly in both
 worklet and CSS form, so Reanimated timing and gesture-captured CSS
 transitions feel identical (`motionCSS` exists because CSS easing objects
 must stay outside `motion` or gesture capturing a spring tries to serialize
-them to the UI runtime). Reach for `motion.timing.*` in `withTiming`/
-`withSpring` calls, `motion.spring.*` for gesture settles and sheets, and
+them to the UI runtime). Reach for `motion.timing.*` in `withTiming` calls
+(timing objects carry an easing, so springs cannot take them),
+`motion.spring.*` for gesture settles and sheets, and
 `motion.scale.pressed` for press feedback. The `fadeIn`/`fadeOut` builders
 animate opacity only and stay gentle under Reduce Motion; never attach them
 (or any `entering`) to recycled list rows — rows recycle constantly, so every
@@ -102,8 +103,9 @@ stagger, ramp budget, monotonic ink, bounded blank hold, no post-settle
 baseline shift), with a swap mode that reports the native-to-canvas step; run
 it before moving the hold or the morph timings.
 
-Reduce Motion is `System` by default on every timing object. Screens add
-explicit branches where spatial motion would carry meaning: navigation stacks
+Reduce Motion is `System` by default on the timing objects except the `fade`
+token and the fade builders, which use `Never`. Screens add explicit branches
+where spatial motion would carry meaning: navigation stacks
 fade instead of sliding, zoom transitions are suppressed, the tidy card
 container drops its transforms, and the text morph falls back to native text
 (alongside Dynamic Type above 1x and complex scripts, which native text
