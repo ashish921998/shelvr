@@ -130,7 +130,8 @@ export const CardAnimationProvider: FC<Props> = ({
           if (!success) return;
 
           // onChange already parked the full-travel offsets on the pan values,
-          // so the decision reads from there and folds in release velocity.
+          // so the decision reads from there and folds in release velocity —
+          // momentum may extend a drag but never reverse it.
           const action = swipeDecision(
             panX.get(),
             panY.get(),

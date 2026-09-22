@@ -286,6 +286,24 @@ describe("CardAnimationProvider", () => {
     );
   });
 
+  it("springs home when a pull-back after the threshold releases against it", () => {
+    const { card, deck, onDecision } = setup(0);
+    // The recorded repro: drag past Keep, settle, yank back to center, and
+    // lift while the finger still pulls left. The release momentum must not
+    // turn the abort into a Delete.
+    fire("onBegin", { absoluteY: 400 });
+    fire("onChange", { translationX: 150, translationY: 0 });
+    fire("onChange", { translationX: 0, translationY: 0 });
+    fire("onEnd", { velocityX: -500, velocityY: 0 }, true);
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck.currentIndex.value).toBe(1);
+    expect(deck.animatedIndex.value).toEqual({ driver: "spring", value: 1 });
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(haptics.commit).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
+  });
+
   it("cancels in-flight animations and resumes from the card's offset on begin", () => {
     const { card, deck } = setup(0);
     // A card mid-settle, 120px out with some vertical drift.

@@ -6,11 +6,17 @@ type SwipeProgress = {
   progress: number;
 };
 
-// Animate Expo's momentum projection, in points (velocity is points/second).
+// Release-momentum window in seconds: the travel the finger's parting speed
+// adds after the lift. 0.05s is RNGH Swipeable's DRAG_TOSS, the convention
+// for swipe-a-card releases. The old 0.998-deceleration projection (~0.5s of
+// coast) let an aborting pull-back at ~500 pt/s project ~250 pt and commit
+// the opposite action from rest.
+const MOMENTUM_WINDOW_S = 0.05;
+
+// The extra travel release velocity contributes, in points.
 function project(velocity: number) {
   "worklet";
-  const decelerationRate = 0.998;
-  return ((velocity / 1000) * decelerationRate) / (1 - decelerationRate);
+  return velocity * MOMENTUM_WINDOW_S;
 }
 
 /**
@@ -43,7 +49,9 @@ export function swipeProgress(
 /**
  * Pure commit decision for a released tidy card: the dominant projected axis
  * wins, so a fast flick commits even when its translation is short and a
- * downward drag never does. Returns null when the pan springs back.
+ * downward drag never does. Momentum may extend a drag in its own direction
+ * but never carry its projection across rest, so a pull-back release springs
+ * home. Returns null when the pan springs back.
  */
 export function swipeDecision(
   x: number,
@@ -56,6 +64,15 @@ export function swipeDecision(
   "worklet";
   const projectedX = x + project(velocityX);
   const projectedY = y + project(velocityY);
+  // The direction guard: a projected position on the far side of the origin
+  // from where the card sat is a reversal at lift, not a commit direction.
+  // Momentum may speed a drag up, never turn it around.
+  if (x !== 0 && projectedX !== 0 && Math.sign(x) !== Math.sign(projectedX)) {
+    return null;
+  }
+  if (y !== 0 && projectedY !== 0 && Math.sign(y) !== Math.sign(projectedY)) {
+    return null;
+  }
   const { action, progress } = swipeProgress(
     projectedX,
     projectedY,

@@ -41,8 +41,35 @@ describe("swipeDecision", () => {
   });
 
   it("commits a short flick through velocity projection", () => {
-    // 30px of travel plus ~1000px of projected momentum clears the threshold.
+    // 30px of travel plus the projected momentum (0.05s × 2000 pt/s = 100px)
+    // clears the threshold.
     expect(swipeDecision(30, 0, 2000, 0, TX, TY)).toBe("keep");
+  });
+
+  it("refuses a pull-back released at the origin", () => {
+    // Drag past a threshold, yank back to center, and lift while the finger
+    // still pulls away: with ~0.5s of coast a 500 pt/s pull-back projected
+    // ~250px and committed the opposite action; 0.05s leaves 25px, far short.
+    expect(swipeDecision(0, 0, -500, 0, TX, TY)).toBeNull();
+    expect(swipeDecision(0, 0, 500, 0, TX, TY)).toBeNull();
+  });
+
+  it("refuses momentum that carries a parked card across rest", () => {
+    // 150px parked right (Keep lit) with a hard leftward release flings the
+    // projection to the far side of the origin: the direction guard refuses.
+    expect(swipeDecision(150, 0, -6000, 0, TX, TY)).toBeNull();
+  });
+
+  it("lets momentum extend a drag in its own direction", () => {
+    // A leftward drag released still moving left commits delete: momentum
+    // agrees with the parked offset instead of opposing it.
+    expect(swipeDecision(-250, 0, -2000, 0, TX, TY)).toBe("delete");
+  });
+
+  it("keeps a parked card when a late velocity blip never crosses rest", () => {
+    // 230px right is long past the threshold; a small opposing velocity at
+    // lift shrinks the projection but never flips it across the origin.
+    expect(swipeDecision(230, 0, -800, 0, TX, TY)).toBe("keep");
   });
 
   it("lets upward velocity rescue a sub-threshold vertical pan", () => {
