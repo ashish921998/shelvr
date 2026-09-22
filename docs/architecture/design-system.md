@@ -81,7 +81,11 @@ effect with its own budget, bounded scenes, and interruption handling; see
 `components/animated-text.tsx` and `lib/text-morph.ts` before touching it.
 Both scenes are glyph-bounded in `lib/text-morph.ts`: `MAX_MORPH_GLYPHS` caps
 the laid-out title (replacing any tail with "…") and the retiring exit layer,
-whichever a long note or rapid paging would otherwise blow past.
+whichever a long note or rapid paging would otherwise blow past. Skia resolves
+a font asynchronously and caches nothing, so a slot holds blank for one screen
+transition rather than painting native text it would then have to animate away:
+`resolveMorphRender` staggers a first scene in only while nothing has been
+painted, and once native text has shown, every later canvas mount is opaque.
 
 Reduce Motion is `System` by default on every timing object. Screens add
 explicit branches where spatial motion would carry meaning: navigation stacks

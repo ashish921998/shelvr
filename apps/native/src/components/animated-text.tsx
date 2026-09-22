@@ -6,6 +6,7 @@ import {
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
+  resolveMorphRender,
   type MorphTransition,
 } from "@/lib/text-morph";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -60,6 +61,11 @@ const CANVAS_HEIGHT = 56;
 // canvas on screen and the text, centered within it, lands dead-center.
 const DEFAULT_WIDTH = 240;
 const DEFAULT_FONT_SIZE = 24;
+// How long a slot may stay blank waiting for Skia to resolve its font, so the
+// title can rise into an empty header instead of replacing text already on
+// screen. About one screen transition, so the gap hides inside the push, and
+// bounded so a slow or failed font load still shows the title.
+const FONT_HOLD_MS = motion.duration.enter;
 
 // How long a started transition stays active: the slowest of its staggered
 // entrance and its delayed position glide. An interrupted transition drops the
@@ -231,12 +237,38 @@ export function AnimatedText({
     fontSize,
   );
 
+  // Native text shapes joined scripts, bidi, combining marks and emoji as
+  // runs; Dynamic Type and Reduce Motion skip the spatial glyph choreography.
   const nativeText =
     needsNativeText(text) ||
     Boolean(font?.getGlyphIDs(text).some((glyph) => glyph === 0));
-  // Native text shapes joined scripts, bidi, combining marks and emoji as
-  // runs; Dynamic Type and Reduce Motion skip the spatial glyph choreography.
-  if (!font || nativeText || reducedMotion || fontScale > 1) {
+  const forceNative = nativeText || reducedMotion || fontScale > 1;
+
+  // Latches once native text has been on screen, so a later canvas mount can
+  // never blank a title the reader is already looking at. Native shaping
+  // latches on the next tick, having painted; a pending font gets the hold.
+  const [paintedNative, setPaintedNative] = useState(false);
+  useEffect(() => {
+    if (paintedNative) return;
+    // A resolved font with nothing painted yet is the one case that may
+    // stagger in, so it is also the one case that starts no timer.
+    if (font && !forceNative) return;
+    const timer = setTimeout(
+      () => setPaintedNative(true),
+      forceNative ? 0 : FONT_HOLD_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [paintedNative, forceNative, font]);
+
+  const { mode, animateOnMount } = resolveMorphRender(
+    Boolean(font),
+    forceNative,
+    paintedNative,
+  );
+
+  // The `!font` test never decides the branch, since mode is only "morph" once
+  // the font resolves. It is what narrows the type for the canvas below.
+  if (!font || mode !== "morph") {
     return (
       <View style={[styles.container, { width }, containerStyle]}>
         <RNText
@@ -244,6 +276,9 @@ export function AnimatedText({
             style,
             { maxWidth: width },
             nativeText && { fontFamily: undefined },
+            // Laid out but unpainted: the canvas is about to rise into this
+            // slot, and the reader must not watch a title appear then vanish.
+            mode === "hold" && styles.held,
           ]}
           numberOfLines={truncate ? 1 : undefined}
         >
@@ -272,14 +307,16 @@ export function AnimatedText({
       baselineY={baselineY}
       blurMax={blurMax}
       truncate={truncate}
+      animateOnMount={animateOnMount}
       containerStyle={containerStyle}
     />
   );
 }
 
-// Mounts only when the font is ready, with a complete, opaque initial scene:
-// rebuilding a native header must not replay a transparent title. Unmounting
-// when native shaping takes over also drops any stale exit glyphs.
+// Mounts only when the font is ready. Its initial scene staggers in only when
+// the slot painted nothing before it, so rebuilding a native header never
+// replays a transparent title. Unmounting when native shaping takes over also
+// drops any stale exit glyphs.
 function MorphText({
   text,
   font,
@@ -291,6 +328,7 @@ function MorphText({
   baselineY,
   blurMax,
   truncate,
+  animateOnMount,
   containerStyle,
 }: {
   text: string;
@@ -303,6 +341,7 @@ function MorphText({
   baselineY: number;
   blurMax: number;
   truncate: boolean;
+  animateOnMount: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }) {
   const measure = useMemo(
@@ -312,12 +351,36 @@ function MorphText({
         .reduce((sum, advance) => sum + advance, 0),
     [font],
   );
+  const [mount] = useState(() => {
+    const laid = layoutMorphText(text, width, overscan, measure, truncate);
+    if (!animateOnMount || laid.length === 0) {
+      return { cells: laid, deadline: null as number | null };
+    }
+    const now = performance.now();
+    return {
+      // Reconciling against no previous scene marks every glyph as added, so
+      // the whole title staggers in the way a text change does.
+      cells: reconcileMorphCells(
+        [],
+        laid,
+        now,
+        morph.exit.duration,
+        morph.stagger,
+      ),
+      // Record the entrance as a running transition. A title that changes
+      // mid-stagger must read as an interruption, not stack a second one.
+      deadline: now + morphDuration(laid.length, false),
+    };
+  });
   const [{ cells, interrupted }, setTransition] = useState(() => ({
-    cells: layoutMorphText(text, width, overscan, measure, truncate),
+    cells: mount.cells,
     interrupted: false,
   }));
-  const scene = useRef(cells);
-  const lastChange = useRef<MorphTransition>({ text, deadline: null });
+  const scene = useRef(mount.cells);
+  const lastChange = useRef<MorphTransition>({
+    text,
+    deadline: mount.deadline,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -413,5 +476,8 @@ const styles = StyleSheet.create(() => ({
   container: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  held: {
+    opacity: 0,
   },
 }));

@@ -26,6 +26,33 @@ export type MorphCell = {
   exitAt?: number;
 };
 
+/** What a morph slot paints, and whether its first scene may stagger in. */
+type MorphRender = {
+  mode: "native" | "hold" | "morph";
+  animateOnMount: boolean;
+};
+
+/**
+ * Decides what a morph slot paints while its Skia font resolves. Skia loads a
+ * font in an effect and caches nothing, so the first render of every mount has
+ * no canvas. Painting the title natively in that gap and then morphing it in
+ * would blank text the reader can already see, so an untouched slot `hold`s
+ * blank and the letters rise into it. `paintedNative` latches once native text
+ * has been shown — the hold expired, the font failed, or native shaping owns
+ * this string — and from then on the canvas mounts opaque.
+ */
+export function resolveMorphRender(
+  fontReady: boolean,
+  forceNative: boolean,
+  paintedNative: boolean,
+): MorphRender {
+  if (forceNative) return { mode: "native", animateOnMount: false };
+  if (!fontReady) {
+    return { mode: paintedNative ? "native" : "hold", animateOnMount: false };
+  }
+  return { mode: "morph", animateOnMount: !paintedNative };
+}
+
 /**
  * Lays a string out as keyed glyph cells, centered in a slot of `width`,
  * offset by the canvas `overscan` on every side. The run is hard-bounded by

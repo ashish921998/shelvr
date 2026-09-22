@@ -6,11 +6,55 @@ import {
   layoutMorphText,
   pruneMorphCells,
   reconcileMorphCells,
+  resolveMorphRender,
   type MorphCell,
 } from "./text-morph";
 
 // Every glyph advances 10px, so widths and centering are easy to predict.
 const advance10 = () => 10;
+
+describe("resolveMorphRender", () => {
+  it("holds an untouched slot blank while its font resolves", () => {
+    expect(resolveMorphRender(false, false, false)).toEqual({
+      mode: "hold",
+      animateOnMount: false,
+    });
+  });
+
+  it("staggers the first canvas in when nothing was painted before it", () => {
+    expect(resolveMorphRender(true, false, false)).toEqual({
+      mode: "morph",
+      animateOnMount: true,
+    });
+  });
+
+  it("shows native text once the hold has expired", () => {
+    expect(resolveMorphRender(false, false, true)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+  });
+
+  it("mounts opaque over a title the reader can already see", () => {
+    // The slow-font and native-shaping paths both land here: replacing
+    // readable text with a transparent entrance is the regression to avoid.
+    expect(resolveMorphRender(true, false, true)).toEqual({
+      mode: "morph",
+      animateOnMount: false,
+    });
+  });
+
+  it("keeps native shaping, Reduce Motion and Dynamic Type on native text", () => {
+    expect(resolveMorphRender(true, true, false)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+    expect(resolveMorphRender(false, true, false)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+  });
+});
 
 describe("layoutMorphText", () => {
   it("preserves the full glyph budget when no ellipsis is requested", () => {
@@ -121,6 +165,17 @@ describe("reconcileMorphCells", () => {
     // Present cells come first so they win any budget contention.
     expect(next[0]?.key).toBe("b#0");
     expect(next[1]?.key).toBe("d#0");
+  });
+
+  it("staggers a whole first scene in against no previous scene", () => {
+    // How a slot that painted nothing yet mounts its entrance: every glyph
+    // counts as added, and nothing is left retiring behind it.
+    const present = layoutMorphText("abc", 240, 0, advance10);
+    const next = reconcileMorphCells([], present, 1000, 240, 25);
+
+    expect(next).toHaveLength(3);
+    expect(next.every((cell) => cell.animateIn === true)).toBe(true);
+    expect(next.every((cell) => cell.phase === "present")).toBe(true);
   });
 
   it("schedules each retirement after the exit duration plus its stagger", () => {
