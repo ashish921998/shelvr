@@ -363,6 +363,20 @@ describe("consent delivery reliability", () => {
     ).toBe("false");
     expect((await f.row())?.syncState).toBe("synced");
   });
+  it("spends an attempt when lease recovery rescues an abandoned action", async () => {
+    const f = await fixture();
+    mockRevenueCat();
+    await f.review(true);
+    const row = await f.row();
+    if (!row) throw new Error("Missing consent");
+    await f.t.mutation(internal.legalConsentSync.claim, { id: row._id });
+    vi.setSystemTime(Date.now() + CONSENT_SYNC_LEASE_MS + 1);
+    await f.t.mutation(internal.legalConsent.retry, {});
+    expect(await f.row()).toMatchObject({
+      syncState: "pending",
+      attempts: 1,
+    });
+  });
   it("recovers an abandoned action after its runtime limit and rejects stale completions", async () => {
     const f = await fixture();
     mockRevenueCat();

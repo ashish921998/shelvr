@@ -535,4 +535,29 @@ describe("receipt retention", () => {
       await t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect()),
     ).toHaveLength(1);
   });
+
+  it("chains across pages until every expired row is purged", async () => {
+    const t = newConvexTest();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 250; i++) {
+        await ctx.db.insert("paymentAnalyticsReceipts", {
+          eventId: `expired-${i}`,
+        });
+      }
+    });
+    vi.advanceTimersByTime(30 * 24 * 60 * 60 * 1000);
+    await t.run((ctx) =>
+      ctx.db.insert("paymentAnalyticsReceipts", { eventId: "live" }),
+    );
+    vi.advanceTimersByTime(RECEIPT_RETENTION_MS);
+    // Two full pages chain themselves; the third call drains the remainder
+    // and stops without scheduling more.
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
+    const remaining = await t.run((ctx) =>
+      ctx.db.query("paymentAnalyticsReceipts").collect(),
+    );
+    expect(remaining.map((row) => row.eventId)).toEqual(["live"]);
+  });
 });

@@ -135,7 +135,14 @@ export const retry = internalMutation({
         )
         .take(50);
       for (const row of rows) {
-        await ctx.db.patch(row._id, { syncState: "pending", nextSyncAt: now });
+        // A syncing row past its lease means the action died before finish
+        // could spend the attempt — spend it here so crash-recovery loops
+        // cannot retry for free forever (mirrors feedback delivery).
+        await ctx.db.patch(row._id, {
+          syncState: "pending",
+          nextSyncAt: now,
+          attempts: state === "syncing" ? row.attempts + 1 : row.attempts,
+        });
         await ctx.scheduler.runAfter(0, internal.legalConsentSync.send, {
           id: row._id,
         });
