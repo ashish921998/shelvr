@@ -5,16 +5,21 @@
 //   node tools/measure-header-morph.mjs <recording.mp4> --from <frame> [--window 120] [--mode stagger|swap]
 //
 // The title band is cropped, converted to grayscale, and split into vertical
-// columns. Stagger mode anchors on the blank hold frame (the slot is provably
-// empty while the font resolves), then judges the entrance on saturation
-// order, ramp length, and monotonicity. Swap mode starts on a screen whose
-// title already painted and reports the largest single-frame column step,
-// which is the native-to-canvas glyph shift that P1 exists to catch. The
-// window must not contain the push transition, whose overlapping screens
-// defeat ink-based anchoring.
+// columns. Stagger mode anchors on the blank band frame, then judges the
+// entrance on saturation order, ramp length, monotonicity, and whether the
+// baseline holds once settled. Swap mode starts on a screen whose title
+// already painted and reports the largest single-frame column step, which is
+// the native-to-canvas shift P1 exists to catch. The window must not contain
+// the push transition, whose overlapping screens defeat ink-based anchoring.
+//
+// The blank band is not the font-resolve latency, and no number off this
+// harness should be reported as one: the count starts only once the incoming
+// header covers the band, and the entrance's own delay sits between the font
+// arriving and the first ink. Time the font inside the app instead.
 //
 // Exits 0 when every predicate passes, 1 on a FAIL, 2 on INCONCLUSIVE.
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 
 const [video, ...rest] = process.argv.slice(2);
 const usage =
@@ -40,8 +45,24 @@ if (mode !== "stagger" && mode !== "swap") {
 const dump = rest.includes("--dump");
 const COLUMNS = 6;
 // Fractions of the screen holding the native header title, measured from the
-// accessibility frame of the title node on the item-detail screen.
+// accessibility frame of the title node on the item-detail screen. Fits the
+// device it was measured on; re-derive it from `describe` for another screen
+// size before trusting a number off this harness.
 const BAND = { x: 0.227, y: 0.062, width: 0.545, height: 0.035 };
+
+// The blank band may not outlast the component's hold budget. Read from the
+// motion token so the gate follows FONT_HOLD_MS instead of drifting from it,
+// plus two frames of capture slack.
+const motionSource = await readFile(
+  new URL("../apps/native/src/lib/motion.ts", import.meta.url),
+  "utf8",
+);
+const enterMs = Number(/\benter:\s*(\d+)/.exec(motionSource)?.[1]);
+if (!Number.isFinite(enterMs)) {
+  console.error("could not read motion.duration.enter from apps/native/src/lib/motion.ts");
+  process.exit(2);
+}
+const HOLD_LIMIT_MS = enterMs + 67;
 
 const run = (cmd, args, binary) =>
   new Promise((resolve, reject) => {
@@ -162,7 +183,13 @@ if (mode === "stagger") {
     return hit ? hit.ms : null;
   });
   const lit = saturation.filter((ms) => ms !== null);
+  // Adjacent columns legitimately tie: the per-glyph stagger is shorter than a
+  // frame, so two columns can saturate in the same one. What separates a
+  // stagger from a uniform cross-fade is that the whole run spreads over
+  // several frames, so order alone is not enough to pass.
   const ordered = lit.every((ms, i) => i === 0 || ms >= lit[i - 1]);
+  const spread = lit.length > 1 ? lit[lit.length - 1] - lit[0] : 0;
+  const staggered = ordered && lit.length > 1 && spread >= 67;
   const ramp = settled.ms - frames[appear].ms;
 
   // Post-settle layout drift. A native-to-canvas swap moves glyphs after the
@@ -174,6 +201,17 @@ if (mode === "stagger") {
       if (delta > drift) drift = delta;
     }
   }
+  // Column ink barely moves when the swap is a pure vertical translation, so
+  // the baseline is judged on its own. This catches the swap on any title,
+  // where a per-column ink threshold depends on which letters the title has.
+  // The limit clears the ~1.6px of anti-aliasing wobble a settled title shows
+  // and still catches the measured 5.5px native-to-canvas step.
+  let baselineShift = 0;
+  for (const r of frames.slice(settleAt + 1)) {
+    if (r.cy === null) continue;
+    const delta = Math.abs(r.cy - settled.cy);
+    if (delta > baselineShift) baselineShift = delta;
+  }
   let dips = 0;
   for (let i = appear + 1; i <= settleAt; i++) {
     if (frames[i].ink < frames[i - 1].ink * 0.98) dips++;
@@ -181,16 +219,22 @@ if (mode === "stagger") {
   const holdMs = Math.round((hold * 1000) / fps);
 
   console.log("");
-  console.log(`blank hold before the entrance: ${hold} frame(s), ${holdMs}ms (budget: the font resolves within FONT_HOLD_MS)`);
+  console.log(`blank band before the entrance: ${hold} frame(s), ${holdMs}ms`);
+  console.log(`  this is not the font-resolve latency: it starts once the incoming`);
+  console.log(`  header covers the band, and the first ink trails the font by about`);
+  console.log(`  morph.enterDelay. Time the font in the app, not from a recording.`);
   console.log(`column saturation (ms): ${saturation.map((ms) => (ms === null ? "-" : ms)).join(" ")}`);
   console.log(`centroid ${frames[appear].cy.toFixed(1)} -> ${settled.cy.toFixed(1)}`);
   console.log("");
   verdict("P1 no double paint", drift <= 0.02, `max post-settle column drift ${(drift * 100).toFixed(1)}% (limit 2%)`);
-  verdict("P2 entrance staggered", ordered && lit.length > 1, `saturation order ${ordered ? "left to right" : "out of order"} across ${lit.length} columns`);
+  verdict("P1 baseline holds", baselineShift <= 3, `max post-settle baseline shift ${baselineShift.toFixed(1)}px (limit 3px)`);
+  verdict("P2 entrance staggered", staggered, `${ordered ? "left to right" : "out of order"} across ${lit.length} columns, spread ${spread}ms (want 67ms or more)`);
   verdict("P2 ramp in budget", ramp >= 300 && ramp <= 1200, `${ramp}ms (want 300-1200ms)`);
   verdict("P2 ink monotonic", dips === 0, `${dips} frames dipped more than 2%`);
-  verdict("P4 bounded absence", holdMs <= 300, `blank hold ${holdMs}ms (limit 300ms)`);
-  const pass = drift <= 0.02 && ordered && lit.length > 1 && ramp >= 300 && ramp <= 1200 && dips === 0 && holdMs <= 300;
+  verdict("P4 bounded absence", holdMs <= HOLD_LIMIT_MS, `blank band ${holdMs}ms (limit ${HOLD_LIMIT_MS}ms, and this is not the font latency)`);
+  const pass =
+    drift <= 0.02 && baselineShift <= 3 && staggered &&
+    ramp >= 300 && ramp <= 1200 && dips === 0 && holdMs <= HOLD_LIMIT_MS;
   process.exitCode = pass ? 0 : 1;
 } else {
   const peak = Math.max(...frames.map((r) => r.ink));
