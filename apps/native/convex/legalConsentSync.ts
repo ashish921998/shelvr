@@ -84,7 +84,11 @@ export const finish = internalMutation({
       return null;
     }
     const attempts = row.changedAt === changedAt ? row.attempts + 1 : 0;
-    if (attempts >= MAX_SYNC_ATTEMPTS) {
+    // Deletion withdrawals are exempt: the refund-consent doc promises the
+    // record remains "until remote revocation succeeds, then is removed", and
+    // no user action can ever revive a deleted account's row. Their count is
+    // bounded (one per deletion) and the 1h backoff cap keeps them cheap.
+    if (!row.deleting && attempts >= MAX_SYNC_ATTEMPTS) {
       await ctx.db.patch(id, {
         syncState: "failed",
         attempts,

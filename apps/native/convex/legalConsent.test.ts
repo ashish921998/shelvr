@@ -289,6 +289,10 @@ describe("consent delivery reliability", () => {
       syncState: "failed",
       attempts: MAX_SYNC_ATTEMPTS,
     });
+    expect(await f.signedIn.query(api.legalConsent.get, {})).toMatchObject({
+      syncPending: true,
+      syncFailed: true,
+    });
     // The recovery cron skips capped rows instead of rescheduling forever.
     await f.t.mutation(internal.legalConsent.retry, {});
     expect(await f.row()).toMatchObject({
@@ -302,6 +306,36 @@ describe("consent delivery reliability", () => {
     expect(await f.row()).toMatchObject({ syncState: "pending", attempts: 0 });
     await f.send();
     expect((await f.row())?.syncState).toBe("synced");
+    expect(await f.signedIn.query(api.legalConsent.get, {})).toMatchObject({
+      syncPending: false,
+      syncFailed: false,
+    });
+  });
+  it("never caps deletion withdrawals, which no user action can revive", async () => {
+    const f = await fixture();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockRejectedValue(new Error("rc_down"));
+    vi.stubGlobal("fetch", fetchMock);
+    await f.review(true);
+    const row = await f.row();
+    if (!row) throw new Error("Missing fixture consent");
+    await f.t.run((ctx) =>
+      ctx.db.patch(row._id, {
+        deleting: true,
+        syncState: "pending",
+        attempts: 0,
+        nextSyncAt: Date.now(),
+      }),
+    );
+    for (let attempt = 0; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
+      if (attempt > 0) vi.setSystemTime(Date.now() + 3_600_000);
+      await f.send();
+    }
+    expect(await f.row()).toMatchObject({
+      deleting: true,
+      syncState: "pending",
+      attempts: MAX_SYNC_ATTEMPTS + 1,
+    });
   });
   it("serializes a withdrawal behind an in-flight grant and ignores duplicate workers", async () => {
     const f = await fixture();

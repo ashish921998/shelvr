@@ -20,6 +20,7 @@ export const get = query({
       acceptedAt: v.optional(v.number()),
       refundSharing: v.boolean(),
       syncPending: v.boolean(),
+      syncFailed: v.boolean(),
     }),
   ),
   handler: async (ctx) => {
@@ -35,6 +36,7 @@ export const get = query({
       acceptedAt: row.acceptedAt,
       refundSharing: row.refundSharing,
       syncPending: row.syncState !== "synced",
+      syncFailed: row.syncState === "failed",
     };
   },
 });

@@ -42,7 +42,8 @@ older attribute updates. One claimed worker per record also serializes delivery;
 a changed decision schedules another pass after the current worker finishes.
 Failures retry with backoff up to ten attempts, then stop as `failed` for
 manual inspection; a later consent change revives the record with a fresh
-budget. A bounded minute cron recovers lost jobs
+budget. Deletion withdrawals never cap — the record is only removed once
+remote revocation succeeds. A bounded minute cron recovers lost jobs
 and claims older than the maximum action runtime. Missing credentials cannot
 mark a grant synced. The worker creates a missing RevenueCat customer when a
 live user's choice precedes SDK registration.

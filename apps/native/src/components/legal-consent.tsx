@@ -135,7 +135,7 @@ export function LegalConsentPreference() {
             : "refundConsent.disabled",
         )}
       </Text>
-      {consent?.syncPending ? (
+      {consent?.syncPending && !consent.syncFailed ? (
         <Text style={styles.body}>{t("refundConsent.syncPending")}</Text>
       ) : null}
       <Pressable
