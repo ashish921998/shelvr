@@ -281,8 +281,6 @@ export const ItemDetail = memo(function ItemDetail({
     </>
   ) : null;
 
-  // FlashList can recycle this page instance for a different item; a
-  // recycled page must open at the top, not at the previous item's offset.
   const scrollProps = {
     ref: scrollRef,
     testID: item.fixtureKey

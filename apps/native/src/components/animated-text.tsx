@@ -67,9 +67,9 @@ const DEFAULT_FONT_SIZE = 24;
 // bounded so a slow or failed font load still shows the title. Timed from
 // mount to resolve on an iOS simulator over Metro's fetch: 53ms for a
 // session's first slot, 30ms warm. Losing the race costs a late title and a
-// 2pt baseline step where the canvas replaces native text. Re-time it before
-// moving this, on a real device and on Android, where the typeface parse a
-// bundled read still pays is the part a simulator flatters.
+// 2pt baseline step where the canvas replaces native text. The figures are
+// simulator ones; a real device or Android still pays a typeface parse, so
+// re-time it there before moving the hold.
 const FONT_HOLD_MS = motion.duration.enter;
 
 // How long a started transition stays active: the slowest of its staggered

@@ -111,10 +111,8 @@ export const CardAnimationProvider: FC<Props> = ({
           const x = startX.get() + event.translationX;
           const y = startY.get() + event.translationY;
           // Progress in card-index space: 1.0 of shift equals one card
-          // dismissed. The shift reads the shared dominance rule, so the
-          // reveal never promises a commit the release will refuse — a
-          // downward-dominant drag shifts the deck nothing, matching the
-          // release's refusal.
+          // dismissed. The shift reads the shared dominance rule, so a
+          // downward-dominant drag shifts the deck nothing.
           const { progress } = swipeProgress(x, y, panDistanceX, panDistanceY);
           animatedIndex.set(currentIndex.get() - Math.min(1, progress));
 
