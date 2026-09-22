@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
+import { logEvent } from "./model/log";
 import { TERMS_VERSION } from "./model/legalConsent";
 import { MAX_SYNC_ATTEMPTS, deliversGrant } from "./legalConsentSync";
 
@@ -152,6 +153,11 @@ export const retry = internalMutation({
             syncState: "failed",
             attempts,
             nextSyncAt: now,
+          });
+          logEvent("error", "refund_consent_sync_exhausted", {
+            consent_id: row._id,
+            attempts,
+            via: "recovery",
           });
           continue;
         }

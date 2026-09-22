@@ -10,11 +10,13 @@ import {
 } from "./model/legalConsent";
 import { errorName, logEvent } from "./model/log";
 
-/** Matches the bounded budgets of the feedback and waitlist delivery
- * machines: capped rows stop consuming the recovery crons and stay `failed`
- * for manual inspection. A later consent change revives the row via
- * `queueSync`, which resets the attempt count. */
-export const MAX_SYNC_ATTEMPTS = 10;
+/** Capped rows stop consuming the recovery crons and stay `failed` for
+ * manual inspection (logged as `refund_consent_sync_exhausted`). A later
+ * consent change revives the row via `queueSync`, which resets the attempt
+ * count. With `finish`'s backoff (doubling from 2s, capped at 1h) twenty
+ * attempts span roughly ten hours, so a RevenueCat outage shorter than a
+ * working day cannot park a grant. */
+export const MAX_SYNC_ATTEMPTS = 20;
 
 /** Whether delivering this row would report an allowed grant to RevenueCat.
  * Only grants may cap out: a withdrawal (sharing off, obsolete terms
@@ -102,6 +104,11 @@ export const finish = internalMutation({
         syncState: "failed",
         attempts,
         nextSyncAt: Date.now(),
+      });
+      logEvent("error", "refund_consent_sync_exhausted", {
+        consent_id: id,
+        attempts,
+        via: "finish",
       });
       return null;
     }

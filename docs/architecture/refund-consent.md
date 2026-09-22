@@ -40,11 +40,12 @@ The monotonic `changedAt` timestamp identifies each decision for stale-worker
 checks and supplies RevenueCat’s `updated_at_ms` value. RevenueCat ignores
 older attribute updates. One claimed worker per record also serializes delivery;
 a changed decision schedules another pass after the current worker finishes.
-Failures retry with backoff up to ten attempts, then stop as `failed` for
-manual inspection; a later consent change revives the record with a fresh
-budget. Withdrawals never cap — any sync that revokes remote sharing (sharing
-off, obsolete terms acceptance, or deletion) retries until RevenueCat accepts
-it. A bounded minute cron recovers lost jobs
+Failures retry with backoff up to twenty attempts — roughly ten hours —
+then stop as `failed` for manual inspection (logging
+`refund_consent_sync_exhausted`); a later consent change revives the record
+with a fresh budget. Withdrawals never cap — any sync that revokes remote
+sharing (sharing off, obsolete terms acceptance, or deletion) retries until
+RevenueCat accepts it. A bounded minute cron recovers lost jobs
 and claims older than the maximum action runtime. Missing credentials cannot
 mark a grant synced. The worker creates a missing RevenueCat customer when a
 live user's choice precedes SDK registration.
