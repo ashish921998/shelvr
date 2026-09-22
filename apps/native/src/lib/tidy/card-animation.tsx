@@ -19,7 +19,11 @@ import { scheduleOnRN } from "react-native-worklets";
 import { motion } from "@/lib/motion";
 
 import { useDeckAnimation } from "./deck-animation";
-import { swipeDecision, type TidyAction } from "./swipe-decision";
+import {
+  swipeDecision,
+  swipeProgress,
+  type TidyAction,
+} from "./swipe-decision";
 import { useSingleHapticOnPan } from "./use-single-haptic-on-pan";
 
 export type { TidyAction } from "./swipe-decision";
@@ -49,8 +53,7 @@ export const CardAnimationProvider: FC<Props> = ({
   onDecision,
   children,
 }) => {
-  const { isDragging, animatedIndex, currentIndex, prevIndex } =
-    useDeckAnimation();
+  const { isDragging, animatedIndex, currentIndex } = useDeckAnimation();
   const { width, height } = useWindowDimensions();
 
   // Quarter-width matches the reference feel; the up-swipe threshold is a
@@ -107,21 +110,13 @@ export const CardAnimationProvider: FC<Props> = ({
           // card visibly is.
           const x = startX.get() + event.translationX;
           const y = startY.get() + event.translationY;
-          // Progress in card-index space: 1.0 of shift equals one card dismissed.
-          // Horizontal and upward drags both advance; downward drag does not.
-          const shift = Math.min(
-            1,
-            Math.max(
-              Math.abs(x) / panDistanceX,
-              Math.max(0, -y) / panDistanceY,
-            ),
-          );
-          const progress = currentIndex.get() - shift;
-          animatedIndex.set(
-            progress < currentIndex.get() - 1
-              ? currentIndex.get() - 1
-              : progress,
-          );
+          // Progress in card-index space: 1.0 of shift equals one card
+          // dismissed. The shift reads the shared dominance rule, so the
+          // reveal never promises a commit the release will refuse — a
+          // downward-dominant drag shifts the deck nothing, matching the
+          // release's refusal.
+          const { progress } = swipeProgress(x, y, panDistanceX, panDistanceY);
+          animatedIndex.set(currentIndex.get() - Math.min(1, progress));
 
           panX.set(x);
           panY.set(y);
@@ -148,7 +143,6 @@ export const CardAnimationProvider: FC<Props> = ({
           );
 
           if (action !== null) {
-            prevIndex.set(Math.round(currentIndex.get()));
             currentIndex.set(Math.round(currentIndex.get() - 1));
 
             // Springs carry the release velocity and clamp overshoot, so the

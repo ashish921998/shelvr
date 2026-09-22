@@ -3,6 +3,8 @@ import { useCallback } from "react";
 import { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { swipeProgress } from "./swipe-decision";
+
 function fire() {
   if (process.env.EXPO_OS === "ios") {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -10,8 +12,9 @@ function fire() {
 }
 
 type Params = {
+  /** Horizontal commit distance, in points. */
   thresholdX: number;
-  /** Upward-drag threshold (positive number; compared against -y). */
+  /** Upward commit distance, in points. */
   thresholdY: number;
 };
 
@@ -19,6 +22,8 @@ type Params = {
  * Latch on the UI thread: at most one light impact per pan, including a
  * short flick. `resetHaptic` re-arms on grab, `commitHaptic` fires when a
  * decision commits even if the threshold was never crossed during the drag.
+ * The mid-drag trigger reads the shared dominance rule, so the haptic
+ * promises a commit only when the release would grant one.
  */
 export function useSingleHapticOnPan({ thresholdX, thresholdY }: Params) {
   const isTriggered = useSharedValue(false);
@@ -41,7 +46,8 @@ export function useSingleHapticOnPan({ thresholdX, thresholdY }: Params) {
   const singleHapticOnChange = useCallback(
     (x: number, y: number) => {
       "worklet";
-      if (Math.abs(x) > thresholdX || -y > thresholdY) commitHaptic();
+      const { progress } = swipeProgress(x, y, thresholdX, thresholdY);
+      if (progress >= 1) commitHaptic();
     },
     [thresholdX, thresholdY, commitHaptic],
   );

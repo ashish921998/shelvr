@@ -11,7 +11,7 @@ import { useDeckAnimation } from "./deck-animation";
  * up and eases its own pan offsets home.
  */
 export function useUndoAnimation(index: number) {
-  const { isDragging, animatedIndex, currentIndex, prevIndex, undoIndex } =
+  const { isDragging, animatedIndex, currentIndex, undoIndex } =
     useDeckAnimation();
   const { panX, panY, absoluteYAnchor } = useCardAnimation();
 
@@ -28,7 +28,6 @@ export function useUndoAnimation(index: number) {
 
       // Order matters: consumers key off the integer currentIndex once
       // animatedIndex settles, so it moves last.
-      prevIndex.set(currentIndex.get());
       animatedIndex.set(
         withTiming(currentIndex.get() + 1, motion.timing.enter),
       );

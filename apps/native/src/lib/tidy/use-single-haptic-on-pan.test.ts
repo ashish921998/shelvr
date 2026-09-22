@@ -49,6 +49,20 @@ it("fires once per pan, stays latched after retreat, and rearms on grab", () => 
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(2);
 });
 
+it("does not fire for a downward-dominant drag past the side threshold", () => {
+  vi.stubEnv("EXPO_OS", "ios");
+  const { result } = renderHook(() =>
+    useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
+  );
+  // 150px right clears thresholdX alone, but 400px down dominates: the
+  // release would refuse, so the drag must not promise a commit either.
+  result.current.singleHapticOnChange(150, 400);
+  expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  // The dominant upward drag still fires once.
+  result.current.singleHapticOnChange(0, -200);
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+});
+
 it("does not dispatch an iOS impact on Android", () => {
   vi.stubEnv("EXPO_OS", "android");
   const { result } = renderHook(() =>

@@ -173,11 +173,24 @@ describe("CardAnimationProvider", () => {
     expect(deck.animatedIndex.value).toBe(1);
   });
 
+  it("does not shift the deck for a downward-dominant drag past the side threshold", () => {
+    const { card, deck, onDecision } = setup(0);
+    // 150px right clears the 100px side threshold, but 400px down dominates
+    // the axis, so release will refuse: the reveal must not promise a commit.
+    fire("onChange", { translationX: 150, translationY: 400 });
+    expect(deck.animatedIndex.value).toBe(1);
+    fire("onEnd", { velocityX: 0, velocityY: 0 }, true);
+    expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
+    expect(deck.currentIndex.value).toBe(1);
+    expect(onDecision).not.toHaveBeenCalled();
+    expect(haptics.commit).not.toHaveBeenCalled();
+    expect(worklets.scheduled).toHaveLength(0);
+  });
+
   it("commits a right fling as keep on a velocity spring", () => {
     const { card, deck, onDecision } = setup(0);
     drag({ x: 250, y: 0 });
     expect(deck.currentIndex.value).toBe(0);
-    expect(deck.prevIndex.value).toBe(1);
     // 125% of the screen width, off the right edge.
     expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { swipeDecision } from "./swipe-decision";
+import { swipeDecision, swipeProgress } from "./swipe-decision";
 
 // Thresholds mirror the runtime geometry: a quarter of the width and a fifth
 // of the height of the test window (400×800).
@@ -56,5 +56,38 @@ describe("swipeDecision", () => {
 
   it("prefers save when the projected upward axis dominates", () => {
     expect(swipeDecision(150, -400, 0, 0, TX, TY)).toBe("save");
+  });
+});
+
+describe("swipeProgress", () => {
+  it("tracks the dominant axis toward its action, unclamped", () => {
+    expect(swipeProgress(150, 0, TX, TY)).toEqual({
+      action: "keep",
+      progress: 1.5,
+    });
+    expect(swipeProgress(-150, 0, TX, TY)).toEqual({
+      action: "delete",
+      progress: 1.5,
+    });
+    expect(swipeProgress(0, -240, TX, TY)).toEqual({
+      action: "save",
+      progress: 1.5,
+    });
+  });
+
+  it("scores a downward-dominant drag as zero even past the side threshold", () => {
+    // 150px right clears thresholdX on its own, but 400px down dominates:
+    // the drag heads nowhere, so every cue reads zero.
+    expect(swipeProgress(150, 400, TX, TY)).toEqual({
+      action: null,
+      progress: 0,
+    });
+  });
+
+  it("breaks an exact diagonal tie toward the horizontal action", () => {
+    expect(swipeProgress(100, -160, TX, TY)).toEqual({
+      action: "keep",
+      progress: 1,
+    });
   });
 });

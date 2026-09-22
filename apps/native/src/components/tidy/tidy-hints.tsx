@@ -14,6 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { motion } from "@/lib/motion";
 import { useCardAnimation } from "@/lib/tidy/card-animation";
+import { swipeProgress } from "@/lib/tidy/swipe-decision";
 
 // Direction hint overlay, adapted from the Slack Catch Up recreation's
 // color-background + mark-view: a solid tint per swipe direction plus a badge
@@ -25,19 +26,23 @@ const ICON_SIZE = 24;
 
 type Direction = "keep" | "delete" | "save";
 
-/** Fraction of the commit threshold covered, 0 at rest, 1 at commit. */
+/**
+ * Fraction of the commit threshold the dominant axis has covered toward this
+ * direction, 0 at rest, 1 at commit. A direction's cue fills only when that
+ * direction is the one the release would act on: a diagonal lights one
+ * badge instead of two, and a downward-dominant drag lights none.
+ */
 function useDirectionProgress(direction: Direction) {
   const { panX, panY, panDistanceX, panDistanceY } = useCardAnimation();
 
   return useDerivedValue(() => {
-    switch (direction) {
-      case "keep":
-        return panX.get() / panDistanceX;
-      case "delete":
-        return -panX.get() / panDistanceX;
-      case "save":
-        return -panY.get() / panDistanceY;
-    }
+    const { action, progress } = swipeProgress(
+      panX.get(),
+      panY.get(),
+      panDistanceX,
+      panDistanceY,
+    );
+    return action === direction ? progress : 0;
   });
 }
 
