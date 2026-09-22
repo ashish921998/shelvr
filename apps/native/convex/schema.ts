@@ -42,6 +42,7 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("syncing"),
       v.literal("synced"),
+      v.literal("failed"),
     ),
     nextSyncAt: v.number(),
     attempts: v.number(),

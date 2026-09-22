@@ -62,6 +62,7 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
           item.isSticker ? (
             <Image
               source={{ uri: imageUri }}
+              recyclingKey={item._id}
               contentFit="contain"
               style={[styles.similarSticker, { aspectRatio }]}
             />
@@ -69,6 +70,7 @@ function SimilarItemCard({ item }: { item: DetailItem }) {
             <View style={styles.similarImageFrame}>
               <Image
                 source={{ uri: imageUri }}
+                recyclingKey={item._id}
                 contentFit="cover"
                 style={[styles.similarImage, { aspectRatio }]}
               />

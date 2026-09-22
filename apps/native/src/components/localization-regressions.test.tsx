@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
+import { Button } from "./ui/button";
+import { Pressable } from "react-native";
 import { TidyDone } from "./tidy/tidy-done";
 import { SetupStep } from "@/components/onboarding/setup";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -76,23 +78,84 @@ vi.mock("react-native", () => {
     ),
     ActivityIndicator: vi.fn(() => null),
     TextInput: vi.fn(() => <input />),
+    useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844 }),
     StyleSheet: { flatten },
   };
 });
+const mockTheme = vi.hoisted(() => ({
+  fonts: { regular: "r", medium: "m", bold: "b", display: "d" },
+  gap: (v: number) => v * 8,
+  radius: { sm: 8, md: 11, lg: 16, xl: 24, full: 9999 },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+    huge: 48,
+  },
+  // Any variant a component asks for resolves to an empty style.
+  type: new Proxy({}, { get: () => ({}) }) as Record<string, object>,
+  opacity: { pressed: 0.7, disabled: 0.4 },
+  control: { minHeight: 48, pressRetentionOffset: 12 },
+  colors: {
+    background: "white",
+    surface: "white",
+    surfaceMuted: "white",
+    foreground: "black",
+    muted: "gray",
+    faint: "gray",
+    primary: "orange",
+    primaryForeground: "black",
+    primarySoft: "white",
+    primaryText: "black",
+    border: "gray",
+    imageBorder: "gray",
+    danger: "red",
+    overlay: "black",
+    onTint: "black",
+    onOverlay: "white",
+    keep: "green",
+    onKeep: "darkgreen",
+    tabTint: "orange",
+  },
+}));
+
 vi.mock("react-native-unistyles", () => ({
-  useUnistyles: () => ({
-    theme: { colors: { foreground: "black", primary: "orange" } },
-  }),
-  StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({ theme: mockTheme }),
+  StyleSheet: {
+    // Evaluate style factories with the mock theme so dynamic variant
+    // styles (styles.text(variant)) keep working.
+    create: (factory: (theme: typeof mockTheme) => unknown) =>
+      typeof factory === "function" ? factory(mockTheme) : factory,
+    absoluteFillObject: {},
+  },
 }));
 vi.mock("react-native-reanimated", async () => {
   const { useRef } = await import("react");
   const { Text, View } = await import("react-native");
-  const transition = { duration: () => transition, delay: () => transition };
+  const transition = {
+    duration: () => transition,
+    delay: () => transition,
+    easing: () => transition,
+    reduceMotion: () => transition,
+  };
   return {
-    default: { View, Text },
+    default: {
+      View,
+      Text,
+      createAnimatedComponent: (component: unknown) => component,
+    },
     FadeIn: transition,
     FadeInDown: transition,
+    FadeOut: transition,
+    Easing: { bezier: () => ({}), linear: () => ({}) },
+    cubicBezier: () => ({}),
+    ReduceMotion: { System: "system", Never: "never", Always: "always" },
+    useReducedMotion: () => false,
+    cancelAnimation: () => undefined,
     useSharedValue: (initial: number) =>
       useRef({
         value: initial,
@@ -276,4 +339,24 @@ it("refreshes loaded map fallback titles without changing saved titles", async (
 it("keeps long header glyphs inside the available title width", () => {
   render(<AnimatedText text="Long header" width={40} truncate />);
   expect(screen.getByTestId("canvas").textContent).toBe("Lon…");
+});
+
+it("preserves caller accessibility state alongside loading and disabled state", () => {
+  const { rerender } = render(
+    <Button
+      title="Continue"
+      loading
+      accessibilityState={{ selected: true, busy: false, disabled: false }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: true, disabled: true });
+  rerender(<Button title="Continue" accessibilityState={{ selected: true }} />);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: false, disabled: false });
 });

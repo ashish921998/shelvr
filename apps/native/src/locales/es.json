@@ -34,7 +34,7 @@
   "notifications.weeklyShelf": "Estantería semanal",
   "errors.searchTitle": "No se ha podido buscar",
   "loading.app": "Abriendo Shelvr",
-  "capture.backToLibrary": "Volver a la biblioteca",
+  "digest.backHome": "Volver al inicio",
   "capture.backToOptions": "Volver a las opciones de guardado",
   "common.save": "Guardar",
   "errors.saveTitle": "No se ha podido guardar",

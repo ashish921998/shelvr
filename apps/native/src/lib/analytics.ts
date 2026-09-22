@@ -1,7 +1,6 @@
 import {
   SAFE_ERROR_MESSAGES,
   posthog,
-  resetClient,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
@@ -36,6 +35,13 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
+/**
+ * Which sign-in UI started an OAuth attempt. `$screen_name` cannot tell these
+ * apart, because the onboarding route renders both the full-page view and the
+ * demo sheet, and only the sheet runs the flow from inside a native modal.
+ */
+export type OAuthSurface = "sign_in_view" | "demo_sheet";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
@@ -43,17 +49,39 @@ type AnalyticsEventProperties = {
     step_index: number;
     duration_ms: number;
   };
-  auth_started: { provider: string };
-  auth_cancelled: { provider: string; elapsed_ms: number; browser_ms: number };
+  auth_started: { provider: string; surface: OAuthSurface };
+  auth_cancelled: {
+    provider: string;
+    elapsed_ms: number;
+    browser_ms: number;
+    surface: OAuthSurface;
+    // iOS reports a person backing out and a session that never presented as
+    // the same `cancel`, so the fields below carry what the OS said. The
+    // NSError domain and code are bounded and carry no user content; the
+    // description they come from is not sent, because free-form error text is
+    // redacted out of this project's telemetry on purpose.
+    result: "cancel" | "dismiss";
+    native_error_domain?: string;
+    native_error_code?: number;
+  };
   auth_failed: {
     provider: string;
     stage: "request" | "browser" | "exchange";
     elapsed_ms: number;
+    surface: OAuthSurface;
   };
   // A sign-in that finished in this session. `auth_completed` below is the
   // identify-time signal and also fires on every signed-in cold start.
-  auth_succeeded: { provider: string; elapsed_ms: number };
+  auth_succeeded: {
+    provider: string;
+    elapsed_ms: number;
+    surface: OAuthSurface;
+  };
   auth_completed: Record<string, never>;
+  // Widget snapshot and file cleanup completed, including signed-out startup
+  // and foreground recovery. This counts cleanup operations, not sign-outs or
+  // confirmed WidgetKit redraws.
+  widget_cleared: Record<string, never>;
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
     placement: string;
@@ -273,19 +301,14 @@ function identify(userId: string): void {
   }
 }
 
-function reset(): void {
-  if (!posthog) return;
-
-  try {
-    resetClient(posthog);
-  } catch {
-    // Analytics must never block sign-out.
-  }
-}
-
-/** Resets only when PostHog still holds an identified user. A signed-out
- * launch keeps its anonymous id, while a session that expired stops
- * attributing events to the previous account once Convex reports it. */
+/** The only reset. Resets only when PostHog still holds an identified user:
+ * a signed-out launch keeps its anonymous id, while an explicit sign-out, an
+ * account deletion, or an expired session stops attributing events to the
+ * previous account once Convex reports it. A device that was never
+ * identified has no link to break, so rotating its anonymous id would only
+ * split one person's onboarding across two profiles. Invoked solely from
+ * `useAnalyticsIdentity` on the auth edge; sign-out flows must not reset
+ * analytics themselves. */
 async function resetIfIdentified(): Promise<void> {
   if (!posthog) return;
 
@@ -311,7 +334,6 @@ export const analytics = {
   capture,
   captureError,
   identify,
-  reset,
   resetIfIdentified,
   sessionId,
   screen,
