@@ -5,17 +5,24 @@
 //   node tools/measure-header-morph.mjs <recording.mp4> --from <frame> [--window 120] [--mode stagger|swap]
 //
 // The title band is cropped, converted to grayscale, and split into vertical
-// columns. Stagger mode anchors on the blank band frame, then judges the
-// entrance on saturation order, ramp length, monotonicity, and whether the
-// baseline holds once settled. Swap mode starts on a screen whose title
-// already painted and reports the largest single-frame column step, which is
-// the native-to-canvas shift P1 exists to catch. The window must not contain
-// the push transition, whose overlapping screens defeat ink-based anchoring.
+// columns. Ink is measured against the page itself: the blank band that opens
+// the window is detected as light or dark, and a dark page flips the measure
+// to bright writing. Stagger mode anchors on the blank band frame, then
+// judges the entrance on saturation order, ramp length, monotonicity, and
+// whether the baseline holds once settled. Swap mode starts on a screen whose
+// title already painted and reports the largest single-frame column step,
+// which is the native-to-canvas shift P1 exists to catch. The window must not
+// contain the push transition, whose overlapping screens defeat ink-based
+// anchoring.
 //
 // The blank band is not the font-resolve latency, and no number off this
 // harness should be reported as one: the count starts only once the incoming
 // header covers the band, and the entrance's own delay sits between the font
 // arriving and the first ink. Time the font inside the app instead.
+//
+// Timing reads the frames' presentation timestamps; a recording whose frame
+// spacing leaves the nominal rate exits INCONCLUSIVE instead of being timed
+// by its index.
 //
 // Exits 0 when every predicate passes, 1 on a FAIL, 2 on INCONCLUSIVE.
 import { spawn } from "node:child_process";
@@ -101,6 +108,11 @@ const run = (cmd, args, binary) =>
     });
   });
 
+const inconclusive = (why) => {
+  console.log(`INCONCLUSIVE  ${why}`);
+  process.exit(2);
+};
+
 const probe = await run("ffprobe", [
   "-v", "error",
   "-select_streams", "v:0",
@@ -111,6 +123,21 @@ const probe = await run("ffprobe", [
 const [width, height, rate] = probe.trim().split("\n");
 const [num, den] = rate.split("/").map(Number);
 const fps = num / (den || 1);
+// Timing reads each frame's own presentation timestamp, never its index: the
+// nominal rate is a promise the recorder can break, and a recording that
+// drops frames or varies its rate still indexes uniformly, so frames counted
+// against it would hand stagger and hold verdicts to timings the pixels never
+// showed. ffprobe decodes the file once more to list them, buffering nothing.
+const timestamps = (await run("ffprobe", [
+  "-v", "error",
+  "-select_streams", "v:0",
+  "-show_entries", "frame=best_effort_timestamp_time",
+  "-of", "default=nw=1:nk=1",
+  video,
+]))
+  .trim()
+  .split("\n")
+  .map((line) => (line.trim() === "" ? NaN : Number(line)));
 // The blank band may not outlast the hold budget plus the entrance's own delay:
 // the count starts once the incoming header covers the band, and the first ink
 // trails the resolved font by textMorph.enterDelay, so a limit without it fails
@@ -124,17 +151,49 @@ const ch = even(Number(height) * BAND.height);
 const cx = even(Number(width) * BAND.x);
 const cy = even(Number(height) * BAND.y);
 
+// Only the judged window leaves ffmpeg: the trim sits after the crop, so the
+// rest of the recording is decoded but never buffered, and a long recording
+// costs the window's bytes instead of the whole file's. Passthrough keeps the
+// decode honest on top of it: ffmpeg's default mode duplicates frames to fill
+// the nominal rate, which would pad a variable-rate recording with copies the
+// timestamps below never saw.
 const raw = await run(
   "ffmpeg",
-  ["-v", "error", "-i", video, "-vf", `crop=${cw}:${ch}:${cx}:${cy},format=gray`,
+  ["-v", "error", "-i", video, "-vf",
+   `crop=${cw}:${ch}:${cx}:${cy},format=gray,trim=start_frame=${from}:end_frame=${from + window}`,
+   "-fps_mode", "passthrough",
    "-f", "rawvideo", "-pix_fmt", "gray", "-"],
   true,
 );
 
 const FRAME = cw * ch;
 const total = Math.floor(raw.length / FRAME);
+// The window's frames sit at the same positions in ffmpeg's decode as in
+// ffprobe's list, so the slice aligns with what the pixels above decoded.
+const framePts = timestamps.slice(from, from + total);
+const period = 1 / fps;
+if (framePts.length < total || framePts.some((t) => !Number.isFinite(t))) {
+  inconclusive("the window's frames carry no readable timestamps");
+}
+if (
+  framePts.some(
+    (t, i) => i > 0 && Math.abs(t - framePts[i - 1] - period) > period / 2,
+  )
+) {
+  inconclusive(
+    "frame spacing leaves the nominal rate; the recording drops frames or varies its rate, so index-based timing would be false",
+  );
+}
+// The window opens on a blank band by contract, so the first frame's modal
+// value is the page itself; ink is measured against it, mirrored to bright
+// writing on a dark page.
+const histogram = new Array(16).fill(0);
+for (let i = 0; i < FRAME; i++) histogram[raw[i] >> 4]++;
+const light = histogram.indexOf(Math.max(...histogram)) >= 8;
+const skip = light ? (v) => v >= 235 : (v) => v <= 20;
+const amount = light ? (v) => 235 - v : (v) => v - 20;
 const frames = [];
-for (let f = from; f < Math.min(total, from + window); f++) {
+for (let f = 0; f < total; f++) {
   const base = f * FRAME;
   const columns = new Array(COLUMNS).fill(0);
   let ink = 0;
@@ -142,26 +201,22 @@ for (let f = from; f < Math.min(total, from + window); f++) {
   for (let y = 0; y < ch; y++) {
     for (let x = 0; x < cw; x++) {
       const v = raw[base + y * cw + x];
-      if (v >= 235) continue;
-      const dark = 235 - v;
-      columns[Math.min(COLUMNS - 1, Math.floor((x / cw) * COLUMNS))] += dark;
-      ink += dark;
-      weighted += dark * y;
+      if (skip(v)) continue;
+      const a = amount(v);
+      columns[Math.min(COLUMNS - 1, Math.floor((x / cw) * COLUMNS))] += a;
+      ink += a;
+      weighted += a * y;
     }
   }
   frames.push({
-    f,
-    ms: Math.round(((f - from) * 1000) / fps),
+    f: from + f,
+    ms: Math.round((framePts[f] - framePts[0]) * 1000),
     ink,
     columns,
     cy: ink > 0 ? weighted / ink : null,
   });
 }
 
-const inconclusive = (why) => {
-  console.log(`INCONCLUSIVE  ${why}`);
-  process.exit(2);
-};
 const verdict = (name, pass, detail) =>
   console.log(`${pass ? "PASS" : "FAIL"}  ${name.padEnd(26)} ${detail}`);
 const row = (r) =>
@@ -174,7 +229,7 @@ const row = (r) =>
   );
 
 console.log(`${video}`);
-console.log(`band ${cw}x${ch} at (${cx},${cy}) of ${width}x${height} @ ${fps}fps, mode ${mode}, frames ${from}..${from + frames.length - 1}`);
+console.log(`band ${cw}x${ch} at (${cx},${cy}) of ${width}x${height} @ ${fps}fps, mode ${mode}, theme ${light ? "light" : "dark"}, frames ${from}..${from + frames.length - 1}`);
 console.log("frame     ms" + Array.from({ length: COLUMNS }, (_, i) => `c${i}`.padStart(7)).join("") + "     ink     cy");
 if (dump) {
   for (const r of frames) row(r);
@@ -250,7 +305,9 @@ if (mode === "stagger") {
   for (let i = appear + 1; i <= settleAt; i++) {
     if (frames[i].ink < frames[i - 1].ink * 0.98) dips++;
   }
-  const holdMs = Math.round((hold * 1000) / fps);
+  // Blank from the first held frame through the anchor: the distance between
+  // their timestamps, not hold periods counted at the nominal rate.
+  const holdMs = frames[anchor].ms - frames[anchor - hold + 1].ms;
 
   console.log("");
   console.log(`blank band before the entrance: ${hold} frame(s), ${holdMs}ms`);
