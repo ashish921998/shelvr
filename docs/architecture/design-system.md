@@ -28,14 +28,18 @@ naming the step it needs instead of overriding sizes at the call site.
 ## Spacing, radius, and controls
 
 Spacing is one scale: `theme.gap(n)`, n × 8, fractions included, so `gap(0.5)`
-is 4, `gap(1.5)` is 12, and `gap(2.5)` is 20. Every layout uses it. A parallel
-set of named steps was tried and removed: it could express nothing `gap` could
-not, and it left two vocabularies for one concept — reach for a fraction rather
-than a name. `theme.radius` is `sm` 8, `md` 11, `lg` 16, and `xl` 24.
-`theme.control` holds the minimum touch target height (48) and
-`pressRetentionOffset` (12); `Button` consumes both, so interactive rows that
-roll their own `Pressable` should match them. `theme.opacity` carries the
-pressed (0.7) and disabled (0.4) states so feedback stays consistent.
+is 4, `gap(1.5)` is 12, and `gap(2.5)` is 20. New styles always read it and most
+layouts already do, but adoption is no more exhaustive than the type ramp's: a
+couple of dozen literal paddings remain in older files, a few of them off the
+grid entirely (`intent-chip` pads 7 and 12), and they migrate when the file is
+touched for other reasons. A parallel set of named steps was tried and removed:
+it could express nothing `gap` could not, and it left two vocabularies for one
+concept — reach for a fraction rather than a name. `theme.radius` is `sm` 8,
+`md` 11, `lg` 16, and `xl` 24. `theme.control` holds the minimum touch target
+height (48) and `pressRetentionOffset` (12); `Button` consumes both, so
+interactive rows that roll their own `Pressable` should match them.
+`theme.opacity` carries the pressed (0.7) and disabled (0.4) states so feedback
+stays consistent.
 
 ## Color
 
