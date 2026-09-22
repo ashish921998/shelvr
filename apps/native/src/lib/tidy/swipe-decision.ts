@@ -64,20 +64,20 @@ export function swipeDecision(
   "worklet";
   const projectedX = x + project(velocityX);
   const projectedY = y + project(velocityY);
-  // The direction guard: a projected position on the far side of the origin
-  // from where the card sat is a reversal at lift, not a commit direction.
-  // Momentum may speed a drag up, never turn it around.
-  if (x !== 0 && projectedX !== 0 && Math.sign(x) !== Math.sign(projectedX)) {
-    return null;
-  }
-  if (y !== 0 && projectedY !== 0 && Math.sign(y) !== Math.sign(projectedY)) {
-    return null;
-  }
   const { action, progress } = swipeProgress(
     projectedX,
     projectedY,
     thresholdX,
     thresholdY,
   );
-  return progress > 1 ? action : null;
+  if (action === null || progress <= 1) return null;
+  // The direction guard, on the deciding axis alone: a projection landing on
+  // the far side of the origin from where the card sat is a reversal at lift,
+  // not a commit direction. Momentum may speed a drag up, never turn it
+  // around. The losing axis carries drift, and reversing a few points of
+  // drift must not veto the axis that owns the gesture.
+  const parked = action === "save" ? y : x;
+  const projected = action === "save" ? projectedY : projectedX;
+  if (parked !== 0 && Math.sign(parked) !== Math.sign(projected)) return null;
+  return action;
 }

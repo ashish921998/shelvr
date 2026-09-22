@@ -6,7 +6,7 @@
 // velocity-carrying spring off-screen, the deck index walks, the haptic latch
 // commits once, and anything less springs back.
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cancelAnimation, withSpring } from "react-native-reanimated";
 import { CardAnimationProvider, useCardAnimation } from "./card-animation";
@@ -133,10 +133,6 @@ beforeEach(() => {
   gesture.handlers = {};
   worklets.scheduled = [];
   vi.clearAllMocks();
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
 });
 
 describe("CardAnimationProvider", () => {

@@ -30,10 +30,20 @@ describe("swipeDecision", () => {
   });
 
   it("refuses a downward gesture carrying horizontal release noise", () => {
-    // 300 pt/s projects to ~150 horizontal points, past thresholdX on its own.
+    // 3000 pt/s projects to 150 horizontal points, past thresholdX on its own.
     // The downward travel still dominates, so the photo stays unreviewed.
-    expect(swipeDecision(0, 400, 300, 0, TX, TY)).toBeNull();
-    expect(swipeDecision(0, 400, -300, 0, TX, TY)).toBeNull();
+    expect(swipeDecision(0, 400, 3000, 0, TX, TY)).toBeNull();
+    expect(swipeDecision(0, 400, -3000, 0, TX, TY)).toBeNull();
+  });
+
+  it("ignores a reversal on the axis that lost the gesture", () => {
+    // A sideways drag carries a few points of vertical drift. Upward release
+    // velocity flips that drift across rest, but horizontal owns the gesture,
+    // so the reversal is noise on a losing axis and keep still commits.
+    expect(swipeDecision(250, 4, 0, -300, TX, TY)).toBe("keep");
+    // The same shape with the axes swapped: a save whose small horizontal
+    // drift reverses at lift.
+    expect(swipeDecision(5, -300, -200, -1500, TX, TY)).toBe("save");
   });
 
   it("still commits sideways when a downward drift is the smaller axis", () => {
