@@ -63,6 +63,20 @@ it("does not fire for a downward-dominant drag past the side threshold", () => {
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
 });
 
+it("does not fire at exactly the commit threshold, only past it", () => {
+  vi.stubEnv("EXPO_OS", "ios");
+  const { result } = renderHook(() =>
+    useSingleHapticOnPan({ thresholdX: 100, thresholdY: 160 }),
+  );
+  // Exactly 1.0: the release springs back (swipeDecision needs progress > 1),
+  // so the drag must not promise a commit either.
+  result.current.singleHapticOnChange(100, 0);
+  expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  // The first value past 1.0 fires once.
+  result.current.singleHapticOnChange(101, 0);
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+});
+
 it("does not dispatch an iOS impact on Android", () => {
   vi.stubEnv("EXPO_OS", "android");
   const { result } = renderHook(() =>

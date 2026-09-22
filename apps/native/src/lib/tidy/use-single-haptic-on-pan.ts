@@ -47,7 +47,9 @@ export function useSingleHapticOnPan({ thresholdX, thresholdY }: Params) {
     (x: number, y: number) => {
       "worklet";
       const { progress } = swipeProgress(x, y, thresholdX, thresholdY);
-      if (progress >= 1) commitHaptic();
+      // Fire only past the same > 1 bar the release commits at, so a drag
+      // that will spring back never promises a commit first.
+      if (progress > 1) commitHaptic();
     },
     [thresholdX, thresholdY, commitHaptic],
   );
