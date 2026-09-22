@@ -210,30 +210,6 @@ export const updateResendStatus = internalMutation({
   },
 });
 
-// Internal privacy/admin primitive for verified deletion requests and synthetic
-// deployment checks. It is intentionally not callable by clients.
-export const deleteSignupByEmail = internalMutation({
-  args: { email: v.string() },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    const email = normalizeEmail(args.email);
-    let deleted = false;
-    for (const product of ["shelvr", "shelvr-android"] as const) {
-      const signup = await ctx.db
-        .query("waitlistSignups")
-        .withIndex("by_email_and_product", (q) =>
-          q.eq("email", email).eq("product", product),
-        )
-        .unique();
-      if (signup) {
-        await ctx.db.delete(signup._id);
-        deleted = true;
-      }
-    }
-    return deleted;
-  },
-});
-
 export const listSignupsNeedingResendSync = internalQuery({
   args: {},
   returns: v.array(
