@@ -9,6 +9,12 @@ import {
 } from "./model/legalConsent";
 import { errorName, logEvent } from "./model/log";
 
+/** Matches the bounded budgets of the feedback and waitlist delivery
+ * machines: capped rows stop consuming the recovery crons and stay `failed`
+ * for manual inspection. A later consent change revives the row via
+ * `queueSync`, which resets the attempt count. */
+export const MAX_SYNC_ATTEMPTS = 10;
+
 const claimValidator = v.object({
   userId: v.id("users"),
   lease: v.number(),
@@ -78,6 +84,14 @@ export const finish = internalMutation({
       return null;
     }
     const attempts = row.changedAt === changedAt ? row.attempts + 1 : 0;
+    if (attempts >= MAX_SYNC_ATTEMPTS) {
+      await ctx.db.patch(id, {
+        syncState: "failed",
+        attempts,
+        nextSyncAt: Date.now(),
+      });
+      return null;
+    }
     const delay =
       attempts === 0
         ? 0

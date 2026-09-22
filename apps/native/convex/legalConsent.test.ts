@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import { newConvexTest } from "./test.setup";
 import { CONSENT_SYNC_LEASE_MS, TERMS_VERSION } from "./model/legalConsent";
+import { MAX_SYNC_ATTEMPTS } from "./legalConsentSync";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -273,6 +274,34 @@ describe("consent delivery reliability", () => {
     vi.setSystemTime(Date.now() + 2000);
     await f.send();
     expect((await f.row())?.syncState).toBe("pending");
+  });
+  it("caps repeated failures as failed and revives on the next decision", async () => {
+    const f = await fixture();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockRejectedValue(new Error("rc_down"));
+    vi.stubGlobal("fetch", fetchMock);
+    await f.review(true);
+    for (let attempt = 0; attempt < MAX_SYNC_ATTEMPTS; attempt++) {
+      if (attempt > 0) vi.setSystemTime(Date.now() + 3_600_000);
+      await f.send();
+    }
+    expect(await f.row()).toMatchObject({
+      syncState: "failed",
+      attempts: MAX_SYNC_ATTEMPTS,
+    });
+    // The recovery cron skips capped rows instead of rescheduling forever.
+    await f.t.mutation(internal.legalConsent.retry, {});
+    expect(await f.row()).toMatchObject({
+      syncState: "failed",
+      attempts: MAX_SYNC_ATTEMPTS,
+    });
+    // A fresh decision revives the row with a clean attempt budget.
+    vi.setSystemTime(Date.now() + 3_600_000);
+    fetchMock.mockImplementation(async () => Response.json({}));
+    await f.review(false);
+    expect(await f.row()).toMatchObject({ syncState: "pending", attempts: 0 });
+    await f.send();
+    expect((await f.row())?.syncState).toBe("synced");
   });
   it("serializes a withdrawal behind an in-flight grant and ignores duplicate workers", async () => {
     const f = await fixture();
