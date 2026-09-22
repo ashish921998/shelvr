@@ -54,8 +54,8 @@ import { createMMKV } from "react-native-mmkv";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
-  EASE_OUT,
-  EASE_OUT_CSS,
+  motion,
+  motionCSS,
   REDUCED_FADE_IN,
   REDUCED_FADE_OUT,
 } from "@/lib/motion";
@@ -86,18 +86,18 @@ const PHASE_ENTER = new Keyframe({
   100: {
     opacity: 1,
     transform: [{ translateY: 0 }],
-    easing: EASE_OUT,
+    easing: motion.easing.out,
   },
-}).duration(250);
+}).duration(motion.duration.enter);
 
 const PHASE_EXIT = new Keyframe({
   0: { opacity: 1, transform: [{ translateY: 0 }] },
   100: {
     opacity: 0,
     transform: [{ translateY: -4 }],
-    easing: EASE_OUT,
+    easing: motion.easing.out,
   },
-}).duration(200);
+}).duration(motion.duration.exit);
 
 /** The session-driven UI states. The resolution-driven states (resolving,
  * empty) are pure functions of the `useIncomingShare` hook
@@ -768,7 +768,7 @@ function Button({
             transform: [{ scale }],
             transitionProperty: "transform",
             transitionDuration: "120ms",
-            transitionTimingFunction: EASE_OUT_CSS,
+            transitionTimingFunction: motionCSS.out,
           },
         ]}
       >
