@@ -16,8 +16,11 @@ const fonts = {
 
 const shared = {
   fonts,
-  // The shared type ramp. Existing layouts keep their literal styles; new UI
-  // reaches for these names so type stays consistent (see
+  // The shared type ramp. Every step names a family/size pair the app already
+  // renders as a literal somewhere in src/, so the ramp is the inventory of
+  // type in use, not a wish list: a step with no `variant` caller yet still has
+  // consumers writing its numbers by hand. Existing layouts keep their literal
+  // styles; new UI reaches for these names so type stays consistent (see
   // docs/architecture/design-system.md).
   type: {
     hero: { fontFamily: fonts.display, fontSize: 48 },
@@ -44,17 +47,8 @@ const shared = {
     finePrint: { fontFamily: fonts.regular, fontSize: 11 },
     badge: { fontFamily: fonts.bold, fontSize: 10 },
   },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    xxl: 24,
-    xxxl: 32,
-    huge: 48,
-  },
-  // Existing layouts use this 8pt helper; new styles use named 4pt steps above.
+  // The one spacing scale. Fractions are expected: gap(0.5) is 4, gap(1.5) is
+  // 12. A second, named set of steps would only split the vocabulary.
   gap: (v: number) => v * 8,
   motion,
   opacity: { pressed: 0.7, disabled: 0.4 },
@@ -64,7 +58,6 @@ const shared = {
     md: 11,
     lg: 16,
     xl: 24,
-    full: 9999,
   },
 } as const;
 

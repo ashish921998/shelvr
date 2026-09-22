@@ -90,8 +90,8 @@ export function Button({
 const styles = StyleSheet.create((theme) => ({
   button: {
     minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.gap(3),
+    paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primary,

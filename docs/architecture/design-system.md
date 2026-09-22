@@ -10,22 +10,29 @@ file is touched for other reasons, not in bulk.
 ## Type
 
 The type ramp is `theme.type`: 23 named steps from `hero` (48) down to `badge`
-(10), each pairing a font family with a size. The display face
-(`ExposureTrial-0`) carries titles (`hero`, `largeTitle`, `sheetTitle`,
-`title`, `header`, `displaySmall`); Satoshi regular/medium/bold carries body
-and label steps. `ThemedText` takes a `variant` prop keyed by ramp name,
-defaults its color to `theme.colors.foreground`, and applies `style` last so
-callers can override. Use variants in new UI; a `fontSize` literal in a new
-component is a smell. When a genuinely new step is needed, name it and add it
-to the ramp rather than overriding sizes at call sites.
+(10), each pairing a font family with a size. The steps were not invented —
+each one names a family/size pair the app already renders as a literal, so the
+ramp is a census of the type in use rather than a wish list. Read it that way
+before pruning it: a step no component passes to `variant` yet still describes
+sizes written by hand across `src/`, and deleting it only means re-deriving it
+from those literals later. The display face (`ExposureTrial-0`) carries titles
+(`hero`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
+Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
+`variant` prop keyed by ramp name, defaults its color to
+`theme.colors.foreground`, and applies `style` last so callers can override.
+Use variants in new UI; a `fontSize` literal in a new component is a smell.
+The census is not complete — bold 14, regular 12, medium 11, bold 11, and bold
+26 are rendered as literals with no step yet — so migrating a file may mean
+naming the step it needs instead of overriding sizes at the call site.
 
 ## Spacing, radius, and controls
 
-Spacing uses named 4pt steps: `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 20,
-`xxl` 24, `xxxl` 32, `huge` 48. The `gap(n)` helper (n × 8) predates the
-steps and stays for existing layouts; new styles use the named steps.
-`theme.radius` is `sm` 8, `md` 11, `lg` 16, `xl` 24, and `full` for pills and
-circles. `theme.control` holds the minimum touch target height (48) and
+Spacing is one scale: `theme.gap(n)`, n × 8, fractions included, so `gap(0.5)`
+is 4, `gap(1.5)` is 12, and `gap(2.5)` is 20. Every layout uses it. A parallel
+set of named steps was tried and removed: it could express nothing `gap` could
+not, and it left two vocabularies for one concept — reach for a fraction rather
+than a name. `theme.radius` is `sm` 8, `md` 11, `lg` 16, and `xl` 24.
+`theme.control` holds the minimum touch target height (48) and
 `pressRetentionOffset` (12); `Button` consumes both, so interactive rows that
 roll their own `Pressable` should match them. `theme.opacity` carries the
 pressed (0.7) and disabled (0.4) states so feedback stays consistent.
@@ -67,14 +74,17 @@ declared in the same file for `useBreakpoints`.
 `lib/motion.ts` is a shared vocabulary, not a set of per-screen constants.
 Durations form a budget — `feedback` 120ms for press/hover swaps, `state` 180
 for in-place content changes, `enter` 250 / `exit` 200 for layout animations —
-and the curves (`out`, `inOut`, `sheet`) match Expo's easing exactly in both
-worklet and CSS form, so Reanimated timing and gesture-captured CSS
+and the curves (`out`, `inOut`) match Expo's easing exactly, with `out`
+published in CSS form too, so Reanimated timing and gesture-captured CSS
 transitions feel identical (`motionCSS` exists because CSS easing objects
 must stay outside `motion` or gesture capturing a spring tries to serialize
 them to the UI runtime). Reach for `motion.timing.*` in `withTiming` calls
 (timing objects carry an easing, so springs cannot take them),
-`motion.spring.*` for gesture settles and sheets, and
-`motion.scale.pressed` for press feedback. The `fadeIn`/`fadeOut` builders
+`motion.spring.*` for gesture settles and drags, and
+`motion.scale.pressed` for press feedback. The prebuilt timing objects cover
+`feedback`, `enter`, and `fade`; a call site wanting another point in the
+budget composes it from `motion.duration.*` and `motion.easing.*` instead of
+a preset added ahead of its first use. The `fadeIn`/`fadeOut` builders
 animate opacity only and stay gentle under Reduce Motion; never attach them
 (or any `entering`) to recycled list rows — rows recycle constantly, so every
 bind would replay an entrance. `REDUCED_FADE_*` covers reduced-motion state
@@ -133,4 +143,10 @@ per theme go in each theme's `colors`. Keep the `as const` annotations — the
 generated types flow through the `UnistylesThemes` module augmentation into
 `StyleSheet.create` factories and `useUnistyles`. Knip fails the build on
 unused exports, so a new exported token or builder needs a consumer in the
-same change.
+same change. It cannot see properties inside the theme or `motion` objects, so
+those are pruned by hand, and the bar differs by kind. A motion or radius token
+is a tuned number: an unused preset reads to the next person as a measured
+choice when nobody has ever watched it run, so add one when a call site needs
+it, not before. The type ramp is the opposite case — its steps document sizes
+the app already renders, so they stay whether or not a `variant` caller exists
+yet.
