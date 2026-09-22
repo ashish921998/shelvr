@@ -397,6 +397,29 @@ describe("consent delivery reliability", () => {
       attempts: 1,
     });
   });
+  it("terminal-fails a grant whose attempts exhaust during lease recovery", async () => {
+    const f = await fixture();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockRejectedValue(new Error("rc_down"));
+    vi.stubGlobal("fetch", fetchMock);
+    await f.review(true);
+    const row = await f.row();
+    if (!row) throw new Error("Missing consent");
+    await f.t.mutation(internal.legalConsentSync.claim, { id: row._id });
+    await f.t.run((ctx) =>
+      ctx.db.patch(row._id, { attempts: MAX_SYNC_ATTEMPTS - 1 }),
+    );
+    vi.setSystemTime(Date.now() + CONSENT_SYNC_LEASE_MS + 1);
+    await f.t.mutation(internal.legalConsent.retry, {});
+    expect(await f.row()).toMatchObject({
+      syncState: "failed",
+      attempts: MAX_SYNC_ATTEMPTS,
+    });
+    expect(await f.signedIn.query(api.legalConsent.get, {})).toMatchObject({
+      syncPending: true,
+      syncFailed: true,
+    });
+  });
   it("recovers an abandoned action after its runtime limit and rejects stale completions", async () => {
     const f = await fixture();
     mockRevenueCat();

@@ -9,6 +9,7 @@ import {
 import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
 import { TERMS_VERSION } from "./model/legalConsent";
+import { MAX_SYNC_ATTEMPTS, deliversGrant } from "./legalConsentSync";
 
 export const get = query({
   args: {},
@@ -138,10 +139,26 @@ export const retry = internalMutation({
         // A syncing row past its lease means the action died before finish
         // could spend the attempt — spend it here so crash-recovery loops
         // cannot retry for free forever (mirrors feedback delivery).
+        const attempts = state === "syncing" ? row.attempts + 1 : row.attempts;
+        // Recovery must not outlive the cap either: a grant that keeps
+        // crashing before `finish` would otherwise burn attempts via this
+        // path and stay retryable indefinitely.
+        if (
+          state === "syncing" &&
+          deliversGrant(row) &&
+          attempts >= MAX_SYNC_ATTEMPTS
+        ) {
+          await ctx.db.patch(row._id, {
+            syncState: "failed",
+            attempts,
+            nextSyncAt: now,
+          });
+          continue;
+        }
         await ctx.db.patch(row._id, {
           syncState: "pending",
           nextSyncAt: now,
-          attempts: state === "syncing" ? row.attempts + 1 : row.attempts,
+          attempts,
         });
         await ctx.scheduler.runAfter(0, internal.legalConsentSync.send, {
           id: row._id,
