@@ -12,6 +12,12 @@ for (const ext of [".jpg", ".jpeg", ".png"]) {
   };
 }
 
+// Some src modules read the Convex URL at import time and now fail fast
+// without it (src/lib/convex-url.ts). Tests never dial the deployment, but
+// the value must exist for those imports to load; suites that care stub
+// their own.
+process.env.EXPO_PUBLIC_CONVEX_URL ??= "https://test.convex.cloud";
+
 vi.mock("expo-localization", () => ({
   getLocales: () => [
     { languageTag: "en-US", languageCode: "en", textDirection: "ltr" },

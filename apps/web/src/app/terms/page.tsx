@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import Logo from "@/components/common/Logo";
+import { LegalPage } from "@/components/LegalPage";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Shelvr",
@@ -9,130 +8,111 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="bg-paper min-h-screen">
-      <div className="container max-w-3xl py-10 sm:py-16">
-        <Logo />
-
-        <h1 className="mt-10 font-display text-3xl sm:text-4xl text-ink">
-          Terms of Service
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Last updated: September 19, 2026
+    <LegalPage
+      title="Terms of Service"
+      lastUpdated="September 19, 2026"
+      footerHref="/privacy"
+      footerLabel="Privacy Policy"
+    >
+      <section>
+        <h2 className="font-semibold text-ink text-lg">1. The service</h2>
+        <p className="mt-2">
+          Shelvr lets you save links, images, and notes and organizes them into
+          spaces. By creating an account or using the app you agree to these
+          terms.
         </p>
+      </section>
 
-        <div className="mt-8 space-y-8 text-[15px] leading-7 text-ink/90">
-          <section>
-            <h2 className="font-semibold text-ink text-lg">1. The service</h2>
-            <p className="mt-2">
-              Shelvr lets you save links, images, and notes and organizes them
-              into spaces. By creating an account or using the app you agree to
-              these terms.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">2. Your account</h2>
-            <p className="mt-2">
-              You must provide accurate information and keep your account
-              secure. You are responsible for activity under your account. You
-              must be at least 13 years old to use Shelvr.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">3. Your content</h2>
-            <p className="mt-2">
-              You own what you save. You grant us the limited license needed to
-              store, process, and display your content back to you — including
-              automated AI processing that titles, tags, and organizes it. We
-              claim no other rights to it. Don&rsquo;t save content that is
-              unlawful or that you have no right to store.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">4. Subscriptions</h2>
-            <p className="mt-2">
-              Shelvr Pro is an auto-renewing subscription purchased through the
-              App Store. Plans may include a free trial; you can cancel anytime
-              in your App Store subscription settings, and cancelling before the
-              trial ends means you won&rsquo;t be charged. Prices are shown
-              before purchase and may change with notice. Refunds are handled by
-              Apple under App Store policies. Pro includes storage for up to
-              1,000 photos per account; links and notes are not limited.
-            </p>
-            <p className="mt-2">
-              Apple refund data sharing is optional. If you choose “Agree and
-              allow sharing” on the updated-terms screen in Shelvr, you consent
-              to Shelvr, through RevenueCat, sharing purchase identifiers,
-              delivery status, and whether sample content was provided with
-              Apple when reviewing your refund request. Apple makes the final
-              refund decision. Your saved links, notes, and photos are not
-              shared for this purpose. Using the app or making a purchase alone
-              does not enable this sharing. Declining does not restrict app
-              access or your ability to request a refund. You can withdraw this
-              consent in Profile under Apple refund data sharing.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">
-              5. Acceptable use
-            </h2>
-            <p className="mt-2">
-              Don&rsquo;t abuse the service: no attempts to breach security,
-              scrape other users&rsquo; data, reverse engineer the app beyond
-              what the law permits, or use Shelvr to store or distribute
-              unlawful material.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">6. Termination</h2>
-            <p className="mt-2">
-              You can stop using Shelvr and delete your account from Profile in
-              the app at any time. Deleting your Shelvr account removes your
-              saves and sign-in identity from our backend (see the Privacy
-              Policy for how third-party analytics data is handled); it does not
-              cancel an App Store subscription. We may suspend or terminate
-              accounts that violate these terms.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">7. Disclaimers</h2>
-            <p className="mt-2">
-              Shelvr is provided &ldquo;as is.&rdquo; AI-generated titles, tags,
-              and classifications can be wrong. To the maximum extent permitted
-              by law, we disclaim warranties and limit our liability to the
-              amount you paid us in the twelve months before a claim.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">8. Changes</h2>
-            <p className="mt-2">
-              We may update these terms; material changes will be posted on this
-              page with an updated date. Continuing to use Shelvr after changes
-              take effect means you accept them.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-ink text-lg">9. Contact</h2>
-            <p className="mt-2">
-              Questions: <strong>support@shelvr.app</strong>
-            </p>
-          </section>
-        </div>
-
-        <p className="mt-12 pt-6 border-t border-line text-sm text-muted">
-          © {new Date().getFullYear()} Shelvr. All rights reserved. ·{" "}
-          <Link href="/privacy" className="underline hover:text-ink">
-            Privacy Policy
-          </Link>
+      <section>
+        <h2 className="font-semibold text-ink text-lg">2. Your account</h2>
+        <p className="mt-2">
+          You must provide accurate information and keep your account secure.
+          You are responsible for activity under your account. You must be at
+          least 13 years old to use Shelvr.
         </p>
-      </div>
-    </main>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">3. Your content</h2>
+        <p className="mt-2">
+          You own what you save. You grant us the limited license needed to
+          store, process, and display your content back to you — including
+          automated AI processing that titles, tags, and organizes it. We claim
+          no other rights to it. Don&rsquo;t save content that is unlawful or
+          that you have no right to store.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">4. Subscriptions</h2>
+        <p className="mt-2">
+          Shelvr Pro is an auto-renewing subscription purchased through the App
+          Store. Plans may include a free trial; you can cancel anytime in your
+          App Store subscription settings, and cancelling before the trial ends
+          means you won&rsquo;t be charged. Prices are shown before purchase and
+          may change with notice. Refunds are handled by Apple under App Store
+          policies. Pro includes storage for up to 1,000 photos per account;
+          links and notes are not limited.
+        </p>
+        <p className="mt-2">
+          Apple refund data sharing is optional. If you choose “Agree and allow
+          sharing” on the updated-terms screen in Shelvr, you consent to Shelvr,
+          through RevenueCat, sharing purchase identifiers, delivery status, and
+          whether sample content was provided with Apple when reviewing your
+          refund request. Apple makes the final refund decision. Your saved
+          links, notes, and photos are not shared for this purpose. Using the
+          app or making a purchase alone does not enable this sharing. Declining
+          does not restrict app access or your ability to request a refund. You
+          can withdraw this consent in Profile under Apple refund data sharing.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">5. Acceptable use</h2>
+        <p className="mt-2">
+          Don&rsquo;t abuse the service: no attempts to breach security, scrape
+          other users&rsquo; data, reverse engineer the app beyond what the law
+          permits, or use Shelvr to store or distribute unlawful material.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">6. Termination</h2>
+        <p className="mt-2">
+          You can stop using Shelvr and delete your account from Profile in the
+          app at any time. Deleting your Shelvr account removes your saves and
+          sign-in identity from our backend (see the Privacy Policy for how
+          third-party analytics data is handled); it does not cancel an App
+          Store subscription. We may suspend or terminate accounts that violate
+          these terms.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">7. Disclaimers</h2>
+        <p className="mt-2">
+          Shelvr is provided &ldquo;as is.&rdquo; AI-generated titles, tags, and
+          classifications can be wrong. To the maximum extent permitted by law,
+          we disclaim warranties and limit our liability to the amount you paid
+          us in the twelve months before a claim.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">8. Changes</h2>
+        <p className="mt-2">
+          We may update these terms; material changes will be posted on this
+          page with an updated date. Continuing to use Shelvr after changes take
+          effect means you accept them.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">9. Contact</h2>
+        <p className="mt-2">
+          Questions: <strong>support@shelvr.app</strong>
+        </p>
+      </section>
+    </LegalPage>
   );
 }

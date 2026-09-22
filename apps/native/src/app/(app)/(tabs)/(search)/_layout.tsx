@@ -2,17 +2,13 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Stack } from "expo-router";
 import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 
 export default function SearchStackLayout() {
   useAppLocale();
+  const { screenOptions } = useTabStackChrome({ headerTransparent: true });
   return (
-    <Stack
-      screenOptions={{
-        headerTransparent: true,
-        headerShadowVisible: false,
-        headerTitleAlign: "center",
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index">
         <Stack.Title asChild>
           <Text style={styles.title}>{t("navigation.searchHeader")}</Text>

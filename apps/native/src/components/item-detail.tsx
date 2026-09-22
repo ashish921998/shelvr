@@ -11,11 +11,11 @@ import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
 import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
+import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
 import { socialPost, type SocialPost } from "@/lib/social-post";
-import { displayHost } from "@/lib/url";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -23,9 +23,15 @@ import { useMutation } from "convex/react";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -101,9 +107,17 @@ function useItemDetailData(item: DetailItem) {
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
+  // Conditional queries use the 'skip' sentinel, not `enabled` (see the
+  // pager): a disabled React Query still subscribes through the Convex
+  // adapter. The short gcTime ends each visited page's subscription soon
+  // after it unmounts instead of holding one for the session-long default.
+  const similarReady = item.status === "ready" && item.type !== "note";
   const { data: similar } = useQuery({
-    ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === "ready" && item.type !== "note",
+    ...convexQuery(
+      api.items.similarItems,
+      similarReady ? { id: item._id } : "skip",
+    ),
+    gcTime: 30_000,
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
@@ -136,6 +150,16 @@ export const ItemDetail = memo(function ItemDetail({
 
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
+
+  // FlashList can recycle this page instance for a different item; a
+  // recycled page must open at the top, not at the previous item's offset.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
 
   // A social save's "content" is its caption, not an article: keep the
   // poster layout.
@@ -197,6 +221,7 @@ export const ItemDetail = memo(function ItemDetail({
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
+      recyclingKey={item._id}
       contentFit="contain"
       style={
         item.isSticker
@@ -207,9 +232,7 @@ export const ItemDetail = memo(function ItemDetail({
   ) : null;
 
   const openPost = () => {
-    void WebBrowser.openBrowserAsync(item.url!)
-      .then(() => analytics.itemAction(item, "open_source"))
-      .catch(() => {});
+    openItemSource(item);
   };
 
   const hero =
@@ -236,6 +259,7 @@ export const ItemDetail = memo(function ItemDetail({
             >
               <Image
                 source={{ uri: media.imageUrl }}
+                recyclingKey={`${item._id}-media-${index}`}
                 contentFit="contain"
                 style={[styles.heroImage, frameSize(media.aspectRatio)]}
               />
@@ -258,6 +282,7 @@ export const ItemDetail = memo(function ItemDetail({
   ) : null;
 
   const scrollProps = {
+    ref: scrollRef,
     testID: item.fixtureKey
       ? `fixture-item-detail-${item.fixtureKey}`
       : undefined,
@@ -350,30 +375,21 @@ function ItemDetailBody({
 
       {item.url ? (
         <View style={styles.titleContainer}>
-          <Pressable
-            style={styles.sourceRow}
-            onPress={() => {
-              void WebBrowser.openBrowserAsync(item.url!)
-                .then(() => analytics.itemAction(item, "open_source"))
-                .catch(() => {});
-            }}
-          >
-            <AppSymbolIcon
-              name={social?.playable ? "play.rectangle" : "safari"}
-              size={15}
-              tintColor={theme.colors.muted}
-            />
-            <Text style={styles.sourceText}>
-              {social && item.author
+          <ItemSourceLink
+            item={item}
+            icon={social?.playable ? "play.rectangle" : "safari"}
+            iconSize={15}
+            arrowSize={11}
+            iconTintColor={theme.colors.muted}
+            arrowTintColor={theme.colors.faint}
+            label={
+              social && item.author
                 ? `${item.author} · ${social.site}`
-                : (item.siteName ?? displayHost(item.url))}
-            </Text>
-            <AppSymbolIcon
-              name="arrow.up.right"
-              size={11}
-              tintColor={theme.colors.faint}
-            />
-          </Pressable>
+                : undefined
+            }
+            style={styles.sourceRow}
+            textStyle={styles.sourceText}
+          />
         </View>
       ) : null}
 
@@ -388,9 +404,7 @@ function ItemDetailBody({
           style={styles.urlRow}
           accessibilityRole="link"
           onPress={() => {
-            void WebBrowser.openBrowserAsync(item.url!)
-              .then(() => analytics.itemAction(item, "open_source"))
-              .catch(() => {});
+            openItemSource(item);
           }}
           hitSlop={4}
         >
