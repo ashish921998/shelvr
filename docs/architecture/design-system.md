@@ -86,6 +86,15 @@ a font asynchronously and caches nothing, so a slot holds blank for one screen
 transition rather than painting native text it would then have to animate away:
 `resolveMorphRender` staggers a first scene in only while nothing has been
 painted, and once native text has shown, every later canvas mount is opaque.
+`FONT_HOLD_MS` is budgeted from measurement rather than taste: the font
+resolves in 33ms for a session's first slot and 67ms warm over Metro's fetch,
+which a production build's bundled read only beats. When the hold does lose,
+the canvas replaces native text with a 1.8pt baseline step and no entrance,
+which is the graceful outcome the latch exists to produce.
+`tools/measure-header-morph.mjs` crops the title band out of a screen recording
+and re-checks the contract (no double paint, left-to-right stagger, ramp
+budget, monotonic ink, bounded blank hold), with a swap mode that reports the
+native-to-canvas step; run it before moving the hold or the morph timings.
 
 Reduce Motion is `System` by default on every timing object. Screens add
 explicit branches where spatial motion would carry meaning: navigation stacks
