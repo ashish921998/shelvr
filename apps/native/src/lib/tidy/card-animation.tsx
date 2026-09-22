@@ -129,12 +129,19 @@ export const CardAnimationProvider: FC<Props> = ({
           // decision — so leave a cancelled pan to its recovery below.
           if (!success) return;
 
-          // onChange already parked the full-travel offsets on the pan values,
-          // so the decision reads from there and folds in release velocity —
-          // momentum may extend a drag but never reverse it.
+          // The lift can carry travel that arrived after the last onChange, so
+          // recompute the offsets from the grab the way onChange does instead
+          // of reading pan values that may trail the release by a frame. The
+          // springs below start from the released position for the same
+          // reason. Momentum folds in on top: it may extend a drag, never
+          // reverse it.
+          const x = startX.get() + event.translationX;
+          const y = startY.get() + event.translationY;
+          panX.set(x);
+          panY.set(y);
           const action = swipeDecision(
-            panX.get(),
-            panY.get(),
+            x,
+            y,
             event.velocityX,
             event.velocityY,
             panDistanceX,

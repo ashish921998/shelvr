@@ -126,7 +126,18 @@ function drag(translation: { x: number; y: number }) {
     translationX: translation.x,
     translationY: translation.y,
   });
-  fire("onEnd", { velocityX: 0, velocityY: 0 }, true);
+  // RNGH's end event carries the gesture's own translation too, so the release
+  // repeats it rather than relying on the last onChange.
+  fire(
+    "onEnd",
+    {
+      translationX: translation.x,
+      translationY: translation.y,
+      velocityX: 0,
+      velocityY: 0,
+    },
+    true,
+  );
 }
 
 beforeEach(() => {
@@ -175,7 +186,11 @@ describe("CardAnimationProvider", () => {
     // the axis, so release will refuse: the reveal must not promise a commit.
     fire("onChange", { translationX: 150, translationY: 400 });
     expect(deck.animatedIndex.value).toBe(1);
-    fire("onEnd", { velocityX: 0, velocityY: 0 }, true);
+    fire(
+      "onEnd",
+      { translationX: 150, translationY: 400, velocityX: 0, velocityY: 0 },
+      true,
+    );
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(deck.currentIndex.value).toBe(1);
     expect(onDecision).not.toHaveBeenCalled();
@@ -263,7 +278,11 @@ describe("CardAnimationProvider", () => {
     const { onDecision } = setup(0);
     // 30px of travel, but the projected momentum clears the threshold.
     fire("onChange", { translationX: 30, translationY: 0 });
-    fire("onEnd", { velocityX: 2000, velocityY: 0 }, true);
+    fire(
+      "onEnd",
+      { translationX: 30, translationY: 0, velocityX: 2000, velocityY: 0 },
+      true,
+    );
     expect(flushDecision()).toBe("keep");
     expect(onDecision).toHaveBeenCalledWith(0, "keep");
     // The latch fires on commit even though the drag never crossed.
@@ -290,7 +309,11 @@ describe("CardAnimationProvider", () => {
     fire("onBegin", { absoluteY: 400 });
     fire("onChange", { translationX: 150, translationY: 0 });
     fire("onChange", { translationX: 0, translationY: 0 });
-    fire("onEnd", { velocityX: -500, velocityY: 0 }, true);
+    fire(
+      "onEnd",
+      { translationX: 0, translationY: 0, velocityX: -500, velocityY: 0 },
+      true,
+    );
     expect(card.panX.value).toEqual({ driver: "spring", value: 0 });
     expect(card.panY.value).toEqual({ driver: "spring", value: 0 });
     expect(deck.currentIndex.value).toBe(1);
@@ -298,6 +321,23 @@ describe("CardAnimationProvider", () => {
     expect(onDecision).not.toHaveBeenCalled();
     expect(haptics.commit).not.toHaveBeenCalled();
     expect(worklets.scheduled).toHaveLength(0);
+  });
+
+  it("commits travel that arrives only with the release event", () => {
+    const { card, onDecision } = setup(0);
+    // The last of the drag can land on the end event alone: onChange stopped
+    // at 80px, under the 100px threshold, and the lift reports the full 250px.
+    // Reading the parked pan value here would spring back a crossed release.
+    fire("onBegin", { absoluteY: 400 });
+    fire("onChange", { translationX: 80, translationY: 0 });
+    fire(
+      "onEnd",
+      { translationX: 250, translationY: 0, velocityX: 0, velocityY: 0 },
+      true,
+    );
+    expect(card.panX.value).toEqual({ driver: "spring", value: 500 });
+    expect(flushDecision()).toBe("keep");
+    expect(onDecision).toHaveBeenCalledWith(0, "keep");
   });
 
   it("cancels in-flight animations and resumes from the card's offset on begin", () => {
@@ -359,7 +399,11 @@ describe("CardAnimationProvider", () => {
     fire("onChange", { translationX: 250, translationY: 0 });
     // RNGH reports a failed or cancelled pan through onEnd's success flag
     // too; the parked full-travel offset must not turn that into a decision.
-    fire("onEnd", { velocityX: 0, velocityY: 0 }, false);
+    fire(
+      "onEnd",
+      { translationX: 250, translationY: 0, velocityX: 0, velocityY: 0 },
+      false,
+    );
     expect(deck.isDragging.value).toBe(false);
     // No commit spring and no spring home either — recovery is onFinalize's.
     expect(card.panX.value).toBe(250);
