@@ -84,11 +84,16 @@ export const finish = internalMutation({
       return null;
     }
     const attempts = row.changedAt === changedAt ? row.attempts + 1 : 0;
-    // Deletion withdrawals are exempt: the refund-consent doc promises the
-    // record remains "until remote revocation succeeds, then is removed", and
-    // no user action can ever revive a deleted account's row. Their count is
-    // bounded (one per deletion) and the 1h backoff cap keeps them cheap.
-    if (!row.deleting && attempts >= MAX_SYNC_ATTEMPTS) {
+    // Only grants may cap out: a withdrawal (sharing off, obsolete terms
+    // acceptance, or account deletion) revokes remote data sharing and no
+    // user action may exist to revive it, so those retry until delivered.
+    // Same predicate as claim's `allowed`, minus the owner check that the
+    // owner-gone branch above already handled.
+    const deliversGrant =
+      !row.deleting &&
+      row.refundSharing &&
+      row.acceptedVersion === TERMS_VERSION;
+    if (deliversGrant && attempts >= MAX_SYNC_ATTEMPTS) {
       await ctx.db.patch(id, {
         syncState: "failed",
         attempts,

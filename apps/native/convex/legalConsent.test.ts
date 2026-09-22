@@ -337,6 +337,26 @@ describe("consent delivery reliability", () => {
       attempts: MAX_SYNC_ATTEMPTS + 1,
     });
   });
+  it("never caps live withdrawals, which RevenueCat must learn about", async () => {
+    const f = await fixture();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn().mockRejectedValue(new Error("rc_down"));
+    vi.stubGlobal("fetch", fetchMock);
+    await f.review(true);
+    await f.send();
+    expect(await f.row()).toMatchObject({ syncState: "pending" });
+    await f.signedIn.mutation(api.legalConsent.withdraw, {});
+    for (let attempt = 0; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
+      if (attempt > 0) vi.setSystemTime(Date.now() + 3_600_000);
+      await f.send();
+    }
+    expect(await f.row()).toMatchObject({
+      refundSharing: false,
+      deleting: false,
+      syncState: "pending",
+      attempts: MAX_SYNC_ATTEMPTS + 1,
+    });
+  });
   it("serializes a withdrawal behind an in-flight grant and ignores duplicate workers", async () => {
     const f = await fixture();
     await f.review(true);
