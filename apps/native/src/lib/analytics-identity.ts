@@ -3,6 +3,47 @@ import { useConvexAuth } from "convex/react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { queryClient } from "@/lib/query-client";
+import {
+  clearRecentSavesWidget,
+  retryPendingWidgetClear,
+} from "@/lib/widget-sync";
+import { widgetClearErrorEvent } from "@/lib/widget-clear-error";
+import { AppState, Platform } from "react-native";
+
+function useWidgetCleanup(isAuthenticated: boolean, isLoading: boolean) {
+  useEffect(() => {
+    if (isLoading || Platform.OS !== "ios") return;
+    let active = true;
+    let pending = false;
+    let completed = false;
+    const clear = async (beginBoundary = false) => {
+      if (!active || pending || (completed && !isAuthenticated)) return;
+      pending = true;
+      try {
+        const cleared = await (beginBoundary
+          ? clearRecentSavesWidget()
+          : retryPendingWidgetClear());
+        if (!active) return;
+        completed = true;
+        if (cleared && !isAuthenticated) analytics.capture("widget_cleared");
+      } catch (error) {
+        if (!active) return;
+        const event = widgetClearErrorEvent(error);
+        analytics.captureError(event, new Error(event));
+      } finally {
+        pending = false;
+      }
+    };
+    void clear(!isAuthenticated);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void clear();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [isAuthenticated, isLoading]);
+}
 
 /**
  * The one session boundary for analytics identity, reacting to the Convex
@@ -14,6 +55,7 @@ import { queryClient } from "@/lib/query-client";
  */
 export function useAnalyticsIdentity(): null {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  useWidgetCleanup(isAuthenticated, isLoading);
   const { data: user, isFetching } = useCurrentUser();
   const identifiedUserId = useRef<string | undefined>(undefined);
   const clearedUnauthenticatedUserCache = useRef(false);
