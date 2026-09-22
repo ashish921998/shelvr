@@ -79,6 +79,9 @@ bind would replay an entrance. `REDUCED_FADE_*` covers reduced-motion state
 swaps. The header text morph (`motion.textMorph`) is a deliberate signature
 effect with its own budget, bounded scenes, and interruption handling; see
 `components/animated-text.tsx` and `lib/text-morph.ts` before touching it.
+Both scenes are glyph-bounded in `lib/text-morph.ts`: `MAX_MORPH_GLYPHS` caps
+the laid-out title (replacing any tail with "…") and the retiring exit layer,
+whichever a long note or rapid paging would otherwise blow past.
 
 Reduce Motion is `System` by default on every timing object. Screens add
 explicit branches where spatial motion would carry meaning: navigation stacks

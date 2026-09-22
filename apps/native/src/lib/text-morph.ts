@@ -2,8 +2,15 @@
 // Reanimated or Skia imports, so the transition logic tests in isolation.
 // The rendering half lives in components/animated-text.tsx.
 
-// Bound both the visible title and its retiring scene, including zero-width
-// glyphs. Long saved notes must not allocate thousands of Skia/worklet nodes.
+// One cap, two bounded layers — both matter for long or rapidly swapped
+// titles, and both keep the Skia/worklet scene from allocating unbounded
+// glyph nodes:
+// - The laid-out run: layoutMorphText stops adding glyphs at this count and
+//   replaces the tail with "…", so a long saved note never shapes more cells
+//   than the visible slot can hold.
+// - The retiring layer: reconcileMorphCells keeps at most this many exits
+//   (present cells first, so the newest departures win when a burst fills
+//   the window) while old glyphs are still fading out.
 export const MAX_MORPH_GLYPHS = 48;
 
 export type MorphCell = {
