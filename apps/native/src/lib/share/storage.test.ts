@@ -7,11 +7,9 @@ import {
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
-  GHOST_SUPPRESS_MS,
   LAST_COMPLETED_SHARE_KEY,
   loadSession,
   markComplete,
-  markGhostDismissed,
   operationIdFor,
   reconcileSession,
   recordCompletedShare,
@@ -246,10 +244,8 @@ describe("reconcileSession", () => {
 });
 
 describe("ghost redelivery (Android task-restore replay)", () => {
-  const NOW = 1_000_000_000_000;
-
   function completedBatchA(store: SessionStoreAdapter) {
-    reconcileSession(store, USER, BATCH_A, id, NOW);
+    reconcileSession(store, USER, BATCH_A, id);
     updateEntry(store, 0, {
       status: "saved",
       itemId: "items-1",
@@ -266,64 +262,22 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     // operationId the ledger could not dedupe. It must prompt instead.
     const store = memoryStore();
     completedBatchA(store);
-    const result = reconcileSession(store, USER, BATCH_A, id, NOW + 1000);
-    expect(result).toEqual({ kind: "ghost", suppress: false });
+    const result = reconcileSession(store, USER, BATCH_A, id);
+    expect(result).toEqual({ kind: "ghost" });
     // No session was started behind the prompt.
     expect(loadSession(store)).toBeNull();
-  });
-
-  it("silently suppresses a ghost the user recently dismissed", () => {
-    const store = memoryStore();
-    completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
-    const result = reconcileSession(
-      store,
-      USER,
-      BATCH_A,
-      id,
-      NOW + GHOST_SUPPRESS_MS - 1,
-    );
-    expect(result).toEqual({ kind: "ghost", suppress: true });
-  });
-
-  it("re-prompts once the dismissal latch expires", () => {
-    const store = memoryStore();
-    completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
-    const result = reconcileSession(
-      store,
-      USER,
-      BATCH_A,
-      id,
-      NOW + GHOST_SUPPRESS_MS,
-    );
-    expect(result).toEqual({ kind: "ghost", suppress: false });
   });
 
   it("treats a different batch as a genuine new share, not a ghost", () => {
     const store = memoryStore();
     completedBatchA(store);
-    expect(reconcileSession(store, USER, BATCH_B, id, NOW + 1000).kind).toBe(
-      "new",
-    );
+    expect(reconcileSession(store, USER, BATCH_B, id).kind).toBe("new");
   });
 
   it("treats an identical batch as new when nothing completed before it", () => {
     // First-ever share must never prompt.
     const store = memoryStore();
-    expect(reconcileSession(store, USER, BATCH_A, id, NOW).kind).toBe("new");
-  });
-
-  it("re-arms the prompt when the same content is re-handled after a dismissal", () => {
-    const store = memoryStore();
-    completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
-    // The user (or the prompt) saved the batch again: a fresh completion
-    // replaces the tombstone and clears the dismissal.
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
-    expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
-      "ghost",
-    );
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("does not ghost-check an active or completed session match", () => {
@@ -342,15 +296,13 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     );
     recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
     // Active session for the same batch → resume, not ghost.
-    expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
-      "resume",
-    );
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("resume");
   });
 
   it("drops a corrupt tombstone instead of failing reconciliation", () => {
     const store = memoryStore();
     store.set(LAST_COMPLETED_SHARE_KEY, "not json{");
-    expect(reconcileSession(store, USER, BATCH_A, id, NOW).kind).toBe("new");
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("never matches a tombstone left by a different user", () => {
@@ -358,25 +310,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     // content. The ghost check is user-scoped — B's share is genuine.
     const store = memoryStore();
     completedBatchA(store);
-    expect(
-      reconcileSession(store, OTHER_USER, BATCH_A, id, NOW + 1000).kind,
-    ).toBe("new");
-  });
-
-  it("does not inherit another user's dismissal suppression", () => {
-    // A dismissal latches per user: B's identical share right after A's
-    // "don't save" must prompt (or save), never silently clear.
-    const store = memoryStore();
-    completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
-    const result = reconcileSession(
-      store,
-      OTHER_USER,
-      BATCH_A,
-      id,
-      NOW + GHOST_SUPPRESS_MS - 1,
-    );
-    expect(result.kind).toBe("new");
+    expect(reconcileSession(store, OTHER_USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("starts the approved session with a fresh id via startNewSession", () => {

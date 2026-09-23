@@ -12,9 +12,9 @@ import {
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import ShareScreen from "@/app/(app)/share";
+import { analytics } from "@/lib/analytics";
 import {
   fingerprintSharePayloads,
-  GHOST_SUPPRESS_MS,
   LAST_COMPLETED_SHARE_KEY,
 } from "@/lib/share/storage";
 
@@ -35,6 +35,7 @@ const mock = vi.hoisted(() => ({
   router: { replace: vi.fn(), push: vi.fn() },
   store: new Map<string, string>(),
   uuid: 0,
+  platform: "android",
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -128,6 +129,11 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: vi.fn(() => null),
+  Platform: {
+    get OS() {
+      return mock.platform;
+    },
+  },
   Pressable: vi.fn(
     ({ children, onPress }: { children: ReactNode; onPress: () => void }) => (
       <button onClick={onPress}>{children}</button>
@@ -167,6 +173,7 @@ beforeEach(() => {
   mock.isResolving = false;
   mock.store.clear();
   mock.uuid = 0;
+  mock.platform = "android";
   mock.openPaywall.mockResolvedValue(false);
   mock.createLinkItem.mockResolvedValue("item-1");
 });
@@ -214,7 +221,7 @@ it("gates a retry again when the entitlement lapses after a locked session ran",
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 
-const ghostTombstone = (extra: object = {}) =>
+const ghostTombstone = () =>
   JSON.stringify({
     fingerprint: fingerprintSharePayloads([
       {
@@ -224,7 +231,6 @@ const ghostTombstone = (extra: object = {}) =>
       },
     ]),
     userId: mock.user._id,
-    ...extra,
   });
 
 it("asks before re-saving a batch that matches the last completed one", async () => {
@@ -232,11 +238,19 @@ it("asks before re-saving a batch that matches the last completed one", async ()
   // batch that just completed. It must prompt, not auto-save a duplicate.
   mock.entitled = true;
   mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
-  render(<ShareScreen />);
+  const view = render(<ShareScreen />);
   await waitFor(() =>
     expect(screen.getByText("share.ghostTitle")).toBeDefined(),
   );
+  // Resolution settling re-runs the reconcile effect; the prompt counts once.
+  mock.resolvedSharedPayloads = [resolvedLink];
+  view.rerender(<ShareScreen />);
   await settle();
+  expect(
+    vi
+      .mocked(analytics.capture)
+      .mock.calls.filter(([event]) => event === "share_ghost_prompt"),
+  ).toHaveLength(1);
   expect(mock.createLinkItem).not.toHaveBeenCalled();
   expect(mock.router.replace).not.toHaveBeenCalled();
 
@@ -254,10 +268,10 @@ it("asks before re-saving a batch that matches the last completed one", async ()
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 });
 
-it("dismisses the ghost prompt and latches the suppression", async () => {
+it("dismisses the ghost prompt and prompts again on the next replay", async () => {
   mock.entitled = true;
   mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
-  render(<ShareScreen />);
+  const first = render(<ShareScreen />);
   await waitFor(() =>
     expect(screen.getByText("share.ghostTitle")).toBeDefined(),
   );
@@ -266,23 +280,44 @@ it("dismisses the ghost prompt and latches the suppression", async () => {
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).not.toHaveBeenCalled();
   expect(mock.clearSharedPayloads).toHaveBeenCalled();
-  const tombstone = JSON.parse(
-    mock.store.get(LAST_COMPLETED_SHARE_KEY) as string,
+  first.unmount();
+
+  // A deliberate re-share (or another replay) is never silently dropped.
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
   );
-  expect(tombstone.dismissedAt).toBeGreaterThan(0);
-  expect(tombstone.userId).toBe(mock.user._id);
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
 });
 
-it("silently clears a recently dismissed ghost without prompting", async () => {
+it("keeps the tombstone when the native clear fails and the user cancels", async () => {
+  // Every entry saved, the native clear throws, the user leaves via Cancel
+  // (which deletes the completed session). The Android replay must still be
+  // caught, or it saves the whole batch a second time.
   mock.entitled = true;
-  mock.store.set(
-    LAST_COMPLETED_SHARE_KEY,
-    ghostTombstone({ dismissedAt: Date.now() - GHOST_SUPPRESS_MS / 2 }),
+  mock.clearSharedPayloads.mockImplementationOnce(() => {
+    throw new Error("clear failed");
+  });
+  const first = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("share.finishFailed")).toBeDefined(),
   );
-  render(<ShareScreen />);
-  await settle();
-  expect(screen.queryByText("share.ghostTitle")).toBeNull();
+  fireEvent.click(screen.getByText("common.cancel"));
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
-  expect(mock.clearSharedPayloads).toHaveBeenCalled();
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
+  first.unmount();
+
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
+  );
+  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+});
+
+it("never records a tombstone on iOS, which does not replay shares", async () => {
+  mock.platform = "ios";
+  mock.entitled = true;
+  render(<ShareScreen />);
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+  expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(false);
 });

@@ -160,7 +160,7 @@
   "share.continueSaved": "Continuer avec les éléments enregistrés",
   "share.finishFailed": "Enregistré, mais traitement inachevé",
   "share.success": "Enregistré dans Shelvr",
-  "share.ghostTitle": "Déjà enregistré?",
+  "share.ghostTitle": "Partagé récemment",
   "share.ghostBody": "Shelvr a récemment traité ce contenu partagé. L’enregistrer à nouveau?",
   "share.saveAgain": "Enregistrer à nouveau",
   "account.signingIn": "Connexion",

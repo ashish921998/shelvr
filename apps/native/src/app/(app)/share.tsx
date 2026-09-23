@@ -19,7 +19,6 @@ import {
   fingerprintSharePayloads,
   loadSession,
   markComplete,
-  markGhostDismissed,
   reconcileSession,
   recordCompletedShare,
   startNewSession,
@@ -49,6 +48,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -169,6 +169,9 @@ export default function ShareScreen() {
   // that land before the first run's setPhase re-renders. One confirmation =
   // one save run; ghostConfirm never returns within this mount afterwards.
   const ghostSaveStarted = useRef(false);
+  // The reconcile effect re-runs on dependency identity changes; count one
+  // share_ghost_prompt per mount, not per re-run.
+  const ghostPromptLogged = useRef(false);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. */
@@ -239,8 +242,17 @@ export default function ShareScreen() {
       //    success and clear is then reconciled on remount (a matching
       //    completed session clears native payloads and deletes itself).
       markComplete(shareStore, sid);
+      // 2. Tombstone the batch BEFORE the native clear: every later exit
+      //    (clear, a throwing clear then Cancel, a crash) can delete the
+      //    session, and without a tombstone the next Android task-restore
+      //    replay would mint a fresh operationId the ledger cannot dedupe.
+      //    User-scoped so one account's batch never matches another's.
+      //    Android only — iOS never replays a share, so it never prompts.
+      if (Platform.OS === "android") {
+        recordCompletedShare(shareStore, session.fingerprint, session.userId);
+      }
       try {
-        // 2. Native clear. A throwing clear keeps the completed session (no
+        // 3. Native clear. A throwing clear keeps the completed session (no
         //    delete, no navigation) and surfaces clearFailed for a manual retry.
         clearSharedPayloads();
       } catch (err) {
@@ -249,14 +261,6 @@ export default function ShareScreen() {
         setPhase({ kind: "clearFailed", session });
         return;
       }
-      // 3. Tombstone the batch BEFORE deleting the session: a process death
-      //    between the two would erase both dedup markers, and the next
-      //    launch's Android replay would mint a fresh operationId the ledger
-      //    cannot dedupe — the duplicate save this ordering closes. The
-      //    reverse crash (tombstone written, session left) is safe: the
-      //    completed session still reconciles to a clear on remount.
-      //    User-scoped so one account's batch never suppresses another's.
-      recordCompletedShare(shareStore, session.fingerprint, session.userId);
       // 4. Delete the local session ONLY after a successful clear — otherwise a
       //    later identical re-share would match a stale completed record and be
       //    silently dropped. Scoped so a stale in-flight run can't delete the
@@ -279,7 +283,7 @@ export default function ShareScreen() {
           analytics.captureError("record_first_share_failed", err);
         }
       }
-      // 4. Navigate Home exactly once.
+      // 5. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === "saved")) {
         analytics.capture("shared_content_saved", {
           item_count: session.entries.length,
@@ -391,7 +395,7 @@ export default function ShareScreen() {
 
   /** Clears native payloads (best-effort), drops any persisted session, and
    * returns Home. Used by the terminal error/empty states and the ghost
-   * suppression path. Deleting the session is essential: a session may already
+   * prompt's Cancel. Deleting the session is essential: a session may already
    * exist (e.g. counts diverged after the record was created), and leaving it
    * would let a later identical share resume the canceled work instead of
    * starting fresh. */
@@ -445,14 +449,12 @@ export default function ShareScreen() {
       // (reopening from recents). Saving it again would mint a fresh
       // operationId the backend ledger cannot dedupe: the reported duplicate.
       // A deliberate identical re-share is indistinguishable from JS, so it
-      // gets one confirmation; a recently-dismissed ghost clears silently.
-      if (reconciled.suppress) {
-        analytics.capture("share_ghost_suppressed");
-        void Promise.resolve().then(() => abandon());
-        return;
-      }
+      // always gets a confirmation — never a silent drop.
       void Promise.resolve().then(() => {
-        analytics.capture("share_ghost_prompt");
+        if (!ghostPromptLogged.current) {
+          ghostPromptLogged.current = true;
+          analytics.capture("share_ghost_prompt");
+        }
         setPhase({
           kind: "ghostConfirm",
           fingerprint: fingerprintSharePayloads(rawPayloads),
@@ -500,7 +502,6 @@ export default function ShareScreen() {
     saveDeps,
     runSave,
     completeSession,
-    abandon,
   ]);
 
   // --- Derived resolution state (pure functions of hook props) --------------
@@ -513,23 +514,13 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
-  // --- Phase render ---------------------------------------------------------
-
   /** The Android task-restore ghost reached its confirmation: the redelivered
-   * batch matches the last handled one. Don't save → latch the dismissal so
-   * recents reopens stop re-prompting; Save again → start the session
-   * reconcileSession deliberately did not. */
+   * batch matches the last handled one. Cancel → clear and leave; Save again →
+   * start the session reconcileSession deliberately did not. */
   const onGhostDismiss = useCallback(() => {
-    if (phase.kind !== "ghostConfirm") return;
-    if (user === null || user === undefined) return;
     analytics.capture("share_ghost_dismissed");
-    try {
-      markGhostDismissed(shareStore, phase.fingerprint, Date.now(), user._id);
-    } catch (err) {
-      analytics.captureError("share_ghost_dismiss_failed", err);
-    }
     abandon();
-  }, [abandon, phase, user]);
+  }, [abandon]);
 
   const onGhostSaveAgain = useCallback(() => {
     if (

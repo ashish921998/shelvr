@@ -20,18 +20,16 @@
 //                                     here — a throwing clear must stay retryable on remount, so
 //                                     the caller deletes it only after a non-throwing clear.
 //        { kind: 'empty' }            no raw payloads: drop any stale local session
-//        { kind: 'ghost', suppress }  no session record, but the batch matches the last
+//        { kind: 'ghost' }            no session record, but the batch matches the last
 //                                     completed one (see recordCompletedShare). Android keeps
 //                                     the last share SEND intent in the task record and
 //                                     re-delivers it to onCreate after a process death, so
 //                                     reopening the app from recents replays the previous share
 //                                     as if it were fresh. A fresh sessionId would mint a fresh
 //                                     operationId and the backend ledger could not dedupe — the
-//                                     last-saved item would be saved again. suppress=true means
-//                                     the user recently declined this exact batch, so the caller
-//                                     clears silently; otherwise the caller must ask before
-//                                     saving again (a deliberate identical re-share must stay
-//                                     possible, so this is never auto-saved nor auto-dropped).
+//                                     last-saved item would be saved again. The caller must ask
+//                                     before saving again: a deliberate identical re-share looks
+//                                     the same from JS, so this is never auto-saved nor dropped.
 //      Sessions are scoped to userId: a record left by a different user (account
 //      switch) is treated as no session, never matched.
 //   3. updateEntry / markComplete / deleteSession — mutate the persisted session
@@ -118,13 +116,8 @@ export const SESSION_KEY = "incoming-share-session";
  * to detect Android task-restore ghost redeliveries. Survives completion —
  * unlike the session record, which is single-use by design. Scoped to the
  * authenticated user, like sessions: a prior account's tombstone must never
- * suppress a new user's identical share. */
+ * match a new user's identical share. */
 export const LAST_COMPLETED_SHARE_KEY = "last-completed-share";
-
-/** How long an explicit "don't save" on a ghost prompt keeps suppressing the
- * prompt for the same batch. Without it, every reopen from recents would
- * re-prompt for as long as the OS keeps redelivering the task's share intent. */
-export const GHOST_SUPPRESS_MS = 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Fingerprinting
@@ -232,7 +225,7 @@ type ReconcileResult =
   | { kind: "new"; session: ShareSession }
   | { kind: "resume"; session: ShareSession }
   | { kind: "clear"; session: ShareSession }
-  | { kind: "ghost"; suppress: boolean };
+  | { kind: "ghost" };
 
 /** The single entry point the UI calls on every render/mount with the current
  * raw shared payloads. It decides — atomically with respect to the store —
@@ -254,7 +247,6 @@ export function reconcileSession(
   userId: string,
   rawPayloads: RawSharePayload[],
   generateSessionId: () => string,
-  now: number = Date.now(),
 ): ReconcileResult {
   // No native payloads. Drop any stale local session — there is nothing to
   // resume or clear.
@@ -272,9 +264,8 @@ export function reconcileSession(
   // DIFFERENT batch stays a genuine 'new' (its own fingerprint mismatch path
   // below handles it).
   if (existing === null || existing.userId !== userId) {
-    const ghost = classifyGhostRedelivery(store, currentFp, now, userId);
-    if (ghost !== null) {
-      return { kind: "ghost", suppress: ghost };
+    if (isGhostRedelivery(store, currentFp, userId)) {
+      return { kind: "ghost" };
     }
     return {
       kind: "new",
@@ -356,8 +347,8 @@ export function startNewSession(
 
 /** Records the batch that just finished its handoff (saved, continued, or
  * cancelled — any path through the share screen's completion). Replaces any
- * prior tombstone and re-arms the ghost prompt for this fingerprint. Takes the
- * completing user's id so a tombstone left by one account never suppresses
+ * prior tombstone. Android only: iOS never replays a share. Takes the
+ * completing user's id so a tombstone left by one account never matches
  * another account's identical batch (the ghost check is user-scoped). */
 export function recordCompletedShare(
   store: SessionStoreAdapter,
@@ -367,53 +358,25 @@ export function recordCompletedShare(
   store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ fingerprint, userId }));
 }
 
-/** The user explicitly declined to re-save a redelivered batch. Its ghost may
- * redeliver again on the next recents reopen, so the prompt stays suppressed
- * for GHOST_SUPPRESS_MS — a genuine re-share after that prompts again rather
- * than ever being silently dropped. */
-export function markGhostDismissed(
+/** True when this fingerprint matches the user's last handled batch. */
+function isGhostRedelivery(
   store: SessionStoreAdapter,
   fingerprint: string,
-  now: number,
   userId: string,
-): void {
-  store.set(
-    LAST_COMPLETED_SHARE_KEY,
-    JSON.stringify({ fingerprint, dismissedAt: now, userId }),
-  );
-}
-
-/** Returns true when this fingerprint matches the last handled batch and its
- * prompt was recently dismissed (silent clear), null when it is not a ghost
- * candidate, false when it is a ghost that still needs a confirmation. */
-function classifyGhostRedelivery(
-  store: SessionStoreAdapter,
-  fingerprint: string,
-  now: number,
-  userId: string,
-): boolean | null {
+): boolean {
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
-  if (raw === undefined) return null;
+  if (raw === undefined) return false;
   try {
     const parsed = JSON.parse(raw) as {
       fingerprint?: unknown;
-      dismissedAt?: unknown;
       userId?: unknown;
     };
     // A tombstone from a different account is not this user's ghost: their
-    // identical share is a genuine new share, never suppressed or dropped.
-    if (parsed.userId !== userId) return null;
-    if (parsed.fingerprint !== fingerprint) return null;
-    if (
-      typeof parsed.dismissedAt === "number" &&
-      now - parsed.dismissedAt < GHOST_SUPPRESS_MS
-    ) {
-      return true;
-    }
-    return false;
+    // identical share is a genuine new share.
+    return parsed.userId === userId && parsed.fingerprint === fingerprint;
   } catch {
     store.remove(LAST_COMPLETED_SHARE_KEY);
-    return null;
+    return false;
   }
 }
 
