@@ -434,6 +434,66 @@ describe("listLocatedItems", () => {
   });
 });
 
+describe("similarItems", () => {
+  async function insertItem(
+    t: TestCtx,
+    userId: string,
+    fields: { title: string; tags: string[]; status?: "ready" | "processing" },
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: fields.status ?? "ready",
+        title: fields.title,
+        url: `https://example.com/${encodeURIComponent(fields.title)}`,
+        tags: fields.tags,
+        searchText: [fields.title, ...fields.tags].join(" ").toLowerCase(),
+      }),
+    );
+  }
+
+  it("finds a related save older than the newest-items window", async () => {
+    const t = await as("similar-user");
+    const old = await insertItem(t, "similar-user", {
+      title: "Walnut floor lamp",
+      tags: ["lighting", "furniture"],
+    });
+    // Enough unrelated saves to push the old one out of the recent read.
+    await seedFeed(t, "similar-user", 320);
+    const fresh = await insertItem(t, "similar-user", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+    // Card shape only: the index copy never reaches the client.
+    expect(similar[0]).not.toHaveProperty("searchText");
+  });
+
+  it("skips unready matches and never reads another user's saves", async () => {
+    const backend = newConvexTest();
+    const mine = backend.withIdentity({ subject: "similar-a|session-1" });
+    const theirs = backend.withIdentity({ subject: "similar-b|session-1" });
+    await insertItem(theirs, "similar-b", {
+      title: "Ceramic table lamp",
+      tags: ["lighting", "furniture"],
+    });
+    await insertItem(mine, "similar-a", {
+      title: "Paper pendant lamp",
+      tags: ["lighting", "furniture"],
+      status: "processing",
+    });
+    const fresh = await insertItem(mine, "similar-a", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    expect(await mine.query(api.items.similarItems, { id: fresh })).toEqual([]);
+  });
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const t = await as("telemetry-user");
