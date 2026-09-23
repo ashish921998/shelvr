@@ -241,7 +241,13 @@ it("asks before re-saving a batch that matches the last completed one", async ()
   expect(mock.router.replace).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByText("share.saveAgain"));
+  // Rapid-press guard: the second press lands before any re-render, while the
+  // handler closure still sees ghostConfirm — only the synchronous latch
+  // prevents a second startNewSession/runSave pair (a duplicate save run).
+  fireEvent.click(screen.getByText("share.saveAgain"));
   await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  await settle();
+  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
   });
