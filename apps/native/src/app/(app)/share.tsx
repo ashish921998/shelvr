@@ -248,7 +248,12 @@ export default function ShareScreen() {
       //    replay would mint a fresh operationId the ledger cannot dedupe.
       //    User-scoped so one account's batch never matches another's.
       //    Android only — iOS never replays a share, so it never prompts.
-      if (Platform.OS === "android") {
+      //    Skipped for a stale run whose record a newer share replaced, so it
+      //    cannot overwrite the newer batch's tombstone.
+      if (
+        Platform.OS === "android" &&
+        loadSession(shareStore)?.sessionId === sid
+      ) {
         recordCompletedShare(shareStore, session.fingerprint, session.userId);
       }
       try {

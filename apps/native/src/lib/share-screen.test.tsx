@@ -262,6 +262,7 @@ it("asks before re-saving a batch that matches the last completed one", async ()
   await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
   await settle();
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+  expect(analytics.capture).toHaveBeenCalledWith("share_ghost_save_again");
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
   });
@@ -280,6 +281,7 @@ it("dismisses the ghost prompt and prompts again on the next replay", async () =
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).not.toHaveBeenCalled();
   expect(mock.clearSharedPayloads).toHaveBeenCalled();
+  expect(analytics.capture).toHaveBeenCalledWith("share_ghost_dismissed");
   first.unmount();
 
   // A deliberate re-share (or another replay) is never silently dropped.
