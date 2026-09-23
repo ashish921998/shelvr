@@ -178,6 +178,11 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
+  // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
+  // saved item's title, tags, or URL.
+  save_recall_shown: { match_count: number };
+  save_recall_opened: { match_count: number };
+  save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —

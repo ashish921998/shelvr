@@ -448,7 +448,15 @@ export const searchItems = query({
 // Similar-items v0: lexical overlap, no new infra. Tags carry most of the
 // signal (they're the classifier's own summary), searchText tokens catch the
 // rest. A vector index over real embeddings replaces this in v1.
+//
+// Candidates come from two reads: the newest saves, and a full-text search on
+// the item's own tags and title. The search reaches saves of any age, so an
+// item saved months ago can still come back when a related one arrives.
+// Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
+const SIMILAR_SEARCH_CANDIDATES = 100;
+// Convex caps a full-text query at 16 terms.
+const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
 
@@ -459,6 +467,26 @@ function searchTokens(text: string): Set<string> {
       .split(/[^a-z0-9]+/)
       .filter((token) => token.length > 3),
   );
+}
+
+/** The full-text query for an item's older relatives: its tags first, since
+ * they carry most of the scoring signal, then its title words. Deduplicated
+ * and capped at the search term limit. */
+function similarSearchTerms(item: Doc<"items">): string[] {
+  const terms = new Set<string>();
+  const words = [
+    ...item.tags.flatMap((tag) => tag.toLowerCase().split(/[^a-z0-9]+/)),
+    ...(item.title ?? "").toLowerCase().split(/[^a-z0-9]+/),
+  ];
+  for (const word of words) {
+    if (word.length > 3) {
+      terms.add(word);
+    }
+    if (terms.size >= SIMILAR_SEARCH_TERMS) {
+      break;
+    }
+  }
+  return [...terms];
 }
 
 export const similarItems = query({
@@ -476,14 +504,30 @@ export const similarItems = query({
       return [];
     }
 
-    const candidates = await ctx.db
+    const recent = await ctx.db
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(SIMILAR_CANDIDATES);
 
+    const terms = similarSearchTerms(item);
+    const searched =
+      terms.length === 0
+        ? []
+        : await ctx.db
+            .query("items")
+            .withSearchIndex("search_text", (q) =>
+              q.search("searchText", terms.join(" ")).eq("userId", userId),
+            )
+            .take(SIMILAR_SEARCH_CANDIDATES);
+
+    const candidates = new Map<Id<"items">, Doc<"items">>();
+    for (const candidate of [...recent, ...searched]) {
+      candidates.set(candidate._id, candidate);
+    }
+
     const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates) {
+    for (const candidate of candidates.values()) {
       if (candidate._id === item._id || candidate.status !== "ready") {
         continue;
       }

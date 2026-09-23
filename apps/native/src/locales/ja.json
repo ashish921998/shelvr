@@ -480,6 +480,10 @@
   "home.howToMoreHelp": "Shelvrをよく使う項目に追加すると、先頭に表示されます。",
   "home.pasteLink": "リンクを貼り付ける",
   "home.onYourShelf": "シェルフ",
+  "home.recallTitle": "似たものを前にも保存しています",
+  "home.recallBody": {
+    "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
+  },
   "demo.pickHelp": "Shelvr が読み込み、タイトルを付けて整理します。",
   "demo.clipboardNoLink": "クリップボードにリンクがありません。リンクをコピーするか、下のリンクを試してください。",
   "demo.samplesOr": "または、このリンクで試す",

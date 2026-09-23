@@ -495,6 +495,11 @@
   "home.howToMoreHelp": "Then add Shelvr to Favorites so it stays up front.",
   "home.pasteLink": "Paste a link",
   "home.onYourShelf": "On your shelf",
+  "home.recallTitle": "You've saved things like this before",
+  "home.recallBody": {
+    "one": "%{formattedCount} earlier save goes with what you just added.",
+    "other": "%{formattedCount} earlier saves go with what you just added."
+  },
   "demo.pickHelp": "Shelvr reads it, titles it and files it for you.",
   "demo.clipboardNoLink": "Your clipboard has no link. Copy one, or try one of these.",
   "demo.samplesOr": "Or try one of these",

@@ -451,6 +451,8 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.recallTitle": undefined;
+  "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
