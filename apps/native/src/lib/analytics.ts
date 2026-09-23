@@ -178,6 +178,12 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
+  // Android task-restore ghost: the share screen re-offered a batch that was
+  // already handled (recordCompletedShare tombstone matched).
+  share_ghost_prompt: Record<string, never>;
+  share_ghost_save_again: Record<string, never>;
+  share_ghost_dismissed: Record<string, never>;
+  share_ghost_suppressed: Record<string, never>;
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —

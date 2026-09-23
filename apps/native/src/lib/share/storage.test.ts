@@ -7,12 +7,17 @@ import {
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
+  GHOST_SUPPRESS_MS,
+  LAST_COMPLETED_SHARE_KEY,
   loadSession,
   markComplete,
+  markGhostDismissed,
   operationIdFor,
   reconcileSession,
+  recordCompletedShare,
   SESSION_KEY,
   SESSION_SCHEMA_VERSION,
+  startNewSession,
   updateEntry,
   type SessionStoreAdapter,
   type RawSharePayload,
@@ -236,6 +241,132 @@ describe("reconcileSession", () => {
     reconcileSession(store, USER, BATCH_A, id);
     const session = loadSession(store);
     expect(session?.version).toBe(SESSION_SCHEMA_VERSION);
+  });
+});
+
+describe("ghost redelivery (Android task-restore replay)", () => {
+  const NOW = 1_000_000_000_000;
+
+  function completedBatchA(store: SessionStoreAdapter) {
+    reconcileSession(store, USER, BATCH_A, id, NOW);
+    updateEntry(store, 0, {
+      status: "saved",
+      itemId: "items-1",
+      kind: "link",
+    });
+    markComplete(store, "sess-1");
+    deleteSession(store, "sess-1");
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+  }
+
+  it("flags a record-less identical batch as a ghost needing confirmation", () => {
+    // The reported duplicate: the save completed (record deleted), Android
+    // replayed the task's share intent, and a fresh session minted a fresh
+    // operationId the ledger could not dedupe. It must prompt instead.
+    const store = memoryStore();
+    completedBatchA(store);
+    const result = reconcileSession(store, USER, BATCH_A, id, NOW + 1000);
+    expect(result).toEqual({ kind: "ghost", suppress: false });
+    // No session was started behind the prompt.
+    expect(loadSession(store)).toBeNull();
+  });
+
+  it("silently suppresses a ghost the user recently dismissed", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    const result = reconcileSession(
+      store,
+      USER,
+      BATCH_A,
+      id,
+      NOW + GHOST_SUPPRESS_MS - 1,
+    );
+    expect(result).toEqual({ kind: "ghost", suppress: true });
+  });
+
+  it("re-prompts once the dismissal latch expires", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    const result = reconcileSession(
+      store,
+      USER,
+      BATCH_A,
+      id,
+      NOW + GHOST_SUPPRESS_MS,
+    );
+    expect(result).toEqual({ kind: "ghost", suppress: false });
+  });
+
+  it("treats a different batch as a genuine new share, not a ghost", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    expect(reconcileSession(store, USER, BATCH_B, id, NOW + 1000).kind).toBe(
+      "new",
+    );
+  });
+
+  it("treats an identical batch as new when nothing completed before it", () => {
+    // First-ever share must never prompt.
+    const store = memoryStore();
+    expect(reconcileSession(store, USER, BATCH_A, id, NOW).kind).toBe("new");
+  });
+
+  it("re-arms the prompt when the same content is re-handled after a dismissal", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    // The user (or the prompt) saved the batch again: a fresh completion
+    // replaces the tombstone and clears the dismissal.
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+    expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
+      "ghost",
+    );
+  });
+
+  it("does not ghost-check an active or completed session match", () => {
+    // A matching existing session follows the resume/clear rules regardless of
+    // any tombstone — those paths reuse stable operation ids.
+    const store = memoryStore();
+    completedBatchA(store);
+    // Directly start the active session (bypasses the ghost branch, like the
+    // Save-again button does).
+    startNewSession(
+      store,
+      USER,
+      fingerprintSharePayloads(BATCH_A),
+      BATCH_A,
+      id,
+    );
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+    // Active session for the same batch → resume, not ghost.
+    expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
+      "resume",
+    );
+  });
+
+  it("drops a corrupt tombstone instead of failing reconciliation", () => {
+    const store = memoryStore();
+    store.set(LAST_COMPLETED_SHARE_KEY, "not json{");
+    expect(reconcileSession(store, USER, BATCH_A, id, NOW).kind).toBe("new");
+  });
+
+  it("starts the approved session with a fresh id via startNewSession", () => {
+    // The Save-again button's path: reconcile declined to start a session for
+    // a ghost batch; startNewSession must create one like the 'new' branch.
+    const store = memoryStore();
+    const session = startNewSession(
+      store,
+      USER,
+      fingerprintSharePayloads(BATCH_A),
+      BATCH_A,
+      () => "sess-9",
+    );
+    expect(session.sessionId).toBe("sess-9");
+    expect(session.phase).toBe("active");
+    expect(session.entries[0].operationId).toBe("share:sess-9:0");
+    expect(loadSession(store)?.sessionId).toBe("sess-9");
   });
 });
 

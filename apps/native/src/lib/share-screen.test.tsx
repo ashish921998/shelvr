@@ -12,6 +12,11 @@ import {
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import ShareScreen from "@/app/(app)/share";
+import {
+  fingerprintSharePayloads,
+  GHOST_SUPPRESS_MS,
+  LAST_COMPLETED_SHARE_KEY,
+} from "@/lib/share/storage";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
@@ -207,4 +212,69 @@ it("gates a retry again when the entitlement lapses after a locked session ran",
   fireEvent.click(screen.getByText("capture.retryFailed"));
   await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(2));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+});
+
+const ghostTombstone = (extra: object = {}) =>
+  JSON.stringify({
+    fingerprint: fingerprintSharePayloads([
+      {
+        value: link.value,
+        shareType: link.shareType,
+        mimeType: link.mimeType,
+      },
+    ]),
+    ...extra,
+  });
+
+it("asks before re-saving a batch that matches the last completed one", async () => {
+  // The Android task-restore ghost: no session record, but the payload is the
+  // batch that just completed. It must prompt, not auto-save a duplicate.
+  mock.entitled = true;
+  mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
+  );
+  await settle();
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+  expect(mock.router.replace).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByText("share.saveAgain"));
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+    url: link.value,
+  });
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+});
+
+it("dismisses the ghost prompt and latches the suppression", async () => {
+  mock.entitled = true;
+  mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
+  );
+
+  fireEvent.click(screen.getByText("common.cancel"));
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+  expect(mock.clearSharedPayloads).toHaveBeenCalled();
+  const tombstone = JSON.parse(
+    mock.store.get(LAST_COMPLETED_SHARE_KEY) as string,
+  );
+  expect(tombstone.dismissedAt).toBeGreaterThan(0);
+});
+
+it("silently clears a recently dismissed ghost without prompting", async () => {
+  mock.entitled = true;
+  mock.store.set(
+    LAST_COMPLETED_SHARE_KEY,
+    ghostTombstone({ dismissedAt: Date.now() - GHOST_SUPPRESS_MS / 2 }),
+  );
+  render(<ShareScreen />);
+  await settle();
+  expect(screen.queryByText("share.ghostTitle")).toBeNull();
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  expect(mock.clearSharedPayloads).toHaveBeenCalled();
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
 });
