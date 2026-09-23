@@ -271,7 +271,8 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   it("keeps no shared content in the tombstone, only a digest", () => {
     const store = memoryStore();
     completedBatchA(store);
-    const tombstone = store.getString(LAST_COMPLETED_SHARE_KEY) ?? "";
+    const tombstone = store.getString(LAST_COMPLETED_SHARE_KEY);
+    expect(tombstone).toBeDefined();
     for (const p of BATCH_A) expect(tombstone).not.toContain(p.value);
   });
 
