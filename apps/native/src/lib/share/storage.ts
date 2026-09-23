@@ -355,7 +355,31 @@ export function recordCompletedShare(
   fingerprint: string,
   userId: string,
 ): void {
-  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ fingerprint, userId }));
+  store.set(
+    LAST_COMPLETED_SHARE_KEY,
+    JSON.stringify({ digest: digestFingerprint(fingerprint), userId }),
+  );
+}
+
+/** A one-way digest of a fingerprint. The tombstone outlives the session, so
+ * it keeps only this digest, never the shared URLs or note text themselves.
+ * Sync because reconcileSession is sync (expo-crypto only hashes async).
+ * ponytail: cyrb53, 53 bits, not cryptographic; a collision only shows the
+ * ghost prompt for a genuinely new share, so move to SHA-256 only if the
+ * reconcile path goes async. */
+function digestFingerprint(fingerprint: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < fingerprint.length; i++) {
+    const ch = fingerprint.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 /** True when this fingerprint matches the user's last handled batch. */
@@ -367,13 +391,13 @@ function isGhostRedelivery(
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
   if (raw === undefined) return false;
   try {
-    const parsed = JSON.parse(raw) as {
-      fingerprint?: unknown;
-      userId?: unknown;
-    };
+    const parsed = JSON.parse(raw) as { digest?: unknown; userId?: unknown };
     // A tombstone from a different account is not this user's ghost: their
     // identical share is a genuine new share.
-    return parsed.userId === userId && parsed.fingerprint === fingerprint;
+    return (
+      parsed.userId === userId &&
+      parsed.digest === digestFingerprint(fingerprint)
+    );
   } catch {
     store.remove(LAST_COMPLETED_SHARE_KEY);
     return false;

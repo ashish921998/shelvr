@@ -16,6 +16,7 @@ import { analytics } from "@/lib/analytics";
 import {
   fingerprintSharePayloads,
   LAST_COMPLETED_SHARE_KEY,
+  recordCompletedShare,
 } from "@/lib/share/storage";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
@@ -221,23 +222,26 @@ it("gates a retry again when the entitlement lapses after a locked session ran",
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 
-const ghostTombstone = () =>
-  JSON.stringify({
-    fingerprint: fingerprintSharePayloads([
-      {
-        value: link.value,
-        shareType: link.shareType,
-        mimeType: link.mimeType,
-      },
+/** Records the tombstone the real completion path writes for `link`. */
+const seedGhostTombstone = () =>
+  recordCompletedShare(
+    {
+      getString: (key) => mock.store.get(key),
+      set: (key, value) => mock.store.set(key, value),
+      remove: (key) => mock.store.delete(key),
+      contains: (key) => mock.store.has(key),
+    },
+    fingerprintSharePayloads([
+      { value: link.value, shareType: link.shareType, mimeType: link.mimeType },
     ]),
-    userId: mock.user._id,
-  });
+    mock.user._id,
+  );
 
 it("asks before re-saving a batch that matches the last completed one", async () => {
   // The Android task-restore ghost: no session record, but the payload is the
   // batch that just completed. It must prompt, not auto-save a duplicate.
   mock.entitled = true;
-  mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
+  seedGhostTombstone();
   const view = render(<ShareScreen />);
   await waitFor(() =>
     expect(screen.getByText("share.ghostTitle")).toBeDefined(),
@@ -259,9 +263,12 @@ it("asks before re-saving a batch that matches the last completed one", async ()
   // handler closure still sees ghostConfirm — only the synchronous latch
   // prevents a second startNewSession/runSave pair (a duplicate save run).
   fireEvent.click(screen.getByText("share.saveAgain"));
+  // Nor may a queued Cancel abandon the run Save again just started.
+  fireEvent.click(screen.getByText("common.cancel"));
   await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
   await settle();
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+  expect(analytics.capture).not.toHaveBeenCalledWith("share_ghost_dismissed");
   expect(analytics.capture).toHaveBeenCalledWith("share_ghost_save_again");
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
@@ -271,15 +278,19 @@ it("asks before re-saving a batch that matches the last completed one", async ()
 
 it("dismisses the ghost prompt and prompts again on the next replay", async () => {
   mock.entitled = true;
-  mock.store.set(LAST_COMPLETED_SHARE_KEY, ghostTombstone());
+  seedGhostTombstone();
   const first = render(<ShareScreen />);
   await waitFor(() =>
     expect(screen.getByText("share.ghostTitle")).toBeDefined(),
   );
 
   fireEvent.click(screen.getByText("common.cancel"));
+  // A queued Save again landing before the re-render must not save after Cancel.
+  fireEvent.click(screen.getByText("share.saveAgain"));
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  await settle();
   expect(mock.createLinkItem).not.toHaveBeenCalled();
+  expect(analytics.capture).not.toHaveBeenCalledWith("share_ghost_save_again");
   expect(mock.clearSharedPayloads).toHaveBeenCalled();
   expect(analytics.capture).toHaveBeenCalledWith("share_ghost_dismissed");
   first.unmount();

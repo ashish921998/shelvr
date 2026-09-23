@@ -164,11 +164,12 @@ export default function ShareScreen() {
   // the same session as soon as native resolution settles. Cleared when a run
   // starts so a later lapse gates the session again.
   const lockedSessionId = useRef<string | null>(null);
-  // Synchronous latch for the ghost "Save again" button: every press mints a
-  // NEW session id, so runSave's per-session guard cannot dedupe two presses
-  // that land before the first run's setPhase re-renders. One confirmation =
-  // one save run; ghostConfirm never returns within this mount afterwards.
-  const ghostSaveStarted = useRef(false);
+  // Synchronous latch shared by the ghost prompt's Save again and Cancel: the
+  // first press claims the confirmation before any re-render, so a queued
+  // second press can neither start a second save (each press mints a NEW
+  // session id runSave cannot dedupe) nor save after Cancel, or vice versa.
+  // ghostConfirm never returns within this mount afterwards.
+  const ghostAnswered = useRef(false);
   // The reconcile effect re-runs on dependency identity changes; count one
   // share_ghost_prompt per mount, not per re-run.
   const ghostPromptLogged = useRef(false);
@@ -523,6 +524,8 @@ export default function ShareScreen() {
    * batch matches the last handled one. Cancel → clear and leave; Save again →
    * start the session reconcileSession deliberately did not. */
   const onGhostDismiss = useCallback(() => {
+    if (ghostAnswered.current) return;
+    ghostAnswered.current = true;
     analytics.capture("share_ghost_dismissed");
     abandon();
   }, [abandon]);
@@ -532,15 +535,11 @@ export default function ShareScreen() {
       phase.kind !== "ghostConfirm" ||
       user === null ||
       user === undefined ||
-      // Double-tap guard: the press below starts a run whose phase change is
-      // visible only after a re-render, and each press creates a fresh session
-      // id runSave cannot dedupe. Latch synchronously so only the first press
-      // can ever reach startNewSession.
-      ghostSaveStarted.current
+      ghostAnswered.current
     ) {
       return;
     }
-    ghostSaveStarted.current = true;
+    ghostAnswered.current = true;
     analytics.capture("share_ghost_save_again");
     const session = startNewSession(
       shareStore,
