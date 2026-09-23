@@ -223,6 +223,7 @@ const ghostTombstone = (extra: object = {}) =>
         mimeType: link.mimeType,
       },
     ]),
+    userId: mock.user._id,
     ...extra,
   });
 
@@ -263,6 +264,7 @@ it("dismisses the ghost prompt and latches the suppression", async () => {
     mock.store.get(LAST_COMPLETED_SHARE_KEY) as string,
   );
   expect(tombstone.dismissedAt).toBeGreaterThan(0);
+  expect(tombstone.userId).toBe(mock.user._id);
 });
 
 it("silently clears a recently dismissed ghost without prompting", async () => {

@@ -42,6 +42,7 @@ function memoryStore(): SessionStoreAdapter {
 // The authenticated user the session is scoped to. Different USER values model
 // different accounts on the same device.
 const USER = "user-a";
+const OTHER_USER = "user-b";
 
 const id = () => "sess-1";
 const payload = (value: string, shareType = "text"): RawSharePayload => ({
@@ -256,7 +257,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     });
     markComplete(store, "sess-1");
     deleteSession(store, "sess-1");
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
   }
 
   it("flags a record-less identical batch as a ghost needing confirmation", () => {
@@ -274,7 +275,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   it("silently suppresses a ghost the user recently dismissed", () => {
     const store = memoryStore();
     completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
     const result = reconcileSession(
       store,
       USER,
@@ -288,7 +289,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   it("re-prompts once the dismissal latch expires", () => {
     const store = memoryStore();
     completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
     const result = reconcileSession(
       store,
       USER,
@@ -316,10 +317,10 @@ describe("ghost redelivery (Android task-restore replay)", () => {
   it("re-arms the prompt when the same content is re-handled after a dismissal", () => {
     const store = memoryStore();
     completedBatchA(store);
-    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
     // The user (or the prompt) saved the batch again: a fresh completion
     // replaces the tombstone and clears the dismissal.
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
     expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
       "ghost",
     );
@@ -339,7 +340,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
       BATCH_A,
       id,
     );
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A));
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
     // Active session for the same batch → resume, not ghost.
     expect(reconcileSession(store, USER, BATCH_A, id, NOW + 1000).kind).toBe(
       "resume",
@@ -350,6 +351,32 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     const store = memoryStore();
     store.set(LAST_COMPLETED_SHARE_KEY, "not json{");
     expect(reconcileSession(store, USER, BATCH_A, id, NOW).kind).toBe("new");
+  });
+
+  it("never matches a tombstone left by a different user", () => {
+    // Account switch: user A completed this batch, user B shares identical
+    // content. The ghost check is user-scoped — B's share is genuine.
+    const store = memoryStore();
+    completedBatchA(store);
+    expect(
+      reconcileSession(store, OTHER_USER, BATCH_A, id, NOW + 1000).kind,
+    ).toBe("new");
+  });
+
+  it("does not inherit another user's dismissal suppression", () => {
+    // A dismissal latches per user: B's identical share right after A's
+    // "don't save" must prompt (or save), never silently clear.
+    const store = memoryStore();
+    completedBatchA(store);
+    markGhostDismissed(store, fingerprintSharePayloads(BATCH_A), NOW, USER);
+    const result = reconcileSession(
+      store,
+      OTHER_USER,
+      BATCH_A,
+      id,
+      NOW + GHOST_SUPPRESS_MS - 1,
+    );
+    expect(result.kind).toBe("new");
   });
 
   it("starts the approved session with a fresh id via startNewSession", () => {

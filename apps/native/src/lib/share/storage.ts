@@ -114,9 +114,11 @@ const ENTRY_KINDS = new Set<ShareEntryKind>([
 
 export const SESSION_KEY = "incoming-share-session";
 
-/** Device-level tombstone of the most recently completed (or cancelled) share
- * batch, used to detect Android task-restore ghost redeliveries. Survives
- * completion — unlike the session record, which is single-use by design. */
+/** Tombstone of the most recently completed (or cancelled) share batch, used
+ * to detect Android task-restore ghost redeliveries. Survives completion —
+ * unlike the session record, which is single-use by design. Scoped to the
+ * authenticated user, like sessions: a prior account's tombstone must never
+ * suppress a new user's identical share. */
 export const LAST_COMPLETED_SHARE_KEY = "last-completed-share";
 
 /** How long an explicit "don't save" on a ghost prompt keeps suppressing the
@@ -270,7 +272,7 @@ export function reconcileSession(
   // DIFFERENT batch stays a genuine 'new' (its own fingerprint mismatch path
   // below handles it).
   if (existing === null || existing.userId !== userId) {
-    const ghost = classifyGhostRedelivery(store, currentFp, now);
+    const ghost = classifyGhostRedelivery(store, currentFp, now, userId);
     if (ghost !== null) {
       return { kind: "ghost", suppress: ghost };
     }
@@ -354,12 +356,15 @@ export function startNewSession(
 
 /** Records the batch that just finished its handoff (saved, continued, or
  * cancelled — any path through the share screen's completion). Replaces any
- * prior tombstone and re-arms the ghost prompt for this fingerprint. */
+ * prior tombstone and re-arms the ghost prompt for this fingerprint. Takes the
+ * completing user's id so a tombstone left by one account never suppresses
+ * another account's identical batch (the ghost check is user-scoped). */
 export function recordCompletedShare(
   store: SessionStoreAdapter,
   fingerprint: string,
+  userId: string,
 ): void {
-  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ fingerprint }));
+  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ fingerprint, userId }));
 }
 
 /** The user explicitly declined to re-save a redelivered batch. Its ghost may
@@ -370,10 +375,11 @@ export function markGhostDismissed(
   store: SessionStoreAdapter,
   fingerprint: string,
   now: number,
+  userId: string,
 ): void {
   store.set(
     LAST_COMPLETED_SHARE_KEY,
-    JSON.stringify({ fingerprint, dismissedAt: now }),
+    JSON.stringify({ fingerprint, dismissedAt: now, userId }),
   );
 }
 
@@ -384,6 +390,7 @@ function classifyGhostRedelivery(
   store: SessionStoreAdapter,
   fingerprint: string,
   now: number,
+  userId: string,
 ): boolean | null {
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
   if (raw === undefined) return null;
@@ -391,7 +398,11 @@ function classifyGhostRedelivery(
     const parsed = JSON.parse(raw) as {
       fingerprint?: unknown;
       dismissedAt?: unknown;
+      userId?: unknown;
     };
+    // A tombstone from a different account is not this user's ghost: their
+    // identical share is a genuine new share, never suppressed or dropped.
+    if (parsed.userId !== userId) return null;
     if (parsed.fingerprint !== fingerprint) return null;
     if (
       typeof parsed.dismissedAt === "number" &&

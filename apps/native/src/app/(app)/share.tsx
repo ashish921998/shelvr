@@ -164,6 +164,11 @@ export default function ShareScreen() {
   // the same session as soon as native resolution settles. Cleared when a run
   // starts so a later lapse gates the session again.
   const lockedSessionId = useRef<string | null>(null);
+  // Synchronous latch for the ghost "Save again" button: every press mints a
+  // NEW session id, so runSave's per-session guard cannot dedupe two presses
+  // that land before the first run's setPhase re-renders. One confirmation =
+  // one save run; ghostConfirm never returns within this mount afterwards.
+  const ghostSaveStarted = useRef(false);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. */
@@ -244,16 +249,19 @@ export default function ShareScreen() {
         setPhase({ kind: "clearFailed", session });
         return;
       }
-      // 3. Delete the local session ONLY after a successful clear — otherwise a
+      // 3. Tombstone the batch BEFORE deleting the session: a process death
+      //    between the two would erase both dedup markers, and the next
+      //    launch's Android replay would mint a fresh operationId the ledger
+      //    cannot dedupe — the duplicate save this ordering closes. The
+      //    reverse crash (tombstone written, session left) is safe: the
+      //    completed session still reconciles to a clear on remount.
+      //    User-scoped so one account's batch never suppresses another's.
+      recordCompletedShare(shareStore, session.fingerprint, session.userId);
+      // 4. Delete the local session ONLY after a successful clear — otherwise a
       //    later identical re-share would match a stale completed record and be
       //    silently dropped. Scoped so a stale in-flight run can't delete the
       //    newer session that replaced its record.
       deleteSession(shareStore, sid);
-      // Tombstone the batch so a later record-less redelivery of the exact
-      // same content (the Android task-restore ghost, or a deliberate
-      // identical re-share) prompts instead of silently auto-saving a
-      // duplicate under a fresh operation id.
-      recordCompletedShare(shareStore, session.fingerprint);
       // The share handoff is durable now — drop the deferred-share flag so the
       // resume hook can't re-open /share after we land Home. Kept this late so
       // a process death mid-share still resumes on next launch.
@@ -513,19 +521,30 @@ export default function ShareScreen() {
    * reconcileSession deliberately did not. */
   const onGhostDismiss = useCallback(() => {
     if (phase.kind !== "ghostConfirm") return;
+    if (user === null || user === undefined) return;
     analytics.capture("share_ghost_dismissed");
     try {
-      markGhostDismissed(shareStore, phase.fingerprint, Date.now());
+      markGhostDismissed(shareStore, phase.fingerprint, Date.now(), user._id);
     } catch (err) {
       analytics.captureError("share_ghost_dismiss_failed", err);
     }
     abandon();
-  }, [abandon, phase]);
+  }, [abandon, phase, user]);
 
   const onGhostSaveAgain = useCallback(() => {
-    if (phase.kind !== "ghostConfirm" || user === null || user === undefined) {
+    if (
+      phase.kind !== "ghostConfirm" ||
+      user === null ||
+      user === undefined ||
+      // Double-tap guard: the press below starts a run whose phase change is
+      // visible only after a re-render, and each press creates a fresh session
+      // id runSave cannot dedupe. Latch synchronously so only the first press
+      // can ever reach startNewSession.
+      ghostSaveStarted.current
+    ) {
       return;
     }
+    ghostSaveStarted.current = true;
     analytics.capture("share_ghost_save_again");
     const session = startNewSession(
       shareStore,
