@@ -25,8 +25,10 @@ export function finishWeeklyNudge(userId: string): void {
   SecureStore.setItem(weeklyNudgeKey(userId), "done");
 }
 
-/** One item is the onboarding demo save, which does not pass through the share
- * screen. Larger libraries, including existing users', skip the guide. */
+/** The guide shows until the first share records the flag, and only while the
+ * library is nearly empty. The onboarding demo records the flag when it saves
+ * through the real share sheet, so only the paste or type demo still sees it.
+ * Larger libraries, including existing users', skip the guide. */
 export function shouldShowHowTo({
   firstShareSaved,
   itemCount,
