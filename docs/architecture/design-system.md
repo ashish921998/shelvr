@@ -15,7 +15,7 @@ each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
-from those literals later. The display face (`ExposureTrial-0`) carries titles
+from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
 (`hero`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
 Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
