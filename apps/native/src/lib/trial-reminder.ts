@@ -96,6 +96,8 @@ export async function scheduleTrialReminder(
 
 async function cancelTrialReminder(): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
+  // A reminder already delivered is wrong once the trial converts or ends.
+  await Notifications.dismissNotificationAsync(TRIAL_REMINDER_ID);
 }
 
 /**
