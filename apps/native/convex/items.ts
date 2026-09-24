@@ -19,6 +19,7 @@ import {
   requireProEntitlement,
 } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -455,6 +456,12 @@ export const searchItems = query({
 // Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
 const SIMILAR_SEARCH_CANDIDATES = 100;
+// Candidate rows are full documents, and an article's stored content runs to
+// MAX_STORED_CONTENT_CHARS. Each read also stops at a byte budget, kept
+// separate so the recent read can't starve the search, and together well
+// under the per-query read limit.
+const SIMILAR_RECENT_BYTES = 4 * 1024 * 1024;
+const SIMILAR_SEARCH_BYTES = 2 * 1024 * 1024;
 // Convex caps a full-text query at 16 terms.
 const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
@@ -515,22 +522,29 @@ export const similarItems = query({
       return [];
     }
 
-    const recent = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(SIMILAR_CANDIDATES);
+    const recent = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc"),
+      { maxRows: SIMILAR_CANDIDATES, maxBytes: SIMILAR_RECENT_BYTES },
+    );
 
     const terms = similarSearchTerms(item);
     const searched =
       terms.length === 0
         ? []
-        : await ctx.db
-            .query("items")
-            .withSearchIndex("search_text", (q) =>
-              q.search("searchText", terms.join(" ")).eq("userId", userId),
-            )
-            .take(SIMILAR_SEARCH_CANDIDATES);
+        : await takeWithinBytes(
+            ctx.db
+              .query("items")
+              .withSearchIndex("search_text", (q) =>
+                q.search("searchText", terms.join(" ")).eq("userId", userId),
+              ),
+            {
+              maxRows: SIMILAR_SEARCH_CANDIDATES,
+              maxBytes: SIMILAR_SEARCH_BYTES,
+            },
+          );
 
     const candidates = new Map<Id<"items">, Doc<"items">>();
     for (const candidate of [...recent, ...searched]) {

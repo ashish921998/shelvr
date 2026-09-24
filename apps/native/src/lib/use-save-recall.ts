@@ -4,6 +4,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useSegments } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { isHomeRootRoute } from "@/lib/feedback";
@@ -27,7 +28,10 @@ type RecallFeedItem = {
  * dismisses it. A save with no such matches is marked handled so its similar
  * items are not read again. `defer` holds evaluation while another Home card
  * owns the moment. Nothing is evaluated, recorded, or marked handled while
- * another route covers Home, matching the feedback and review prompts.
+ * another route covers Home, matching the feedback and review prompts, and
+ * nothing is recorded while the app is in the background. `pending` is true
+ * while the newest save's similar items are still loading, so the caller can
+ * hold a competing Home card until the recall card has had its chance.
  */
 export function useSaveRecall(
   items: readonly RecallFeedItem[] | undefined,
@@ -36,6 +40,12 @@ export function useSaveRecall(
   const { data: user } = useCurrentUser();
   const userId = user?._id;
   const home = isHomeRootRoute(useSegments());
+  const [appState, setAppState] = useState(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", setAppState);
+    return () => subscription.remove();
+  }, []);
+  const active = appState === "active";
   // Freshness is measured against the current time, refreshed whenever Home
   // gains focus and every minute while it stays focused. Home can stay
   // mounted underneath a stacked screen (share, item detail); a timestamp
@@ -62,7 +72,7 @@ export function useSaveRecall(
 
   // gcTime ends the subscription soon after the card goes, like the similar
   // strip on item detail.
-  const { data: similar } = useQuery({
+  const { data: similar, isError } = useQuery({
     ...convexQuery(
       api.items.similarItems,
       candidate ? { id: candidate._id } : "skip",
@@ -79,12 +89,13 @@ export function useSaveRecall(
     [similar, savedAt],
   );
   const visible = candidate !== null && matches.length > 0;
+  const pending = candidate !== null && similar === undefined && !isError;
 
   const candidateId = candidate?._id;
   const loaded = similar !== undefined;
   const reportedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!userId || !candidateId || !loaded) return;
+    if (!userId || !candidateId || !loaded || !active) return;
     if (matches.length === 0) {
       // No rerender needed: every render re-reads the handled ids, so the
       // next one (including a late match arriving) drops this candidate.
@@ -94,7 +105,7 @@ export function useSaveRecall(
     if (reportedRef.current === candidateId) return;
     reportedRef.current = candidateId;
     analytics.capture("save_recall_shown", { match_count: matches.length });
-  }, [userId, candidateId, loaded, matches.length]);
+  }, [userId, candidateId, loaded, active, matches.length]);
 
   const finish = useCallback(
     (event: "save_recall_opened" | "save_recall_dismissed") => {
@@ -108,5 +119,5 @@ export function useSaveRecall(
   const opened = useCallback(() => finish("save_recall_opened"), [finish]);
   const dismiss = useCallback(() => finish("save_recall_dismissed"), [finish]);
 
-  return { visible, matches, opened, dismiss };
+  return { visible, pending, matches, opened, dismiss };
 }

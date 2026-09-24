@@ -35,7 +35,7 @@ export default function HomeScreen() {
   // behind a card that holds the slot.
   const recall = useSaveRecall(items, { defer: cancelSurvey.visible });
   const feedback = useFeedbackInvitation(items, {
-    defer: cancelSurvey.visible || recall.visible,
+    defer: cancelSurvey.visible || recall.visible || recall.pending,
   });
   const busySaving = useBusySaving(items);
   const { data: user } = useCurrentUser();
