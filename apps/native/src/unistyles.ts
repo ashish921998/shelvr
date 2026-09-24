@@ -1,19 +1,58 @@
 import { StyleSheet } from "react-native-unistyles";
 import { Appearance } from "react-native";
+import { motion } from "@/lib/motion";
 import {
   readStoredAppearanceMode,
   resolveThemeName,
   type AppThemeName,
 } from "@/lib/appearance";
 
+const fonts = {
+  regular: "Satoshi-Regular",
+  medium: "Satoshi-Medium",
+  bold: "Satoshi-Bold",
+  display: "ExposureTrial-0",
+} as const;
+
 const shared = {
-  fonts: {
-    regular: "Satoshi-Regular",
-    medium: "Satoshi-Medium",
-    bold: "Satoshi-Bold",
-    display: "ExposureTrial-0",
+  fonts,
+  // The shared type ramp. Every step names a family/size pair the app already
+  // renders as a literal somewhere in src/, so the ramp is the inventory of
+  // type in use, not a wish list: a step with no `variant` caller yet still has
+  // consumers writing its numbers by hand. Existing layouts keep their literal
+  // styles; new UI reaches for these names so type stays consistent (see
+  // docs/architecture/design-system.md).
+  type: {
+    hero: { fontFamily: fonts.display, fontSize: 48 },
+    largeTitle: { fontFamily: fonts.display, fontSize: 26 },
+    sheetTitle: { fontFamily: fonts.display, fontSize: 24 },
+    title: { fontFamily: fonts.display, fontSize: 22 },
+    header: { fontFamily: fonts.display, fontSize: 19 },
+    displaySmall: { fontFamily: fonts.display, fontSize: 18 },
+    reader: { fontFamily: fonts.regular, fontSize: 18 },
+    headline: { fontFamily: fonts.bold, fontSize: 17 },
+    body: { fontFamily: fonts.regular, fontSize: 16 },
+    bodyLabel: { fontFamily: fonts.medium, fontSize: 16 },
+    button: { fontFamily: fonts.bold, fontSize: 16 },
+    subhead: { fontFamily: fonts.regular, fontSize: 15 },
+    subheadLabel: { fontFamily: fonts.medium, fontSize: 15 },
+    subheadStrong: { fontFamily: fonts.bold, fontSize: 15 },
+    footnote: { fontFamily: fonts.regular, fontSize: 14 },
+    secondaryLabel: { fontFamily: fonts.medium, fontSize: 14 },
+    caption: { fontFamily: fonts.regular, fontSize: 13 },
+    label: { fontFamily: fonts.medium, fontSize: 13 },
+    labelStrong: { fontFamily: fonts.bold, fontSize: 13 },
+    captionLabel: { fontFamily: fonts.medium, fontSize: 12 },
+    captionStrong: { fontFamily: fonts.bold, fontSize: 12 },
+    finePrint: { fontFamily: fonts.regular, fontSize: 11 },
+    badge: { fontFamily: fonts.bold, fontSize: 10 },
   },
+  // The one spacing scale. Fractions are expected: gap(0.5) is 4, gap(1.5) is
+  // 12. A second, named set of steps would only split the vocabulary.
   gap: (v: number) => v * 8,
+  motion,
+  opacity: { pressed: 0.7, disabled: 0.4 },
+  control: { minHeight: 48, pressRetentionOffset: 12 },
   radius: {
     sm: 8,
     md: 11,
@@ -29,19 +68,35 @@ const lightTheme = {
     surface: "#fffdf8",
     surfaceMuted: "#f3ecdd",
     foreground: "#2b2418",
-    // Clears 4.5:1 on every light surface it paints on
-    // (design-system.md, Color): 5.37:1 paper, 4.92:1 surfaceMuted,
-    // 4.79:1 primarySoft; captions use it at 13-14pt.
+    // Darkened from #8d8271 for WCAG AA contrast. The binding surface is
+    // surfaceMuted #f3ecdd (4.92:1), where tag labels and captions sit; the
+    // paper background clears 5.37:1.
     muted: "#6f6455",
-    faint: "#b5aa97",
+    // Small captions need AA normal-text contrast on secondary surfaces too.
+    faint: "#6f6455",
     primary: "#e6a23c",
     primaryForeground: "#2b2418",
     primarySoft: "#f7e8cd",
-    primaryText: "#9a6416",
+    // Darkened from #9a6416; amber-toned text must clear 4.5:1 on paper.
+    primaryText: "#935d09",
     border: "#ece3d1",
     imageBorder: "rgba(0, 0, 0, 0.07)",
-    danger: "#c05a3a",
+    // Darkened from #c05a3a so destructive text clears 4.5:1 on paper
+    // (4.84:1) and the background (4.57:1); on surfaceMuted (4.18:1) and
+    // primarySoft (4.07:1) it stays under AA, so destructive labels must
+    // not render on those surfaces.
+    danger: "#b75232",
     overlay: "rgba(43, 36, 24, 0.45)",
+    // Dark label on the amber fill; white on #e6a23c is 2.19:1.
+    onTint: "#2b2418",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    // NativeTabs paints the selected tab's icon AND its label with this one
+    // color, so it carries small normal-size text and owes 4.5:1. Darkened
+    // from #bf8114, which cleared only 3.06:1 on background, 3.25:1 on
+    // surface and 2.80:1 on surfaceMuted: now 5.49, 5.82 and 5.03:1.
+    tabTint: "#8a5a0b",
   },
 } as const;
 
@@ -62,6 +117,12 @@ const darkTheme = {
     imageBorder: "rgba(255, 255, 255, 0.07)",
     danger: "#e07a58",
     overlay: "rgba(0, 0, 0, 0.55)",
+    // The amber fill is shared, so the dark label is too.
+    onTint: "#2b2418",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    tabTint: "#e6a23c",
   },
 } as const;
 
@@ -85,6 +146,12 @@ const darkNeutralTheme = {
     imageBorder: "rgba(255, 255, 255, 0.08)",
     danger: "#ff6f5e",
     overlay: "rgba(0, 0, 0, 0.6)",
+    onTint: "#111417",
+    onOverlay: "#ffffff",
+    keep: "#34d399",
+    onKeep: "#065f46",
+    // Matches the previous hard-coded dark tab tint on this theme.
+    tabTint: "#e6a23c",
   },
 } as const;
 

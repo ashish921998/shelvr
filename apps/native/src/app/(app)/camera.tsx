@@ -17,11 +17,11 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
@@ -92,8 +92,8 @@ export default function CameraScreen() {
         .activeOffsetX([-20, 20])
         .onEnd((event) => {
           "worklet";
-          if (event.translationX < -40) runOnJS(switchMode)("sticker");
-          else if (event.translationX > 40) runOnJS(switchMode)("photo");
+          if (event.translationX < -40) scheduleOnRN(switchMode, "sticker");
+          else if (event.translationX > 40) scheduleOnRN(switchMode, "photo");
         }),
     [switchMode],
   );

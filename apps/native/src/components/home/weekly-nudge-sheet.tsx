@@ -39,7 +39,14 @@ export function WeeklyNudgeSheet({
 
   useEffect(() => {
     if (pending && alreadyOn) {
+      // Finish AND clear the local flag: the persisted flag alone leaves
+      // `pending` true, so the preferences query stays subscribed instead of
+      // flipping to "skip". The flip cannot be a render-phase adjustment
+      // (it would discard the pass this effect commits) and the write must
+      // not run during render.
       finishWeeklyNudge(userId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPending(false);
     }
   }, [pending, alreadyOn, userId]);
 

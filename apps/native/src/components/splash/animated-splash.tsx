@@ -4,12 +4,12 @@ import Animated, {
   cancelAnimation,
   Easing,
   ReduceMotion,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { isDarkThemeName } from "@/lib/appearance";
@@ -98,7 +98,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         },
         (completed) => {
           "worklet";
-          if (completed) runOnJS(finish)();
+          if (completed) scheduleOnRN(finish);
         },
       ),
     );

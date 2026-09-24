@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import {
   createContext,
   useCallback,
@@ -13,26 +12,21 @@ import {
   cancelAnimation,
   useSharedValue,
   withSpring,
-  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { motion } from "@/lib/motion";
+
 import { useDeckAnimation } from "./deck-animation";
+import {
+  swipeDecision,
+  swipeProgress,
+  type TidyAction,
+} from "./swipe-decision";
 import { useSingleHapticOnPan } from "./use-single-haptic-on-pan";
 
-export type TidyAction = "keep" | "delete" | "save";
-
-const SPRING_CONFIG = {
-  damping: 60,
-  stiffness: 900,
-};
-
-// Short fling so the dismissed card clears the screen quickly and the next
-// card is immediately swipeable.
-const FLING_CONFIG = {
-  duration: 220,
-};
+export type { TidyAction } from "./swipe-decision";
 
 type CardAnimationValue = {
   panX: SharedValue<number>;
@@ -52,14 +46,14 @@ type Props = PropsWithChildren<{
 // One provider per card scopes pan shared values to a single stack element,
 // mirroring the Slack Catch Up recreation. The gesture commits horizontally
 // (keep/delete) like the reference and adds an upward commit (save); the
-// dominant axis on release wins.
+// dominant projected axis on release wins, so a fast flick commits even
+// when its translation is short.
 export const CardAnimationProvider: FC<Props> = ({
   index,
   onDecision,
   children,
 }) => {
-  const { isDragging, animatedIndex, currentIndex, prevIndex } =
-    useDeckAnimation();
+  const { isDragging, animatedIndex, currentIndex } = useDeckAnimation();
   const { width, height } = useWindowDimensions();
 
   // Quarter-width matches the reference feel; the up-swipe threshold is a
@@ -76,17 +70,14 @@ export const CardAnimationProvider: FC<Props> = ({
   // Grab point picks the rotation hinge direction (top half vs bottom half).
   const absoluteYAnchor = useSharedValue(0);
 
-  const { singleHapticOnChange } = useSingleHapticOnPan({
-    thresholdX: panDistanceX,
-    thresholdY: panDistanceY,
-  });
+  const { singleHapticOnChange, resetHaptic, commitHaptic } =
+    useSingleHapticOnPan({
+      thresholdX: panDistanceX,
+      thresholdY: panDistanceY,
+    });
 
   const handleDecision = useCallback(
     (action: TidyAction) => {
-      if (index === 0 && process.env.EXPO_OS === "ios") {
-        // Batch finished — the checkpoint state takes over after this card.
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
       // Commit immediately. The fling runs on the UI thread via shared values,
       // so a JS-side state update here can't jank it — and deferring would make
       // rapid successive swipes feel laggy.
@@ -109,6 +100,7 @@ export const CardAnimationProvider: FC<Props> = ({
           cancelAnimation(animatedIndex);
           startX.set(panX.get());
           startY.set(panY.get());
+          resetHaptic();
           isDragging.set(true);
           absoluteYAnchor.set(event.absoluteY);
         })
@@ -118,66 +110,99 @@ export const CardAnimationProvider: FC<Props> = ({
           // card visibly is.
           const x = startX.get() + event.translationX;
           const y = startY.get() + event.translationY;
-          // Progress in card-index space: 1.0 of shift equals one card dismissed.
-          // Horizontal and upward drags both advance; downward drag does not.
-          const shift = Math.min(
-            1,
-            Math.max(
-              Math.abs(x) / panDistanceX,
-              Math.max(0, -y) / panDistanceY,
-            ),
-          );
-          const progress = currentIndex.get() - shift;
-          animatedIndex.set(
-            progress < currentIndex.get() - 1
-              ? currentIndex.get() - 1
-              : progress,
-          );
+          // Progress in card-index space: 1.0 of shift equals one card
+          // dismissed. The shift reads the shared dominance rule, so a
+          // downward-dominant drag shifts the deck nothing.
+          const { progress } = swipeProgress(x, y, panDistanceX, panDistanceY);
+          animatedIndex.set(currentIndex.get() - Math.min(1, progress));
 
           panX.set(x);
           panY.set(y);
 
-          singleHapticOnChange(event);
+          singleHapticOnChange(x, y);
         })
-        .onEnd((event) => {
+        .onEnd((event, success) => {
           isDragging.set(false);
+          // RNGH also calls onEnd for a FAILED or CANCELLED pan, with
+          // success=false. Deciding from one would delete or keep a photo the
+          // person never released, and onFinalize cannot recall a scheduled
+          // decision — so leave a cancelled pan to its recovery below.
+          if (!success) return;
 
-          // Thresholds compare full travel from rest, not the grab-relative
-          // translation, so a re-grab that pushes the card past a threshold
-          // commits even though its own translation is short.
+          // The lift can carry travel that arrived after the last onChange, so
+          // recompute the offsets from the grab the way onChange does instead
+          // of reading pan values that may trail the release by a frame. The
+          // springs below start from the released position for the same
+          // reason. Momentum folds in on top: it may extend a drag, never
+          // reverse it.
           const x = startX.get() + event.translationX;
           const y = startY.get() + event.translationY;
-          const horizontal = Math.abs(x);
-          const upward = -y;
-          const commitUp = upward > panDistanceY && upward > horizontal;
-          const commitSide = horizontal > panDistanceX && horizontal >= upward;
+          panX.set(x);
+          panY.set(y);
+          const action = swipeDecision(
+            x,
+            y,
+            event.velocityX,
+            event.velocityY,
+            panDistanceX,
+            panDistanceY,
+          );
 
-          if (commitUp || commitSide) {
-            // The drag already walked animatedIndex to the next card (shift clamps
-            // at 1 past the threshold), so only the integer indices move here.
-            prevIndex.set(Math.round(currentIndex.get()));
+          if (action !== null) {
             currentIndex.set(Math.round(currentIndex.get() - 1));
 
-            // Fling the card fully off-screen with a short, snappy timing (no
-            // withDecay — a long decay animation on an off-screen card keeps the
-            // UI thread busy and makes the next card feel unresponsive). The
-            // perpendicular axis snaps home quickly.
-            if (commitUp) {
-              panY.set(withTiming(-height * 1.15, FLING_CONFIG));
-              panX.set(withTiming(0, { duration: 150 }));
-              scheduleOnRN(handleDecision, "save");
-            } else {
-              const sign = x > 0 ? 1 : -1;
-              panX.set(withTiming(sign * width * 1.25, FLING_CONFIG));
-              panY.set(withTiming(0, { duration: 150 }));
-              scheduleOnRN(handleDecision, sign > 0 ? "keep" : "delete");
-            }
-          } else {
-            panX.set(withSpring(0, SPRING_CONFIG));
-            panY.set(withSpring(0, SPRING_CONFIG));
-            // The index can be fractional on release; settle it back to the card.
+            // Springs carry the release velocity and clamp overshoot, so the
+            // card rides its own momentum off-screen and the deck index lands
+            // without a bounce.
+            const direction = action === "delete" ? -1 : 1;
+            const commitUp = action === "save";
+            const indexVelocity = commitUp
+              ? event.velocityY / panDistanceY
+              : (-direction * event.velocityX) / panDistanceX;
             animatedIndex.set(
-              withTiming(Math.ceil(currentIndex.get()), { duration: 200 }),
+              withSpring(currentIndex.get(), {
+                ...motion.spring.drag,
+                velocity: indexVelocity,
+                overshootClamping: true,
+              }),
+            );
+            panX.set(
+              withSpring(commitUp ? 0 : direction * width * 1.25, {
+                ...motion.spring.drag,
+                velocity: event.velocityX,
+                overshootClamping: true,
+              }),
+            );
+            panY.set(
+              withSpring(commitUp ? -height * 1.15 : 0, {
+                ...motion.spring.drag,
+                velocity: event.velocityY,
+                overshootClamping: true,
+              }),
+            );
+
+            commitHaptic();
+            scheduleOnRN(handleDecision, action);
+          } else {
+            // Spring home carrying the release velocity; the index can be
+            // fractional, so settle it back to the card with clamped overshoot.
+            panX.set(
+              withSpring(0, {
+                ...motion.spring.drag,
+                velocity: event.velocityX,
+              }),
+            );
+            panY.set(
+              withSpring(0, {
+                ...motion.spring.drag,
+                velocity: event.velocityY,
+              }),
+            );
+            animatedIndex.set(
+              withSpring(currentIndex.get(), {
+                ...motion.spring.settle,
+                overshootClamping: true,
+              }),
             );
           }
         })
@@ -187,10 +212,13 @@ export const CardAnimationProvider: FC<Props> = ({
           // The OS stole the pan (incoming call, tab switch, a winning
           // recognizer): onEnd never runs, so return the card home here or it
           // stays stranded mid-drag with the hints overlay stuck visible.
-          panX.set(withSpring(0, SPRING_CONFIG));
-          panY.set(withSpring(0, SPRING_CONFIG));
+          panX.set(withSpring(0, motion.spring.settle));
+          panY.set(withSpring(0, motion.spring.settle));
           animatedIndex.set(
-            withTiming(Math.ceil(currentIndex.get()), { duration: 200 }),
+            withSpring(currentIndex.get(), {
+              ...motion.spring.settle,
+              overshootClamping: true,
+            }),
           );
         }),
     // Shared values are stable refs; everything else is a stable callback or
@@ -199,6 +227,8 @@ export const CardAnimationProvider: FC<Props> = ({
     [
       handleDecision,
       singleHapticOnChange,
+      resetHaptic,
+      commitHaptic,
       width,
       height,
       panDistanceX,
