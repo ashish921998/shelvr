@@ -23,6 +23,10 @@ const THUMB_MAX_DIM = 512;
 // failure.
 const THUMBNAIL_TIMEOUT_MS = 30_000;
 const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
+// The widget learns about a renewal only when the app next runs, so locking at
+// the stored period end would show the Pro lock to a subscriber who renewed
+// but has not opened the app since. Lock a week after it instead.
+const WIDGET_LOCK_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Numbers each thumbnail build so its private working files never collide with
 // a newer build for the same item.
@@ -159,14 +163,17 @@ function deleteWidgetFiles(
   }
 }
 
-// Publishes one widget snapshot for `items` (empty + `locked` clears it) and
-// prunes thumbnails the snapshot no longer references. Resolves to `true` once
-// the snapshot is published, or `false` if it bailed — the widget module is
-// missing, or a session boundary bumped the generation past this call.
+// Publishes the widget for `items` (empty + `locked` clears it) and prunes
+// thumbnails the snapshot no longer references. With a `validUntil` it schedules
+// a timeline that locks itself at the expiry instead of a single snapshot.
+// Resolves to `true` once the widget is published, or `false` if it bailed — the
+// widget module is missing, or a session boundary bumped the generation past
+// this call.
 async function syncWidget(
   items: FeedItem[],
   locked: boolean,
   generation: number,
+  validUntil?: number,
 ): Promise<boolean> {
   // A sign-out between this sync being queued and running owns the widget now;
   // don't rebuild the previous account's snapshot over the cleared one.
@@ -217,12 +224,39 @@ async function syncWidget(
   }
 
   try {
-    RecentSavesWidget.updateSnapshot({
+    // The locked Pro copy is shared by the locked snapshot and the dated lock
+    // entry below, so it is defined once here.
+    const proEmpty = {
+      emptyTitle: t("widget.proTitle"),
+      emptyHint: t("widget.proBody"),
+    };
+    const current = {
       items: widgetItems,
-      emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
-      emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
+      ...(locked
+        ? proEmpty
+        : {
+            emptyTitle: t("widget.emptyTitle"),
+            emptyHint: t("widget.emptyBody"),
+          }),
       locked,
-    });
+      validUntil,
+    };
+    if (!locked && validUntil !== undefined) {
+      // A snapshot outlives the app, so a Pro entitlement that lapses while
+      // the app stays closed would keep the last saves on the Home Screen.
+      // Schedule a second, dated entry so WidgetKit swaps to the locked Pro
+      // state at the expiry with no app launch. The live entry also carries
+      // `validUntil`, so it fails closed on the widget's own clock.
+      RecentSavesWidget.updateTimeline([
+        { date: new Date(), props: current },
+        {
+          date: new Date(validUntil),
+          props: { items: [], ...proEmpty, locked: true },
+        },
+      ]);
+    } else {
+      RecentSavesWidget.updateSnapshot(current);
+    }
   } finally {
     // Clearing private files must not depend on publishing the locked snapshot.
     if (locked) deleteWidgetFiles(dir);
@@ -369,7 +403,12 @@ export function RecentSavesWidgetSync() {
     hasPendingCleanup,
   );
   const locale = useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const {
+    status,
+    entitled,
+    loading: entitlementLoading,
+    expiresAt,
+  } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
   // `enabled` entirely. It opens its subscription from the query cache's
   // "added" event and drops it on "removed", so an `enabled: false` query
@@ -406,10 +445,19 @@ export function RecentSavesWidgetSync() {
     // subscription lapses or the user signs out so old Pro content is not
     // left visible on the Home Screen.
     const items = entitled ? (recent ?? []) : [];
+    // A finite expiry lets the widget lock itself after the app closes, a
+    // grace period after the stored period end. A lifetime row still carries a
+    // stored `expiresAt` (0, or a stale period end kept when the row went
+    // sticky), so it must never become a lock date.
+    const validUntil =
+      entitled && status !== "lifetime" && expiresAt !== undefined
+        ? expiresAt + WIDGET_LOCK_GRACE_MS
+        : undefined;
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
       (entitled ? "open" : "locked") +
+      `@${validUntil ?? ""}` +
       items
         .map(
           (item) =>
@@ -429,13 +477,21 @@ export function RecentSavesWidgetSync() {
           lastKey.current = null;
           return false;
         }
-        return syncWidget(items, !entitled, generation);
+        return syncWidget(items, !entitled, generation, validUntil);
       })
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [entitled, entitlementLoading, recent, locale, cleanupPending]);
+  }, [
+    status,
+    entitled,
+    entitlementLoading,
+    expiresAt,
+    recent,
+    locale,
+    cleanupPending,
+  ]);
 
   return null;
 }

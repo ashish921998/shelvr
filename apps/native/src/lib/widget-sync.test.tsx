@@ -21,6 +21,8 @@ const fsx = vi.hoisted(() => ({
   platformOs: "ios",
   locale: "en-US",
   entitled: true,
+  entitlementStatus: "pro" as string,
+  expiresAt: undefined as number | undefined,
   entitlementLoading: false,
   nativeModulePresent: true,
   failImages: false,
@@ -35,6 +37,7 @@ const fsx = vi.hoisted(() => ({
   listed: [] as unknown[],
   cacheListed: [] as unknown[],
   snapshots: [] as unknown[],
+  timelines: [] as { date: Date; props: unknown }[][],
   downloads: [] as string[],
   deletes: [] as string[],
   moves: [] as [string, string][],
@@ -117,6 +120,9 @@ vi.mock("@/widgets/recent-saves-widget", () => ({
       if (fsx.failSnapshot) throw new Error("widget unavailable");
       fsx.snapshots.push(snapshot);
     },
+    updateTimeline: (entries: { date: Date; props: unknown }[]) => {
+      fsx.timelines.push(entries);
+    },
   },
 }));
 vi.mock("react-native-nitro-image", () => ({
@@ -160,6 +166,8 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({
+    status: fsx.entitlementStatus,
+    expiresAt: fsx.expiresAt,
     entitled: fsx.entitled,
     loading: fsx.entitlementLoading,
     now: Date.now(),
@@ -205,6 +213,8 @@ beforeEach(async () => {
   fsx.platformOs = "ios";
   fsx.locale = "en-US";
   fsx.entitled = true;
+  fsx.entitlementStatus = "pro";
+  fsx.expiresAt = undefined;
   fsx.entitlementLoading = false;
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
@@ -217,6 +227,7 @@ beforeEach(async () => {
   fsx.listed = [];
   fsx.cacheListed = [];
   fsx.snapshots = [];
+  fsx.timelines = [];
   fsx.downloads = [];
   fsx.deletes = [];
   fsx.moves = [];
@@ -242,6 +253,37 @@ describe("RecentSavesWidgetSync", () => {
       emptyHint: ja["widget.emptyBody"],
       items: [{ title: "Home", subtitle: ja["item.note"] }],
     });
+  });
+
+  // Locking a week past the stored period end keeps a renewal the app has not
+  // seen yet from flashing the Pro lock at a paying subscriber.
+  it("schedules a locked entry a week after a finite Pro expiry", async () => {
+    fsx.expiresAt = Date.now() + 86_400_000;
+    const lockAt = fsx.expiresAt + 7 * 86_400_000;
+    renderSync([note]);
+    await waitFor(() => expect(fsx.timelines).toHaveLength(1));
+    expect(fsx.snapshots).toHaveLength(0);
+    const [live, lock] = fsx.timelines[0];
+    expect(live.props).toMatchObject({
+      locked: false,
+      validUntil: lockAt,
+      items: [{ id: "i2" }],
+    });
+    expect(lock.date.getTime()).toBe(lockAt);
+    expect(lock.props).toMatchObject({ items: [], locked: true });
+  });
+
+  // A lifetime row keeps a stored expiresAt (0 from RevenueCat, or the period
+  // end it had before going sticky). Treating it as a lock date would lock a
+  // lifetime user's widget immediately.
+  it("never schedules a lock for a lifetime entitlement", async () => {
+    fsx.entitlementStatus = "lifetime";
+    fsx.expiresAt = 0;
+    renderSync([note]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.timelines).toHaveLength(0);
+    expect(fsx.snapshots[0]).toMatchObject({ locked: false });
+    expect(fsx.snapshots[0]).not.toHaveProperty("validUntil", 0);
   });
 
   it("stays idle without data or off iOS", async () => {
