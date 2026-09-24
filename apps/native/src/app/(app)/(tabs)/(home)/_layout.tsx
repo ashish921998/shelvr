@@ -2,54 +2,27 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { usePaywallGuard } from "@/lib/entitlement";
-import * as Haptics from "expo-haptics";
 import { Stack, useRouter } from "expo-router";
-import { Platform, PlatformColor } from "react-native";
-import { useUnistyles } from "react-native-unistyles";
+import { Platform } from "react-native";
+import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 
 export default function HomeStackLayout() {
   useAppLocale();
   const router = useRouter();
-  const { theme } = useUnistyles();
+  const { haptic, labelColor, screenOptions, tap } = useTabStackChrome();
   const { guard, loading: entitlementLoading } = usePaywallGuard("home");
-  const labelColor =
-    Platform.OS === "ios" ? PlatformColor("label") : theme.colors.foreground;
-
-  // Native bar-button items don't run JS on tap the way a Pressable does, so
-  // the light haptic HeaderButton used to give is fired here instead.
-  const tap = (href: "/profile") => () => {
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    router.push(href);
-  };
 
   // Add and Map are Pro features — route to the paywall unless entitled.
   // Suppress haptic until entitlement resolves — firing it during loading
   // would imply the action is about to run when the guard will drop it.
   const guardedTap = (href: "/add") => () => {
     if (entitlementLoading) return;
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    haptic();
     void guard(() => router.push(href));
   };
 
   return (
-    <Stack
-      screenOptions={{
-        // FlashList does not consistently apply transparent-header insets on
-        // Android. Native headers own their space there; iOS keeps the
-        // content-under-header treatment.
-        headerTransparent: Platform.OS === "ios",
-        headerStyle:
-          Platform.OS === "android"
-            ? { backgroundColor: theme.colors.background }
-            : undefined,
-        headerShadowVisible: false,
-        headerTitleAlign: "center",
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       <Stack.Screen
         name="index"
         options={

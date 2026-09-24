@@ -31,6 +31,7 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
         <AnimatedText
           text={formatItemDate(when)}
           height={18}
+          truncate
           style={styles.date}
         />
       ) : null}

@@ -20,7 +20,8 @@ existing native-text fallback handles scripts or glyphs the font does not cover,
 which is how Japanese and Korean titles render: Spectral is a Latin face and
 covers no CJK, as the trial face it replaces did not either.
 
-Spectral covers every display string in all nine locale catalogues. The face it
+Spectral covers every Latin-script display string in all nine locale catalogues;
+Japanese and Korean titles rely on the fallback above. The face it
 replaced, `ExposureTrial-0`, was a 119-character trial cut that covered 69 of
 77, so accented titles such as `Aufräumen`, `Coleções` and `Início` fell back
 mid-word. Check coverage before swapping this font again.

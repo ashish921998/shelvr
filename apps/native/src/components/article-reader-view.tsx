@@ -4,16 +4,15 @@ import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ItemSpaces } from "@/components/item-spaces";
 import { PostMediaButton } from "@/components/post-media-button";
-import { analytics } from "@/lib/analytics";
 import { displayHost } from "@/lib/url";
 import { SimilarGrid } from "@/components/similar-grid";
+import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import type { DetailItem } from "@/components/item-detail";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
 import type { Id } from "@convex/_generated/dataModel";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -68,11 +67,17 @@ export function ArticleReaderView({
     return byParagraph;
   }, [item.articleMedia, paragraphs.length]);
 
-  const openSource = () => {
-    void WebBrowser.openBrowserAsync(item.url!)
-      .then(() => analytics.itemAction(item, "open_source"))
-      .catch(() => {});
-  };
+  // A recycled reader instance must open at the top of its article.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    setTagsExpanded(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
+
+  const openSource = () => openItemSource(item);
 
   // Full body width, but a tall video poster stops at 60% of the screen.
   const mediaFrame = (aspectRatio: number) => {
@@ -88,6 +93,7 @@ export function ArticleReaderView({
       const image = (
         <Image
           source={{ uri: media.imageUrl }}
+          recyclingKey={`${item._id}-media-${index}`}
           contentFit="cover"
           style={[styles.articleMedia, mediaFrame(media.aspectRatio)]}
         />
@@ -123,6 +129,7 @@ export function ArticleReaderView({
   const thumbnail = heroUri ? (
     <Image
       source={{ uri: heroUri }}
+      recyclingKey={item._id}
       contentFit="cover"
       style={styles.thumbnailImage}
     />
@@ -138,6 +145,7 @@ export function ArticleReaderView({
 
   return (
     <ScrollView
+      ref={scrollRef}
       testID={
         item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
       }
@@ -166,32 +174,16 @@ export function ArticleReaderView({
           <View style={styles.summaryCopy}>
             <View style={styles.sourceLine}>
               {item.url ? (
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel={t("item.openSite", {
-                    site: item.siteName ?? displayHost(item.url),
-                  })}
-                  hitSlop={6}
+                <ItemSourceLink
+                  item={item}
+                  iconTintColor={theme.colors.muted}
+                  arrowTintColor={theme.colors.faint}
                   style={({ pressed }) => [
                     styles.source,
                     pressed && styles.pressed,
                   ]}
-                  onPress={openSource}
-                >
-                  <AppSymbolIcon
-                    name="safari"
-                    size={13}
-                    tintColor={theme.colors.muted}
-                  />
-                  <Text numberOfLines={1} style={styles.sourceText}>
-                    {item.siteName ?? displayHost(item.url)}
-                  </Text>
-                  <AppSymbolIcon
-                    name="arrow.up.right"
-                    size={10}
-                    tintColor={theme.colors.faint}
-                  />
-                </Pressable>
+                  textStyle={styles.sourceText}
+                />
               ) : null}
             </View>
 

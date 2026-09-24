@@ -32,6 +32,8 @@ type Env = {
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
   readonly RESEND_ANDROID_SEGMENT_ID: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
+  readonly RESEND_FEEDBACK_FROM_EMAIL: string | undefined;
+  readonly RESEND_FEEDBACK_INBOX_EMAIL: string | undefined;
   readonly RESEND_SEGMENT_ID: string | undefined;
   readonly RESEND_TOPIC_ID: string | undefined;
   readonly REVENUECAT_API_KEY: string | undefined;
