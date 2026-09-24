@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import AppStoreButton from "@/components/AppStoreButton";
 import SharePageView from "@/components/SharePageView";
 import Logo from "@/components/common/Logo";
-import { fetchSharePreview } from "@/lib/sharePreview";
+import { fetchSharePreview, loadSharePreview } from "@/lib/sharePreview";
 
 type PageProps = { params: Promise<{ token: string }> };
 
@@ -54,12 +54,12 @@ export async function generateMetadata({
 
 export default async function SharedItemPage({ params }: PageProps) {
   const { token } = await params;
-  const preview = await fetchSharePreview(token);
+  const { outcome, preview } = await loadSharePreview(token);
   const summary = previewSummary(preview);
 
   return (
     <main className="min-h-screen bg-paper">
-      <SharePageView token={token} found={Boolean(preview)} />
+      <SharePageView token={token} outcome={outcome} />
       <div className="container max-w-xl py-10 sm:py-16">
         <Logo />
 

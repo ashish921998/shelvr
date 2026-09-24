@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSharePreview } from "./sharePreview";
+import { fetchSharePreview, loadSharePreview } from "./sharePreview";
 
 const originalEnv = { ...process.env };
 
@@ -53,5 +53,33 @@ describe("fetchSharePreview", () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("network down"));
     expect(await fetchSharePreview("abc")).toBeUndefined();
     expect(error).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("loadSharePreview", () => {
+  it("tells a dead link apart from an outage", async () => {
+    process.env.CONVEX_SITE_URL = "https://deployment.convex.site";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ type: "note", title: "A" }), {
+        status: 200,
+      }),
+    );
+    expect((await loadSharePreview("abc")).outcome).toBe("found");
+
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect(await loadSharePreview("gone")).toEqual({ outcome: "missing" });
+
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
+    expect(await loadSharePreview("abc")).toEqual({ outcome: "unavailable" });
+
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("network down"));
+    expect(await loadSharePreview("abc")).toEqual({ outcome: "unavailable" });
+  });
+
+  it("reports unavailable when Convex isn't configured", async () => {
+    delete process.env.CONVEX_SITE_URL;
+    delete process.env.CONVEX_URL;
+    expect(await loadSharePreview("abc")).toEqual({ outcome: "unavailable" });
   });
 });

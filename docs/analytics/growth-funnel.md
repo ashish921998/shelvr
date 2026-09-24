@@ -52,7 +52,10 @@ whose `save_source` is not `onboarding_demo`. The onboarding demo save skips
 the Pro gate and nearly every new account makes one, so it proves nothing. Both events are
 server-side and keyed on the Convex user id.
 
-Mature cohorts only: accounts created 37 to 7 days ago.
+Mature cohorts only: accounts created 37 to 7 days ago. `item_saved` has
+carried `save_source` since 2026-09-20 (#128). Earlier saves have none, and the
+filter drops them, so the cohort starts no earlier than that. The query returns
+no rows until 2026-09-27.
 
 ```sql
 WITH signups AS (
@@ -61,6 +64,7 @@ WITH signups AS (
   WHERE event = 'account_created'
     AND properties.environment = 'production'
     AND timestamp BETWEEN now() - INTERVAL 37 DAY AND now() - INTERVAL 7 DAY
+    AND timestamp >= toDateTime('2026-09-20 00:00:00')
   GROUP BY distinct_id
 ),
 first_saves AS (
@@ -96,9 +100,13 @@ WHERE event = 'item_saved'
   AND properties.environment = 'production'
   AND properties.save_source != 'onboarding_demo'
   AND timestamp > now() - INTERVAL 12 WEEK
+  AND timestamp >= toDateTime('2026-09-20 00:00:00')
 GROUP BY week
 ORDER BY week
 ```
+
+Weeks before 2026-09-20 are left out rather than shown as zero, because their
+saves carry no `save_source`.
 
 **Save retention by signup week**: of the accounts activated in a week, the
 share that saved again in each later week. Build it as a PostHog Retention
@@ -116,12 +124,22 @@ because the token opens the item's preview. The app and the website report
 | Event               | Where                          | `share_ref`                               |
 | ------------------- | ------------------------------ | ----------------------------------------- |
 | `item_shared`       | App, item detail or feed share | Set when a branded link went out          |
-| `share_page_viewed` | Website, share preview page    | Always; `found` is false for dead links   |
+| `share_page_viewed` | Website, share preview page    | Always; see `outcome` below               |
 | `app_store_clicked` | Website, share page's Download | Set; `source = share`, `campaign = share` |
 
 `item_shared` also carries `surface` (`item_detail` or `feed`). Before this
 release the feed did not send `item_shared` at all, so counts step up at that
 release. Sharing an image or a source URL sends no `share_ref`.
+
+`share_page_viewed` carries `outcome`:
+
+- `found`: the preview rendered.
+- `missing`: a dead link, meaning an unknown or revoked token.
+- `unavailable`: the backend could not be reached. Count it as an outage, not a dead link.
+
+`item_shared` comes from the app, so filter it to production. Development and
+preview builds stamp another environment. Web events carry none, so the
+production filter applies to app rows only.
 
 **Share loop totals, last 30 days**:
 
@@ -134,6 +152,7 @@ SELECT
 FROM events
 WHERE event IN ('item_shared', 'share_page_viewed', 'app_store_clicked')
   AND timestamp > now() - INTERVAL 30 DAY
+  AND (event != 'item_shared' OR properties.environment = 'production')
 ```
 
 **Who drives views**: page views and store clicks credited to each sharer.
@@ -143,6 +162,7 @@ WITH shares AS (
   SELECT properties.share_ref AS ref, any(person_id) AS sharer
   FROM events
   WHERE event = 'item_shared' AND properties.share_ref IS NOT NULL
+    AND properties.environment = 'production'
   GROUP BY ref
 )
 SELECT shares.sharer,
