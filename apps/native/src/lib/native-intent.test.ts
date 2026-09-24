@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { redirectSystemPath } from "@/app/+native-intent";
+import {
+  isDirectLaunch,
+  resetDirectLaunchForTests,
+} from "@/lib/splash/launch-intent";
 
 const { markPendingShareOnDevice, secureStore } = vi.hoisted(() => ({
   markPendingShareOnDevice: vi.fn(),
@@ -21,6 +25,11 @@ vi.mock("expo-secure-store", () => ({
 
 vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice,
+}));
+
+// What the native module returns for a production install.
+vi.mock("expo-linking", () => ({
+  createURL: () => "shelvr:///",
 }));
 
 describe("redirectSystemPath", () => {
@@ -65,5 +74,41 @@ describe("redirectSystemPath", () => {
   it("leaves unrelated deep links untouched", () => {
     const path = "shelvr:///add";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);
+  });
+});
+
+describe("redirectSystemPath and the launch animation", () => {
+  beforeEach(() => {
+    markPendingShareOnDevice.mockClear();
+    secureStore.values.clear();
+    secureStore.values.set("shelvr.onboarded", "true");
+    resetDirectLaunchForTests();
+  });
+
+  it.each([
+    "shelvr://expo-sharing",
+    "shelvr://auth/callback?code=verification-code",
+    "shelvr:///add",
+    "https://shelvr.app/item/abc123",
+  ])("stands the splash down for %s", (path) => {
+    redirectSystemPath({ path, initial: true });
+    expect(isDirectLaunch()).toBe(true);
+  });
+
+  it("stands the splash down for a share held back by onboarding", () => {
+    secureStore.values.delete("shelvr.onboarded");
+    expect(
+      redirectSystemPath({ path: "shelvr://expo-sharing", initial: true }),
+    ).toBe("/onboarding");
+    expect(isDirectLaunch()).toBe(true);
+  });
+
+  it.each([
+    ["the root URL a home-screen launch produces", "shelvr:///"],
+    ["the same root without its trailing slash", "shelvr://"],
+    ["a path that is not a link at all", "/share"],
+  ])("leaves the splash alone for %s", (_name, path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(path);
+    expect(isDirectLaunch()).toBe(false);
   });
 });

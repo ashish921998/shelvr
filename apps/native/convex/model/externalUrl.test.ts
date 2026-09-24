@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  instagramMedia,
+  isInstagramUrl,
   isTikTokUrl,
+  shortFormSource,
   isUrlPolicyError,
-  isXTweetUrl,
   MAX_URL_LENGTH,
   normalizeExternalUrl,
+  xStatusId,
 } from "./externalUrl";
 
 /** Assert the policy code thrown by normalizeExternalUrl for a given input. */
@@ -177,42 +180,99 @@ describe("isTikTokUrl", () => {
   });
 });
 
-describe("isXTweetUrl", () => {
-  it("matches post URLs on x.com, twitter.com, and subdomains", () => {
-    expect(isXTweetUrl("https://x.com/nasa/status/1747678091936260416")).toBe(
-      true,
+describe("xStatusId", () => {
+  it("reads the post id from x.com, twitter.com, and subdomain post URLs", () => {
+    expect(xStatusId("https://x.com/nasa/status/1747678091936260416")).toBe(
+      "1747678091936260416",
     );
     expect(
-      isXTweetUrl("https://twitter.com/nasa/status/1747678091936260416"),
-    ).toBe(true);
+      xStatusId("https://twitter.com/nasa/status/1747678091936260416?s=20"),
+    ).toBe("1747678091936260416");
     expect(
-      isXTweetUrl("https://mobile.twitter.com/nasa/status/1747678091936260416"),
-    ).toBe(true);
+      xStatusId("https://mobile.twitter.com/nasa/status/1747678091936260416"),
+    ).toBe("1747678091936260416");
   });
 
-  it("matches the archive bookmark shape x.com/i/web/status/{id}", () => {
-    expect(isXTweetUrl("https://x.com/i/web/status/1747678091936260416")).toBe(
-      true,
+  it("reads the archive bookmark shape x.com/i/web/status/{id}", () => {
+    expect(xStatusId("https://x.com/i/web/status/1747678091936260416")).toBe(
+      "1747678091936260416",
     );
   });
 
   it("accepts trailing segments but rejects ids with trailing garbage", () => {
     expect(
-      isXTweetUrl("https://x.com/nasa/status/1747678091936260416/photo/1"),
-    ).toBe(true);
-    expect(isXTweetUrl("https://x.com/nasa/status/123abc")).toBe(false);
-    expect(isXTweetUrl("https://x.com/nasa/status/abc123")).toBe(false);
+      xStatusId("https://x.com/nasa/status/1747678091936260416/photo/1"),
+    ).toBe("1747678091936260416");
+    expect(xStatusId("https://x.com/nasa/status/123abc")).toBeUndefined();
+    expect(xStatusId("https://x.com/nasa/status/abc123")).toBeUndefined();
   });
 
-  it("rejects profiles, lists, short links, look-alike hosts, and bad input", () => {
-    expect(isXTweetUrl("https://x.com/nasa")).toBe(false);
-    expect(isXTweetUrl("https://x.com/i/lists/12345")).toBe(false);
-    expect(isXTweetUrl("https://x.com/nasa/status")).toBe(false);
-    expect(isXTweetUrl("https://t.co/abc123")).toBe(false);
-    expect(isXTweetUrl("https://x.com.evil.example/nasa/status/123")).toBe(
+  it("rejects profiles, lists, articles, short links, look-alike hosts, and bad input", () => {
+    expect(xStatusId("https://x.com/nasa")).toBeUndefined();
+    expect(xStatusId("https://x.com/i/lists/12345")).toBeUndefined();
+    expect(
+      xStatusId("https://x.com/i/article/2097060822207909888"),
+    ).toBeUndefined();
+    expect(xStatusId("https://x.com/nasa/status")).toBeUndefined();
+    expect(xStatusId("https://t.co/abc123")).toBeUndefined();
+    expect(
+      xStatusId("https://x.com.evil.example/nasa/status/123"),
+    ).toBeUndefined();
+    expect(xStatusId("not a url")).toBeUndefined();
+    expect(xStatusId(undefined)).toBeUndefined();
+  });
+});
+
+describe("instagramMedia", () => {
+  it.each([
+    ["https://www.instagram.com/reel/DHVrPLrIyQ_/", "reel"],
+    ["https://instagram.com/reel/DHVrPLrIyQ_/?igsh=MWQ1ZGUxMzBkMA==", "reel"],
+    ["https://m.instagram.com/reels/DHVrPLrIyQ_/", "reel"],
+    ["https://www.instagram.com/natgeo/reel/DHVrPLrIyQ_/", "reel"],
+    ["https://www.instagram.com/p/DHVrPLrIyQ_/?img_index=2", "p"],
+    ["https://instagr.am/p/DHVrPLrIyQ_/", "p"],
+    ["https://www.instagram.com/tv/DHVrPLrIyQ_", "tv"],
+  ])("reads %s as a %s", (url, kind) => {
+    expect(instagramMedia(url)).toEqual({ kind, shortcode: "DHVrPLrIyQ_" });
+  });
+
+  it.each([
+    ["https://www.instagram.com/share/reel/BAbc123xyz/", "reel"],
+    ["https://www.instagram.com/share/p/BAbc123xyz", "p"],
+  ])("reads the share link %s as a %s with no shortcode", (url, kind) => {
+    expect(instagramMedia(url)).toEqual({ kind });
+    expect(isInstagramUrl(url)).toBe(true);
+  });
+
+  it("rejects profiles, sound pages, look-alike hosts, and bad input", () => {
+    expect(isInstagramUrl("https://www.instagram.com/natgeo/")).toBe(false);
+    expect(isInstagramUrl("https://www.instagram.com/reels/audio/123/")).toBe(
       false,
     );
-    expect(isXTweetUrl("not a url")).toBe(false);
-    expect(isXTweetUrl(undefined)).toBe(false);
+    expect(isInstagramUrl("https://www.instagram.com/stories/natgeo/1/")).toBe(
+      false,
+    );
+    expect(isInstagramUrl("https://instagram.com.evil.example/p/abc/")).toBe(
+      false,
+    );
+    expect(isInstagramUrl("https://notinstagram.com/p/abc/")).toBe(false);
+    expect(isInstagramUrl("not a url")).toBe(false);
+    expect(isInstagramUrl(undefined)).toBe(false);
+  });
+});
+
+describe("shortFormSource", () => {
+  it("names the site and whether the link is a video", () => {
+    expect(shortFormSource("https://vm.tiktok.com/ZMabc123/")).toEqual({
+      site: "TikTok",
+      video: true,
+    });
+    expect(
+      shortFormSource("https://www.instagram.com/reel/DHVrPLrIyQ_/"),
+    ).toEqual({ site: "Instagram", video: true });
+    expect(shortFormSource("https://www.instagram.com/p/DHVrPLrIyQ_/")).toEqual(
+      { site: "Instagram", video: false },
+    );
+    expect(shortFormSource("https://example.com/reel/abc/")).toBeUndefined();
   });
 });

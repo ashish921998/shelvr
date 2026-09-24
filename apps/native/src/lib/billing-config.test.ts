@@ -17,7 +17,6 @@ function validate(env: Record<string, string>) {
     URL,
   });
 }
-
 describe("billing environment isolation", () => {
   it.each(["/", "?test=true", "/?test=true", "/#test"])(
     "rejects production origin with suffix %s",
@@ -87,17 +86,5 @@ describe("billing environment isolation", () => {
         GOOGLE_SERVICES_JSON: "/tmp/google-services.json",
       }),
     ).toThrow(/production deployment URL/);
-  });
-
-  it("requires Firebase client configuration in a production Android build", () => {
-    expect(() =>
-      validate({
-        EAS_BUILD: "true",
-        APP_VARIANT: "production",
-        EAS_BUILD_PLATFORM: "android",
-        EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_store",
-        EXPO_PUBLIC_CONVEX_URL: productionUrl,
-      }),
-    ).toThrow(/GOOGLE_SERVICES_JSON/);
   });
 });

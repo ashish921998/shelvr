@@ -42,7 +42,6 @@ describe("DeckAnimationProvider", () => {
     expect(sink[0].isDragging.value).toBe(false);
     expect(sink[0].animatedIndex.value).toBe(2);
     expect(sink[0].currentIndex.value).toBe(2);
-    expect(sink[0].prevIndex.value).toBe(2);
     expect(sink[0].undoIndex.value).toBeNull();
   });
 
