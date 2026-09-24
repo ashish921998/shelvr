@@ -255,18 +255,21 @@ describe("RecentSavesWidgetSync", () => {
     });
   });
 
-  it("schedules a locked entry at a finite Pro expiry", async () => {
+  // Locking a week past the stored period end keeps a renewal the app has not
+  // seen yet from flashing the Pro lock at a paying subscriber.
+  it("schedules a locked entry a week after a finite Pro expiry", async () => {
     fsx.expiresAt = Date.now() + 86_400_000;
+    const lockAt = fsx.expiresAt + 7 * 86_400_000;
     renderSync([note]);
     await waitFor(() => expect(fsx.timelines).toHaveLength(1));
     expect(fsx.snapshots).toHaveLength(0);
     const [live, lock] = fsx.timelines[0];
     expect(live.props).toMatchObject({
       locked: false,
-      validUntil: fsx.expiresAt,
+      validUntil: lockAt,
       items: [{ id: "i2" }],
     });
-    expect(lock.date.getTime()).toBe(fsx.expiresAt);
+    expect(lock.date.getTime()).toBe(lockAt);
     expect(lock.props).toMatchObject({ items: [], locked: true });
   });
 

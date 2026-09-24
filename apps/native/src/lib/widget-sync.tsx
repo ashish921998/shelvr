@@ -23,6 +23,10 @@ const THUMB_MAX_DIM = 512;
 // failure.
 const THUMBNAIL_TIMEOUT_MS = 30_000;
 const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
+// The widget learns about a renewal only when the app next runs, so locking at
+// the stored period end would show the Pro lock to a subscriber who renewed
+// but has not opened the app since. Lock a week after it instead.
+const WIDGET_LOCK_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Numbers each thumbnail build so its private working files never collide with
 // a newer build for the same item.
@@ -441,11 +445,14 @@ export function RecentSavesWidgetSync() {
     // subscription lapses or the user signs out so old Pro content is not
     // left visible on the Home Screen.
     const items = entitled ? (recent ?? []) : [];
-    // A finite expiry lets the widget lock itself after the app closes. A
-    // lifetime row still carries a stored `expiresAt` (0, or a stale period end
-    // kept when the row went sticky), so it must never become a lock date.
+    // A finite expiry lets the widget lock itself after the app closes, a
+    // grace period after the stored period end. A lifetime row still carries a
+    // stored `expiresAt` (0, or a stale period end kept when the row went
+    // sticky), so it must never become a lock date.
     const validUntil =
-      entitled && status !== "lifetime" ? expiresAt : undefined;
+      entitled && status !== "lifetime" && expiresAt !== undefined
+        ? expiresAt + WIDGET_LOCK_GRACE_MS
+        : undefined;
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
