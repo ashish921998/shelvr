@@ -20,6 +20,15 @@ const LEAD_MS = 2 * 24 * 60 * 60 * 1000;
 // A reminder due within this window is pointless: the trial ends first.
 const MIN_LEAD_MS = 60 * 1000;
 
+// Every schedule and cancel shares one notification id, so they run one at a
+// time: a slow, stale call can never finish after a newer one and undo it.
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(work: () => Promise<T>): Promise<T> {
+  const next = queue.then(work);
+  queue = next.catch(() => undefined);
+  return next;
+}
+
 const askedKey = (userId: string) => `shelvr.trialReminderAsked.${userId}`;
 
 /** When to remind, or null when the trial ends too soon for a reminder. */
@@ -124,7 +133,7 @@ export function useTrialReminder(): void {
     if (status !== "trialing" || expiresAt === undefined) {
       scheduledFor.current = null;
       generation.current += 1;
-      cancelTrialReminder().catch((error) =>
+      serial(cancelTrialReminder).catch((error) =>
         analytics.captureError("trial_reminder_cancel_failed", error),
       );
     }
@@ -150,11 +159,8 @@ export function useTrialReminder(): void {
       // The OS prompt cannot present over a closing RevenueCat sheet.
       if (mayAsk) await waitForSheetTransition();
       if (!isCurrent()) return;
-      const scheduled = await scheduleTrialReminder(
-        expiresAt,
-        Date.now(),
-        mayAsk,
-        isCurrent,
+      const scheduled = await serial(() =>
+        scheduleTrialReminder(expiresAt, Date.now(), mayAsk, isCurrent),
       );
       if (!scheduled && isCurrent()) scheduledFor.current = null;
     })().catch((error) => {
