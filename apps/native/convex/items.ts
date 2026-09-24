@@ -461,8 +461,11 @@ const SIMILAR_SEARCH_CANDIDATES = 100;
 // that leaves headroom under Convex's 16 MiB per-query read limit. The search
 // runs first under its own smaller cap, so the recent read can't starve it,
 // and the recent read gets whatever the search left, never less than 10 MiB.
+// Each read can overshoot by the one document that crosses its cap, which
+// the headroom covers.
 const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
 const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
+const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
 // Convex caps a full-text query at 16 terms.
 const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
@@ -549,7 +552,10 @@ export const similarItems = query({
         .order("desc"),
       {
         maxRows: SIMILAR_CANDIDATES,
-        maxBytes: SIMILAR_READ_BYTES - searched.bytes,
+        maxBytes: Math.max(
+          SIMILAR_READ_BYTES - searched.bytes,
+          SIMILAR_RECENT_MIN_BYTES,
+        ),
       },
     );
 
