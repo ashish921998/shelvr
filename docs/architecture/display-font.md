@@ -1,8 +1,8 @@
 # Display font
 
-Native headings, animated text, and design-sync previews use Crimson Pro at
-weight 400. The marketing site uses Spectral Regular. Satoshi remains the body
-and control font. The widget uses system fonts.
+Native headings, animated text, design-sync previews, and the marketing site use
+Crimson Pro at weight 400. Satoshi remains the body and control font. The widget
+uses system fonts.
 
 Crimson Pro was chosen as the closest free match to the retired Exposure [0]
 face. Measured over the 52 Latin letters at a shared x-height, its letter shapes
@@ -13,15 +13,14 @@ overlap Exposure's more than any other Google Fonts serif tried.
 `f2bd09badbc763d8757951d52deec29da27e85fb`, under `ofl/crimsonpro/`, made with
 `fonttools varLib.instancer ... wght=400 --update-name-table`. Crimson Pro
 declares no Reserved Font Name, so the instance keeps the family name. The
-website's `Spectral-Regular.ttf` is an unmodified file from `ofl/spectral/` at
-the same commit.
-https://github.com/google/fonts/tree/f2bd09badbc763d8757951d52deec29da27e85fb/ofl
+website serves the same file from `apps/web/public/fonts/`.
+https://github.com/google/fonts/tree/f2bd09badbc763d8757951d52deec29da27e85fb/ofl/crimsonpro
 
-Both are licensed under SIL Open Font License 1.1. Keep each font's copyright
-and full license when distributing it. The native copy of the Crimson Pro
-license is stored in `apps/native/assets/fonts/crimson-pro-license.json` and
-included in the bundled Expo manifest through `extra.fontLicenses`. The website
-serves the Spectral license at `/fonts/Spectral-OFL.txt`.
+Crimson Pro is licensed under SIL Open Font License 1.1. Keep its copyright and
+full license when distributing it. The native copy of the license is stored in
+`apps/native/assets/fonts/crimson-pro-license.json` and included in the bundled
+Expo manifest through `extra.fontLicenses`. The website serves the same license
+at `/fonts/CrimsonPro-OFL.txt`.
 
 The PostScript name and Android filename stem are both
 `CrimsonProRoman-Regular`. Use that name for native styles and the same TTF for
