@@ -1,6 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { shareUrl, useShareLink } from "@/lib/share-link";
+import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
 import type { DetailItem } from "@/components/item-detail";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -15,6 +15,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
 
     let shared = false;
     let shareSheetOnly = false;
+    let branded: string | undefined;
     try {
       if (activeItem.type === "note") {
         const message =
@@ -24,13 +25,15 @@ export function useItemShare(activeItem: DetailItem | undefined) {
           activeItem.title;
         if (!message) return;
         const link = await shareLink(activeItem._id);
+        branded = link;
         const result = await Share.share({
           message: link ? `${message}\n\n${link}` : message,
         });
         shared = result.action !== Share.dismissedAction;
       } else if (activeItem.type === "link") {
         // No link for an unfinished save, or offline: share the source.
-        const url = (await shareLink(activeItem._id)) ?? activeItem.url;
+        branded = await shareLink(activeItem._id);
+        const url = branded ?? activeItem.url;
         if (!url) return;
         const result = await shareUrl(url);
         shared = result.action !== Share.dismissedAction;
@@ -56,7 +59,11 @@ export function useItemShare(activeItem: DetailItem | undefined) {
     }
 
     if (shared) {
-      analytics.capture("item_shared");
+      const shareRef = await shareRefOf(branded);
+      analytics.capture("item_shared", {
+        surface: "item_detail",
+        ...(shareRef ? { share_ref: shareRef } : {}),
+      });
       analytics.itemAction(
         activeItem,
         shareSheetOnly ? "share_sheet_opened" : "share",
