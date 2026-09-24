@@ -1804,6 +1804,42 @@ export const getItemInternal = internalQuery({
   },
 });
 
+/** Bounded preview for the public branded share page (`GET /share/items/:id`
+ * on the marketing site). Deliberately narrow: no `userId`, no article body,
+ * no tags — just enough to render an OG card and a useful landing page for
+ * someone who doesn't have the app yet. The item id itself is the only
+ * capability check, matching how the native share sheet hands this link out. */
+export const getSharePreview = internalQuery({
+  args: { itemId: v.string() },
+  returns: v.union(
+    v.object({
+      type: itemTypeValidator,
+      title: v.string(),
+      description: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      noteText: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { itemId }) => {
+    const id = ctx.db.normalizeId("items", itemId);
+    if (!id) return null;
+    const item = await ctx.db.get(id);
+    if (!item || item.status !== "ready") return null;
+
+    const { imageUrl } = await enrichItem(ctx, item);
+    return {
+      type: item.type,
+      title: item.title ?? "A save from Shelvr",
+      description: item.description,
+      imageUrl: imageUrl ?? item.heroImageUrl,
+      sourceUrl: item.type === "link" ? item.url : undefined,
+      noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
+    };
+  },
+});
+
 export const listReadyItemsInternal = internalQuery({
   args: { userId: v.string(), limit: v.number() },
   returns: v.array(v.object(itemFields)),

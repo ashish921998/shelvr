@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { shareableItemUrl } from "@/lib/web-url";
 import type { DetailItem } from "@/components/item-detail";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -21,15 +22,21 @@ export function useItemShare(activeItem: DetailItem | undefined) {
           activeItem.description ??
           activeItem.title;
         if (!message) return;
-        const result = await Share.share({ message });
+        const result = await Share.share({
+          message: `${message}\n\n${shareableItemUrl(activeItem._id)}`,
+        });
         shared = result.action !== Share.dismissedAction;
       } else if (!activeItem.imageUrl) {
         if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
+        const result = await Share.share({
+          url: shareableItemUrl(activeItem._id),
+        });
         shared = result.action !== Share.dismissedAction;
       } else if (!(await Sharing.isAvailableAsync())) {
         if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
+        const result = await Share.share({
+          url: shareableItemUrl(activeItem._id),
+        });
         shared = result.action !== Share.dismissedAction;
       } else {
         const ext = activeItem.isSticker ? "png" : "jpg";

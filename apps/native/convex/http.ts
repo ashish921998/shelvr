@@ -234,6 +234,26 @@ http.route({
   }),
 });
 
+/**
+ * Public preview for a branded item share link (`shelvr-web.vercel.app/i/:id`).
+ * The marketing site's `/i/[id]` route calls this to build the page's OG tags
+ * and fallback content. No secret: the item id is the capability, the same as
+ * the link the native share sheet hands out, and the response is a narrow
+ * preview shape (see `getSharePreview`), never the full item.
+ */
+http.route({
+  pathPrefix: "/share/items/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const itemId = new URL(req.url).pathname.split("/").pop() ?? "";
+    const preview = await ctx.runQuery(internal.items.getSharePreview, {
+      itemId,
+    });
+    if (!preview) return json({ message: "Not found." }, 404);
+    return json(preview, 200);
+  }),
+});
+
 function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
   if (event.type === "REFUND_REVERSED") return true;
   if (event.type === "CANCELLATION")

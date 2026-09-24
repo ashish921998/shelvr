@@ -3051,3 +3051,71 @@ describe("stale processing runs", () => {
     ).toBe(true);
   });
 });
+
+describe("getSharePreview", () => {
+  it("returns a narrow preview for a ready link item, no userId leaked", async () => {
+    const t = await as("share-user");
+    const id = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "share-user",
+        type: "link",
+        status: "ready",
+        title: "A great recipe",
+        description: "Weeknight pasta",
+        url: "https://example.com/recipe",
+        tags: ["food"],
+        searchText: "a great recipe",
+      }),
+    );
+
+    const preview = await t.query(internal.items.getSharePreview, {
+      itemId: id,
+    });
+    expect(preview).toEqual({
+      type: "link",
+      title: "A great recipe",
+      description: "Weeknight pasta",
+      imageUrl: undefined,
+      sourceUrl: "https://example.com/recipe",
+      noteText: undefined,
+    });
+  });
+
+  it("returns null for a processing item, a missing item, and a bad id", async () => {
+    const t = await as("share-user");
+    const processingId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "share-user",
+        type: "note",
+        status: "processing",
+        note: "still cooking",
+        tags: [],
+        searchText: "",
+      }),
+    );
+    const deletedId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("items", {
+        userId: "share-user",
+        type: "note",
+        status: "ready",
+        note: "gone",
+        tags: [],
+        searchText: "",
+      });
+      await ctx.db.delete(id);
+      return id;
+    });
+
+    expect(
+      await t.query(internal.items.getSharePreview, {
+        itemId: processingId,
+      }),
+    ).toBeNull();
+    expect(
+      await t.query(internal.items.getSharePreview, { itemId: deletedId }),
+    ).toBeNull();
+    expect(
+      await t.query(internal.items.getSharePreview, { itemId: "not-an-id" }),
+    ).toBeNull();
+  });
+});
