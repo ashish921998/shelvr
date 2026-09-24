@@ -256,19 +256,17 @@ version bump has to land on `main` before any OTA aimed at the build that
 carries it, or every publish is invisible to the app it was meant for. The
 build number is not an input.
 
-**Building outside the workflow.** `eas build --local` produces the same
-artifact on your own machine when EAS cloud minutes run out. Three things
-differ from a cloud worker. It runs plain `pod install`, never
-`--repo-update`, so a stale CocoaPods cache fails the build on an
-unsatisfiable dependency — run `pod repo update` first. Secret-visibility
-EAS variables never leave the builder, so `GOOGLE_SERVICES_JSON` is
-unreadable locally and an Android production build refuses to start; build
-Android in the cloud or supply that file another way. And a hand-run `eas
-submit` needs `APP_VARIANT=production` in its environment, because submit
-profiles have no `env` block of their own and the config otherwise resolves
-the `.dev` bundle id and looks for credentials that do not exist.
-`release.yml` is unaffected: it submits with `--auto-submit` from the build
-it just produced.
+**Building outside the workflow.** `eas build --local` runs on your own
+machine when EAS cloud minutes run out, but it is not guaranteed to produce
+the same artifact as a cloud worker: it ignores the `build.production.ios.image`
+pin in `eas.json` and builds against whatever Xcode and CocoaPods are already
+installed, so a machine that doesn't match the pinned image can fail or
+produce a binary built against a different SDK. Two concrete differences: it
+runs plain `pod install`, never `--repo-update`, so a stale CocoaPods cache
+fails the build on an unsatisfiable dependency — run `pod repo update` first.
+And secret-visibility EAS variables never leave the builder, so
+`GOOGLE_SERVICES_JSON` is unreadable locally and an Android production build
+refuses to start; build Android in the cloud or supply that file another way.
 
 Ordering rule: installed clients update on their own schedule, so deploy
 backend changes the clients can tolerate first. Never push a Convex change an
