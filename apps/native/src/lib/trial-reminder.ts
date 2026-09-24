@@ -86,7 +86,7 @@ export async function scheduleTrialReminder(
   return true;
 }
 
-export async function cancelTrialReminder(): Promise<void> {
+async function cancelTrialReminder(): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
 }
 
