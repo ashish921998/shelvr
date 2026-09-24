@@ -13,7 +13,8 @@ type SharePreview = {
  * Fetches the public preview for a branded item share link. Returns
  * `undefined` when Convex isn't configured, the token doesn't resolve to a
  * shareable item, or the request fails — every case the page renders as a
- * generic Shelvr promo rather than an error.
+ * generic Shelvr promo rather than an error. Uncached, so a deleted item or
+ * revoked link stops rendering at once.
  */
 export async function fetchSharePreview(
   token: string,
@@ -24,7 +25,7 @@ export async function fetchSharePreview(
   try {
     const response = await fetch(
       `${siteUrl}/share/links/${encodeURIComponent(token)}`,
-      { next: { revalidate: 300 } },
+      { cache: "no-store" },
     );
     if (!response.ok) return undefined;
     return (await response.json()) as SharePreview;

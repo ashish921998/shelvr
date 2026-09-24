@@ -35,7 +35,7 @@ describe("fetchSharePreview", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       "https://deployment.convex.site/share/links/abc123",
-      expect.objectContaining({ next: { revalidate: 300 } }),
+      expect.objectContaining({ cache: "no-store" }),
     );
     expect(result).toEqual(preview);
   });
