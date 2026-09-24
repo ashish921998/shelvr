@@ -392,6 +392,17 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
 
+  // A public share link for one item. The random token, never the item id, is
+  // the capability: item ids travel through analytics, tokens do not.
+  shareLinks: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    itemId: v.id("items"),
+  })
+    .index("by_token", ["token"])
+    .index("by_item", ["itemId"])
+    .index("by_user", ["userId"]),
+
   // A persisted weekly shelf keeps the notification payload and in-app view
   // stable even if the underlying saves are later deleted or reclassified.
   weeklyDigests: defineTable({

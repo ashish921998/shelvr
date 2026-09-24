@@ -4,7 +4,7 @@ import AppStoreButton from "@/components/AppStoreButton";
 import Logo from "@/components/common/Logo";
 import { fetchSharePreview } from "@/lib/sharePreview";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = { params: Promise<{ token: string }> };
 
 const FALLBACK_TITLE = "Someone saved this with Shelvr";
 const FALLBACK_DESCRIPTION =
@@ -13,8 +13,8 @@ const FALLBACK_DESCRIPTION =
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  const preview = await fetchSharePreview(id);
+  const { token } = await params;
+  const preview = await fetchSharePreview(token);
 
   const title = preview?.title || FALLBACK_TITLE;
   const description =
@@ -23,13 +23,13 @@ export async function generateMetadata({
   return {
     title: `${title} — Shelvr`,
     description,
-    alternates: { canonical: `/i/${id}` },
+    alternates: { canonical: `/i/${token}` },
     // A share link is for its recipients, not for search results.
     robots: { index: false, follow: false },
     openGraph: {
       title,
       description,
-      url: `/i/${id}`,
+      url: `/i/${token}`,
       siteName: "Shelvr",
       type: "article",
       images: preview?.imageUrl ? [{ url: preview.imageUrl }] : undefined,
@@ -43,8 +43,8 @@ export async function generateMetadata({
 }
 
 export default async function SharedItemPage({ params }: PageProps) {
-  const { id } = await params;
-  const preview = await fetchSharePreview(id);
+  const { token } = await params;
+  const preview = await fetchSharePreview(token);
 
   return (
     <main className="min-h-screen bg-paper">

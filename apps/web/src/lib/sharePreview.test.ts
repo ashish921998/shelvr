@@ -23,7 +23,7 @@ describe("fetchSharePreview", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("derives the .convex.site host from CONVEX_URL and fetches the item", async () => {
+  it("derives the .convex.site host from CONVEX_URL and fetches the share link", async () => {
     delete process.env.CONVEX_SITE_URL;
     process.env.CONVEX_URL = "https://deployment.convex.cloud";
     const preview = { type: "link", title: "A save" };
@@ -34,7 +34,7 @@ describe("fetchSharePreview", () => {
     const result = await fetchSharePreview("abc123");
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://deployment.convex.site/share/items/abc123",
+      "https://deployment.convex.site/share/links/abc123",
       expect.objectContaining({ next: { revalidate: 300 } }),
     );
     expect(result).toEqual(preview);
