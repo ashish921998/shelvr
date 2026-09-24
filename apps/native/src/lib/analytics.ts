@@ -82,6 +82,11 @@ type AnalyticsEventProperties = {
   // and foreground recovery. This counts cleanup operations, not sign-outs or
   // confirmed WidgetKit redraws.
   widget_cleared: Record<string, never>;
+  // A widget thumbnail could not be built, so the item degraded to its text
+  // tile. `reason` separates a bounded timeout (a stalled download or wedged
+  // decode) from any other download or decode error. It never carries the
+  // image URL or any saved content.
+  widget_sync_failed: { reason: "timeout" | "error" };
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
     placement: string;
@@ -183,6 +188,11 @@ type AnalyticsEventProperties = {
   share_ghost_prompt: Record<string, never>;
   share_ghost_save_again: Record<string, never>;
   share_ghost_dismissed: Record<string, never>;
+  // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
+  // saved item's title, tags, or URL.
+  save_recall_shown: { match_count: number };
+  save_recall_opened: { match_count: number };
+  save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —

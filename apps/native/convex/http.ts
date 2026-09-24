@@ -234,6 +234,25 @@ http.route({
   }),
 });
 
+/**
+ * Public preview for a branded share link (`shelvr-web.vercel.app/i/:token`).
+ * The marketing site's `/i/[token]` route calls this to build the page's OG
+ * tags. No secret: the random share token is the capability, and the
+ * response is a narrow preview shape (see `getSharePreview`).
+ */
+http.route({
+  pathPrefix: "/share/links/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const preview = await ctx.runQuery(internal.items.getSharePreview, {
+      token,
+    });
+    if (!preview) return json({ message: "Not found." }, 404);
+    return json(preview, 200);
+  }),
+});
+
 function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
   if (event.type === "REFUND_REVERSED") return true;
   if (event.type === "CANCELLATION")

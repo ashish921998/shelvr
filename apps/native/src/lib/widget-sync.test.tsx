@@ -21,6 +21,8 @@ const fsx = vi.hoisted(() => ({
   platformOs: "ios",
   locale: "en-US",
   entitled: true,
+  entitlementStatus: "pro" as string,
+  expiresAt: undefined as number | undefined,
   entitlementLoading: false,
   nativeModulePresent: true,
   failImages: false,
@@ -35,14 +37,19 @@ const fsx = vi.hoisted(() => ({
   listed: [] as unknown[],
   cacheListed: [] as unknown[],
   snapshots: [] as unknown[],
+  timelines: [] as { date: Date; props: unknown }[][],
   downloads: [] as string[],
   deletes: [] as string[],
+  moves: [] as [string, string][],
+  saved: [] as string[],
   created: [] as string[],
 }));
 const tanstack = vi.hoisted(() => ({
   data: undefined as unknown,
   args: undefined as unknown,
 }));
+const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
 
 vi.mock("react-native", () => ({
   Platform: {
@@ -68,6 +75,12 @@ vi.mock("expo-file-system", () => {
       this.exists = false;
       fsx.listed = fsx.listed.filter((entry) => entry !== this);
       fsx.cacheListed = fsx.cacheListed.filter((entry) => entry !== this);
+    }
+    moveSync(destination: File) {
+      fsx.moves.push([this.uri, destination.uri]);
+      fsx.files.set(destination.uri, true);
+      destination.exists = true;
+      this.exists = false;
     }
     static async downloadFileAsync(url: string, target: File) {
       fsx.downloads.push(url);
@@ -107,6 +120,9 @@ vi.mock("@/widgets/recent-saves-widget", () => ({
       if (fsx.failSnapshot) throw new Error("widget unavailable");
       fsx.snapshots.push(snapshot);
     },
+    updateTimeline: (entries: { date: Date; props: unknown }[]) => {
+      fsx.timelines.push(entries);
+    },
   },
 }));
 vi.mock("react-native-nitro-image", () => ({
@@ -121,7 +137,8 @@ vi.mock("react-native-nitro-image", () => ({
           return {
             width,
             height,
-            async saveToFileAsync() {
+            async saveToFileAsync(path: string) {
+              fsx.saved.push(path);
               fsx.onImageSaved?.();
             },
           };
@@ -149,6 +166,8 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({
+    status: fsx.entitlementStatus,
+    expiresAt: fsx.expiresAt,
     entitled: fsx.entitled,
     loading: fsx.entitlementLoading,
     now: Date.now(),
@@ -194,6 +213,8 @@ beforeEach(async () => {
   fsx.platformOs = "ios";
   fsx.locale = "en-US";
   fsx.entitled = true;
+  fsx.entitlementStatus = "pro";
+  fsx.expiresAt = undefined;
   fsx.entitlementLoading = false;
   fsx.nativeModulePresent = true;
   fsx.failImages = false;
@@ -206,11 +227,15 @@ beforeEach(async () => {
   fsx.listed = [];
   fsx.cacheListed = [];
   fsx.snapshots = [];
+  fsx.timelines = [];
   fsx.downloads = [];
   fsx.deletes = [];
+  fsx.moves = [];
+  fsx.saved = [];
   fsx.created = [];
   tanstack.data = undefined;
   tanstack.args = undefined;
+  analyticsMock.capture.mockClear();
   await retryPendingWidgetClear();
   fsx.snapshots = [];
   fsx.snapshotAttempts = 0;
@@ -228,6 +253,37 @@ describe("RecentSavesWidgetSync", () => {
       emptyHint: ja["widget.emptyBody"],
       items: [{ title: "Home", subtitle: ja["item.note"] }],
     });
+  });
+
+  // Locking a week past the stored period end keeps a renewal the app has not
+  // seen yet from flashing the Pro lock at a paying subscriber.
+  it("schedules a locked entry a week after a finite Pro expiry", async () => {
+    fsx.expiresAt = Date.now() + 86_400_000;
+    const lockAt = fsx.expiresAt + 7 * 86_400_000;
+    renderSync([note]);
+    await waitFor(() => expect(fsx.timelines).toHaveLength(1));
+    expect(fsx.snapshots).toHaveLength(0);
+    const [live, lock] = fsx.timelines[0];
+    expect(live.props).toMatchObject({
+      locked: false,
+      validUntil: lockAt,
+      items: [{ id: "i2" }],
+    });
+    expect(lock.date.getTime()).toBe(lockAt);
+    expect(lock.props).toMatchObject({ items: [], locked: true });
+  });
+
+  // A lifetime row keeps a stored expiresAt (0 from RevenueCat, or the period
+  // end it had before going sticky). Treating it as a lock date would lock a
+  // lifetime user's widget immediately.
+  it("never schedules a lock for a lifetime entitlement", async () => {
+    fsx.entitlementStatus = "lifetime";
+    fsx.expiresAt = 0;
+    renderSync([note]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.timelines).toHaveLength(0);
+    expect(fsx.snapshots[0]).toMatchObject({ locked: false });
+    expect(fsx.snapshots[0]).not.toHaveProperty("validUntil", 0);
   });
 
   it("stays idle without data or off iOS", async () => {
@@ -380,7 +436,6 @@ describe("RecentSavesWidgetSync", () => {
   });
 
   it("keeps the sync alive when a thumbnail fails", async () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     fsx.failImages = true;
     renderSync([link, note]);
     await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
@@ -390,7 +445,81 @@ describe("RecentSavesWidgetSync", () => {
     // The failing image degrades to the text tile; its sibling still syncs.
     expect(snapshot.items[0].imageUri).toBeUndefined();
     expect(snapshot.items[1].id).toBe("i2");
-    spy.mockRestore();
+    expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
+      reason: "error",
+    });
+  });
+
+  it("degrades a stalled thumbnail to the text tile after the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      // The decode never settles, so only the deadline can end the thumbnail.
+      fsx.imageGate = new Promise<void>(() => {});
+      renderSync([link, note]);
+      // Advance past the 30s deadline: the stalled thumbnail is abandoned and
+      // the sync still lands with the failing item on its text tile.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(fsx.downloads).toEqual(["https://cdn.example/a.jpg"]);
+      expect(fsx.snapshots).toHaveLength(1);
+      const snapshot = fsx.snapshots[0] as {
+        items: { id: string; imageUri?: string }[];
+      };
+      expect(snapshot.items[0].imageUri).toBeUndefined();
+      expect(snapshot.items[1].id).toBe("i2");
+      expect(analyticsMock.capture).toHaveBeenCalledWith("widget_sync_failed", {
+        reason: "timeout",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The abandoned build has no abort API, so it can finish after a sign-out
+  // clear. It must never write the previous account's thumbnail into the
+  // shared widget container.
+  it("keeps an abandoned thumbnail out of the widget container after a clear", async () => {
+    vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      fsx.imageGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const session = renderSync([link]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(fsx.snapshots).toHaveLength(1);
+      session.unmount();
+      await act(async () => {
+        expect(await clearRecentSavesWidget()).toBe(true);
+      });
+
+      release();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      // The late decode finished, but only into the private cache.
+      expect(fsx.saved).toHaveLength(1);
+      expect(fsx.saved[0]).toMatch(/^\/cache\/widget-download-/);
+      expect(fsx.moves).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("moves a finished thumbnail into the widget container", async () => {
+    renderSync([link]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.moves).toEqual([
+      [
+        expect.stringMatching(
+          /^file:\/\/\/cache\/widget-download-i1-\d+\.jpg$/,
+        ),
+        "file:///widgets/recent-saves-i1.jpg",
+      ],
+    ]);
   });
 
   it("resets the dedupe key on failure so a later render retries", async () => {

@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/components/item-card";
+import { analytics } from "@/lib/analytics";
 import { useEntitlement } from "@/lib/entitlement";
 import { displayHost } from "@/lib/url";
 import { api } from "@convex/_generated/api";
@@ -15,6 +16,21 @@ const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
 const DOWNLOAD_PREFIX = "widget-download-";
 const THUMB_MAX_DIM = 512;
+// A stalled download or a wedged native decode must never hang a thumbnail
+// forever. The sign-out clear waits on the in-flight sync, so one unbounded
+// thumbnail leaves the widget stuck empty until the app relaunches. Bound the
+// work so a timed-out thumbnail degrades to the text tile like any other
+// failure.
+const THUMBNAIL_TIMEOUT_MS = 30_000;
+const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
+// The widget learns about a renewal only when the app next runs, so locking at
+// the stored period end would show the Pro lock to a subscriber who renewed
+// but has not opened the app since. Lock a week after it instead.
+const WIDGET_LOCK_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Numbers each thumbnail build so its private working files never collide with
+// a newer build for the same item.
+let thumbnailAttempt = 0;
 
 // Widget extensions have a hard memory cap (~30 MB), so full-size photos are
 // downsized to widget-friendly JPEGs before they enter the shared container.
@@ -27,26 +43,76 @@ async function ensureThumbnail(
   const thumb = new File(dir, `${THUMB_PREFIX}${item._id}.jpg`);
   if (thumb.exists) return thumb.uri;
 
-  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${item._id}`);
+  // Build in the app's private cache and move the result into the shared
+  // container only once it beats the deadline. A timed-out build keeps running
+  // (there is no abort API for the download or the native decode), so it must
+  // never write into the container itself: a sign-out clear could already have
+  // run. Both working files carry DOWNLOAD_PREFIX, so the clear sweeps them too.
+  const tag = `${item._id}-${++thumbnailAttempt}`;
+  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}`);
+  const staged = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}.jpg`);
+  deleteQuietly(download);
+  deleteQuietly(staged);
+  const build = buildThumbnail(url, download, staged).finally(() =>
+    deleteQuietly(download),
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    if (download.exists) download.delete();
-    await File.downloadFileAsync(url, download);
-    const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
-    const scale = Math.min(
-      1,
-      THUMB_MAX_DIM / Math.max(image.width, image.height),
-    );
-    const resized =
-      scale < 1
-        ? await image.resizeAsync(
-            Math.round(image.width * scale),
-            Math.round(image.height * scale),
-          )
-        : image;
-    await resized.saveToFileAsync(toPlainPath(thumb.uri), "jpg", 80);
-    return thumb.uri;
-  } finally {
-    if (download.exists) download.delete();
+    // The losing side of the race stays handled because Promise.race keeps a
+    // handler on both inputs.
+    await Promise.race([
+      build,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(THUMBNAIL_TIMEOUT)),
+          THUMBNAIL_TIMEOUT_MS,
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
+  } catch (error) {
+    // Failed or abandoned, the staged file is never used. An abandoned build
+    // may still write it, so remove it once the build settles.
+    const discard = () => deleteQuietly(staged);
+    build.then(discard, discard);
+    throw error;
+  }
+  try {
+    staged.moveSync(thumb, { overwrite: true });
+  } catch (error) {
+    deleteQuietly(staged);
+    throw error;
+  }
+  return thumb.uri;
+}
+
+async function buildThumbnail(
+  url: string,
+  download: File,
+  staged: File,
+): Promise<void> {
+  await File.downloadFileAsync(url, download);
+  const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
+  const scale = Math.min(
+    1,
+    THUMB_MAX_DIM / Math.max(image.width, image.height),
+  );
+  const resized =
+    scale < 1
+      ? await image.resizeAsync(
+          Math.round(image.width * scale),
+          Math.round(image.height * scale),
+        )
+      : image;
+  await resized.saveToFileAsync(toPlainPath(staged.uri), "jpg", 80);
+}
+
+// Working files live in the private cache, and the sign-out clear sweeps any
+// that survive, so a failed delete here is not worth failing a sync over.
+function deleteQuietly(file: File) {
+  try {
+    if (file.exists) file.delete();
+  } catch {
+    // Swept by clearWidgetFiles at the next session boundary.
   }
 }
 
@@ -97,14 +163,17 @@ function deleteWidgetFiles(
   }
 }
 
-// Publishes one widget snapshot for `items` (empty + `locked` clears it) and
-// prunes thumbnails the snapshot no longer references. Resolves to `true` once
-// the snapshot is published, or `false` if it bailed — the widget module is
-// missing, or a session boundary bumped the generation past this call.
+// Publishes the widget for `items` (empty + `locked` clears it) and prunes
+// thumbnails the snapshot no longer references. With a `validUntil` it schedules
+// a timeline that locks itself at the expiry instead of a single snapshot.
+// Resolves to `true` once the widget is published, or `false` if it bailed — the
+// widget module is missing, or a session boundary bumped the generation past
+// this call.
 async function syncWidget(
   items: FeedItem[],
   locked: boolean,
   generation: number,
+  validUntil?: number,
 ): Promise<boolean> {
   // A sign-out between this sync being queued and running owns the widget now;
   // don't rebuild the previous account's snapshot over the cleared one.
@@ -130,7 +199,13 @@ async function syncWidget(
         imageUri = await ensureThumbnail(dir, item);
       } catch (error) {
         // A failed thumbnail falls back to the text tile; never block the sync.
-        console.warn(`Widget thumbnail failed for ${item._id}`, error);
+        // Record the reason so the timeout path is measurable in production.
+        analytics.capture("widget_sync_failed", {
+          reason:
+            error instanceof Error && error.message === THUMBNAIL_TIMEOUT
+              ? "timeout"
+              : "error",
+        });
       }
       return {
         id: item._id as string,
@@ -149,12 +224,39 @@ async function syncWidget(
   }
 
   try {
-    RecentSavesWidget.updateSnapshot({
+    // The locked Pro copy is shared by the locked snapshot and the dated lock
+    // entry below, so it is defined once here.
+    const proEmpty = {
+      emptyTitle: t("widget.proTitle"),
+      emptyHint: t("widget.proBody"),
+    };
+    const current = {
       items: widgetItems,
-      emptyTitle: t(locked ? "widget.proTitle" : "widget.emptyTitle"),
-      emptyHint: t(locked ? "widget.proBody" : "widget.emptyBody"),
+      ...(locked
+        ? proEmpty
+        : {
+            emptyTitle: t("widget.emptyTitle"),
+            emptyHint: t("widget.emptyBody"),
+          }),
       locked,
-    });
+      validUntil,
+    };
+    if (!locked && validUntil !== undefined) {
+      // A snapshot outlives the app, so a Pro entitlement that lapses while
+      // the app stays closed would keep the last saves on the Home Screen.
+      // Schedule a second, dated entry so WidgetKit swaps to the locked Pro
+      // state at the expiry with no app launch. The live entry also carries
+      // `validUntil`, so it fails closed on the widget's own clock.
+      RecentSavesWidget.updateTimeline([
+        { date: new Date(), props: current },
+        {
+          date: new Date(validUntil),
+          props: { items: [], ...proEmpty, locked: true },
+        },
+      ]);
+    } else {
+      RecentSavesWidget.updateSnapshot(current);
+    }
   } finally {
     // Clearing private files must not depend on publishing the locked snapshot.
     if (locked) deleteWidgetFiles(dir);
@@ -301,7 +403,12 @@ export function RecentSavesWidgetSync() {
     hasPendingCleanup,
   );
   const locale = useAppLocale();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const {
+    status,
+    entitled,
+    loading: entitlementLoading,
+    expiresAt,
+  } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
   // `enabled` entirely. It opens its subscription from the query cache's
   // "added" event and drops it on "removed", so an `enabled: false` query
@@ -338,10 +445,19 @@ export function RecentSavesWidgetSync() {
     // subscription lapses or the user signs out so old Pro content is not
     // left visible on the Home Screen.
     const items = entitled ? (recent ?? []) : [];
+    // A finite expiry lets the widget lock itself after the app closes, a
+    // grace period after the stored period end. A lifetime row still carries a
+    // stored `expiresAt` (0, or a stale period end kept when the row went
+    // sticky), so it must never become a lock date.
+    const validUntil =
+      entitled && status !== "lifetime" && expiresAt !== undefined
+        ? expiresAt + WIDGET_LOCK_GRACE_MS
+        : undefined;
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
       (entitled ? "open" : "locked") +
+      `@${validUntil ?? ""}` +
       items
         .map(
           (item) =>
@@ -361,13 +477,21 @@ export function RecentSavesWidgetSync() {
           lastKey.current = null;
           return false;
         }
-        return syncWidget(items, !entitled, generation);
+        return syncWidget(items, !entitled, generation, validUntil);
       })
       .catch((error) => {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [entitled, entitlementLoading, recent, locale, cleanupPending]);
+  }, [
+    status,
+    entitled,
+    entitlementLoading,
+    expiresAt,
+    recent,
+    locale,
+    cleanupPending,
+  ]);
 
   return null;
 }
