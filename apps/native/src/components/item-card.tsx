@@ -36,6 +36,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { shareUrl, useShareLink } from "@/lib/share-link";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -320,10 +321,12 @@ export const ItemCard = memo(function ItemCard({
   const isSuggested = item.suggested === true && spaceId !== undefined;
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
+  const shareLink = useShareLink();
   const share = async () => {
     if (!item.url) return;
     try {
-      const result = await Share.share({ url: item.url });
+      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      const result = await shareUrl(link ?? item.url);
       if (
         result.action === Share.sharedAction &&
         item._creationTime !== undefined

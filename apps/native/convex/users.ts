@@ -180,6 +180,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (reads.length === DELETE_BATCH) return false;
 
+  if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
+
   const devices = await ctx.db
     .query("notificationDevices")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
@@ -249,6 +251,22 @@ async function deleteFeedbackBatch(
     await ctx.db.delete(submission._id);
   }
   return feedback.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's branded share links. Returns true
+ * when the table is fully drained for this user. */
+async function deleteShareLinksBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const links = await ctx.db
+    .query("shareLinks")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const link of links) {
+    await ctx.db.delete(link._id);
+  }
+  return links.length !== DELETE_BATCH;
 }
 
 /** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */
