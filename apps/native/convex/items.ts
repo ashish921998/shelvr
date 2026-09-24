@@ -1860,6 +1860,13 @@ export const deleteItem = mutation({
     for (const read of reads) {
       await ctx.db.delete(read._id);
     }
+    const shareLinks = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .collect();
+    for (const link of shareLinks) {
+      await ctx.db.delete(link._id);
+    }
     if (item.storageId) {
       // Existence-checked: if the blob is somehow already gone, the delete must
       // still remove the item rather than throw and leave it undeletable.
@@ -1869,6 +1876,40 @@ export const deleteItem = mutation({
     return null;
   },
 });
+
+/** Token for an item's public preview page, minted the first time the owner
+ * shares it and reused after. Null when the item has no preview to show (not
+ * ready, or an image, which shares its file instead). */
+export const createShareLink = mutation({
+  args: { itemId: v.id("items") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    if (!isShareable(item)) return null;
+
+    const existing = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .first();
+    if (existing !== null) return existing.token;
+
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const token = Array.from(bytes, (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
+    await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
+    return token;
+  },
+});
+
+function isShareable(item: Doc<"items">): boolean {
+  return item.status === "ready" && item.type !== "image";
+}
 
 // ---------------------------------------------------------------------------
 // Internal — used by the AI actions
@@ -1882,6 +1923,44 @@ export const getItemInternal = internalQuery({
     // `itemFields` deliberately omits the vector, and Convex enforces
     // `returns` exactly — the raw document would fail validation here.
     return item === null ? null : stripEmbedding(item);
+  },
+});
+
+/** Bounded preview for the public branded share page, looked up by the token
+ * `createShareLink` minted. Deliberately narrow: no `userId`, no article
+ * body, no tags — just enough to render an OG card and a landing page for
+ * someone who doesn't have the app yet. */
+export const getSharePreview = internalQuery({
+  args: { token: v.string() },
+  returns: v.union(
+    v.object({
+      type: itemTypeValidator,
+      title: v.string(),
+      description: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      noteText: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { token }) => {
+    const link = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (link === null) return null;
+    const item = await ctx.db.get(link.itemId);
+    if (!item || item.userId !== link.userId || !isShareable(item)) return null;
+
+    const { imageUrl } = await enrichItem(ctx, item);
+    return {
+      type: item.type,
+      title: item.title ?? "A save from Shelvr",
+      description: item.description,
+      imageUrl: imageUrl ?? item.heroImageUrl,
+      sourceUrl: item.type === "link" ? item.url : undefined,
+      noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
+    };
   },
 });
 
