@@ -459,6 +459,13 @@ const SIMILAR_SEARCH_CANDIDATES = 100;
 const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
+// Mirrors RECALL_MIN_AGE_MS in apps/native/src/lib/save-recall.ts: the age a
+// match needs to clear before the save recall card will show it. Reserving a
+// few slots for the best-scoring matches this old means a burst of newer,
+// higher-scoring saves can't crowd every old match out of SIMILAR_LIMIT
+// before the card ever sees them.
+const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const SIMILAR_RESERVED_OLD = 3;
 
 function searchTokens(text: string): Set<string> {
   return new Set(
@@ -471,15 +478,19 @@ function searchTokens(text: string): Set<string> {
 
 /** The full-text query for an item's older relatives: its tags first, since
  * they carry most of the scoring signal, then its title words. Deduplicated
- * and capped at the search term limit. */
+ * and capped at the search term limit. Splits on Unicode letters and digits
+ * so a Japanese or Korean title still yields terms; scoring below matches
+ * tags exactly, so those candidates can still clear the threshold. */
 function similarSearchTerms(item: Doc<"items">): string[] {
   const terms = new Set<string>();
   const words = [
-    ...item.tags.flatMap((tag) => tag.toLowerCase().split(/[^a-z0-9]+/)),
-    ...(item.title ?? "").toLowerCase().split(/[^a-z0-9]+/),
+    ...item.tags.flatMap((tag) => tag.toLowerCase().split(/[^\p{L}\p{N}]+/u)),
+    ...(item.title ?? "").toLowerCase().split(/[^\p{L}\p{N}]+/u),
   ];
   for (const word of words) {
-    if (word.length > 3) {
+    // Short Latin words are mostly noise; CJK words are often two characters.
+    const minLength = /^[a-z0-9]*$/.test(word) ? 4 : 2;
+    if (word.length >= minLength) {
       terms.add(word);
     }
     if (terms.size >= SIMILAR_SEARCH_TERMS) {
@@ -547,10 +558,22 @@ export const similarItems = query({
       }
     }
     scored.sort((a, b) => b.score - a.score);
+
+    // Reserve a few slots for the best-scoring old-enough matches before the
+    // general top-score cut, so they survive even when newer saves outscore
+    // them. The final list stays score-ordered either way.
+    const oldCutoff = item._creationTime - SIMILAR_OLD_AGE_MS;
+    const reservedOld = scored
+      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
+      .slice(0, SIMILAR_RESERVED_OLD);
+    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
+    const rest = scored
+      .filter((candidate) => !reservedIds.has(candidate.item._id))
+      .slice(0, SIMILAR_LIMIT - reservedOld.length);
+    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
+
     return await Promise.all(
-      scored
-        .slice(0, SIMILAR_LIMIT)
-        .map(({ item: match }) => toItemCard(ctx, match)),
+      final.map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });

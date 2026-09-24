@@ -2,9 +2,11 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect, useSegments } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
+import { isHomeRootRoute } from "@/lib/feedback";
 import {
   olderMatches,
   readHandledRecall,
@@ -24,7 +26,8 @@ type RecallFeedItem = {
  * to be worth bringing back, and stays until the person opens one or
  * dismisses it. A save with no such matches is marked handled so its similar
  * items are not read again. `defer` holds evaluation while another Home card
- * owns the moment.
+ * owns the moment. Nothing is evaluated, recorded, or marked handled while
+ * another route covers Home, matching the feedback and review prompts.
  */
 export function useSaveRecall(
   items: readonly RecallFeedItem[] | undefined,
@@ -32,18 +35,28 @@ export function useSaveRecall(
 ) {
   const { data: user } = useCurrentUser();
   const userId = user?._id;
-  // Freshness is measured from when Home mounted: a save made while the app is
-  // open always qualifies, and one made just before launch does too. Anything
-  // older belongs to an earlier visit.
-  const [mountedAt] = useState(() => Date.now());
-  // Bumped when the person acts on the card, so the handled id is re-read.
+  const home = isHomeRootRoute(useSegments());
+  // Freshness is measured against the current time, refreshed whenever Home
+  // gains focus and every minute while it stays focused. Home can stay
+  // mounted underneath a stacked screen (share, item detail); a timestamp
+  // captured once at mount would let a save keep qualifying indefinitely
+  // instead of aging out after RECALL_FRESH_MS.
+  const [now, setNow] = useState(() => Date.now());
+  useFocusEffect(
+    useCallback(() => {
+      setNow(Date.now());
+      const interval = setInterval(() => setNow(Date.now()), 60_000);
+      return () => clearInterval(interval);
+    }, []),
+  );
+  // Bumped when the person acts on the card, so the handled ids are re-read.
   const [, setHandledVersion] = useState(0);
 
   const candidate =
-    items && userId && !opts.defer
+    items && userId && home && !opts.defer
       ? recallCandidate(items, {
-          now: mountedAt,
-          handledId: readHandledRecall(userId),
+          now,
+          handledIds: readHandledRecall(userId),
         })
       : null;
 
@@ -73,6 +86,8 @@ export function useSaveRecall(
   useEffect(() => {
     if (!userId || !candidateId || !loaded) return;
     if (matches.length === 0) {
+      // No rerender needed: every render re-reads the handled ids, so the
+      // next one (including a late match arriving) drops this candidate.
       writeHandledRecall(userId, candidateId);
       return;
     }

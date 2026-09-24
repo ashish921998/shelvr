@@ -26,12 +26,12 @@ type RecallFeedItem = {
  * still fresh, and only if this account has not already handled it. */
 export function recallCandidate<Item extends RecallFeedItem>(
   items: readonly Item[],
-  { now, handledId }: { now: number; handledId: string | null },
+  { now, handledIds }: { now: number; handledIds: readonly string[] },
 ): Item | null {
   const newest = items[0];
   if (newest === undefined || newest.status !== "ready") return null;
   if (now - newest._creationTime > RECALL_FRESH_MS) return null;
-  if (newest._id === handledId) return null;
+  if (handledIds.includes(newest._id)) return null;
   return newest;
 }
 
@@ -49,11 +49,32 @@ export function olderMatches<Match extends { _creationTime: number }>(
 // Keyed per account, like the other one-shot Home prompts in first-share.ts.
 const handledKey = (userId: string) => `shelvr.saveRecall.${userId}`;
 
-/** The last save the card was evaluated for, shown or not. */
-export function readHandledRecall(userId: string): string | null {
-  return SecureStore.getItem(handledKey(userId));
+// Bounds the stored history so it never grows without limit. Far more than a
+// person could plausibly need: the feed reorders around a deleted save far
+// less often than this many saves happen in between.
+const HANDLED_HISTORY_LIMIT = 50;
+
+/** The saves this account has already evaluated the card for, shown or not,
+ * oldest first. Kept as a bounded history (not just the latest one) so a
+ * deleted later save can't resurface an earlier dismissal: if only the
+ * newest handled id were remembered, deleting it could let the feed's new
+ * newest item match an id that was actually handled further back. */
+export function readHandledRecall(userId: string): string[] {
+  const raw = SecureStore.getItem(handledKey(userId));
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function writeHandledRecall(userId: string, itemId: string): void {
-  SecureStore.setItem(handledKey(userId), itemId);
+  const handled = readHandledRecall(userId).filter((id) => id !== itemId);
+  handled.push(itemId);
+  const bounded = handled.slice(-HANDLED_HISTORY_LIMIT);
+  SecureStore.setItem(handledKey(userId), JSON.stringify(bounded));
 }

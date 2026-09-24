@@ -69,7 +69,7 @@ function RecallThumb({
   return (
     <Link href={{ pathname: "/item/[id]", params: { id: item._id } }} asChild>
       <Pressable
-        accessibilityRole="button"
+        // Link asChild supplies the link role; a button role would conflict.
         accessibilityLabel={title}
         onPress={onOpen}
         style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.7 }]}
