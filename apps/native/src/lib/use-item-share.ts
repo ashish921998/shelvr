@@ -27,13 +27,11 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         });
         shared = result.action !== Share.dismissedAction;
       } else if (!activeItem.imageUrl) {
-        if (!activeItem.url) return;
         const result = await Share.share({
           url: shareableItemUrl(activeItem._id),
         });
         shared = result.action !== Share.dismissedAction;
       } else if (!(await Sharing.isAvailableAsync())) {
-        if (!activeItem.url) return;
         const result = await Share.share({
           url: shareableItemUrl(activeItem._id),
         });
