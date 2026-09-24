@@ -160,7 +160,7 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/ExposureTrial-0.otf",
+            "./assets/fonts/CrimsonProRoman-Regular.ttf",
             "./assets/fonts/Satoshi-Regular.otf",
             "./assets/fonts/Satoshi-Medium.otf",
             "./assets/fonts/Satoshi-Bold.otf"

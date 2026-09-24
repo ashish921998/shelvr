@@ -21,7 +21,7 @@ export default function SearchStackLayout() {
 const styles = StyleSheet.create((theme) => ({
   title: {
     fontFamily: theme.fonts.display,
-    fontSize: 26,
+    fontSize: 31,
     letterSpacing: 0.5,
     color: theme.colors.foreground,
   },
