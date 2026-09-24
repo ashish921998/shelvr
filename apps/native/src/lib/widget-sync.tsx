@@ -24,6 +24,10 @@ const THUMB_MAX_DIM = 512;
 const THUMBNAIL_TIMEOUT_MS = 30_000;
 const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
 
+// Numbers each thumbnail build so its private working files never collide with
+// a newer build for the same item.
+let thumbnailAttempt = 0;
+
 // Widget extensions have a hard memory cap (~30 MB), so full-size photos are
 // downsized to widget-friendly JPEGs before they enter the shared container.
 async function ensureThumbnail(
@@ -35,15 +39,25 @@ async function ensureThumbnail(
   const thumb = new File(dir, `${THUMB_PREFIX}${item._id}.jpg`);
   if (thumb.exists) return thumb.uri;
 
-  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${item._id}`);
+  // Build in the app's private cache and move the result into the shared
+  // container only once it beats the deadline. A timed-out build keeps running
+  // (there is no abort API for the download or the native decode), so it must
+  // never write into the container itself: a sign-out clear could already have
+  // run. Both working files carry DOWNLOAD_PREFIX, so the clear sweeps them too.
+  const tag = `${item._id}-${++thumbnailAttempt}`;
+  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}`);
+  const staged = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}.jpg`);
+  deleteQuietly(download);
+  deleteQuietly(staged);
+  const build = buildThumbnail(url, download, staged).finally(() =>
+    deleteQuietly(download),
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    if (download.exists) download.delete();
-    // Race the work against the deadline. The losing side keeps running but is
-    // orphaned; its later rejection stays handled because Promise.race keeps a
+    // The losing side of the race stays handled because Promise.race keeps a
     // handler on both inputs.
     await Promise.race([
-      buildThumbnail(url, download, thumb),
+      build,
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(new Error(THUMBNAIL_TIMEOUT)),
@@ -51,20 +65,33 @@ async function ensureThumbnail(
         );
       }),
     ]).finally(() => clearTimeout(timer));
-    return thumb.uri;
-  } finally {
-    if (download.exists) download.delete();
+  } catch (error) {
+    // Failed or abandoned, the staged file is never used. An abandoned build
+    // may still write it, so remove it once the build settles.
+    const discard = () => deleteQuietly(staged);
+    build.then(discard, discard);
+    throw error;
   }
+  try {
+    staged.moveSync(thumb, { overwrite: true });
+  } catch (error) {
+    deleteQuietly(staged);
+    throw error;
+  }
+  return thumb.uri;
 }
 
 async function buildThumbnail(
   url: string,
   download: File,
-  thumb: File,
+  staged: File,
 ): Promise<void> {
   await File.downloadFileAsync(url, download);
   const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
-  const scale = Math.min(1, THUMB_MAX_DIM / Math.max(image.width, image.height));
+  const scale = Math.min(
+    1,
+    THUMB_MAX_DIM / Math.max(image.width, image.height),
+  );
   const resized =
     scale < 1
       ? await image.resizeAsync(
@@ -72,7 +99,17 @@ async function buildThumbnail(
           Math.round(image.height * scale),
         )
       : image;
-  await resized.saveToFileAsync(toPlainPath(thumb.uri), "jpg", 80);
+  await resized.saveToFileAsync(toPlainPath(staged.uri), "jpg", 80);
+}
+
+// Working files live in the private cache, and the sign-out clear sweeps any
+// that survive, so a failed delete here is not worth failing a sync over.
+function deleteQuietly(file: File) {
+  try {
+    if (file.exists) file.delete();
+  } catch {
+    // Swept by clearWidgetFiles at the next session boundary.
+  }
 }
 
 function toPlainPath(uri: string): string {

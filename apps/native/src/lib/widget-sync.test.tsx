@@ -37,6 +37,8 @@ const fsx = vi.hoisted(() => ({
   snapshots: [] as unknown[],
   downloads: [] as string[],
   deletes: [] as string[],
+  moves: [] as [string, string][],
+  saved: [] as string[],
   created: [] as string[],
 }));
 const tanstack = vi.hoisted(() => ({
@@ -70,6 +72,12 @@ vi.mock("expo-file-system", () => {
       this.exists = false;
       fsx.listed = fsx.listed.filter((entry) => entry !== this);
       fsx.cacheListed = fsx.cacheListed.filter((entry) => entry !== this);
+    }
+    moveSync(destination: File) {
+      fsx.moves.push([this.uri, destination.uri]);
+      fsx.files.set(destination.uri, true);
+      destination.exists = true;
+      this.exists = false;
     }
     static async downloadFileAsync(url: string, target: File) {
       fsx.downloads.push(url);
@@ -123,7 +131,8 @@ vi.mock("react-native-nitro-image", () => ({
           return {
             width,
             height,
-            async saveToFileAsync() {
+            async saveToFileAsync(path: string) {
+              fsx.saved.push(path);
               fsx.onImageSaved?.();
             },
           };
@@ -210,6 +219,8 @@ beforeEach(async () => {
   fsx.snapshots = [];
   fsx.downloads = [];
   fsx.deletes = [];
+  fsx.moves = [];
+  fsx.saved = [];
   fsx.created = [];
   tanstack.data = undefined;
   tanstack.args = undefined;
@@ -421,6 +432,52 @@ describe("RecentSavesWidgetSync", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // The abandoned build has no abort API, so it can finish after a sign-out
+  // clear. It must never write the previous account's thumbnail into the
+  // shared widget container.
+  it("keeps an abandoned thumbnail out of the widget container after a clear", async () => {
+    vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      fsx.imageGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const session = renderSync([link]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(fsx.snapshots).toHaveLength(1);
+      session.unmount();
+      await act(async () => {
+        expect(await clearRecentSavesWidget()).toBe(true);
+      });
+
+      release();
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      // The late decode finished, but only into the private cache.
+      expect(fsx.saved).toHaveLength(1);
+      expect(fsx.saved[0]).toMatch(/^\/cache\/widget-download-/);
+      expect(fsx.moves).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("moves a finished thumbnail into the widget container", async () => {
+    renderSync([link]);
+    await waitFor(() => expect(fsx.snapshots).toHaveLength(1));
+    expect(fsx.moves).toEqual([
+      [
+        expect.stringMatching(
+          /^file:\/\/\/cache\/widget-download-i1-\d+\.jpg$/,
+        ),
+        "file:///widgets/recent-saves-i1.jpg",
+      ],
+    ]);
   });
 
   it("resets the dedupe key on failure so a later render retries", async () => {
