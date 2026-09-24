@@ -16,7 +16,7 @@ const device = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
 }));
 // The native asset loader normally handles these requires; Node has no font
-// loader. AnimatedText requires both the Spectral TTF and the Satoshi OTFs.
+// loader. AnimatedText requires both the display TTF and the Satoshi OTFs.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
