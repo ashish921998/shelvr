@@ -9,19 +9,30 @@ function shareLinkUrl(token: string): string {
   return `https://shelvr-web.vercel.app/i/${token}`;
 }
 
+/** Convex queues mutations while offline and resolves only once the server
+ * answers, so waiting on the mint unbounded would leave the share sheet shut.
+ * After this long the caller falls back to the source URL. */
+const SHARE_LINK_TIMEOUT_MS = 3000;
+
 /** The branded link for an item, or undefined when it has none (unfinished,
- * an image) or the token could not be minted, e.g. offline. */
+ * an image) or the token could not be minted in time, e.g. offline. */
 export function useShareLink() {
   const createShareLink = useMutation(api.items.createShareLink);
   return useCallback(
     async (itemId: string): Promise<string | undefined> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const token = await createShareLink({
-          itemId: itemId as Id<"items">,
-        });
+        const token = await Promise.race([
+          createShareLink({ itemId: itemId as Id<"items"> }),
+          new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), SHARE_LINK_TIMEOUT_MS);
+          }),
+        ]);
         return token === null ? undefined : shareLinkUrl(token);
       } catch {
         return undefined;
+      } finally {
+        clearTimeout(timer);
       }
     },
     [createShareLink],
