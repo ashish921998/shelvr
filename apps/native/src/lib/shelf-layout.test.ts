@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cardSize, cardTilt, dropDelay } from "./shelf-layout";
+import {
+  cardSize,
+  cardTilt,
+  dropDelay,
+  nearRowEnd,
+  STAGGERED_CARDS,
+} from "./shelf-layout";
 
 describe("cardSize", () => {
   it("gives a shelf a skyline: a portrait save stands taller and narrower than a landscape one", () => {
@@ -60,10 +66,40 @@ describe("dropDelay", () => {
   });
 
   it("keeps each gap inside the spec's 80–150ms", () => {
-    for (let i = 1; i < 10; i++) {
+    for (let i = 1; i < STAGGERED_CARDS; i++) {
       const gap = dropDelay(i) - dropDelay(i - 1);
       expect(gap).toBeGreaterThanOrEqual(80);
       expect(gap).toBeLessThanOrEqual(150);
     }
+  });
+
+  it("lands the whole row within the first few turns, however long it is", () => {
+    const last = dropDelay(STAGGERED_CARDS - 1);
+    expect(last).toBeLessThan(1000);
+    expect(dropDelay(STAGGERED_CARDS)).toBe(last);
+    expect(dropDelay(100)).toBe(last);
+  });
+});
+
+describe("nearRowEnd", () => {
+  it("is false until the row has been measured", () => {
+    expect(nearRowEnd({ offset: 0, layout: 0, content: 800 })).toBe(false);
+    expect(nearRowEnd({ offset: 0, layout: 400, content: 0 })).toBe(false);
+  });
+
+  it("is false at the start of a long row", () => {
+    expect(nearRowEnd({ offset: 0, layout: 400, content: 4000 })).toBe(false);
+  });
+
+  it("is true within half a row of the end", () => {
+    expect(nearRowEnd({ offset: 3399, layout: 400, content: 4000 })).toBe(
+      false,
+    );
+    expect(nearRowEnd({ offset: 3400, layout: 400, content: 4000 })).toBe(true);
+    expect(nearRowEnd({ offset: 3600, layout: 400, content: 4000 })).toBe(true);
+  });
+
+  it("is true for a row too short to scroll", () => {
+    expect(nearRowEnd({ offset: 0, layout: 400, content: 300 })).toBe(true);
   });
 });

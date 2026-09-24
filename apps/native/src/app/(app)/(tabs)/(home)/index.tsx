@@ -154,7 +154,6 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        onMomentumScrollEnd={canLoadMore ? () => loadMore() : undefined}
       >
         <Gutter style={styles.headline}>
           <Display>{t("home.headline", { count: items.length })}</Display>
@@ -182,6 +181,13 @@ export default function HomeScreen() {
               clock={clock}
               seed={index}
               prop={SHELF_PROPS[index % SHELF_PROPS.length]}
+              // Older pages land on the last shelf, which grows sideways, so
+              // that row's end is where the feed asks for more.
+              onEndReached={
+                canLoadMore && index === shelves.length - 1
+                  ? loadMore
+                  : undefined
+              }
               testID={`shelf-${shelf.section}`}
               cards={shelf.items.map<ShelfCard>((item) => ({
                 key: item._id,

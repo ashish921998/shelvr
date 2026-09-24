@@ -252,8 +252,8 @@ export default function SpaceScreen() {
 
         {items.length === 0 ? (
           <EmptyState
-            title={t("spaces.listEmptyTitle")}
-            message={t("spaces.listEmptyBody")}
+            title={t("spaces.emptyTitle")}
+            message={t("spaces.emptyBody")}
           />
         ) : (
           <View style={styles.shelf}>

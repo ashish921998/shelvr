@@ -35,13 +35,22 @@ export function cardTilt(seed: number): number {
   return Math.sin(seed * 2.3 + 1.1) * 1.5;
 }
 
+/** How many cards take a turn in the stagger: about what a phone shows of a
+ * row before it scrolls. */
+export const STAGGERED_CARDS = 6;
+
 /** The pause before card `index` drops, in ms. Each card waits 80–150ms
  * longer than the one before it, so a row lands one at a time rather than all
- * at once, and the gaps vary so the rhythm is not metronomic. */
+ * at once, and the gaps vary so the rhythm is not metronomic.
+ *
+ * Every card in a row mounts at once, so an uncapped stagger would leave the
+ * fortieth card blank for seconds after the reader has scrolled to it. Cards
+ * past the first `STAGGERED_CARDS` drop with the last of them instead. */
 export function dropDelay(index: number): number {
   "worklet";
+  const turn = Math.min(index, STAGGERED_CARDS - 1);
   let total = 0;
-  for (let i = 1; i <= index; i++) total += 80 + (i % 3) * 35;
+  for (let i = 1; i <= turn; i++) total += 80 + (i % 3) * 35;
   return total;
 }
 
@@ -50,3 +59,19 @@ export const DROP_MS = 800;
 export const SQUASH_MS = 350;
 /** How far above its resting place a card starts. */
 export const DROP_FROM = -26;
+
+/** Whether a scrolled row is close enough to its last card to fetch more:
+ * within half a row's width of the end, or with nothing to scroll at all. A
+ * row not laid out yet is never at its end. */
+export function nearRowEnd({
+  offset,
+  layout,
+  content,
+}: {
+  offset: number;
+  layout: number;
+  content: number;
+}): boolean {
+  if (layout <= 0 || content <= 0) return false;
+  return offset + layout >= content - layout / 2;
+}

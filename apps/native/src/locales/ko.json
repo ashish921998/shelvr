@@ -251,7 +251,7 @@
   "common.add": "추가",
   "spaces.addAll": "모두 추가",
   "spaces.emptyTitle": "아직 아무것도 없어요",
-  "spaces.emptyBody": "Shelvr가 이 공간에 어울리는 항목을 찾고 있어요.\n위의 +로 직접 추가할 수도 있어요.",
+  "spaces.emptyBody": "Shelvr가 이 공간에 어울리는 항목을 찾고 있어요.\n위의 ··· 메뉴에서 직접 추가할 수도 있어요.",
   "navigation.profile": "프로필",
   "capture.add": "저장 항목 추가",
   "loading.home": "책장 준비 중",

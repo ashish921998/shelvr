@@ -251,7 +251,7 @@
   "common.add": "追加",
   "spaces.addAll": "すべて追加",
   "spaces.emptyTitle": "まだ何もありません",
-  "spaces.emptyBody": "Shelvrがこのスペースに合う項目を探しています。\n上の＋から自分で追加することもできます。",
+  "spaces.emptyBody": "Shelvrがこのスペースに合う項目を探しています。\n上の「···」メニューから自分で追加することもできます。",
   "navigation.profile": "プロフィール",
   "capture.add": "項目を保存",
   "loading.home": "シェルフを準備しています",
