@@ -161,6 +161,9 @@ export type MessageParams = {
   "share.continueSaved": undefined;
   "share.finishFailed": undefined;
   "share.success": undefined;
+  "share.ghostTitle": undefined;
+  "share.ghostBody": undefined;
+  "share.saveAgain": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
   "account.signInNotFinished": undefined;
@@ -451,6 +454,8 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.recallTitle": undefined;
+  "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;

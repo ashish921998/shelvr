@@ -42,6 +42,7 @@ import type * as model_notificationSchedule from "../model/notificationSchedule.
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
+import type * as model_readBudget from "../model/readBudget.js";
 import type * as model_recipeMarkup from "../model/recipeMarkup.js";
 import type * as model_resend from "../model/resend.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
@@ -102,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/posthogCapture": typeof model_posthogCapture;
   "model/rateLimiter": typeof model_rateLimiter;
+  "model/readBudget": typeof model_readBudget;
   "model/recipeMarkup": typeof model_recipeMarkup;
   "model/resend": typeof model_resend;
   "model/revenuecat": typeof model_revenuecat;

@@ -160,6 +160,9 @@
   "share.continueSaved": "Continue with saved",
   "share.finishFailed": "Saved, but couldn’t finish",
   "share.success": "Saved to Shelvr",
+  "share.ghostTitle": "Shared recently",
+  "share.ghostBody": "Shelvr handled this share recently. Save it again?",
+  "share.saveAgain": "Save again",
   "account.signingIn": "Signing in",
   "account.signInTitle": "Sign in to continue",
   "account.signInNotFinished": "Sign-in didn't finish. Try again.",
@@ -495,6 +498,11 @@
   "home.howToMoreHelp": "Then add Shelvr to Favorites so it stays up front.",
   "home.pasteLink": "Paste a link",
   "home.onYourShelf": "On your shelf",
+  "home.recallTitle": "You've saved things like this before",
+  "home.recallBody": {
+    "one": "%{formattedCount} earlier save goes with what you just added.",
+    "other": "%{formattedCount} earlier saves go with what you just added."
+  },
   "demo.pickHelp": "Shelvr reads it, titles it and files it for you.",
   "demo.clipboardNoLink": "Your clipboard has no link. Copy one, or try one of these.",
   "demo.samplesOr": "Or try one of these",

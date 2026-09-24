@@ -160,6 +160,9 @@
   "share.continueSaved": "Continuar com o que foi salvo",
   "share.finishFailed": "Salvo, mas não concluído",
   "share.success": "Salvo no Shelvr",
+  "share.ghostTitle": "Compartilhado recentemente",
+  "share.ghostBody": "A Shelvr processou este conteúdo compartilhado recentemente. Salvar novamente?",
+  "share.saveAgain": "Salvar novamente",
   "account.signingIn": "Entrando",
   "account.signInTitle": "Entre para continuar",
   "account.signInNotFinished": "O login não foi concluído. Tente novamente.",
@@ -510,6 +513,12 @@
   "home.howToMoreHelp": "Depois adicione o Shelvr aos Favoritos para ele ficar na frente.",
   "home.pasteLink": "Colar um link",
   "home.onYourShelf": "Na sua estante",
+  "home.recallTitle": "Você já salvou coisas parecidas",
+  "home.recallBody": {
+    "one": "%{formattedCount} conteúdo salvo antes combina com o que você acabou de adicionar.",
+    "many": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar.",
+    "other": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar."
+  },
   "demo.pickHelp": "O Shelvr lê, dá um título e organiza para você.",
   "demo.clipboardNoLink": "Não há link na área de transferência. Copie um ou experimente um destes.",
   "demo.samplesOr": "Ou experimente um destes",

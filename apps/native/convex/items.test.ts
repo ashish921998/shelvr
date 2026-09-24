@@ -434,6 +434,142 @@ describe("listLocatedItems", () => {
   });
 });
 
+describe("similarItems", () => {
+  async function insertItem(
+    t: TestCtx,
+    userId: string,
+    fields: { title: string; tags: string[]; status?: "ready" | "processing" },
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: fields.status ?? "ready",
+        title: fields.title,
+        url: `https://example.com/${encodeURIComponent(fields.title)}`,
+        tags: fields.tags,
+        searchText: [fields.title, ...fields.tags].join(" ").toLowerCase(),
+      }),
+    );
+  }
+
+  it("finds a related save older than the newest-items window", async () => {
+    const t = await as("similar-user");
+    const old = await insertItem(t, "similar-user", {
+      title: "Walnut floor lamp",
+      tags: ["lighting", "furniture"],
+    });
+    // Enough unrelated saves to push the old one out of the recent read.
+    await seedFeed(t, "similar-user", 320);
+    const fresh = await insertItem(t, "similar-user", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+    // Card shape only: the index copy never reaches the client.
+    expect(similar[0]).not.toHaveProperty("searchText");
+  });
+
+  it("searches for older saves with non-Latin tags and titles", async () => {
+    const t = await as("similar-ja-user");
+    const old = await insertItem(t, "similar-ja-user", {
+      title: "真鍮のフロアランプ",
+      tags: ["照明", "家具"],
+    });
+    await seedFeed(t, "similar-ja-user", 320);
+    const fresh = await insertItem(t, "similar-ja-user", {
+      title: "読書用ランプ",
+      tags: ["照明", "家具"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("scores shared non-Latin title words without a shared tag", async () => {
+    const t = await as("similar-ja-title-user");
+    const old = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 真鍮",
+      tags: ["インテリア"],
+    });
+    const fresh = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 木製",
+      tags: ["読書"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("skips unready matches and never reads another user's saves", async () => {
+    const backend = newConvexTest();
+    const mine = backend.withIdentity({ subject: "similar-a|session-1" });
+    const theirs = backend.withIdentity({ subject: "similar-b|session-1" });
+    await insertItem(theirs, "similar-b", {
+      title: "Ceramic table lamp",
+      tags: ["lighting", "furniture"],
+    });
+    await insertItem(mine, "similar-a", {
+      title: "Paper pendant lamp",
+      tags: ["lighting", "furniture"],
+      status: "processing",
+    });
+    const fresh = await insertItem(mine, "similar-a", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    expect(await mine.query(api.items.similarItems, { id: fresh })).toEqual([]);
+  });
+
+  describe("reserves old matches ahead of the score cut", () => {
+    // _creationTime is stamped from Date.now(), so backdating the old save
+    // needs the same faked-Date pattern as the "stale processing runs" tests.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+    });
+
+    it("keeps a strong old match out of a burst of higher-scoring newer saves", async () => {
+      const start = Date.now();
+      const oldAgeMs = 8 * 24 * 60 * 60 * 1000; // past the 7-day reserve threshold
+
+      // convex-test's virtual clock anchors to the real Date.now() at the
+      // first write on a test context, then ticks forward from there — so
+      // the backdated write has to be the very first thing this context
+      // does. `as()` seeds a Pro row first, which similarItems doesn't need,
+      // so build the identity directly instead.
+      vi.setSystemTime(start - oldAgeMs);
+      const t = newConvexTest().withIdentity({
+        subject: "similar-old-user|session-1",
+      });
+      const old = await insertItem(t, "similar-old-user", {
+        title: "Walnut floor lamp",
+        tags: ["lighting", "furniture", "walnut"],
+      });
+
+      vi.setSystemTime(start);
+      // More than SIMILAR_LIMIT newer saves that fully match the fresh
+      // save's tags, so a plain top-score cut would push the old match out.
+      for (let i = 0; i < 12; i++) {
+        await insertItem(t, "similar-old-user", {
+          title: `Recent lamp ${i}`,
+          tags: ["lighting", "furniture", "brass", "reading"],
+        });
+      }
+      const fresh = await insertItem(t, "similar-old-user", {
+        title: "Brass reading lamp",
+        tags: ["lighting", "furniture", "brass", "reading"],
+      });
+
+      const similar = await t.query(api.items.similarItems, { id: fresh });
+      expect(similar.map((item) => item._id)).toContain(old);
+    });
+  });
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const t = await as("telemetry-user");

@@ -160,6 +160,9 @@
   "share.continueSaved": "저장된 항목으로 계속",
   "share.finishFailed": "저장했지만 완료하지 못했어요",
   "share.success": "Shelvr에 저장됨",
+  "share.ghostTitle": "최근에 공유한 항목",
+  "share.ghostBody": "이 공유 콘텐츠는 최근에 Shelvr에서 처리되었습니다. 다시 저장할까요?",
+  "share.saveAgain": "다시 저장",
   "account.signingIn": "로그인 중",
   "account.signInTitle": "계속하려면 로그인하세요",
   "account.signInNotFinished": "로그인이 완료되지 않았어요. 다시 시도해 주세요.",
@@ -480,6 +483,10 @@
   "home.howToMoreHelp": "그다음 Shelvr를 즐겨찾기에 추가하면 앞쪽에 계속 보여요.",
   "home.pasteLink": "링크 붙여넣기",
   "home.onYourShelf": "내 책장",
+  "home.recallTitle": "비슷한 항목을 이전에도 저장했어요",
+  "home.recallBody": {
+    "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."
+  },
   "demo.pickHelp": "Shelvr가 읽고 제목을 붙여 정리해 드려요.",
   "demo.clipboardNoLink": "클립보드에 링크가 없어요. 링크를 복사하거나 아래 링크로 해 보세요.",
   "demo.samplesOr": "또는 이 링크로 해 보기",

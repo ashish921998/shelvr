@@ -160,6 +160,9 @@
   "share.continueSaved": "Mit Gespeichertem fortfahren",
   "share.finishFailed": "Gespeichert, aber nicht abgeschlossen",
   "share.success": "In Shelvr gespeichert",
+  "share.ghostTitle": "Kürzlich geteilt",
+  "share.ghostBody": "Diese geteilten Inhalte wurden vor Kurzem in Shelvr verarbeitet. Erneut speichern?",
+  "share.saveAgain": "Erneut speichern",
   "account.signingIn": "Anmelden",
   "account.signInTitle": "Melde dich an, um fortzufahren",
   "account.signInNotFinished": "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut.",
@@ -495,6 +498,11 @@
   "home.howToMoreHelp": "Füge Shelvr dann zu den Favoriten hinzu, damit es vorne bleibt.",
   "home.pasteLink": "Link einfügen",
   "home.onYourShelf": "In deinem Regal",
+  "home.recallTitle": "Du hast so etwas schon mal gespeichert",
+  "home.recallBody": {
+    "one": "%{formattedCount} früher gespeicherter Inhalt passt zu dem, was du gerade hinzugefügt hast.",
+    "other": "%{formattedCount} früher gespeicherte Inhalte passen zu dem, was du gerade hinzugefügt hast."
+  },
   "demo.pickHelp": "Shelvr liest ihn, gibt ihm einen Titel und sortiert ihn für dich ein.",
   "demo.clipboardNoLink": "In deiner Zwischenablage ist kein Link. Kopiere einen oder probier einen von diesen.",
   "demo.samplesOr": "Oder probier einen von diesen",

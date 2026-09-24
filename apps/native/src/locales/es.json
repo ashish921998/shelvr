@@ -160,6 +160,9 @@
   "share.continueSaved": "Continuar con lo guardado",
   "share.finishFailed": "Guardado, pero sin terminar",
   "share.success": "Guardado en Shelvr",
+  "share.ghostTitle": "Compartido hace poco",
+  "share.ghostBody": "Shelvr procesó este contenido compartido recientemente. ¿Guardarlo de nuevo?",
+  "share.saveAgain": "Guardar de nuevo",
   "account.signingIn": "Iniciando sesión",
   "account.signInTitle": "Inicia sesión para continuar",
   "account.signInNotFinished": "El inicio de sesión no ha terminado. Reintenta.",
@@ -510,6 +513,12 @@
   "home.howToMoreHelp": "Después añade Shelvr a Favoritos para que quede al principio.",
   "home.pasteLink": "Pega un enlace",
   "home.onYourShelf": "En tu estantería",
+  "home.recallTitle": "Ya guardaste cosas parecidas",
+  "home.recallBody": {
+    "one": "%{formattedCount} contenido guardado antes encaja con lo que acabas de añadir.",
+    "many": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de añadir.",
+    "other": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de añadir."
+  },
   "demo.pickHelp": "Shelvr lo lee, le pone título y lo archiva por ti.",
   "demo.clipboardNoLink": "No hay ningún enlace en el portapapeles. Copia uno o prueba uno de estos.",
   "demo.samplesOr": "O prueba uno de estos",
