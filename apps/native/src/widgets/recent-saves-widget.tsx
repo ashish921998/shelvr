@@ -66,7 +66,7 @@ const RecentSavesWidget = (
         background: "#faf6ee",
         tile: "#f3ecdd",
         foreground: "#2b2418",
-        muted: "#8d8271",
+        muted: "#6f6455",
         accent: "#e6a23c",
       };
 

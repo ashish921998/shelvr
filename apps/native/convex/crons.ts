@@ -67,4 +67,14 @@ crons.interval(
   {},
 );
 
+// Drop payment-event dedupe rows past the retention window so the ledger does
+// not grow forever. RevenueCat retries deliveries for days, never months, so
+// a purged id cannot cause double counting.
+crons.interval(
+  "purge expired payment receipts",
+  { hours: 24 },
+  internal.paymentTelemetry.purgeExpiredReceipts,
+  {},
+);
+
 export default crons;
