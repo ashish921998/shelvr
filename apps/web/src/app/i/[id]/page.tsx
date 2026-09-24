@@ -24,6 +24,8 @@ export async function generateMetadata({
     title: `${title} — Shelvr`,
     description,
     alternates: { canonical: `/i/${id}` },
+    // A share link is for its recipients, not for search results.
+    robots: { index: false, follow: false },
     openGraph: {
       title,
       description,

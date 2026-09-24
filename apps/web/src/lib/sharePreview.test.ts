@@ -24,6 +24,7 @@ describe("fetchSharePreview", () => {
   });
 
   it("derives the .convex.site host from CONVEX_URL and fetches the item", async () => {
+    delete process.env.CONVEX_SITE_URL;
     process.env.CONVEX_URL = "https://deployment.convex.cloud";
     const preview = { type: "link", title: "A save" };
     vi.mocked(fetch).mockResolvedValue(

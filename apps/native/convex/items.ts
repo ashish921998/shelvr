@@ -1826,7 +1826,9 @@ export const getSharePreview = internalQuery({
     const id = ctx.db.normalizeId("items", itemId);
     if (!id) return null;
     const item = await ctx.db.get(id);
-    if (!item || item.status !== "ready") return null;
+    // Image shares hand off the photo file, never this link, so image ids are
+    // not share capabilities and must not expose their storage URL here.
+    if (!item || item.status !== "ready" || item.type === "image") return null;
 
     const { imageUrl } = await enrichItem(ctx, item);
     return {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,19 +22,6 @@ function clientIp(request: Request): string | undefined {
   const fromForwarded = forwarded?.split(",")[0]?.trim();
   const ip = fromForwarded || request.headers.get("x-real-ip")?.trim() || "";
   return ip.length > 0 && ip.length <= 64 ? ip : undefined;
-}
-
-/**
- * Base URL of the Convex deployment's HTTP actions. `CONVEX_SITE_URL` wins
- * when set; otherwise derive it from `CONVEX_URL` (`*.convex.cloud` serves
- * functions, the matching `*.convex.site` serves HTTP actions).
- */
-function convexSiteUrl(): string | undefined {
-  const explicit = process.env.CONVEX_SITE_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  const cloud = process.env.CONVEX_URL?.trim();
-  if (!cloud || !cloud.includes(".convex.cloud")) return undefined;
-  return cloud.replace(".convex.cloud", ".convex.site").replace(/\/$/, "");
 }
 
 export async function POST(request: Request) {

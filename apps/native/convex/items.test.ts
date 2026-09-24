@@ -3118,4 +3118,22 @@ describe("getSharePreview", () => {
       await t.query(internal.items.getSharePreview, { itemId: "not-an-id" }),
     ).toBeNull();
   });
+
+  it("returns null for an image item, which is never shared by link", async () => {
+    const t = await as("share-user");
+    const imageId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "share-user",
+        type: "image",
+        status: "ready",
+        title: "A private photo",
+        tags: [],
+        searchText: "",
+      }),
+    );
+
+    expect(
+      await t.query(internal.items.getSharePreview, { itemId: imageId }),
+    ).toBeNull();
+  });
 });

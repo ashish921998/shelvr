@@ -23,18 +23,25 @@ export function useItemShare(activeItem: DetailItem | undefined) {
           activeItem.title;
         if (!message) return;
         const result = await Share.share({
-          message: `${message}\n\n${shareableItemUrl(activeItem._id)}`,
+          message:
+            activeItem.status === "ready"
+              ? `${message}\n\n${shareableItemUrl(activeItem._id)}`
+              : message,
         });
         shared = result.action !== Share.dismissedAction;
-      } else if (!activeItem.imageUrl) {
-        const result = await Share.share({
-          url: shareableItemUrl(activeItem._id),
-        });
+      } else if (activeItem.type === "link") {
+        // The preview page only renders ready items, so an unfinished save
+        // shares its source instead of a generic fallback page.
+        const url =
+          activeItem.status === "ready"
+            ? shareableItemUrl(activeItem._id)
+            : activeItem.url;
+        if (!url) return;
+        const result = await Share.share({ url });
         shared = result.action !== Share.dismissedAction;
-      } else if (!(await Sharing.isAvailableAsync())) {
-        const result = await Share.share({
-          url: shareableItemUrl(activeItem._id),
-        });
+      } else if (!activeItem.imageUrl || !(await Sharing.isAvailableAsync())) {
+        if (!activeItem.url) return;
+        const result = await Share.share({ url: activeItem.url });
         shared = result.action !== Share.dismissedAction;
       } else {
         const ext = activeItem.isSticker ? "png" : "jpg";
