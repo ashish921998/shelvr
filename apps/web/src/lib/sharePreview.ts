@@ -1,4 +1,4 @@
-export type SharePreview = {
+type SharePreview = {
   type: "image" | "link" | "note";
   title: string;
   description?: string;
