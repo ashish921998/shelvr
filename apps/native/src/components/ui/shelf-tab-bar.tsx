@@ -104,14 +104,14 @@ const CARD_SIZE = 44;
 /** Room for the pill plus the gap under it. Root-tab content pads by this. */
 export const TAB_BAR_CLEARANCE = 110;
 
-function tap() {
+export function tap() {
   if (Platform.OS !== "android") return;
   void Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Virtual_Key);
 }
 
 /** A trigger's own press handler emits `tabPress` before switching, which pops
  * a focused tab's stack back to its root. */
-function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
+export function pressTrigger(trigger: ReturnType<typeof useTabTrigger>) {
   trigger.triggerProps.onPress?.(undefined as unknown as GestureResponderEvent);
 }
 

@@ -1,4 +1,5 @@
 import { useAppLocale } from "@/lib/i18n";
+import { NavBarVariant, type NavVariant } from "@/components/ui/nav-variants";
 import {
   ShelfTabBar,
   SHELF_TABS,
@@ -13,6 +14,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // pill, with the active one standing on a save card. `ShelfTabBar` draws it;
 // this shell only registers the routes with the navigator and reserves the
 // room the pill floats over.
+
+// ponytail: design exploration switch, removed once a bar is picked.
+const NAV_VARIANT: NavVariant | "current" = "docked";
 
 export function AppTabs() {
   useAppLocale();
@@ -38,7 +42,11 @@ export function AppTabs() {
             <TabTrigger key={tab.name} name={tab.name} href={tab.href} />
           ))}
         </TabList>
-        <ShelfTabBar restingBottom={restingBottom} />
+        {NAV_VARIANT === "current" ? (
+          <ShelfTabBar restingBottom={restingBottom} />
+        ) : (
+          <NavBarVariant variant={NAV_VARIANT} restingBottom={restingBottom} />
+        )}
       </Tabs>
     </View>
   );
