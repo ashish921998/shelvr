@@ -266,13 +266,15 @@ export function useDemoSave({
         // A relaunch resubmits the persisted save and gets it back; that is
         // not a second submission.
         if (!result.reused) analytics.capture("onboarding_demo_submitted");
+        const sharedUrlSaved =
+          request.source === "share" && result.urlMatchesRequest;
         setPendingDemo({
           url: result.url,
           destination: result.savedSpaceNames[0] ?? null,
-          source: request.source,
+          source: sharedUrlSaved ? "share" : "direct",
         });
         clearLegacyDemoUrlIfSaved(result.url);
-        if (request.source === "share") {
+        if (sharedUrlSaved) {
           try {
             recordShareSaved(result.userId);
           } catch (err) {

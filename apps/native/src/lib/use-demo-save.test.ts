@@ -74,6 +74,7 @@ const saved = (reused = false) => ({
   itemId: ITEM_ID,
   userId: "user_1",
   url: "https://example.com/",
+  urlMatchesRequest: true,
   reused,
   savedSpaceNames: [],
 });
@@ -380,6 +381,25 @@ describe("useDemoSave", () => {
     });
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("does not record a reused item for a different shared URL", async () => {
+    mock.create.mockResolvedValue({
+      ...saved(true),
+      urlMatchesRequest: false,
+    });
+    const { result } = renderDemo({
+      url: "https://example.com/different",
+      destination: null,
+      source: "share",
+    });
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+    expect(mock.setPendingDemo).toHaveBeenLastCalledWith({
+      url: "https://example.com/",
+      destination: null,
+      source: "direct",
+    });
   });
 
   it("returns to picking when sign-in is cancelled", () => {
