@@ -6,19 +6,21 @@ export function approximateDocBytes(doc: unknown): number {
 }
 
 /** Reads rows from `rows` until `maxRows` are taken or the rows taken so far
- * reach `maxBytes`. The document that crosses the budget is kept, since it
- * has already been read; the budget bounds everything after it. */
+ * reach `maxBytes`, and reports the bytes read so a caller can hand what is
+ * left of a shared budget to its next read. The document that crosses the
+ * budget is kept, since it has already been read; the budget bounds
+ * everything after it. */
 export async function takeWithinBytes<Row>(
   rows: AsyncIterable<Row>,
   { maxRows, maxBytes }: { maxRows: number; maxBytes: number },
-): Promise<Row[]> {
+): Promise<{ rows: Row[]; bytes: number }> {
   const taken: Row[] = [];
   let bytes = 0;
-  if (maxRows <= 0) return taken;
+  if (maxRows <= 0 || maxBytes <= 0) return { rows: taken, bytes };
   for await (const row of rows) {
     taken.push(row);
     bytes += approximateDocBytes(row);
     if (taken.length >= maxRows || bytes >= maxBytes) break;
   }
-  return taken;
+  return { rows: taken, bytes };
 }

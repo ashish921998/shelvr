@@ -16,7 +16,8 @@ describe("takeWithinBytes", () => {
       maxRows: 3,
       maxBytes: 1_000_000,
     });
-    expect(taken).toEqual([{ i: 0 }, { i: 1 }, { i: 2 }]);
+    expect(taken.rows).toEqual([{ i: 0 }, { i: 1 }, { i: 2 }]);
+    expect(taken.bytes).toBe(3 * approximateDocBytes({ i: 0 }));
     expect(seen.count).toBe(3);
   });
 
@@ -28,8 +29,18 @@ describe("takeWithinBytes", () => {
       maxRows: 10,
       maxBytes: approximateDocBytes(big) * 2.5,
     });
-    expect(taken).toHaveLength(3);
+    expect(taken.rows).toHaveLength(3);
     expect(seen.count).toBe(3);
+  });
+
+  it("reads nothing once the budget is spent", async () => {
+    const seen = { count: 0 };
+    const taken = await takeWithinBytes(rowsOf([{ i: 0 }], seen), {
+      maxRows: 10,
+      maxBytes: 0,
+    });
+    expect(taken).toEqual({ rows: [], bytes: 0 });
+    expect(seen.count).toBe(0);
   });
 
   it("counts multi-byte text by its encoded size", () => {

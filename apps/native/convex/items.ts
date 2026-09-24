@@ -457,11 +457,12 @@ export const searchItems = query({
 const SIMILAR_CANDIDATES = 300;
 const SIMILAR_SEARCH_CANDIDATES = 100;
 // Candidate rows are full documents, and an article's stored content runs to
-// MAX_STORED_CONTENT_CHARS. Each read also stops at a byte budget, kept
-// separate so the recent read can't starve the search, and together well
-// under the per-query read limit.
-const SIMILAR_RECENT_BYTES = 4 * 1024 * 1024;
-const SIMILAR_SEARCH_BYTES = 2 * 1024 * 1024;
+// MAX_STORED_CONTENT_CHARS, so both reads also stop at a shared byte budget
+// that leaves headroom under Convex's 16 MiB per-query read limit. The search
+// runs first under its own smaller cap, so the recent read can't starve it,
+// and the recent read gets whatever the search left, never less than 10 MiB.
+const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
+const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
 // Convex caps a full-text query at 16 terms.
 const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
@@ -525,18 +526,10 @@ export const similarItems = query({
       return [];
     }
 
-    const recent = await takeWithinBytes(
-      ctx.db
-        .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .order("desc"),
-      { maxRows: SIMILAR_CANDIDATES, maxBytes: SIMILAR_RECENT_BYTES },
-    );
-
     const terms = similarSearchTerms(item);
     const searched =
       terms.length === 0
-        ? []
+        ? { rows: [], bytes: 0 }
         : await takeWithinBytes(
             ctx.db
               .query("items")
@@ -549,8 +542,19 @@ export const similarItems = query({
             },
           );
 
+    const recent = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc"),
+      {
+        maxRows: SIMILAR_CANDIDATES,
+        maxBytes: SIMILAR_READ_BYTES - searched.bytes,
+      },
+    );
+
     const candidates = new Map<Id<"items">, Doc<"items">>();
-    for (const candidate of [...recent, ...searched]) {
+    for (const candidate of [...recent.rows, ...searched.rows]) {
       candidates.set(candidate._id, candidate);
     }
 
