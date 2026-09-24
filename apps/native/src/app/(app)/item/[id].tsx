@@ -1,6 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
-import { HeaderActionMenu } from "@/components/ui/header-icon-button";
+import {
+  HeaderActionMenu,
+  HeaderIconButton,
+} from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
 import { ItemHeader } from "@/components/item-header";
@@ -476,37 +479,50 @@ function ItemScreenContent() {
           ...(Platform.OS === "android"
             ? {
                 headerRight: () => (
-                  <HeaderActionMenu
-                    icon="ellipsis"
-                    label={t("item.actions")}
-                    title={
-                      activeItem?.title ?? activeItem?.note ?? t("item.actions")
-                    }
-                    actions={[
-                      ...(activeItem?.status === "ready"
-                        ? [{ label: t("spaces.addItem"), onPress: openSpaces }]
-                        : []),
-                      { label: t("common.share"), onPress: shareActive },
-                      ...(activeItem?.url
-                        ? [{ label: t("item.copyLink"), onPress: copyLink }]
-                        : []),
-                      ...(activeItem?.status === "ready" &&
-                      activeItem.type !== "note"
-                        ? [
-                            {
-                              label: t("products.findLinks"),
-                              onPress: onFindLinks,
-                              disabled: searchDisabled,
-                            },
-                          ]
-                        : []),
-                      {
-                        label: t("common.delete"),
-                        destructive: true,
-                        onPress: onDelete,
-                      },
-                    ]}
-                  />
+                  <View style={styles.headerActions}>
+                    <HeaderIconButton
+                      icon="square.and.arrow.up"
+                      label={t("common.share")}
+                      onPress={shareActive}
+                    />
+                    <HeaderActionMenu
+                      icon="ellipsis"
+                      label={t("item.actions")}
+                      title={
+                        activeItem?.title ??
+                        activeItem?.note ??
+                        t("item.actions")
+                      }
+                      actions={[
+                        ...(activeItem?.status === "ready"
+                          ? [
+                              {
+                                label: t("spaces.addItem"),
+                                onPress: openSpaces,
+                              },
+                            ]
+                          : []),
+                        ...(activeItem?.url
+                          ? [{ label: t("item.copyLink"), onPress: copyLink }]
+                          : []),
+                        ...(activeItem?.status === "ready" &&
+                        activeItem.type !== "note"
+                          ? [
+                              {
+                                label: t("products.findLinks"),
+                                onPress: onFindLinks,
+                                disabled: searchDisabled,
+                              },
+                            ]
+                          : []),
+                        {
+                          label: t("common.delete"),
+                          destructive: true,
+                          onPress: onDelete,
+                        },
+                      ]}
+                    />
+                  </View>
                 ),
               }
             : {}),
@@ -517,6 +533,13 @@ function ItemScreenContent() {
       </Stack.Title>
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="square.and.arrow.up"
+            tintColor={theme.colors.foreground}
+            onPress={shareActive}
+          >
+            {t("common.share")}
+          </Stack.Toolbar.Button>
           <Stack.Toolbar.Menu icon="ellipsis">
             {activeItem?.status === "ready" ? (
               <Stack.Toolbar.MenuAction
@@ -526,12 +549,6 @@ function ItemScreenContent() {
                 {t("spaces.addItem")}
               </Stack.Toolbar.MenuAction>
             ) : null}
-            <Stack.Toolbar.MenuAction
-              icon="square.and.arrow.up"
-              onPress={shareActive}
-            >
-              {t("common.share")}
-            </Stack.Toolbar.MenuAction>
             {activeItem?.url ? (
               <Stack.Toolbar.MenuAction icon="doc.on.doc" onPress={copyLink}>
                 {t("item.copyLink")}
@@ -653,6 +670,11 @@ function ItemScreenContent() {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+  },
   acceptedNotice: {
     position: "absolute",
     left: theme.gap(2),
