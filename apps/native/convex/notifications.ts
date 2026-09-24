@@ -1,11 +1,6 @@
 import { notificationLocale } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import {
-  internalAction,
-  internalMutation,
-  mutation,
-  query,
-} from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
@@ -457,16 +452,6 @@ export const prepareWeeklyDigest = internalMutation({
     await ctx.scheduler.runAfter(0, internal.notificationDelivery.send, {
       digestId,
     });
-    return null;
-  },
-});
-
-// Keep the scheduled entry point used by previously deployed code.
-export const sendDigestNotification = internalAction({
-  args: { digestId: v.id("weeklyDigests") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.runAction(internal.notificationDelivery.send, args);
     return null;
   },
 });

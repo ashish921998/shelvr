@@ -5,8 +5,7 @@ import {
   BottomSheetView,
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
-import { parseExifDate } from "@/lib/date";
-import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import { saveErrorCode } from "@convex/model/saveErrors";
@@ -15,7 +14,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -198,6 +196,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
           url: trimmed,
           spaceId: pinnedSpaceId,
           analyticsSessionId: analytics.sessionId(),
+          saveSource: "manual_link",
         });
       } else {
         await createNoteItem({
@@ -226,6 +225,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   // route, and the partial-failure alert.
   const runImageRequests = useSaveImageBatch({
     spaceId: pinnedSpaceId,
+    saveSource: "photo_import",
     paywallPlacement: PAYWALL_PLACEMENT,
     setBusy: setSaving,
     onAllSaved: (results) => {
@@ -242,30 +242,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     },
   });
 
-  const pickImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-      exif: true,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    await runImageRequests(
-      await Promise.all(
-        result.assets.map(async (asset) => ({
-          image: {
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            mimeType: asset.mimeType,
-            capturedAt: parseExifDate(asset.exif),
-            ...(await resolvePickedImageLocation(asset)),
-          },
-        })),
-      ),
-    );
-  };
+  const pickImages = () => pickAndSaveImages(runImageRequests);
 
   const isComposer = mode === "note" || mode === "article";
   const isArticle = mode === "article";

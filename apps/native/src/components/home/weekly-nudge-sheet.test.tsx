@@ -9,6 +9,8 @@ const mock = vi.hoisted(() => ({
   finish: vi.fn(),
   alert: vi.fn(),
   settings: vi.fn(),
+  shelfEnabled: false,
+  queries: [] as unknown[],
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
@@ -62,9 +64,15 @@ vi.mock("@/components/onboarding/parts", () => ({
 vi.mock("@convex/_generated/api", () => ({
   api: { notifications: { getPreferences: "preferences" } },
 }));
-vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("@convex-dev/react-query", () => ({
+  // Captures the skip sentinel so tests can assert the subscription flips.
+  convexQuery: (_api: unknown, options: unknown) => {
+    mock.queries.push(options);
+    return {};
+  },
+}));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: { weeklyShelfEnabled: false } }),
+  useQuery: () => ({ data: { weeklyShelfEnabled: mock.shelfEnabled } }),
 }));
 vi.mock("expo-router", () => ({ useFocusEffect: vi.fn() }));
 vi.mock("react-native-unistyles", () => ({
@@ -87,6 +95,8 @@ vi.mock("react-native", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mock.setWeeklyShelf.mockReset().mockResolvedValue(true);
+  mock.shelfEnabled = false;
+  mock.queries.length = 0;
 });
 
 it("keeps the opt-in pending after denied permission and lets the user finish after Settings", async () => {
@@ -129,4 +139,15 @@ it("keeps a failed preference save retryable", async () => {
     ),
   );
   expect(mock.finish).not.toHaveBeenCalled();
+});
+
+it("finishes an already-enabled shelf and unsubscribes from preferences", async () => {
+  mock.shelfEnabled = true;
+  render(<WeeklyNudgeSheet userId="user-a" />);
+  await waitFor(() => expect(mock.finish).toHaveBeenCalledWith("user-a"));
+  // The query ran while the nudge was pending, then flipped to "skip" once
+  // alreadyOn finished it.
+  expect(mock.queries[0]).not.toBe("skip");
+  expect(mock.queries.at(-1)).toBe("skip");
+  expect(screen.queryByText("weekly.nudgeTitle")).toBeNull();
 });

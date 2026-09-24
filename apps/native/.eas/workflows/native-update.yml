@@ -48,3 +48,24 @@ jobs:
               echo "Android OTA requires the same GOOGLE_SERVICES_JSON file as the native build."
               exit 1
             }
+        # Runs here, inside the publishing job, rather than in a separate
+        # `type: fingerprint` job: this job's environment and env: are what the
+        # update gets stamped with, and a second job would have to be kept
+        # identical to them by hand. The walk up to the repository root replaces
+        # `git rev-parse --show-toplevel` because a worker may receive the
+        # project as an archive with no .git, and the hook's working directory
+        # is not documented for a monorepo. Reaching / without finding the tool
+        # leaves node a path that does not exist, so the publish still blocks.
+        - name: Verify the update can reach the released build
+          run: |
+            root="$PWD"
+            while [ ! -f "$root/tools/verify-ota-compatibility.mjs" ] && [ "$root" != "/" ]; do
+              root="$(dirname "$root")"
+            done
+            test -f "$root/tools/verify-ota-compatibility.mjs" || {
+              echo "No tools/verify-ota-compatibility.mjs at or above $PWD, so the update cannot be checked."
+              exit 1
+            }
+            node "$root/tools/verify-ota-compatibility.mjs" \
+              --profile "${{ inputs.profile }}" \
+              --platform "${{ inputs.platform }}"

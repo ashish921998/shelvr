@@ -32,9 +32,14 @@ export default function SearchScreen() {
   const search = Platform.OS === "ios" ? iosSearch : tabBarSearch;
   const query = useDebounced(search.trim(), 250);
 
+  // 'skip', not `enabled`: a disabled React Query still subscribes through
+  // the Convex adapter (see the pager), so an empty query would hold a live
+  // server subscription that answers [] on every push.
   const { data: results } = useQuery({
-    ...convexQuery(api.items.searchItems, { query }),
-    enabled: query.length > 0,
+    ...convexQuery(
+      api.items.searchItems,
+      query.length > 0 ? { query } : "skip",
+    ),
   });
 
   return (

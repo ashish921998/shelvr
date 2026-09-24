@@ -35,7 +35,7 @@ export type MessageParams = {
   "notifications.weeklyShelf": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
-  "capture.backToLibrary": undefined;
+  "digest.backHome": undefined;
   "capture.backToOptions": undefined;
   "common.save": undefined;
   "errors.saveTitle": undefined;
@@ -161,6 +161,9 @@ export type MessageParams = {
   "share.continueSaved": undefined;
   "share.finishFailed": undefined;
   "share.success": undefined;
+  "share.ghostTitle": undefined;
+  "share.ghostBody": undefined;
+  "share.saveAgain": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
   "account.signInNotFinished": undefined;
@@ -180,6 +183,7 @@ export type MessageParams = {
   "support.email": undefined;
   "common.close": undefined;
   "feedback.prompt": undefined;
+  "feedback.replyNotice": undefined;
   "feedback.messageLabel": undefined;
   "feedback.placeholder": undefined;
   "feedback.cancel": undefined;
@@ -297,6 +301,9 @@ export type MessageParams = {
   "item.stalled": undefined;
   "item.partial": undefined;
   "item.noArticle": undefined;
+  "recipe.ingredients": undefined;
+  "recipe.steps": undefined;
+  "recipe.serves": { count: number };
   "presets.articles": undefined;
   "presets.recipes": undefined;
   "presets.products": undefined;
@@ -447,6 +454,8 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.recallTitle": undefined;
+  "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
@@ -456,6 +465,19 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "splash.tagline": undefined;
+  "refundConsent.title": undefined;
+  "refundConsent.disclosure": undefined;
+  "refundConsent.optional": undefined;
+  "refundConsent.accept": undefined;
+  "refundConsent.later": undefined;
+  "refundConsent.error": undefined;
+  "refundConsent.setting": undefined;
+  "refundConsent.enabled": undefined;
+  "refundConsent.disabled": undefined;
+  "refundConsent.syncPending": undefined;
+  "refundConsent.withdraw": undefined;
+  "refundConsent.review": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
