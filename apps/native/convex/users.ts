@@ -6,6 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
+import { revoke } from "./legalConsent";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -50,6 +51,7 @@ export const getCurrentUser = query({
  *  - onboardingDemos (the demo allowance row and its item reference)
  *  - subscriptions
  *  - cancelSurveys (the one-time cancel-survey ask row)
+ *  - feedbackSubmissions (in-app feedback rows and their messages)
  *  - Convex Auth sessions, refresh tokens, accounts, and the users row
  *
  * Apple/Google subscriptions are NOT cancelled here; the client must warn the
@@ -67,6 +69,7 @@ export const deleteCurrentUserAccount = mutation({
   returns: v.null(),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
+    await revoke(ctx, userId, true);
     await deleteAccountBatch(ctx, userId);
     return null;
   },
@@ -177,6 +180,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (reads.length === DELETE_BATCH) return false;
 
+  if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
+
   const devices = await ctx.db
     .query("notificationDevices")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
@@ -204,6 +209,11 @@ async function deleteUserOwnedDataBatch(
   }
   if (digests.length === DELETE_BATCH) return false;
 
+  // Feedback rows hold the user's authored messages, so they drain with the
+  // account. Deleting a row cannot retract an already-delivered inbox email
+  // (see docs/architecture/feedback.md); it only removes the Convex copy.
+  if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
+
   // Does not cancel the App Store subscription — only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
@@ -222,6 +232,41 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(survey._id);
   }
   return true;
+}
+
+/** Deletes up to one batch of the user's feedback submissions. Returns true
+ * when the table is fully drained for this user. Feedback rows hold the
+ * user's authored messages, so they drain with the account; deleting a row
+ * cannot retract an already-delivered inbox email
+ * (see docs/architecture/feedback.md) — it only removes the Convex copy. */
+async function deleteFeedbackBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const feedback = await ctx.db
+    .query("feedbackSubmissions")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const submission of feedback) {
+    await ctx.db.delete(submission._id);
+  }
+  return feedback.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's branded share links. Returns true
+ * when the table is fully drained for this user. */
+async function deleteShareLinksBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const links = await ctx.db
+    .query("shareLinks")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const link of links) {
+    await ctx.db.delete(link._id);
+  }
+  return links.length !== DELETE_BATCH;
 }
 
 /** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */

@@ -4,6 +4,7 @@ import {
   PHOTO_LIMIT_MESSAGE,
 } from "@convex/model/imagePolicy";
 import { saveErrorCode, type SaveErrorCode } from "@convex/model/saveErrors";
+import type { SaveSource } from "@convex/model/saveSource";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -97,6 +98,7 @@ export type SaveImageDeps = {
     latitude?: number;
     longitude?: number;
     spaceId?: Id<"spaces">;
+    saveSource?: SaveSource;
   }) => Promise<Id<"items">>;
 };
 
@@ -160,7 +162,7 @@ export const MAX_CONCURRENT_SAVES = 3;
 export async function saveImageOperations(
   requests: ImageSaveRequest[],
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<"spaces"> },
+  options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
 ): Promise<ImageSaveResult[]> {
   const results: ImageSaveResult[] = new Array(requests.length);
   let next = 0;
@@ -182,7 +184,7 @@ export async function saveImageOperations(
 async function saveImageOperation(
   request: ImageSaveRequest,
   deps: SaveImageDeps,
-  options?: { spaceId?: Id<"spaces"> },
+  options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
 ): Promise<ImageSaveResult> {
   const image = request.image;
   let stage: ImageSaveStage = "begin";
@@ -225,6 +227,7 @@ async function saveImageOperation(
       latitude: image.latitude,
       longitude: image.longitude,
       spaceId: options?.spaceId,
+      saveSource: options?.saveSource,
     });
     return { status: "saved", operationId, image, itemId };
   } catch (error) {
@@ -254,7 +257,7 @@ export function useSaveImages() {
   return useCallback(
     async (
       requests: ImageSaveRequest[],
-      options?: { spaceId?: Id<"spaces"> },
+      options?: { spaceId?: Id<"spaces">; saveSource?: SaveSource },
     ): Promise<ImageSaveResult[]> => {
       const deps: SaveImageDeps = {
         begin: (operationId) => beginImageImport({ operationId }),

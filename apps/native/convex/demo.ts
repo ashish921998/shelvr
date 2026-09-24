@@ -171,6 +171,7 @@ export const createDemoItem = mutation({
       itemType: "link",
       savedAt: item?._creationTime ?? Date.now(),
       sessionId: args.analyticsSessionId?.slice(0, 128),
+      saveSource: "onboarding_demo",
     });
     return {
       itemId,

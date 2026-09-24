@@ -36,7 +36,7 @@ export function SignInView({
     pendingProvider: pending,
     lastError,
     interrupted,
-  } = useOAuthSignIn();
+  } = useOAuthSignIn("sign_in_view");
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
   const { theme } = useUnistyles();

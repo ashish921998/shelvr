@@ -6,6 +6,7 @@ import { auth } from "./auth";
 import {
   mapRevenueCatStatus,
   parseRevenueCatEvent,
+  resolveExpiresAt,
   type RevenueCatEvent,
 } from "./model/revenuecat";
 import {
@@ -102,8 +103,7 @@ http.route({
       return new Response(null, { status: 200 });
     }
 
-    const { type, userId, expiresAt, productId, periodType, eventTimestampMs } =
-      event;
+    const { type, userId, productId, periodType, eventTimestampMs } = event;
 
     if (requiresRefundReconciliation(event)) {
       try {
@@ -126,7 +126,7 @@ http.route({
     await ctx.runMutation(internal.subscriptions.upsertSubscription, {
       userId,
       status,
-      expiresAt: expiresAt ?? 0,
+      expiresAt: resolveExpiresAt(event),
       productId,
       eventTimestampMs,
     });
@@ -231,6 +231,25 @@ http.route({
       });
       return json({ message: "Could not join right now." }, 500);
     }
+  }),
+});
+
+/**
+ * Public preview for a branded share link (`shelvr-web.vercel.app/i/:token`).
+ * The marketing site's `/i/[token]` route calls this to build the page's OG
+ * tags. No secret: the random share token is the capability, and the
+ * response is a narrow preview shape (see `getSharePreview`).
+ */
+http.route({
+  pathPrefix: "/share/links/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const preview = await ctx.runQuery(internal.items.getSharePreview, {
+      token,
+    });
+    if (!preview) return json({ message: "Not found." }, 404);
+    return json(preview, 200);
   }),
 });
 

@@ -10,6 +10,7 @@ import { Eyebrow } from "@/components/shelf/typography";
 import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { LegalConsentPreference } from "@/components/legal-consent";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
 import {
@@ -343,6 +344,8 @@ export default function ProfileScreen() {
           </View>
           <InkIcon name="chevron.right" size={16} tint={theme.colors.muted} />
         </Pressable>
+
+        <LegalConsentPreference />
 
         <Eyebrow style={styles.eyebrow}>{t("profile.appearance")}</Eyebrow>
         <SegmentedControl

@@ -127,7 +127,6 @@ cp apps/native/.example.env apps/native/.env.local
 - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` → `true` to mirror the dev-only backend flag
 - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` → isolated Shelvr Development Test Store key from `.example.env`, used by local development and preview on both platforms. Use the development Convex deployment (`amicable-antelope-639`), never production.
 - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` → production-only RevenueCat SDK keys
-- `ACTIVATION_PAL_IOS_KEY` → ActivationPal public app key embedded in iOS builds
 
 The web marketing site uses the Convex deployment for its Android waitlist;
 analytics are optional (copy `apps/web/.env.example` to
@@ -246,8 +245,28 @@ publication pin `APP_VARIANT=production`.
 
 **Fingerprint rule:** OTA updates reach installs by EAS fingerprint. Any
 change that alters it — a native dependency added or removed, a native
-config change — makes new updates invisible to binaries built from the old
-fingerprint. Cut a fresh store build before resuming OTA publishes.
+config change, or the `version` in `app.json` — makes new updates invisible
+to binaries built from the old fingerprint. Cut a fresh store build before
+resuming OTA publishes.
+
+The app version is the surprising input. Bumping 1.0.3 to 1.0.4 moved the
+iOS fingerprint from `d2537f3a` to `890e5366`, measured across two local
+production builds of the same commit differing only in that field. So a
+version bump has to land on `main` before any OTA aimed at the build that
+carries it, or every publish is invisible to the app it was meant for. The
+build number is not an input.
+
+**Building outside the workflow.** `eas build --local` runs on your own
+machine when EAS cloud minutes run out, but it is not guaranteed to produce
+the same artifact as a cloud worker: it ignores the `build.production.ios.image`
+pin in `eas.json` and builds against whatever Xcode and CocoaPods are already
+installed, so a machine that doesn't match the pinned image can fail or
+produce a binary built against a different SDK. Two concrete differences: it
+runs plain `pod install`, never `--repo-update`, so a stale CocoaPods cache
+fails the build on an unsatisfiable dependency — run `pod repo update` first.
+And secret-visibility EAS variables never leave the builder, so
+`GOOGLE_SERVICES_JSON` is unreadable locally and an Android production build
+refuses to start; build Android in the cloud or supply that file another way.
 
 Ordering rule: installed clients update on their own schedule, so deploy
 backend changes the clients can tolerate first. Never push a Convex change an
@@ -268,3 +287,16 @@ pnpm --filter native-app add mypackage@latest
 - Native routes live under `apps/native/src/app`
 - Web is marketing only at `/` — no authenticated `/app` product surface
 - See root `CLAUDE.md` for architecture guidance when working with agents
+- `assets/splash-blank.png` is a 1x1 transparent PNG and is meant to stay that
+  way. On iOS the `expo-splash-screen` plugin applies `backgroundColor` only
+  from inside `applyImageToSplashScreenXML`, which it calls only when `image`
+  is set (`withIosSplashScreenStoryboardImage.js`, `Boolean(splash.image)`).
+  With no `image` the generated storyboard keeps the bare template's
+  `systemBackgroundColor` — white or black — and the configured colour is
+  silently ignored, even though the colorset is still written. Shelvr wants the
+  brand ground with no mark, because the animated splash draws its own S at
+  1.05s and a static one here would appear, vanish, then pop back. The blank
+  image buys the background; `imageWidth: 1` keeps it invisible. Verify after
+  changing it: the generated `ios/Shelvr/SplashScreen.storyboard` must say
+  `<color key="backgroundColor" name="SplashScreenBackground"/>`, not
+  `systemBackgroundColor`.

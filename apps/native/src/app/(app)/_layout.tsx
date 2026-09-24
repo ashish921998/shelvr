@@ -8,6 +8,7 @@ import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
+import { useReducedMotion } from "react-native-reanimated";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -17,6 +18,8 @@ export default function AppLayout() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
+  // Spatial slide transitions are the first thing to cut under Reduce Motion.
+  const reducedMotion = useReducedMotion();
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
@@ -38,6 +41,7 @@ export default function AppLayout() {
       <RecentSavesWidgetSync />
       <Stack
         screenOptions={{
+          animation: reducedMotion ? "fade" : "default",
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: theme.colors.primary,
@@ -65,7 +69,7 @@ export default function AppLayout() {
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("capture.backToLibrary")}
+                    label={t("digest.backHome")}
                     onPress={() => router.replace("/")}
                   />
                 ),

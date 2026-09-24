@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { widgetClearErrorEvent } from "./widget-clear-error";
 
 function isOwnershipConflict(error: unknown): boolean {
   if (!(error instanceof ConvexError)) return false;
@@ -24,6 +25,7 @@ type SessionDependencies = {
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
+  clearWidget: () => Promise<unknown>;
   resetAnalytics: () => void;
   reportError: (error: unknown) => void;
 };
@@ -183,15 +185,21 @@ export class NotificationDeviceSession {
           throw error;
         }
         this.stop();
-        // Once the account is deleted, local cleanup cannot turn it into a failed deletion.
-        const cleanup =
-          operation === "delete_account"
-            ? [this.deps.signOut, this.deps.resetAnalytics]
-            : [this.deps.resetAnalytics];
-        for (const action of cleanup) {
+        // After a successful account deletion the server has already ended the
+        // session; clear the local Convex Auth credentials too.
+        if (operation === "delete_account") {
+          // Server deletion succeeded even if local auth cleanup fails next.
+          void this.deps.clearWidget().catch((error) => {
+            this.deps.reportError(new Error(widgetClearErrorEvent(error)));
+          });
           try {
-            await action();
+            await this.deps.signOut();
           } catch (error) {
+            // Local sign-out failed, so no unauthenticated auth edge may
+            // follow promptly and the identity hook would not fire — clear
+            // the PostHog identity here so events stop attributing to the
+            // deleted account.
+            this.deps.resetAnalytics();
             this.deps.reportError(error);
           }
         }

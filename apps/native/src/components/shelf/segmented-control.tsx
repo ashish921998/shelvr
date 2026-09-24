@@ -17,7 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-import { EASE_OUT } from "@/lib/motion";
+import { motion } from "@/lib/motion";
 
 const HEIGHT = 40;
 const PADDING = 3;
@@ -54,7 +54,7 @@ export function SegmentedControl<T extends string>({
         {
           translateX: reduced
             ? x
-            : withTiming(x, { duration: 240, easing: EASE_OUT }),
+            : withTiming(x, { duration: 240, easing: motion.easing.out }),
         },
       ],
     };

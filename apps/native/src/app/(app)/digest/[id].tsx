@@ -44,7 +44,7 @@ export default function DigestScreen() {
           message={t("digest.retryHelp")}
         />
         <SecondaryButton
-          label={t("capture.backToLibrary")}
+          label={t("digest.backHome")}
           onPress={() => router.replace("/")}
           style={styles.errorButton}
         />

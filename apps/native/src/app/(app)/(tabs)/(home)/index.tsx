@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { SaveHowTo } from "@/components/home/save-how-to";
+import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
+import { useSaveRecall } from "@/lib/use-save-recall";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
@@ -54,10 +56,12 @@ export default function HomeScreen() {
   const clock = useInkClock();
 
   const cancelSurvey = useCancelSurvey();
-  // The cancel survey owns the Home moment when visible; defer the feedback
-  // invitation's one-shot claim so it is never consumed behind the card.
+  // The cancel survey owns the Home moment when visible, then the save recall
+  // card. Each later prompt defers its one-shot claim so it is never consumed
+  // behind a card that holds the slot.
+  const recall = useSaveRecall(items, { defer: cancelSurvey.visible });
   const feedback = useFeedbackInvitation(items, {
-    defer: cancelSurvey.visible,
+    defer: cancelSurvey.visible || recall.visible || recall.pending,
   });
   const busySaving = useBusySaving(items);
   const { data: user } = useCurrentUser();
@@ -163,6 +167,14 @@ export default function HomeScreen() {
           (showHowTo ? (
             <Gutter style={styles.howToHeader}>
               <SaveHowTo />
+            </Gutter>
+          ) : recall.visible ? (
+            <Gutter style={styles.howToHeader}>
+              <SaveRecallCard
+                matches={recall.matches}
+                onOpen={recall.opened}
+                onDismiss={recall.dismiss}
+              />
             </Gutter>
           ) : feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation

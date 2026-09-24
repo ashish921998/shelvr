@@ -2,6 +2,7 @@ export type RevenueCatEvent = {
   type?: string;
   userId?: string;
   expiresAt?: number;
+  gracePeriodExpiresAt?: number;
   productId?: string;
   periodType?: string;
   cancelReason?: string;
@@ -28,6 +29,7 @@ export function parseRevenueCatEvent(
   const type = readString(event?.type);
   const userId = readString(event?.app_user_id);
   const expiresAt = readNumber(event?.expiration_at_ms);
+  const gracePeriodExpiresAt = readNumber(event?.grace_period_expiration_at_ms);
   const productId = readString(event?.product_id);
   const periodType = readString(event?.period_type);
   const eventTimestampMs = readNumber(event?.event_timestamp_ms);
@@ -36,6 +38,7 @@ export function parseRevenueCatEvent(
     type,
     userId,
     expiresAt,
+    gracePeriodExpiresAt,
     productId,
     periodType,
     cancelReason: readString(event.cancel_reason),
@@ -72,6 +75,24 @@ export function mapRevenueCatStatus(
     default:
       return undefined;
   }
+}
+
+/** The instant Pro access should actually end for a webhook event.
+ * A BILLING_ISSUE reports the original, already-past expiry in
+ * `expiration_at_ms` and the store's billing retry window in a separate
+ * `grace_period_expiration_at_ms`, so writing the former revokes access while
+ * the charge is still being retried. The grace field is read only for that
+ * event type, because an unconditional maximum of the two would extend an
+ * entitlement past its end if the field ever rode along on an EXPIRATION, and
+ * over-granting Pro is the worse failure.
+ */
+export function resolveExpiresAt(event: RevenueCatEvent): number {
+  if (
+    event.type === "BILLING_ISSUE" &&
+    event.gracePeriodExpiresAt !== undefined
+  )
+    return event.gracePeriodExpiresAt;
+  return event.expiresAt ?? 0;
 }
 
 function readStringArray(value: unknown): string[] | undefined {

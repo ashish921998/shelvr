@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
 import { displayHost } from "@/lib/url";
@@ -24,12 +25,12 @@ import { InkSpinner } from "@/components/ink/ink-thread";
 import { Alert, Pressable, Share, Text, View } from "react-native";
 import Animated, {
   FadeIn,
-  FadeOut,
   useReducedMotion,
   ZoomOut,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { shareUrl, useShareLink } from "@/lib/share-link";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -91,16 +92,6 @@ export type ItemSource =
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
-
-const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
-const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
-
-function clampRatio(ratio: number | undefined, fallback: number) {
-  const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
-  // Preserve the true aspect ratio so previews aren't cropped; only bound
-  // pathological extremes so one very tall/wide image can't hijack a column.
-  return Math.min(Math.max(value, 0.5), 2);
-}
 
 function cardMenuActions({
   isSuggested,
@@ -178,6 +169,8 @@ function CardMedia({
               aspectRatio: clampRatio(
                 item.aspectRatio,
                 isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+                0.5,
+                2,
               ),
             },
           ]}
@@ -264,16 +257,14 @@ function CardCaption({
 function CardStatusCorner({
   item,
   theme,
-  reducedMotion,
 }: {
   item: FeedItem;
   theme: UnistylesTheme;
-  reducedMotion: boolean;
 }) {
   return (
     <Animated.View
-      entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
-      exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+      entering={REDUCED_FADE_IN}
+      exiting={REDUCED_FADE_OUT}
       collapsable={false}
       style={styles.processing}
     >
@@ -313,10 +304,12 @@ export const ItemCard = memo(function ItemCard({
   const isSuggested = item.suggested === true && spaceId !== undefined;
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
+  const shareLink = useShareLink();
   const share = async () => {
     if (!item.url) return;
     try {
-      const result = await Share.share({ url: item.url });
+      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      const result = await shareUrl(link ?? item.url);
       if (
         result.action === Share.sharedAction &&
         item._creationTime !== undefined
@@ -409,7 +402,7 @@ export const ItemCard = memo(function ItemCard({
         href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
         asChild
       >
-        <Link.Trigger withAppleZoom>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable
             // `role`, not `accessibilityRole`: Link spreads its own role="link"
             // onto this trigger, and React Native reads `role` first on both
@@ -450,11 +443,7 @@ export const ItemCard = memo(function ItemCard({
             )}
 
             {(item.status === "processing" || item.status === "failed") && (
-              <CardStatusCorner
-                item={item}
-                theme={theme}
-                reducedMotion={reducedMotion}
-              />
+              <CardStatusCorner item={item} theme={theme} />
             )}
           </Pressable>
         </Link.Trigger>

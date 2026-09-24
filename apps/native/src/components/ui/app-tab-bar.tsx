@@ -7,7 +7,7 @@ import {
 import { TabList, TabSlot, TabTrigger, Tabs } from "expo-router/ui";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The app's tab bar on every platform: five equal tabs in a floating paper
 // pill, with the active one standing on a save card. `ShelfTabBar` draws it;
@@ -16,12 +16,21 @@ import { StyleSheet } from "react-native-unistyles";
 
 export function AppTabs() {
   useAppLocale();
+  // `Tabs` is a plain view the Unistyles babel plugin cannot repaint
+  // natively, and the render a scheme change triggers still resolves
+  // styles.* to the outgoing theme. Reading `theme` here re-renders on the
+  // rebuild, and the inline colour hands the view the new value. Without it
+  // the backdrop under the bar keeps the outgoing theme's background.
+  const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const restingBottom = Math.max(insets.bottom, 10);
 
   return (
     <View style={styles.root}>
-      <Tabs style={styles.root} options={{ backBehavior: "history" }}>
+      <Tabs
+        style={[styles.root, { backgroundColor: theme.colors.background }]}
+        options={{ backBehavior: "history" }}
+      >
         <TabSlot style={[styles.slot, { paddingBottom: TAB_BAR_CLEARANCE }]} />
         {/* Registers the routes; ShelfTabBar draws them. */}
         <TabList style={styles.routeRegistry}>

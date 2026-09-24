@@ -7,35 +7,13 @@ const configUrl = new URL("../../app.config.js", import.meta.url);
 const source = readFileSync(configUrl, "utf8");
 const requireConfig = createRequire(configUrl);
 
-function validate(
-  variant: string,
-  platform: string,
-  file?: string,
-  packages: string[] = [],
-) {
+function validate(variant: string, platform: string) {
   const module = {
-    exports: (_input: { config: object }) => ({
-      android: { googleServicesFile: undefined as string | undefined },
-    }),
+    exports: (_input: { config: object }) => ({ android: {} }),
   };
   runInNewContext(source, {
     module,
-    require: (id: string) =>
-      id === "node:fs"
-        ? {
-            readFileSync: () =>
-              JSON.stringify({
-                project_info: { project_number: "12345" },
-                client: packages.map((packageName) => ({
-                  client_info: {
-                    android_client_info: { package_name: packageName },
-                    mobilesdk_app_id: "test-app-id",
-                  },
-                  api_key: [{ current_key: "test-client-key" }],
-                })),
-              }),
-          }
-        : requireConfig(id),
+    require: requireConfig,
     process: {
       env: {
         EAS_BUILD: "true",
@@ -48,7 +26,6 @@ function validate(
           variant === "production"
             ? "https://amiable-setter-120.convex.cloud"
             : "https://amicable-antelope-639.convex.cloud",
-        GOOGLE_SERVICES_JSON: file,
       },
     },
     URL,
@@ -58,30 +35,13 @@ function validate(
 
 describe("Firebase build configuration", () => {
   it.each(["development", "preview", "production"])(
-    "requires Firebase for Android %s builds",
+    "does not expose the Firebase file in %s Android config",
     (variant) => {
-      expect(() => validate(variant, "android")).toThrow(
-        /require GOOGLE_SERVICES_JSON/,
+      expect(validate(variant, "android").android).not.toHaveProperty(
+        "googleServicesFile",
       );
     },
   );
-
-  it.each([
-    ["development", "app.shelvr.save.dev"],
-    ["preview", "app.shelvr.save.preview"],
-    ["production", "app.shelvr.save"],
-  ])("accepts the matching Firebase client for %s", (variant, packageName) => {
-    expect(
-      validate(variant, "android", "/tmp/firebase.json", [packageName]).android
-        .googleServicesFile,
-    ).toBe("/tmp/firebase.json");
-  });
-
-  it("rejects a production-only Firebase file in a preview build", () => {
-    expect(() =>
-      validate("preview", "android", "/tmp/firebase.json", ["app.shelvr.save"]),
-    ).toThrow(/Firebase client for app.shelvr.save.preview/);
-  });
 
   it.each(["development", "preview", "production"])(
     "does not require Firebase for iOS %s",

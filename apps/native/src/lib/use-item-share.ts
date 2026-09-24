@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { shareUrl, useShareLink } from "@/lib/share-link";
 import type { DetailItem } from "@/components/item-detail";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -8,6 +9,7 @@ import { Share } from "react-native";
 
 export function useItemShare(activeItem: DetailItem | undefined) {
   useAppLocale();
+  const shareLink = useShareLink();
   return useCallback(async () => {
     if (!activeItem) return;
 
@@ -21,15 +23,20 @@ export function useItemShare(activeItem: DetailItem | undefined) {
           activeItem.description ??
           activeItem.title;
         if (!message) return;
-        const result = await Share.share({ message });
+        const link = await shareLink(activeItem._id);
+        const result = await Share.share({
+          message: link ? `${message}\n\n${link}` : message,
+        });
         shared = result.action !== Share.dismissedAction;
-      } else if (!activeItem.imageUrl) {
-        if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
+      } else if (activeItem.type === "link") {
+        // No link for an unfinished save, or offline: share the source.
+        const url = (await shareLink(activeItem._id)) ?? activeItem.url;
+        if (!url) return;
+        const result = await shareUrl(url);
         shared = result.action !== Share.dismissedAction;
-      } else if (!(await Sharing.isAvailableAsync())) {
+      } else if (!activeItem.imageUrl || !(await Sharing.isAvailableAsync())) {
         if (!activeItem.url) return;
-        const result = await Share.share({ url: activeItem.url });
+        const result = await shareUrl(activeItem.url);
         shared = result.action !== Share.dismissedAction;
       } else {
         const ext = activeItem.isSticker ? "png" : "jpg";
@@ -55,5 +62,5 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         shareSheetOnly ? "share_sheet_opened" : "share",
       );
     }
-  }, [activeItem]);
+  }, [activeItem, shareLink]);
 }
