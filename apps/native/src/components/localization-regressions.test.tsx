@@ -15,13 +15,16 @@ const device = vi.hoisted(() => ({
   fontReady: true,
   listeners: new Set<() => void>(),
 }));
-// The native asset loader normally handles this require; Node has no TTF loader.
+// The native asset loader normally handles these requires; Node has no font
+// loader. AnimatedText requires both the Spectral TTF and the Satoshi OTFs.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
-  load.extensions[".ttf"] = (module) => {
-    module.exports = "font-asset";
-  };
+  for (const extension of [".otf", ".ttf"]) {
+    load.extensions[extension] = (module) => {
+      module.exports = "font-asset";
+    };
+  }
 });
 vi.mock("expo-localization", async () => {
   const { useSyncExternalStore } = await import("react");
