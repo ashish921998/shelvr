@@ -177,6 +177,9 @@ export function RevealStep({
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
         {entitled ? null : (
+          <Text style={styles.trialNote}>{t("reveal.trialNote")}</Text>
+        )}
+        {entitled ? null : (
           <GhostButton
             label={t("common.notNow")}
             onPress={() => {
@@ -233,6 +236,13 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.faint,
+  },
+  trialNote: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
   },
   foot: {
     marginTop: "auto",
