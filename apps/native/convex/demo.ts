@@ -106,6 +106,7 @@ export const createDemoItem = mutation({
   },
   returns: v.object({
     itemId: v.id("items"),
+    userId: v.string(),
     url: v.string(),
     reused: v.boolean(),
     savedSpaceNames: v.array(v.string()),
@@ -126,6 +127,7 @@ export const createDemoItem = mutation({
       }
       return {
         itemId: existing.itemId,
+        userId,
         url: item.url,
         reused: true,
         savedSpaceNames: await savedSpaceNames(ctx, existing.itemId),
@@ -175,6 +177,7 @@ export const createDemoItem = mutation({
     });
     return {
       itemId,
+      userId,
       url,
       reused: false,
       savedSpaceNames: destination !== undefined ? [destination] : [],

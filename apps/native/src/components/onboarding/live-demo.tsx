@@ -6,7 +6,6 @@ import {
   type DemoSample,
 } from "@/lib/onboarding-demo";
 import type { PendingDemo } from "@/lib/pending-onboarding";
-import { useCurrentUser } from "@/lib/current-user";
 import { displayHost } from "@/lib/url";
 import { useDemoSave, linkFromText, type DemoSaved } from "@/lib/use-demo-save";
 import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
@@ -66,18 +65,17 @@ export function LiveDemoStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const { data: user } = useCurrentUser();
   const demo = useDemoSave({
     spaces,
     resume,
     onSaved,
     onAdvance,
-    userId: user?._id ?? null,
   });
   const { shareSheetOpen, shareSample } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
-    onUrl: demo.submitSharedUrl,
+    onSharedUrl: demo.submitSharedUrl,
+    onDirectUrl: demo.submitUrl,
     onError: demo.setError,
   });
   const [draft, setDraft] = useState("");

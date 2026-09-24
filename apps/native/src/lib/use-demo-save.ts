@@ -182,15 +182,11 @@ export function useDemoSave({
   resume,
   onSaved,
   onAdvance,
-  userId,
 }: {
   spaces: string[];
   resume: PendingDemo | null;
   onSaved: (saved: DemoSaved) => void;
   onAdvance: () => void;
-  /** Current account id, so a share-sheet demo save records the first share
-   * and Home drops the how-to card. Null until sign-in resolves. */
-  userId: string | null;
 }) {
   const { isAuthenticated } = useConvexAuth();
   const createDemoItem = useMutation(api.demo.createDemoItem);
@@ -202,28 +198,7 @@ export function useDemoSave({
   );
   const inFlightRef = useRef(false);
   const advancedRef = useRef(false);
-  // The share sheet, not a paste or typed link, is the user's first share.
-  // The mark is per attempt: a save resumed on a fresh mount (an app kill mid
-  // OAuth) records nothing, so Home shows the card once, which is harmless.
-  const viaShareRef = useRef(false);
-  const pendingShareRecordRef = useRef(false);
   const { itemId } = state;
-
-  // Records a share-sheet demo save as the first share, so Home drops the
-  // how-to card. Waits until sign-in resolves the account id.
-  const recordSharePending = useCallback(() => {
-    if (!pendingShareRecordRef.current || userId === null) return;
-    pendingShareRecordRef.current = false;
-    try {
-      recordShareSaved(userId);
-    } catch (err) {
-      analytics.captureError("record_first_share_failed", err);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    recordSharePending();
-  }, [recordSharePending]);
 
   // 'skip', not `enabled`: a disabled React Query still subscribes through the
   // Convex adapter and sends `id: null`, which fails argument validation.
@@ -271,7 +246,7 @@ export function useDemoSave({
     async (request: PendingDemo) => {
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
-      const trimmed = { url, destination: request.destination };
+      const trimmed = { ...request, url };
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
@@ -294,17 +269,21 @@ export function useDemoSave({
         setPendingDemo({
           url: result.url,
           destination: result.savedSpaceNames[0] ?? null,
+          source: request.source,
         });
         clearLegacyDemoUrlIfSaved(result.url);
+        if (request.source === "share") {
+          try {
+            recordShareSaved(result.userId);
+          } catch (err) {
+            analytics.captureError("record_first_share_failed", err);
+          }
+        }
         dispatch({ type: "saved", itemId: result.itemId });
         onSaved({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
         });
-        if (viaShareRef.current) {
-          pendingShareRecordRef.current = true;
-          recordSharePending();
-        }
       } catch (err) {
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
@@ -318,17 +297,17 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, lost, onSaved, recordSharePending],
+    [createDemoItem, isAuthenticated, lost, onSaved],
   );
 
   const submitUrl = useCallback(
-    (url: string, viaShare = false) => {
-      viaShareRef.current = viaShare;
+    (url: string) => {
       const preset = demoDestination(url.trim(), spaces);
       void submit({
         url,
         destination:
           preset === null ? null : resolveOnboardingSpaceName(preset),
+        source: "direct",
       });
     },
     [spaces, submit],
@@ -337,8 +316,16 @@ export function useDemoSave({
   // The onboarding share sheet routes its save here so it records the first
   // share; paste and typed saves stay on submitUrl and keep the how-to card.
   const submitSharedUrl = useCallback(
-    (url: string) => submitUrl(url, true),
-    [submitUrl],
+    (url: string) => {
+      const preset = demoDestination(url.trim(), spaces);
+      void submit({
+        url,
+        destination:
+          preset === null ? null : resolveOnboardingSpaceName(preset),
+        source: "share",
+      });
+    },
+    [spaces, submit],
   );
 
   // Resume the save once auth is ready; submitting consumes the request.
