@@ -199,8 +199,6 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
-  - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
-    iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
   - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
