@@ -39,7 +39,7 @@ export function RevealStep({
   useAppLocale();
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const { entitled, status, loading: entitlementLoading } = useEntitlement();
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const attachRef = useRef(false);
@@ -176,7 +176,9 @@ export function RevealStep({
           onPress={() => void keepSaving()}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
-        {entitled ? null : (
+        {/* A lapsed account has used its trial, so only a first-time
+            subscriber is told about one. */}
+        {entitled || status === "lapsed" ? null : (
           <Text style={styles.trialNote}>{t("reveal.trialNote")}</Text>
         )}
         {entitled ? null : (

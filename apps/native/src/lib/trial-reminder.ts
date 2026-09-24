@@ -148,8 +148,16 @@ export function useTrialReminder(): void {
     if (scheduledFor.current === expiresAt) return;
 
     const justStarted = before !== null && before !== "trialing";
-    const mayAsk = justStarted && SecureStore.getItem(askedKey(userId)) !== "1";
-    if (mayAsk) SecureStore.setItem(askedKey(userId), "1");
+    let mayAsk = false;
+    try {
+      mayAsk = justStarted && SecureStore.getItem(askedKey(userId)) !== "1";
+      if (mayAsk) SecureStore.setItem(askedKey(userId), "1");
+    } catch (error) {
+      // Without the once-per-account flag, don't ask; a granted permission
+      // still gets the reminder.
+      mayAsk = false;
+      analytics.captureError("trial_reminder_flag_failed", error);
+    }
 
     scheduledFor.current = expiresAt;
     generation.current += 1;
