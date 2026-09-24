@@ -488,6 +488,21 @@ describe("similarItems", () => {
     expect(similar.map((item) => item._id)).toEqual([old]);
   });
 
+  it("scores shared non-Latin title words without a shared tag", async () => {
+    const t = await as("similar-ja-title-user");
+    const old = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 真鍮",
+      tags: ["インテリア"],
+    });
+    const fresh = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 木製",
+      tags: ["読書"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
   it("skips unready matches and never reads another user's saves", async () => {
     const backend = newConvexTest();
     const mine = backend.withIdentity({ subject: "similar-a|session-1" });

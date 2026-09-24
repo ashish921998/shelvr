@@ -474,32 +474,35 @@ const SIMILAR_MIN_SCORE = 3;
 const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const SIMILAR_RESERVED_OLD = 3;
 
+/** The words of `text` worth matching on. Splits on Unicode letters and
+ * digits, so Japanese or Korean text still yields words. Short Latin words
+ * are mostly noise; words in other scripts are often two characters. */
+function significantWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(
+      (word) =>
+        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
+    );
+}
+
 function searchTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((token) => token.length > 3),
-  );
+  return new Set(significantWords(text));
 }
 
 /** The full-text query for an item's older relatives: its tags first, since
  * they carry most of the scoring signal, then its title words. Deduplicated
- * and capped at the search term limit. Splits on Unicode letters and digits
- * so a Japanese or Korean title still yields terms; scoring below matches
- * tags exactly, so those candidates can still clear the threshold. */
+ * and capped at the search term limit. Uses the same words as scoring, so
+ * any candidate a term finds can score on it. */
 function similarSearchTerms(item: Doc<"items">): string[] {
   const terms = new Set<string>();
   const words = [
-    ...item.tags.flatMap((tag) => tag.toLowerCase().split(/[^\p{L}\p{N}]+/u)),
-    ...(item.title ?? "").toLowerCase().split(/[^\p{L}\p{N}]+/u),
+    ...item.tags.flatMap(significantWords),
+    ...significantWords(item.title ?? ""),
   ];
   for (const word of words) {
-    // Short Latin words are mostly noise; CJK words are often two characters.
-    const minLength = /^[a-z0-9]*$/.test(word) ? 4 : 2;
-    if (word.length >= minLength) {
-      terms.add(word);
-    }
+    terms.add(word);
     if (terms.size >= SIMILAR_SEARCH_TERMS) {
       break;
     }
