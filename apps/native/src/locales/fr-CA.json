@@ -160,6 +160,9 @@
   "share.continueSaved": "Continuer avec les éléments enregistrés",
   "share.finishFailed": "Enregistré, mais traitement inachevé",
   "share.success": "Enregistré dans Shelvr",
+  "share.ghostTitle": "Partagé récemment",
+  "share.ghostBody": "Shelvr a récemment traité ce contenu partagé. L’enregistrer à nouveau ?",
+  "share.saveAgain": "Enregistrer à nouveau",
   "account.signingIn": "Connexion",
   "account.signInTitle": "Connectez-vous pour continuer",
   "account.signInNotFinished": "La connexion n'a pas abouti. Réessayez.",
@@ -510,6 +513,12 @@
   "home.howToMoreHelp": "Ajoutez ensuite Shelvr aux Favoris pour qu'il reste en premier.",
   "home.pasteLink": "Coller un lien",
   "home.onYourShelf": "Sur votre étagère",
+  "home.recallTitle": "Vous avez déjà enregistré des contenus similaires",
+  "home.recallBody": {
+    "one": "%{formattedCount} contenu enregistré plus tôt va avec ce que vous venez d'ajouter.",
+    "many": "%{formattedCount} contenus enregistrés plus tôt vont avec ce que vous venez d'ajouter.",
+    "other": "%{formattedCount} contenus enregistrés plus tôt vont avec ce que vous venez d'ajouter."
+  },
   "demo.pickHelp": "Shelvr le lit, lui donne un titre et le classe pour vous.",
   "demo.clipboardNoLink": "Votre presse-papiers ne contient aucun lien. Copiez-en un ou essayez l'un de ceux-ci.",
   "demo.samplesOr": "Ou essayez l'un de ceux-ci",

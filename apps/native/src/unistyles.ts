@@ -11,7 +11,7 @@ const fonts = {
   regular: "Satoshi-Regular",
   medium: "Satoshi-Medium",
   bold: "Satoshi-Bold",
-  display: "ExposureTrial-0",
+  display: "CrimsonProRoman-Regular",
 } as const;
 
 const shared = {
