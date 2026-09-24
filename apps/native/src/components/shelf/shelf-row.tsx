@@ -84,6 +84,7 @@ export function ShelfRow({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.scroller}
           contentContainerStyle={styles.cards}
           scrollEventThrottle={100}
           onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -117,6 +118,10 @@ export function ShelfRow({
 
 const styles = StyleSheet.create({
   row: { alignItems: "flex-start" },
+  // A scroll view clips to its bounds, which cut each card's pooled shadow
+  // into a grey slab and sliced the tops off the type stickers. Letting it
+  // draw past its edges keeps both whole; the shelf below still overlaps.
+  scroller: { overflow: "visible" },
   cards: {
     flexDirection: "row",
     alignItems: "flex-end",
