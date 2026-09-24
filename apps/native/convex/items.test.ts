@@ -3051,3 +3051,98 @@ describe("stale processing runs", () => {
     ).toBe(true);
   });
 });
+
+describe("share links", () => {
+  async function seedItem(
+    t: TestCtx,
+    userId: string,
+    fields: Partial<{
+      type: "image" | "link" | "note";
+      status: "processing" | "ready" | "failed";
+    }> = {},
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: fields.type ?? "link",
+        status: fields.status ?? "ready",
+        title: "A great recipe",
+        description: "Weeknight pasta",
+        url: "https://example.com/recipe",
+        tags: ["food"],
+        searchText: "a great recipe",
+      }),
+    );
+  }
+
+  it("mints one token per item and serves a narrow preview for it", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+
+    const preview = await t.query(internal.items.getSharePreview, {
+      token: token!,
+    });
+    expect(preview).toEqual({
+      type: "link",
+      title: "A great recipe",
+      description: "Weeknight pasta",
+      imageUrl: undefined,
+      sourceUrl: "https://example.com/recipe",
+      noteText: undefined,
+    });
+  });
+
+  it("does not treat an item id as a token", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: itemId }),
+    ).toBeNull();
+  });
+
+  it("returns no token for an unfinished save or an image", async () => {
+    const t = await as("share-user");
+    const processing = await seedItem(t, "share-user", {
+      status: "processing",
+    });
+    const image = await seedItem(t, "share-user", { type: "image" });
+
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: processing }),
+    ).toBeNull();
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: image }),
+    ).toBeNull();
+  });
+
+  it("refuses another user's item", async () => {
+    const backend = newConvexTest();
+    const owner = backend.withIdentity({ subject: "share-owner|session-1" });
+    const other = backend.withIdentity({ subject: "share-other|session-1" });
+    const itemId = await seedItem(owner, "share-owner");
+
+    await expect(
+      other.mutation(api.items.createShareLink, { itemId }),
+    ).rejects.toThrow("Item not found");
+  });
+
+  it("stops serving the preview once the item is deleted", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.deleteItem, { id: itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+    const links = await t.run((ctx) => ctx.db.query("shareLinks").collect());
+    expect(links).toEqual([]);
+  });
+});
