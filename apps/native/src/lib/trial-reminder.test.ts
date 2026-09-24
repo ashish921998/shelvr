@@ -104,4 +104,28 @@ describe("scheduleTrialReminder", () => {
     expect(mock.request).not.toHaveBeenCalled();
     expect(mock.schedule).not.toHaveBeenCalled();
   });
+
+  it("schedules nothing when the trial ends during the permission prompt", async () => {
+    let current = true;
+    mock.permission.mockResolvedValue(undetermined);
+    mock.request.mockImplementation(async () => {
+      current = false;
+      return granted;
+    });
+    expect(
+      await scheduleTrialReminder(NOW + 7 * DAY, NOW, true, () => current),
+    ).toBe(false);
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("removes a reminder that went stale while it was being scheduled", async () => {
+    let current = true;
+    mock.schedule.mockImplementation(async () => {
+      current = false;
+    });
+    expect(
+      await scheduleTrialReminder(NOW + 7 * DAY, NOW, false, () => current),
+    ).toBe(false);
+    expect(mock.cancel).toHaveBeenLastCalledWith(TRIAL_REMINDER_ID);
+  });
 });

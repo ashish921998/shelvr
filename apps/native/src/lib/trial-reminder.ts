@@ -42,11 +42,15 @@ function canNotify(permission: Notifications.NotificationPermissionsStatus) {
  * Schedules (or replaces) the reminder for a trial ending at `expiresAt`.
  * Asks for notification permission only when `mayAsk` is set, which is the
  * moment a trial has just started. Returns whether a reminder is scheduled.
+ * `isCurrent` turns false once the trial it was called for has ended or the
+ * account changed, so a call left waiting on the permission prompt never
+ * leaves a reminder behind.
  */
 export async function scheduleTrialReminder(
   expiresAt: number,
   now: number,
   mayAsk: boolean,
+  isCurrent: () => boolean = () => true,
 ): Promise<boolean> {
   const fireAt = trialReminderAt(expiresAt, now);
   if (fireAt === null) {
@@ -67,7 +71,7 @@ export async function scheduleTrialReminder(
       granted: canNotify(permission),
     });
   }
-  if (!canNotify(permission)) return false;
+  if (!canNotify(permission) || !isCurrent()) return false;
 
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
   await Notifications.scheduleNotificationAsync({
@@ -83,6 +87,10 @@ export async function scheduleTrialReminder(
       channelId: CHANNEL_ID,
     },
   });
+  if (!isCurrent()) {
+    await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
+    return false;
+  }
   return true;
 }
 
@@ -105,11 +113,15 @@ export function useTrialReminder(): void {
   // the app is open can be told apart from one that was already running.
   const previous = useRef<{ userId: string; status: string } | null>(null);
   const scheduledFor = useRef<number | null>(null);
+  // Bumped whenever the reminder should no longer exist, so scheduling work
+  // still in flight from an earlier trial knows it is stale.
+  const generation = useRef(0);
 
   useEffect(() => {
     if (loading) return;
     if (status !== "trialing" || expiresAt === undefined) {
       scheduledFor.current = null;
+      generation.current += 1;
       cancelTrialReminder().catch((error) =>
         analytics.captureError("trial_reminder_cancel_failed", error),
       );
@@ -129,17 +141,22 @@ export function useTrialReminder(): void {
     if (mayAsk) SecureStore.setItem(askedKey(userId), "1");
 
     scheduledFor.current = expiresAt;
+    generation.current += 1;
+    const mine = generation.current;
+    const isCurrent = () => generation.current === mine;
     void (async () => {
       // The OS prompt cannot present over a closing RevenueCat sheet.
       if (mayAsk) await waitForSheetTransition();
+      if (!isCurrent()) return;
       const scheduled = await scheduleTrialReminder(
         expiresAt,
         Date.now(),
         mayAsk,
+        isCurrent,
       );
-      if (!scheduled) scheduledFor.current = null;
+      if (!scheduled && isCurrent()) scheduledFor.current = null;
     })().catch((error) => {
-      scheduledFor.current = null;
+      if (isCurrent()) scheduledFor.current = null;
       analytics.captureError("trial_reminder_schedule_failed", error);
     });
   }, [status, expiresAt, loading, userId]);
