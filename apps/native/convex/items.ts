@@ -19,6 +19,7 @@ import {
   requireProEntitlement,
 } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -448,17 +449,69 @@ export const searchItems = query({
 // Similar-items v0: lexical overlap, no new infra. Tags carry most of the
 // signal (they're the classifier's own summary), searchText tokens catch the
 // rest. A vector index over real embeddings replaces this in v1.
+//
+// Candidates come from two reads: the newest saves, and a full-text search on
+// the item's own tags and title. The search reaches saves of any age, so an
+// item saved months ago can still come back when a related one arrives.
+// Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
+const SIMILAR_SEARCH_CANDIDATES = 100;
+// Candidate rows are full documents, and an article's stored content runs to
+// MAX_STORED_CONTENT_CHARS, so both reads also stop at a shared byte budget
+// that leaves headroom under Convex's 16 MiB per-query read limit. The search
+// runs first under its own smaller cap, so the recent read can't starve it,
+// and the recent read gets whatever the search left, never less than 10 MiB.
+// Each read can overshoot by the one document that crosses its cap, which
+// the headroom covers.
+const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
+const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
+const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
+// Convex caps a full-text query at 16 terms.
+const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
+// Mirrors RECALL_MIN_AGE_MS in apps/native/src/lib/save-recall.ts: the age a
+// match needs to clear before the save recall card will show it. Reserving a
+// few slots for the best-scoring matches this old means a burst of newer,
+// higher-scoring saves can't crowd every old match out of SIMILAR_LIMIT
+// before the card ever sees them.
+const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const SIMILAR_RESERVED_OLD = 3;
+
+/** The words of `text` worth matching on. Splits on Unicode letters and
+ * digits, so Japanese or Korean text still yields words. Short Latin words
+ * are mostly noise; words in other scripts are often two characters. */
+function significantWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(
+      (word) =>
+        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
+    );
+}
 
 function searchTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((token) => token.length > 3),
-  );
+  return new Set(significantWords(text));
+}
+
+/** The full-text query for an item's older relatives: its tags first, since
+ * they carry most of the scoring signal, then its title words. Deduplicated
+ * and capped at the search term limit. Uses the same words as scoring, so
+ * any candidate a term finds can score on it. */
+function similarSearchTerms(item: Doc<"items">): string[] {
+  const terms = new Set<string>();
+  const words = [
+    ...item.tags.flatMap(significantWords),
+    ...significantWords(item.title ?? ""),
+  ];
+  for (const word of words) {
+    terms.add(word);
+    if (terms.size >= SIMILAR_SEARCH_TERMS) {
+      break;
+    }
+  }
+  return [...terms];
 }
 
 export const similarItems = query({
@@ -476,14 +529,43 @@ export const similarItems = query({
       return [];
     }
 
-    const candidates = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(SIMILAR_CANDIDATES);
+    const terms = similarSearchTerms(item);
+    const searched =
+      terms.length === 0
+        ? { rows: [], bytes: 0 }
+        : await takeWithinBytes(
+            ctx.db
+              .query("items")
+              .withSearchIndex("search_text", (q) =>
+                q.search("searchText", terms.join(" ")).eq("userId", userId),
+              ),
+            {
+              maxRows: SIMILAR_SEARCH_CANDIDATES,
+              maxBytes: SIMILAR_SEARCH_BYTES,
+            },
+          );
+
+    const recent = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc"),
+      {
+        maxRows: SIMILAR_CANDIDATES,
+        maxBytes: Math.max(
+          SIMILAR_READ_BYTES - searched.bytes,
+          SIMILAR_RECENT_MIN_BYTES,
+        ),
+      },
+    );
+
+    const candidates = new Map<Id<"items">, Doc<"items">>();
+    for (const candidate of [...recent.rows, ...searched.rows]) {
+      candidates.set(candidate._id, candidate);
+    }
 
     const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates) {
+    for (const candidate of candidates.values()) {
       if (candidate._id === item._id || candidate.status !== "ready") {
         continue;
       }
@@ -503,10 +585,22 @@ export const similarItems = query({
       }
     }
     scored.sort((a, b) => b.score - a.score);
+
+    // Reserve a few slots for the best-scoring old-enough matches before the
+    // general top-score cut, so they survive even when newer saves outscore
+    // them. The final list stays score-ordered either way.
+    const oldCutoff = item._creationTime - SIMILAR_OLD_AGE_MS;
+    const reservedOld = scored
+      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
+      .slice(0, SIMILAR_RESERVED_OLD);
+    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
+    const rest = scored
+      .filter((candidate) => !reservedIds.has(candidate.item._id))
+      .slice(0, SIMILAR_LIMIT - reservedOld.length);
+    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
+
     return await Promise.all(
-      scored
-        .slice(0, SIMILAR_LIMIT)
-        .map(({ item: match }) => toItemCard(ctx, match)),
+      final.map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });

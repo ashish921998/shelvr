@@ -483,6 +483,10 @@
   "home.howToMoreHelp": "그다음 Shelvr를 즐겨찾기에 추가하면 앞쪽에 계속 보여요.",
   "home.pasteLink": "링크 붙여넣기",
   "home.onYourShelf": "내 책장",
+  "home.recallTitle": "비슷한 항목을 이전에도 저장했어요",
+  "home.recallBody": {
+    "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."
+  },
   "demo.pickHelp": "Shelvr가 읽고 제목을 붙여 정리해 드려요.",
   "demo.clipboardNoLink": "클립보드에 링크가 없어요. 링크를 복사하거나 아래 링크로 해 보세요.",
   "demo.samplesOr": "또는 이 링크로 해 보기",
