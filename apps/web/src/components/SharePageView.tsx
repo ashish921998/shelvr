@@ -18,8 +18,9 @@ export default function SharePageView({
 }) {
   useEffect(() => {
     // Remember the share as this visit's campaign so the other store links
-    // on the site credit it too.
-    arrivalCampaign("?ct=share");
+    // on the site credit it too, unless the visitor already arrived with one
+    // (a creator's link), which keeps the credit.
+    if (!arrivalCampaign(window.location.search)) arrivalCampaign("?ct=share");
     void shareRef(token).then((ref) =>
       captureWebAnalyticsEvent("share_page_viewed", {
         // An outage is not a dead link, so it reports `unavailable`.
