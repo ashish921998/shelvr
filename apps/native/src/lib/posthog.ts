@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
+import { Platform } from "react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -145,6 +146,7 @@ function updateProperties(): Record<string, string | boolean> {
 export function superProperties(): Record<string, string | number | boolean> {
   return {
     environment: Constants.expoConfig?.extra?.variant ?? "development",
+    platform: Platform.OS,
     analytics_version: 1,
     ...updateProperties(),
   };
@@ -153,7 +155,7 @@ export function superProperties(): Record<string, string | number | boolean> {
 posthog?.register(superProperties());
 
 /** Clears the identity and restores the super properties a reset drops. */
-export function resetClient(client: PostHog): void {
+function resetClient(client: PostHog): void {
   client.reset();
   client.register(superProperties());
 }

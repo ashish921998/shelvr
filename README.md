@@ -287,3 +287,16 @@ pnpm --filter native-app add mypackage@latest
 - Native routes live under `apps/native/src/app`
 - Web is marketing only at `/` — no authenticated `/app` product surface
 - See root `CLAUDE.md` for architecture guidance when working with agents
+- `assets/splash-blank.png` is a 1x1 transparent PNG and is meant to stay that
+  way. On iOS the `expo-splash-screen` plugin applies `backgroundColor` only
+  from inside `applyImageToSplashScreenXML`, which it calls only when `image`
+  is set (`withIosSplashScreenStoryboardImage.js`, `Boolean(splash.image)`).
+  With no `image` the generated storyboard keeps the bare template's
+  `systemBackgroundColor` — white or black — and the configured colour is
+  silently ignored, even though the colorset is still written. Shelvr wants the
+  brand ground with no mark, because the animated splash draws its own S at
+  1.05s and a static one here would appear, vanish, then pop back. The blank
+  image buys the background; `imageWidth: 1` keeps it invisible. Verify after
+  changing it: the generated `ios/Shelvr/SplashScreen.storyboard` must say
+  `<color key="backgroundColor" name="SplashScreenBackground"/>`, not
+  `systemBackgroundColor`.

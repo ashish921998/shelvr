@@ -444,7 +444,7 @@ function DemoAuthSheet({
   useAppLocale();
   const { theme } = useUnistyles();
   const { signInWith, pendingProvider, lastError, interrupted } =
-    useOAuthSignIn();
+    useOAuthSignIn("demo_sheet");
   const busy = pendingProvider !== null;
   const pageHeading =
     DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??

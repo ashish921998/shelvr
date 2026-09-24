@@ -3,7 +3,7 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -160,7 +160,7 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/ExposureTrial-0.otf",
+            "./assets/fonts/CrimsonProRoman-Regular.ttf",
             "./assets/fonts/Satoshi-Regular.otf",
             "./assets/fonts/Satoshi-Medium.otf",
             "./assets/fonts/Satoshi-Bold.otf"
@@ -176,6 +176,18 @@
         }
       ],
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#faf6ee",
+          "image": "./assets/splash-blank.png",
+          "imageWidth": 1,
+          "dark": {
+            "backgroundColor": "#191510",
+            "image": "./assets/splash-blank.png"
+          }
+        }
+      ],
       "expo-status-bar",
       [
         "expo-secure-store",

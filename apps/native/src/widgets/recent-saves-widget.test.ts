@@ -22,11 +22,13 @@ type WidgetSnapshotProps = {
   emptyTitle?: string;
   emptyHint?: string;
   locked?: boolean;
+  validUntil?: number;
 };
 
 type WidgetEnvironment = {
   colorScheme: "light" | "dark";
   widgetFamily: "systemSmall" | "systemMedium";
+  date?: Date;
 };
 
 /** One element of the tree the component returns. */
@@ -189,5 +191,43 @@ describe("RecentSavesWidget", () => {
     expect(rendered).toContain("Chair");
     expect(rendered).not.toContain("lock.fill");
     expect(rendered).not.toContain("paywall");
+  });
+
+  it("keeps showing saves while its clock is before the expiry", () => {
+    const tree = widget()(
+      {
+        items: [
+          { id: "a", title: "Chair", subtitle: "example.com", kind: "link" },
+        ],
+        locked: false,
+        validUntil: 2_000,
+      },
+      { ...smallLight, date: new Date(1_000) },
+    );
+
+    expect(widgetUrl(tree)).toBe("shelvr:///");
+    const rendered = JSON.stringify(tree);
+    expect(rendered).toContain("Chair");
+    expect(rendered).not.toContain("lock.fill");
+  });
+
+  it("locks and hides saves once its clock passes the expiry", () => {
+    const tree = widget()(
+      {
+        items: [
+          { id: "a", title: "Chair", subtitle: "example.com", kind: "link" },
+        ],
+        emptyTitle: "Shelvr Pro",
+        emptyHint: "Unlock your latest saves",
+        locked: false,
+        validUntil: 1_000,
+      },
+      { ...smallLight, date: new Date(2_000) },
+    );
+
+    // The lapsed entitlement collapses to the Pro upsell — no saved content.
+    expect(childView(tree, 0).props.systemName).toBe("lock.fill");
+    expect(widgetUrl(tree)).toBe("shelvr:///paywall");
+    expect(JSON.stringify(tree)).not.toContain("Chair");
   });
 });

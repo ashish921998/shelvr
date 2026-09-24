@@ -44,7 +44,7 @@ export default function DigestScreen() {
           onPress={() => router.replace("/")}
           style={[styles.button, styles.errorButton]}
         >
-          <Text style={styles.buttonText}>{t("capture.backToLibrary")}</Text>
+          <Text style={styles.buttonText}>{t("digest.backHome")}</Text>
         </Pressable>
       </View>
     );

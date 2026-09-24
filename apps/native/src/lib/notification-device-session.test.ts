@@ -22,6 +22,7 @@ function setup(initial: string[] = [], getLocale?: () => string) {
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
     deleteAccount: vi.fn(async () => {}),
+    clearWidget: vi.fn(async () => {}),
     resetAnalytics: vi.fn(),
     reportError: vi.fn(),
   };
@@ -284,6 +285,7 @@ describe("notification device session", () => {
     expect(deps.signOut).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
+    expect(deps.clearWidget).not.toHaveBeenCalled();
   });
 
   it("keeps successful deletion successful when local cleanup fails", async () => {
@@ -292,9 +294,35 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.clearWidget).toHaveBeenCalledOnce();
+    expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
+    expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);
+    // signOut failed after a successful deletion, so no auth edge will fire
+    // promptly — the fallback must have cleared the identity itself.
     expect(deps.resetAnalytics).toHaveBeenCalledOnce();
     expect(deps.reportError).toHaveBeenCalledOnce();
     expect(await session.register()).toBe(false);
     expect(deps.saveToken).not.toHaveBeenCalled();
+  });
+
+  it("reports widget failure without blocking successful account deletion", async () => {
+    const { session, deps } = setup();
+    deps.clearWidget.mockRejectedValueOnce(new Error("private native path"));
+    await expect(session.deleteAccount()).resolves.toBeUndefined();
+    expect(deps.signOut).toHaveBeenCalledOnce();
+    expect(deps.reportError).toHaveBeenCalledWith(
+      new Error("widget_clear_failed"),
+    );
+  });
+
+  it("preserves the safe file-cleanup category after account deletion", async () => {
+    const { session, deps } = setup();
+    deps.clearWidget.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    await session.deleteAccount();
+    expect(deps.reportError).toHaveBeenCalledWith(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
   });
 });
