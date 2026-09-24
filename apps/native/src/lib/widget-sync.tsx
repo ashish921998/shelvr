@@ -331,7 +331,12 @@ export function RecentSavesWidgetSync() {
     hasPendingCleanup,
   );
   const locale = useAppLocale();
-  const { entitled, loading: entitlementLoading, expiresAt } = useEntitlement();
+  const {
+    status,
+    entitled,
+    loading: entitlementLoading,
+    expiresAt,
+  } = useEntitlement();
   // "skip" rather than TanStack's `enabled`: the Convex adapter ignores
   // `enabled` entirely. It opens its subscription from the query cache's
   // "added" event and drops it on "removed", so an `enabled: false` query
@@ -368,9 +373,11 @@ export function RecentSavesWidgetSync() {
     // subscription lapses or the user signs out so old Pro content is not
     // left visible on the Home Screen.
     const items = entitled ? (recent ?? []) : [];
-    // A finite expiry lets the widget lock itself after the app closes; a
-    // lifetime entitlement has none, so it never locks.
-    const validUntil = entitled ? expiresAt : undefined;
+    // A finite expiry lets the widget lock itself after the app closes. A
+    // lifetime row still carries a stored `expiresAt` (0, or a stale period end
+    // kept when the row went sticky), so it must never become a lock date.
+    const validUntil =
+      entitled && status !== "lifetime" ? expiresAt : undefined;
     // Only re-sync when something the widget shows actually changed.
     const key =
       locale +
@@ -401,7 +408,15 @@ export function RecentSavesWidgetSync() {
         lastKey.current = null;
         console.warn("Recent Saves widget sync failed", error);
       });
-  }, [entitled, entitlementLoading, expiresAt, recent, locale, cleanupPending]);
+  }, [
+    status,
+    entitled,
+    entitlementLoading,
+    expiresAt,
+    recent,
+    locale,
+    cleanupPending,
+  ]);
 
   return null;
 }
