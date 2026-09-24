@@ -24,9 +24,10 @@ export function sanitizeCampaign(value: string | null | undefined) {
  */
 export function arrivalCampaign(search: string): string | undefined {
   const params = new URLSearchParams(search);
-  const fromUrl = sanitizeCampaign(
-    params.get("ct") ?? params.get("utm_campaign"),
-  );
+  // An empty or unusable `ct` must not hide a valid `utm_campaign`.
+  const fromUrl =
+    sanitizeCampaign(params.get("ct")) ??
+    sanitizeCampaign(params.get("utm_campaign"));
   try {
     if (fromUrl) {
       window.sessionStorage.setItem(CAMPAIGN_STORAGE_KEY, fromUrl);

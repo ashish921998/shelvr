@@ -108,7 +108,7 @@ ORDER BY week
 Weeks before 2026-09-20 are left out rather than shown as zero, because their
 saves carry no `save_source`.
 
-**Save retention by signup week**: of the accounts activated in a week, the
+**Save retention by first-save week**: of the accounts activated in a week, the
 share that saved again in each later week. Build it as a PostHog Retention
 insight: cohortizing event `item_saved`, returning event `item_saved`, both
 filtered to `save_source != onboarding_demo` and `environment = production`,

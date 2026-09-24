@@ -43,6 +43,15 @@ describe("App Store link", () => {
     expect(arrivalCampaign("?ct=meta_test_1")).toBe("meta_test_1");
   });
 
+  it("falls back to utm_campaign when ct is empty or unusable", () => {
+    expect(arrivalCampaign("?ct=&utm_campaign=creator_jane")).toBe(
+      "creator_jane",
+    );
+    expect(arrivalCampaign("?ct=!!!&utm_campaign=creator_ann")).toBe(
+      "creator_ann",
+    );
+  });
+
   it("has no campaign for a direct visit", () => {
     expect(arrivalCampaign("")).toBeUndefined();
   });
