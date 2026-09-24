@@ -1,4 +1,5 @@
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
+import { serverLog } from "@/lib/serverLog";
 
 type SharePreview = {
   type: "image" | "link" | "note";
@@ -27,9 +28,18 @@ export async function fetchSharePreview(
       `${siteUrl}/share/links/${encodeURIComponent(token)}`,
       { cache: "no-store" },
     );
-    if (!response.ok) return undefined;
+    if (!response.ok) {
+      // 404 is an unknown or revoked token; anything else is an outage.
+      if (response.status !== 404) {
+        serverLog("error", "share_preview_failed", { status: response.status });
+      }
+      return undefined;
+    }
     return (await response.json()) as SharePreview;
-  } catch {
+  } catch (error) {
+    serverLog("error", "share_preview_failed", {
+      error_name: error instanceof Error ? error.name : "unknown",
+    });
     return undefined;
   }
 }

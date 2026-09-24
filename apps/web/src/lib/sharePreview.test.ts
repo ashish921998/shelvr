@@ -42,10 +42,16 @@ describe("fetchSharePreview", () => {
 
   it("returns undefined on a non-ok response or a network failure", async () => {
     process.env.CONVEX_SITE_URL = "https://deployment.convex.site";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
     expect(await fetchSharePreview("missing")).toBeUndefined();
+    expect(error).not.toHaveBeenCalled();
 
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
+    expect(await fetchSharePreview("abc")).toBeUndefined();
     vi.mocked(fetch).mockRejectedValueOnce(new Error("network down"));
     expect(await fetchSharePreview("abc")).toBeUndefined();
+    expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
   });
 });

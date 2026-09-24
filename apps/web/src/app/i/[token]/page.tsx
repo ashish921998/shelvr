@@ -10,6 +10,16 @@ const FALLBACK_TITLE = "Someone saved this with Shelvr";
 const FALLBACK_DESCRIPTION =
   "Shelvr captures links, images, and notes, then sorts them into spaces so you can find them later.";
 
+/** A note's own words come first; other saves lead with their description. */
+function previewSummary(
+  preview: Awaited<ReturnType<typeof fetchSharePreview>>,
+): string | undefined {
+  if (!preview) return undefined;
+  return preview.type === "note"
+    ? preview.noteText || preview.description
+    : preview.description || preview.noteText;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -17,8 +27,7 @@ export async function generateMetadata({
   const preview = await fetchSharePreview(token);
 
   const title = preview?.title || FALLBACK_TITLE;
-  const description =
-    preview?.description || preview?.noteText || FALLBACK_DESCRIPTION;
+  const description = previewSummary(preview) || FALLBACK_DESCRIPTION;
 
   return {
     title: `${title} — Shelvr`,
@@ -45,6 +54,7 @@ export async function generateMetadata({
 export default async function SharedItemPage({ params }: PageProps) {
   const { token } = await params;
   const preview = await fetchSharePreview(token);
+  const summary = previewSummary(preview);
 
   return (
     <main className="min-h-screen bg-paper">
@@ -69,9 +79,9 @@ export default async function SharedItemPage({ params }: PageProps) {
             <h1 className="mt-2 font-display text-2xl text-ink sm:text-3xl">
               {preview?.title || FALLBACK_TITLE}
             </h1>
-            {(preview?.description || preview?.noteText) && (
+            {summary && (
               <p className="mt-3 text-[15px] leading-7 text-ink/90">
-                {preview?.description || preview?.noteText}
+                {summary}
               </p>
             )}
 
