@@ -12,6 +12,7 @@ beforeEach(() => {
 afterEach(() => {
   process.env = { ...originalEnv };
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("fetchSharePreview", () => {
@@ -52,6 +53,5 @@ describe("fetchSharePreview", () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("network down"));
     expect(await fetchSharePreview("abc")).toBeUndefined();
     expect(error).toHaveBeenCalledTimes(2);
-    error.mockRestore();
   });
 });
