@@ -14,6 +14,6 @@
   src: url('../apps/native/assets/fonts/Satoshi-Bold.otf') format('opentype');
 }
 @font-face {
-  font-family: 'Spectral-Regular';
-  src: url('../apps/native/assets/fonts/Spectral-Regular.ttf') format('truetype');
+  font-family: 'Spectral-SemiBold';
+  src: url('../apps/native/assets/fonts/Spectral-SemiBold.ttf') format('truetype');
 }

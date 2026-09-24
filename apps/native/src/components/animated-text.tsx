@@ -48,7 +48,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // note or rapid paging cannot flood it with worklet nodes.
 
 const FONTS: Record<string, number> = {
-  "Spectral-Regular": require("../../assets/fonts/Spectral-Regular.ttf"),
+  "Spectral-SemiBold": require("../../assets/fonts/Spectral-SemiBold.ttf"),
   "Satoshi-Regular": require("../../assets/fonts/Satoshi-Regular.otf"),
   "Satoshi-Medium": require("../../assets/fonts/Satoshi-Medium.otf"),
   "Satoshi-Bold": require("../../assets/fonts/Satoshi-Bold.otf"),

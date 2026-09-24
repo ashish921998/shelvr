@@ -1,10 +1,11 @@
 # Display font
 
-Native headings, animated text, the marketing site, and design-sync previews use
-Spectral Regular. Satoshi remains the body and control font. The widget uses
-system fonts.
+Native headings, animated text, and design-sync previews use Spectral SemiBold
+(weight 600). The marketing site uses Spectral Regular. Satoshi remains the body
+and control font. The widget uses system fonts.
 
-The unmodified `Spectral-Regular.ttf` comes from Google Fonts at commit
+Regular read too light for app titles on device, so the app moved to SemiBold.
+Both files are unmodified copies from Google Fonts at commit
 `f2bd09badbc763d8757951d52deec29da27e85fb`, under `ofl/spectral/`:
 https://github.com/google/fonts/tree/f2bd09badbc763d8757951d52deec29da27e85fb/ofl/spectral
 
@@ -14,7 +15,7 @@ full license when distributing the font. The native copy is stored in
 Expo manifest through `extra.fontLicenses`. The website serves the same license
 at `/fonts/Spectral-OFL.txt`.
 
-The PostScript name and Android filename stem are both `Spectral-Regular`.
+The PostScript name and Android filename stem are both `Spectral-SemiBold`.
 Use that name for native styles and the same TTF for Skia's animated text. The
 existing native-text fallback handles scripts or glyphs the font does not cover,
 which is how Japanese and Korean titles render: Spectral is a Latin face and
