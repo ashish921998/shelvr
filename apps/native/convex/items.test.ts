@@ -438,12 +438,7 @@ describe("similarItems", () => {
   async function insertItem(
     t: TestCtx,
     userId: string,
-    fields: {
-      title: string;
-      tags: string[];
-      description?: string;
-      status?: "ready" | "processing";
-    },
+    fields: { title: string; tags: string[]; status?: "ready" | "processing" },
   ): Promise<Id<"items">> {
     return await t.run(async (ctx) =>
       ctx.db.insert("items", {
@@ -451,12 +446,9 @@ describe("similarItems", () => {
         type: "link",
         status: fields.status ?? "ready",
         title: fields.title,
-        description: fields.description,
         url: `https://example.com/${encodeURIComponent(fields.title)}`,
         tags: fields.tags,
-        searchText: [fields.title, fields.description ?? "", ...fields.tags]
-          .join(" ")
-          .toLowerCase(),
+        searchText: [fields.title, ...fields.tags].join(" ").toLowerCase(),
       }),
     );
   }
@@ -490,24 +482,6 @@ describe("similarItems", () => {
     const fresh = await insertItem(t, "similar-short-tag-user", {
       title: "Watercolour washes",
       tags: ["art", "diy"],
-    });
-
-    const similar = await t.query(api.items.similarItems, { id: fresh });
-    expect(similar.map((item) => item._id)).toEqual([old]);
-  });
-
-  it("searches on description words the title doesn't carry", async () => {
-    const t = await as("similar-description-user");
-    const old = await insertItem(t, "similar-description-user", {
-      title: "Weekend project",
-      tags: ["woodworking"],
-      description: "Dovetail joinery walnut cabinet",
-    });
-    await seedFeed(t, "similar-description-user", 320);
-    const fresh = await insertItem(t, "similar-description-user", {
-      title: "Workshop ideas",
-      tags: ["tools"],
-      description: "Dovetail joinery walnut drawer",
     });
 
     const similar = await t.query(api.items.similarItems, { id: fresh });

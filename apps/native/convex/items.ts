@@ -496,9 +496,8 @@ export const searchItems = query({
 // rest. A vector index over real embeddings replaces this in v1.
 //
 // Candidates come from two reads: the newest saves, and a full-text search on
-// the item's own tags, title and description. The search reaches saves of any
-// age, so an item saved months ago can still come back when a related one
-// arrives.
+// the item's own tags and title. The search reaches saves of any age, so an
+// item saved months ago can still come back when a related one arrives.
 // Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
 const SIMILAR_SEARCH_CANDIDATES = 100;
@@ -573,16 +572,14 @@ function tagSearchWords(tag: string): string[] {
 }
 
 /** The full-text query for an item's older relatives: its tags first, since
- * they carry most of the scoring signal, then its title words, then its
- * description words. Deduplicated and capped at the search term limit. Title
- * and description use the same words as scoring, so any candidate those terms
- * find can score on them. */
+ * they carry most of the scoring signal, then its title words. Deduplicated
+ * and capped at the search term limit. Title words are the same words scoring
+ * uses, so any candidate they find can score on them. */
 function similarSearchTerms(item: Doc<"items">): string[] {
   const terms = new Set<string>();
   const words = [
     ...item.tags.flatMap(tagSearchWords),
     ...significantWords(item.title ?? ""),
-    ...significantWords(item.description ?? ""),
   ];
   for (const word of words) {
     terms.add(word);
