@@ -27,6 +27,7 @@ import {
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   Text,
@@ -147,6 +148,29 @@ function usePagerParamSync(initialId: string) {
       if (paramTimer.current) clearTimeout(paramTimer.current);
     }, []),
   };
+}
+
+/**
+ * Each page is bounded to the list so the inner vertical ScrollView has a
+ * fixed height to scroll within (rather than growing to fit). The height is
+ * the list's own, not the window's: on Android the opaque toolbar sits above
+ * the list, so a window-tall page would push its last header-height of
+ * content below the screen where no scroll reaches it. iOS keeps a
+ * transparent header and the list fills the window, so the two agree there.
+ * The window height only covers the first frame, before layout reports.
+ *
+ * Stable so an ItemScreen re-render (setActiveId on every swipe) doesn't hand
+ * FlashList a fresh renderItem/style and force every mounted page to re-render.
+ */
+function usePageStyle(width: number, windowHeight: number) {
+  const [listHeight, setListHeight] = useState<number | null>(null);
+  const onListLayout = useCallback(
+    (e: LayoutChangeEvent) => setListHeight(e.nativeEvent.layout.height),
+    [],
+  );
+  const height = listHeight ?? windowHeight;
+  const pageStyle = useMemo(() => ({ width, height }), [width, height]);
+  return { pageStyle, onListLayout };
 }
 
 function ItemScreenContent() {
@@ -274,14 +298,10 @@ function ItemScreenContent() {
     [],
   );
 
-  // Stable so an ItemScreen re-render (setActiveId on every swipe) doesn't hand
-  // FlashList a fresh renderItem/style and force every mounted page to re-render.
-  const pageStyle = useMemo(() => ({ width, height }), [width, height]);
+  const { pageStyle, onListLayout } = usePageStyle(width, height);
   const keyExtractor = useCallback((item: DetailItem) => item._id, []);
   const renderItem = useCallback(
     ({ item }: { item: DetailItem }) => (
-      // Each page is bounded to the screen so the inner vertical ScrollView
-      // has a fixed height to scroll within (rather than growing to fit).
       <View style={pageStyle}>
         <ItemDetail item={item} isZoomTarget={item._id === pushedId} />
       </View>
@@ -568,6 +588,7 @@ function ItemScreenContent() {
       <FlashList
         ref={listRef}
         style={styles.container}
+        onLayout={onListLayout}
         data={items}
         horizontal
         pagingEnabled
