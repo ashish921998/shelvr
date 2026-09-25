@@ -561,14 +561,32 @@ function searchTokens(text: string): Set<string> {
   return new Set(significantWords(text));
 }
 
+// Filler that multi-word tags like "how to" or "to do" would otherwise put in
+// the query. `searchText` holds article bodies, so each of these matches
+// nearly every save and spends search rows on candidates that score 0.
+const TAG_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "for",
+  "how",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+]);
+
 /** The words of a tag to search on. A shared tag scores in full however
  * short it is, so tags like "art", "diy" or "ux" keep every word of two or
  * more characters instead of going through the Latin length floor. */
-function tagSearchWords(tag: string): string[] {
+export function tagSearchWords(tag: string): string[] {
   return tag
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length >= 2);
+    .filter((word) => word.length >= 2 && !TAG_STOPWORDS.has(word));
 }
 
 /** The full-text query for an item's older relatives: its tags first, since

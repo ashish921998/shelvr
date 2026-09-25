@@ -15,6 +15,7 @@ import {
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
+  tagSearchWords,
 } from "./items";
 import {
   IMAGE_EMPTY_MESSAGE,
@@ -486,6 +487,13 @@ describe("similarItems", () => {
 
     const similar = await t.query(api.items.similarItems, { id: fresh });
     expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("keeps short tag words but drops filler from multi-word tags", () => {
+    expect(tagSearchWords("art")).toEqual(["art"]);
+    expect(tagSearchWords("ux")).toEqual(["ux"]);
+    expect(tagSearchWords("how to")).toEqual([]);
+    expect(tagSearchWords("to do lists")).toEqual(["do", "lists"]);
   });
 
   it("searches for older saves with non-Latin tags and titles", async () => {
