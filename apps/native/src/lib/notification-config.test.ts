@@ -22,6 +22,8 @@ function validate(variant: string, platform: string) {
         EXPO_PUBLIC_REVENUECAT_TEST_KEY: "test_VOYicTvOGPXCBFMVdHzyxRndiRi",
         EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_store",
         EXPO_PUBLIC_REVENUECAT_IOS_KEY: "appl_store",
+        // A production Android config refuses to build without the maps key.
+        GOOGLE_MAPS_API_KEY: "maps_key",
         EXPO_PUBLIC_CONVEX_URL:
           variant === "production"
             ? "https://amiable-setter-120.convex.cloud"
