@@ -15,6 +15,7 @@
  * Node-only (linkedom); imported from the `"use node"` action module.
  */
 import { parseHTML } from "linkedom";
+import type { Recipe } from "./itemFields";
 
 /** A recipe as proposed by a source (markup or model) before sanitizing. */
 export type RecipeDraft = {
@@ -291,4 +292,66 @@ export function extractRecipeMarkup(html: string): RecipeDraft | undefined {
   } catch {
     return undefined;
   }
+}
+
+// Bounds for a proposed recipe. Both reject the whole recipe rather than
+// shorten it, so they sit well above what a real recipe reaches: an elaborate
+// multi-component bake runs to a few thousand characters, not twenty thousand.
+const MAX_RECIPE_LINES = 120;
+const MAX_RECIPE_CHARS = 20000;
+const MAX_RECIPE_NAME_CHARS = 120;
+const MAX_RECIPE_SERVINGS_CHARS = 60;
+
+/** Clean a proposed recipe (page markup or model) before it's persisted: trim
+ * every line, drop the empty ones, and reject the whole recipe when a list
+ * comes back empty (the markup is incomplete or the model is guessing) or when
+ * it is too long to store.
+ *
+ * Nothing here shortens a recipe. The card replaces the article body, so a cut
+ * instruction is a wrong recipe the reader cannot tell from a right one and
+ * cannot read around; a recipe over budget is refused instead, which leaves the
+ * article in place. Repeated lines are kept for the same reason: a recipe in
+ * components lists the same quantity under each one, and a dough really does
+ * rest twice. A rejected recipe is simply omitted — never fails the whole
+ * finalize. */
+export function sanitizeRecipe(
+  raw: RecipeDraft | null | undefined,
+): Recipe | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const clean = (lines: string[] | undefined): string[] =>
+    (lines ?? []).map((line) => line.trim()).filter((line) => line !== "");
+  const ingredients = clean(raw.ingredients);
+  const steps = clean(raw.steps);
+  if (ingredients.length === 0 || steps.length === 0) {
+    return undefined;
+  }
+  if (
+    ingredients.length > MAX_RECIPE_LINES ||
+    steps.length > MAX_RECIPE_LINES
+  ) {
+    return undefined;
+  }
+  // Blank name/servings are left out entirely (not set to undefined) so the
+  // persisted document never carries an explicit undefined key. Both label the
+  // recipe rather than state it, so capping their length loses no instruction.
+  const name = raw.name?.trim().slice(0, MAX_RECIPE_NAME_CHARS);
+  const servings = raw.servings?.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS);
+  const recipe = {
+    ...(name ? { name } : {}),
+    ...(servings ? { servings } : {}),
+    ingredients,
+    steps,
+  };
+  return recipeChars(recipe) > MAX_RECIPE_CHARS ? undefined : recipe;
+}
+
+function recipeChars(recipe: Recipe): number {
+  return [
+    recipe.name ?? "",
+    recipe.servings ?? "",
+    ...recipe.ingredients,
+    ...recipe.steps,
+  ].reduce((total, line) => total + line.length, 0);
 }
