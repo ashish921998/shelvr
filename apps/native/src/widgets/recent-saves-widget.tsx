@@ -36,6 +36,12 @@ type RecentSavesWidgetProps = {
   emptyTitle?: string;
   emptyHint?: string;
   locked?: boolean;
+  /**
+   * Epoch ms the current entitlement stays valid until. The widget locks
+   * itself once its own clock passes this, so a Pro entitlement that lapses
+   * while the app never runs stops showing saves on its own.
+   */
+  validUntil?: number;
 };
 
 // Everything (palette, helpers) lives inside the component: the `'widget'`
@@ -60,17 +66,23 @@ const RecentSavesWidget = (
         background: "#faf6ee",
         tile: "#f3ecdd",
         foreground: "#2b2418",
-        muted: "#8d8271",
+        muted: "#6f6455",
         accent: "#e6a23c",
       };
 
   const kindIcon = (kind: "image" | "link" | "note") =>
     kind === "link" ? "link" : kind === "note" ? "note.text" : "photo";
 
-  const items = props.items ?? [];
-  // Until the app writes its first snapshot, fail closed and show the Pro
-  // state rather than exposing a misleading free widget.
-  const locked = props.locked ?? true;
+  // Fail closed before the app writes its first snapshot (no `locked`), when
+  // told to lock, and once the widget's own clock passes the snapshot's
+  // expiry. The last covers a Pro entitlement that lapses while the app never
+  // runs: the app cannot republish, so the snapshot must expire on its own.
+  const expired =
+    props.validUntil !== undefined &&
+    environment.date.getTime() >= props.validUntil;
+  const locked = (props.locked ?? true) || expired;
+  // A locked widget never shows saved content, even if items came through.
+  const items = locked ? [] : (props.items ?? []);
 
   if (items.length === 0) {
     return (

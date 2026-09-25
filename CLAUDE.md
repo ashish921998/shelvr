@@ -75,6 +75,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads` — per-user read state, kept out of the item row
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `waitlistSignups` — waitlist source of truth, projected to Resend
+  - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
+    (see [feedback delivery](docs/architecture/feedback.md))
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -96,18 +98,25 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
   RevenueCat webhook.
+- **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
+  Apple refund-data sharing, delivered to RevenueCat with retries. See
+  [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
 - **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
   `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
   plus internal digest preparation and send. `notificationDelivery.ts` holds the
   claim/finish/recover delivery machine.
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
+- **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
+  claim/finish delivery machine that projects each submission to the Resend support inbox with an
+  hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
   the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
-- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
-  and weekly shelf delivery recovery.
+- **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
+  failure, waitlist Resend retry, weekly shelf preparation, weekly shelf delivery recovery, hourly
+  feedback inbox delivery retry, and daily payment-receipt retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
@@ -179,19 +188,23 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
   Analytics is a no-op when either is unset
+- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
+  it, App Store links carry `ct=` campaign tokens; see
+  [growth funnel](docs/analytics/growth-funnel.md)
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the dev-only passwordless button
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
-    non-production variant. `app.config.js` pins it to one exact value
+    to show the passwordless dev-login button and fixture reset on development builds
+    (release-mode included); preview and production builds never show either
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
+    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
+    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
+    to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
-  - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
-    iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen
   - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
@@ -236,6 +249,11 @@ needed at runtime by the features that use them:
 - `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
   `unconfigured` until it is set
 - `RESEND_TOPIC_ID` — Resend topic the contact is opted into
+- `RESEND_FEEDBACK_INBOX_EMAIL` — Resend address in-app feedback is projected to. Together with
+  `RESEND_FEEDBACK_FROM_EMAIL` and `RESEND_API_KEY` it gates configured delivery; submissions stay
+  `unconfigured` until all three are set
+- `RESEND_FEEDBACK_FROM_EMAIL` — verified Resend sending address for feedback email, required with
+  the inbox address and `RESEND_API_KEY` for delivery
 
 ## Working conventions
 

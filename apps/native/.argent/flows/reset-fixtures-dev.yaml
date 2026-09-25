@@ -1,0 +1,23 @@
+steps:
+  - tap: { id: person }
+  - await: { visible: { id: reset-flow-fixtures }, timeout: 15000 }
+  - await: { idle: true }
+  - tap: { id: reset-flow-fixtures }
+  - await: { visible: { text: "Reset flow fixtures?" }, timeout: 15000 }
+  - await: { idle: true }
+  - tap: { text: Reset, after: { text: "Reset flow fixtures?" } }
+  - await: { visible: { text: "Flow fixtures ready" }, timeout: 30000 }
+  - await: { idle: true }
+  - await:
+      visible: { text: "4 saves and 3 spaces were created." }
+      timeout: 15000
+  - tap: { text: OK, after: { text: "Flow fixtures ready" } }
+  - await: { hidden: { text: "Flow fixtures ready" }, timeout: 10000 }
+  - swipe: { from: { x: 0.5, y: 0.1 }, to: { x: 0.5, y: 0.88 }, duration: 300 }
+  - await: { hidden: { id: reset-flow-fixtures }, timeout: 10000 }
+  - await: { visible: { text: Profile }, timeout: 10000 }
+  - await: { idle: true }
+executionPrerequisite: Shelvr dev app (app.shelvr.save.dev) is open on the Home
+  tab of the signed-in anonymous dev user, with the Convex dev deployment's
+  AUTH_ENABLE_ANONYMOUS set to "true" so Reset flow fixtures is available on
+  Profile.

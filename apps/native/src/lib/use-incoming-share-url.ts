@@ -38,13 +38,17 @@ export function decideShareIntake(
 export function useIncomingShareUrl({
   canAccept,
   readOnMount,
-  onUrl,
+  onSharedUrl,
+  onDirectUrl,
   onError,
 }: {
   /** Read at intake time, so it sees in-flight refs as well as render state. */
   canAccept: () => boolean;
   readOnMount: boolean;
-  onUrl: (url: string) => void;
+  /** A URL the share extension actually delivered to Shelvr. */
+  onSharedUrl: (url: string) => void;
+  /** A sample saved only because the system share sheet failed to open. */
+  onDirectUrl: (url: string) => void;
   onError: (error: TextMessageKey | null) => void;
 }) {
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -68,9 +72,9 @@ export function useIncomingShareUrl({
     }
     if (intake.kind !== "consume") return false;
     clearSharedPayloads();
-    onUrl(intake.url);
+    onSharedUrl(intake.url);
     return true;
-  }, [canAccept, onUrl]);
+  }, [canAccept, onSharedUrl]);
 
   // iOS opens the real share sheet over a sample, so the first save goes
   // through the same Shelvr tile the user will tap in other apps.
@@ -84,7 +88,7 @@ export function useIncomingShareUrl({
       } catch (err) {
         analytics.captureError("onboarding_share_sheet_failed", err);
         setShareSheetOpen(false);
-        onUrl(url);
+        onDirectUrl(url);
         return;
       }
       await new Promise((resolve) =>
@@ -94,12 +98,12 @@ export function useIncomingShareUrl({
       if (result.action !== Share.sharedAction) return;
       if (consumeShare()) return;
       if (result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
-        onUrl(url);
+        onSharedUrl(url);
       } else {
         onError("demo.pickShelvr");
       }
     },
-    [consumeShare, onError, onUrl],
+    [consumeShare, onDirectUrl, onError, onSharedUrl],
   );
 
   const consumeShareRef = useRef(consumeShare);

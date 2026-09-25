@@ -26,11 +26,12 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
     <View style={styles.container}>
       {/* Narrower than the default so the morph canvas clears the back button
           on the left and the Share item on the right. */}
-      <AnimatedText text={title} truncate height={24} style={styles.title} />
+      <AnimatedText text={title} truncate height={28} style={styles.title} />
       {when ? (
         <AnimatedText
           text={formatItemDate(when)}
           height={18}
+          truncate
           style={styles.date}
         />
       ) : null}
@@ -46,7 +47,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: {
     fontFamily: theme.fonts.display,
-    fontSize: 19,
+    fontSize: 22,
     color: theme.colors.foreground,
   },
   date: {
