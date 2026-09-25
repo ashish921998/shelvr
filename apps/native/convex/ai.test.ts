@@ -10,18 +10,19 @@ import {
   vi,
 } from "vitest";
 import { api, internal } from "@convex/_generated/api";
+import { finalRecipe } from "./ai";
 import {
   extractBodyText,
   fetchInstagram,
   fetchXoEmbed,
   fetchXPost,
-  finalRecipe,
   firstLinkedUrl,
   linkEnrichment,
   parseInstagramEmbed,
-  sanitizeRecipe,
+  readPage,
   storePoster,
-} from "./ai";
+} from "./model/pageRead";
+import { sanitizeRecipe } from "./model/recipeMarkup";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
 import fxArticle from "./testdata/xSyndication/fxArticle.json";
@@ -2105,5 +2106,104 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+});
+
+describe("readPage recipe eligibility", () => {
+  const TIKTOK_URL = "https://www.tiktok.com/@cook/video/7350000000000000000";
+  const RECIPE_PAGE = "https://recipes.test/one-pan-gnocchi";
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    decodeWithContentType.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+  });
+
+  /** A TikTok whose oEmbed caption is `caption`; `recipeHtml`, when given, is
+   * the page the caption links to. Every other fetch fails. */
+  function serveTikTok(caption: string, recipeHtml?: string) {
+    safeFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith("https://www.tiktok.com/oembed?")) {
+        return {
+          ok: true,
+          finalUrl: url,
+          status: 200,
+          contentType: "application/json",
+          bytes: new TextEncoder().encode(
+            JSON.stringify({ title: caption, author_unique_id: "cook" }),
+          ),
+        };
+      }
+      if (url === RECIPE_PAGE && recipeHtml !== undefined) {
+        return {
+          ok: true,
+          finalUrl: url,
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          bytes: new TextEncoder().encode(recipeHtml),
+        };
+      }
+      return { ok: false, code: "http_error", status: 599 };
+    });
+  }
+
+  it("asks for a recipe from a full caption with no markup", async () => {
+    serveTikTok("One-pan gnocchi: 500g gnocchi, 1 tin tomatoes. Fry, simmer.");
+    const read = await readPage(TIKTOK_URL);
+    expect(read).toMatchObject({
+      status: "ok",
+      askForRecipe: true,
+      shortForm: { site: "TikTok", video: true },
+    });
+  });
+
+  it("does not ask when the caption was cut short", async () => {
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+    const read = await readPage(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(read.status).toBe("ok");
+    expect(read.status === "ok" && read.page.truncated).toBe(true);
+    expect(read.status === "ok" && read.askForRecipe).toBe(false);
+  });
+
+  it("does not ask when the caption's linked page yielded markup", async () => {
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "One-pan gnocchi",
+      recipeIngredient: ["500g gnocchi", "1 tin tomatoes"],
+      recipeInstructions: ["Fry the gnocchi.", "Add the tomatoes and simmer."],
+    };
+    serveTikTok(
+      `One-pan gnocchi, full recipe at ${RECIPE_PAGE}`,
+      `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+    );
+    const read = await readPage(TIKTOK_URL);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+    expect(read.status === "ok" && read.askForRecipe).toBe(false);
+  });
+
+  it("does not ask for an ordinary web page", async () => {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(
+        "<html><head><title>Short page</title></head><body><p>Hi.</p></body></html>",
+      ),
+    }));
+    const read = await readPage("https://example.com/post");
+    expect(read).toMatchObject({ status: "ok", askForRecipe: false });
+    expect(read).not.toHaveProperty("shortForm");
   });
 });
