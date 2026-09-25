@@ -255,70 +255,27 @@ const seedGhostTombstone = () =>
     mock.user._id,
   );
 
-it("asks before re-saving a batch that matches the last completed one", async () => {
+it("skips a replayed batch that matches the last completed one", async () => {
   // The Android task-restore ghost: no session record, but the payload is the
-  // batch that just completed. It must prompt, not auto-save a duplicate.
+  // batch that already completed. It must not save again, and must not ask.
   mock.entitled = true;
   seedGhostTombstone();
   const view = render(<ShareScreen />);
-  await waitFor(() =>
-    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
-  );
-  // Resolution settling re-runs the reconcile effect; the prompt counts once.
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  // Resolution settling re-runs the reconcile effect; the skip runs once.
   mock.resolvedSharedPayloads = [resolvedLink];
   view.rerender(<ShareScreen />);
   await settle();
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+  expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
+  expect(mock.router.replace).toHaveBeenCalledTimes(1);
   expect(
     vi
       .mocked(analytics.capture)
-      .mock.calls.filter(([event]) => event === "share_ghost_prompt"),
+      .mock.calls.filter(([event]) => event === "share_ghost_skipped"),
   ).toHaveLength(1);
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  expect(mock.router.replace).not.toHaveBeenCalled();
-
-  fireEvent.click(screen.getByText("share.saveAgain"));
-  // Rapid-press guard: the second press lands before any re-render, while the
-  // handler closure still sees ghostConfirm — only the synchronous latch
-  // prevents a second startNewSession/runSave pair (a duplicate save run).
-  fireEvent.click(screen.getByText("share.saveAgain"));
-  // Nor may a queued Cancel abandon the run Save again just started.
-  fireEvent.click(screen.getByText("common.cancel"));
-  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
-  await settle();
-  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
-  expect(analytics.capture).not.toHaveBeenCalledWith("share_ghost_dismissed");
-  expect(analytics.capture).toHaveBeenCalledWith("share_ghost_save_again");
-  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
-    url: link.value,
-  });
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
-});
-
-it("dismisses the ghost prompt and prompts again on the next replay", async () => {
-  mock.entitled = true;
-  seedGhostTombstone();
-  const first = render(<ShareScreen />);
-  await waitFor(() =>
-    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
-  );
-
-  fireEvent.click(screen.getByText("common.cancel"));
-  // A queued Save again landing before the re-render must not save after Cancel.
-  fireEvent.click(screen.getByText("share.saveAgain"));
-  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
-  await settle();
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  expect(analytics.capture).not.toHaveBeenCalledWith("share_ghost_save_again");
-  expect(mock.clearSharedPayloads).toHaveBeenCalled();
-  expect(analytics.capture).toHaveBeenCalledWith("share_ghost_dismissed");
-  first.unmount();
-
-  // A deliberate re-share (or another replay) is never silently dropped.
-  render(<ShareScreen />);
-  await waitFor(() =>
-    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
-  );
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
+  // The tombstone survives, so the next replay is skipped too.
+  expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(true);
 });
 
 it("keeps the tombstone when the native clear fails and the user cancels", async () => {
@@ -337,10 +294,9 @@ it("keeps the tombstone when the native clear fails and the user cancels", async
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   first.unmount();
 
+  vi.mocked(mock.router.replace).mockClear();
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(screen.getByText("share.ghostTitle")).toBeDefined(),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 

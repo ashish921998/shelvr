@@ -27,9 +27,8 @@
 //                                     reopening the app from recents replays the previous share
 //                                     as if it were fresh. A fresh sessionId would mint a fresh
 //                                     operationId and the backend ledger could not dedupe — the
-//                                     last-saved item would be saved again. The caller must ask
-//                                     before saving again: a deliberate identical re-share looks
-//                                     the same from JS, so this is never auto-saved nor dropped.
+//                                     last-saved item would be saved again. The caller skips it
+//                                     quietly: the batch is already in Shelvr.
 //      Sessions are scoped to userId: a record left by a different user (account
 //      switch) is treated as no session, never matched.
 //   3. updateEntry / markComplete / deleteSession — mutate the persisted session
@@ -313,9 +312,7 @@ export function reconcileSession(
 
 /** Allocates a brand-new active session for `rawPayloads` and persists it. All
  * entries start `pending`; the processor assigns their kind/status as it
- * resolves and saves them. Exported so the caller can start the session a
- * ghost confirmation explicitly approved — reconcileSession deliberately does
- * not start one for a ghost batch. */
+ * resolves and saves them. */
 export function startNewSession(
   store: SessionStoreAdapter,
   userId: string,
@@ -364,9 +361,9 @@ export function recordCompletedShare(
 /** A one-way digest of a fingerprint. The tombstone outlives the session, so
  * it keeps only this digest, never the shared URLs or note text themselves.
  * Sync because reconcileSession is sync (expo-crypto only hashes async).
- * ponytail: cyrb53, 53 bits, not cryptographic; a collision only shows the
- * ghost prompt for a genuinely new share, so move to SHA-256 only if the
- * reconcile path goes async. */
+ * ponytail: cyrb53, 53 bits, not cryptographic; a collision would skip a
+ * genuinely new share, so move to SHA-256 only if the reconcile path goes
+ * async. */
 function digestFingerprint(fingerprint: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
