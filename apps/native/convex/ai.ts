@@ -115,14 +115,18 @@ const EMBED_TIMEOUT_MS = 20_000;
 /**
  * The two sides of retrieval.
  *
- * Gemini embeddings are asymmetric: a corpus vector and a query vector are
- * meant to be produced under a matching pair of task types. Items are the
- * corpus, so they are embedded as documents; anything searching against that
- * index embeds its query text as a query. Mixing the two silently degrades
- * ranking rather than failing, which is why the pairing lives in one place and
- * callers pick a side by choosing `embedTexts` or `embedQuery` rather than by
- * passing a string. Item-to-item similarity is unaffected: both sides are
- * documents, which is symmetric.
+ * Google documents these task types as an asymmetric pair: items are the
+ * corpus, so they are embedded as documents, and anything searching the index
+ * embeds its query text as a query. The pairing lives in one place and callers
+ * pick a side by choosing `embedTexts` or `embedQuery` rather than by passing
+ * a string.
+ *
+ * Measured 2026-09-25 against the dev deployment: `gemini-embedding-2` returns
+ * the same vector for a query under either task type, so with this model the
+ * pairing changes nothing and ranking is plain symmetric similarity. It is
+ * kept because the provider forwards it and a later model may honour it; do
+ * not read it as a ranking guarantee, and do not expect a mismatch to show up
+ * as worse results.
  */
 const EMBEDDING_DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT";
 const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
