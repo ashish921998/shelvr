@@ -1,15 +1,64 @@
 steps:
-  - echo: Restart Shelvr and expect Home.
+  - echo: Restart Shelvr dev and expect Home for the signed-in anonymous dev user.
+      Requires one Metro on :8081, an English UI, and the Convex dev deployment
+      with anonymous auth enabled.
   - launch: app.shelvr.save.dev
-  - await: { visible: { text: Home } }
+  - await: { visible: { text: Profile }, timeout: 120000 }
   - await: { idle: true }
-  - echo: From Home, open Add and expect save options.
-  - tap:
-      id: plus
-  - await: { visible: { text: Note } }
+  - echo: Reset flow fixtures for a deterministic baseline. Expect the reset flow's
+      own gates to pass and end on Home with 4 saves and 3 spaces.
+  - run: reset-fixtures-dev.yaml
+  - echo: Open Search and type the unique token. Expect Nothing yet, which proves the
+      token starts unmatched and warms the query subscription so the later hidden
+      check cannot pass on an unloaded result set.
+  - tap: { id: magnifyingglass }
+  - await: { visible: { text: Find anything }, timeout: 15000 }
   - await: { idle: true }
-  - echo: From save options, choose Note and expect the note composer.
-  - tap:
-      text: Note
-  - await: { visible: { text: Jot a note } }
+  - type:
+      into: { text: Search your saves }
+      text: zzzqflownote
+  - await: { visible: { text: Nothing yet }, timeout: 30000 }
   - await: { idle: true }
+  - echo: Return to Home and open the Add sheet. Expect the save options with the
+      Note choice available.
+  - tap: { id: square.grid.2x2 }
+  - await: { visible: { text: Profile }, timeout: 15000 }
+  - await: { idle: true }
+  - tap: { id: plus }
+  - await: { visible: { id: add-option-note }, timeout: 15000 }
+  - await: { idle: true }
+  - echo: Choose Note and expect the note composer field.
+  - tap: { id: add-option-note }
+  - await: { visible: { id: add-note-input }, timeout: 15000 }
+  - await: { idle: true }
+  - type:
+      into: { id: add-note-input }
+      text: zzzqflownote remember to check the lamp and shelves before the weekend
+      submit: false
+  # The runner tree reports this field's own text as empty, so the committed-value
+  # check holds only against the accessibility tree and has to stay a raw tool step.
+  - tool: await-ui-element
+    args:
+      condition: text
+      selector: { identifier: add-note-input }
+      expectedText: zzzqflownote remember to check the lamp and shelves before the weekend
+      textMatch: equals
+      timeoutMs: 10000
+  - echo: Save the note. Expect the composer to close and Home to return.
+  - tap: { id: checkmark }
+  - await: { hidden: { id: add-note-input }, timeout: 30000 }
+  - await: { visible: { text: Profile }, timeout: 15000 }
+  - await: { idle: true }
+  - echo: Return to Search with the same token query. Expect the no-results state to
+      disappear once the classifier finishes indexing the new note.
+  - tap: { id: magnifyingglass }
+  - await: { visible: { text: Search your saves }, timeout: 15000 }
+  - await: { idle: true }
+  - await: { hidden: { text: Nothing yet }, timeout: 120000 }
+  - await: { hidden: { text: Find anything }, timeout: 10000 }
+  - echo: "Restore the baseline: return to Home and reset the fixtures so the new
+      note is removed."
+  - tap: { id: square.grid.2x2 }
+  - await: { visible: { text: Profile }, timeout: 15000 }
+  - await: { idle: true }
+  - run: reset-fixtures-dev.yaml

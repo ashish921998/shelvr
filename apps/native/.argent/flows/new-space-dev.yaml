@@ -1,15 +1,58 @@
 steps:
-  - echo: Restart Shelvr and expect Home.
   - launch: app.shelvr.save.dev
-  - await: { visible: { text: Home } }
+  - await:
+      visible: { text: Profile }
+      timeout: 120000
   - await: { idle: true }
-  - echo: From Home, open Spaces and expect the new-space action.
-  - tap:
-      id: rectangle.stack
-  - await: { visible: { text: New space } }
+  - echo: Reset fixtures and expect the seeded Spaces list before creating a new
+      space.
+  - run: reset-fixtures-dev.yaml
+  - echo: Open Spaces and expect the seeded list with the New space action.
+  - tap: { id: rectangle.stack }
+  - await: { visible: { text: New space }, timeout: 15000 }
   - await: { idle: true }
-  - echo: From Spaces, open New space and expect the space form.
-  - tap:
-      id: plus
-  - await: { visible: { text: Apartment shopping list } }
+  - tap: { id: plus }
+  - await: { visible: { text: Create space }, timeout: 15000 }
+  - await: { idle: true }
+  # The native form field and button have no runner-tree selectors.
+  - tap: { x: 0.5, y: 0.428 }
+  - tool: keyboard
+    args:
+      text: Flow created space
+  - tap: { x: 0.5, y: 0.565 }
+  - await: { hidden: { text: Create space }, timeout: 30000 }
+  - await: { idle: true }
+  - echo: Open the created space and verify its title before deleting it.
+  # Wait for the animated card grid before tapping the inaccessible zoom wrapper.
+  - wait: 1500
+  # Space cards are inside an inaccessible native zoom wrapper, so the recorded
+  # card tap has no stable runner-tree selector.
+  - tool: gesture-tap
+    args: { x: 0.25, y: 0.19 }
+  - await: { visible: { text: Flow created space }, timeout: 15000 }
+  - await: { visible: { id: BackButton }, timeout: 15000 }
+  - await: { idle: true }
+  # The iOS toolbar menu is absent from the runner tree after this transition.
+  - tool: gesture-tap
+    args: { x: 0.902, y: 0.088 }
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector: { text: Delete space }
+      timeoutMs: 15000
+  - tool: gesture-tap
+    args: { x: 0.68, y: 0.142 }
+  - tool: await-ui-element
+    args:
+      condition: visible
+      selector: { text: "Delete space?" }
+      timeoutMs: 15000
+  - await: { idle: true }
+  - tap: { text: Delete, after: { text: "Delete space?" } }
+  - await: { visible: { text: New space }, timeout: 15000 }
+  - await: { idle: true }
+  - await: { hidden: { text: Flow created space }, timeout: 15000 }
+  - echo: Restore the baseline by returning to Home.
+  - tap: { id: square.grid.2x2 }
+  - await: { visible: { text: Profile }, timeout: 15000 }
   - await: { idle: true }

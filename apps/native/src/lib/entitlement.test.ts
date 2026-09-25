@@ -12,6 +12,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
   presentCustomerCenter: vi.fn(),
+  captureError: vi.fn(),
+  apiKey: {
+    REVENUECAT_API_KEY: "appl_test" as string | undefined,
+    REVENUECAT_DISABLED_BY_BUILD: false,
+  },
 }));
 
 vi.mock("react-native", () => ({
@@ -44,7 +49,7 @@ seedRequire("react-native-purchases-ui", {
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "attempt-1" }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: () => {}, captureError: () => {} },
+  analytics: { capture: () => {}, captureError: mock.captureError },
 }));
 vi.mock("@/lib/paywall-telemetry", () => ({
   observePaywallPresentation: async (
@@ -55,9 +60,7 @@ vi.mock("@/lib/paywall-telemetry", () => ({
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: { _id: "user_1" } }),
 }));
-vi.mock("@/lib/revenuecat-api-key", () => ({
-  REVENUECAT_API_KEY: "appl_test",
-}));
+vi.mock("@/lib/revenuecat-api-key", () => mock.apiKey);
 vi.mock("@/lib/trial-cancellation", () => ({
   readFreshTrialCancellation: () => null,
 }));
@@ -99,7 +102,33 @@ async function loadReady() {
 beforeEach(() => {
   mock.presentPaywall.mockReset();
   mock.presentCustomerCenter.mockReset();
+  mock.captureError.mockReset();
+  mock.apiKey.REVENUECAT_API_KEY = "appl_test";
+  mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
   push.mockClear();
+});
+
+describe("useEntitlementSync on a build with RevenueCat disabled", () => {
+  it("neither reports the missing key nor marks the user synced", async () => {
+    mock.apiKey.REVENUECAT_API_KEY = undefined;
+    mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = true;
+    const { openPaywall } = await loadReady();
+    expect(mock.captureError).not.toHaveBeenCalled();
+    // Readiness was never recorded, so the paywall degrades to the fallback
+    // route instead of opening a sheet under an unsynced identity.
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    expect(mock.presentPaywall).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/(app)/paywall");
+  });
+
+  it("still reports a missing key the build did not choose", async () => {
+    mock.apiKey.REVENUECAT_API_KEY = undefined;
+    await loadReady();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "purchase_identity_sync_failed",
+      expect.objectContaining({ message: "revenuecat_key_missing" }),
+    );
+  });
 });
 
 afterEach(() => {

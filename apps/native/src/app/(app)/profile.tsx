@@ -13,6 +13,7 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
+import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
 import { LEGAL_URLS, SUPPORT_URL } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
@@ -54,8 +55,7 @@ export default function ProfileScreen() {
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
-  const fixtureResetEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
+  const fixtureResetEnabled = isAnonymousAuthEnabled();
   const { data: canResetFlowFixtures } = useQuery(
     convexQuery(
       api.devFixtures.canResetCurrentUser,
