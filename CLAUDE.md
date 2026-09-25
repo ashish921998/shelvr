@@ -74,6 +74,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences` — weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads` — per-user read state, kept out of the item row
+  - `shareLinks` — one random public token per shared item, the capability behind the
+    branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `saveReminders` — one push naming one save (an unread article or a recipe),
     with its delivery state; also the reminder budget's memory

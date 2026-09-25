@@ -18,6 +18,16 @@ import {
   LAST_COMPLETED_SHARE_KEY,
   recordCompletedShare,
 } from "@/lib/share/storage";
+import {
+  DISCARDED_SHARE_KEY,
+  PENDING_SHARE_KEY,
+} from "@/lib/share/pending-share";
+import {
+  hasPendingShareOnDevice,
+  markPendingShareOnDevice,
+  markShareDiscardedOnDevice,
+} from "@/lib/share/pending-share-store";
+import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
@@ -35,6 +45,9 @@ const mock = vi.hoisted(() => ({
   clearSharedPayloads: vi.fn(),
   router: { replace: vi.fn(), push: vi.fn() },
   store: new Map<string, string>(),
+  // SecureStore: the pending flag and the discard record run through the real
+  // pending-share rules and the real device binding.
+  secure: new Map<string, string>(),
   uuid: 0,
   platform: "android",
 }));
@@ -45,8 +58,9 @@ vi.mock("@/lib/i18n", () => ({
   localizeError: (message: string) => message,
 }));
 vi.mock("@/lib/first-share", () => ({ recordShareSaved: vi.fn() }));
-vi.mock("@/lib/share/pending-share-store", () => ({
-  clearPendingShareOnDevice: vi.fn(),
+vi.mock("expo-secure-store", () => ({
+  getItem: (key: string) => mock.secure.get(key) ?? null,
+  setItem: (key: string, value: string) => mock.secure.set(key, value),
 }));
 vi.mock("@/lib/use-save-image", () => ({
   useSaveImages: () => mock.saveImages,
@@ -102,6 +116,9 @@ vi.mock("expo-sharing", () => ({
     error: null,
     clearSharedPayloads: mock.clearSharedPayloads,
   }),
+  // The native store the resume path reads. Clears are mocked, so it keeps
+  // whatever batch the test put there.
+  getSharedPayloads: () => mock.sharedPayloads,
 }));
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({
@@ -173,6 +190,7 @@ beforeEach(() => {
   mock.resolvedSharedPayloads = [];
   mock.isResolving = false;
   mock.store.clear();
+  mock.secure.clear();
   mock.uuid = 0;
   mock.platform = "android";
   mock.openPaywall.mockResolvedValue(false);
@@ -333,4 +351,75 @@ it("never records a tombstone on iOS, which does not replay shares", async () =>
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(false);
+});
+
+it("records the discard when Cancel's native clear throws, so the leftover is not resumable", async () => {
+  // A deferred share landed here (the flag +native-intent sets), the user is
+  // not Pro and cancels at the gate, and the native clear throws. The batch
+  // stays in the native store, so without the discard record the resume path
+  // would route it straight back and re-save it.
+  markPendingShareOnDevice();
+  mock.clearSharedPayloads.mockImplementationOnce(() => {
+    throw new Error("clear failed");
+  });
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
+  );
+  fireEvent.click(screen.getByText("common.cancel"));
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+
+  expect(mock.secure.get(DISCARDED_SHARE_KEY)).toBe(
+    fingerprintSharePayloads([link]),
+  );
+  expect(hasPendingShareOnDevice()).toBe(false);
+  expect(hasResumableSharedPayloads()).toBe(false);
+});
+
+it("clears the pending flag and the discard record once a share completes", async () => {
+  mock.entitled = true;
+  markPendingShareOnDevice();
+  markShareDiscardedOnDevice(
+    fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
+  );
+  render(<ShareScreen />);
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+
+  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+  expect(mock.secure.get(PENDING_SHARE_KEY)).toBe("");
+  expect(mock.secure.get(DISCARDED_SHARE_KEY)).toBe("");
+  expect(hasPendingShareOnDevice()).toBe(false);
+});
+
+it("still resumes and saves a different batch after a discard", async () => {
+  mock.clearSharedPayloads.mockImplementationOnce(() => {
+    throw new Error("clear failed");
+  });
+  const first = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
+  );
+  fireEvent.click(screen.getByText("common.cancel"));
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  expect(hasResumableSharedPayloads()).toBe(false);
+  first.unmount();
+
+  // A new share replaced the leftover in the native store.
+  const other: RawPayload = {
+    value: "https://example.com/b",
+    shareType: "url",
+    mimeType: "text/plain",
+  };
+  mock.sharedPayloads = [other];
+  expect(hasResumableSharedPayloads()).toBe(true);
+
+  mock.entitled = true;
+  mock.router.replace.mockClear();
+  render(<ShareScreen />);
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
+  expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
+  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+    url: other.value,
+  });
+  expect(mock.secure.get(DISCARDED_SHARE_KEY)).toBe("");
 });
