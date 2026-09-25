@@ -17,8 +17,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 /**
  * Full-page Convex Auth sign-in, shown by the (auth) route and by the
  * onboarding opener. The "Dev login" button renders when
- * isAnonymousAuthEnabled() passes (the build-time flag plus a development or
- * preview variant); the server independently refuses anonymous sign-in unless
+ * isAnonymousAuthEnabled() passes (the build-time flag plus the development
+ * variant); the server independently refuses anonymous sign-in unless
  * the deployment sets AUTH_ENABLE_ANONYMOUS=true.
  */
 export function SignInView({

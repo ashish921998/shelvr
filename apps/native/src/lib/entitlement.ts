@@ -17,7 +17,10 @@ import {
   readFreshTrialCancellation,
   type TrialCancellationState,
 } from "@/lib/trial-cancellation";
-import { REVENUECAT_API_KEY } from "@/lib/revenuecat-api-key";
+import {
+  REVENUECAT_API_KEY,
+  REVENUECAT_DISABLED_BY_BUILD,
+} from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -218,6 +221,10 @@ export function useEntitlementSync(): void {
   useEffect(() => {
     setRcTargetUserId(sub);
     if (sub === null) return;
+    // A build that deliberately has no key would only burn the retry budget
+    // and report the absence as a sync failure on every foreground. Readiness
+    // stays false, so purchase entry points still degrade to unavailable.
+    if (REVENUECAT_DISABLED_BY_BUILD) return;
 
     let cancelled = false;
     const observer = startRevenueCatIdentitySync({

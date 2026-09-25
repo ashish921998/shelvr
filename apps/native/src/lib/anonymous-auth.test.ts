@@ -33,10 +33,10 @@ describe("isAnonymousAuthEnabled", () => {
     expect(isAnonymousAuthEnabled()).toBe(true);
   });
 
-  it("returns true with the flag on a preview build", () => {
+  it("returns false with the flag on a preview build", () => {
     vi.stubEnv("EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS", "true");
     setVariant("preview");
-    expect(isAnonymousAuthEnabled()).toBe(true);
+    expect(isAnonymousAuthEnabled()).toBe(false);
   });
 
   it("returns false with the flag on a production build", () => {
