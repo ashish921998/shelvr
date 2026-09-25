@@ -253,18 +253,20 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     });
     markComplete(store, "sess-1");
     deleteSession(store, "sess-1");
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
   }
 
-  it("flags a record-less identical batch as a ghost needing confirmation", () => {
+  it("flags a record-less identical, fully settled batch as a ghost", () => {
     // The reported duplicate: the save completed (record deleted), Android
     // replayed the task's share intent, and a fresh session minted a fresh
-    // operationId the ledger could not dedupe. It must prompt instead.
+    // operationId the ledger could not dedupe. It must be skipped instead.
     const store = memoryStore();
     completedBatchA(store);
     const result = reconcileSession(store, USER, BATCH_A, id);
     expect(result).toEqual({ kind: "ghost" });
-    // No session was started behind the prompt.
+    // No session was started for the replay.
     expect(loadSession(store)).toBeNull();
   });
 
@@ -293,8 +295,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     // any tombstone — those paths reuse stable operation ids.
     const store = memoryStore();
     completedBatchA(store);
-    // Directly start the active session (bypasses the ghost branch, like the
-    // Save-again button does).
+    // Directly start the active session (bypasses the ghost branch).
     startNewSession(
       store,
       USER,
@@ -302,7 +303,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
       BATCH_A,
       id,
     );
-    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER);
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
     // Active session for the same batch → resume, not ghost.
     expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("resume");
   });
@@ -321,9 +322,48 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     expect(reconcileSession(store, OTHER_USER, BATCH_A, id).kind).toBe("new");
   });
 
-  it("starts the approved session with a fresh id via startNewSession", () => {
-    // The Save-again button's path: reconcile declined to start a session for
-    // a ghost batch; startNewSession must create one like the 'new' branch.
+  it("retries a replayed batch that failed, instead of skipping it", () => {
+    // A failed save still completes (Cancel / Continue) and tombstones the
+    // batch. Sharing it again must save it, not return Home empty-handed.
+    const store = memoryStore();
+    recordCompletedShare(store, fingerprintSharePayloads(BATCH_A), USER, []);
+    const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
+    expect(result.kind).toBe("new");
+    expect(loadSession(store)?.entries.map((e) => e.status)).toEqual(
+      BATCH_A.map(() => "pending"),
+    );
+  });
+
+  it("carries settled entries into a partly saved batch's replay", () => {
+    // Only the entries that did not save are attempted again; the saved one
+    // keeps its item id, so it is never saved twice.
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
+    const result = reconcileSession(store, USER, batch, () => "sess-9");
+    expect(result.kind).toBe("new");
+    const entries = loadSession(store)?.entries ?? [];
+    expect(entries[0]).toMatchObject({ status: "saved", itemId: "items-1" });
+    expect(entries.slice(1).every((e) => e.status === "pending")).toBe(true);
+  });
+
+  it("skips a replay whose tombstone predates settled entries", () => {
+    // Tombstones written before this change only ever gated the prompt.
+    const store = memoryStore();
+    completedBatchA(store);
+    const legacy = JSON.parse(store.getString(LAST_COMPLETED_SHARE_KEY)!) as {
+      settled?: unknown;
+    };
+    delete legacy.settled;
+    store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify(legacy));
+    expect(reconcileSession(store, USER, BATCH_A, id)).toEqual({
+      kind: "ghost",
+    });
+  });
+
+  it("starts a session with a fresh id via startNewSession", () => {
     const store = memoryStore();
     const session = startNewSession(
       store,

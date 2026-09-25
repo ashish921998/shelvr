@@ -253,6 +253,7 @@ const seedGhostTombstone = () =>
       { value: link.value, shareType: link.shareType, mimeType: link.mimeType },
     ]),
     mock.user._id,
+    [{ index: 0, status: "saved", itemId: "items-1" }],
   );
 
 it("skips a replayed batch that matches the last completed one", async () => {

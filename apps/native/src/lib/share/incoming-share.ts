@@ -14,8 +14,10 @@ import { classifyEntries, type ResolvedPayload } from "./process-share";
 import { withEntry } from "./session-view";
 import {
   fingerprintSharePayloads,
+  settledEntries,
   type RawSharePayload,
   type reconcileSession,
+  type SettledEntry,
   type ShareEntry,
   type ShareSession,
 } from "./storage";
@@ -97,7 +99,12 @@ export type ShareEvent =
  * entry, the result, or a crash back as events. */
 export type ShareEffect =
   | { type: "markComplete"; sessionId: string }
-  | { type: "tombstone"; fingerprint: string; userId: string }
+  | {
+      type: "tombstone";
+      fingerprint: string;
+      userId: string;
+      settled: SettledEntry[];
+    }
   | { type: "nativeClear"; for: ClearFor }
   | { type: "deleteSession"; sessionId?: string }
   | { type: "clearPendingFlag" }
@@ -230,8 +237,9 @@ function reconciled(
       return none(state);
     case "ghost": {
       // No session record, but this exact batch was the user's last completed
-      // share: Android restored the task after a process death and replayed
-      // the old share intent. It is already in Shelvr, so consume it quietly
+      // share and every entry settled: Android restored the task after a
+      // process death and replayed the old share intent. It is already in
+      // Shelvr, so consume it quietly
       // and go Home. Saving would mint an operationId the backend ledger
       // cannot dedupe (a duplicate), and asking made every cold start after
       // a share look like a new one.
@@ -364,6 +372,7 @@ function complete(
       type: "tombstone",
       fingerprint: session.fingerprint,
       userId: session.userId,
+      settled: settledEntries(session.entries),
     });
   }
   effects.push({ type: "nativeClear", for: { kind: "complete", session } });

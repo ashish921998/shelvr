@@ -421,7 +421,12 @@ function runEffect(
       markComplete(shareStore, effect.sessionId);
       return;
     case "tombstone":
-      recordCompletedShare(shareStore, effect.fingerprint, effect.userId);
+      recordCompletedShare(
+        shareStore,
+        effect.fingerprint,
+        effect.userId,
+        effect.settled,
+      );
       return;
     case "nativeClear": {
       let ok = true;
