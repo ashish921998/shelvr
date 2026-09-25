@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { ProCard } from "@/components/home/pro-card";
 import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
@@ -9,6 +10,7 @@ import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
+import { useEntitlement } from "@/lib/entitlement";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
@@ -44,6 +46,13 @@ export default function HomeScreen() {
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
+  // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
+  // Home offers Pro instead of teaching a save that would only reopen it.
+  const entitlement = useEntitlement();
+  const locked = !entitlement.loading && !entitlement.entitled;
+  const proCard = locked ? (
+    <ProCard lapsed={entitlement.status === "lapsed"} />
+  ) : null;
 
   // One element, two slots (empty feed and feed header) — the survey claims
   // the Home moment when both prompts are eligible.
@@ -72,12 +81,12 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {showHowTo ? (
+        {proCard || showHowTo ? (
           <ScrollView
             contentInsetAdjustmentBehavior="automatic"
             contentContainerStyle={styles.howToOnly}
           >
-            <SaveHowTo />
+            {proCard ?? <SaveHowTo />}
           </ScrollView>
         ) : (
           <EmptyState
@@ -100,12 +109,13 @@ export default function HomeScreen() {
     />
   ) : null;
 
-  const howToHeader = showHowTo ? (
-    <View style={styles.howToHeader}>
-      <SaveHowTo />
-      <Text style={styles.shelfLabel}>{t("home.onYourShelf")}</Text>
-    </View>
-  ) : null;
+  const howToHeader =
+    proCard || showHowTo ? (
+      <View style={styles.howToHeader}>
+        {proCard ?? <SaveHowTo />}
+        <Text style={styles.shelfLabel}>{t("home.onYourShelf")}</Text>
+      </View>
+    ) : null;
 
   return (
     <View style={styles.container}>
