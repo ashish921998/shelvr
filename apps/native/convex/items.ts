@@ -47,6 +47,7 @@ import {
   CURRENT_EMBEDDING_VERSION,
   EMBEDDING_SWEEP_PAGE,
   isValidEmbedding,
+  MAX_HYDRATE_READ_BYTES,
   MAX_EMBEDDING_ATTEMPTS,
   MAX_SWEEP_READ_BYTES,
 } from "./model/embedding";
@@ -1980,6 +1981,74 @@ export const listReadyItemsInternal = internalQuery({
       .take(limit);
     // Keeps `limit` vectors (~6 KB each) from crossing into the action on
     // every recommendation pass, and keeps the rows inside `itemFields`.
+    return rows.map(stripEmbedding);
+  },
+});
+
+/**
+ * Hydrates vector-search hits back into item documents, preserving the order
+ * they were given in.
+ *
+ * `ctx.vectorSearch` returns `{_id, _score}` and nothing else, and it is
+ * action-only, so the ids have to come back through a query to become rows.
+ * Order is the caller's ranking and is load-bearing: the recommendation prompt
+ * numbers the list it is handed, so re-sorting here would quietly hand the
+ * model a worse shortlist.
+ *
+ * Rows that are not `ready` are dropped rather than returned: the vector index
+ * has no `status` filter field (Convex vector filters cannot AND across
+ * fields), so a stale vector belonging to an item that has since failed can
+ * still match. The `userId` re-check is defence in depth — the search is
+ * already filtered to one owner, and this is the one field whose failure would
+ * cross accounts.
+ *
+ * Rows stamped with an older generation are dropped for the same reason. A
+ * version bump means the vectors describe different text, a different model,
+ * or both, and the index keeps serving the old ones until the sweep replaces
+ * them. Scoring a current query against them is not a weaker ranking so much
+ * as a meaningless one, and the ranking is silent about it either way. The
+ * caller's recency half covers the gap while the sweep drains, so refusing to
+ * mix generations costs candidates only where they would have been misranked.
+ */
+export const listReadyItemsByIdInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    itemIds: v.array(v.id("items")),
+    limit: v.number(),
+  },
+  returns: v.array(v.object(itemFields)),
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
+    const rows: Doc<"items">[] = [];
+    let bytes = 0;
+    for (const itemId of args.itemIds) {
+      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
+        break;
+      }
+      const item = await ctx.db.get(itemId);
+      if (item === null) {
+        continue;
+      }
+      // Charged before the row is judged, not after: the read has already
+      // happened by this point, and it is reads the budget exists to bound.
+      // A dropped hit costs the transaction exactly what a kept one does, so
+      // a run of large non-`ready` rows would otherwise walk straight past
+      // the budget and into Convex's own limit.
+      //
+      // Approximate, like the sweep's budget: the body dominates, and this
+      // only has to keep the transaction clear of that limit.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (
+        item.userId !== args.userId ||
+        item.status !== "ready" ||
+        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
+      ) {
+        continue;
+      }
+      rows.push(item);
+    }
+    // Same reason as listReadyItemsInternal: vectors stay out of the action,
+    // and the rows stay inside `itemFields`.
     return rows.map(stripEmbedding);
   },
 });

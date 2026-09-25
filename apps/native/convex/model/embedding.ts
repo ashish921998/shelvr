@@ -64,6 +64,21 @@ export const EMBEDDING_SWEEP_PAGE = 25;
 export const MAX_SWEEP_READ_BYTES = 1_000_000;
 
 /**
+ * Byte budget for one `listReadyItemsByIdInternal` read.
+ *
+ * The same argument as the sweep's budget, for the same reason: rows are not
+ * a bound when one `ready` link can carry 100k characters of extracted
+ * article, so a full page of worst-case documents would be megabytes inside
+ * one Convex transaction. Truncating is safe there specifically because the
+ * ids arrive in descending relevance order, so the budget drops the least
+ * relevant tail rather than a strong match.
+ *
+ * It lives here rather than in `items.ts` so the query and the tests that
+ * assert its boundary read the same number, as the sweep's pair already do.
+ */
+export const MAX_HYDRATE_READ_BYTES = 2_000_000;
+
+/**
  * How many times one item may fail to embed before the sweep gives up on it
  * and stamps it anyway.
  *
