@@ -192,6 +192,20 @@ export function stepIncomingShare(
     case "saveSettled": {
       const sid = event.session.sessionId;
       const settled = releaseRun(state, sid);
+      // A newer share replaced this session's record while it saved. Its
+      // result must not clear the newer batch's native payloads, leave the
+      // screen, or draw over the newer run; that session's own completion
+      // does all of it. A missing record is not a replacement: a record lost
+      // mid-save still completes, or the screen would spin forever.
+      const superseded =
+        (state.recordId !== null && state.recordId !== sid) ||
+        (ctx.storedSessionId !== null && ctx.storedSessionId !== sid);
+      if (superseded) {
+        return {
+          state: settled,
+          effects: [{ type: "markComplete", sessionId: sid }],
+        };
+      }
       if (event.session.entries.every((e) => e.status === "saved")) {
         return complete(settled, event.session, ctx);
       }

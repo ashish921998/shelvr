@@ -102,7 +102,7 @@ describe("incoming share owner", () => {
     expect(state.partial).toBeNull();
   });
 
-  it("completes a stale session scoped to its own id, without a tombstone", () => {
+  it("never completes a session a newer share has replaced", () => {
     // s1 is saving when a newer share replaces the record with s2.
     const { state, effects } = run(
       [
@@ -127,13 +127,9 @@ describe("incoming share owner", () => {
         entry: session("s1", "saved").entries[0],
       },
     ]);
-    expect(effects[3]).toEqual([
-      { type: "markComplete", sessionId: "s1" },
-      {
-        type: "nativeClear",
-        for: { kind: "complete", session: session("s1", "saved") },
-      },
-    ]);
+    // s1's result touches only its own (already replaced) record: no native
+    // clear of s2's payloads, no navigation, no phase change.
+    expect(effects[3]).toEqual([{ type: "markComplete", sessionId: "s1" }]);
     // s2 still owns the record, so its completion tombstones the batch.
     expect(types(effects[4])).toEqual([
       "markComplete",
@@ -356,15 +352,43 @@ describe("incoming share owner", () => {
 
   it("skips the tombstone when the store already holds a newer record", () => {
     // s2's record is written synchronously in the reconcile effect, but its
-    // result reaches the owner a microtask later. s1 settling in between
-    // still matches recordId, so only the store check can catch it.
+    // result reaches the owner a microtask later. s1 completing in between
+    // (Continue on its partial screen) still matches recordId, so only the
+    // store check can catch it.
     const stale = run(
       [
         { type: "reconciled", result: { kind: "new", session: session("s1") } },
-        { type: "saveSettled", session: session("s1", "saved") },
+        { type: "complete", session: session("s1", "saved") },
       ],
       ctx({ storedSessionId: "s2" }),
     );
     expect(types(stale.effects[1])).toEqual(["markComplete", "nativeClear"]);
+  });
+
+  it("keeps the current phase when a replaced session settles partial", () => {
+    const { state, effects } = run(
+      [
+        { type: "reconciled", result: { kind: "new", session: session("s1") } },
+        { type: "reconciled", result: { kind: "new", session: session("s2") } },
+        { type: "saveSettled", session: session("s1", "failed") },
+      ],
+      ctx({ storedSessionId: "s2" }),
+    );
+    expect(effects[2]).toEqual([{ type: "markComplete", sessionId: "s1" }]);
+    expect(state.phase).toEqual({ kind: "saving", session: session("s2") });
+    expect(state.partial).toBeNull();
+    expect(state.running).toBe("s2");
+  });
+
+  it("still completes when the stored record is missing, not replaced", () => {
+    const { state, effects } = run(
+      [
+        { type: "reconciled", result: { kind: "new", session: session("s1") } },
+        { type: "saveSettled", session: session("s1", "saved") },
+      ],
+      ctx({ storedSessionId: null }),
+    );
+    expect(types(effects[1])).toEqual(["markComplete", "nativeClear"]);
+    expect(state.completing).toBe("s1");
   });
 });
