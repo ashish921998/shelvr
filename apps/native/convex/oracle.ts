@@ -2,7 +2,8 @@
 
 import { generateObject } from "ai";
 import { internalAction } from "./_generated/server";
-import { MODEL, modelCallOptions, readPage } from "./ai";
+import { MODEL, modelCallOptions } from "./ai";
+import { readPage } from "./model/pageRead";
 import { errorName, logEvent } from "./model/log";
 import {
   oracleInputValidator,
