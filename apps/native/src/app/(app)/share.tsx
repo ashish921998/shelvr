@@ -187,6 +187,7 @@ export default function ShareScreen() {
         entitlementLoading,
         rawPayloads,
         resolved: processorPayloads,
+        storedSessionId: loadSession(shareStore)?.sessionId ?? null,
       });
       owner.current = next.state;
       for (const effect of next.effects) {
@@ -478,6 +479,14 @@ function runEffect(
       return;
     case "save":
       void save(effect, dispatch, deps.saveDeps);
+      return;
+    case "saveFailed":
+      analytics.captureError("share_save_failed", effect.error);
+      dispatch({
+        type: "saveCrashed",
+        session: effect.session,
+        live: loadSession(shareStore),
+      });
       return;
     case "startSession": {
       const session = startNewSession(

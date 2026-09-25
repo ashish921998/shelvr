@@ -73,6 +73,10 @@ export type ShareContext = {
   entitlementLoading: boolean;
   rawPayloads: RawSharePayload[];
   resolved: ResolvedPayload[];
+  /** The session id the store holds right now. The owner's `recordId` only
+   * catches up when a reconcile result is dispatched, a microtask after the
+   * record is written, and another mount may have written it. */
+  storedSessionId: string | null;
 };
 
 type ClearFor =
@@ -121,6 +125,7 @@ export type ShareEffect =
       fingerprint: string;
       rawPayloads: RawSharePayload[];
     }
+  | { type: "saveFailed"; session: ShareSession; error: unknown }
   | { type: "recordFirstShare"; userId: string }
   | {
       type: "capture";
@@ -188,7 +193,7 @@ export function stepIncomingShare(
       const sid = event.session.sessionId;
       const settled = releaseRun(state, sid);
       if (event.session.entries.every((e) => e.status === "saved")) {
-        return complete(settled, event.session);
+        return complete(settled, event.session, ctx);
       }
       return none({
         ...settled,
@@ -216,7 +221,7 @@ export function stepIncomingShare(
         ctx,
       );
     case "complete":
-      return complete(state, event.session);
+      return complete(state, event.session, ctx);
     case "retry":
       return event.live === null
         ? none(state)
@@ -295,6 +300,7 @@ function reconciled(
       return complete(
         { ...state, recordId: result.session.sessionId },
         result.session,
+        ctx,
       );
     case "new":
     case "resume": {
@@ -334,9 +340,25 @@ function requestSave(
   // Classify a fresh session (no side effects), persisting terminal statuses
   // so a crash before any save still records failed/unsupported entries.
   const fresh = session.entries.every((e) => e.status === "pending");
-  const working = fresh
-    ? { ...session, entries: classifyEntries(session, ctx.resolved) }
-    : session;
+  let working = session;
+  if (fresh) {
+    try {
+      working = { ...session, entries: classifyEntries(session, ctx.resolved) };
+    } catch (error) {
+      // A malformed payload: settle on the partial screen as a crashed run
+      // does (the screen reports it and reloads what survived), never idle
+      // behind the "Saved to Shelvr" spinner.
+      return {
+        state: {
+          ...state,
+          partial: sid,
+          locked: null,
+          phase: { kind: "partial", session },
+        },
+        effects: [{ type: "saveFailed", session, error }],
+      };
+    }
+  }
   return {
     state: {
       ...state,
@@ -375,11 +397,15 @@ function releaseRun(state: IncomingShareState, sid: string) {
  *      the next task-restore replay would save the batch again. iOS never
  *      replays a share.
  *   3. native clear; the rest waits for its outcome (see clearSettled). */
-function complete(state: IncomingShareState, session: ShareSession): Step {
+function complete(
+  state: IncomingShareState,
+  session: ShareSession,
+  ctx: ShareContext,
+): Step {
   const sid = session.sessionId;
   if (state.completing === sid) return none(state);
   const effects: ShareEffect[] = [{ type: "markComplete", sessionId: sid }];
-  if (state.android && state.recordId === sid) {
+  if (state.android && state.recordId === sid && ctx.storedSessionId === sid) {
     effects.push({
       type: "tombstone",
       fingerprint: session.fingerprint,

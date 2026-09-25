@@ -33,6 +33,7 @@ const ctx = (over: Partial<ShareContext> = {}): ShareContext => ({
       contentMimeType: "text/plain",
     },
   ],
+  storedSessionId: null,
   ...over,
 });
 
@@ -103,17 +104,20 @@ describe("incoming share owner", () => {
 
   it("completes a stale session scoped to its own id, without a tombstone", () => {
     // s1 is saving when a newer share replaces the record with s2.
-    const { state, effects } = run([
-      { type: "reconciled", result: { kind: "new", session: session("s1") } },
-      { type: "reconciled", result: { kind: "new", session: session("s2") } },
-      {
-        type: "entrySettled",
-        sessionId: "s1",
-        entry: session("s1", "saved").entries[0],
-      },
-      { type: "saveSettled", session: session("s1", "saved") },
-      { type: "saveSettled", session: session("s2", "saved") },
-    ]);
+    const { state, effects } = run(
+      [
+        { type: "reconciled", result: { kind: "new", session: session("s1") } },
+        { type: "reconciled", result: { kind: "new", session: session("s2") } },
+        {
+          type: "entrySettled",
+          sessionId: "s1",
+          entry: session("s1", "saved").entries[0],
+        },
+        { type: "saveSettled", session: session("s1", "saved") },
+        { type: "saveSettled", session: session("s2", "saved") },
+      ],
+      ctx({ storedSessionId: "s2" }),
+    );
     expect(types(effects[1])).toEqual(["save"]);
     // s1's progress is persisted against s1 only and never drawn over s2.
     expect(effects[2]).toEqual([
@@ -142,14 +146,17 @@ describe("incoming share owner", () => {
   it("orders a completion around the native clear outcome", () => {
     const saved = session("s1", "saved");
     const clear = { kind: "complete" as const, session: saved };
-    const { state, effects } = run([
-      { type: "reconciled", result: { kind: "new", session: session("s1") } },
-      { type: "saveSettled", session: saved },
-      { type: "complete", session: saved },
-      { type: "nativeClearSettled", ok: false, for: clear },
-      { type: "complete", session: saved },
-      { type: "nativeClearSettled", ok: true, for: clear },
-    ]);
+    const { state, effects } = run(
+      [
+        { type: "reconciled", result: { kind: "new", session: session("s1") } },
+        { type: "saveSettled", session: saved },
+        { type: "complete", session: saved },
+        { type: "nativeClearSettled", ok: false, for: clear },
+        { type: "complete", session: saved },
+        { type: "nativeClearSettled", ok: true, for: clear },
+      ],
+      ctx({ storedSessionId: "s1" }),
+    );
     // A second press while completing is a no-op.
     expect(effects[2]).toEqual([]);
     // A throwing clear keeps the session and offers Try again.
@@ -324,5 +331,40 @@ describe("incoming share owner", () => {
     expect(state.phase).toEqual({ kind: "partial", session: s1 });
     expect(state.running).toBeNull();
     expect(state.partial).toBe("s1");
+  });
+
+  it("settles a malformed payload on the partial screen, not idle", () => {
+    const s1 = session("s1");
+    const { state, effects } = run(
+      [{ type: "reconciled", result: { kind: "new", session: s1 } }],
+      ctx({
+        resolved: [
+          {
+            contentType: "website",
+            value: undefined as unknown as string,
+            contentUri: null,
+            contentMimeType: null,
+          },
+        ],
+      }),
+    );
+    expect(state.phase).toEqual({ kind: "partial", session: s1 });
+    expect(state.partial).toBe("s1");
+    expect(state.running).toBeNull();
+    expect(types(effects[0])).toEqual(["saveFailed"]);
+  });
+
+  it("skips the tombstone when the store already holds a newer record", () => {
+    // s2's record is written synchronously in the reconcile effect, but its
+    // result reaches the owner a microtask later. s1 settling in between
+    // still matches recordId, so only the store check can catch it.
+    const stale = run(
+      [
+        { type: "reconciled", result: { kind: "new", session: session("s1") } },
+        { type: "saveSettled", session: session("s1", "saved") },
+      ],
+      ctx({ storedSessionId: "s2" }),
+    );
+    expect(types(stale.effects[1])).toEqual(["markComplete", "nativeClear"]);
   });
 });
