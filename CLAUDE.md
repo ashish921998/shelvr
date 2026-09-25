@@ -219,8 +219,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     read). `app.config.js` adds the `posthog-react-native/expo` source map upload plugin only when
     this is set, so a build without it keeps working and uploads switch on the moment the EAS
     secret is added. The upload runs inside the native build and needs `@posthog/cli` available
-    there; `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` are already set in the production EAS
-    profile. `metro.config.js` stamps the matching debug id into every bundle regardless
+    there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
+    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
+    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
 `apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and
