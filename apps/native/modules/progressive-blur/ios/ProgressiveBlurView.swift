@@ -12,13 +12,24 @@ import UIKit
 // opacity is faded out by a gradient `CALayer` mask. The result is a close
 // visual approximation, not a true per-pixel variable-radius blur.
 class ProgressiveBlurView: ExpoView {
-  // `.systemChromeMaterial` is the material UIKit gives its own bars, and it is
-  // the reason text scrolling under a system navigation bar stops being
-  // readable: it layers a tint over the blur, which a plain `.regular` blur has
-  // none of — that one smears text but leaves it legible.
+  // A plain `.regular` blur smears text but leaves it legible; what makes text
+  // under a system navigation bar unreadable is the tint `.systemChromeMaterial`
+  // layers over its blur. That tint is a system grey-white though, so on a
+  // paper-coloured page the band read as a different colour from the body.
+  // This lays the page's own background over the blur instead (`pageColor`),
+  // so the band mutes what scrolls under it while staying the page's colour.
   private let blurView = UIVisualEffectView(
-    effect: UIBlurEffect(style: .systemChromeMaterial)
+    effect: UIBlurEffect(style: .regular)
   )
+  private let tintView = UIView()
+  // How much of the page colour sits over the blur. Chrome material lands
+  // around here; lower and text under the band reads through, higher and the
+  // blur stops showing at all.
+  private let tintOpacity: CGFloat = 0.72
+
+  var pageColor: UIColor? {
+    didSet { tintView.backgroundColor = pageColor?.withAlphaComponent(tintOpacity) }
+  }
 
   // Opacity mask on the whole effect view. A UIVisualEffectView draws a faint
   // hairline at its own bottom edge no matter its blur radius; only fading the
@@ -60,6 +71,10 @@ class ProgressiveBlurView: ExpoView {
     blurView.isUserInteractionEnabled = false
     isUserInteractionEnabled = false
     blurView.layer.mask = maskLayer
+    tintView.isUserInteractionEnabled = false
+    tintView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // Inside the effect view's contentView so the same opacity mask fades it.
+    blurView.contentView.addSubview(tintView)
     addSubview(blurView)
   }
 
@@ -72,6 +87,7 @@ class ProgressiveBlurView: ExpoView {
     // to zero by the header's bottom edge and stays zero through the overhang.
     let totalSize = CGSize(width: bounds.width, height: bounds.height + edgeMargin)
     blurView.frame = CGRect(origin: .zero, size: totalSize)
+    tintView.frame = blurView.contentView.bounds
     updateOpacityMask(bandHeight: bounds.height, totalSize: totalSize)
   }
 
