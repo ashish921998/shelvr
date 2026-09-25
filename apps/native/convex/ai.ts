@@ -2038,7 +2038,7 @@ async function analyzeImageItem(
           {
             type: "text",
             text: [
-              "You are helping organize a save-it-for-later app. Analyze this saved image and produce a title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
+              "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
               "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
               spacesBlock,
               intentsPromptBlock(5),
@@ -2071,7 +2071,7 @@ async function analyzeNoteItem(
     // wrote (and edits), so a lifted copy would only duplicate it.
     schema: itemAnalysisSchema,
     prompt: [
-      "You are helping organize a save-it-for-later app. Analyze this saved note and produce a title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+      "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
       spacesBlock,
       ...(item.titleSource === "user" && item.title
         ? [`The user titled this note: ${item.title}`]
