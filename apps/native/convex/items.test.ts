@@ -15,6 +15,7 @@ import {
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
+  tagSearchWords,
 } from "./items";
 import {
   IMAGE_EMPTY_MESSAGE,
@@ -470,6 +471,29 @@ describe("similarItems", () => {
     expect(similar.map((item) => item._id)).toEqual([old]);
     // Card shape only: the index copy never reaches the client.
     expect(similar[0]).not.toHaveProperty("searchText");
+  });
+
+  it("searches on short tags like art and diy", async () => {
+    const t = await as("similar-short-tag-user");
+    const old = await insertItem(t, "similar-short-tag-user", {
+      title: "Linocut prints",
+      tags: ["art", "diy"],
+    });
+    await seedFeed(t, "similar-short-tag-user", 320);
+    const fresh = await insertItem(t, "similar-short-tag-user", {
+      title: "Watercolour washes",
+      tags: ["art", "diy"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("keeps short tag words but drops filler from multi-word tags", () => {
+    expect(tagSearchWords("art")).toEqual(["art"]);
+    expect(tagSearchWords("ux")).toEqual(["ux"]);
+    expect(tagSearchWords("how to")).toEqual([]);
+    expect(tagSearchWords("to do lists")).toEqual(["do", "lists"]);
   });
 
   it("searches for older saves with non-Latin tags and titles", async () => {
