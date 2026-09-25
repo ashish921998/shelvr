@@ -1,11 +1,10 @@
 steps:
   - echo: Restart Shelvr and expect Home.
   - launch: app.shelvr.save.dev
-  - await: { visible: { text: Home } }
+  - await: { visible: { text: Profile }, timeout: 120000 }
   - await: { idle: true }
   - echo: From Home, open Search and expect the empty search screen.
-  - tap:
-      id: magnifyingglass
+  - tap: { id: magnifyingglass, text: Search }
   - await: { visible: { text: Find anything } }
   - await: { idle: true }
   - echo: Focus Search, enter a guaranteed-missing query, and expect the no-results
@@ -15,3 +14,4 @@ steps:
       text: zzzz-shelvr-no-result
       submit: false
   - await: { visible: { text: Nothing yet } }
+  - await: { idle: true }

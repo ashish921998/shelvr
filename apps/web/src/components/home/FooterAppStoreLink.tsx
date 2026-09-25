@@ -1,24 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { APP_STORE_URL } from "@/lib/appStore";
-import { captureWebAnalyticsEvent } from "@/lib/analytics";
+import { useAppStoreLink } from "@/lib/appStoreLink";
 
 export default function FooterAppStoreLink({
   children,
 }: {
   children: ReactNode;
 }) {
+  const { href, onClick } = useAppStoreLink("footer-nav");
   return (
     <a
-      href={APP_STORE_URL}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() =>
-        captureWebAnalyticsEvent("app_store_clicked", {
-          source: "footer-nav",
-        })
-      }
+      onClick={onClick}
       className="text-sm font-medium text-muted transition-colors hover:text-ink"
     >
       {children}

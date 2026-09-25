@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
 
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 type BeforeSend = (event: EventLike) => EventLike;
 type ExceptionListEntry = {
   type?: unknown;
@@ -88,6 +90,45 @@ describe("posthog before_send", () => {
     expect(sent.properties?.$exception_list).toEqual([
       { type: "Error", value: "Network request failed" },
     ]);
+  });
+
+  it("keeps a generated Expo error code so the failing module is named", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "ERR_UNAVAILABLE",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "ERR_UNAVAILABLE",
+            stacktrace: "frame at app.js:1",
+          },
+        ],
+      }),
+    );
+    expect(sent.properties?.$exception_message).toBe("ERR_UNAVAILABLE");
+    const list = sent.properties?.$exception_list as ExceptionListEntry[];
+    expect(list[0].value).toBe("ERR_UNAVAILABLE");
+  });
+
+  it("redacts an all-caps message that is not a bare code token", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "FAILED saving https://private.example/note",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "FAILED saving https://private.example/note",
+          },
+        ],
+      }),
+    );
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain("private.example");
+    expect(sent.properties?.$exception_message).toBe("Error");
   });
 
   it("replaces content-carrying messages with the error class", () => {
@@ -200,9 +241,10 @@ describe("posthog exception autocapture gate", () => {
 });
 
 describe("superProperties", () => {
-  it("tags events with the running OTA update", () => {
+  it("tags events with the running OTA update and the store platform", () => {
     expect(superProperties()).toEqual({
       environment: "development",
+      platform: "ios",
       analytics_version: 1,
       ota_update_id: "update-7",
       ota_channel: "production",

@@ -65,6 +65,7 @@ export function ProductsSection({ item }: { item: DetailItem }) {
               {product.thumbnailUrl ? (
                 <Image
                   source={{ uri: product.thumbnailUrl }}
+                  recyclingKey={`${product.url}-${index}`}
                   contentFit="cover"
                   style={styles.productImage}
                 />

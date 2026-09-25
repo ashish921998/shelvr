@@ -19,6 +19,7 @@ import {
   requireProEntitlement,
 } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -42,11 +43,21 @@ import {
   recipeValidator,
 } from "./model/itemFields";
 import {
+  buildEmbeddingText,
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+  MAX_HYDRATE_READ_BYTES,
+  MAX_EMBEDDING_ATTEMPTS,
+  MAX_SWEEP_READ_BYTES,
+} from "./model/embedding";
+import {
   imageSizeError,
   imageSizeErrorCode,
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
 // Re-exported for spaces.ts, which builds its membership validators from the
@@ -205,11 +216,37 @@ export const itemCardValidator = enrichedItemValidator.omit(
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
+/**
+ * Drops the retrieval vector before a row crosses any function boundary.
+ *
+ * `embedding` is ~6 KB of floats and `itemFields` is spread into
+ * `enrichedItemValidator` — the return shape of `listItems`, `getItem`,
+ * `searchItems`, the weekly digest, and `getSpace`. Left in, every one of
+ * those reads would ship the vector to the client (and Convex would reject
+ * the response outright, since the field is not in their validators).
+ *
+ * Nothing outside the backend has any use for it: vector search runs server
+ * side, in an action. So the vector is stripped at the boundary rather than
+ * added to the validators.
+ */
+function stripEmbedding(
+  item: Doc<"items">,
+): Omit<Doc<"items">, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
+  const {
+    embedding: _embedding,
+    embeddingVersion: _version,
+    embeddingAttempts: _attempts,
+    ...rest
+  } = item;
+  return rest;
+}
+
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
-  return { ...item, imageUrl };
+  // The single chokepoint every client-facing item read shares.
+  return { ...stripEmbedding(item), imageUrl };
 }
 
 export async function toItemCard(
@@ -235,12 +272,21 @@ export async function toItemCard(
  * the cap keeps a pasted essay from bloating the index. */
 const MAX_SEARCH_NOTE_CHARS = 8000;
 
+/** How much of an extracted article body the search index carries. Without
+ * this the index only ever held the classifier's ~40-word summary of a page,
+ * so a phrase the reader actually remembers from the article was unfindable.
+ * The cap mirrors the note cap rather than MAX_STORED_CONTENT_CHARS (100k):
+ * `searchText` rides along on every `enrichedItemValidator` read, so the index
+ * copy stays a lede, not a second copy of the body. */
+const MAX_SEARCH_CONTENT_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
   note?: string;
+  content?: string;
 }): string {
   return [
     parts.title,
@@ -248,6 +294,7 @@ function buildSearchText(parts: {
     ...parts.tags,
     parts.siteName,
     parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+    parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
   ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
@@ -447,17 +494,90 @@ export const searchItems = query({
 // Similar-items v0: lexical overlap, no new infra. Tags carry most of the
 // signal (they're the classifier's own summary), searchText tokens catch the
 // rest. A vector index over real embeddings replaces this in v1.
+//
+// Candidates come from two reads: the newest saves, and a full-text search on
+// the item's own tags and title. The search reaches saves of any age, so an
+// item saved months ago can still come back when a related one arrives.
+// Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
+const SIMILAR_SEARCH_CANDIDATES = 100;
+// Candidate rows are full documents, and an article's stored content runs to
+// MAX_STORED_CONTENT_CHARS, so both reads also stop at a shared byte budget
+// that leaves headroom under Convex's 16 MiB per-query read limit. The search
+// runs first under its own smaller cap, so the recent read can't starve it,
+// and the recent read gets whatever the search left, never less than 10 MiB.
+// Each read can overshoot by the one document that crosses its cap, which
+// the headroom covers.
+const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
+const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
+const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
+// Convex caps a full-text query at 16 terms.
+const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
+// Mirrors RECALL_MIN_AGE_MS in apps/native/src/lib/save-recall.ts: the age a
+// match needs to clear before the save recall card will show it. Reserving a
+// few slots for the best-scoring matches this old means a burst of newer,
+// higher-scoring saves can't crowd every old match out of SIMILAR_LIMIT
+// before the card ever sees them.
+const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const SIMILAR_RESERVED_OLD = 3;
+
+/** The words of `text` worth matching on. Splits on Unicode letters and
+ * digits, so Japanese or Korean text still yields words. Short Latin words
+ * are mostly noise; words in other scripts are often two characters. */
+function significantWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(
+      (word) =>
+        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
+    );
+}
+
+/**
+ * The text similar-items scores on: exactly what `searchText` held before the
+ * article body was indexed.
+ *
+ * `searchTokens` keeps every token longer than three characters and has no
+ * stopword list, so scoring over a body-bearing `searchText` would have every
+ * pair of English articles sharing "that", "with", "from", "have" and dozens
+ * more. With SIMILAR_MIN_SCORE at 3 effectively every candidate would qualify
+ * and ranking would track document length instead of topic. The full-text
+ * index still gets the body; this scorer deliberately does not.
+ */
+function summaryText(item: Doc<"items">): string {
+  return buildSearchText({
+    title: item.title,
+    description: item.description,
+    tags: item.tags,
+    siteName: item.siteName,
+    note: item.note,
+  });
+}
 
 function searchTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((token) => token.length > 3),
-  );
+  return new Set(significantWords(text));
+}
+
+/** The full-text query for an item's older relatives: its tags first, since
+ * they carry most of the scoring signal, then its title words. Deduplicated
+ * and capped at the search term limit. Uses the same words as scoring, so
+ * any candidate a term finds can score on it. */
+function similarSearchTerms(item: Doc<"items">): string[] {
+  const terms = new Set<string>();
+  const words = [
+    ...item.tags.flatMap(significantWords),
+    ...significantWords(item.title ?? ""),
+  ];
+  for (const word of words) {
+    terms.add(word);
+    if (terms.size >= SIMILAR_SEARCH_TERMS) {
+      break;
+    }
+  }
+  return [...terms];
 }
 
 export const similarItems = query({
@@ -470,19 +590,48 @@ export const similarItems = query({
       return [];
     }
     const tags = new Set(item.tags);
-    const tokens = searchTokens(item.searchText);
+    const tokens = searchTokens(summaryText(item));
     if (tags.size === 0 && tokens.size === 0) {
       return [];
     }
 
-    const candidates = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(SIMILAR_CANDIDATES);
+    const terms = similarSearchTerms(item);
+    const searched =
+      terms.length === 0
+        ? { rows: [], bytes: 0 }
+        : await takeWithinBytes(
+            ctx.db
+              .query("items")
+              .withSearchIndex("search_text", (q) =>
+                q.search("searchText", terms.join(" ")).eq("userId", userId),
+              ),
+            {
+              maxRows: SIMILAR_SEARCH_CANDIDATES,
+              maxBytes: SIMILAR_SEARCH_BYTES,
+            },
+          );
+
+    const recent = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc"),
+      {
+        maxRows: SIMILAR_CANDIDATES,
+        maxBytes: Math.max(
+          SIMILAR_READ_BYTES - searched.bytes,
+          SIMILAR_RECENT_MIN_BYTES,
+        ),
+      },
+    );
+
+    const candidates = new Map<Id<"items">, Doc<"items">>();
+    for (const candidate of [...recent.rows, ...searched.rows]) {
+      candidates.set(candidate._id, candidate);
+    }
 
     const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates) {
+    for (const candidate of candidates.values()) {
       if (candidate._id === item._id || candidate.status !== "ready") {
         continue;
       }
@@ -492,7 +641,7 @@ export const similarItems = query({
           score += 3;
         }
       }
-      for (const token of searchTokens(candidate.searchText)) {
+      for (const token of searchTokens(summaryText(candidate))) {
         if (tokens.has(token)) {
           score += 1;
         }
@@ -502,10 +651,22 @@ export const similarItems = query({
       }
     }
     scored.sort((a, b) => b.score - a.score);
+
+    // Reserve a few slots for the best-scoring old-enough matches before the
+    // general top-score cut, so they survive even when newer saves outscore
+    // them. The final list stays score-ordered either way.
+    const oldCutoff = item._creationTime - SIMILAR_OLD_AGE_MS;
+    const reservedOld = scored
+      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
+      .slice(0, SIMILAR_RESERVED_OLD);
+    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
+    const rest = scored
+      .filter((candidate) => !reservedIds.has(candidate.item._id))
+      .slice(0, SIMILAR_LIMIT - reservedOld.length);
+    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
+
     return await Promise.all(
-      scored
-        .slice(0, SIMILAR_LIMIT)
-        .map(({ item: match }) => toItemCard(ctx, match)),
+      final.map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });
@@ -906,6 +1067,7 @@ export const finalizeImageImport = mutation({
   args: {
     operationId: v.string(),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
     aspectRatio: v.optional(v.number()),
     isSticker: v.optional(v.boolean()),
     capturedAt: v.optional(v.number()),
@@ -987,7 +1149,9 @@ export const finalizeImageImport = mutation({
       itemId,
       runId: run.processingRunId,
     });
-    await scheduleSaveTelemetry(ctx, itemId, args.analyticsSessionId, {
+    await scheduleSaveTelemetry(ctx, itemId, {
+      sessionId: args.analyticsSessionId,
+      saveSource: args.saveSource,
       photoCount: photoCount + 1,
       storedBytes,
     });
@@ -1102,6 +1266,7 @@ async function createItemWithOperation(
     operationId?: string;
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
+    saveSource?: SaveSource;
   },
 ): Promise<Id<"items">> {
   const now = Date.now();
@@ -1139,14 +1304,7 @@ async function createItemWithOperation(
     // so a retry of an already-finished operation is never billed a token —
     // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-    const itemId = await insertLinkOrNote(
-      ctx,
-      userId,
-      kind,
-      payload,
-      options.spaceId,
-      options.analyticsSessionId,
-    );
+    const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
         userId,
@@ -1172,14 +1330,7 @@ async function createItemWithOperation(
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-  return await insertLinkOrNote(
-    ctx,
-    userId,
-    kind,
-    payload,
-    options.spaceId,
-    options.analyticsSessionId,
-  );
+  return await insertLinkOrNote(ctx, userId, kind, payload, options);
 }
 
 /** Throws if a link/note payload is empty/invalid. Validation is shared by the
@@ -1213,8 +1364,11 @@ async function insertLinkOrNote(
   userId: string,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
-  spaceId?: Id<"spaces">,
-  analyticsSessionId?: string,
+  options: {
+    spaceId?: Id<"spaces">;
+    analyticsSessionId?: string;
+    saveSource?: SaveSource;
+  },
 ): Promise<Id<"items">> {
   const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
@@ -1226,22 +1380,29 @@ async function insertLinkOrNote(
     tags: [],
     searchText: "",
   });
-  if (spaceId !== undefined) {
-    await saveIntoSpace(ctx, userId, itemId, spaceId);
+  if (options.spaceId !== undefined) {
+    await saveIntoSpace(ctx, userId, itemId, options.spaceId);
   }
   await ctx.scheduler.runAfter(0, internal.ai.processItem, {
     itemId,
     runId: run.processingRunId,
   });
-  await scheduleSaveTelemetry(ctx, itemId, analyticsSessionId);
+  await scheduleSaveTelemetry(ctx, itemId, {
+    sessionId: options.analyticsSessionId,
+    saveSource: options.saveSource,
+  });
   return itemId;
 }
 
 async function scheduleSaveTelemetry(
   ctx: MutationCtx,
   itemId: Id<"items">,
-  sessionId?: string,
-  photo?: { photoCount: number; storedBytes?: number },
+  telemetry?: {
+    sessionId?: string;
+    saveSource?: SaveSource;
+    photoCount?: number;
+    storedBytes?: number;
+  },
 ): Promise<void> {
   const item = await ctx.db.get(itemId);
   if (!item) return;
@@ -1250,8 +1411,8 @@ async function scheduleSaveTelemetry(
     userId: item.userId,
     itemType: item.type,
     savedAt: item._creationTime,
-    sessionId: sessionId?.slice(0, 128),
-    ...photo,
+    ...telemetry,
+    sessionId: telemetry?.sessionId?.slice(0, 128),
   });
 }
 
@@ -1261,6 +1422,7 @@ export const createLinkItem = mutation({
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -1284,6 +1446,7 @@ export const createLinkItem = mutation({
         operationId: args.operationId,
         spaceId: args.spaceId,
         analyticsSessionId: args.analyticsSessionId,
+        saveSource: args.saveSource,
       },
     );
   },
@@ -1295,6 +1458,7 @@ export const createNoteItem = mutation({
     spaceId: v.optional(v.id("spaces")),
     operationId: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    saveSource: v.optional(saveSourceValidator),
   },
   returns: v.id("items"),
   handler: async (ctx, args) => {
@@ -1311,6 +1475,11 @@ export const createNoteItem = mutation({
         operationId: args.operationId,
         spaceId: args.spaceId,
         analyticsSessionId: args.analyticsSessionId,
+        // Defaulted server-side so a client that sends nothing still reports
+        // `note`, while share.tsx can override with `share_extension`: a note
+        // shared through the extension is extension use, and counting it as an
+        // ordinary note would understate the extension's adoption.
+        saveSource: args.saveSource ?? "note",
       },
     );
   },
@@ -1450,6 +1619,8 @@ export const importLinks = mutation({
         internal.ai.processItem,
         { itemId, runId: run.processingRunId },
       );
+      // No saveSource: the closed union has no literal for a bulk import, and
+      // a wrong one would pollute the funnel worse than an absent one does.
       await scheduleSaveTelemetry(ctx, itemId);
     }
     return {
@@ -1531,7 +1702,19 @@ export const updateNoteItem = mutation({
         description: item.description,
         tags: item.tags,
         note: text,
+        content: item.content,
       }),
+      // The note's own words are most of what it is embedded from, so an edit
+      // invalidates the vector. A text change also schedules a re-classify
+      // that re-embeds, but a title-only edit does not — clearing the stamp
+      // covers both by handing the row back to the sweep either way.
+      //
+      // The attempt count goes with it: it is a budget for embedding one
+      // particular text, and this is different text. Carried over, a row that
+      // had already failed four times would be stamped current after a single
+      // failure on the edited note, with no vector for what it now says.
+      embeddingVersion: undefined,
+      embeddingAttempts: undefined,
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
         ? { processingStartedAt: Date.now() }
@@ -1677,6 +1860,13 @@ export const deleteItem = mutation({
     for (const read of reads) {
       await ctx.db.delete(read._id);
     }
+    const shareLinks = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .collect();
+    for (const link of shareLinks) {
+      await ctx.db.delete(link._id);
+    }
     if (item.storageId) {
       // Existence-checked: if the blob is somehow already gone, the delete must
       // still remove the item rather than throw and leave it undeletable.
@@ -1687,6 +1877,40 @@ export const deleteItem = mutation({
   },
 });
 
+/** Token for an item's public preview page, minted the first time the owner
+ * shares it and reused after. Null when the item has no preview to show (not
+ * ready, or an image, which shares its file instead). */
+export const createShareLink = mutation({
+  args: { itemId: v.id("items") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    if (!isShareable(item)) return null;
+
+    const existing = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .first();
+    if (existing !== null) return existing.token;
+
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const token = Array.from(bytes, (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
+    await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
+    return token;
+  },
+});
+
+function isShareable(item: Doc<"items">): boolean {
+  return item.status === "ready" && item.type !== "image";
+}
+
 // ---------------------------------------------------------------------------
 // Internal — used by the AI actions
 // ---------------------------------------------------------------------------
@@ -1695,7 +1919,48 @@ export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
   returns: v.union(v.object(itemFields), v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.itemId);
+    const item = await ctx.db.get(args.itemId);
+    // `itemFields` deliberately omits the vector, and Convex enforces
+    // `returns` exactly — the raw document would fail validation here.
+    return item === null ? null : stripEmbedding(item);
+  },
+});
+
+/** Bounded preview for the public branded share page, looked up by the token
+ * `createShareLink` minted. Deliberately narrow: no `userId`, no article
+ * body, no tags — just enough to render an OG card and a landing page for
+ * someone who doesn't have the app yet. */
+export const getSharePreview = internalQuery({
+  args: { token: v.string() },
+  returns: v.union(
+    v.object({
+      type: itemTypeValidator,
+      title: v.string(),
+      description: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      noteText: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { token }) => {
+    const link = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (link === null) return null;
+    const item = await ctx.db.get(link.itemId);
+    if (!item || item.userId !== link.userId || !isShareable(item)) return null;
+
+    const { imageUrl } = await enrichItem(ctx, item);
+    return {
+      type: item.type,
+      title: item.title ?? "A save from Shelvr",
+      description: item.description,
+      imageUrl: imageUrl ?? item.heroImageUrl,
+      sourceUrl: item.type === "link" ? item.url : undefined,
+      noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
+    };
   },
 });
 
@@ -1707,13 +1972,84 @@ export const listReadyItemsInternal = internalQuery({
     // Index-scoped to `ready` so a library full of failed or in-flight saves
     // still yields `limit` candidates; the old by_user read took 2x and
     // filtered in JS, which starved users with many failed items.
-    return await ctx.db
+    const rows = await ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
         q.eq("userId", args.userId).eq("status", "ready"),
       )
       .order("desc")
       .take(limit);
+    // Keeps `limit` vectors (~6 KB each) from crossing into the action on
+    // every recommendation pass, and keeps the rows inside `itemFields`.
+    return rows.map(stripEmbedding);
+  },
+});
+
+/**
+ * Hydrates vector-search hits back into item documents, preserving the order
+ * they were given in.
+ *
+ * `ctx.vectorSearch` returns `{_id, _score}` and nothing else, and it is
+ * action-only, so the ids have to come back through a query to become rows.
+ * Order is the caller's ranking and is load-bearing: the recommendation prompt
+ * numbers the list it is handed, so re-sorting here would quietly hand the
+ * model a worse shortlist.
+ *
+ * Rows that are not `ready` are dropped rather than returned: the vector index
+ * has no `status` filter field (Convex vector filters cannot AND across
+ * fields), so a stale vector belonging to an item that has since failed can
+ * still match. The `userId` re-check is defence in depth — the search is
+ * already filtered to one owner, and this is the one field whose failure would
+ * cross accounts.
+ *
+ * Rows stamped with an older generation are dropped for the same reason. A
+ * version bump means the vectors describe different text, a different model,
+ * or both, and the index keeps serving the old ones until the sweep replaces
+ * them. Scoring a current query against them is not a weaker ranking so much
+ * as a meaningless one, and the ranking is silent about it either way. The
+ * caller's recency half covers the gap while the sweep drains, so refusing to
+ * mix generations costs candidates only where they would have been misranked.
+ */
+export const listReadyItemsByIdInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    itemIds: v.array(v.id("items")),
+    limit: v.number(),
+  },
+  returns: v.array(v.object(itemFields)),
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
+    const rows: Doc<"items">[] = [];
+    let bytes = 0;
+    for (const itemId of args.itemIds) {
+      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
+        break;
+      }
+      const item = await ctx.db.get(itemId);
+      if (item === null) {
+        continue;
+      }
+      // Charged before the row is judged, not after: the read has already
+      // happened by this point, and it is reads the budget exists to bound.
+      // A dropped hit costs the transaction exactly what a kept one does, so
+      // a run of large non-`ready` rows would otherwise walk straight past
+      // the budget and into Convex's own limit.
+      //
+      // Approximate, like the sweep's budget: the body dominates, and this
+      // only has to keep the transaction clear of that limit.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (
+        item.userId !== args.userId ||
+        item.status !== "ready" ||
+        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
+      ) {
+        continue;
+      }
+      rows.push(item);
+    }
+    // Same reason as listReadyItemsInternal: vectors stay out of the action,
+    // and the rows stay inside `itemFields`.
+    return rows.map(stripEmbedding);
   },
 });
 
@@ -1781,6 +2117,12 @@ export const finalizeItem = internalMutation({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
+    // The retrieval vector for the text this run classified, already
+    // normalized and width-checked by the action. Optional because embedding
+    // is best-effort: a run whose embed call failed still finalizes the item,
+    // and the sweeper fills the vector in later. Never `null` — absent means
+    // "this run produced none".
+    embedding: v.optional(v.array(v.float64())),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
@@ -1814,6 +2156,7 @@ export const finalizeItem = internalMutation({
       tags: args.tags,
       siteName: args.siteName,
       note: item.note,
+      content: args.content,
     });
     await ctx.db.patch(args.itemId, {
       title,
@@ -1835,6 +2178,31 @@ export const finalizeItem = internalMutation({
       enrichment: args.enrichment,
       failureReason: undefined,
       searchText,
+      // Written in the same run-fenced transaction as the classification it
+      // describes, so a superseded run can never leave a vector that
+      // disagrees with the text beside it.
+      // Re-checked here even though the action already validated: Convex
+      // rejects a vector whose width differs from the index at write time, and
+      // that would fail this whole transaction — losing the classification
+      // over a field that is optional by design.
+      ...(args.embedding !== undefined && isValidEmbedding(args.embedding)
+        ? {
+            embedding: args.embedding,
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+            embeddingAttempts: undefined,
+          }
+        : // This run could not embed. Keep whatever vector the row already
+          // carried — a slightly stale semantic match beats none — but drop
+          // the generation stamp so the sweeper re-embeds it against the text
+          // just written. Patching `embedding: undefined` instead would
+          // delete a good vector over a transient provider failure.
+          //
+          // The attempt count is cleared for the same reason it is on a
+          // success: the budget belongs to one particular text, and this
+          // classification just wrote new text. Carried over, a row with four
+          // prior attempts would be stamped current after one failure on the
+          // new text, keeping a vector that describes the old.
+          { embeddingVersion: undefined, embeddingAttempts: undefined }),
     });
     if (
       args.storageId !== undefined &&
@@ -1863,6 +2231,237 @@ export const deleteStorageIfUnreferenced = internalMutation({
       await safeDeleteStorage(ctx, args.storageId);
     }
     return null;
+  },
+});
+
+/**
+ * One page of items whose stored vector is missing or from an older
+ * generation, already reduced to the exact text each one should be embedded
+ * from.
+ *
+ * Composing the text here rather than in the action is what keeps the page
+ * small on the way out: the builder truncates to MAX_EMBED_CHARS, so the
+ * result is bounded even when the source article is not.
+ *
+ * The read side is bounded separately and explicitly. Rows are streamed rather
+ * than `take`n so the loop can stop on a byte budget as well as a row count —
+ * a `ready` link can carry 100k characters of `content`, and a page of those
+ * would blow the transaction read limit. That failure would not be a one-off:
+ * the same oversized rows sit at the front of the range on every run, so the
+ * sweep would wedge on them forever instead of making progress.
+ *
+ * Rows with nothing to embed are returned too, with an empty `text`. The
+ * caller needs to see them to mark them finished — otherwise an item that can
+ * never produce text would sit at the front of the range forever.
+ */
+export const listItemsNeedingEmbeddingInternal = internalQuery({
+  args: { limit: v.number() },
+  returns: v.array(v.object({ itemId: v.id("items"), text: v.string() })),
+  handler: async (ctx, args) => {
+    const limit = Math.min(
+      Math.max(1, Math.floor(args.limit)),
+      EMBEDDING_SWEEP_PAGE,
+    );
+    // `undefined` sorts before every number, so this one range covers rows
+    // that have never been embedded and rows left behind by a version bump.
+    const rows = ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      );
+    const page: { itemId: Id<"items">; text: string }[] = [];
+    let bytes = 0;
+    for await (const item of rows) {
+      page.push({
+        itemId: item._id,
+        text: buildEmbeddingText({
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          note: item.note,
+          content: item.content,
+        }),
+      });
+      // Approximate: the body dominates, and the budget only has to keep the
+      // transaction well clear of its limit, not measure it exactly.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (page.length >= limit || bytes >= MAX_SWEEP_READ_BYTES) {
+        break;
+      }
+    }
+    return page;
+  },
+});
+
+/**
+ * What the sweep concluded about one item, decided in the action where the
+ * batch outcome is visible.
+ *
+ * The distinction between `failed` and `deferred` is the whole point. Stamping
+ * the current generation is what removes a row from the sweep range, so doing
+ * it for an item the provider merely could not reach right now would delete it
+ * from the vector index permanently. During an outage that is not one row: the
+ * sweep would march the entire table, stamping every item as done with no
+ * vector, and nothing would ever revisit them.
+ */
+const embeddingOutcomeValidator = v.union(
+  // A usable vector came back.
+  v.literal("embedded"),
+  // The item has no embeddable text at all, so it is finished either way.
+  v.literal("nothing_to_embed"),
+  // The provider answered for the rest of the batch but not usefully for this
+  // item: its own content is the problem, so it spends an attempt.
+  v.literal("failed"),
+  // The whole batch came back empty — the provider is down. Costs nothing and
+  // changes nothing; the row is retried on a later tick.
+  v.literal("deferred"),
+);
+
+/**
+ * Writes one sweep's results back.
+ *
+ * Guards, in order: the item may have been deleted while the action ran; a
+ * live pipeline run may have written a current-generation vector in the
+ * meantime, which describes newer text than the sweep read and must win; and a
+ * vector that is the wrong width, non-finite, or all zero is dropped rather
+ * than written, because Convex rejects the wrong width at write time and the
+ * other two poison every later comparison.
+ *
+ * It also rebuilds `searchText`, but only when the value actually changes.
+ * The rebuild is what makes the article body reach the full-text index for
+ * saves classified before it was indexed, without re-running the model — and
+ * skipping no-op writes keeps a drained sweep from invalidating every
+ * subscribed feed query on a timer.
+ */
+export const setEmbeddingsInternal = internalMutation({
+  args: {
+    entries: v.array(
+      v.object({
+        itemId: v.id("items"),
+        // The exact text the action embedded. Echoed back so the write can
+        // check it still describes the row — see the staleness fence below.
+        text: v.string(),
+        embedding: v.optional(v.array(v.float64())),
+        outcome: embeddingOutcomeValidator,
+      }),
+    ),
+  },
+  returns: v.object({
+    written: v.number(),
+    stamped: v.number(),
+    deferred: v.number(),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ written: number; stamped: number; deferred: number }> => {
+    let written = 0;
+    let stamped = 0;
+    let deferred = 0;
+    for (const entry of args.entries) {
+      const item = await ctx.db.get(entry.itemId);
+      if (item === null) {
+        continue;
+      }
+      if ((item.embeddingVersion ?? -1) >= CURRENT_EMBEDDING_VERSION) {
+        // A pipeline run beat the sweep to it.
+        continue;
+      }
+
+      const nextSearchText = buildSearchText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        content: item.content,
+      });
+      const reindex =
+        nextSearchText === item.searchText
+          ? {}
+          : { searchText: nextSearchText };
+
+      // Staleness fence. The version guard above catches a pipeline run that
+      // embedded successfully, but not one that re-classified this item and
+      // then failed to embed — that clears the stamp, so the row looks
+      // unembedded while its text is newer than what the action read. Writing
+      // then would pin a vector describing text the item no longer has, at the
+      // current generation, where nothing would revisit it. Comparing the
+      // composed text is the cheap equivalent of a run fence: the row is left
+      // for the next tick, which reads the new text.
+      const currentText = buildEmbeddingText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        content: item.content,
+      });
+      if (currentText !== entry.text) {
+        if (reindex.searchText !== undefined) {
+          await ctx.db.patch(entry.itemId, reindex);
+        }
+        deferred++;
+        continue;
+      }
+
+      const usable =
+        entry.outcome === "embedded" &&
+        entry.embedding !== undefined &&
+        isValidEmbedding(entry.embedding);
+
+      if (usable) {
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embedding: entry.embedding,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          embeddingAttempts: undefined,
+        });
+        written++;
+        stamped++;
+        continue;
+      }
+
+      if (entry.outcome === "nothing_to_embed") {
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+        });
+        stamped++;
+        continue;
+      }
+
+      if (entry.outcome === "deferred") {
+        // The provider was down. Reindexing is still worth doing; the row
+        // stays in the range so a later tick retries the vector.
+        if (reindex.searchText !== undefined) {
+          await ctx.db.patch(entry.itemId, reindex);
+        }
+        deferred++;
+        continue;
+      }
+
+      // "failed", or "embedded" with a vector that did not survive validation:
+      // this item's own content is the problem, so it spends an attempt.
+      const attempts = (item.embeddingAttempts ?? 0) + 1;
+      const givingUp = attempts >= MAX_EMBEDDING_ATTEMPTS;
+      await ctx.db.patch(entry.itemId, {
+        ...reindex,
+        embeddingAttempts: attempts,
+        // Giving up stamps the row so it stops blocking everything behind it.
+        // A later CURRENT_EMBEDDING_VERSION bump re-enlists it.
+        ...(givingUp ? { embeddingVersion: CURRENT_EMBEDDING_VERSION } : {}),
+      });
+      if (givingUp) {
+        stamped++;
+      } else {
+        deferred++;
+      }
+    }
+    return { written, stamped, deferred };
   },
 });
 

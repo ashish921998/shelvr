@@ -39,7 +39,7 @@ export function RevealStep({
   useAppLocale();
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const { entitled, status, loading: entitlementLoading } = useEntitlement();
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const attachRef = useRef(false);
@@ -172,10 +172,15 @@ export function RevealStep({
 
       <View style={styles.foot}>
         <CtaButton
-          label={t("reveal.keepSaving")}
+          label={t(entitled ? "common.continue" : "reveal.keepSaving")}
           onPress={() => void keepSaving()}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
+        {/* A lapsed account has used its trial, so only a first-time
+            subscriber is told about one. */}
+        {entitled || status === "lapsed" ? null : (
+          <Text style={styles.trialNote}>{t("reveal.trialNote")}</Text>
+        )}
         {entitled ? null : (
           <GhostButton
             label={t("common.notNow")}
@@ -233,6 +238,13 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: theme.colors.faint,
+  },
+  trialNote: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
   },
   foot: {
     marginTop: "auto",

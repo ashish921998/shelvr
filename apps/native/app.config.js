@@ -1,5 +1,4 @@
 const appConfig = require("./app.json");
-const { readFileSync } = require("node:fs");
 const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
@@ -101,35 +100,23 @@ function displayName(base) {
 }
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
-const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
-// Every Android variant needs its own matching Firebase client. Validate on
-// the EAS worker, where secret file variables are available, before compiling.
-if (buildPlatform === "android" && process.env.EAS_BUILD === "true") {
-  if (!googleServicesFile) {
-    throw new Error("Android builds require GOOGLE_SERVICES_JSON.");
-  }
-  let firebase;
-  try {
-    firebase = JSON.parse(readFileSync(googleServicesFile, "utf8"));
-  } catch {
-    throw new Error(
-      "GOOGLE_SERVICES_JSON must be a readable Firebase JSON file.",
-    );
-  }
-  if (
-    !firebase?.project_info?.project_number ||
-    !firebase?.client?.some(
-      (client) =>
-        client.client_info?.android_client_info?.package_name === bundleId &&
-        client.client_info?.mobilesdk_app_id &&
-        client.api_key?.some((key) => key.current_key),
-    )
-  ) {
-    throw new Error(
-      `GOOGLE_SERVICES_JSON requires a Firebase client for ${bundleId}.`,
-    );
-  }
+// expo-maps reads the Android Google Maps key from the config block below. A
+// production build without it ships the Pro-gated map screen unconfigured, so
+// fail the build instead — matching the RevenueCat key guardrails above.
+if (buildPlatform === "android") {
+  requireProductionValue(
+    "GOOGLE_MAPS_API_KEY",
+    googleMapsApiKey,
+    (value) => Boolean(value),
+    "a Google Maps API key so expo-maps is configured on Android",
+  );
 }
+
+// PostHog source map upload runs inside the native build (Gradle/Xcode) and
+// fails the build when it cannot authenticate. Enable it only once the CLI key
+// is present, so a build without credentials keeps working and uploads switch on
+// the moment the EAS secret is set.
+const uploadsSourceMaps = Boolean(process.env.POSTHOG_CLI_API_KEY);
 const requestedAndroidBuildArchs = (process.env.ANDROID_BUILD_ARCHS ?? "")
   .split(",")
   .map((arch) => arch.trim())
@@ -171,13 +158,13 @@ module.exports = ({ config }) => ({
     ...(googleMapsApiKey
       ? { config: { googleMaps: { apiKey: googleMapsApiKey } } }
       : {}),
-    ...(googleServicesFile ? { googleServicesFile } : {}),
     package: bundleId,
   },
   locales: Object.fromEntries(
     supportedLocales.map((locale) => [locale, `./locales/${locale}.json`]),
   ),
   plugins: [
+    "./plugins/with-google-services",
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
     ["expo-localization", { supportedLocales, supportsRTL }],
@@ -222,6 +209,12 @@ module.exports = ({ config }) => ({
         ],
       },
     ],
+    // Uploads the Hermes source map on each native build so error tracking can
+    // symbolicate crash stacks. skipOnConflict keeps a rebuild of the same
+    // commit from failing on an already-uploaded release.
+    ...(uploadsSourceMaps
+      ? [["posthog-react-native/expo", { skipOnConflict: true }]]
+      : []),
   ],
   extra: {
     ...appConfig.expo.extra,
@@ -253,6 +246,11 @@ module.exports = ({ config }) => ({
         },
       },
     },
+    // Ship the full font license with the native app's Expo manifest. JSON
+    // rather than the plain OFL.txt the website serves: the test suite loads
+    // this config without __dirname or require.resolve, so a require() of JSON
+    // is the only form that resolves in both Node and the tests.
+    fontLicenses: require("./assets/fonts/crimson-pro-license.json"),
     // Public ingestion key for Shelvr; development stays opt-in via env.
     posthogProjectToken:
       process.env.POSTHOG_PROJECT_TOKEN ??
