@@ -207,7 +207,9 @@ type AnalyticsEventProperties = {
     outcome: "granted" | "provisional" | "denied";
   };
   notification_opened: { notification_kind: string; notification_id: string };
-  notification_disabled: Record<string, never>;
+  notification_disabled: {
+    notification_kind: "weekly_shelf" | "save_reminders";
+  };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
   cancel_survey_submitted: {

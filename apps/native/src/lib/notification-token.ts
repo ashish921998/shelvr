@@ -35,9 +35,15 @@ export async function getExpoPushToken(
   devicePushToken?: Notifications.DevicePushToken,
 ): Promise<string | null> {
   // Android 13 cannot request notification permission before a channel exists.
+  // Each push kind gets its own channel so Android users can mute one alone.
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("weekly-shelf", {
       name: t("notifications.weeklyShelf"),
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 150],
+    });
+    await Notifications.setNotificationChannelAsync("save-reminders", {
+      name: t("notifications.remindersChannel"),
       importance: Notifications.AndroidImportance.DEFAULT,
       vibrationPattern: [0, 150],
     });

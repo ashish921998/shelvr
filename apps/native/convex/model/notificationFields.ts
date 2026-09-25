@@ -88,6 +88,7 @@ const catalogs: Record<
     body: Record<string, string>;
     named: Record<string, string>;
     namedSingle: string;
+    reminder: Record<"read" | "cook", { title: string; body: string }>;
   }
 > = translations;
 
@@ -142,5 +143,24 @@ export function digestCopy(
     body: copy.named[pluralRules[selected](others)]
       .replace("%{formattedCount}", format(others))
       .replace("%{title}", () => title),
+  };
+}
+
+/**
+ * A save reminder names one save and the thing it was saved for. `subject` is
+ * user content (a dish or an article title), substituted through a replacer
+ * for the same reason as the digest's. The caller only builds a reminder for
+ * a save with a non-blank subject, so there is always something to name.
+ */
+export function reminderCopy(
+  locale: string | undefined,
+  kind: "read" | "cook",
+  subject: string,
+) {
+  const title = truncateTitle(subject) ?? subject;
+  const copy = catalogs[notificationLocale(locale) ?? "en"].reminder[kind];
+  return {
+    title: copy.title,
+    body: copy.body.replace("%{title}", () => title),
   };
 }

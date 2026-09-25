@@ -44,6 +44,10 @@ describe("notification token registration", () => {
       "weekly-shelf",
       expect.any(Object),
     );
+    expect(mock.channel).toHaveBeenCalledWith(
+      "save-reminders",
+      expect.any(Object),
+    );
     expect(mock.channel).toHaveBeenCalledBefore(mock.request);
     expect(mock.request).toHaveBeenCalledBefore(mock.token);
   });

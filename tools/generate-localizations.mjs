@@ -30,6 +30,8 @@ const notificationPlaceholders = {
   "digest.waitingCount": "%{formattedCount}",
   "digest.namedCount": "%{formattedCount}|%{title}",
   "digest.namedSingle": "%{title}",
+  "reminder.readBody": "%{title}",
+  "reminder.cookBody": "%{title}",
 };
 
 // Validate the whole input before writing any native resources.
@@ -129,6 +131,16 @@ const notificationCopy = Object.fromEntries(
       body: messages["digest.waitingCount"],
       named: messages["digest.namedCount"],
       namedSingle: messages["digest.namedSingle"],
+      reminder: {
+        read: {
+          title: messages["reminder.readTitle"],
+          body: messages["reminder.readBody"],
+        },
+        cook: {
+          title: messages["reminder.cookTitle"],
+          body: messages["reminder.cookBody"],
+        },
+      },
     },
   ]),
 );

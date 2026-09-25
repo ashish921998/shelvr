@@ -4,70 +4,95 @@ What Shelvr sends, when it sends it, and how it is built.
 [Push notification builds and updates](push-notifications.md) stays the
 reference for credentials, EAS profiles and OTA fingerprints.
 
-Status: V1 below is implemented and awaiting deploy. Everything under
-[Beyond V1](#beyond-v1) is parked research, not a plan of record.
+Status: [What ships](#what-ships) is implemented and awaiting deploy.
+Everything under [Beyond V1](#beyond-v1) is parked research, not a plan of
+record.
 
-## V1
+## What ships
 
-**One notification — the one that already exists — made specific, and
-measured.** That is the whole of V1.
+Every notification about saves names one of them, or it is not sent.
 
-### What changes
+| Kind            | Example                                                  | When                                                         | Switch         |
+| --------------- | -------------------------------------------------------- | ------------------------------------------------------------ | -------------- |
+| `weekly_shelf`  | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3+ unopened saves from the week     | Weekly shelf   |
+| `read_reminder` | _You haven't read "Why bread rises" yet._                | An article unopened for a day or more (up to 90 days)        | Save reminders |
+| `cook_reminder` | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week      | Save reminders |
+| trial reminder  | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`) | OS permission  |
 
-1. **The Sunday notification names a save instead of counting them.**
-   Before: _3 saves waiting for you._
-   After: _"The 12-hour short rib" and 2 more you saved this week._
-2. **Four events, so we can see what happens:**
-   `notification_permission_result` (only when the user was actually
-   prompted), `notification_sent` (once per digest, when delivery reaches a
-   terminal state, carrying whether a provider accepted it),
-   `notification_opened`, and `notification_disabled`.
+### Save reminders
 
-### What does not change
+The server pushes are `convex/notifications.ts` (`prepareSaveReminder`) and
+`convex/notificationDelivery.ts` (`sendReminder`). The rules are pure
+functions in `convex/model/saveReminders.ts`, with tests next to them.
 
-The Sunday 09:00 local schedule, the three-unopened-saves floor, the digest
-screen, the single on/off switch, and the whole delivery machine. All of it
-already works and none of it is touched.
+- **Which save.** An article is a link with a readable body and no social
+  `media`. A recipe is a save with a `recipe`. Anything else never gets a
+  reminder, because a vague "remember this?" is the notification people
+  turn off. The notification names a recipe by `recipe.name` (the dish), and
+  anything else by its title. Each save is reminded about at most once. The
+  two kinds take turns, newest save first within each kind.
+- **When.** At the local hour the user saved the most over the past 30 days,
+  clamped to 10:00 to 19:00. It stays at 18:00 until there are 5 saves to go
+  on. Most saves come from the share sheet while the user is scrolling
+  another app. So this is the closest proxy for "while they are scrolling"
+  that needs no tracking, and it answers the Instagram and TikTok feedback
+  without Screen Time.
+- **How often.** At most one push a day (20 hours apart) and four a week,
+  counting the weekly shelf. After three reminders in a row whose save
+  stayed unopened, it drops to one a week until the user opens one. A
+  reminder that cannot go out within 6 hours is dropped, because it says
+  "today".
+- **Who.** Anyone who allowed notifications. The switch in Profile turns it
+  off, and it is on by default: the OS permission is the consent, and
+  every reminder is about the user's own save. A user who is off, or has no
+  device, is parked (`nextReminderAt` cleared) and costs nothing until
+  `setSaveReminders` or the next `registerDevice` re-arms them.
+- **Where a tap goes.** Straight to the save (`/item/<id>`). The payload
+  carries `kind` and `notificationId`, like the weekly shelf.
+
+### Events
+
+`notification_permission_result` (only when the user was actually prompted),
+`notification_sent` (once per digest or reminder at a terminal state, with
+its `notification_kind`), `notification_opened`, and `notification_disabled`
+(with the kind switched off). The trial reminder carries no `kind` yet, so
+its opens record as `unknown`.
 
 ### What we learn
 
-Two numbers: **do people open it, and do they turn it off?** Those decide
-everything else.
-
-### Why this small
-
-Shelvr exists because people save things and forget them. The notification is
-where the product either delivers on that or does not, and right now nobody
-knows which, because nothing measures it.
-
-Everything below this section is a way to send _better_ notifications. None of
-it is worth building before we know whether anyone opens a notification from
-Shelvr at all. That is one number, and V1 is the cheapest way to get it.
-
-### Explicitly not in V1
-
-Every other notification kind, the budget arbiter, per-kind switches, the
-outbox rewrite, holdout groups, rich images, geofencing, Screen Time. Parked
-below; none of it blocks V1.
-
-V1 is days of work. No new permission, no new native build, no change to any
-public function's shape.
+Per kind, **do people open it, and do they turn it off?** If a kind is not
+opened, cut it. Do not iterate on its copy indefinitely.
 
 ### Decisions taken
 
-- **Lapsed users keep getting it.** Someone whose subscription ended can still
-  read what they already saved. A reminder about their own save is the most
-  honest reason to come back, and the paywall is already there when they
+- **Reminders are on by default for anyone who allowed notifications.** The
+  founder asked for as many notifications as possible without spamming. The
+  budget above is what keeps that from turning into spam.
+- **Lapsed users keep getting them.** Someone whose subscription ended can
+  still read what they already saved. A reminder about their own save is the
+  most honest reason to come back, and the paywall is already there when they
   arrive.
 - **File the Apple Screen Time request now.** Paperwork rather than
   engineering, weeks of waiting, refusable, and free if we never build the
-  feature. Starting it now costs nothing and removes a two-month stall later.
-- **If V1 shows people do not open it, stop here.** Do not iterate on copy
-  indefinitely. The weekly shelf is the floor, not the opening move of a
-  campaign. Deciding this before seeing the number is the point.
-- **Holdout groups wait.** V1 asks "does anyone open this", which needs no
-  control group. A holdout is how you decide whether to _add_ kinds, and that
-  is V2's question. When it comes: 10% per kind, 8 weeks, then rotate in.
+  feature.
+- **Holdout groups wait.** "Does anyone open this" needs no control group.
+  When it comes: 10% per kind, 8 weeks, then rotate in.
+
+### Deploy order
+
+1. `npx convex deploy`.
+2. `npx convex run notifications:armSaveReminders`, once. It schedules a
+   first pass for every existing user. Without it a user is only picked up
+   the next time they open the app, which misses exactly the people a
+   reminder is for.
+3. Ship the client update. It adds the Profile switch and the Android
+   `save-reminders` channel.
+
+Older clients handle reminders without the update:
+
+- A tap routes through the existing `url` handling.
+- On Android, reminders fall back to the app's default channel.
+- Their Profile screen simply has no reminders switch.
 
 ## Evidence status
 

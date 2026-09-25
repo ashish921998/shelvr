@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import translations from "./notificationTranslations.json";
-import { digestCopy, truncateTitle } from "./notificationFields";
+import { digestCopy, reminderCopy, truncateTitle } from "./notificationFields";
 
 describe("digest copy", () => {
   it("names a save and counts only the others", () => {
@@ -84,5 +84,38 @@ describe("title truncation", () => {
     expect(
       truncateTitle(`${"word ".repeat(11).trim()}, ${"x".repeat(40)}`),
     ).toBe(`${"word ".repeat(11).trim()}…`);
+  });
+});
+
+describe("reminder copy", () => {
+  it("asks about the article by name", () => {
+    expect(reminderCopy("en", "read", "Why bread rises")).toEqual({
+      title: "Still on your list",
+      body: "You haven’t read “Why bread rises” yet.",
+    });
+  });
+
+  it("offers the dish for today", () => {
+    expect(reminderCopy("en", "cook", "Lasagna").body).toBe(
+      "Want to make “Lasagna” today?",
+    );
+  });
+
+  it("localizes, and falls back to English for a device with no locale", () => {
+    expect(reminderCopy("ja", "cook", "Lasagna")).toEqual({
+      title: translations.ja.reminder.cook.title,
+      body: "今日は「Lasagna」を作ってみませんか？",
+    });
+    expect(reminderCopy(undefined, "read", "A").title).toBe(
+      translations.en.reminder.read.title,
+    );
+  });
+
+  it("keeps replacement patterns in a title literal and trims long ones", () => {
+    expect(reminderCopy("en", "read", "Cost of $& and $`").body).toBe(
+      "You haven’t read “Cost of $& and $`” yet.",
+    );
+    const long = reminderCopy("en", "read", "word ".repeat(30)).body;
+    expect(long).toContain("…”");
   });
 });

@@ -135,13 +135,23 @@ export default function ProfileScreen() {
     void Linking.openURL(url);
   };
 
-  const toggleWeeklyShelf = async (enabled: boolean) => {
+  const toggleNotifications = async (
+    kind: "weekly_shelf" | "save_reminders",
+    enabled: boolean,
+  ) => {
     try {
-      const saved = await session.setWeeklyShelf(enabled);
+      const saved =
+        kind === "weekly_shelf"
+          ? await session.setWeeklyShelf(enabled)
+          : await session.setSaveReminders(enabled);
       if (saved === false) {
         Alert.alert(
           t("notifications.disabledTitle"),
-          t("notifications.disabledBody"),
+          t(
+            kind === "weekly_shelf"
+              ? "notifications.disabledBody"
+              : "notifications.remindersDisabledBody",
+          ),
           [
             { text: t("common.cancel"), style: "cancel" },
             {
@@ -155,9 +165,14 @@ export default function ProfileScreen() {
       // Only a saved preference is a decision. `undefined` means another
       // session operation held the queue and this toggle changed nothing.
       if (saved === true && !enabled)
-        analytics.capture("notification_disabled", {});
+        analytics.capture("notification_disabled", { notification_kind: kind });
     } catch (error) {
-      analytics.captureError("weekly_shelf_preference_failed", error);
+      analytics.captureError(
+        kind === "weekly_shelf"
+          ? "weekly_shelf_preference_failed"
+          : "save_reminders_preference_failed",
+        error,
+      );
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
     }
   };
@@ -395,7 +410,34 @@ export default function ProfileScreen() {
           accessibilityLabel={t("notifications.toggleLabel")}
           value={notificationPreferences?.weeklyShelfEnabled ?? false}
           disabled={notificationPreferences === undefined || busy}
-          onValueChange={(value) => void toggleWeeklyShelf(value)}
+          onValueChange={(value) =>
+            void toggleNotifications("weekly_shelf", value)
+          }
+          trackColor={{
+            false: theme.colors.border,
+            true: theme.colors.primary,
+          }}
+          thumbColor="#fff"
+        />
+      </View>
+
+      <View style={styles.preferenceRow}>
+        <View style={styles.preferenceCopy}>
+          <Text style={styles.preferenceLabel}>
+            {t("notifications.remindersLabel")}
+          </Text>
+          <Text style={styles.preferenceDescription}>
+            {t("notifications.remindersHelp")}
+          </Text>
+        </View>
+        <Switch
+          accessibilityLabel={t("notifications.remindersToggle")}
+          // Older backends return no field; show it off rather than guess.
+          value={notificationPreferences?.remindersEnabled ?? false}
+          disabled={notificationPreferences === undefined || busy}
+          onValueChange={(value) =>
+            void toggleNotifications("save_reminders", value)
+          }
           trackColor={{
             false: theme.colors.border,
             true: theme.colors.primary,

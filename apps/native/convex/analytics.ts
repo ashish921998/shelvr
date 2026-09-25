@@ -151,7 +151,8 @@ export const captureSave = internalAction({
 export const captureNotification = internalAction({
   args: {
     userId: v.string(),
-    digestId: v.id("weeklyDigests"),
+    /** The weekly digest or save reminder id; also the payload's `notificationId`. */
+    notificationId: v.string(),
     kind: v.string(),
     itemCount: v.number(),
     /** Provider acceptance, not a device read. Expo reports that APNs or FCM
@@ -172,9 +173,9 @@ export const captureNotification = internalAction({
       timestamp: args.sentAt,
       properties: {
         $process_person_profile: false,
-        // The digest id is also the deep-link target, so an open recorded by
-        // the client joins to this row without a second identifier.
-        notification_id: args.digestId,
+        // The payload carries the same id, so an open recorded by the client
+        // joins to this row without a second identifier.
+        notification_id: args.notificationId,
         notification_kind: args.kind,
         item_count: args.itemCount,
         delivered: args.delivered,

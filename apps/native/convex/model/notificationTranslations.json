@@ -9,7 +9,17 @@
       "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt aus dieser Woche",
       "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
     },
-    "namedSingle": "„%{title}“ – diese Woche gespeichert"
+    "namedSingle": "„%{title}“ – diese Woche gespeichert",
+    "reminder": {
+      "read": {
+        "title": "Noch auf deiner Liste",
+        "body": "Du hast „%{title}“ noch nicht gelesen."
+      },
+      "cook": {
+        "title": "Aus deinen gespeicherten Rezepten",
+        "body": "Lust, heute „%{title}“ zu kochen?"
+      }
+    }
   },
   "en": {
     "title": "Your weekly shelf",
@@ -21,7 +31,17 @@
       "one": "“%{title}” and %{formattedCount} more you saved this week",
       "other": "“%{title}” and %{formattedCount} more you saved this week"
     },
-    "namedSingle": "“%{title}”, saved this week"
+    "namedSingle": "“%{title}”, saved this week",
+    "reminder": {
+      "read": {
+        "title": "Still on your list",
+        "body": "You haven’t read “%{title}” yet."
+      },
+      "cook": {
+        "title": "From your saved recipes",
+        "body": "Want to make “%{title}” today?"
+      }
+    }
   },
   "es": {
     "title": "Tu estantería semanal",
@@ -35,7 +55,17 @@
       "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
       "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
     },
-    "namedSingle": "«%{title}», guardado esta semana"
+    "namedSingle": "«%{title}», guardado esta semana",
+    "reminder": {
+      "read": {
+        "title": "Sigue en tu lista",
+        "body": "Aún no has leído «%{title}»."
+      },
+      "cook": {
+        "title": "De tus recetas guardadas",
+        "body": "¿Te apetece preparar «%{title}» hoy?"
+      }
+    }
   },
   "es-MX": {
     "title": "Tu estantería semanal",
@@ -49,7 +79,17 @@
       "many": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana",
       "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
     },
-    "namedSingle": "«%{title}», guardado esta semana"
+    "namedSingle": "«%{title}», guardado esta semana",
+    "reminder": {
+      "read": {
+        "title": "Sigue en tu lista",
+        "body": "Todavía no has leído «%{title}»."
+      },
+      "cook": {
+        "title": "De tus recetas guardadas",
+        "body": "¿Se te antoja preparar «%{title}» hoy?"
+      }
+    }
   },
   "fr": {
     "title": "Votre étagère hebdomadaire",
@@ -63,7 +103,17 @@
       "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
       "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
     },
-    "namedSingle": "« %{title} », enregistré cette semaine"
+    "namedSingle": "« %{title} », enregistré cette semaine",
+    "reminder": {
+      "read": {
+        "title": "Toujours sur votre liste",
+        "body": "Vous n'avez pas encore lu « %{title} »."
+      },
+      "cook": {
+        "title": "Parmi vos recettes enregistrées",
+        "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      }
+    }
   },
   "fr-CA": {
     "title": "Votre étagère hebdomadaire",
@@ -77,7 +127,17 @@
       "many": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine",
       "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
     },
-    "namedSingle": "« %{title} », enregistré cette semaine"
+    "namedSingle": "« %{title} », enregistré cette semaine",
+    "reminder": {
+      "read": {
+        "title": "Toujours sur votre liste",
+        "body": "Vous n'avez pas encore lu « %{title} »."
+      },
+      "cook": {
+        "title": "Parmi vos recettes enregistrées",
+        "body": "Envie de préparer « %{title} » aujourd'hui ?"
+      }
+    }
   },
   "ja": {
     "title": "あなたの今週のシェルフ",
@@ -87,7 +147,17 @@
     "named": {
       "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
     },
-    "namedSingle": "「%{title}」を今週保存しました"
+    "namedSingle": "「%{title}」を今週保存しました",
+    "reminder": {
+      "read": {
+        "title": "保存した記事",
+        "body": "「%{title}」をまだ読んでいません。"
+      },
+      "cook": {
+        "title": "保存したレシピから",
+        "body": "今日は「%{title}」を作ってみませんか？"
+      }
+    }
   },
   "ko": {
     "title": "내 주간 책장",
@@ -97,7 +167,17 @@
     "named": {
       "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
     },
-    "namedSingle": "이번 주에 저장한 '%{title}'"
+    "namedSingle": "이번 주에 저장한 '%{title}'",
+    "reminder": {
+      "read": {
+        "title": "저장한 글",
+        "body": "'%{title}'을(를) 아직 읽지 않았어요."
+      },
+      "cook": {
+        "title": "저장한 레시피에서",
+        "body": "오늘 '%{title}' 만들어 볼까요?"
+      }
+    }
   },
   "pt-BR": {
     "title": "Sua estante semanal",
@@ -111,6 +191,16 @@
       "many": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana",
       "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
     },
-    "namedSingle": "“%{title}”, salvo esta semana"
+    "namedSingle": "“%{title}”, salvo esta semana",
+    "reminder": {
+      "read": {
+        "title": "Ainda na sua lista",
+        "body": "Você ainda não leu “%{title}”."
+      },
+      "cook": {
+        "title": "Das suas receitas salvas",
+        "body": "Que tal fazer “%{title}” hoje?"
+      }
+    }
   }
 }

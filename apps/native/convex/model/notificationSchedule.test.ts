@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   isValidTimezone,
+  localHour,
+  nextLocalHourAt,
   nextWeeklyDigestAt,
   parseTimezoneInput,
   resolveTimezone,
@@ -27,6 +29,28 @@ describe("Sunday 09:00 schedule", () => {
     expect(nextWeeklyDigestAt(now, "")).toBe(utc);
     expect(nextWeeklyDigestAt(now, "a".repeat(65))).toBe(utc);
     expect(nextWeeklyDigestAt(now, undefined)).toBe(utc);
+  });
+});
+
+describe("daily local hour", () => {
+  it.each([
+    // Later today, then tomorrow once the hour has passed.
+    ["2026-09-25T10:00:00Z", "UTC", 18, "2026-09-25T18:00:00Z"],
+    ["2026-09-25T18:00:00Z", "UTC", 18, "2026-09-26T18:00:00Z"],
+    ["2026-09-25T13:00:00Z", "Asia/Kolkata", 18, "2026-09-26T12:30:00Z"],
+    // Across the spring-forward night the wall clock still reads 18:00.
+    ["2026-03-07T23:30:00Z", "America/New_York", 18, "2026-03-08T22:00:00Z"],
+  ])("%s in %s at %i:00 is %s", (now, zone, hour, expected) => {
+    expect(
+      new Date(nextLocalHourAt(Date.parse(now), zone, hour)).toISOString(),
+    ).toBe(new Date(expected).toISOString());
+  });
+
+  it("reads the hour on the user's clock", () => {
+    const instant = Date.parse("2026-09-25T13:45:00Z");
+    expect(localHour(instant, "UTC")).toBe(13);
+    expect(localHour(instant, "Asia/Kolkata")).toBe(19);
+    expect(localHour(instant, "Mars/Olympus_Mons")).toBe(13);
   });
 });
 

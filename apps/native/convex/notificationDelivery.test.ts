@@ -414,7 +414,7 @@ describe("durable digest delivery", () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0].args[0]).toMatchObject({
       userId: "user-a",
-      digestId,
+      notificationId: digestId,
       kind: "weekly_shelf",
       itemCount: 1,
       delivered: true,

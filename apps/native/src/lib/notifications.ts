@@ -73,6 +73,7 @@ export function NotificationSessionProvider({
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const setPreferences = useMutation(api.notifications.setPreferences);
+  const setSaveReminders = useMutation(api.notifications.setSaveReminders);
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const session = useMemo(
     () =>
@@ -92,6 +93,8 @@ export function NotificationSessionProvider({
             weeklyShelfEnabled: enabled,
             timezone: getNotificationTimezone(),
           }),
+        setSaveReminders: (enabled) =>
+          setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
         signOut,
         deleteAccount: () => deleteAccount({}),
         clearWidget: clearRecentSavesWidget,
@@ -107,7 +110,14 @@ export function NotificationSessionProvider({
           analytics.captureError(event, error);
         },
       }),
-    [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
+    [
+      registerDevice,
+      unregisterDevice,
+      setPreferences,
+      setSaveReminders,
+      signOut,
+      deleteAccount,
+    ],
   );
   useEffect(() => {
     if (!isAuthenticated) {
