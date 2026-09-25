@@ -13,7 +13,7 @@ export const RECALL_FRESH_MS = 10 * 60 * 1000;
  * are still in the person's head and on the first screen of the feed. */
 export const RECALL_MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Thumbnails the card shows. The count in the copy covers every match. */
+/** Thumbnails the card shows. The count in the copy matches them. */
 export const RECALL_MAX_SHOWN = 3;
 
 type RecallFeedItem = {

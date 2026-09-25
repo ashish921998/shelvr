@@ -26,14 +26,17 @@ export function SaveRecallCard({
   onDismiss: () => void;
 }) {
   useAppLocale();
+  // The count names only the saves the card can open, so it never promises
+  // more than the thumbnails deliver.
+  const shown = matches.slice(0, RECALL_MAX_SHOWN);
   return (
     <InlineCard
       testID="save-recall-card"
       title={t("home.recallTitle")}
-      body={t("home.recallBody", { count: matches.length })}
+      body={t("home.recallBody", { count: shown.length })}
     >
       <View style={styles.row}>
-        {matches.slice(0, RECALL_MAX_SHOWN).map((item) => (
+        {shown.map((item) => (
           <RecallThumb key={item._id} item={item} onOpen={onOpen} />
         ))}
       </View>
