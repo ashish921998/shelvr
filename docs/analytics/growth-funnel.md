@@ -22,7 +22,8 @@ Without it, links stay plain and nothing is attributed.
   landing URL, kept for the browser session. Give each creator, ad set or post
   its own link, for example `https://shelvr-web.vercel.app/?ct=tiktok_jane`.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
-  `web_footer`, `web_footer-nav`). The share preview page uses `share`.
+  `web_footer`, `web_footer-nav`, `web_oracle`). The share preview page uses
+  `share`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 
 **Installs, first opens and paying users per campaign** are in App Store
@@ -179,6 +180,43 @@ ORDER BY page_views DESC
 Installs from shares are App Store Connect's `share` campaign (section 1).
 Link previews fetched by chat apps do not run the page's script, so they are
 not counted as views.
+
+## 5. The oracle: does a free verdict earn an install
+
+`/oracle` gives a no-login visitor a verdict about their saving habits, then
+an App Store link. Its link uses `source = oracle`, so a visitor who arrived
+without a campaign lands in App Store Connect's `web_oracle` campaign. A
+visitor who arrived with a creator's `?ct=` keeps that campaign instead.
+
+| Event            | When                         | Properties                                                                       |
+| ---------------- | ---------------------------- | -------------------------------------------------------------------------------- |
+| `oracle_opened`  | The page loads               | `mode` when the URL carries `?mode=`                                             |
+| `oracle_started` | The visitor submits an input | `mode`                                                                           |
+| `oracle_verdict` | A verdict renders            | `mode`, `persona`                                                                |
+| `oracle_failed`  | The request fails            | `mode`, `status` (HTTP status, `0` for a network error; `429` is the rate limit) |
+| `oracle_shared`  | The visitor shares a verdict | `mode`, `method` (`web_share` or `clipboard`)                                    |
+
+`mode` is `links`, `screenshot`, `tabs`, or `library`. A shared verdict links
+to `/oracle?mode=<mode>`, so `oracle_opened` with a `mode` is mostly share
+traffic.
+
+**Oracle funnel by mode, last 30 days**:
+
+```sql
+SELECT
+  properties.mode AS mode,
+  countIf(event = 'oracle_started') AS started,
+  countIf(event = 'oracle_verdict') AS verdicts,
+  countIf(event = 'oracle_failed') AS failed,
+  countIf(event = 'oracle_shared') AS shared
+FROM events
+WHERE event IN ('oracle_started', 'oracle_verdict', 'oracle_failed', 'oracle_shared')
+  AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY mode
+ORDER BY started DESC
+```
+
+Store clicks from the page are `app_store_clicked` with `source = 'oracle'`.
 
 ## Not measured yet
 
