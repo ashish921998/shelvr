@@ -1,4 +1,8 @@
-import { SAFE_ERROR_MESSAGES, posthog } from "@/lib/posthog";
+import {
+  SAFE_ERROR_MESSAGES,
+  posthog,
+  resetIfIdentified as resetClientIfIdentified,
+} from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import Constants from "expo-constants";
 
@@ -31,6 +35,13 @@ type ItemAction =
 
 export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
 
+/**
+ * Which sign-in UI started an OAuth attempt. `$screen_name` cannot tell these
+ * apart, because the onboarding route renders both the full-page view and the
+ * demo sheet, and only the sheet runs the flow from inside a native modal.
+ */
+export type OAuthSurface = "sign_in_view" | "demo_sheet";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
@@ -38,10 +49,44 @@ type AnalyticsEventProperties = {
     step_index: number;
     duration_ms: number;
   };
-  auth_started: { provider: string };
-  auth_cancelled: { provider: string };
-  auth_failed: { provider: string };
+  auth_started: { provider: string; surface: OAuthSurface };
+  auth_cancelled: {
+    provider: string;
+    elapsed_ms: number;
+    browser_ms: number;
+    surface: OAuthSurface;
+    // iOS reports a person backing out and a session that never presented as
+    // the same `cancel`, so the fields below carry what the OS said. The
+    // NSError domain and code are bounded and carry no user content; the
+    // description they come from is not sent, because free-form error text is
+    // redacted out of this project's telemetry on purpose.
+    result: "cancel" | "dismiss";
+    native_error_domain?: string;
+    native_error_code?: number;
+  };
+  auth_failed: {
+    provider: string;
+    stage: "request" | "browser" | "exchange";
+    elapsed_ms: number;
+    surface: OAuthSurface;
+  };
+  // A sign-in that finished in this session. `auth_completed` below is the
+  // identify-time signal and also fires on every signed-in cold start.
+  auth_succeeded: {
+    provider: string;
+    elapsed_ms: number;
+    surface: OAuthSurface;
+  };
   auth_completed: Record<string, never>;
+  // Widget snapshot and file cleanup completed, including signed-out startup
+  // and foreground recovery. This counts cleanup operations, not sign-outs or
+  // confirmed WidgetKit redraws.
+  widget_cleared: Record<string, never>;
+  // A widget thumbnail could not be built, so the item degraded to its text
+  // tile. `reason` separates a bounded timeout (a stalled download or wedged
+  // decode) from any other download or decode error. It never carries the
+  // image URL or any saved content.
+  widget_sync_failed: { reason: "timeout" | "error" };
   paywall_requested: { placement: string; paywall_attempt_id: string };
   paywall_presentation_started: {
     placement: string;
@@ -96,7 +141,9 @@ type AnalyticsEventProperties = {
     space_id: string;
     undone: boolean;
   };
-  item_shared: Record<string, never>;
+  // `share_ref` is set when a branded link went out: a hash of its token that
+  // matches the web share page's `share_page_viewed` and `app_store_clicked`.
+  item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
   item_deleted: { item_type: AnalyticsItem["type"] };
   suggestion_accepted: Record<string, never>;
@@ -106,29 +153,50 @@ type AnalyticsEventProperties = {
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   onboarding_completed: {
-    // Q1 "Where do your saves pile up today?" — free analytics signal.
+    // Always empty since the pileup question was removed. Kept so existing
+    // PostHog insights keep a stable property shape.
     save_pileup: string[];
-    // Q2 "What do you save most?" — also seeds the space presets.
+    // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
     space_count: number;
+    // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
-    // Mirror the survey answers onto the person so they're durable for
+    custom_space_count: number;
+    // Mirror the setup answers onto the person so they're durable for
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
-  // Feedback events never carry message text; see lib/feedback.ts.
+  // Feedback events never carry message text; see lib/feedback.ts. The
+  // submission event fires only after Convex acknowledges persistence — the
+  // message itself lives in Convex and the support inbox, never in PostHog.
   feedback_invitation_shown: { surface: string; ready_count: number };
   feedback_invitation_dismissed: { surface: string };
   feedback_opened: { surface: string };
+  feedback_submitted: {
+    surface: string;
+    char_count: number;
+    delivery: "scheduled" | "unconfigured";
+  };
   // Demo step tracking. Deliberately content-free: no URLs, titles, tags, or
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
+  onboarding_demo_skipped: Record<string, never>;
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
-  onboarding_demo_skipped: Record<string, never>;
   shared_content_saved: { item_count: number };
+  // Android task-restore ghost: the share screen re-offered a batch that was
+  // already handled (recordCompletedShare tombstone matched).
+  share_ghost_prompt: Record<string, never>;
+  share_ghost_save_again: Record<string, never>;
+  share_ghost_dismissed: Record<string, never>;
+  // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
+  // saved item's title, tags, or URL.
+  save_recall_shown: { match_count: number };
+  save_recall_opened: { match_count: number };
+  save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
+  trial_reminder_permission: { granted: boolean };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —
   // only the server-side webhook events (trial_cancelled, …) count as
@@ -251,15 +319,19 @@ function identify(userId: string): void {
   }
 }
 
-function reset(): void {
+/** The only reset. Resets only when PostHog still holds an identified user:
+ * a signed-out launch keeps its anonymous id, while an explicit sign-out, an
+ * account deletion, or an expired session stops attributing events to the
+ * previous account once Convex reports it. A device that was never
+ * identified has no link to break, so rotating its anonymous id would only
+ * split one person's onboarding across two profiles. Invoked solely from
+ * `useAnalyticsIdentity` on the auth edge; sign-out flows must not reset
+ * analytics themselves. */
+async function resetIfIdentified(): Promise<void> {
   if (!posthog) return;
 
   try {
-    posthog.reset();
-    posthog.register({
-      environment: Constants.expoConfig?.extra?.variant ?? "development",
-      analytics_version: 1,
-    });
+    await resetClientIfIdentified(posthog);
   } catch {
     // Analytics must never block sign-out.
   }
@@ -267,7 +339,7 @@ function reset(): void {
 
 function screen(route: string): void {
   try {
-    posthog?.screen(route, {
+    void posthog?.screen(route, {
       environment: Constants.expoConfig?.extra?.variant ?? "development",
       analytics_version: 1,
     });
@@ -280,7 +352,7 @@ export const analytics = {
   capture,
   captureError,
   identify,
-  reset,
+  resetIfIdentified,
   sessionId,
   screen,
   itemOpened,

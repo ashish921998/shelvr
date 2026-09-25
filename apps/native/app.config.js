@@ -164,6 +164,7 @@ module.exports = ({ config }) => ({
     supportedLocales.map((locale) => [locale, `./locales/${locale}.json`]),
   ),
   plugins: [
+    "./plugins/with-google-services",
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
     ["expo-localization", { supportedLocales, supportsRTL }],
@@ -245,6 +246,11 @@ module.exports = ({ config }) => ({
         },
       },
     },
+    // Ship the full font license with the native app's Expo manifest. JSON
+    // rather than the plain OFL.txt the website serves: the test suite loads
+    // this config without __dirname or require.resolve, so a require() of JSON
+    // is the only form that resolves in both Node and the tests.
+    fontLicenses: require("./assets/fonts/crimson-pro-license.json"),
     // Public ingestion key for Shelvr; development stays opt-in via env.
     posthogProjectToken:
       process.env.POSTHOG_PROJECT_TOKEN ??

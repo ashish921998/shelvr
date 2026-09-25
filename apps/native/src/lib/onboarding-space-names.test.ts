@@ -36,10 +36,9 @@ it("reuses the demo space after a language change and persisted-step resume", as
   const backend = newConvexTest();
   const owner = backend.withIdentity({ subject: "onboarding-owner|session" });
   setOnboardingProgress({
-    q1: [],
-    q2: ["Recipes"],
+    saveKinds: ["Recipes"],
     spaces: ["Recipes"],
-    step: 5,
+    step: 2,
   });
   const spaceName = resolveOnboardingSpaceName("Recipes");
   expect(spaceName).toBe("Recipes");
@@ -47,12 +46,15 @@ it("reuses the demo space after a language change and persisted-step resume", as
     url: "https://example.com/recipe",
     spaceName,
   });
-  setPendingDemo({ url: demo.url, destination: spaceName });
+  setPendingDemo({
+    url: demo.url,
+    destination: spaceName,
+    source: "direct",
+  });
   setOnboardingProgress({
-    q1: [],
-    q2: ["Recipes"],
+    saveKinds: ["Recipes"],
     spaces: ["Recipes"],
-    step: 7,
+    step: 3,
   });
   setPendingDemo(null);
 
@@ -78,7 +80,7 @@ it("reuses the demo space after a language change and persisted-step resume", as
   });
 });
 
-it("reads old progress records and clears frozen names when onboarding is cleared", () => {
+it("keeps an old record's frozen names but not its progress, and clears them with onboarding", () => {
   device.storage.set(
     "shelvr.pending.onboarding",
     JSON.stringify({
@@ -88,9 +90,10 @@ it("reads old progress records and clears frozen names when onboarding is cleare
       step: 3,
     }),
   );
-  expect(getOnboardingProgress().spaces).toEqual(["Recipes"]);
+  expect(getOnboardingProgress().spaces).toEqual([]);
+  expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");
+  device.locale = "de-DE";
   expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");
   clearPending();
-  device.locale = "de-DE";
   expect(resolveOnboardingSpaceName("Recipes")).toBe("Rezepte");
 });

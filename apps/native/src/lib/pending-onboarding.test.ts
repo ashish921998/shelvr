@@ -5,6 +5,7 @@ import {
   getOnboardingProgress,
   getOrCreatePendingOperationId,
   getPendingDemoUrl,
+  getPendingSpaces,
   hasPending,
   setOnboardingProgress,
   setPendingDemo,
@@ -64,29 +65,31 @@ describe("onboarding recovery", () => {
     expect(hasPending()).toBe(false);
   });
 
-  it("recovers the demo request and destination alongside survey and step progress", () => {
+  it("recovers the demo request and destination alongside kind and step progress", () => {
     setOnboardingProgress({
-      q1: ["X bookmarks"],
-      q2: ["Inspiration"],
+      saveKinds: ["Inspiration"],
       spaces: ["Inspiration"],
-      step: 5,
+      step: 2,
     });
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     setOnboardingProgress({
-      q1: ["X bookmarks"],
-      q2: ["Inspiration"],
+      saveKinds: ["Inspiration"],
       spaces: ["Inspiration"],
-      step: 6,
+      step: 3,
     });
     expect(getOnboardingProgress()).toEqual({
-      q1: ["X bookmarks"],
-      q2: ["Inspiration"],
+      saveKinds: ["Inspiration"],
       spaces: ["Inspiration"],
-      step: 6,
-      demo: { url: "https://example.com/design", destination: "Inspiration" },
+      step: 3,
+      demo: {
+        url: "https://example.com/design",
+        destination: "Inspiration",
+        source: "share",
+      },
     });
     setPendingDemo(null);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -94,9 +97,13 @@ describe("onboarding recovery", () => {
   });
 
   it("drops a completed demo when onboarding finishes, even with no spaces picked", () => {
-    setOnboardingProgress({ q1: [], q2: [], spaces: [], step: 5 });
-    setPendingDemo({ url: "https://example.com/design", destination: null });
-    setOnboardingProgress({ q1: [], q2: [], spaces: [], step: 7 });
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 2 });
+    setPendingDemo({
+      url: "https://example.com/design",
+      destination: null,
+      source: "direct",
+    });
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 3 });
     // finish(): nothing for the replay hook to do, and no stale save left in
     // SecureStore that a later mount could replay.
     setPendingSpaces([]);
@@ -105,18 +112,125 @@ describe("onboarding recovery", () => {
   });
 
   it("keeps the in-flight demo through a partial replay update but not through finish", () => {
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 2 });
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     updatePendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toEqual({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     setPendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toBeNull();
     expect(getOnboardingProgress().spaces).toEqual(["Recipes"]);
     expect(hasPending()).toBe(true);
+  });
+});
+
+describe("progress written by an older onboarding flow", () => {
+  const fresh = { saveKinds: [], spaces: [], step: null, demo: null };
+
+  it.each([0, 1, 2, 3, 4, 5, 6, 7])(
+    "restarts a record at old step %i with fresh progress",
+    (step) => {
+      storage.set(
+        "shelvr.pending.onboarding",
+        JSON.stringify({
+          operationId: "legacy-operation",
+          spaces: ["Recipes"],
+          demoUrl: null,
+          q1: ["X bookmarks"],
+          q2: ["Recipes"],
+          step,
+          demo: { url: "https://example.com/recipe", destination: "Recipes" },
+        }),
+      );
+      expect(getOnboardingProgress()).toEqual(fresh);
+    },
+  );
+
+  it.each([
+    ["no version", {}],
+    ["an unknown version", { progressVersion: 1 }],
+    ["a non-numeric version", { progressVersion: "2" }],
+  ])("restarts a record with %s", (_name, version) => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Travel"],
+        demoUrl: null,
+        saveKinds: ["Travel"],
+        step: 2,
+        ...version,
+      }),
+    );
+    expect(getOnboardingProgress()).toEqual(fresh);
+  });
+
+  it("restores a record written by the current flow", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Travel"],
+        demoUrl: null,
+        progressVersion: 2,
+        saveKinds: ["Travel"],
+        step: 2,
+        demo: { url: "https://example.com/trip", destination: null },
+        spaceNames: {},
+      }),
+    );
+    expect(getOnboardingProgress()).toEqual({
+      saveKinds: ["Travel"],
+      spaces: ["Travel"],
+      step: 2,
+      demo: {
+        url: "https://example.com/trip",
+        destination: null,
+        source: "direct",
+      },
+    });
+  });
+
+  it("keeps the replay fields but not the old demo once the new flow writes progress", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "legacy-operation",
+        spaces: ["Recipes"],
+        demoUrl: "https://example.com/queued",
+        step: 5,
+        demo: { url: "https://example.com/recipe", destination: "Recipes" },
+      }),
+    );
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 0 });
+    expect(getOnboardingProgress()).toEqual({
+      saveKinds: [],
+      spaces: [],
+      step: 0,
+      demo: null,
+    });
+    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
+    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
+  });
+
+  it("still hands an older finished record's spaces to the replay", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "legacy-operation",
+        spaces: ["Recipes"],
+        demoUrl: null,
+        step: 7,
+      }),
+    );
+    expect(hasPending()).toBe(true);
+    expect(getPendingSpaces()).toEqual(["Recipes"]);
   });
 });

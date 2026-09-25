@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   countPartial,
   countProgress,
+  failedEntries,
   hasRetryableEntries,
   selectProcessorPayloads,
   withEntry,
@@ -80,27 +81,101 @@ describe("hasRetryableEntries", () => {
 });
 
 describe("countProgress / countPartial", () => {
+  const links = (...urls: string[]) => urls.map((u) => resolved(u, "website"));
+
   it("counts saved against the whole batch while saving", () => {
-    expect(countProgress(makeSession(["saved", "pending", "failed"]))).toEqual({
-      saved: 1,
-      total: 3,
-    });
+    expect(
+      countProgress(
+        makeSession(["saved", "pending", "failed"]),
+        links("https://a.example", "https://b.example", "https://c.example"),
+      ),
+    ).toEqual({ saved: 1, total: 3 });
   });
 
   it("counts unsupported entries as failures on the partial screen", () => {
     expect(
-      countPartial(makeSession(["saved", "failed", "unsupported"])),
+      countPartial(
+        makeSession(["saved", "failed", "unsupported"]),
+        links("https://a.example", "https://b.example", "https://c.example"),
+      ),
     ).toEqual({ saved: 1, failed: 2, total: 3 });
+  });
+
+  it("counts entries that reuse one item as a single save", () => {
+    const reel = "https://www.instagram.com/reel/abc/";
+    const session = makeSession(["saved", "saved", "pending"]);
+    session.entries[0].itemId = "items:reel";
+    session.entries[1].itemId = "items:reel";
+    const payloads = [
+      resolved(reel, "website"),
+      resolved(reel),
+      resolved("https://b.example", "website"),
+    ];
+    expect(countProgress(session, payloads)).toEqual({ saved: 1, total: 2 });
+    expect(countPartial(session, payloads)).toEqual({
+      saved: 1,
+      failed: 0,
+      total: 2,
+    });
+  });
+
+  it("counts a repeated link once before it settles", () => {
+    const reel = "https://www.instagram.com/reel/abc/";
+    const payloads = [resolved(reel, "website"), resolved(`Watch ${reel}`)];
+    expect(
+      countProgress(makeSession(["pending", "pending"]), payloads),
+    ).toEqual({ saved: 0, total: 1 });
+  });
+
+  it("keeps a caption an older build saved as a note apart from its failed link", () => {
+    const session = makeSession(["saved", "failed"]);
+    session.entries[0] = {
+      ...session.entries[0],
+      kind: "note",
+      itemId: "items:note",
+    };
+    session.entries[1].message = "offline";
+    const payloads = [
+      resolved("See this post"),
+      resolved("https://www.instagram.com/reel/abc/", "website"),
+    ];
+    expect(countProgress(session, payloads)).toEqual({ saved: 1, total: 2 });
+    expect(countPartial(session, payloads)).toEqual({
+      saved: 1,
+      failed: 1,
+      total: 2,
+    });
+    expect(failedEntries(session, payloads).map((e) => e.index)).toEqual([1]);
+  });
+
+  it("reports a failed repeated link as one failure with one message", () => {
+    const reel = "https://www.instagram.com/reel/abc/";
+    const session = makeSession(["failed", "failed", "failed"]);
+    session.entries.forEach((e) => (e.message = "offline"));
+    const payloads = [
+      resolved("See this post"),
+      resolved(reel, "website"),
+      resolved("https://b.example", "website"),
+    ];
+    expect(countPartial(session, payloads)).toEqual({
+      saved: 0,
+      failed: 2,
+      total: 2,
+    });
+    expect(failedEntries(session, payloads).map((e) => e.index)).toEqual([
+      0, 2,
+    ]);
   });
 
   it("reports zero failures when the batch only stalled", () => {
     // The orchestration-error path lands on the partial screen with entries
     // still pending, so the screen must be able to word itself from failed===0.
-    expect(countPartial(makeSession(["saved", "pending"]))).toEqual({
-      saved: 1,
-      failed: 0,
-      total: 2,
-    });
+    expect(
+      countPartial(
+        makeSession(["saved", "pending"]),
+        links("https://a.example", "https://b.example"),
+      ),
+    ).toEqual({ saved: 1, failed: 0, total: 2 });
   });
 });
 

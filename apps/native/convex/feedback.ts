@@ -1,0 +1,417 @@
+import { ConvexError, Infer, v } from "convex/values";
+import { internal } from "./_generated/api";
+import {
+  env,
+  internalAction,
+  internalMutation,
+  internalQuery,
+  mutation,
+  type ActionCtx,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { requireUserId } from "./model/auth";
+import {
+  feedbackDeliveryStatusValidator,
+  feedbackPlatformValidator,
+  feedbackSurfaceValidator,
+} from "./model/feedbackFields";
+import { logEvent } from "./model/log";
+import { rateLimiter } from "./model/rateLimiter";
+import {
+  classifyResendError,
+  formatResendError,
+  ResendResponseError,
+  resendErrorCategoryValidator,
+  resendRequest,
+} from "./model/resend";
+
+/**
+ * Authenticated in-app feedback (the client boundary is the shared
+ * apps/native/src/components/feedback/feedback-modal.tsx).
+ *
+ * Convex is the source of truth: `submitFeedback` persists the row first,
+ * then the support-inbox email is projected out of it. A Resend outage,
+ * timeout, or missing operator configuration can never lose feedback — the
+ * row simply waits (status `pending` / `failed` / `unconfigured`) for the
+ * bounded, index-backed retry worker, sharing its provider boundary with the
+ * waitlist (`model/resend.ts`).
+ *
+ * Privacy boundary: the message is user content. It lives in Convex and —
+ * once delivered — in the operator's inbox (the authorized feedback
+ * channel). It never appears in backend logs (only categories, status codes,
+ * ids, and attempt counts) nor in PostHog (client telemetry carries surface,
+ * char count, and a content-free delivery category only).
+ */
+
+/** Mirrors the client's FEEDBACK_MESSAGE_MAX_LENGTH (src/lib/feedback.ts). */
+export const FEEDBACK_MESSAGE_MAX_LENGTH = 1000;
+/** A row that starts this many deliveries stays `failed` for manual
+ * inspection instead of occupying the retry window forever. */
+export const MAX_DELIVERY_ATTEMPTS = 10;
+/** Rows scanned per retryable status per retry run. */
+const RETRY_SCAN = 100;
+/** Context strings (app version, build variant) are best-effort metadata for
+ * the reply, so an over-long value is truncated rather than rejected. */
+const MAX_CONTEXT_LENGTH = 64;
+
+const claimedDeliveryValidator = v.object({
+  attempt: v.number(),
+  submittedAt: v.number(),
+  message: v.string(),
+  surface: feedbackSurfaceValidator,
+  platform: v.optional(feedbackPlatformValidator),
+  appVersion: v.optional(v.string()),
+  buildVariant: v.optional(v.string()),
+  accountEmail: v.optional(v.string()),
+});
+type ClaimedDelivery = Infer<typeof claimedDeliveryValidator>;
+
+/** Operator inbox configuration. All three must be set for delivery. */
+type FeedbackInboxConfig = {
+  apiKey: string;
+  to: string;
+  from: string;
+};
+
+function feedbackInboxConfig(): FeedbackInboxConfig | null {
+  const { RESEND_API_KEY: apiKey, RESEND_FEEDBACK_INBOX_EMAIL: to } = env;
+  const { RESEND_FEEDBACK_FROM_EMAIL: from } = env;
+  if (!apiKey || !to || !from) return null;
+  return { apiKey, to, from };
+}
+
+/** True once the support inbox env vars are all set. Rows submitted before
+ * that stay `unconfigured` and are delivered once it is. */
+export function isFeedbackInboxConfigured(): boolean {
+  return feedbackInboxConfig() !== null;
+}
+
+/** Server-side twin of the client's sanitizeFeedbackMessage: the row is the
+ * record of what the user said, so over-long input is rejected rather than
+ * silently truncated, and whitespace-only input never creates a row. */
+export function normalizeFeedbackMessage(raw: string): string {
+  const message = raw.trim();
+  if (message.length === 0) {
+    throw new ConvexError("Feedback message is empty.");
+  }
+  if (message.length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+    throw new ConvexError("Feedback message is too long.");
+  }
+  return message;
+}
+
+function boundContext(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const bounded = value.trim().slice(0, MAX_CONTEXT_LENGTH);
+  return bounded.length > 0 ? bounded : undefined;
+}
+
+/**
+ * Persist one authenticated feedback submission. The user is always derived
+ * from the session (never an argument) and per-user rate limited, so this
+ * cannot become an email relay. Returns only after the row is durable — the
+ * scheduled inbox delivery is a projection the client never claims as done.
+ */
+export const submitFeedback = mutation({
+  args: {
+    message: v.string(),
+    surface: feedbackSurfaceValidator,
+    platform: v.optional(feedbackPlatformValidator),
+    appVersion: v.optional(v.string()),
+    buildVariant: v.optional(v.string()),
+  },
+  returns: v.object({
+    submissionId: v.id("feedbackSubmissions"),
+    // Content-free projection state for client telemetry: `scheduled` means
+    // an inbox is configured and delivery is queued; `unconfigured` means the
+    // row waits for operator setup. Neither means the email was sent.
+    deliveryState: v.union(v.literal("scheduled"), v.literal("unconfigured")),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await rateLimiter.limit(ctx, "feedbackSubmit", {
+      key: userId,
+      throws: true,
+    });
+    const message = normalizeFeedbackMessage(args.message);
+    const configured = isFeedbackInboxConfigured();
+    const submissionId = await ctx.db.insert("feedbackSubmissions", {
+      userId,
+      message,
+      surface: args.surface,
+      ...(args.platform !== undefined ? { platform: args.platform } : {}),
+      ...(args.appVersion !== undefined
+        ? { appVersion: boundContext(args.appVersion) }
+        : {}),
+      ...(args.buildVariant !== undefined
+        ? { buildVariant: boundContext(args.buildVariant) }
+        : {}),
+      status: configured ? "pending" : "unconfigured",
+      attempts: 0,
+    });
+    if (configured) {
+      // Persist first, then deliver: the action reads the committed row, so
+      // a provider outage retries from Convex instead of losing feedback.
+      await ctx.scheduler.runAfter(0, internal.feedback.deliver, {
+        submissionId,
+      });
+    }
+    return {
+      submissionId,
+      deliveryState: configured
+        ? ("scheduled" as const)
+        : ("unconfigured" as const),
+    };
+  },
+});
+
+/**
+ * Load one deliverable row plus the safe context the email needs. No lease:
+ * the immediate post-submit action runs once per row and the retry worker
+ * schedules one bounded action per row, so the only concurrent-claim window
+ * is a retry racing a still-queued immediate action — a rare duplicate email
+ * to the operator, never a lost row or a user-visible failure. Claiming
+ * spends the attempt immediately (persisted before the send), so a delivery
+ * that crashes mid-flight still counts toward the cap instead of retrying
+ * for free forever. Unconfigured spends no attempt (an operator condition
+ * is not a row failure).
+ */
+export const claimDelivery = internalMutation({
+  args: { submissionId: v.id("feedbackSubmissions") },
+  returns: v.union(v.null(), claimedDeliveryValidator),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.submissionId);
+    if (
+      row === null ||
+      row.status === "delivered" ||
+      row.attempts >= MAX_DELIVERY_ATTEMPTS
+    ) {
+      return null;
+    }
+    if (!isFeedbackInboxConfigured()) {
+      if (row.status !== "unconfigured") {
+        await ctx.db.patch(args.submissionId, { status: "unconfigured" });
+      }
+      return null;
+    }
+    // The attempt is spent the moment the delivery starts, not when it
+    // finishes: an action that dies between the send and finishDelivery
+    // must not leave the row retryable for free.
+    const attempt = row.attempts + 1;
+    await ctx.db.patch(args.submissionId, { attempts: attempt });
+    // The authenticated account's email is safe reply context, read from the
+    // users table — never a client-supplied address.
+    const user = await ctx.db.get(row.userId as Id<"users">);
+    return {
+      attempt,
+      submittedAt: row._creationTime,
+      message: row.message,
+      surface: row.surface,
+      ...(row.platform !== undefined ? { platform: row.platform } : {}),
+      ...(row.appVersion !== undefined ? { appVersion: row.appVersion } : {}),
+      ...(row.buildVariant !== undefined
+        ? { buildVariant: row.buildVariant }
+        : {}),
+      ...(user?.email !== undefined ? { accountEmail: user.email } : {}),
+    };
+  },
+});
+
+/**
+ * Advance a row's delivery state. Only `deliver` calls this, so a crashed
+ * attempt simply leaves the row as it was for the retry worker (the attempt
+ * was already spent at claim time). `failed` records why; `delivered` is
+ * terminal.
+ */
+export const finishDelivery = internalMutation({
+  args: {
+    submissionId: v.id("feedbackSubmissions"),
+    status: v.union(v.literal("delivered"), v.literal("failed")),
+    errorCategory: v.optional(resendErrorCategoryValidator),
+    errorStatus: v.optional(v.number()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.submissionId);
+    if (row === null || row.status === "delivered") return null;
+    if (args.status === "delivered") {
+      await ctx.db.patch(args.submissionId, {
+        status: "delivered",
+        deliveredAt: Date.now(),
+        deliveryError: undefined,
+      });
+      return null;
+    }
+    await ctx.db.patch(args.submissionId, {
+      status: "failed",
+      deliveryError: formatResendError(
+        args.errorCategory ?? "network_error",
+        args.errorStatus,
+      ),
+    });
+    return null;
+  },
+});
+
+/** The support email. The message is included — this is the authorized
+ * feedback channel — but the subject stays content-free (a bounded surface
+ * word) so notification previews cannot leak user content. */
+function buildFeedbackEmail(
+  submissionId: Id<"feedbackSubmissions">,
+  claimed: ClaimedDelivery,
+): { subject: string; text: string; replyTo?: string } {
+  const lines = [
+    `New Shelvr feedback from the ${claimed.surface} form.`,
+    "",
+    claimed.message,
+    "",
+    "—",
+    `Submission ID: ${submissionId}`,
+    `Surface: ${claimed.surface}`,
+    `Platform: ${claimed.platform ?? "unknown"}`,
+    `App version: ${claimed.appVersion ?? "unknown"}`,
+    `Build: ${claimed.buildVariant ?? "unknown"}`,
+    `Account email: ${claimed.accountEmail ?? "not available"}`,
+    `Submitted: ${new Date(claimed.submittedAt).toISOString()}`,
+  ];
+  return {
+    subject: `Shelvr feedback (${claimed.surface})`,
+    text: lines.join("\n"),
+    ...(claimed.accountEmail !== undefined
+      ? { replyTo: claimed.accountEmail }
+      : {}),
+  };
+}
+
+async function sendFeedbackEmail(
+  config: FeedbackInboxConfig,
+  submissionId: Id<"feedbackSubmissions">,
+  claimed: ClaimedDelivery,
+): Promise<void> {
+  const { subject, text, replyTo } = buildFeedbackEmail(submissionId, claimed);
+  const response = await resendRequest(
+    config.apiKey,
+    "Shelvr-Feedback/1.0",
+    "/emails",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        from: config.from,
+        to: config.to,
+        subject,
+        text,
+        ...(replyTo === undefined ? {} : { reply_to: replyTo }),
+      }),
+    },
+  );
+  if (!response.ok) {
+    // The response body can echo the submitted message, so it is never read.
+    throw new ResendResponseError("send", response.status);
+  }
+}
+
+/** One claim → send → finish cycle. Delivery state only ever advances
+ * through `claimDelivery` (the attempt) and `finishDelivery` (the outcome),
+ * so a crash in between leaves a spent attempt and an unchanged status for
+ * the retry worker. */
+async function attemptDelivery(
+  ctx: ActionCtx,
+  submissionId: Id<"feedbackSubmissions">,
+): Promise<void> {
+  const claimed: ClaimedDelivery | null = await ctx.runMutation(
+    internal.feedback.claimDelivery,
+    { submissionId },
+  );
+  if (claimed === null) return;
+  const config = feedbackInboxConfig();
+  if (config === null) return; // claim already spent the unconfigured check.
+  try {
+    await sendFeedbackEmail(config, submissionId, claimed);
+    logEvent("info", "feedback_delivered", {
+      submission_id: submissionId,
+      attempt: claimed.attempt,
+    });
+    await ctx.runMutation(internal.feedback.finishDelivery, {
+      submissionId,
+      status: "delivered",
+    });
+  } catch (error) {
+    // Log and persist only the shape of the failure — never the message,
+    // account email, or provider text.
+    const { category, status } = classifyResendError(error, "invalid_request");
+    logEvent("error", "feedback_delivery_failed", {
+      submission_id: submissionId,
+      category,
+      status,
+      attempt: claimed.attempt,
+    });
+    await ctx.runMutation(internal.feedback.finishDelivery, {
+      submissionId,
+      status: "failed",
+      errorCategory: category,
+      errorStatus: status,
+    });
+  }
+}
+
+/** One bounded delivery of a single row, scheduled by `submitFeedback`
+ * (immediately after the row is durable) and by the retry worker (one
+ * scheduled action per row, so each send gets its own timeout budget). */
+export const deliver = internalAction({
+  args: { submissionId: v.id("feedbackSubmissions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await attemptDelivery(ctx, args.submissionId);
+    return null;
+  },
+});
+
+/** Bounded, index-backed retry scan: each retryable status pages rows below
+ * the attempt cap without ever scanning the whole table. */
+export const listSubmissionsNeedingDelivery = internalQuery({
+  args: {},
+  returns: v.array(v.id("feedbackSubmissions")),
+  handler: async (ctx) => {
+    const statuses: Infer<typeof feedbackDeliveryStatusValidator>[] = [
+      "pending",
+      "failed",
+      "unconfigured",
+    ];
+    const out: Id<"feedbackSubmissions">[] = [];
+    for (const status of statuses) {
+      // The compound index drops attempt-capped rows outright so they cannot
+      // fill the retry window and starve newer, still-retryable rows.
+      const page = await ctx.db
+        .query("feedbackSubmissions")
+        .withIndex("by_status_attempts", (q) =>
+          q.eq("status", status).lt("attempts", MAX_DELIVERY_ATTEMPTS),
+        )
+        .take(RETRY_SCAN);
+      for (const row of page) out.push(row._id);
+    }
+    return out;
+  },
+});
+
+/** Retry worker: deliver rows whose first attempt never ran or failed, so a
+ * Resend outage does not leave feedback unrecoverable. Runs from crons.ts.
+ * Each row is scheduled as its own `deliver` action rather than awaited
+ * serially: a full page of rows at the 15-second send timeout would hold
+ * one action open past the Convex runtime's 30-minute limit, while the
+ * scheduled deliveries each get their own timeout budget. */
+export const retryFailedDeliveries = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const submissionIds = await ctx.runQuery(
+      internal.feedback.listSubmissionsNeedingDelivery,
+      {},
+    );
+    for (const submissionId of submissionIds) {
+      await ctx.scheduler.runAfter(0, internal.feedback.deliver, {
+        submissionId,
+      });
+    }
+    return null;
+  },
+});

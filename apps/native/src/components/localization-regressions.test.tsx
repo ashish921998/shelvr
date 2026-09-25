@@ -3,23 +3,28 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import { AnimatedText } from "./animated-text";
+import { Button } from "./ui/button";
+import { Pressable } from "react-native";
 import { TidyDone } from "./tidy/tidy-done";
-import { SpacePickerStep, getSpacePresets } from "./onboarding/space-picker";
-import { SurveyStep } from "./onboarding/survey";
+import { SetupStep } from "@/components/onboarding/setup";
 import { onboardingLabel } from "@/lib/onboarding-labels";
+import { getSpacePresets } from "@/lib/save-kinds";
 
 const device = vi.hoisted(() => ({
   tag: "en-US",
   fontReady: true,
   listeners: new Set<() => void>(),
 }));
-// The native asset loader normally handles this require; Node has no OTF loader.
+// The native asset loader normally handles these requires; Node has no font
+// loader. AnimatedText requires both the display TTF and the Satoshi OTFs.
 vi.hoisted(async () => {
   const { createRequire } = await import("node:module");
   const load = createRequire(import.meta.url);
-  load.extensions[".otf"] = (module) => {
-    module.exports = "font-asset";
-  };
+  for (const extension of [".otf", ".ttf"]) {
+    load.extensions[extension] = (module) => {
+      module.exports = "font-asset";
+    };
+  }
 });
 vi.mock("expo-localization", async () => {
   const { useSyncExternalStore } = await import("react");
@@ -75,23 +80,85 @@ vi.mock("react-native", () => {
       ),
     ),
     ActivityIndicator: vi.fn(() => null),
+    TextInput: vi.fn(() => <input />),
+    useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844 }),
     StyleSheet: { flatten },
   };
 });
+const mockTheme = vi.hoisted(() => ({
+  fonts: { regular: "r", medium: "m", bold: "b", display: "d" },
+  gap: (v: number) => v * 8,
+  radius: { sm: 8, md: 11, lg: 16, xl: 24, full: 9999 },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+    huge: 48,
+  },
+  // Any variant a component asks for resolves to an empty style.
+  type: new Proxy({}, { get: () => ({}) }) as Record<string, object>,
+  opacity: { pressed: 0.7, disabled: 0.4 },
+  control: { minHeight: 48, pressRetentionOffset: 12 },
+  colors: {
+    background: "white",
+    surface: "white",
+    surfaceMuted: "white",
+    foreground: "black",
+    muted: "gray",
+    faint: "gray",
+    primary: "orange",
+    primaryForeground: "black",
+    primarySoft: "white",
+    primaryText: "black",
+    border: "gray",
+    imageBorder: "gray",
+    danger: "red",
+    overlay: "black",
+    onTint: "black",
+    onOverlay: "white",
+    keep: "green",
+    onKeep: "darkgreen",
+    tabTint: "orange",
+  },
+}));
+
 vi.mock("react-native-unistyles", () => ({
-  useUnistyles: () => ({
-    theme: { colors: { foreground: "black", primary: "orange" } },
-  }),
-  StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({ theme: mockTheme }),
+  StyleSheet: {
+    // Evaluate style factories with the mock theme so dynamic variant
+    // styles (styles.text(variant)) keep working.
+    create: (factory: (theme: typeof mockTheme) => unknown) =>
+      typeof factory === "function" ? factory(mockTheme) : factory,
+    absoluteFillObject: {},
+  },
 }));
 vi.mock("react-native-reanimated", async () => {
   const { useRef } = await import("react");
   const { Text, View } = await import("react-native");
-  const transition = { duration: () => transition, delay: () => transition };
+  const transition = {
+    duration: () => transition,
+    delay: () => transition,
+    easing: () => transition,
+    reduceMotion: () => transition,
+  };
   return {
-    default: { View, Text },
+    default: {
+      View,
+      Text,
+      createAnimatedComponent: (component: unknown) => component,
+    },
     FadeIn: transition,
     FadeInDown: transition,
+    FadeOut: transition,
+    Easing: { bezier: () => ({}), linear: () => ({}) },
+    cubicBezier: () => ({}),
+    ReduceMotion: { System: "system", Never: "never", Always: "always" },
+    useReducedMotion: () => false,
+    cancelAnimation: () => undefined,
     useSharedValue: (initial: number) =>
       useRef({
         value: initial,
@@ -126,6 +193,9 @@ vi.mock("@shopify/react-native-skia", () => {
     BlurMask: vi.fn(() => null),
   };
 });
+vi.mock("@/components/symbol", () => ({
+  AppSymbolIcon: vi.fn(() => null),
+}));
 vi.mock("./onboarding/parts", () => ({
   CtaButton: vi.fn(({ label }: { label: string }) => <button>{label}</button>),
 }));
@@ -183,51 +253,46 @@ it("translates the singular deleted-photo summary on a mounted screen", () => {
   expect(screen.queryByText(/1 deleted/)).toBeNull();
 });
 
-it("preserves selected preset identities and focused survey chips across languages", () => {
+it("preserves selected preset identities and focused setup chips across languages", () => {
   let selected: string[] = [];
-  function Picker() {
+  const toggleKind = vi.fn();
+  function Setup() {
     const [spaces, setSpaces] = useState(getSpacePresets(["Recipes"]));
     selected = spaces;
     return (
-      <SpacePickerStep
-        answers={["Recipes"]}
-        selected={spaces}
-        onToggle={(name) =>
+      <SetupStep
+        kinds={["Recipes"]}
+        spaces={spaces}
+        onToggleKind={toggleKind}
+        onToggleSpace={(name) =>
           setSpaces((prev) => prev.filter((item) => item !== name))
         }
+        onAddSpace={() => {}}
         onAdvance={() => {}}
       />
     );
   }
-  render(<Picker />);
-  const button = screen.getByRole("button", { name: /Recipes/ });
-  button.focus();
-  changeLanguage("de-DE");
-  expect(document.activeElement).toBe(button);
-  expect(selected).toContain("Recipes");
-  expect(button.textContent).toContain(onboardingLabel("Recipes"));
-  fireEvent.click(button);
-  expect(selected).not.toContain("Recipes");
-  const toggle = vi.fn();
-  render(
-    <SurveyStep
-      headline="Survey"
-      support=""
-      options={["Articles"]}
-      selected={[]}
-      onToggle={toggle}
-      ctaLabel="Next"
-      onAdvance={() => {}}
-    />,
-  );
-  const surveyChip = screen.getByRole("button", {
-    name: onboardingLabel("Articles"),
+  render(<Setup />);
+  const chip = screen.getByRole("button", {
+    name: onboardingLabel("Restaurants to try"),
   });
-  surveyChip.focus();
+  chip.focus();
+  changeLanguage("de-DE");
+  expect(document.activeElement).toBe(chip);
+  expect(chip.textContent).toBe(onboardingLabel("Restaurants to try"));
+  expect(chip.textContent).not.toBe("Restaurants to try");
+  fireEvent.click(chip);
+  expect(selected).not.toContain("Restaurants to try");
+  expect(selected).toContain("Recipes");
+
+  const kindTile = screen.getByRole("button", {
+    name: onboardingLabel("Fitness"),
+  });
+  kindTile.focus();
   changeLanguage("ja-JP");
-  expect(document.activeElement).toBe(surveyChip);
-  fireEvent.click(surveyChip);
-  expect(toggle).toHaveBeenCalledWith("Articles");
+  expect(document.activeElement).toBe(kindTile);
+  fireEvent.click(kindTile);
+  expect(toggleKind).toHaveBeenCalledWith("Fitness");
 });
 
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
@@ -252,7 +317,7 @@ vi.mock("@tanstack/react-query", () => {
   ];
   return { useQuery: () => ({ data }) };
 });
-vi.mock("expo-image", () => ({ Image: {} }));
+vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("expo-maps", () => {
   const map = ({ markers }: { markers: { id: string; title: string }[] }) => (
@@ -277,4 +342,24 @@ it("refreshes loaded map fallback titles without changing saved titles", async (
 it("keeps long header glyphs inside the available title width", () => {
   render(<AnimatedText text="Long header" width={40} truncate />);
   expect(screen.getByTestId("canvas").textContent).toBe("Lon…");
+});
+
+it("preserves caller accessibility state alongside loading and disabled state", () => {
+  const { rerender } = render(
+    <Button
+      title="Continue"
+      loading
+      accessibilityState={{ selected: true, busy: false, disabled: false }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: true, disabled: true });
+  rerender(<Button title="Continue" accessibilityState={{ selected: true }} />);
+  expect(
+    vi.mocked(Pressable).mock.calls.at(-1)?.[0].accessibilityState,
+  ).toEqual({ selected: true, busy: false, disabled: false });
 });

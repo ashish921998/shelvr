@@ -5,9 +5,11 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
+import { useTrialReminder } from "@/lib/trial-reminder";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
+import { useReducedMotion } from "react-native-reanimated";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -17,11 +19,15 @@ export default function AppLayout() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
+  // Spatial slide transitions are the first thing to cut under Reduce Motion.
+  const reducedMotion = useReducedMotion();
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
   useResumePendingShare();
+  // Remind trialers two days before the yearly plan starts charging.
+  useTrialReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -38,6 +44,7 @@ export default function AppLayout() {
       <RecentSavesWidgetSync />
       <Stack
         screenOptions={{
+          animation: reducedMotion ? "fade" : "default",
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: theme.colors.primary,
@@ -65,7 +72,7 @@ export default function AppLayout() {
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("capture.backToLibrary")}
+                    label={t("digest.backHome")}
                     onPress={() => router.replace("/")}
                   />
                 ),
@@ -162,20 +169,23 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
-          <Stack.Screen
-            name="paywall"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
+        {/* The onboarding reveal opens the paywall fallback before onboarding
+            completes. Keep it last: the first available screen is the initial
+            route, so it must be (tabs) or onboarding. */}
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: "formSheet",
+            headerShown: false,
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: "fitToContents",
+            contentStyle: { backgroundColor: theme.colors.background },
+          }}
+        />
       </Stack>
     </HomeFeedProvider>
   );

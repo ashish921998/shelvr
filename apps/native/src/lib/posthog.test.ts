@@ -4,7 +4,9 @@
 // so the real PostHog client never loads. Runs in the Node default env.
 import { describe, expect, it, vi } from "vitest";
 
-import { SAFE_ERROR_MESSAGES } from "./posthog";
+import { SAFE_ERROR_MESSAGES, superProperties } from "./posthog";
+
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
 type BeforeSend = (event: EventLike) => EventLike;
 type ExceptionListEntry = {
@@ -34,6 +36,11 @@ const posthogCtor = vi.hoisted(() => {
   return PostHogStub;
 });
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
+vi.mock("expo-updates", () => ({
+  updateId: "update-7",
+  channel: "production",
+  isEmbeddedLaunch: false,
+}));
 vi.mock("expo-constants", () => ({
   default: {
     expoConfig: {
@@ -147,6 +154,18 @@ describe("posthog before_send", () => {
     expect(list[0].stacktrace).toBe("frame at app.js:1");
   });
 
+  it("drops the launch deep link from Application Opened", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend({
+      event: "Application Opened",
+      properties: {
+        url: "shelvr://auth/callback?code=secret",
+        version: "1.0.3",
+      },
+    });
+    expect(sent.properties).toEqual({ version: "1.0.3" });
+  });
+
   it("leaves non-exception events untouched", () => {
     const beforeSend = sentBeforeSend();
     const event: EventLike = {
@@ -215,5 +234,30 @@ describe("posthog exception autocapture gate", () => {
     expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(true);
     expect(options.errorTracking.autocapture.unhandledRejections).toBe(true);
     vi.doUnmock("expo-constants");
+  });
+});
+
+describe("superProperties", () => {
+  it("tags events with the running OTA update and the store platform", () => {
+    expect(superProperties()).toEqual({
+      environment: "development",
+      platform: "ios",
+      analytics_version: 1,
+      ota_update_id: "update-7",
+      ota_channel: "production",
+      ota_embedded: false,
+    });
+  });
+});
+
+describe("push notification capture", () => {
+  // Both options default to true in the SDK, and the native side sends
+  // `$push_notification_opened` without consulting `before_send`, so the
+  // redaction above cannot reach it. Pinned off explicitly: an SDK bump must
+  // not widen what leaves the device.
+  it("stays off so no push data bypasses the redaction hook", () => {
+    const options = posthogCtor.options as Record<string, unknown>;
+    expect(options.capturePushNotificationSubscriptions).toBe(false);
+    expect(options.capturePushNotificationOpened).toBe(false);
   });
 });

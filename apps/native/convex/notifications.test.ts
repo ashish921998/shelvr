@@ -128,7 +128,12 @@ describe("weekly shelf notifications", () => {
         token: "token-a",
         platform: "android",
       }),
-    ).rejects.toThrow("registered to another account");
+    ).rejects.toMatchObject({
+      data: {
+        code: "notification_token_owned_by_another_account",
+        message: expect.stringContaining("registered to another account"),
+      },
+    });
     expect(
       await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
     ).toEqual(before);

@@ -5,6 +5,11 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   captureException: vi.fn(),
   identify: vi.fn(),
+  reset: vi.fn(),
+  register: vi.fn(),
+  ready: vi.fn(async () => {}),
+  getDistinctId: vi.fn(() => "anon-1"),
+  getAnonymousId: vi.fn(() => "anon-1"),
   getSessionId: vi.fn(() => "session-1"),
 }));
 const posthogCtor = vi.hoisted(() => {
@@ -19,7 +24,13 @@ const posthogCtor = vi.hoisted(() => {
   }
   return PostHogStub;
 });
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("posthog-react-native", () => ({ default: posthogCtor }));
+vi.mock("expo-updates", () => ({
+  updateId: null,
+  channel: null,
+  isEmbeddedLaunch: true,
+}));
 vi.mock("@/lib/posthog", async (importOriginal) => {
   // Spread the real module so captureError exercises the production
   // allowlist instead of a drift-prone hard-coded copy; swap only the client.
@@ -163,5 +174,40 @@ describe("captureError", () => {
       throw new Error("unavailable");
     });
     expect(() => analytics.captureError("x", new Error("y"))).not.toThrow();
+  });
+});
+
+describe("resetIfIdentified", () => {
+  it("is the only reset the facade exposes", () => {
+    // Sign-out flows used to call an unconditional reset alongside the auth
+    // edge's conditional one. The auth edge (useAnalyticsIdentity) is the
+    // single owner now; an unconditional entry point must not come back.
+    expect("reset" in analytics).toBe(false);
+    expect(typeof analytics.resetIfIdentified).toBe("function");
+  });
+
+  it("keeps a signed-out launch on its anonymous id", async () => {
+    await analytics.resetIfIdentified();
+    expect(mock.ready).toHaveBeenCalledOnce();
+    expect(mock.reset).not.toHaveBeenCalled();
+  });
+
+  it("resets a device still identified as a previous account", async () => {
+    mock.getDistinctId.mockReturnValueOnce("user-1");
+    await analytics.resetIfIdentified();
+    expect(mock.reset).toHaveBeenCalledOnce();
+    expect(mock.register).toHaveBeenCalledWith({
+      environment: "development",
+      platform: "ios",
+      analytics_version: 1,
+      ota_embedded: true,
+    });
+  });
+
+  it("does nothing before the SDK has loaded its ids", async () => {
+    mock.getDistinctId.mockReturnValueOnce("");
+    mock.getAnonymousId.mockReturnValueOnce("");
+    await analytics.resetIfIdentified();
+    expect(mock.reset).not.toHaveBeenCalled();
   });
 });

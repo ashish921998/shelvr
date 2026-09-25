@@ -1,0 +1,71 @@
+name: Native OTA with matching build configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        type: choice
+        description: Build profile of the installed binary
+        options:
+          [
+            production,
+            internal-test,
+            preview,
+            development,
+            development-simulator,
+          ]
+        default: preview
+        required: true
+      platform:
+        type: choice
+        description: Platform with a released build matching this native configuration
+        options: [all, android, ios]
+        default: all
+        required: true
+
+jobs:
+  publish:
+    type: update
+    environment: ${{ inputs.profile == 'preview' && 'preview' || (inputs.profile == 'development' || inputs.profile == 'development-simulator') && 'development' || 'production' }}
+    env:
+      APP_VARIANT: ${{ inputs.profile == 'preview' && 'preview' || (inputs.profile == 'development' || inputs.profile == 'development-simulator') && 'development' || 'production' }}
+      ANDROID_BUILD_ARCHS: ${{ inputs.profile == 'development-simulator' && 'x86_64' || inputs.profile == 'development' && 'arm64-v8a' || '' }}
+    params:
+      channel: ${{ inputs.profile == 'development-simulator' && 'development' || inputs.profile }}
+      platform: ${{ inputs.platform }}
+    hooks:
+      before_update:
+        - name: Check backend configuration
+          run: |
+            test -n "$EXPO_PUBLIC_CONVEX_URL" && test -n "$EXPO_PUBLIC_CONVEX_SITE_URL" || {
+              echo "OTA requires EXPO_PUBLIC_CONVEX_URL and EXPO_PUBLIC_CONVEX_SITE_URL."
+              exit 1
+            }
+        - name: Check Android Firebase file is available for fingerprinting
+          if: ${{ inputs.platform != 'ios' }}
+          run: |
+            test -n "$GOOGLE_SERVICES_JSON" && test -f "$GOOGLE_SERVICES_JSON" || {
+              echo "Android OTA requires the same GOOGLE_SERVICES_JSON file as the native build."
+              exit 1
+            }
+        # Runs here, inside the publishing job, rather than in a separate
+        # `type: fingerprint` job: this job's environment and env: are what the
+        # update gets stamped with, and a second job would have to be kept
+        # identical to them by hand. The walk up to the repository root replaces
+        # `git rev-parse --show-toplevel` because a worker may receive the
+        # project as an archive with no .git, and the hook's working directory
+        # is not documented for a monorepo. Reaching / without finding the tool
+        # leaves node a path that does not exist, so the publish still blocks.
+        - name: Verify the update can reach the released build
+          run: |
+            root="$PWD"
+            while [ ! -f "$root/tools/verify-ota-compatibility.mjs" ] && [ "$root" != "/" ]; do
+              root="$(dirname "$root")"
+            done
+            test -f "$root/tools/verify-ota-compatibility.mjs" || {
+              echo "No tools/verify-ota-compatibility.mjs at or above $PWD, so the update cannot be checked."
+              exit 1
+            }
+            node "$root/tools/verify-ota-compatibility.mjs" \
+              --profile "${{ inputs.profile }}" \
+              --platform "${{ inputs.platform }}"

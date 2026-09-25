@@ -1,102 +1,30 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { LegalConsentBoundary } from "@/components/legal-consent";
 import { OnboardingProvider } from "@/lib/onboarding";
-import { analytics } from "@/lib/analytics";
 import { useEntitlementSync } from "@/lib/entitlement";
-import { useCurrentUser } from "@/lib/current-user";
-import { posthog } from "@/lib/posthog";
-import { ConvexAuthProvider, type TokenStorage } from "@convex-dev/auth/react";
-import {
-  convex,
-  persister,
-  queryClient,
-  restartConvexSubscription,
-} from "@/lib/query-client";
-import { observeAuthQueryErrors } from "@/lib/query-auth-recovery";
-import { useConvexAuth } from "convex/react";
+import { analytics } from "@/lib/analytics";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { authStorage } from "@/lib/auth-storage";
+import { convex, persister, queryClient } from "@/lib/query-client";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import * as SecureStore from "expo-secure-store";
-import {
-  DarkTheme,
-  DefaultTheme,
-  Slot,
-  ThemeProvider,
-  usePathname,
-  useRouter,
-  useSegments,
-  type ErrorBoundaryProps,
-} from "expo-router";
+import { Slot, useRouter, useSegments, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import * as SystemUI from "expo-system-ui";
-import { useEffect, useRef } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PostHogProvider } from "posthog-react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useUnistyles } from "react-native-unistyles";
 import { isDarkThemeName } from "@/lib/appearance";
 import {
   NotificationSessionProvider,
   useNotificationObserver,
 } from "@/lib/notifications";
+import { SplashGate, useSplashGate } from "@/components/splash/splash-gate";
+import { NavThemeProvider } from "@/lib/nav-theme";
+import { useAnalyticsIdentity } from "@/lib/analytics-identity";
+import { useConvexQueryHealing } from "@/lib/convex-query-healing";
+import { posthog } from "@/lib/posthog";
 
-// Convex Auth persists its JWT + refresh token client-side. In React Native we
-// must supply the storage ourselves — wrap Keychain-backed expo-secure-store
-// behind the awaitable TokenStorage interface the provider expects. Scope the
-// keys to the Convex deployment so a development refresh token can never be
-// presented to production (or leave auth initialization stuck while testing).
-const authStorageNamespace = (
-  process.env.EXPO_PUBLIC_CONVEX_URL ?? "default"
-).replace(/[^A-Za-z0-9._-]/g, "_");
-const authStorageKey = (key: string) => `${authStorageNamespace}_${key}`;
-
-const authStorage: TokenStorage = {
-  getItem: (key) => SecureStore.getItemAsync(authStorageKey(key)),
-  setItem: (key, value) => SecureStore.setItemAsync(authStorageKey(key), value),
-  removeItem: (key) => SecureStore.deleteItemAsync(authStorageKey(key)),
-};
-
-// Single source of truth for the native route background. The navigator paints
-// every screen's container with the navigation theme's `background`, so setting
-// it here — instead of a `contentStyle` on each screen — themes all nested
-// stacks at once and paints the screen container before JS content mounts (no
-// white flash on push / zoom transitions). `useColorScheme` is the reliable
-// system-appearance signal; the palette comes from Unistyles.
-function PostHogIdentity() {
-  const { isAuthenticated } = useConvexAuth();
-  const { data: user, isFetching } = useCurrentUser();
-  const identifiedUserId = useRef<string | undefined>(undefined);
-  const clearedUnauthenticatedUserCache = useRef(false);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      analytics.reset();
-      identifiedUserId.current = undefined;
-      // Convex query keys don't include the authenticated user. Remove every
-      // Convex entry once per unauthenticated interval so its subscription
-      // stops and a later account can never observe the previous user's data.
-      if (!clearedUnauthenticatedUserCache.current) {
-        clearedUnauthenticatedUserCache.current = true;
-        queryClient.removeQueries({
-          predicate: (query) => query.queryKey[0] === "convexQuery",
-        });
-      }
-      return;
-    }
-
-    clearedUnauthenticatedUserCache.current = false;
-
-    // Do not identify cached data while the auth-dependent Convex query is
-    // reconnecting after sign-in or an account change.
-    if (isFetching || !user || identifiedUserId.current === user._id) {
-      return;
-    }
-
-    analytics.identify(user._id);
-    analytics.capture("auth_completed");
-    identifiedUserId.current = user._id;
-  }, [isAuthenticated, isFetching, user]);
-
-  return null;
-}
+// Expo Router reads the root boundary from this module's exports.
+export { RootErrorBoundary as ErrorBoundary } from "@/components/root-error-boundary";
 
 function PostHogScreenTracking() {
   // Route segments retain placeholders such as [id], excluding saved item IDs,
@@ -113,84 +41,47 @@ function NotificationSetup() {
   return null;
 }
 
-/**
- * Root render-crash boundary. Reports the exception to error tracking and
- * offers a retry (which remounts the route tree) instead of Expo's bare
- * default screen. Nested routes without their own boundary land here.
- */
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  useAppLocale();
-  useEffect(() => {
-    analytics.captureError("render_error", error);
-  }, [error]);
-
-  return (
-    <View style={errorBoundaryStyles.container}>
-      <Text style={errorBoundaryStyles.title}>
-        {t("errors.unexpectedTitle")}
-      </Text>
-      <Text style={errorBoundaryStyles.message}>
-        {t("errors.unexpectedBody")}
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => void retry()}
-        style={({ pressed }) => [
-          errorBoundaryStyles.retry,
-          pressed && errorBoundaryStyles.retryPressed,
-        ]}
-      >
-        <Text style={errorBoundaryStyles.retryLabel}>
-          {t("common.tryAgain")}
-        </Text>
-      </Pressable>
-    </View>
-  );
+/** Owns analytics identify/reset and the Convex cache clearing on the auth
+ * edge. See useAnalyticsIdentity — the one session boundary. */
+function AnalyticsIdentity() {
+  useAnalyticsIdentity();
+  return null;
 }
 
-function NavThemeProvider({ children }: { children: React.ReactNode }) {
-  const { theme, rt } = useUnistyles();
-  // Base the navigator palette on the ACTIVE app theme, not the OS scheme:
-  // the user can pin a dark appearance while the system stays light.
-  const appThemeIsDark = isDarkThemeName(rt.themeName);
-  const base = appThemeIsDark ? DarkTheme : DefaultTheme;
+/** Re-subscribes Convex queries that errored under a previous identity. */
+function ConvexQueryHealer() {
+  useConvexQueryHealing();
+  return null;
+}
 
-  const navTheme = {
-    ...base,
-    dark: appThemeIsDark,
-    colors: {
-      ...base.colors,
-      background: theme.colors.background,
-      card: theme.colors.background,
-      text: theme.colors.foreground,
-      border: theme.colors.border,
-      primary: theme.colors.primary,
-    },
-  };
-
-  // Keep the native root view / window (behind the routes: launch, overscroll
-  // bounce, transparent sheets) in sync with the theme too.
-  useEffect(() => {
-    SystemUI.setBackgroundColorAsync(theme.colors.background);
-  }, [theme.colors.background]);
-
-  return <ThemeProvider value={navTheme}>{children}</ThemeProvider>;
+/** Configures RevenueCat and logs the Convex Auth user in so webhook events
+ * carry the same `userId` every Convex table keys on. Rendered once inside the
+ * providers. */
+function EntitlementSync() {
+  useEntitlementSync();
+  return null;
 }
 
 export default function RootLayout() {
   const router = useRouter();
-  const pathname = usePathname();
   const { rt } = useUnistyles();
-  // Contrast with the active app theme (not the OS scheme); camera stays light
-  // over the viewfinder.
-  const appThemeIsDark = isDarkThemeName(rt.themeName);
-  const statusBarStyle =
-    pathname === "/camera" || appThemeIsDark ? "light" : "dark";
+  // The launch animation plays once per process, over the booting app — and
+  // not at all when a share intent, deep link or notification is taking the
+  // user somewhere specific.
+  const { showSplash, finishSplash } = useSplashGate();
+  // Contrast with the active app theme. The camera screen renders its own
+  // light StatusBar over the viewfinder; while the splash is up the
+  // theme-driven bar applies, and the splash picks its ground from the theme.
+  const statusBarStyle = isDarkThemeName(rt.themeName) ? "light" : "dark";
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
       <NavThemeProvider>
-        <Slot />
+        <SplashGate active={showSplash} onFinish={finishSplash}>
+          <LegalConsentBoundary>
+            <Slot />
+          </LegalConsentBoundary>
+        </SplashGate>
         <StatusBar style={statusBarStyle} />
       </NavThemeProvider>
     </OnboardingProvider>
@@ -206,8 +97,8 @@ export default function RootLayout() {
         // the cleaned URL ourselves so the param doesn't linger and re-trigger.
         replaceURL={(url) => {
           // `url` is a relative href (e.g. "/"); typed routes can't prove it's
-          // in the union, so cast through the href type Expo Router expects.
-          router.replace(url as never);
+          // in the union, so route it through the Href type Expo Router takes.
+          router.replace(url as Href);
           return Promise.resolve();
         }}
       >
@@ -226,10 +117,10 @@ export default function RootLayout() {
             },
           }}
         >
-          <PostHogIdentity />
+          <AnalyticsIdentity />
           <PostHogScreenTracking />
           <NotificationSetup />
-          <ConvexErroredQueryHealer />
+          <ConvexQueryHealer />
           <NotificationSessionProvider>
             {posthog ? (
               <PostHogProvider client={posthog} autocapture={false}>
@@ -244,57 +135,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-/** Configures RevenueCat and logs the Convex Auth user in so webhook events
- * carry the same `userId` every Convex table keys on. Rendered once inside the
- * providers. */
-function EntitlementSync() {
-  useEntitlementSync();
-  return null;
-}
-
-function ConvexErroredQueryHealer() {
-  const { isAuthenticated } = useConvexAuth();
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    return observeAuthQueryErrors(queryClient, restartConvexSubscription);
-  }, [isAuthenticated]);
-  return null;
-}
-
-const errorBoundaryStyles = StyleSheet.create((theme, rt) => ({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: theme.gap(4),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
-    gap: theme.gap(1),
-  },
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
-    color: theme.colors.foreground,
-  },
-  message: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    color: theme.colors.muted,
-    textAlign: "center",
-    lineHeight: 21,
-  },
-  retry: {
-    marginTop: theme.gap(2),
-    borderRadius: 24,
-    backgroundColor: theme.colors.foreground,
-    paddingHorizontal: theme.gap(3),
-    paddingVertical: theme.gap(1.5),
-  },
-  retryPressed: { opacity: 0.75 },
-  retryLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.background,
-  },
-}));

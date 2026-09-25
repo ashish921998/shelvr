@@ -1,26 +1,29 @@
-import { t, currentLocale, useAppLocale } from "@/lib/i18n";
+import { currentLocale, useAppLocale } from "@/lib/i18n";
+import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
-import Constants from "expo-constants";
 import * as Localization from "expo-localization";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import {
   createContext,
   createElement,
   use,
   useEffect,
   useMemo,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { NotificationDeviceSession } from "./notification-device-session";
+import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
+import { readConvexUrl } from "@/lib/convex-url";
 
-const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
   read: async () => {
     const stored = await SecureStore.getItemAsync(tokenStorageKey);
@@ -51,58 +54,11 @@ export function useNotificationSession() {
   return { session, operation };
 }
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
 function getNotificationTimezone(): string | undefined {
   return (
     Localization.getCalendars()[0]?.timeZone ??
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
-}
-
-async function prepareNotificationChannel(): Promise<void> {
-  if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("weekly-shelf", {
-    name: t("notifications.weeklyShelf"),
-    importance: Notifications.AndroidImportance.DEFAULT,
-    vibrationPattern: [0, 150],
-  });
-}
-
-async function getExpoPushToken(
-  requestPermission: boolean,
-  devicePushToken?: Notifications.DevicePushToken,
-): Promise<string | null> {
-  await prepareNotificationChannel();
-  const existing = await Notifications.getPermissionsAsync();
-  let permission = existing;
-  if (!permission.granted && requestPermission) {
-    permission = await Notifications.requestPermissionsAsync();
-  }
-  if (!permission.granted) return null;
-
-  const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
-  if (!projectId) return null;
-
-  try {
-    return (
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-        devicePushToken,
-      })
-    ).data;
-  } catch {
-    return null;
-  }
 }
 
 export function NotificationSessionProvider({
@@ -112,6 +68,7 @@ export function NotificationSessionProvider({
 }) {
   const { isAuthenticated } = useConvexAuth();
   const locale = useAppLocale();
+  const previousLocale = useRef<string | null>(null);
   const { signOut } = useAuthActions();
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
@@ -137,9 +94,18 @@ export function NotificationSessionProvider({
           }),
         signOut,
         deleteAccount: () => deleteAccount({}),
-        resetAnalytics: analytics.reset,
-        reportError: (error) =>
-          analytics.captureError("notification_session_cleanup_failed", error),
+        clearWidget: clearRecentSavesWidget,
+        // Fallback for a failed post-deletion sign-out: no auth edge may fire
+        // promptly, so clear the identity here (idempotent with the hook's).
+        resetAnalytics: () => void analytics.resetIfIdentified(),
+        reportError: (error) => {
+          const event =
+            error instanceof Error &&
+            error.message === "widget_thumbnail_cleanup_failed"
+              ? "widget_thumbnail_cleanup_failed"
+              : "notification_session_cleanup_failed";
+          analytics.captureError(event, error);
+        },
       }),
     [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
   );
@@ -160,7 +126,6 @@ export function NotificationSessionProvider({
       }
     };
 
-    void register();
     const tokenListener = Notifications.addPushTokenListener(
       (devicePushToken) => {
         void register(devicePushToken);
@@ -173,12 +138,29 @@ export function NotificationSessionProvider({
   }, [isAuthenticated, session]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-    void session
-      .register()
-      .catch((error) =>
-        analytics.captureError("notification_locale_sync_failed", error),
-      );
+    if (!isAuthenticated) {
+      previousLocale.current = null;
+      return;
+    }
+    const localeChanged =
+      previousLocale.current !== null && previousLocale.current !== locale;
+    previousLocale.current = locale;
+    const register = (event = "notification_registration_failed") => {
+      void session
+        .register()
+        .catch((error) => analytics.captureError(event, error));
+    };
+    // One initial registration also carries the locale. Retry after returning
+    // from Settings or an offline launch without requiring an app restart.
+    register(
+      localeChanged
+        ? "notification_locale_sync_failed"
+        : "notification_registration_failed",
+    );
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active" && session.shouldRetryRegistration()) register();
+    });
+    return () => listener.remove();
   }, [locale, isAuthenticated, session]);
 
   return createElement(
@@ -188,7 +170,12 @@ export function NotificationSessionProvider({
   );
 }
 
-function getNotificationUrl(
+/**
+ * The route a notification carries, if any. Exported because the splash gate
+ * decides whether to stand down from the same rule this navigates by — a push
+ * with no `url` goes nowhere, so it is not a reason to skip the animation.
+ */
+export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
   const data = notification.request.content.data as

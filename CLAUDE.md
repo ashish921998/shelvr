@@ -75,6 +75,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `itemReads` — per-user read state, kept out of the item row
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `waitlistSignups` — waitlist source of truth, projected to Resend
+  - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
+    (see [feedback delivery](docs/architecture/feedback.md))
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -96,18 +98,25 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
   RevenueCat webhook.
+- **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
+  Apple refund-data sharing, delivered to RevenueCat with retries. See
+  [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
 - **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
   `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
   plus internal digest preparation and send. `notificationDelivery.ts` holds the
   claim/finish/recover delivery machine.
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
+- **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
+  claim/finish delivery machine that projects each submission to the Resend support inbox with an
+  hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
   the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
-- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, weekly shelf preparation,
-  and weekly shelf delivery recovery.
+- **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
+  failure, waitlist Resend retry, weekly shelf preparation, weekly shelf delivery recovery, hourly
+  feedback inbox delivery retry, and daily payment-receipt retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
@@ -179,22 +188,31 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
   Analytics is a no-op when either is unset
+- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
+  it, App Store links carry `ct=` campaign tokens; see
+  [growth funnel](docs/analytics/growth-funnel.md)
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the dev-only passwordless button
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
-    non-production variant. `app.config.js` pins it to one exact value
+    to show the passwordless dev-login button and fixture reset on development builds
+    (release-mode included); preview and production builds never show either
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
+    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
+    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
+    to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
-  - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
-    iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
     `expo-maps` on the map screen. A production Android EAS build fails without it, so the map
     screen never ships unconfigured
+  - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
+    `google-services.json`; required by every Android EAS build, with a Firebase
+    client matching that variant's package, so `expo-notifications` can obtain an
+    FCM token. See [push notification builds and updates](docs/architecture/push-notifications.md)
+    for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
   - `POSTHOG_CLI_API_KEY` — PostHog personal API key (scopes: error tracking write, organization
@@ -238,6 +256,11 @@ needed at runtime by the features that use them:
 - `RESEND_ANDROID_SEGMENT_ID` — Resend segment for `shelvr-android` signups. Android rows stay
   `unconfigured` until it is set
 - `RESEND_TOPIC_ID` — Resend topic the contact is opted into
+- `RESEND_FEEDBACK_INBOX_EMAIL` — Resend address in-app feedback is projected to. Together with
+  `RESEND_FEEDBACK_FROM_EMAIL` and `RESEND_API_KEY` it gates configured delivery; submissions stay
+  `unconfigured` until all three are set
+- `RESEND_FEEDBACK_FROM_EMAIL` — verified Resend sending address for feedback email, required with
+  the inbox address and `RESEND_API_KEY` for delivery
 
 ## Working conventions
 
@@ -251,7 +274,14 @@ needed at runtime by the features that use them:
   later; store builds lag for weeks). Never change a public function's argument or return shape
   in the same release that moves the client. Expand first (add a new function or accept both
   shapes), deploy, move the client, then contract once the production update channel shows no
-  old bundle still calling it.
+  old bundle still calling it. CI enforces the first half: `tools/verify-convex-api.mjs`
+  resolves every public function's `args` and `returns` to their full text, following the
+  shared validators they reference, and fails a pull request that changes or removes one.
+  Withdrawing a function's `export`, or switching it between `query`, `mutation` and
+  `action`, counts the same way. Acknowledge a change an installed app survives, or the
+  expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
+  range. It cannot yet tell widening from narrowing, so an added field asks for the
+  trailer too.
 - Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
   `subscriptions.ts`.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
@@ -263,10 +293,32 @@ needed at runtime by the features that use them:
   memberships without changing their status. `saved` and `dismissed` statuses are user-owned, so
   no AI pass ever overwrites a user decision.
 - Deploy backend changes in a compatible order: the Convex deploy lands before
-  the client update that needs it (`.github/workflows/deploy.yml` enforces
-  this: approved production deploy, then tester OTA). Breaking changes ship as
+  the client update that needs it. `.github/workflows/deploy.yml` deploys the
+  backend alone, and `.github/workflows/release.yml` deploys the selected
+  commit's backend before it builds or publishes anything, so no client reaches
+  a person ahead of the functions it calls. Breaking changes ship as
   expand/contract — deploy the tolerant version first, tighten once old
   clients are gone.
+- An OTA update only reaches installs whose store build shares its native fingerprint. A
+  change that moves the fingerprint (a new native module, a config plugin, `app.json`,
+  `app.config.js`) strands every later OTA until a store build ships, and the diff does
+  not say so. Two layers cover it. On a pull request CI runs
+  `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
+  and never fails the check; acknowledge an intended move with the
+  `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
+  workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
+  compares the fingerprint the update is about to carry against
+  `apps/native/released-builds.json` and blocks the publish on anything but a match,
+  including a profile or platform with no recorded release. A blocked publish means
+  nothing published from this tree reaches the recorded binary, so the usual fix is a
+  store build, and recording the release afterwards. See
+  [push notification builds and updates](docs/architecture/push-notifications.md).
+- Adding a field to a table is a one-way door once rows carry it. Convex validates
+  every existing document against the new schema on deploy, and a table validator
+  rejects a field it does not declare, failing with an "Unexpected field" error
+  naming it. So reverting the commit that added the field fails the deploy instead
+  of rolling it back. To back a field out, stop writing it and leave it declared
+  `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 

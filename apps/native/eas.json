@@ -71,10 +71,12 @@
   "submit": {
     "production": {
       "ios": {
+        "bundleIdentifier": "app.shelvr.save",
         "ascAppId": "6798143550",
         "appleTeamId": "WJP847UZY2"
       },
       "android": {
+        "applicationId": "app.shelvr.save",
         "serviceAccountKeyPath": "./google-service-account-key.json",
         "track": "internal"
       }

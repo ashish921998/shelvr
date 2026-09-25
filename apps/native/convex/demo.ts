@@ -106,7 +106,9 @@ export const createDemoItem = mutation({
   },
   returns: v.object({
     itemId: v.id("items"),
+    userId: v.string(),
     url: v.string(),
+    urlMatchesRequest: v.boolean(),
     reused: v.boolean(),
     savedSpaceNames: v.array(v.string()),
   }),
@@ -124,9 +126,17 @@ export const createDemoItem = mutation({
       if (item === null || item.userId !== userId || !item.url) {
         throw demoError("demo_used");
       }
+      let urlMatchesRequest = false;
+      try {
+        urlMatchesRequest = normalizeExternalUrl(args.url) === item.url;
+      } catch {
+        // A repeat stays idempotent even when its new URL is invalid.
+      }
       return {
         itemId: existing.itemId,
+        userId,
         url: item.url,
+        urlMatchesRequest,
         reused: true,
         savedSpaceNames: await savedSpaceNames(ctx, existing.itemId),
       };
@@ -171,10 +181,13 @@ export const createDemoItem = mutation({
       itemType: "link",
       savedAt: item?._creationTime ?? Date.now(),
       sessionId: args.analyticsSessionId?.slice(0, 128),
+      saveSource: "onboarding_demo",
     });
     return {
       itemId,
+      userId,
       url,
+      urlMatchesRequest: true,
       reused: false,
       savedSpaceNames: destination !== undefined ? [destination] : [],
     };

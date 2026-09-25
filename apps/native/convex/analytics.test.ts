@@ -34,6 +34,7 @@ describe("save telemetry delivery", () => {
       itemType: "note" as const,
       savedAt: 1000,
       sessionId: "save-session",
+      saveSource: "share_extension" as const,
     };
     await t.action(internal.analytics.captureSave, args);
     const jobs = await t.run((ctx) =>
@@ -53,6 +54,7 @@ describe("save telemetry delivery", () => {
     });
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(firstBody);
     expect(firstBody.properties.save_session_id).toBe("save-session");
+    expect(firstBody.properties.save_source).toBe("share_extension");
     expect(firstBody.properties.environment).toBe("development");
   });
 

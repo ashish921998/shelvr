@@ -3,14 +3,22 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { recipientValidator } from "./model/notificationFields";
 import {
+  articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  postMediaValidator,
+  recipeValidator,
 } from "./model/itemFields";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
 } from "./model/cancelSurveyFields";
+import {
+  feedbackDeliveryStatusValidator,
+  feedbackPlatformValidator,
+  feedbackSurfaceValidator,
+} from "./model/feedbackFields";
 
 export default defineSchema({
   // Convex Auth session/account tables (users, authSessions, authAccounts,
@@ -20,6 +28,26 @@ export default defineSchema({
   // deriving the stable users-table document ID; the raw auth subject can also
   // include a session suffix.
   ...authTables,
+
+  legalConsents: defineTable({
+    userId: v.id("users"),
+    reviewedVersion: v.string(),
+    acceptedVersion: v.optional(v.string()),
+    acceptedAt: v.optional(v.number()),
+    refundSharing: v.boolean(),
+    changedAt: v.number(),
+    deleting: v.optional(v.boolean()),
+    syncState: v.union(
+      v.literal("pending"),
+      v.literal("syncing"),
+      v.literal("synced"),
+      v.literal("failed"),
+    ),
+    nextSyncAt: v.number(),
+    attempts: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_syncState_and_nextSyncAt", ["syncState", "nextSyncAt"]),
 
   paymentAnalyticsReceipts: defineTable({ eventId: v.string() }).index(
     "by_event",
@@ -53,10 +81,18 @@ export default defineSchema({
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
+    // Structured recipe lifted from the page's schema.org markup, a linked
+    // recipe page, or (captions and screenshots) the classifier. Optional so
+    // pre-existing rows validate; absent = not a recipe.
+    recipe: v.optional(recipeValidator),
     siteName: v.optional(v.string()),
-    // Creator handle for video saves (e.g. "@nasa"). Only set for TikTok links.
+    // Creator handle for social saves (e.g. "@nasa"). Set for TikTok and X links.
     author: v.optional(v.string()),
     heroImageUrl: v.optional(v.string()),
+    media: v.optional(v.array(postMediaValidator)),
+    // Images and videos inside `content`. Kept apart from `media`, which marks
+    // a save as a social post.
+    articleMedia: v.optional(v.array(articleMediaValidator)),
     note: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
@@ -276,6 +312,41 @@ export default defineSchema({
     respondedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
+  // Authenticated in-app feedback (convex/feedback.ts). Convex is the source
+  // of truth; the support-inbox email is only a projection, so a Resend
+  // outage or missing operator configuration can never lose a submission.
+  // The message never reaches PostHog — client telemetry carries surface,
+  // char count, and a content-free delivery category only. Deleting a row
+  // does not retract an already-delivered email (see
+  // docs/architecture/feedback.md).
+  feedbackSubmissions: defineTable({
+    userId: v.string(),
+    message: v.string(),
+    surface: feedbackSurfaceValidator,
+    // Bounded app context so the operator can reply with the right build in
+    // mind. Platform is a closed union; the version strings are capped at
+    // write time.
+    platform: v.optional(feedbackPlatformValidator),
+    appVersion: v.optional(v.string()),
+    buildVariant: v.optional(v.string()),
+    status: feedbackDeliveryStatusValidator,
+    // Delivery attempts started, spent at claim time before the send so a
+    // delivery that crashes mid-flight still counts toward the cap.
+    // `unconfigured` claims are free, and a row that reaches the attempt
+    // cap stays `failed` for manual inspection instead of occupying the
+    // retry window forever.
+    attempts: v.number(),
+    // `<category>[:<http status>]` — why the last delivery failed, without
+    // any provider text (which can echo the message back).
+    deliveryError: v.optional(v.string()),
+    deliveredAt: v.optional(v.number()),
+  })
+    // Account deletion drains the user's rows through this index.
+    .index("by_user", ["userId"])
+    // Bounded, index-backed retry scan: each retryable status pages rows
+    // below the attempt cap without ever scanning the whole table.
+    .index("by_status_attempts", ["status", "attempts"]),
+
   // One Expo push token per device. A token row moves to a different account
   // only after its current owner disables it (the client revokes every stored
   // token before sign-out); an enabled row owned by someone else is never
@@ -320,6 +391,17 @@ export default defineSchema({
     .index("by_user_and_item", ["userId", "itemId"])
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
+
+  // A public share link for one item. The random token, never the item id, is
+  // the capability: item ids travel through analytics, tokens do not.
+  shareLinks: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    itemId: v.id("items"),
+  })
+    .index("by_token", ["token"])
+    .index("by_item", ["itemId"])
+    .index("by_user", ["userId"]),
 
   // A persisted weekly shelf keeps the notification payload and in-app view
   // stable even if the underlying saves are later deleted or reclassified.

@@ -1,104 +1,79 @@
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { Pressable, Text, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { ActivityIndicator, Pressable, Text } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Moved out of onboarding.tsx so the promise (step 1) and permissions (step 7)
-// screens can reuse the exact rows the v1 single-screen flow shipped with — same
-// copy, same styling — without the orchestrator owning presentational pieces.
-
-/** A numbered value-prop row: icon in a soft pill, title + supporting line. */
-export function FeatureRow({
-  icon,
-  title,
-  message,
-  delay,
-}: {
-  icon: AppSymbolName;
-  title: string;
-  message: string;
-  delay: number;
-}) {
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(delay).duration(400)}
-      style={styles.feature}
-    >
-      <View style={styles.featureIcon}>
-        <AppSymbolIcon
-          name={icon}
-          size={20}
-          tintColor={styles.featureIcon.tintColor}
-        />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureMessage}>{message}</Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-/**
- * The shared primary CTA used by every step's footer. `disabled` dims it and
- * blocks the press — used by steps that gate advance on a selection (min 1
- * space, etc.). Uses contrasting text on the active accent color.
- */
+/** The primary CTA used by every step's footer. */
 export function CtaButton({
   label,
   onPress,
   disabled,
+  busy,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  busy?: boolean;
 }) {
+  const { theme } = useUnistyles();
+  const inactive = disabled || busy;
   return (
     <Pressable
-      onPress={disabled ? undefined : onPress}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!inactive, busy: !!busy }}
+      onPress={inactive ? undefined : onPress}
       style={({ pressed }) => [
         styles.cta,
         disabled && styles.ctaDisabled,
-        pressed && !disabled && { opacity: 0.85 },
+        pressed && !inactive && { opacity: 0.85 },
       ]}
     >
-      <Text style={styles.ctaText}>{label}</Text>
+      {busy ? (
+        <ActivityIndicator color={theme.colors.primaryForeground} />
+      ) : (
+        <Text style={styles.ctaText}>{label}</Text>
+      )}
+    </Pressable>
+  );
+}
+
+/** The quiet secondary action under a CTA. */
+export function GhostButton({
+  label,
+  onPress,
+  disabled,
+  testID,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      testID={testID}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.ghost,
+        disabled && { opacity: 0.4 },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Text style={styles.ghostText}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  feature: {
-    flexDirection: "row",
-    gap: theme.gap(1.5),
-    alignItems: "flex-start",
-  },
-  featureIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: theme.colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-    tintColor: theme.colors.primaryText,
-  },
-  featureTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.foreground,
-  },
-  featureMessage: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-  },
   cta: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     paddingVertical: theme.gap(2),
+    minHeight: 54,
     alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "stretch",
   },
   ctaDisabled: {
     opacity: 0.4,
@@ -107,5 +82,16 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 17,
     color: theme.colors.primaryForeground,
+  },
+  ghost: {
+    minHeight: 44,
+    paddingHorizontal: theme.gap(1),
+    alignSelf: "center",
+    justifyContent: "center",
+  },
+  ghostText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.muted,
   },
 }));

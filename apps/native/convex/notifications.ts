@@ -1,11 +1,6 @@
 import { notificationLocale } from "./model/notificationFields";
-import { v } from "convex/values";
-import {
-  internalAction,
-  internalMutation,
-  mutation,
-  query,
-} from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
@@ -202,9 +197,11 @@ export const registerDevice = mutation({
       // The server cannot prove a token belongs to the caller's device, so an
       // enabled row owned by another account is never moved: that would let
       // anyone who learns a token redirect and silence its owner's digests.
-      throw new Error(
-        "This device is registered to another account. Sign out of that account on this device first.",
-      );
+      throw new ConvexError({
+        code: "notification_token_owned_by_another_account",
+        message:
+          "This device is registered to another account. Sign out of that account on this device first.",
+      });
     }
 
     const existingPreferences = await ctx.db
@@ -455,16 +452,6 @@ export const prepareWeeklyDigest = internalMutation({
     await ctx.scheduler.runAfter(0, internal.notificationDelivery.send, {
       digestId,
     });
-    return null;
-  },
-});
-
-// Keep the scheduled entry point used by previously deployed code.
-export const sendDigestNotification = internalAction({
-  args: { digestId: v.id("weeklyDigests") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.runAction(internal.notificationDelivery.send, args);
     return null;
   },
 });
