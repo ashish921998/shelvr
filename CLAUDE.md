@@ -73,6 +73,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationDevices` — one Expo push token per device, scoped to a user
   - `notificationPreferences` — weekly shelf opt-in, timezone, and the next digest instant
   - `itemReads` — per-user read state, kept out of the item row
+  - `shareLinks` — one random public token per shared item, the capability behind the
+    branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `waitlistSignups` — waitlist source of truth, projected to Resend
   - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
