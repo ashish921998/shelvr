@@ -269,7 +269,7 @@ http.route({
       await ctx.runMutation(internal.oracleLimits.claim, {
         ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
       });
-      const verdict = await ctx.runAction(internal.oracle.consult, input);
+      const verdict = await ctx.runAction(internal.oracle.consult, { input });
       return json(verdict, 200);
     } catch (error) {
       if (isRateLimitError(error)) {

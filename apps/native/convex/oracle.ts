@@ -140,9 +140,9 @@ function imageParts(input: OracleInput) {
 }
 
 export const consult = internalAction({
-  args: oracleInputValidator,
+  args: { input: oracleInputValidator },
   returns: oracleVerdictValidator,
-  handler: async (_ctx, input) => {
+  handler: async (_ctx, { input }) => {
     const startedAt = Date.now();
     try {
       const pages =
