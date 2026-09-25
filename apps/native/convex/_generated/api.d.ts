@@ -39,6 +39,7 @@ import type * as model_log from "../model/log.js";
 import type * as model_memberships from "../model/memberships.js";
 import type * as model_notificationFields from "../model/notificationFields.js";
 import type * as model_notificationSchedule from "../model/notificationSchedule.js";
+import type * as model_oracle from "../model/oracle.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   "model/memberships": typeof model_memberships;
   "model/notificationFields": typeof model_notificationFields;
   "model/notificationSchedule": typeof model_notificationSchedule;
+  "model/oracle": typeof model_oracle;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/posthogCapture": typeof model_posthogCapture;
   "model/rateLimiter": typeof model_rateLimiter;
