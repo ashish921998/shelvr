@@ -16,9 +16,12 @@ import {
 } from "@/lib/share/session-view";
 import {
   deleteSession,
+  fingerprintSharePayloads,
   loadSession,
   markComplete,
   reconcileSession,
+  recordCompletedShare,
+  startNewSession,
   updateEntry,
   type RawSharePayload,
   type SessionStoreAdapter,
@@ -45,6 +48,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -54,8 +58,8 @@ import { createMMKV } from "react-native-mmkv";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
-  EASE_OUT,
-  EASE_OUT_CSS,
+  motion,
+  motionCSS,
   REDUCED_FADE_IN,
   REDUCED_FADE_OUT,
 } from "@/lib/motion";
@@ -86,18 +90,18 @@ const PHASE_ENTER = new Keyframe({
   100: {
     opacity: 1,
     transform: [{ translateY: 0 }],
-    easing: EASE_OUT,
+    easing: motion.easing.out,
   },
-}).duration(250);
+}).duration(motion.duration.enter);
 
 const PHASE_EXIT = new Keyframe({
   0: { opacity: 1, transform: [{ translateY: 0 }] },
   100: {
     opacity: 0,
     transform: [{ translateY: -4 }],
-    easing: EASE_OUT,
+    easing: motion.easing.out,
   },
-}).duration(200);
+}).duration(motion.duration.exit);
 
 /** The session-driven UI states. The resolution-driven states (resolving,
  * empty) are pure functions of the `useIncomingShare` hook
@@ -122,6 +126,7 @@ type Phase =
   | { kind: "saving"; session: ShareSession }
   | { kind: "partial"; session: ShareSession }
   | { kind: "clearFailed"; session: ShareSession }
+  | { kind: "ghostConfirm"; fingerprint: string }
   | { kind: "complete" };
 
 export default function ShareScreen() {
@@ -154,6 +159,20 @@ export default function ShareScreen() {
   // must NOT auto-restart on every re-render; only an explicit "Retry failed"
   // press re-runs it. A NEW session (different id) bypasses this and starts.
   const partialSessionId = useRef<string | null>(null);
+  // The session already routed to the paywall. The locked branch returns before
+  // any await, so the running claim cannot cover it, and the effect re-runs for
+  // the same session as soon as native resolution settles. Cleared when a run
+  // starts so a later lapse gates the session again.
+  const lockedSessionId = useRef<string | null>(null);
+  // Synchronous latch shared by the ghost prompt's Save again and Cancel: the
+  // first press claims the confirmation before any re-render, so a queued
+  // second press can neither start a second save (each press mints a NEW
+  // session id runSave cannot dedupe) nor save after Cancel, or vice versa.
+  // ghostConfirm never returns within this mount afterwards.
+  const ghostAnswered = useRef(false);
+  // The reconcile effect re-runs on dependency identity changes; count one
+  // share_ghost_prompt per mount, not per re-run.
+  const ghostPromptLogged = useRef(false);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. */
@@ -224,8 +243,22 @@ export default function ShareScreen() {
       //    success and clear is then reconciled on remount (a matching
       //    completed session clears native payloads and deletes itself).
       markComplete(shareStore, sid);
+      // 2. Tombstone the batch BEFORE the native clear: every later exit
+      //    (clear, a throwing clear then Cancel, a crash) can delete the
+      //    session, and without a tombstone the next Android task-restore
+      //    replay would mint a fresh operationId the ledger cannot dedupe.
+      //    User-scoped so one account's batch never matches another's.
+      //    Android only — iOS never replays a share, so it never prompts.
+      //    Skipped for a stale run whose record a newer share replaced, so it
+      //    cannot overwrite the newer batch's tombstone.
+      if (
+        Platform.OS === "android" &&
+        loadSession(shareStore)?.sessionId === sid
+      ) {
+        recordCompletedShare(shareStore, session.fingerprint, session.userId);
+      }
       try {
-        // 2. Native clear. A throwing clear keeps the completed session (no
+        // 3. Native clear. A throwing clear keeps the completed session (no
         //    delete, no navigation) and surfaces clearFailed for a manual retry.
         clearSharedPayloads();
       } catch (err) {
@@ -234,7 +267,7 @@ export default function ShareScreen() {
         setPhase({ kind: "clearFailed", session });
         return;
       }
-      // 3. Delete the local session ONLY after a successful clear — otherwise a
+      // 4. Delete the local session ONLY after a successful clear — otherwise a
       //    later identical re-share would match a stale completed record and be
       //    silently dropped. Scoped so a stale in-flight run can't delete the
       //    newer session that replaced its record.
@@ -256,7 +289,7 @@ export default function ShareScreen() {
           analytics.captureError("record_first_share_failed", err);
         }
       }
-      // 4. Navigate Home exactly once.
+      // 5. Navigate Home exactly once.
       if (session.entries.every((entry) => entry.status === "saved")) {
         analytics.capture("shared_content_saved", {
           item_count: session.entries.length,
@@ -286,6 +319,8 @@ export default function ShareScreen() {
       // the locked phase BEFORE presenting so a cancel lands on the explicit
       // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
       if (!entitled) {
+        if (lockedSessionId.current === session.sessionId) return;
+        lockedSessionId.current = session.sessionId;
         setPhase({ kind: "locked" });
         void openPaywall(router, "share");
         return;
@@ -294,6 +329,7 @@ export default function ShareScreen() {
       // Starting (or retrying) a run clears the partial-settled marker for this
       // session so the effect won't block a future legitimate restart.
       partialSessionId.current = null;
+      lockedSessionId.current = null;
       const sid = session.sessionId;
 
       try {
@@ -363,6 +399,30 @@ export default function ShareScreen() {
     [completeSession, entitled, entitlementLoading, router],
   );
 
+  /** Clears native payloads (best-effort), drops any persisted session, and
+   * returns Home. Used by the terminal error/empty states and the ghost
+   * prompt's Cancel. Deleting the session is essential: a session may already
+   * exist (e.g. counts diverged after the record was created), and leaving it
+   * would let a later identical share resume the canceled work instead of
+   * starting fresh. */
+  const abandon = useCallback(() => {
+    deleteSession(shareStore);
+    // Explicit user discard — the deferred-share flag must not resurrect this.
+    try {
+      clearPendingShareOnDevice();
+    } catch (err) {
+      // Best-effort: abandoning the share must still clear native payloads and
+      // leave the screen if SecureStore is temporarily unavailable.
+      analytics.captureError("clear_pending_share_failed", err);
+    }
+    try {
+      clearSharedPayloads();
+    } catch {
+      // best-effort; the share extension has nothing durable to lose here
+    }
+    router.replace("/");
+  }, [clearSharedPayloads, router]);
+
   // Reconcile + drive the save. The resolution-driven phases (resolving /
   // empty) are derived in render below; this effect only runs once resolution
   // has settled AND there are payloads to save, so it contains no synchronous
@@ -387,6 +447,25 @@ export default function ShareScreen() {
 
     if (reconciled.kind === "empty") {
       // No payloads resolved to anything saveable; render's empty branch covers it.
+      return;
+    }
+    if (reconciled.kind === "ghost") {
+      // No session record, but this exact batch was just handled — an Android
+      // task-restore replayed the last share intent after a process death
+      // (reopening from recents). Saving it again would mint a fresh
+      // operationId the backend ledger cannot dedupe: the reported duplicate.
+      // A deliberate identical re-share is indistinguishable from JS, so it
+      // always gets a confirmation — never a silent drop.
+      void Promise.resolve().then(() => {
+        if (!ghostPromptLogged.current) {
+          ghostPromptLogged.current = true;
+          analytics.capture("share_ghost_prompt");
+        }
+        setPhase({
+          kind: "ghostConfirm",
+          fingerprint: fingerprintSharePayloads(rawPayloads),
+        });
+      });
       return;
     }
     if (reconciled.kind === "clear") {
@@ -441,30 +520,38 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
-  /** Clears native payloads (best-effort), drops any persisted session, and
-   * returns Home. Used by the terminal error/empty states. Deleting the
-   * session is essential: a session may already exist (e.g. counts diverged
-   * after the record was created), and leaving it would let a later identical
-   * share resume the canceled work instead of starting fresh. */
-  const abandon = useCallback(() => {
-    deleteSession(shareStore);
-    // Explicit user discard — the deferred-share flag must not resurrect this.
-    try {
-      clearPendingShareOnDevice();
-    } catch (err) {
-      // Best-effort: abandoning the share must still clear native payloads and
-      // leave the screen if SecureStore is temporarily unavailable.
-      analytics.captureError("clear_pending_share_failed", err);
-    }
-    try {
-      clearSharedPayloads();
-    } catch {
-      // best-effort; the share extension has nothing durable to lose here
-    }
-    router.replace("/");
-  }, [clearSharedPayloads, router]);
+  /** The Android task-restore ghost reached its confirmation: the redelivered
+   * batch matches the last handled one. Cancel → clear and leave; Save again →
+   * start the session reconcileSession deliberately did not. */
+  const onGhostDismiss = useCallback(() => {
+    if (ghostAnswered.current) return;
+    ghostAnswered.current = true;
+    analytics.capture("share_ghost_dismissed");
+    abandon();
+  }, [abandon]);
 
-  // --- Phase render ---------------------------------------------------------
+  const onGhostSaveAgain = useCallback(() => {
+    if (
+      phase.kind !== "ghostConfirm" ||
+      user === null ||
+      user === undefined ||
+      ghostAnswered.current
+    ) {
+      return;
+    }
+    ghostAnswered.current = true;
+    analytics.capture("share_ghost_save_again");
+    const session = startNewSession(
+      shareStore,
+      user._id,
+      phase.fingerprint,
+      rawPayloads,
+      () => Crypto.randomUUID(),
+    );
+    void Promise.resolve().then(() =>
+      runSave(session, processorPayloads, saveDeps),
+    );
+  }, [phase, user, rawPayloads, processorPayloads, saveDeps, runSave]);
 
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
@@ -501,6 +588,31 @@ export default function ShareScreen() {
             onPress={() => {
               void openPaywall(router, "share");
             }}
+          />
+        </View>
+      </PhaseSurface>
+    );
+  }
+
+  // Ghost confirmation: the redelivered batch matches the last handled one.
+  // Never auto-save (that minted the duplicate), never silent-drop a genuine
+  // re-share — one explicit question, then proceed either way.
+  if (phase.kind === "ghostConfirm") {
+    return (
+      <PhaseSurface key="ghost-confirm" phaseKey="ghost-confirm">
+        <Text style={styles.title(theme)}>{t("share.ghostTitle")}</Text>
+        <Text style={styles.subtitle(theme)}>{t("share.ghostBody")}</Text>
+        <View style={styles.actions}>
+          <Button
+            label={t("common.cancel")}
+            theme={theme}
+            onPress={onGhostDismiss}
+          />
+          <Button
+            label={t("share.saveAgain")}
+            theme={theme}
+            primary
+            onPress={onGhostSaveAgain}
           />
         </View>
       </PhaseSurface>
@@ -760,7 +872,7 @@ function Button({
             transform: [{ scale }],
             transitionProperty: "transform",
             transitionDuration: "120ms",
-            transitionTimingFunction: EASE_OUT_CSS,
+            transitionTimingFunction: motionCSS.out,
           },
         ]}
       >

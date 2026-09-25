@@ -30,6 +30,7 @@
         "tools/generate-localizations.mjs",
         "tools/git-trailer.test.mjs",
         "tools/main-module.test.mjs",
+        "tools/measure-header-morph.mjs",
         "tools/release-guards.test.mjs",
         "tools/verify-ci.cjs",
         "tools/verify-convex-api.mjs",

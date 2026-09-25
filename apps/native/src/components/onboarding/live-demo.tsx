@@ -66,11 +66,17 @@ export function LiveDemoStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const demo = useDemoSave({ spaces, resume, onSaved, onAdvance });
+  const demo = useDemoSave({
+    spaces,
+    resume,
+    onSaved,
+    onAdvance,
+  });
   const { shareSheetOpen, shareSample } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
-    onUrl: demo.submitUrl,
+    onSharedUrl: demo.submitSharedUrl,
+    onDirectUrl: demo.submitUrl,
     onError: demo.setError,
   });
   const [draft, setDraft] = useState("");
@@ -445,7 +451,7 @@ function DemoAuthSheet({
   useAppLocale();
   const { theme } = useUnistyles();
   const { signInWith, pendingProvider, lastError, interrupted } =
-    useOAuthSignIn();
+    useOAuthSignIn("demo_sheet");
   const busy = pendingProvider !== null;
   const pageHeading =
     DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??

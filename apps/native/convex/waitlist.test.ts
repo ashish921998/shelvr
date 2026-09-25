@@ -11,10 +11,9 @@ import {
   CONSENT_VERSION,
   RESEND_MAX_ATTEMPTS,
   UNKNOWN_IP_LIMITER_KEY,
-  classifyResendError,
-  formatResendError,
   normalizeIp,
 } from "./waitlist";
+import { classifyResendError, formatResendError } from "./model/resend";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
 import { newConvexTest } from "./test.setup";
 
@@ -65,18 +64,34 @@ function setup(envOverrides: Record<string, string> = {}) {
 describe("POST /waitlist/join", () => {
   it("accepts production records created before retry counts were added", async () => {
     const t = setup();
-    const id = await t.run(async (ctx) => ctx.db.insert("waitlistSignups", {
-      email: "legacy@example.com", product: "shelvr", source: "hero",
-      consentVersion: CONSENT_VERSION, consentText: CONSENT_TEXT,
-      consentedAt: 1, firstSubmittedAt: 1, lastSubmittedAt: 1,
-      resendStatus: "unconfigured",
-    }));
-    expect(await t.query(internal.waitlist.listSignupsNeedingResendSync, {})).toContainEqual({
-      id, email: "legacy@example.com", product: "shelvr", resendAttempts: 0,
+    const id = await t.run(async (ctx) =>
+      ctx.db.insert("waitlistSignups", {
+        email: "legacy@example.com",
+        product: "shelvr",
+        source: "hero",
+        consentVersion: CONSENT_VERSION,
+        consentText: CONSENT_TEXT,
+        consentedAt: 1,
+        firstSubmittedAt: 1,
+        lastSubmittedAt: 1,
+        resendStatus: "unconfigured",
+      }),
+    );
+    expect(
+      await t.query(internal.waitlist.listSignupsNeedingResendSync, {}),
+    ).toContainEqual({
+      id,
+      email: "legacy@example.com",
+      product: "shelvr",
+      resendAttempts: 0,
     });
-    expect(await t.mutation(internal.waitlist.upsertSignup, {
-      email: "legacy@example.com", product: "shelvr", source: "hero",
-    })).toMatchObject({ id, resendAttempts: 0 });
+    expect(
+      await t.mutation(internal.waitlist.upsertSignup, {
+        email: "legacy@example.com",
+        product: "shelvr",
+        source: "hero",
+      }),
+    ).toMatchObject({ id, resendAttempts: 0 });
   });
 
   it("persists a signup when Resend is not configured", async () => {
@@ -256,7 +271,8 @@ describe("POST /waitlist/join", () => {
 
     for (let i = 0; i < 3; i++) {
       expect(
-        (await join(t, { email: "limited@example.com", source: "hero" })).status,
+        (await join(t, { email: "limited@example.com", source: "hero" }))
+          .status,
       ).toBe(200);
     }
 
@@ -327,7 +343,10 @@ describe("POST /waitlist/join", () => {
       );
       expect(response.status).toBe(200);
     }
-    const ninth = await join(t, { email: "anon-9@example.com", source: "hero" });
+    const ninth = await join(t, {
+      email: "anon-9@example.com",
+      source: "hero",
+    });
     expect(ninth.status).toBe(429);
 
     // A request with a real IP is unaffected by the shared bucket.
@@ -343,7 +362,16 @@ describe("POST /waitlist/join", () => {
     const t = setup();
     // A missing IP and every malformed spelling must land in the same bucket
     // even when the mutation is called directly with the raw value.
-    const garbage = [undefined, "::::", "aaaa:", "not an ip", "999.1.1.1", "2001:db8::1%1", "2001:db8::1%2", ""];
+    const garbage = [
+      undefined,
+      "::::",
+      "aaaa:",
+      "not an ip",
+      "999.1.1.1",
+      "2001:db8::1%1",
+      "2001:db8::1%2",
+      "",
+    ];
     const direct = (i: number, ip: string | undefined) =>
       t.mutation(internal.waitlist.upsertSignup, {
         email: `direct-${i}@example.com`,
@@ -417,7 +445,10 @@ describe("POST /waitlist/join authentication", () => {
 
   it("fails closed with 500 when the deployment has no shared secret", async () => {
     const t = setup({ WAITLIST_SHARED_SECRET: "" });
-    const response = await join(t, { email: "anon@example.com", source: "hero" });
+    const response = await join(t, {
+      email: "anon@example.com",
+      source: "hero",
+    });
     expect(response.status).toBe(500);
     await t.run(async (ctx) => {
       expect(await ctx.db.query("waitlistSignups").take(1)).toHaveLength(0);
@@ -497,9 +528,11 @@ describe("Resend failure persistence", () => {
     const t = setup({ RESEND_API_KEY: "re_test_key" });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(
-        new DOMException("The operation timed out.", "TimeoutError"),
-      ),
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException("The operation timed out.", "TimeoutError"),
+        ),
     );
     vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -517,14 +550,19 @@ describe("Resend failure persistence", () => {
   });
 
   it("classifies provider statuses into fixed categories", () => {
-    expect(classifyResendError(new TypeError("fetch failed"))).toEqual({
+    expect(
+      classifyResendError(new TypeError("fetch failed"), "invalid_recipient"),
+    ).toEqual({
       category: "network_error",
       status: undefined,
     });
     expect(
-      classifyResendError(new DOMException("aborted", "AbortError")),
+      classifyResendError(
+        new DOMException("aborted", "AbortError"),
+        "invalid_recipient",
+      ),
     ).toEqual({ category: "timeout", status: undefined });
-    expect(classifyResendError("string")).toEqual({
+    expect(classifyResendError("string", "invalid_recipient")).toEqual({
       category: "network_error",
       status: undefined,
     });

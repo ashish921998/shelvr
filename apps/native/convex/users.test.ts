@@ -141,6 +141,15 @@ describe("deleteCurrentUserAccount", () => {
         reason: "too_expensive",
         respondedAt: 1700000000001,
       });
+      // Feedback submissions hold the user's authored messages; they drain
+      // with the account as well.
+      await ctx.db.insert("feedbackSubmissions", {
+        userId,
+        message: "Loved the app, sad to go",
+        surface: "profile",
+        status: "delivered",
+        attempts: 1,
+      });
     });
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -176,6 +185,12 @@ describe("deleteCurrentUserAccount", () => {
           .withIndex("by_user", (q) => q.eq("userId", userId))
           .unique(),
       ).toBeNull();
+      expect(
+        await ctx.db
+          .query("feedbackSubmissions")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(0);
       expect(await ctx.db.system.get("_storage", seeded.storageId)).toBeNull();
       expect(
         await ctx.db.system.get("_storage", seeded.pendingStorageId),
@@ -339,6 +354,60 @@ describe("deleteCurrentUserAccount", () => {
           .collect(),
       ).toHaveLength(0);
     });
+  });
+
+  // Feedback rows hold authored messages, so a chatty account must be able
+  // to exceed one deletion batch and still drain completely (via the same
+  // scheduled continuations as every other table) before the auth identity
+  // is removed.
+  it("drains more than one batch of feedback rows via scheduled continuations", async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = newConvexTest();
+      const { userId, sessionId } = await backend.run(async (ctx) => {
+        const userId = await ctx.db.insert("users", {
+          email: "chatty@example.com",
+        });
+        const sessionId = await ctx.db.insert("authSessions", {
+          userId,
+          expirationTime: Date.now() + 60_000,
+        });
+        for (let i = 0; i < DELETE_BATCH + 1; i++) {
+          await ctx.db.insert("feedbackSubmissions", {
+            userId: userId as string,
+            message: `feedback ${i}`,
+            surface: "home",
+            status: "delivered",
+            attempts: 1,
+          });
+        }
+        await ctx.db.insert("subscriptions", {
+          userId: userId as string,
+          status: "pro",
+          expiresAt: Date.now() + 60_000,
+          updatedAt: Date.now(),
+        });
+        return { userId, sessionId };
+      });
+
+      const t = backend.withIdentity({ subject: `${userId}|${sessionId}` });
+      await t.mutation(api.users.deleteCurrentUserAccount, {});
+      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+
+      await backend.run(async (ctx) => {
+        expect(
+          await ctx.db
+            .query("feedbackSubmissions")
+            .withIndex("by_user", (q) => q.eq("userId", userId as string))
+            .collect(),
+        ).toHaveLength(0);
+        // The auth identity is only removed by the final batch, so its
+        // absence proves the continuations ran to completion.
+        expect(await ctx.db.get(userId)).toBeNull();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // Regression: the onboarding demo table must drain with the account — no

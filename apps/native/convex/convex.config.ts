@@ -16,6 +16,12 @@ const app = defineApp({
     RESEND_SEGMENT_ID: v.optional(v.string()),
     RESEND_ANDROID_SEGMENT_ID: v.optional(v.string()),
     RESEND_TOPIC_ID: v.optional(v.string()),
+    // Support-inbox projection for in-app feedback (convex/feedback.ts). The
+    // destination is the operator's inbox; the sender must be a Resend-verified
+    // address. Without all three (plus RESEND_API_KEY) submissions persist but
+    // stay `unconfigured` until they are set.
+    RESEND_FEEDBACK_INBOX_EMAIL: v.optional(v.string()),
+    RESEND_FEEDBACK_FROM_EMAIL: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),
