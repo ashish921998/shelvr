@@ -58,4 +58,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // a person (3 covers an immediate follow-up burst, 6/day sustained);
   // fatal to a looped or scripted client.
   feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
+  // The no-login web oracle: one model call per verdict, open to anyone. The
+  // IP bucket lets a visitor try a few modes; the global bucket caps what a
+  // viral spike or an IP-rotating script can spend.
+  oracleIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 4 },
+  oracleGlobal: {
+    kind: "token bucket",
+    rate: 120,
+    period: MINUTE,
+    capacity: 40,
+  },
 });

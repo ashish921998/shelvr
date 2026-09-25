@@ -57,6 +57,7 @@ import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
 import type * as notificationDelivery from "../notificationDelivery.js";
 import type * as notifications from "../notifications.js";
+import type * as oracleLimits from "../oracleLimits.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -119,6 +120,7 @@ declare const fullApi: ApiFromModules<{
   "model/storedImage": typeof model_storedImage;
   notificationDelivery: typeof notificationDelivery;
   notifications: typeof notifications;
+  oracleLimits: typeof oracleLimits;
   paymentTelemetry: typeof paymentTelemetry;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;
