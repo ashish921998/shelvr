@@ -1,0 +1,296 @@
+{
+  "__typename": "Tweet",
+  "favorite_count": 866,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-02-11T21:12:09.000Z",
+  "display_text_range": [0, 281],
+  "entities": {
+    "media": [
+      {
+        "display_url": "pic.x.com/DptMIpjUA7",
+        "expanded_url": "https://x.com/levelsio/status/2021693766793318833/video/1",
+        "indices": [280, 303],
+        "url": "https://t.co/DptMIpjUA7"
+      }
+    ]
+  },
+  "id_str": "2021693766793318833",
+  "text": "🇧🇷 New Brazilian buffet tour\n\nThis one is interesting because it's inside a church\n\nBrazil (like South America) is VERY religious, 87% of the population is Christian\n\nCompare that to the Netherlands, where I'm from, where it's now just 30%, and similar for large parts of Europe, https://t.co/DptMIpjUA7",
+  "user": {
+    "id_str": "1577241403",
+    "name": "@levelsio",
+    "screen_name": "levelsio",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_normal.jpg"
+  },
+  "edit_control": {
+    "edit_tweet_ids": ["2021693766793318833"],
+    "editable_until_msecs": "1770847929000",
+    "edits_remaining": "5",
+    "is_edit_eligible": true
+  },
+  "mediaDetails": [
+    {
+      "additional_media_info": {},
+      "display_url": "pic.x.com/DptMIpjUA7",
+      "expanded_url": "https://x.com/levelsio/status/2021693766793318833/video/1",
+      "ext_media_availability": {
+        "status": "Available"
+      },
+      "indices": [280, 303],
+      "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2021692953023086592/img/vUfb6H6PCZevmQOe.jpg",
+      "original_info": {
+        "focus_rects": [],
+        "height": 1920,
+        "width": 1080
+      },
+      "sizes": {
+        "large": {
+          "h": 1920,
+          "resize": "fit",
+          "w": 1080
+        },
+        "medium": {
+          "h": 1200,
+          "resize": "fit",
+          "w": 675
+        },
+        "small": {
+          "h": 680,
+          "resize": "fit",
+          "w": 383
+        },
+        "thumb": {
+          "h": 150,
+          "resize": "crop",
+          "w": 150
+        }
+      },
+      "type": "video",
+      "url": "https://t.co/DptMIpjUA7",
+      "video_info": {
+        "aspect_ratio": [9, 16],
+        "duration_millis": 491633,
+        "variants": [
+          {
+            "content_type": "application/x-mpegURL",
+            "url": "https://video.twimg.com/amplify_video/2021692953023086592/pl/OhWoLQ1rVR1ISid0.m3u8"
+          },
+          {
+            "bitrate": 632000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/320x568/ED5mBZ4Gu2kRojLG.mp4"
+          },
+          {
+            "bitrate": 950000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/480x852/LBDxKO-rKn3Ls4x7.mp4"
+          },
+          {
+            "bitrate": 2176000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/720x1280/fpvhHH8CkF7Jt0H1.mp4"
+          },
+          {
+            "bitrate": 10368000,
+            "content_type": "video/mp4",
+            "url": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/1080x1920/3CCYeNK5whGfj33W.mp4"
+          }
+        ]
+      }
+    }
+  ],
+  "photos": [],
+  "video": {
+    "aspectRatio": [9, 16],
+    "contentType": "media_entity",
+    "durationMs": 491633,
+    "mediaAvailability": {
+      "status": "available"
+    },
+    "poster": "https://pbs.twimg.com/amplify_video_thumb/2021692953023086592/img/vUfb6H6PCZevmQOe.jpg",
+    "variants": [
+      {
+        "type": "application/x-mpegURL",
+        "src": "https://video.twimg.com/amplify_video/2021692953023086592/pl/OhWoLQ1rVR1ISid0.m3u8"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/320x568/ED5mBZ4Gu2kRojLG.mp4"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/480x852/LBDxKO-rKn3Ls4x7.mp4"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/720x1280/fpvhHH8CkF7Jt0H1.mp4"
+      },
+      {
+        "type": "video/mp4",
+        "src": "https://video.twimg.com/amplify_video/2021692953023086592/vid/avc1/1080x1920/3CCYeNK5whGfj33W.mp4"
+      }
+    ],
+    "videoId": {
+      "type": "tweet",
+      "id": "2021693766793318833"
+    },
+    "viewCount": 0
+  },
+  "conversation_count": 119,
+  "news_action_type": "conversation",
+  "quoted_tweet": {
+    "favorite_count": 1947,
+    "lang": "en",
+    "possibly_sensitive": false,
+    "reply_count": 122,
+    "retweet_count": 50,
+    "created_at": "2026-02-04T16:53:12.000Z",
+    "display_text_range": [0, 275],
+    "entities": {
+      "media": [
+        {
+          "display_url": "pic.x.com/bD4OKTVCwU",
+          "expanded_url": "https://x.com/levelsio/status/2019091883696226541/video/1",
+          "indices": [274, 297],
+          "url": "https://t.co/bD4OKTVCwU"
+        }
+      ]
+    },
+    "id_str": "2019091883696226541",
+    "text": "🇧🇷 To show you more I made a tour of a Brazilian buffet during lunch\n\nThis is one of my favorite ones\n\nIt's run by what feels like kind of a coop, it's always the same people working there for years and doesn't churn like regular restaurants elsewhere\n\nLike it feels people https://t.co/bD4OKTVCwU",
+    "user": {
+      "id_str": "1577241403",
+      "name": "@levelsio",
+      "screen_name": "levelsio",
+      "is_blue_verified": true,
+      "profile_image_shape": "Circle",
+      "verified": false,
+      "profile_image_url_https": "https://pbs.twimg.com/profile_images/2077111020305162240/PwddgOau_normal.jpg"
+    },
+    "edit_control": {
+      "edit_tweet_ids": ["2019091883696226541"],
+      "editable_until_msecs": "1770227592000",
+      "edits_remaining": "5",
+      "is_edit_eligible": true
+    },
+    "mediaDetails": [
+      {
+        "additional_media_info": {},
+        "display_url": "pic.x.com/bD4OKTVCwU",
+        "expanded_url": "https://x.com/levelsio/status/2019091883696226541/video/1",
+        "ext_media_availability": {
+          "status": "Available"
+        },
+        "indices": [274, 297],
+        "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2019090561043488779/img/h3gGsfggaw5Qb3iq.jpg",
+        "original_info": {
+          "focus_rects": [],
+          "height": 1920,
+          "width": 1080
+        },
+        "sizes": {
+          "large": {
+            "h": 1920,
+            "resize": "fit",
+            "w": 1080
+          },
+          "medium": {
+            "h": 1200,
+            "resize": "fit",
+            "w": 675
+          },
+          "small": {
+            "h": 680,
+            "resize": "fit",
+            "w": 383
+          },
+          "thumb": {
+            "h": 150,
+            "resize": "crop",
+            "w": 150
+          }
+        },
+        "type": "video",
+        "url": "https://t.co/bD4OKTVCwU",
+        "video_info": {
+          "aspect_ratio": [9, 16],
+          "duration_millis": 380558,
+          "variants": [
+            {
+              "content_type": "application/x-mpegURL",
+              "url": "https://video.twimg.com/amplify_video/2019090561043488779/pl/wdFB7S6rIhN_ihrx.m3u8?v=616"
+            },
+            {
+              "bitrate": 632000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/320x568/9ZzatfAefYHBRxd4.mp4"
+            },
+            {
+              "bitrate": 950000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/480x852/W2Nn5qo6mqHf7eEj.mp4"
+            },
+            {
+              "bitrate": 2176000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/720x1280/amvW2TVWib-xVQcU.mp4"
+            },
+            {
+              "bitrate": 10368000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/1080x1920/t7xr-Q6IqjjoP7OK.mp4"
+            }
+          ]
+        }
+      }
+    ],
+    "photos": [],
+    "video": {
+      "aspectRatio": [9, 16],
+      "contentType": "media_entity",
+      "durationMs": 380558,
+      "mediaAvailability": {
+        "status": "available"
+      },
+      "poster": "https://pbs.twimg.com/amplify_video_thumb/2019090561043488779/img/h3gGsfggaw5Qb3iq.jpg",
+      "variants": [
+        {
+          "type": "application/x-mpegURL",
+          "src": "https://video.twimg.com/amplify_video/2019090561043488779/pl/wdFB7S6rIhN_ihrx.m3u8?v=616"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/320x568/9ZzatfAefYHBRxd4.mp4"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/480x852/W2Nn5qo6mqHf7eEj.mp4"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/720x1280/amvW2TVWib-xVQcU.mp4"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/amplify_video/2019090561043488779/vid/avc1/1080x1920/t7xr-Q6IqjjoP7OK.mp4"
+        }
+      ],
+      "videoId": {
+        "type": "tweet",
+        "id": "2019091883696226541"
+      },
+      "viewCount": 0
+    },
+    "isEdited": false,
+    "isStaleEdit": false
+  },
+  "isEdited": false,
+  "isStaleEdit": false,
+  "note_tweet": {
+    "id": "Tm90ZVR3ZWV0UmVzdWx0czoyMDIxNjkzNzY2NTk2MTk0MzA0"
+  }
+}

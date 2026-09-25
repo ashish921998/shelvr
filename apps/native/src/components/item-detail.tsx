@@ -2,18 +2,20 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
 import { ProductsSection } from "@/components/products-section";
+import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
 import { SimilarGrid } from "@/components/similar-grid";
 import { TagChip } from "@/components/tag-chip";
+import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
-import { displayHost } from "@/lib/url";
-import { isTikTokUrl } from "@convex/model/externalUrl";
+import { socialPost, type SocialPost } from "@/lib/social-post";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
@@ -21,12 +23,19 @@ import { useMutation } from "convex/react";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import * as WebBrowser from "expo-web-browser";
 import type { FunctionReturnType } from "convex/server";
-import { memo, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -50,7 +59,12 @@ type FullRow = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 // from getSpace additionally carry `spaceIntents`: purpose-steered actions
 // scoped to that space's membership.
 export type DetailItem = CardRow &
-  Partial<Pick<FullRow, "content" | "products" | "productsStatus">> & {
+  Partial<
+    Pick<
+      FullRow,
+      "content" | "articleMedia" | "recipe" | "products" | "productsStatus"
+    >
+  > & {
     spaceIntents?: CardRow["intents"];
   };
 
@@ -94,9 +108,17 @@ function useItemDetailData(item: DetailItem) {
 
   // Lexical-similarity strip for the bottom of the page (v0 — a vector index
   // upgrade slots in behind the same query). Only ready items have signal.
+  // Conditional queries use the 'skip' sentinel, not `enabled` (see the
+  // pager): a disabled React Query still subscribes through the Convex
+  // adapter. The short gcTime ends each visited page's subscription soon
+  // after it unmounts instead of holding one for the session-long default.
+  const similarReady = item.status === "ready" && item.type !== "note";
   const { data: similar } = useQuery({
-    ...convexQuery(api.items.similarItems, { id: item._id }),
-    enabled: item.status === "ready" && item.type !== "note",
+    ...convexQuery(
+      api.items.similarItems,
+      similarReady ? { id: item._id } : "skip",
+    ),
+    gcTime: 30_000,
   });
 
   const heroUri = item.imageUrl ?? item.heroImageUrl;
@@ -127,24 +149,41 @@ export const ItemDetail = memo(function ItemDetail({
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
+  // iOS keeps a transparent header (blur band behind it, full-bleed hero), so
+  // its pages pad the header band in. Android owns an opaque toolbar (see
+  // item/[id].tsx), so its content already starts below the header — padding
+  // by the header height there would open a blank band under the toolbar.
+  const headerInset = Platform.OS === "ios" ? headerHeight : 0;
+
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
-  // A video's "content" is its caption, not an article: keep the poster layout.
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  // FlashList can recycle this page instance for a different item; a
+  // recycled page must open at the top, not at the previous item's offset.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrolledItemRef = useRef(item._id);
+  useLayoutEffect(() => {
+    if (scrolledItemRef.current === item._id) return;
+    scrolledItemRef.current = item._id;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [item._id]);
+
+  // A social save's "content" is its caption, not an article: keep the
+  // poster layout.
+  const social = socialPost(item);
 
   // Link saves with extracted content get the compact reader layout.
   if (
     !bodyPending &&
     item.type === "link" &&
-    !isVideo &&
+    social === undefined &&
     paragraphs.length > 0
   ) {
     return (
       <ArticleReaderView
         item={detail}
         isZoomTarget={isZoomTarget}
-        headerHeight={headerHeight}
+        headerHeight={headerInset}
         spaces={spaces}
         similar={similar}
         heroUri={heroUri}
@@ -171,7 +210,8 @@ export const ItemDetail = memo(function ItemDetail({
 
   // Source shape; OG images default to 1200×630 (≈1.91).
   const heroAspect =
-    item.aspectRatio ?? (isVideo ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
+    item.aspectRatio ??
+    (social?.playable ? 9 / 16 : item.type === "link" ? 1.91 : 1.4);
 
   // Size the framed photo up front from its aspect ratio: fill the width the
   // frame allows, but never taller than the cap — and when the cap bites, pull
@@ -179,13 +219,16 @@ export const ItemDetail = memo(function ItemDetail({
   // (no cropping, no lopsided gap). The frame insets the image by its own
   // horizontal margin + padding.
   const frameInset = theme.gap(2) * 2 + theme.gap(1) * 2;
-  const heroMaxWidth = width - frameInset;
-  const heroHeight = Math.min(heroMaxWidth / heroAspect, maxHeroHeight);
-  const heroWidth = heroHeight * heroAspect;
+  const frameSize = (aspect: number) => {
+    const frameHeight = Math.min((width - frameInset) / aspect, maxHeroHeight);
+    return { width: frameHeight * aspect, height: frameHeight };
+  };
+  const { width: heroWidth, height: heroHeight } = frameSize(heroAspect);
 
   const heroImage = heroUri ? (
     <Image
       source={{ uri: heroUri }}
+      recyclingKey={item._id}
       contentFit="contain"
       style={
         item.isSticker
@@ -195,45 +238,63 @@ export const ItemDetail = memo(function ItemDetail({
     />
   ) : null;
 
-  // The poster is the video's one real action: tap anywhere on it to open.
+  const openPost = () => {
+    openItemSource(item);
+  };
+
   const hero =
-    heroImage && isVideo && item.url ? (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("item.openSite", { site: "TikTok" })}
-        onPress={() => {
-          void WebBrowser.openBrowserAsync(item.url!)
-            .then(() => analytics.itemAction(item, "open_source"))
-            .catch(() => {});
-        }}
+    heroImage && social && item.url ? (
+      <PostMediaButton
+        site={social.site}
+        playable={social.playable}
+        onPress={openPost}
       >
         {heroImage}
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playButton}>
-            <AppSymbolIcon name="play.fill" size={26} tintColor="white" />
-          </View>
-        </View>
-      </Pressable>
+      </PostMediaButton>
     ) : (
       heroImage
     );
 
+  const moreMedia =
+    social && item.url
+      ? (item.media ?? []).slice(1).map((media, index) => (
+          <View key={index} style={[styles.heroContainer, styles.moreMedia]}>
+            <PostMediaButton
+              site={social.site}
+              playable={media.kind !== "photo"}
+              onPress={openPost}
+            >
+              <Image
+                source={{ uri: media.imageUrl }}
+                recyclingKey={`${item._id}-media-${index}`}
+                contentFit="contain"
+                style={[styles.heroImage, frameSize(media.aspectRatio)]}
+              />
+            </PostMediaButton>
+          </View>
+        ))
+      : null;
+
   const heroBlock = heroUri ? (
-    <View style={item.isSticker ? undefined : styles.heroContainer}>
-      {isZoomTarget ? (
-        <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
-      ) : (
-        hero
-      )}
-    </View>
+    <>
+      <View style={item.isSticker ? undefined : styles.heroContainer}>
+        {isZoomTarget ? (
+          <Link.AppleZoomTarget>{hero}</Link.AppleZoomTarget>
+        ) : (
+          hero
+        )}
+      </View>
+      {moreMedia}
+    </>
   ) : null;
 
   const scrollProps = {
+    ref: scrollRef,
     testID: item.fixtureKey
       ? `fixture-item-detail-${item.fixtureKey}`
       : undefined,
     contentInsetAdjustmentBehavior: "never" as const,
-    style: [styles.container, { paddingTop: headerHeight + theme.gap(5) }],
+    style: [styles.container, { paddingTop: headerInset + theme.gap(5) }],
     contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
     showsVerticalScrollIndicator: false,
     // Note pages are edited in place: keep the caret above the keyboard and
@@ -266,7 +327,7 @@ export const ItemDetail = memo(function ItemDetail({
         spaces={spaces}
         similar={similar}
         paragraphs={paragraphs}
-        isVideo={isVideo}
+        social={social}
         intents={intents}
         heroUri={heroUri}
       />
@@ -282,7 +343,7 @@ function ItemDetailBody({
   spaces,
   similar,
   paragraphs,
-  isVideo,
+  social,
   intents,
   heroUri,
 }: {
@@ -291,7 +352,7 @@ function ItemDetailBody({
   spaces: ReturnType<typeof useItemDetailData>["spaces"];
   similar: ReturnType<typeof useItemDetailData>["similar"];
   paragraphs: string[];
-  isVideo: boolean;
+  social: SocialPost | undefined;
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
@@ -321,30 +382,21 @@ function ItemDetailBody({
 
       {item.url ? (
         <View style={styles.titleContainer}>
-          <Pressable
+          <ItemSourceLink
+            item={item}
+            icon={social?.playable ? "play.rectangle" : "safari"}
+            iconSize={15}
+            arrowSize={11}
+            iconTintColor={theme.colors.muted}
+            arrowTintColor={theme.colors.faint}
+            label={
+              social && item.author
+                ? `${item.author} · ${social.site}`
+                : undefined
+            }
             style={styles.sourceRow}
-            onPress={() => {
-              void WebBrowser.openBrowserAsync(item.url!)
-                .then(() => analytics.itemAction(item, "open_source"))
-                .catch(() => {});
-            }}
-          >
-            <AppSymbolIcon
-              name={isVideo ? "play.rectangle" : "safari"}
-              size={15}
-              tintColor={theme.colors.muted}
-            />
-            <Text style={styles.sourceText}>
-              {isVideo && item.author
-                ? `${item.author} · TikTok`
-                : (item.siteName ?? displayHost(item.url))}
-            </Text>
-            <AppSymbolIcon
-              name="arrow.up.right"
-              size={11}
-              tintColor={theme.colors.faint}
-            />
-          </Pressable>
+            textStyle={styles.sourceText}
+          />
         </View>
       ) : null}
 
@@ -359,9 +411,7 @@ function ItemDetailBody({
           style={styles.urlRow}
           accessibilityRole="link"
           onPress={() => {
-            void WebBrowser.openBrowserAsync(item.url!)
-              .then(() => analytics.itemAction(item, "open_source"))
-              .catch(() => {});
+            openItemSource(item);
           }}
           hitSlop={4}
         >
@@ -372,7 +422,7 @@ function ItemDetailBody({
         </Pressable>
       ) : null}
 
-      {isVideo && paragraphs.length > 0 ? (
+      {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
         </Text>
@@ -382,7 +432,13 @@ function ItemDetailBody({
 
       {item.status === "ready" ? <ProductsSection item={detail} /> : null}
 
-      {!isVideo && paragraphs.length > 0 ? (
+      {/* A recipe replaces the article paragraphs: the pipeline already lifted
+          the ingredients and steps out of the story around them. A social post
+          keeps its caption above and gains the recipe its caption described or
+          linked to; a recipe screenshot gets the card under the photo. */}
+      {detail.recipe ? (
+        <RecipeSection recipe={detail.recipe} />
+      ) : !social && paragraphs.length > 0 ? (
         <View style={styles.article}>
           {paragraphs.map((paragraph, index) => (
             <Text selectable key={index} style={styles.paragraph}>
@@ -624,28 +680,13 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(1),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
+  moreMedia: {
+    marginTop: theme.gap(2),
+  },
   heroImage: {
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surfaceMuted,
-  },
-  playOverlay: {
-    position: "absolute",
-    inset: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    // Nudge the glyph to the optical center of the circle.
-    paddingLeft: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   body: {
     gap: theme.gap(5),

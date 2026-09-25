@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import PostHog from "posthog-react-native";
+import { Platform } from "react-native";
 
 const posthogProjectToken = Constants.expoConfig?.extra?.posthogProjectToken as
   | string
@@ -31,10 +32,25 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
 // `before_send` hook below extends it to SDK-autocaptured crashes.
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
+// Expo and other native modules reject with a `CodedError` whose message is a
+// generated code token — `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
+// the failing module and holds no user content (no spaces, URLs, or free text),
+// so it is safe to keep. Without it a native crash reaches error tracking as the
+// bare class name ("Error"), naming nothing that failed. The pattern only admits
+// a single SCREAMING_SNAKE token, so an interpolated message (which carries
+// spaces, slashes, or lowercase) can never match.
+const SAFE_EXCEPTION_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+function isSafeExceptionValue(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (SAFE_ERROR_MESSAGES.has(value) ||
+      (value.length <= 80 && SAFE_EXCEPTION_CODE.test(value)))
+  );
+}
+
 function sanitizeExceptionValue(value: unknown, fallback: unknown): unknown {
-  return typeof value === "string" && SAFE_ERROR_MESSAGES.has(value)
-    ? value
-    : fallback;
+  return isSafeExceptionValue(value) ? value : fallback;
 }
 
 function redactExceptionProperties(properties: unknown): void {
@@ -81,6 +97,15 @@ export const posthog =
     ? new PostHog(posthogProjectToken, {
         host: posthogHost,
         captureAppLifecycleEvents: true,
+        // Both default to true in posthog-react-native >= 4.73 and activate
+        // through @posthog/react-native-plugin. The native SDK builds and sends
+        // `$push_notification_opened` itself, so `before_send` below never sees
+        // it and cannot apply the redaction this file exists to enforce. Push
+        // tokens are already owned by `notificationDevices` in Convex, so
+        // mirroring them into PostHog would widen what leaves the device for no
+        // product gain. Fail closed, as replay and exception autocapture do.
+        capturePushNotificationSubscriptions: false,
+        capturePushNotificationOpened: false,
         // Replay stays off in production until visual masking is verified on a
         // signed build. Fail closed: only builds that declare a non-production
         // variant record, so a missing `extra` can never turn replay on.
@@ -136,6 +161,7 @@ function updateProperties(): Record<string, string | boolean> {
 export function superProperties(): Record<string, string | number | boolean> {
   return {
     environment: Constants.expoConfig?.extra?.variant ?? "development",
+    platform: Platform.OS,
     analytics_version: 1,
     ...updateProperties(),
   };
@@ -144,7 +170,7 @@ export function superProperties(): Record<string, string | number | boolean> {
 posthog?.register(superProperties());
 
 /** Clears the identity and restores the super properties a reset drops. */
-export function resetClient(client: PostHog): void {
+function resetClient(client: PostHog): void {
   client.reset();
   client.register(superProperties());
 }

@@ -1,14 +1,17 @@
 import type { TextMessageKey } from "@/locales/message-types";
-import { t, useAppLocale } from "@/lib/i18n";
+import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
+import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
 import { displayHost } from "@/lib/url";
-import { isTikTokUrl } from "@convex/model/externalUrl";
+import { shortFormSource } from "@convex/model/externalUrl";
+import { socialPost } from "@/lib/social-post";
 import {
   enrichmentValidator,
   failureReasonValidator,
+  type PostMedia,
 } from "@convex/model/itemFields";
 import type { Infer } from "convex/values";
 import { api } from "@convex/_generated/api";
@@ -28,12 +31,12 @@ import {
 } from "react-native";
 import Animated, {
   FadeIn,
-  FadeOut,
   useReducedMotion,
   ZoomOut,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -49,6 +52,7 @@ export type FeedItem = {
   imageUrl?: string | null;
   heroImageUrl?: string;
   aspectRatio?: number;
+  media?: PostMedia[];
   isSticker?: boolean;
   failureReason?: Infer<typeof failureReasonValidator>;
   enrichment?: Infer<typeof enrichmentValidator>;
@@ -94,16 +98,6 @@ export type ItemSource =
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
-
-const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
-const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
-
-function clampRatio(ratio: number | undefined, fallback: number) {
-  const value = ratio && !Number.isNaN(ratio) ? ratio : fallback;
-  // Preserve the true aspect ratio so previews aren't cropped; only bound
-  // pathological extremes so one very tall/wide image can't hijack a column.
-  return Math.min(Math.max(value, 0.5), 2);
-}
 
 function cardMenuActions({
   isSuggested,
@@ -164,7 +158,9 @@ function CardMedia({
   theme: UnistylesTheme;
 }) {
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const isVideo = item.type === "link" && isTikTokUrl(item.url);
+  const social = socialPost(item);
+  const isVideo = social?.playable === true;
+  const mediaCount = item.media?.length ?? 0;
   if (imageUri) {
     return (
       <View style={!item.isSticker && styles.imageContainer}>
@@ -179,17 +175,33 @@ function CardMedia({
               aspectRatio: clampRatio(
                 item.aspectRatio,
                 isVideo ? 9 / 16 : item.type === "link" ? OG_RATIO : 1,
+                0.5,
+                2,
               ),
             },
           ]}
         />
-        {isVideo && (
-          <View style={styles.videoBadge}>
-            <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
-            {item.author ? (
-              <Text style={styles.videoBadgeText} numberOfLines={1}>
-                {item.author}
-              </Text>
+        {(isVideo || mediaCount > 1) && (
+          <View style={styles.mediaBadges} pointerEvents="none">
+            {isVideo ? (
+              <View style={styles.mediaBadge}>
+                <AppSymbolIcon name="play.fill" size={9} tintColor="white" />
+                {item.author ? (
+                  <Text style={styles.mediaBadgeText} numberOfLines={1}>
+                    {item.author}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <View />
+            )}
+            {mediaCount > 1 ? (
+              <View style={[styles.mediaBadge, styles.countBadge]}>
+                <AppSymbolIcon name="photo.stack" size={10} tintColor="white" />
+                <Text style={styles.mediaBadgeText}>
+                  {new Intl.NumberFormat(formattingLocale()).format(mediaCount)}
+                </Text>
+              </View>
             ) : null}
           </View>
         )}
@@ -233,7 +245,7 @@ function CardCaption({
         {item.type === "link" && item.url ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
-              {item.siteName === "TikTok" ? "TikTok" : displayHost(item.url)}
+              {shortFormSource(item.url)?.site ?? displayHost(item.url)}
             </Text>
             <AppSymbolIcon
               name="arrow.up.right"
@@ -262,16 +274,14 @@ function CardCaption({
 function CardStatusCorner({
   item,
   theme,
-  reducedMotion,
 }: {
   item: FeedItem;
   theme: UnistylesTheme;
-  reducedMotion: boolean;
 }) {
   return (
     <Animated.View
-      entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
-      exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+      entering={REDUCED_FADE_IN}
+      exiting={REDUCED_FADE_OUT}
       collapsable={false}
       style={styles.processing}
     >
@@ -311,10 +321,19 @@ export const ItemCard = memo(function ItemCard({
   const isSuggested = item.suggested === true && spaceId !== undefined;
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
+  const shareLink = useShareLink();
   const share = async () => {
     if (!item.url) return;
     try {
-      const result = await Share.share({ url: item.url });
+      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      const result = await shareUrl(link ?? item.url);
+      if (result.action === Share.sharedAction) {
+        const shareRef = await shareRefOf(link);
+        analytics.capture("item_shared", {
+          surface: "feed",
+          ...(shareRef ? { share_ref: shareRef } : {}),
+        });
+      }
       if (
         result.action === Share.sharedAction &&
         item._creationTime !== undefined
@@ -332,11 +351,24 @@ export const ItemCard = memo(function ItemCard({
   // A failed save has no AI title, so without this the card is blank forever and
   // indistinguishable from one still processing.
   const failedLabel = failureLabel(item);
-  const captionTitle =
-    item.title ??
-    item.note ??
-    failedLabel ??
-    (item.url ? displayHost(item.url) : undefined);
+  const titles = [
+    item.title,
+    item.note,
+    failedLabel,
+    item.url ? displayHost(item.url) : undefined,
+  ];
+  const captionTitle = titles.find((title) => title !== undefined);
+
+  // What a screen reader reads instead of the card's contents. The classifier
+  // can hand back a title that is empty or only spaces, and an accessibilityLabel
+  // replaces the child text rather than falling back to it — so a blank one
+  // would leave the card announcing nothing at all. Take the first title with
+  // visible characters, then describe the item's state.
+  const accessibilityLabel =
+    titles.find((title) => title?.trim()) ??
+    (item.status === "processing"
+      ? t("item.stillWorking")
+      : t("item.untitledItem"));
 
   // The primary accept gesture: tap the sparkle, the item is in. The badge's
   // exit animation is the confirmation — no navigation, no dialog.
@@ -394,8 +426,14 @@ export const ItemCard = memo(function ItemCard({
         href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
         asChild
       >
-        <Link.Trigger withAppleZoom>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable
+            // `role`, not `accessibilityRole`: Link spreads its own role="link"
+            // onto this trigger, and React Native reads `role` first on both
+            // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
+            // so an accessibilityRole here would never reach the screen reader.
+            role="button"
+            accessibilityLabel={accessibilityLabel}
             testID={
               item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
             }
@@ -429,11 +467,7 @@ export const ItemCard = memo(function ItemCard({
             )}
 
             {(item.status === "processing" || item.status === "failed") && (
-              <CardStatusCorner
-                item={item}
-                theme={theme}
-                reducedMotion={reducedMotion}
-              />
+              <CardStatusCorner item={item} theme={theme} />
             )}
           </Pressable>
         </Link.Trigger>
@@ -513,10 +547,17 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(0.5),
     boxShadow: `0 0 4px 0 ${theme.colors.imageBorder}`,
   },
-  videoBadge: {
+  mediaBadges: {
     position: "absolute",
     left: theme.gap(1.25),
+    right: theme.gap(1.25),
     bottom: theme.gap(1.25),
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  mediaBadge: {
+    flexShrink: 1,
     maxWidth: "80%",
     flexDirection: "row",
     alignItems: "center",
@@ -526,7 +567,10 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 50,
     backgroundColor: "rgba(0, 0, 0, 0.55)",
   },
-  videoBadgeText: {
+  countBadge: {
+    flexShrink: 0,
+  },
+  mediaBadgeText: {
     flexShrink: 1,
     fontFamily: theme.fonts.bold,
     fontSize: 10,

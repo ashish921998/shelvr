@@ -46,7 +46,11 @@ it("reuses the demo space after a language change and persisted-step resume", as
     url: "https://example.com/recipe",
     spaceName,
   });
-  setPendingDemo({ url: demo.url, destination: spaceName });
+  setPendingDemo({
+    url: demo.url,
+    destination: spaceName,
+    source: "direct",
+  });
   setOnboardingProgress({
     saveKinds: ["Recipes"],
     spaces: ["Recipes"],

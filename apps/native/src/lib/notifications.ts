@@ -1,4 +1,5 @@
 import { currentLocale, useAppLocale } from "@/lib/i18n";
+import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -20,8 +21,9 @@ import {
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
+import { readConvexUrl } from "@/lib/convex-url";
 
-const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
   read: async () => {
     const stored = await SecureStore.getItemAsync(tokenStorageKey);
@@ -51,15 +53,6 @@ export function useNotificationSession() {
   );
   return { session, operation };
 }
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 function getNotificationTimezone(): string | undefined {
   return (
@@ -101,9 +94,18 @@ export function NotificationSessionProvider({
           }),
         signOut,
         deleteAccount: () => deleteAccount({}),
-        resetAnalytics: analytics.reset,
-        reportError: (error) =>
-          analytics.captureError("notification_session_cleanup_failed", error),
+        clearWidget: clearRecentSavesWidget,
+        // Fallback for a failed post-deletion sign-out: no auth edge may fire
+        // promptly, so clear the identity here (idempotent with the hook's).
+        resetAnalytics: () => void analytics.resetIfIdentified(),
+        reportError: (error) => {
+          const event =
+            error instanceof Error &&
+            error.message === "widget_thumbnail_cleanup_failed"
+              ? "widget_thumbnail_cleanup_failed"
+              : "notification_session_cleanup_failed";
+          analytics.captureError(event, error);
+        },
       }),
     [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
   );
@@ -168,7 +170,12 @@ export function NotificationSessionProvider({
   );
 }
 
-function getNotificationUrl(
+/**
+ * The route a notification carries, if any. Exported because the splash gate
+ * decides whether to stand down from the same rule this navigates by — a push
+ * with no `url` goes nowhere, so it is not a reason to skip the animation.
+ */
+export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
   const data = notification.request.content.data as
