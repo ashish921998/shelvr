@@ -1,4 +1,4 @@
-export type LibraryEntry = { url: string; title?: string; savedAt?: number };
+type LibraryEntry = { url: string; title?: string; savedAt?: number };
 
 export type LibraryStats = {
   count: number;
