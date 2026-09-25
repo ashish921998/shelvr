@@ -35,6 +35,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -148,6 +149,12 @@ export const ItemDetail = memo(function ItemDetail({
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
+  // iOS keeps a transparent header (blur band behind it, full-bleed hero), so
+  // its pages pad the header band in. Android owns an opaque toolbar (see
+  // item/[id].tsx), so its content already starts below the header — padding
+  // by the header height there would open a blank band under the toolbar.
+  const headerInset = Platform.OS === "ios" ? headerHeight : 0;
+
   const { detail, bodyPending, spaces, similar, heroUri, paragraphs } =
     useItemDetailData(item);
 
@@ -176,7 +183,7 @@ export const ItemDetail = memo(function ItemDetail({
       <ArticleReaderView
         item={detail}
         isZoomTarget={isZoomTarget}
-        headerHeight={headerHeight}
+        headerHeight={headerInset}
         spaces={spaces}
         similar={similar}
         heroUri={heroUri}
@@ -287,7 +294,7 @@ export const ItemDetail = memo(function ItemDetail({
       ? `fixture-item-detail-${item.fixtureKey}`
       : undefined,
     contentInsetAdjustmentBehavior: "never" as const,
-    style: [styles.container, { paddingTop: headerHeight + theme.gap(5) }],
+    style: [styles.container, { paddingTop: headerInset + theme.gap(5) }],
     contentContainerStyle: { paddingBottom: insets.bottom + theme.gap(4) },
     showsVerticalScrollIndicator: false,
     // Note pages are edited in place: keep the caret above the keyboard and
