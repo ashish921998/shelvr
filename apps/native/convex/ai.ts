@@ -208,20 +208,22 @@ const SYSTEM_PROMPT =
 // zod enum below and the DB shape cannot drift. Anything outside it is
 // dropped in sanitizeIntents before finalize.
 
-// Appended to every classification prompt. Describes the catalog and the rules
-// that keep intents genuinely useful (and, for social posts, honest).
-const INTENTS_PROMPT_BLOCK = [
-  "Also propose up to 5 useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:",
-  "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
-  "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
-  "- web_search: search the web. value is the query.",
-  "- open_maps: open a place in maps. value is a place name or address.",
-  "- call: call a phone number. value is the phone number.",
-  "- message: text a phone number. value is the phone number.",
-  "- email: email someone. value is the email address.",
-  "- add_event: add a calendar event. value is the event title.",
-  "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
-].join("\n");
+// Appended to every classification and steering prompt. Describes the catalog
+// and the rules that keep intents genuinely useful (and, for social posts,
+// honest). The cap matches the caller's schema and sanitize limit.
+const intentsPromptBlock = (maxIntents: number): string =>
+  [
+    `Also propose up to ${maxIntents} useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:`,
+    "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
+    "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
+    "- web_search: search the web. value is the query.",
+    "- open_maps: open a place in maps. value is a place name or address.",
+    "- call: call a phone number. value is the phone number.",
+    "- message: text a phone number. value is the phone number.",
+    "- email: email someone. value is the email address.",
+    "- add_event: add a calendar event. value is the event title.",
+    "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
+  ].join("\n");
 
 // How much extracted text to feed the classifier. The model only needs enough
 // to understand the piece — it doesn't read the whole thing.
@@ -1887,7 +1889,7 @@ function spacesPromptBlock(
     candidates.push(line);
   }
   const lines = candidates.join("\n");
-  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
+  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, list the exact names of the spaces this item clearly belongs to, or an empty array if none do. Each name becomes a suggestion the user reviews, so leave out borderline matches.`;
 }
 
 /** The model's classification for one item, plus the link-read artifacts the
@@ -1945,7 +1947,7 @@ function linkAnalysisPrompt(
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
       : "",
-    INTENTS_PROMPT_BLOCK,
+    intentsPromptBlock(5),
   ]
     .filter((line) => line !== "")
     .join("\n\n");
@@ -2039,7 +2041,7 @@ async function analyzeImageItem(
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
               "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
               spacesBlock,
-              INTENTS_PROMPT_BLOCK,
+              intentsPromptBlock(5),
             ].join("\n\n"),
           },
           {
@@ -2075,7 +2077,7 @@ async function analyzeNoteItem(
         ? [`The user titled this note: ${item.title}`]
         : []),
       `Note:\n${item.note.slice(0, MAX_CONTENT_CHARS)}`,
-      INTENTS_PROMPT_BLOCK,
+      intentsPromptBlock(5),
     ].join("\n\n"),
   });
   return { result: object };
@@ -2476,7 +2478,7 @@ export const recommendForSpace = internalAction({
         prompt: [
           "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Shelvr recommends a few existing saves for it — the user decides which to keep.",
           `Space name: "${space.name}"${space.description ? `\nSpace description: ${space.description}` : ""}`,
-          "Below is a numbered list of the user's saved items. Return the numbers of a handful of items that CLEARLY belong in this space — quality over quantity, high-confidence picks only, at most 8. If nothing clearly fits, return an empty array.",
+          `Below is a numbered list of the user's saved items. Return the numbers of the items that clearly belong in this space, at most ${MAX_RECOMMENDATIONS}, or an empty array if none do. The user reviews each pick, so leave out borderline ones.`,
           itemLines,
         ].join("\n\n"),
       });
@@ -2757,7 +2759,7 @@ export const steerItemForSpace = internalAction({
           ]
             .filter((line) => line !== "")
             .join("\n"),
-          INTENTS_PROMPT_BLOCK,
+          intentsPromptBlock(3),
           "Steering by space purpose:",
           "- Shopping/wishlist space: identify the product and include an open_url intent to a Google Shopping search, https://www.google.com/search?tbm=shop&q=PRODUCT+QUERY, labeled like 'Shop this'.",
           "- Travel space: prefer open_maps for places and open_url for official/booking pages you can actually see.",
