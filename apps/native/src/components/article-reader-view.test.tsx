@@ -61,6 +61,12 @@ vi.mock("expo-router", () => ({
     AppleZoomTarget: vi.fn(({ children }: { children: ReactNode }) => children),
   },
 }));
+vi.mock("@/components/ink/ink-thread", () => ({
+  InkSpinner: vi.fn(() => null),
+}));
+vi.mock("@/components/ink/reading-meter", () => ({
+  ReadingMeter: vi.fn(() => null),
+}));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/tag-chip", () => ({
   TagChip: vi.fn(({ label }: { label: string }) => (

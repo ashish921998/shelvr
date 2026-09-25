@@ -1,4 +1,5 @@
-import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { InkIcon } from "@/components/ink/ink-icon";
+import type { InkIconName } from "@/lib/ink/icons";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -9,12 +10,17 @@ export function HeaderIconButton({
   badge,
   disabled,
   onPress,
+  testID,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   label: string;
   badge?: number;
   disabled?: boolean;
   onPress: () => void;
+  /** A stable handle for the end-to-end flows. Header labels are localized
+   * copy, and a sheet opened over another sheet leaves both in the hierarchy,
+   * where "Close" also matches "Close profile". */
+  testID?: string;
 }) {
   const { theme } = useUnistyles();
   return (
@@ -25,6 +31,7 @@ export function HeaderIconButton({
       disabled={disabled}
       hitSlop={8}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.button,
         pressed && styles.pressed,
@@ -48,7 +55,7 @@ export function HeaderActionMenu({
   title,
   actions,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   label: string;
   title: string;
   actions: HeaderMenuAction[];
@@ -72,18 +79,14 @@ function HeaderIconContent({
   badge,
   tintColor,
 }: {
-  icon: AppSymbolName;
+  icon: InkIconName;
   badge?: number;
   tintColor: string;
 }) {
   return (
     <>
-      <AppSymbolIcon
-        name={icon}
-        size={21}
-        weight="semibold"
-        tintColor={tintColor}
-      />
+      {/* Header buttons draw their icon at 18, per the ink spec. */}
+      <InkIcon name={icon} size={18} tint={tintColor} />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>

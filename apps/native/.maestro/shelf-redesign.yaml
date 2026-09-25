@@ -1,0 +1,179 @@
+# The shelf redesign, end to end.
+#
+# What this is for: the redesign moved every root screen onto drawn shelves and
+# replaced the tab bar with the floating paper pill. None of that is covered by
+# the unit suite — the ink is a Skia canvas, and the component tests mock it
+# away — so this flow is the only thing that proves the screens mount, the nav
+# switches, and the shelves actually hold the saves.
+#
+# It asserts structure and seeded data, never the drawing: ink is
+# `accessibilityElementsHidden`, so Maestro cannot see it by design. The
+# screenshots are the record of how it looked; a human still has to look.
+#
+# Run against a development build (see .maestro/README.md).
+appId: app.shelvr.save.dev
+tags:
+  - redesign
+---
+- launchApp
+- runFlow: helpers/sign-in.yaml
+- runFlow: helpers/seed-fixtures.yaml
+
+# ── Home ────────────────────────────────────────────────────────────────────
+# Shelves grouped by recency under one counted headline, each save standing on
+# a drawn board.
+- assertVisible:
+    text: "shelvr"
+- assertVisible: "things waiting."
+- assertVisible:
+    id: "shelf-new"
+- assertVisible:
+    id: "fixture-item-ramen"
+- takeScreenshot: redesign/01-home
+
+# ── Nav E ───────────────────────────────────────────────────────────────────
+# Five equal tabs. Each tap runs the ~900ms hand-redraw; what is asserted here
+# is that it arrives, not how it looked getting there.
+- tapOn:
+    id: "tab-spaces"
+- assertVisible: "spaces"
+- assertVisible:
+    id: "fixture-space-recipes"
+- assertVisible: "Recipes"
+- takeScreenshot: redesign/02-shelves
+
+# ── A shelf page ────────────────────────────────────────────────────────────
+# Name centred in the header with one summary line, an ellipsis and no plus,
+# then the saves on the shelf.
+- tapOn:
+    id: "fixture-space-recipes"
+- assertVisible:
+    id: "fixture-space-detail-recipes"
+    timeout: 20000
+- assertVisible: "On the shelf"
+- assertVisible:
+    id: "shelf-items"
+- takeScreenshot: redesign/03-shelf-page
+- tapOn: "Back"
+
+# ── Search ──────────────────────────────────────────────────────────────────
+# The field is on the screen now; the nav no longer owns one.
+- tapOn:
+    id: "tab-search"
+- assertVisible:
+    id: "search-field"
+- tapOn:
+    id: "search-field"
+- inputText: "Ramen"
+- assertVisible:
+    text: "Weeknight Miso Ramen"
+    timeout: 20000
+- takeScreenshot: redesign/04-search
+- hideKeyboard
+
+# ── Tidy and Map ────────────────────────────────────────────────────────────
+# Both are on the redesign now, and walking them also proves the pill routes to
+# all five tabs.
+- tapOn:
+    id: "tab-tidy"
+- takeScreenshot: redesign/05-tidy
+- tapOn:
+    id: "tab-map"
+- takeScreenshot: redesign/06-map
+
+# ── The Add sheet ───────────────────────────────────────────────────────────
+# Four mark cards saying what each way in makes. Saving is Pro-gated, so an
+# unentitled account lands on the paywall instead — the flow only opens it.
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-add"
+- assertVisible:
+    id: "add-note"
+- assertVisible:
+    id: "add-article"
+- takeScreenshot: redesign/07-add
+- swipe:
+    direction: DOWN
+    from:
+      id: "add-note"
+
+# ── Settings ────────────────────────────────────────────────────────────────
+# Every control regrouped under eyebrows, appearance as one segmented pill.
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-profile"
+- assertVisible: "Appearance"
+- assertVisible: "Sign out"
+- takeScreenshot: redesign/08-settings
+- tapOn:
+    id: "close-profile"
+
+# ── An item page ────────────────────────────────────────────────────────────
+# The save lies on the table; no shelf is drawn under a single card.
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "fixture-item-ramen"
+- assertVisible:
+    id: "fixture-item-detail-ramen"
+    timeout: 20000
+- takeScreenshot: redesign/09-item-page
+- tapOn: "Back"
+- assertVisible:
+    id: "shelf-new"
+
+# ── The new-shelf sheet ─────────────────────────────────────────────────────
+# The shelf you are making is drawn under the field, with the name on its
+# label. Saving is Pro-gated, so the flow types a name and leaves without
+# committing — the paywall is RevenueCat's and not ours to screenshot.
+- tapOn:
+    id: "tab-spaces"
+- tapOn:
+    id: "new-shelf"
+- assertVisible:
+    id: "save-shelf"
+- inputText: "Weeknight"
+- takeScreenshot: redesign/10-new-shelf
+- tapOn:
+    id: "close-new-shelf"
+
+# ── Import ──────────────────────────────────────────────────────────────────
+# Reached from settings. The button is the progress here: stitches run along
+# it while a batch uploads, so there is no spinner to wait on.
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-profile"
+- tapOn:
+    id: "open-import"
+- assertVisible:
+    id: "import-links"
+- assertVisible: "Importing X bookmarks"
+- takeScreenshot: redesign/11-import
+# Import is pushed OVER the settings sheet, which stays in the stack. Closing
+# only Import leaves settings covering the nav, so both come down here.
+- tapOn:
+    id: "close-import"
+- tapOn:
+    id: "close-profile"
+
+# ── The camera fallback ─────────────────────────────────────────────────────
+# Which state this lands in depends on the machine: a simulator has no camera,
+# and a fresh device has no permission yet — both are the paper fallback, which
+# is the part worth capturing. With no viewfinder to darken for, the screen is
+# ordinary paper with the camera mark on it. Granted permission on real
+# hardware reaches the live preview instead, so nothing is asserted about which
+# of the three arrives; the screenshot is the record.
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-add"
+- tapOn:
+    id: "add-camera"
+- takeScreenshot: redesign/12-camera
+# Both the paper fallback's header and the live preview's overlay carry this
+# id, so this leaves whichever of the three states arrived.
+- tapOn:
+    id: "close-camera"

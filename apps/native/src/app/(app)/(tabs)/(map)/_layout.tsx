@@ -1,30 +1,21 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { useAppLocale } from "@/lib/i18n";
 import { Stack } from "expo-router";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { useTabStackChrome } from "@/lib/tab-stack-chrome";
+import { useUnistyles } from "react-native-unistyles";
 
+// Map draws its own header so the ochre hairline sits under it, like every
+// other root tab. The map itself stays a real native map — see index.tsx.
 export default function MapStackLayout() {
   useAppLocale();
-  const { screenOptions } = useTabStackChrome({ headerTransparent: true });
+  const { theme } = useUnistyles();
+
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="index">
-        <Stack.Title asChild>
-          <Text testID="map-screen-title" style={styles.title}>
-            {t("navigation.mapHeader")}
-          </Text>
-        </Stack.Title>
-      </Stack.Screen>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
+      <Stack.Screen name="index" />
     </Stack>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 31,
-    letterSpacing: 0.5,
-    color: theme.colors.foreground,
-  },
-}));

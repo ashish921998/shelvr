@@ -10,7 +10,11 @@ import {
   noteDeclinedDuringOnboarding,
   notePurchasedDuringOnboarding,
 } from "@/lib/replay-onboarding";
-import { ItemCard, type FeedItem } from "@/components/item-card";
+import { type FeedItem } from "@/components/item-card";
+import { ShelfRow } from "@/components/shelf/shelf-row";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { saveMark } from "@/lib/ink/save-mark";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
@@ -21,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Text, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function RevealStep({
@@ -37,6 +41,8 @@ export function RevealStep({
   onFinish: () => void;
 }) {
   useAppLocale();
+  const { width } = useWindowDimensions();
+  const clock = useInkClock();
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
   const { entitled, status, loading: entitlementLoading } = useEntitlement();
@@ -141,9 +147,26 @@ export function RevealStep({
         </Text>
       </Text>
 
+      {/* The save lands on the shelf it was filed into, and a stitch closes the
+          moment — the same confirmation the app uses everywhere else. */}
       {card ? (
-        <View pointerEvents="none">
-          <ItemCard item={card} />
+        <View pointerEvents="none" style={styles.landing}>
+          <ShelfRow
+            width={width - 48}
+            clock={clock}
+            scrollable={false}
+            cards={[
+              {
+                key: card._id,
+                imageUrl: card.imageUrl ?? card.heroImageUrl,
+                title: card.title ?? card.note,
+                note: card.type === "note",
+                mark: saveMark(card),
+                aspectRatio: card.aspectRatio,
+              },
+            ]}
+          />
+          <StitchLine width={width - 48} clock={clock} />
         </View>
       ) : null}
 
@@ -197,6 +220,7 @@ export function RevealStep({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  landing: { alignItems: "center" },
   wrap: {
     flex: 1,
     gap: theme.gap(2),

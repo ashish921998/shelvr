@@ -104,6 +104,15 @@ const mockTheme = vi.hoisted(() => ({
   opacity: { pressed: 0.7, disabled: 0.4 },
   control: { minHeight: 48, pressRetentionOffset: 12 },
   colors: {
+    // The drawn layer reads its own colours off the theme.
+    ink: {
+      thread: "ochre",
+      terracotta: "terracotta",
+      slate: "slate",
+      light: "paper",
+      body: "body",
+      keep: "green",
+    },
     background: "white",
     surface: "white",
     surfaceMuted: "white",
@@ -154,11 +163,8 @@ vi.mock("react-native-reanimated", async () => {
     FadeIn: transition,
     FadeInDown: transition,
     FadeOut: transition,
-    Easing: { bezier: () => ({}), linear: () => ({}) },
     cubicBezier: () => ({}),
     ReduceMotion: { System: "system", Never: "never", Always: "always" },
-    useReducedMotion: () => false,
-    cancelAnimation: () => undefined,
     useSharedValue: (initial: number) =>
       useRef({
         value: initial,
@@ -173,6 +179,18 @@ vi.mock("react-native-reanimated", async () => {
     withTiming: (value: number) => value,
     withSpring: (value: number) => value,
     withDelay: (_delay: number, value: number) => value,
+    withRepeat: (value: number) => value,
+    withSequence: (value: number) => value,
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    useReducedMotion: () => false,
+    cancelAnimation: () => {},
+    Easing: {
+      linear: (t: number) => t,
+      bezier: () => (t: number) => t,
+      out: (fn: (t: number) => number) => fn,
+      quad: (t: number) => t,
+      cubic: (t: number) => t,
+    },
   };
 });
 vi.mock("@shopify/react-native-skia", () => {
@@ -191,6 +209,17 @@ vi.mock("@shopify/react-native-skia", () => {
       <span data-testid="glyph">{text}</span>
     )),
     BlurMask: vi.fn(() => null),
+    Path: vi.fn(() => null),
+    DashPathEffect: vi.fn(() => null),
+    Skia: {
+      Path: {
+        Make: vi.fn(() => ({
+          moveTo: vi.fn(),
+          lineTo: vi.fn(),
+          close: vi.fn(),
+        })),
+      },
+    },
   };
 });
 vi.mock("@/components/symbol", () => ({
@@ -317,6 +346,12 @@ vi.mock("@tanstack/react-query", () => {
   ];
   return { useQuery: () => ({ data }) };
 });
+// The screens draw their own header now, which reads the safe area. Mock
+// the insets rather than the header itself, so header copy still reaches
+// the accessibility tree these tests read.
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("expo-maps", () => {

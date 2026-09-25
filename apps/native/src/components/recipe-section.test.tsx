@@ -11,8 +11,17 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
+// The ink is decorative and hidden from screen readers, so a content test
+// renders nothing for it rather than pulling Skia into jsdom.
+vi.mock("@/components/ink/ink-checkbox", () => ({
+  InkCheckbox: vi.fn(() => null),
+  StepNumberRing: vi.fn(() => null),
+}));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  )),
+  Pressable: vi.fn(({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   )),
   Text: vi.fn(({ children }: { children: React.ReactNode }) => (

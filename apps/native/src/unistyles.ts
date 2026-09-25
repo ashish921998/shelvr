@@ -97,6 +97,16 @@ const lightTheme = {
     // from #bf8114, which cleared only 3.06:1 on background, 3.25:1 on
     // surface and 2.80:1 on surfaceMuted: now 5.49, 5.82 and 5.03:1.
     tabTint: "#8a5a0b",
+    // The drawn layer. Ochre is the thread and every hairline; terracotta
+    // and slate colour a type mark by kind; `keep` is Tidy only.
+    ink: {
+      thread: "#b8924a",
+      terracotta: "#c96a3a",
+      slate: "#6b7a8f",
+      light: "#fffdf8",
+      body: "#6a6050",
+      keep: "#2f7a4f",
+    },
   },
 } as const;
 
@@ -123,6 +133,16 @@ const darkTheme = {
     keep: "#34d399",
     onKeep: "#065f46",
     tabTint: "#e6a23c",
+    // Dark mode for the drawn layer is deferred (DESIGN.md); these keep
+    // ink legible on the warm dark paper in the meantime.
+    ink: {
+      thread: "#c9a65e",
+      terracotta: "#e08a5c",
+      slate: "#9aabc0",
+      light: "#231e16",
+      body: "#cdc2ad",
+      keep: "#5fae82",
+    },
   },
 } as const;
 
@@ -152,6 +172,15 @@ const darkNeutralTheme = {
     onKeep: "#065f46",
     // Matches the previous hard-coded dark tab tint on this theme.
     tabTint: "#e6a23c",
+    // Neutral dark keeps the same roles with the brown cast removed.
+    ink: {
+      thread: "#d8c05a",
+      terracotta: "#f0846a",
+      slate: "#9fb0c2",
+      light: "#1b1f24",
+      body: "#c6ccd3",
+      keep: "#4fc08a",
+    },
   },
 } as const;
 

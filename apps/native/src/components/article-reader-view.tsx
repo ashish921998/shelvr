@@ -1,4 +1,6 @@
 import { t, useAppLocale, formattingLocale } from "@/lib/i18n";
+import { InkSpinner } from "@/components/ink/ink-thread";
+import { ReadingMeter } from "@/components/ink/reading-meter";
 import { TagChip } from "@/components/tag-chip";
 import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
@@ -14,7 +16,6 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { Id } from "@convex/_generated/dataModel";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
@@ -55,6 +56,9 @@ export function ArticleReaderView({
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  // How far through the article the reader is, rounded to 2% so scrolling
+  // does not re-render the meter on every frame.
+  const [readProgress, setReadProgress] = useState(0);
   const window = useWindowDimensions();
 
   // Media after the last stored paragraph shows at the end.
@@ -153,14 +157,31 @@ export function ArticleReaderView({
       style={[styles.container, { paddingTop: headerHeight + theme.gap(1.5) }]}
       contentContainerStyle={{ paddingBottom: insets.bottom + theme.gap(4) }}
       showsVerticalScrollIndicator={false}
+      scrollEventThrottle={64}
+      onScroll={(event) => {
+        const { contentOffset, contentSize, layoutMeasurement } =
+          event.nativeEvent;
+        const scrollable = contentSize.height - layoutMeasurement.height;
+        const ratio = scrollable > 0 ? contentOffset.y / scrollable : 0;
+        const stepped = Math.round(Math.min(1, Math.max(0, ratio)) * 50) / 50;
+        setReadProgress((current) => (current === stepped ? current : stepped));
+      }}
     >
       <View style={styles.body}>
         {item.status === "processing" ? (
           <View style={styles.processingRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <InkSpinner size={20} />
             <Text style={styles.processingText}>{t("item.reading")}</Text>
           </View>
         ) : null}
+
+        {/* The meter sits where the hairline does, and fills as you read. */}
+        <View style={styles.meter}>
+          <ReadingMeter
+            width={window.width - theme.gap(4)}
+            progress={readProgress}
+          />
+        </View>
 
         <View style={styles.summary}>
           <View style={styles.thumbnailFrame}>
@@ -274,6 +295,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2.5),
   },
+  meter: { paddingBottom: theme.gap(1.5) },
   summary: {
     minHeight: 76,
     flexDirection: "row",

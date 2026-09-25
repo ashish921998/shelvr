@@ -1,6 +1,9 @@
 import { translate } from "@/lib/i18n-core";
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { InkMapGrid } from "@/components/ink/ink-map-grid";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ProGate as ProGateView } from "@/components/pro-gate";
 import { useEntitlement } from "@/lib/entitlement";
@@ -13,7 +16,7 @@ import { Image } from "expo-image";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 // The accent color matches theme.colors.primary (identical in both themes).
@@ -91,6 +94,8 @@ function fitCamera(items: Located[]) {
 export default function MapScreen() {
   const locale = useAppLocale();
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  const clock = useInkClock();
   const { entitled, loading: entitlementLoading } = useEntitlement();
   // Only photos with coordinates, already filtered server-side, so the map
   // never subscribes to the feed.
@@ -142,25 +147,56 @@ export default function MapScreen() {
     [located],
   );
 
+  const header = (
+    <ScreenHeader clock={clock} title={t("navigation.mapHeader")} />
+  );
+
   if (entitlementLoading) {
-    return <ScreenLoader label={t("loading.map")} />;
+    return (
+      <View style={styles.container}>
+        {header}
+        <ScreenLoader label={t("loading.map")} />
+      </View>
+    );
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
   // paywall instead of seeing the map. ProGate's default CTA already presents
   // the paywall, so no guard wrapper is needed.
   if (!entitled) {
-    return <ProGateView title={t("map.proTitle")} message={t("map.proBody")} />;
+    return (
+      <View style={styles.container}>
+        {header}
+        <ProGateView title={t("map.proTitle")} message={t("map.proBody")} />
+      </View>
+    );
   }
 
   if (items === undefined) {
-    return <ScreenLoader label={t("loading.places")} />;
+    return (
+      <View style={styles.container}>
+        {header}
+        <ScreenLoader label={t("loading.places")} />
+      </View>
+    );
   }
 
+  // Nothing to pin: the paper map stands in for the live one, because a blank
+  // screen here reads as a failure rather than as "nothing here yet".
   if (located.length === 0) {
     return (
       <View style={styles.container}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
+        {header}
+        <View style={styles.paper}>
+          <View style={styles.paperGrid} pointerEvents="none">
+            <InkMapGrid width={width} height={height} clock={clock} />
+          </View>
+          <EmptyState
+            title={t("map.emptyTitle")}
+            message={t("map.emptyBody")}
+            prop={null}
+          />
+        </View>
       </View>
     );
   }
@@ -175,47 +211,56 @@ export default function MapScreen() {
 
   if (process.env.EXPO_OS === "ios") {
     return (
-      <AppleMaps.View
-        style={styles.container}
-        cameraPosition={cameraPosition}
-        annotations={withThumb.map((item) => ({
-          id: item.id,
-          coordinates: { latitude: item.latitude, longitude: item.longitude },
-          icon: thumbs[item.id],
-        }))}
-        markers={withoutThumb.map((item) => ({
-          id: item.id,
-          coordinates: { latitude: item.latitude, longitude: item.longitude },
-          title: item.title,
-          systemImage: "photo.fill",
-          tintColor: ACCENT,
-        }))}
-        onAnnotationClick={(annotation) => openItem(annotation.id)}
-        onMarkerClick={(marker) => openItem(marker.id)}
-      />
+      <View style={styles.container}>
+        {header}
+        <AppleMaps.View
+          style={styles.container}
+          cameraPosition={cameraPosition}
+          annotations={withThumb.map((item) => ({
+            id: item.id,
+            coordinates: { latitude: item.latitude, longitude: item.longitude },
+            icon: thumbs[item.id],
+          }))}
+          markers={withoutThumb.map((item) => ({
+            id: item.id,
+            coordinates: { latitude: item.latitude, longitude: item.longitude },
+            title: item.title,
+            systemImage: "photo.fill",
+            tintColor: ACCENT,
+          }))}
+          onAnnotationClick={(annotation) => openItem(annotation.id)}
+          onMarkerClick={(marker) => openItem(marker.id)}
+        />
+      </View>
     );
   }
 
   return (
-    <GoogleMaps.View
-      style={styles.container}
-      cameraPosition={cameraPosition}
-      markers={located.map((item) => ({
-        id: item.id,
-        coordinates: { latitude: item.latitude, longitude: item.longitude },
-        title: item.title,
-        icon: thumbs[item.id],
-        anchor: thumbs[item.id] ? { x: 0.5, y: 0.5 } : undefined,
-      }))}
-      onMarkerClick={(marker) => openItem(marker.id)}
-    />
+    <View style={styles.container}>
+      {header}
+      <GoogleMaps.View
+        style={styles.container}
+        cameraPosition={cameraPosition}
+        markers={located.map((item) => ({
+          id: item.id,
+          coordinates: { latitude: item.latitude, longitude: item.longitude },
+          title: item.title,
+          icon: thumbs[item.id],
+          anchor: thumbs[item.id] ? { x: 0.5, y: 0.5 } : undefined,
+        }))}
+        onMarkerClick={(marker) => openItem(marker.id)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
+  paper: { flex: 1, backgroundColor: theme.colors.surfaceMuted },
+  paperGrid: { ...StyleSheet.absoluteFillObject },
   loading: {
     flex: 1,
     alignItems: "center",

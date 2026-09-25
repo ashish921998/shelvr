@@ -1,6 +1,8 @@
 import type { Recipe } from "@convex/model/itemFields";
 import { t, useAppLocale } from "@/lib/i18n";
-import { Text, View } from "react-native";
+import { InkCheckbox, StepNumberRing } from "@/components/ink/ink-checkbox";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** Recipe markup often states the yield as a bare number ("4"); a phrase
@@ -18,6 +20,15 @@ function servingsLabel(servings: string): string {
 // quantities can be copied.
 export function RecipeSection({ recipe }: { recipe: Recipe }) {
   useAppLocale();
+  // Ticking an ingredient off is local to reading the recipe; it is not a
+  // property of the save, so it is not written back.
+  const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
+  const toggle = (index: number) =>
+    setChecked((current) => {
+      const next = new Set(current);
+      if (!next.delete(index)) next.add(index);
+      return next;
+    });
   return (
     <View style={styles.section}>
       {recipe.servings ? (
@@ -27,12 +38,25 @@ export function RecipeSection({ recipe }: { recipe: Recipe }) {
       <Text style={styles.sectionTitle}>{t("recipe.ingredients")}</Text>
       <View style={styles.list}>
         {recipe.ingredients.map((ingredient, index) => (
-          <View key={index} style={styles.ingredientRow}>
-            <View style={styles.bullet} />
-            <Text selectable style={styles.ingredient}>
+          <Pressable
+            key={index}
+            style={styles.ingredientRow}
+            onPress={() => toggle(index)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: checked.has(index) }}
+            accessibilityLabel={ingredient}
+          >
+            <InkCheckbox size={18} done={checked.has(index)} seed={index} />
+            <Text
+              selectable
+              style={[
+                styles.ingredient,
+                checked.has(index) && styles.ingredientDone,
+              ]}
+            >
               {ingredient}
             </Text>
-          </View>
+          </Pressable>
         ))}
       </View>
 
@@ -40,9 +64,12 @@ export function RecipeSection({ recipe }: { recipe: Recipe }) {
       <View style={styles.list}>
         {recipe.steps.map((step, index) => (
           <View key={index} style={styles.stepRow}>
-            <Text style={styles.stepNumber} numberOfLines={1}>
-              {String(index + 1)}
-            </Text>
+            <View style={styles.stepRing}>
+              <StepNumberRing size={26} seed={index} />
+              <Text style={styles.stepNumber} numberOfLines={1}>
+                {String(index + 1)}
+              </Text>
+            </View>
             <Text selectable style={styles.step}>
               {step}
             </Text>
@@ -78,14 +105,17 @@ const styles = StyleSheet.create((theme) => ({
   ingredientRow: {
     flexDirection: "row",
     gap: theme.gap(1),
-    alignItems: "flex-start",
+    alignItems: "center",
+    minHeight: 40,
   },
-  bullet: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: theme.colors.faint,
-    marginTop: 9,
+  ingredientDone: { color: theme.colors.muted },
+  // The ring is drawn behind the numeral rather than around it, so the number
+  // stays on the text baseline.
+  stepRing: {
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   ingredient: {
@@ -101,11 +131,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "flex-start",
   },
   stepNumber: {
-    minWidth: 20,
-    flexShrink: 0,
+    position: "absolute",
     fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    lineHeight: 23,
+    fontSize: 13,
     textAlign: "center",
     color: theme.colors.primaryText,
     backgroundColor: theme.colors.primarySoft,

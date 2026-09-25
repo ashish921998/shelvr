@@ -1,8 +1,16 @@
-import { LegalConsentPreference } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { InkIcon } from "@/components/ink/ink-icon";
+import { InkRing } from "@/components/ink/ink-ring";
+import { SecondaryButton, TertiaryAction } from "@/components/shelf/ink-button";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { SegmentedControl } from "@/components/shelf/segmented-control";
+import { StitchLine } from "@/components/ink/stitch-line";
+import { Eyebrow } from "@/components/shelf/typography";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
+import { LegalConsentPreference } from "@/components/legal-consent";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
 import {
@@ -32,6 +40,7 @@ import {
   Switch,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -52,6 +61,10 @@ export default function ProfileScreen() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
+  const clock = useInkClock();
+  const { width: windowWidth } = useWindowDimensions();
+  // The link group stretches to the content gutter on both sides.
+  const groupWidth = windowWidth - 24 * 2;
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
   const fixtureResetEnabled =
@@ -255,263 +268,252 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
-    >
-      {process.env.EXPO_OS === "android" ? (
-        <View style={styles.sheetHeader}>
-          <Wordmark size={30} />
+    <View style={styles.screen}>
+      <ScreenHeader
+        clock={clock}
+        center={<Wordmark size={26} />}
+        right={
           <HeaderIconButton
             icon="xmark"
             label={t("profile.close")}
             onPress={closeProfile}
+            testID="close-profile"
           />
-        </View>
-      ) : (
-        <Wordmark size={30} />
-      )}
-      <Text style={styles.slogan}>{t("brand.tagline")}</Text>
+        }
+      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        {/* The tagline is gone: a settings sheet is not a place to be sold to. */}
+        <Eyebrow style={styles.eyebrow}>{t("profile.groupYou")}</Eyebrow>
 
-      <View style={styles.card}>
-        <View style={styles.avatar}>
+        <View style={styles.card}>
+          <View style={styles.avatar}>
+            <InkIcon
+              name="person.fill"
+              size={20}
+              tint={theme.colors.primaryText}
+            />
+            <View style={styles.avatarRing} pointerEvents="none">
+              <InkRing width={52} height={52} />
+            </View>
+          </View>
+          <Text selectable style={styles.email} numberOfLines={1}>
+            {user?.email ?? t("account.signedIn")}
+          </Text>
+        </View>
+
+        {fixtureResetEnabled && canResetFlowFixtures ? (
+          <Pressable
+            testID="reset-flow-fixtures"
+            accessibilityRole="button"
+            accessibilityLabel={t("dev.resetFixtures")}
+            style={({ pressed }) => [
+              styles.fixtureReset,
+              pressed && { opacity: 0.7 },
+              resettingFixtures && { opacity: 0.4 },
+            ]}
+            disabled={resettingFixtures}
+            onPress={confirmResetFlowFixtures}
+          >
+            <Text style={styles.fixtureResetText}>
+              {resettingFixtures ? t("dev.resetting") : t("dev.resetFixtures")}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.proRow,
+            pressed && { opacity: 0.7 },
+            loading && { opacity: 0.4 },
+          ]}
+          disabled={loading}
+          onPress={manageSubscription}
+        >
           <AppSymbolIcon
-            name="person.fill"
-            size={20}
+            name="sparkles"
+            size={18}
             tintColor={theme.colors.primaryText}
           />
-        </View>
-        <Text selectable style={styles.email} numberOfLines={1}>
-          {user?.email ?? t("account.signedIn")}
-        </Text>
-      </View>
-
-      {fixtureResetEnabled && canResetFlowFixtures ? (
-        <Pressable
-          testID="reset-flow-fixtures"
-          accessibilityRole="button"
-          accessibilityLabel={t("dev.resetFixtures")}
-          style={({ pressed }) => [
-            styles.fixtureReset,
-            pressed && { opacity: 0.7 },
-            resettingFixtures && { opacity: 0.4 },
-          ]}
-          disabled={resettingFixtures}
-          onPress={confirmResetFlowFixtures}
-        >
-          <Text style={styles.fixtureResetText}>
-            {resettingFixtures ? t("dev.resetting") : t("dev.resetFixtures")}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.proRow,
-          pressed && { opacity: 0.7 },
-          loading && { opacity: 0.4 },
-        ]}
-        disabled={loading}
-        onPress={manageSubscription}
-      >
-        <AppSymbolIcon
-          name="sparkles"
-          size={18}
-          tintColor={theme.colors.primaryText}
-        />
-        <View style={styles.proCopy}>
-          <Text style={styles.proLabel}>{proLabel}</Text>
-          {photoUsage && hasSubscription && status !== "lapsed" ? (
-            <Text style={styles.preferenceDescription}>
-              {t("profile.photoUsage", {
-                count: photoUsage.count,
-                limit: photoUsage.limit,
-              })}
-            </Text>
-          ) : null}
-        </View>
-        <AppSymbolIcon
-          name="chevron.right"
-          size={16}
-          tintColor={theme.colors.muted}
-        />
-      </Pressable>
-
-      <LegalConsentPreference />
-
-      <View
-        style={styles.linkGroup}
-        accessibilityLabel={t("profile.appearance")}
-        accessibilityRole="radiogroup"
-      >
-        {APPEARANCE_MODES.map((mode) => {
-          const selected = mode === appearanceMode;
-          return (
-            <Pressable
-              key={mode}
-              accessibilityRole="radio"
-              accessibilityLabel={t("profile.appearanceLabel", {
-                appearance: t(APPEARANCE_LABELS[mode]),
-              })}
-              accessibilityState={{ selected }}
-              style={({ pressed }) => [
-                styles.appearanceRow,
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() => setAppearanceMode(mode)}
-            >
-              <Text style={styles.appearanceLabel}>
-                {t(APPEARANCE_LABELS[mode])}
+          <View style={styles.proCopy}>
+            <Text style={styles.proLabel}>{proLabel}</Text>
+            {photoUsage && hasSubscription && status !== "lapsed" ? (
+              <Text style={styles.preferenceDescription}>
+                {t("profile.photoUsage", {
+                  count: photoUsage.count,
+                  limit: photoUsage.limit,
+                })}
               </Text>
-              {selected ? (
-                <AppSymbolIcon
-                  name="checkmark"
-                  size={16}
-                  tintColor={theme.colors.primaryText}
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+            ) : null}
+          </View>
+          <InkIcon name="chevron.right" size={16} tint={theme.colors.muted} />
+        </Pressable>
 
-      <View style={styles.preferenceRow}>
-        <View style={styles.preferenceCopy}>
-          <Text style={styles.preferenceLabel}>
-            {t("notifications.weeklyShelf")}
-          </Text>
-          <Text style={styles.preferenceDescription}>
-            {t("notifications.weeklyHelp")}
-          </Text>
+        <LegalConsentPreference />
+
+        <Eyebrow style={styles.eyebrow}>{t("profile.appearance")}</Eyebrow>
+        <SegmentedControl
+          style={styles.segmented}
+          accessibilityLabel={t("profile.appearance")}
+          value={appearanceMode}
+          onChange={setAppearanceMode}
+          segments={APPEARANCE_MODES.map((mode) => ({
+            value: mode,
+            label: t(APPEARANCE_LABELS[mode]),
+          }))}
+        />
+
+        <Eyebrow style={styles.eyebrow}>{t("profile.groupSends")}</Eyebrow>
+        <View style={styles.preferenceRow}>
+          <View style={styles.preferenceCopy}>
+            <Text style={styles.preferenceLabel}>
+              {t("notifications.weeklyShelf")}
+            </Text>
+            <Text style={styles.preferenceDescription}>
+              {t("notifications.weeklyHelp")}
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel={t("notifications.toggleLabel")}
+            value={notificationPreferences?.weeklyShelfEnabled ?? false}
+            disabled={notificationPreferences === undefined || busy}
+            onValueChange={(value) => void toggleWeeklyShelf(value)}
+            trackColor={{
+              false: theme.colors.border,
+              true: theme.colors.primary,
+            }}
+            thumbColor="#fff"
+          />
         </View>
-        <Switch
-          accessibilityLabel={t("notifications.toggleLabel")}
-          value={notificationPreferences?.weeklyShelfEnabled ?? false}
-          disabled={notificationPreferences === undefined || busy}
-          onValueChange={(value) => void toggleWeeklyShelf(value)}
-          trackColor={{
-            false: theme.colors.border,
-            true: theme.colors.primary,
-          }}
-          thumbColor="#fff"
+
+        <Eyebrow style={styles.eyebrow}>{t("profile.groupMore")}</Eyebrow>
+        <View style={styles.linkGroup}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t("import.fromX")}
+            onPress={() => router.push("/import")}
+            testID="open-import"
+          >
+            <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
+            <InkIcon name="chevron.right" size={16} tint={theme.colors.muted} />
+          </Pressable>
+          <StitchLine width={groupWidth} clock={clock} inset={16} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t("feedback.open")}
+            onPress={() => setFeedbackOpen(true)}
+          >
+            <Text style={styles.linkLabel}>{t("feedback.open")}</Text>
+            <InkIcon
+              name="arrow.up.right"
+              size={14}
+              tint={theme.colors.muted}
+            />
+          </Pressable>
+          <StitchLine width={groupWidth} clock={clock} inset={16} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => openExternal(SUPPORT_URL)}
+          >
+            <Text style={styles.linkLabel}>{t("support.contact")}</Text>
+            <InkIcon
+              name="arrow.up.right"
+              size={14}
+              tint={theme.colors.muted}
+            />
+          </Pressable>
+          <StitchLine width={groupWidth} clock={clock} inset={16} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+              restoring && { opacity: 0.4 },
+            ]}
+            disabled={restoring}
+            onPress={() => void handleRestorePurchases()}
+          >
+            <Text style={styles.linkLabel}>
+              {restoring ? t("pro.restoring") : t("pro.restore")}
+            </Text>
+            <InkIcon
+              name="arrow.clockwise"
+              size={14}
+              tint={theme.colors.muted}
+            />
+          </Pressable>
+          <StitchLine width={groupWidth} clock={clock} inset={16} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => openExternal(LEGAL_URLS.terms)}
+          >
+            <Text style={styles.linkLabel}>{t("legal.terms")}</Text>
+            <InkIcon
+              name="arrow.up.right"
+              size={14}
+              tint={theme.colors.muted}
+            />
+          </Pressable>
+          <StitchLine width={groupWidth} clock={clock} inset={16} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.linkRow,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => openExternal(LEGAL_URLS.privacy)}
+          >
+            <Text style={styles.linkLabel}>{t("legal.privacy")}</Text>
+            <InkIcon
+              name="arrow.up.right"
+              size={14}
+              tint={theme.colors.muted}
+            />
+          </Pressable>
+        </View>
+
+        {/* Sign out is a surface pill in danger text; deleting the account is a
+          line of text under it, because it is not a thing to reach for. */}
+        <SecondaryButton
+          label={signingOut ? t("account.signingOut") : t("account.signOut")}
+          disabled={busy}
+          onPress={() => void handleSignOut()}
+          style={styles.signOut}
         />
-      </View>
-
-      <View style={styles.linkGroup}>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t("import.fromX")}
-          onPress={() => router.push("/import")}
-        >
-          <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
-          <AppSymbolIcon
-            name="chevron.right"
-            size={16}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t("feedback.open")}
-          onPress={() => setFeedbackOpen(true)}
-        >
-          <Text style={styles.linkLabel}>{t("feedback.open")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(SUPPORT_URL)}
-        >
-          <Text style={styles.linkLabel}>{t("support.contact")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.linkRow,
-            pressed && { opacity: 0.7 },
-            restoring && { opacity: 0.4 },
-          ]}
-          disabled={restoring}
-          onPress={() => void handleRestorePurchases()}
-        >
-          <Text style={styles.linkLabel}>
-            {restoring ? t("pro.restoring") : t("pro.restore")}
-          </Text>
-          <AppSymbolIcon
-            name="arrow.clockwise"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(LEGAL_URLS.terms)}
-        >
-          <Text style={styles.linkLabel}>{t("legal.terms")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(LEGAL_URLS.privacy)}
-        >
-          <Text style={styles.linkLabel}>{t("legal.privacy")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-      </View>
-
-      <Pressable
-        style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
-        disabled={busy}
-        onPress={() => void handleSignOut()}
-      >
-        <Text style={styles.signOutText}>
-          {signingOut ? t("account.signingOut") : t("account.signOut")}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.deleteAccount,
-          pressed && { opacity: 0.7 },
-          deleting && { opacity: 0.4 },
-        ]}
-        disabled={busy}
-        onPress={confirmDeleteAccount}
-      >
-        <Text style={styles.deleteAccountText}>
-          {deleting ? t("account.deleting") : t("account.delete")}
-        </Text>
-      </Pressable>
-      {feedbackOpen ? (
-        <FeedbackModal
-          surface="profile"
-          onClose={() => setFeedbackOpen(false)}
+        <TertiaryAction
+          label={deleting ? t("account.deleting") : t("account.delete")}
+          onPress={busy ? undefined : confirmDeleteAccount}
         />
-      ) : null}
-    </ScrollView>
+        {feedbackOpen ? (
+          <FeedbackModal
+            surface="profile"
+            onClose={() => setFeedbackOpen(false)}
+          />
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  screen: { flex: 1, backgroundColor: theme.colors.background },
+  // Eyebrows label a group; they sit left against the content gutter.
+  eyebrow: { alignSelf: "flex-start", paddingTop: theme.gap(1.5) },
+  segmented: { alignSelf: "stretch" },
   content: {
     flexGrow: 1,
     padding: theme.gap(3),
@@ -519,19 +521,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
     alignItems: "center",
-  },
-  sheetHeader: {
-    width: "100%",
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  slogan: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    color: theme.colors.muted,
-    marginBottom: theme.gap(1),
   },
   card: {
     flexDirection: "row",
@@ -553,6 +542,8 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  // The ring is drawn outside the disc, inset -6 as the spec has it.
+  avatarRing: { position: "absolute", left: -6, top: -6 },
   email: {
     flex: 1,
     fontFamily: theme.fonts.medium,
@@ -636,19 +627,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     paddingVertical: theme.gap(1.5),
     paddingHorizontal: theme.gap(1.5),
-  },
-  appearanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 44,
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(1.5),
-  },
-  appearanceLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 15,
-    color: theme.colors.foreground,
   },
   linkLabel: {
     fontFamily: theme.fonts.medium,

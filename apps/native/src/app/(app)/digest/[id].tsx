@@ -1,4 +1,8 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { InkDoodle } from "@/components/ink/ink-doodle";
+import { INK_A11Y } from "@/components/ink/ink-canvas";
+import { PrimaryButton, SecondaryButton } from "@/components/shelf/ink-button";
+import { Display, Eyebrow } from "@/components/shelf/typography";
 import { EmptyState } from "@/components/empty-state";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -9,7 +13,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useMutation } from "convex/react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -39,13 +43,11 @@ export default function DigestScreen() {
           title={t("digest.loadFailed")}
           message={t("digest.retryHelp")}
         />
-        <Pressable
-          accessibilityRole="button"
+        <SecondaryButton
+          label={t("digest.backHome")}
           onPress={() => router.replace("/")}
-          style={[styles.button, styles.errorButton]}
-        >
-          <Text style={styles.buttonText}>{t("digest.backHome")}</Text>
-        </Pressable>
+          style={styles.errorButton}
+        />
       </View>
     );
   }
@@ -84,23 +86,24 @@ export default function DigestScreen() {
         source={{ from: "home" }}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.eyebrow}>{t("digest.eyebrow")}</Text>
-            <Text style={styles.title}>{t("digest.title")}</Text>
+            <Eyebrow style={styles.eyebrow}>{t("digest.eyebrow")}</Eyebrow>
+            <View style={styles.titleRow}>
+              <Display style={styles.title}>{t("digest.title")}</Display>
+              {/* The screen's one accent: Sunday, drawn. */}
+              <View {...INK_A11Y}>
+                <InkDoodle kind="sun" size={44} />
+              </View>
+            </View>
             <Text style={styles.subtitle}>
               {t("digest.waitingCount", {
                 count: digest.itemCount,
               })}
             </Text>
-            <Pressable
-              accessibilityRole="button"
+            <PrimaryButton
+              label={t("digest.openNext")}
               onPress={openNext}
-              style={({ pressed }) => [
-                styles.button,
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={styles.buttonText}>{t("digest.openNext")}</Text>
-            </Pressable>
+              style={styles.button}
+            />
           </View>
         }
       />
@@ -123,36 +126,21 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(1),
     gap: theme.gap(0.75),
   },
-  eyebrow: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    color: theme.colors.primary,
+  eyebrow: { color: theme.colors.primaryText },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 30,
-    color: theme.colors.foreground,
-  },
+  title: { flex: 1 },
   subtitle: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     lineHeight: 21,
     color: theme.colors.muted,
   },
-  button: {
-    alignSelf: "flex-start",
-    marginTop: theme.gap(0.5),
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.gap(1.75),
-    paddingVertical: theme.gap(1),
-  },
-  buttonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 14,
-    color: theme.colors.primaryForeground,
-  },
+  button: { alignSelf: "flex-start", marginTop: theme.gap(1) },
   errorButton: {
     alignSelf: "center",
     marginBottom: theme.gap(6),

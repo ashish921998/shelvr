@@ -56,6 +56,9 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
     saved: 0,
   });
   const [canUndo, setCanUndo] = useState(false);
+  // The photos shelved in this batch, newest last. The screen stands them
+  // on a drawn shelf so the pile you have saved is visible as you work.
+  const [shelved, setShelved] = useState<TidyPhoto[]>([]);
 
   const pendingDeletesRef = useRef<TidyPhoto[]>([]);
   const historyRef = useRef<HistoryEntry[]>([]);
@@ -123,6 +126,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
         case "save":
           markReviewed([photo.id]);
           setCounts((c) => ({ ...c, saved: c.saved + 1 }));
+          setShelved((current) => [...current, photo]);
           entry.itemId = startSave(photo);
           break;
       }
@@ -155,6 +159,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
           unmarkReviewed(entry.photo.id);
         }
         setCounts((c) => ({ ...c, saved: c.saved - 1 }));
+        setShelved((current) => current.slice(0, -1));
         entry.itemId?.then((itemId) => {
           if (itemId) deleteItem({ id: itemId });
         });
@@ -204,6 +209,7 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
   return {
     topIndex,
     counts,
+    shelved,
     pendingDeleteCount,
     canUndo,
     onDecision,

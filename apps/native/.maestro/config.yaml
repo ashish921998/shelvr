@@ -1,0 +1,10 @@
+# Maestro configuration for the Shelvr native app.
+#
+# `flows` lists what `maestro test .maestro` runs; helpers are subflows pulled
+# in with `runFlow` and must not run on their own.
+flows:
+  - "*.yaml"
+
+includeTags: []
+excludeTags:
+  - manual

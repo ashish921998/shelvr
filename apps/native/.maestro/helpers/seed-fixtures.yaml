@@ -1,0 +1,24 @@
+# Replaces this anonymous account's data with the deterministic fixture library
+# in convex/devFixtures.ts: the saves `ramen`, `belem-tower`,
+# `apartment-checklist` and `value-of-craft`, and the shelves `recipes`,
+# `trips` and `apartment-shopping`.
+#
+# The redesign flow asserts against those keys, so it does not depend on
+# whatever happens to be in a developer's account.
+appId: app.shelvr.save.dev
+---
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-profile"
+- tapOn: "Reset flow fixtures"
+- tapOn: "Reset"
+- assertVisible:
+    text: "Flow fixtures ready"
+    timeout: 30000
+# `Alert.alert(title, message)` passes no buttons, so the single dismiss
+# button is supplied and localised by the OS. "OK" holds for an
+# English-locale simulator, which is what this flow targets.
+- tapOn: "OK"
+- tapOn:
+    id: "close-profile"

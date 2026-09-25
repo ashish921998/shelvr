@@ -2,12 +2,16 @@ import { t, useAppLocale } from "@/lib/i18n";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { usePermissions, type PermissionResponse } from "expo-media-library";
-import { Stack, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState, type FC } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { EmptyState } from "@/components/empty-state";
+import { ScreenHeader } from "@/components/shelf/screen-header";
+import { ShelfRow } from "@/components/shelf/shelf-row";
+import { Eyebrow, Gutter } from "@/components/shelf/typography";
+import { useInkClock } from "@/lib/ink/use-ink-clock";
 import {
   HeaderActionMenu,
   HeaderIconButton,
@@ -120,10 +124,13 @@ const TidyDeckView: FC<DeckViewProps> = ({
   noteDeleted,
 }) => {
   useAppLocale();
+  const { width } = useWindowDimensions();
+  const clock = useInkClock();
   const { undoIndex } = useDeckAnimation();
   const {
     topIndex,
     counts,
+    shelved,
     pendingDeleteCount,
     canUndo,
     onDecision,
@@ -167,120 +174,86 @@ const TidyDeckView: FC<DeckViewProps> = ({
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: currentSource.title,
-          ...(Platform.OS === "android"
-            ? {
-                headerLeft: canUndo
-                  ? () => (
-                      <HeaderIconButton
-                        icon="arrow.uturn.backward"
-                        label={t("common.undo")}
-                        onPress={handleUndo}
-                      />
-                    )
-                  : undefined,
-                headerRight: () => (
-                  <View style={styles.headerActions}>
-                    {pendingDeleteCount > 0 ? (
-                      <HeaderIconButton
-                        icon="trash"
-                        label={t("tidy.confirmDelete")}
-                        badge={pendingDeleteCount}
-                        onPress={commitDeletes}
-                      />
-                    ) : null}
-                    <HeaderActionMenu
-                      icon="photo.on.rectangle.angled"
-                      label={
-                        limitedAccess
-                          ? t("albums.chooseLimited")
-                          : t("albums.choose")
-                      }
-                      title={t("albums.source")}
-                      actions={[
-                        ...sources.map((source) => ({
-                          id: source.id,
-                          label:
-                            source.id === selectedId
-                              ? `${source.title} ✓`
-                              : source.title,
-                          onPress: () => selectSource(source.id),
-                        })),
-                        ...(limitedAccess
-                          ? [
-                              {
-                                id: "manage-photo-access",
-                                label: t("albums.manageAccessAction"),
-                                onPress: () => Linking.openSettings(),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
-                  </View>
-                ),
+      {/* Undo on the left, the source and progress in the middle, the delete
+          queue and the album picker on the right. The progress counter used to
+          sit under the header; it is the header's summary line now. */}
+      <ScreenHeader
+        clock={clock}
+        title={t("navigation.tidyHeader")}
+        subtitle={`${currentSource.title} · ${Math.min(reviewedCount, batch.length)} / ${batch.length}`}
+        left={
+          canUndo ? (
+            <HeaderIconButton
+              icon="arrow.uturn.backward"
+              label={t("common.undo")}
+              onPress={handleUndo}
+            />
+          ) : null
+        }
+        right={
+          <>
+            {pendingDeleteCount > 0 ? (
+              <HeaderIconButton
+                icon="trash"
+                label={t("tidy.confirmDelete")}
+                badge={pendingDeleteCount}
+                onPress={commitDeletes}
+              />
+            ) : null}
+            <HeaderActionMenu
+              icon="photo.on.rectangle.angled"
+              label={
+                limitedAccess ? t("albums.chooseLimited") : t("albums.choose")
               }
-            : {}),
-        }}
+              title={t("albums.source")}
+              actions={[
+                ...sources.map((source) => ({
+                  id: source.id,
+                  label:
+                    source.id === selectedId
+                      ? `${source.title} \u2713`
+                      : source.title,
+                  onPress: () => selectSource(source.id),
+                })),
+                ...(limitedAccess
+                  ? [
+                      {
+                        id: "manage-photo-access",
+                        label: t("albums.manageAccessAction"),
+                        onPress: () => Linking.openSettings(),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </>
+        }
       />
 
-      {/* Native header controls (note 3): undo on the left, delete on the
-          right with a live count badge. */}
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="arrow.uturn.backward"
-            hidden={!canUndo}
-            onPress={handleUndo}
-          >
-            {t("common.undo")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
+      {/* What you have shelved in this batch, standing on a drawn board so the
+          pile is visible as it grows. */}
+      {shelved.length > 0 ? (
+        <View style={styles.shelvedRow}>
+          <Gutter>
+            <Eyebrow>{`${t("tidy.shelved")} \u00b7 ${shelved.length}`}</Eyebrow>
+          </Gutter>
+          <ShelfRow
+            width={width}
+            clock={clock}
+            testID="tidy-shelved"
+            cards={shelved.slice(-8).map((photo) => ({
+              key: photo.id,
+              // `id` is the asset URI (ph:// or content://), renderable directly.
+              imageUrl: photo.id,
+              mark: "photo" as const,
+              aspectRatio:
+                photo.width && photo.height
+                  ? photo.width / photo.height
+                  : undefined,
+            }))}
+          />
+        </View>
       ) : null}
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="trash"
-            hidden={pendingDeleteCount === 0}
-            onPress={commitDeletes}
-          >
-            <Stack.Toolbar.Label>{t("common.delete")}</Stack.Toolbar.Label>
-            {pendingDeleteCount > 0 && (
-              <Stack.Toolbar.Badge>
-                {String(pendingDeleteCount)}
-              </Stack.Toolbar.Badge>
-            )}
-          </Stack.Toolbar.Button>
-          <Stack.Toolbar.Menu icon="photo.on.rectangle.angled">
-            {sources.map((s) => (
-              <Stack.Toolbar.MenuAction
-                key={s.id}
-                isOn={s.id === selectedId}
-                onPress={() => selectSource(s.id)}
-              >
-                {s.title}
-              </Stack.Toolbar.MenuAction>
-            ))}
-            {limitedAccess ? (
-              <Stack.Toolbar.MenuAction
-                icon="gearshape"
-                onPress={() => Linking.openSettings()}
-              >
-                {t("albums.manageAccessTitle")}
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-          </Stack.Toolbar.Menu>
-        </Stack.Toolbar>
-      ) : null}
-
-      {/* Centered progress counter (note 2). */}
-      <View style={styles.progressRow}>
-        <Text style={styles.progressText}>
-          {Math.min(reviewedCount, batch.length)} / {batch.length}
-        </Text>
-      </View>
 
       <View style={styles.deckArea}>
         <TidyDeck photos={batch} onDecision={onDecision} />
@@ -342,6 +315,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexDirection: "row",
     gap: theme.gap(1),
   },
+  shelvedRow: { gap: 8, paddingTop: 8, paddingBottom: 4 },
   progressRow: {
     alignItems: "center",
     justifyContent: "center",

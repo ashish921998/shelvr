@@ -3,22 +3,12 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
+import { TypeMark } from "@/components/ink/type-mark";
+import { kindMark } from "@/lib/ink/save-mark";
 import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
-import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const KIND_IMAGES: Record<SaveKind, number> = {
-  Articles: require("../../../assets/onboarding/article.jpg"),
-  Recipes: require("../../../assets/onboarding/recipes.jpg"),
-  Products: require("../../../assets/onboarding/product.jpg"),
-  "Home & decor": require("../../../assets/onboarding/sofa.jpg"),
-  Travel: require("../../../assets/onboarding/prague.jpg"),
-  Inspiration: require("../../../assets/onboarding/reading.jpg"),
-  Fitness: require("../../../assets/onboarding/fitness.jpg"),
-  Videos: require("../../../assets/onboarding/videos.jpg"),
-};
 
 export function SetupStep({
   kinds,
@@ -68,26 +58,20 @@ export function SetupStep({
                 pressed && { opacity: 0.85 },
               ]}
             >
-              <Image
-                source={KIND_IMAGES[kind]}
-                contentFit="cover"
-                style={styles.kindImage}
-              />
+              <View style={styles.kindMark}>
+                <TypeMark
+                  kind={kindMark(kind)}
+                  size={30}
+                  seed={SAVE_KINDS.indexOf(kind)}
+                  tint={active ? theme.colors.ink.light : undefined}
+                />
+              </View>
               <Text
                 style={[styles.kindLabel, active && styles.kindLabelActive]}
                 numberOfLines={1}
               >
                 {onboardingLabel(kind)}
               </Text>
-              {active ? (
-                <View style={styles.tick}>
-                  <AppSymbolIcon
-                    name="checkmark"
-                    size={12}
-                    tintColor={theme.colors.primaryForeground}
-                  />
-                </View>
-              ) : null}
             </Pressable>
           );
         })}
@@ -193,18 +177,18 @@ const styles = StyleSheet.create((theme) => ({
     flexBasis: "48%",
     flexGrow: 1,
     overflow: "hidden",
-    borderRadius: theme.radius.md,
+    borderRadius: 14,
     borderCurve: "continuous",
     borderWidth: 2,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
+  // A picked kind is ink-filled with its mark drawn in paper.
   kindActive: {
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.foreground,
+    backgroundColor: theme.colors.foreground,
   },
-  kindImage: {
-    height: 58,
-  },
+  kindMark: { height: 58, alignItems: "center", justifyContent: "center" },
   kindLabel: {
     paddingHorizontal: theme.gap(1.25),
     paddingTop: theme.gap(0.75),
@@ -215,18 +199,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   kindLabelActive: {
     color: theme.colors.primaryText,
-  },
-  tick: {
-    position: "absolute",
-    top: theme.gap(1),
-    right: theme.gap(1),
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.22)",
   },
   spaces: {
     gap: theme.gap(1.25),

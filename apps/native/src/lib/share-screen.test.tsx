@@ -124,6 +124,41 @@ vi.mock("react-native-reanimated", () => ({
   },
   useReducedMotion: () => false,
 }));
+// The redesign draws its chrome with Skia; stand in plain elements so the
+// phases' copy and actions stay queryable.
+vi.mock("@/components/ink/ink-thread", () => ({
+  ThreadLoop: vi.fn(() => null),
+}));
+vi.mock("@/components/ink/stitch-line", () => ({
+  StitchLine: vi.fn(() => null),
+}));
+vi.mock("@/components/ink/ink-canvas", () => ({ INK_A11Y: {} }));
+vi.mock("@/components/wordmark", () => ({ Wordmark: vi.fn(() => null) }));
+vi.mock("@/components/shelf/screen-header", () => ({
+  ScreenHeader: vi.fn(() => null),
+}));
+vi.mock("@/components/shelf/typography", () => ({
+  Display: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+  Headline: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+}));
+vi.mock("@/components/shelf/ink-button", () => {
+  const InkButton = ({
+    label,
+    onPress,
+  }: {
+    label: string;
+    onPress: () => void;
+  }) => <button onClick={onPress}>{label}</button>;
+  return {
+    PrimaryButton: InkButton,
+    SecondaryButton: InkButton,
+    TertiaryAction: InkButton,
+  };
+});
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => new Proxy({}, { get: () => () => ({}) }) },
   useUnistyles: () => ({ theme: { colors: { primary: "" } } }),

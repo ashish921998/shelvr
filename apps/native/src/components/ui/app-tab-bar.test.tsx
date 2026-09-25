@@ -116,6 +116,12 @@ vi.mock("expo-haptics", () => ({
   AndroidHaptics: { Segment_Tick: 0, Virtual_Key: 1 },
   performAndroidHapticsAsync: vi.fn(),
 }));
+// The pill draws on Skia; these tests only cover the backdrop it floats over.
+vi.mock("@/components/ui/shelf-tab-bar", () => ({
+  ShelfTabBar: vi.fn(() => null),
+  SHELF_TABS: [],
+  TAB_BAR_CLEARANCE: 110,
+}));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => "en",

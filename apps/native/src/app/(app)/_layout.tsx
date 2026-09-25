@@ -152,10 +152,9 @@ export default function AppLayout() {
             name="import"
             options={{
               presentation: "formSheet",
-              headerShown: true,
-              headerTransparent: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              headerBackButtonDisplayMode: "minimal",
+              // Import draws its own ScreenHeader (title, hairline, close) like
+              // every other sheet in the app.
+              headerShown: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },

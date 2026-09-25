@@ -15,6 +15,14 @@ type A11yProps = {
   accessibilityRole?: string;
   accessibilityLabel?: string;
 };
+// The drawn layer is decoration: it is hidden from the accessibility tree,
+// so these queries render nothing for it rather than pulling Skia into jsdom.
+vi.mock("@/components/ink/ink-icon", () => ({ InkIcon: vi.fn(() => null) }));
+vi.mock("@/components/ink/ink-thread", () => ({
+  InkSpinner: vi.fn(() => null),
+  ThreadLoop: vi.fn(() => null),
+}));
+
 vi.mock("react-native", () => {
   const a11yElement = ({
     children,
