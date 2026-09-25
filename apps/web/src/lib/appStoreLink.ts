@@ -6,18 +6,26 @@ import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
-type AppStoreLinkSource = "header" | "hero" | "footer" | "footer-nav" | "share";
+export type AppStoreLinkSource =
+  | "header"
+  | "hero"
+  | "footer"
+  | "footer-nav"
+  | "share"
+  | "play";
 
 /**
  * The App Store link for one button, tagged with the campaign the visitor
- * arrived with (a creator's `?ct=`), or else with where the button sits, and
- * the matching `app_store_clicked` event.
+ * arrived with (a creator's `?ct=`), or else with `fallbackCampaign` or where
+ * the button sits, and the matching `app_store_clicked` event.
  */
 export function useAppStoreLink(
   source: AppStoreLinkSource,
   shareToken?: string,
+  fallbackCampaign?: string,
 ) {
-  const fallback = source === "share" ? "share" : `web_${source}`;
+  const fallback =
+    fallbackCampaign ?? (source === "share" ? "share" : `web_${source}`);
   const [campaign, setCampaign] = useState(fallback);
   useEffect(() => {
     // The search string only exists in the browser, after hydration.

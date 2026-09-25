@@ -8,6 +8,8 @@ type LensInfo = {
   blurb: string;
   minImages: number;
   maxImages: number;
+  /** Whether the visitor picks a roast heat. */
+  hasHeat: boolean;
   waitingLine: string;
   installBridge: string;
   shareVerb: string;
@@ -22,6 +24,7 @@ export const LENSES: Record<Lens, LensInfo> = {
       "Your saved screenshots already know where you're headed. We'll name the era and show our evidence.",
     minImages: 3,
     maxImages: 6,
+    hasHeat: false,
     waitingLine: "Reading between your screenshots…",
     installBridge:
       "Make this era happen. Keep your inspiration together in Shelvr.",
@@ -35,6 +38,7 @@ export const LENSES: Record<Lens, LensInfo> = {
       "Pick a few screenshots and we'll read them back to you, lovingly. Only the saves get roasted, never you.",
     minImages: 3,
     maxImages: 6,
+    hasHeat: true,
     waitingLine: "Reading your receipts…",
     installBridge: "Give your screenshots somewhere better to live.",
     shareVerb: "Get roasted",
@@ -47,6 +51,7 @@ export const LENSES: Record<Lens, LensInfo> = {
       "Show us the things you keep saving. We'll give your taste a name, a few keywords, and a palette.",
     minImages: 3,
     maxImages: 6,
+    hasHeat: false,
     waitingLine: "Mixing your palette…",
     installBridge: "Start a space for your taste.",
     shareVerb: "Name your taste",
@@ -59,6 +64,7 @@ export const LENSES: Record<Lens, LensInfo> = {
       "Add a screenshot of a place or a product. We'll make our best guess, say how sure we are, and hand you a search.",
     minImages: 1,
     maxImages: 3,
+    hasHeat: false,
     waitingLine: "Looking for clues…",
     installBridge: "Next time, save it straight to Shelvr.",
     shareVerb: "Find yours",

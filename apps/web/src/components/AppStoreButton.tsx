@@ -1,20 +1,23 @@
 "use client";
 
-import { useAppStoreLink } from "@/lib/appStoreLink";
+import { type AppStoreLinkSource, useAppStoreLink } from "@/lib/appStoreLink";
 
 type AppStoreButtonProps = {
-  source: "header" | "hero" | "footer" | "share";
+  source: AppStoreLinkSource;
   compact?: boolean;
   /** On a share page, the link's token, so the click credits that share. */
   shareToken?: string;
+  /** The campaign for a visitor who arrived without one of their own. */
+  campaign?: string;
 };
 
 export default function AppStoreButton({
   source,
   compact = false,
   shareToken,
+  campaign,
 }: AppStoreButtonProps) {
-  const { href, onClick } = useAppStoreLink(source, shareToken);
+  const { href, onClick } = useAppStoreLink(source, shareToken, campaign);
   return (
     <a
       href={href}
