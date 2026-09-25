@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useSaveGuard } from "@/lib/entitlement";
 import { Stack, useRouter } from "expo-router";
 import { Platform } from "react-native";
 import { useTabStackChrome } from "@/lib/tab-stack-chrome";
@@ -10,9 +10,9 @@ export default function HomeStackLayout() {
   useAppLocale();
   const router = useRouter();
   const { haptic, labelColor, screenOptions, tap } = useTabStackChrome();
-  const { guard, loading: entitlementLoading } = usePaywallGuard("home");
+  const { guard, loading: entitlementLoading } = useSaveGuard("home");
 
-  // Add and Map are Pro features — route to the paywall unless entitled.
+  // Add is open while the user has Pro or free saves left, else the paywall.
   // Suppress haptic until entitlement resolves — firing it during loading
   // would imply the action is about to run when the guard will drop it.
   const guardedTap = (href: "/add") => () => {

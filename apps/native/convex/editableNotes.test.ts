@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, spendFreeSaves } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
@@ -212,9 +212,10 @@ describe("updateNoteItem", () => {
     });
   });
 
-  it("requires Pro", async () => {
+  it("requires Pro once the free allowance is spent", async () => {
     const base = newConvexTest();
     const id = await readyNote(base, "lapsed");
+    await spendFreeSaves(base, "lapsed");
     const lapsed = base.withIdentity({ subject: "lapsed|session-1" });
 
     await expect(

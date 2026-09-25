@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, spendFreeSaves } from "./test.setup";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -141,6 +141,7 @@ describe("refund webhook reconciliation", () => {
     expect(
       await f.signedIn.query(api.subscriptions.getEntitlement, {}),
     ).toMatchObject({ status: "lapsed" });
+    await spendFreeSaves(f.signedIn, f.userId);
     await expect(
       f.signedIn.mutation(api.items.createNoteItem, {
         text: "refund gate test",

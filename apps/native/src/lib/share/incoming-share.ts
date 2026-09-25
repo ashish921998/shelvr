@@ -69,6 +69,7 @@ export type IncomingShareState = {
 /** The world as the screen sees it when it dispatches. */
 export type ShareContext = {
   userId: string | null;
+  /** The user may save: Pro, or free saves left. */
   entitled: boolean;
   entitlementLoading: boolean;
   rawPayloads: RawSharePayload[];

@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, spendFreeSaves } from "./test.setup";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import { ConvexError, type Value } from "convex/values";
@@ -148,6 +148,7 @@ describe("onboarding demo allowance", () => {
     const backend = newConvexTest();
     const t = await asUser(backend, "free-user", { pro: false });
     await t.mutation(api.demo.createDemoItem, { url: URL });
+    await spendFreeSaves(t, "free-user");
     await expect(
       t.mutation(api.items.createLinkItem, { url: "https://example.com" }),
     ).rejects.toThrow("Pro required");

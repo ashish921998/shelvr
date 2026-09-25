@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, spendFreeSaves } from "./test.setup";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
@@ -30,7 +30,9 @@ describe("Convex Auth identity boundaries", () => {
       });
     });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "pro",
       expiresAt: expect.any(Number),
     });
@@ -50,7 +52,9 @@ describe("Convex Auth identity boundaries", () => {
     });
     const t = backend.withIdentity({ subject: `${userId}|session-1` });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "lifetime",
     });
     await expect(
@@ -72,9 +76,12 @@ describe("Convex Auth identity boundaries", () => {
     });
     const t = backend.withIdentity({ subject: `${userId}|session-1` });
 
-    await expect(t.query(api.subscriptions.getEntitlement, {})).resolves.toEqual({
+    await expect(
+      t.query(api.subscriptions.getEntitlement, {}),
+    ).resolves.toEqual({
       status: "none",
     });
+    await spendFreeSaves(t, userId);
     await expect(
       t.mutation(api.items.createNoteItem, { text: "blocked save" }),
     ).rejects.toThrow(/Pro required/);
@@ -94,7 +101,9 @@ describe("RevenueCat subscription webhook writes", () => {
       }),
     ).resolves.toBeNull();
 
-    const rows = await t.run(async (ctx) => await ctx.db.query("subscriptions").collect());
+    const rows = await t.run(
+      async (ctx) => await ctx.db.query("subscriptions").collect(),
+    );
     expect(rows).toEqual([]);
   });
 
@@ -107,11 +116,12 @@ describe("RevenueCat subscription webhook writes", () => {
       eventTimestampMs: 1,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+          .unique(),
     );
     expect(row).toBeNull();
   });
@@ -131,11 +141,12 @@ describe("RevenueCat subscription webhook writes", () => {
       eventTimestampMs: 1,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId as string))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .unique(),
     );
     expect(row?.status).toBe("trialing");
   });
@@ -168,11 +179,12 @@ describe("RevenueCat subscription webhook writes", () => {
       eventTimestampMs: 2,
     });
 
-    const row = await t.run(async (ctx) =>
-      await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId as string))
-        .unique(),
+    const row = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", userId as string))
+          .unique(),
     );
     // The stale row is neither patched nor a fresh one inserted.
     expect(row).toMatchObject({

@@ -36,9 +36,10 @@ import { AppState, NativeModules } from "react-native";
  *
  * Model: the yearly plan carries a 7-day free trial (payment method upfront,
  * auto-charges at day 7 unless cancelled); the monthly plan has no trial and
- * charges immediately. No free tier. A lapsed user
- * (trial or subscription ended) is read-only: they can view and search existing
- * saves and spaces, but every save and Pro feature routes to the paywall.
+ * charges immediately. Without Pro (never subscribed, or lapsed) a user gets
+ * a free save allowance (`FREE_SAVE_LIMIT` saves, see `useSaveGuard`). They can
+ * always view and search existing saves and spaces; once the allowance is
+ * spent, every save and Pro feature routes to the paywall.
  *
  * The paywall UI itself is rendered natively by RevenueCat's SDK (designed in
  * the RevenueCat dashboard Paywall Editor). We call `presentPaywall()` which
@@ -547,8 +548,8 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
  * presents the RevenueCat paywall (native sheet). If the RC UI SDK isn't linked
  * or the paywall is unavailable, falls back to routing to the paywall route.
  * A user cancellation returns to the current screen. Use this at every
- * Pro-gated affordance (Save, dynamic spaces,
- * Find links, Tidy, Map) so the paywall appears at a moment of felt need rather
+ * Pro-gated affordance (dynamic spaces,
+ * Find links, Tidy, Map; saving uses {@link useSaveGuard}) so the paywall appears at a moment of felt need rather
  * than blocking the whole app. The server re-checks entitlement on every gated
  * mutation, so this client guard is advisory only.
  *
@@ -561,11 +562,63 @@ export function usePaywallGuard(placement = "pro_gate"): {
   loading: boolean;
 } {
   const { entitled, loading } = useEntitlement();
+  return useGuard(entitled, loading, placement);
+}
+
+/**
+ * The guard for saving. Like {@link usePaywallGuard}, but it also lets a user
+ * without Pro through while their free save allowance has room, so closing
+ * the paywall still leaves a working app. At the limit it opens the paywall.
+ */
+export function useSaveGuard(placement = "pro_gate"): {
+  guard: (action?: () => void) => Promise<boolean>;
+  loading: boolean;
+} {
+  const { canSave, loading } = useCanSave();
+  return useGuard(canSave, loading, placement);
+}
+
+/**
+ * Whether the user can save right now: Pro, or free saves left. Advisory;
+ * the save mutations re-check both. If the allowance query fails (a backend
+ * without it), this falls back to Pro only rather than waiting forever.
+ */
+export function useCanSave(): {
+  canSave: boolean;
+  loading: boolean;
+  entitled: boolean;
+  remaining: number;
+} {
+  const { isAuthenticated } = useConvexAuth();
+  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const allowance = useQuery(
+    convexQuery(api.freeSaves.getSaveAllowance, isAuthenticated ? {} : "skip"),
+  );
+  const remaining = allowance.data?.remaining ?? 0;
+  const allowanceLoading =
+    isAuthenticated && allowance.data === undefined && !allowance.isError;
+  return {
+    canSave: entitled || remaining > 0,
+    // A Pro user never waits on the allowance.
+    loading: entitlementLoading || (!entitled && allowanceLoading),
+    entitled,
+    remaining,
+  };
+}
+
+function useGuard(
+  allowed: boolean,
+  loading: boolean,
+  placement: string,
+): {
+  guard: (action?: () => void) => Promise<boolean>;
+  loading: boolean;
+} {
   const router = useRouter();
   const guard = useCallback(
     async (action?: () => void) => {
       if (loading) return false;
-      if (entitled) {
+      if (allowed) {
         action?.();
         return true;
       }
@@ -574,7 +627,7 @@ export function usePaywallGuard(placement = "pro_gate"): {
       await openPaywall(router, placement);
       return false;
     },
-    [entitled, loading, placement, router],
+    [allowed, loading, placement, router],
   );
   return { guard, loading };
 }

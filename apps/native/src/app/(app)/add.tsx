@@ -6,7 +6,7 @@ import {
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
 import { pickAndSaveImages } from "@/lib/pick-and-save-images";
-import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
+import { openPaywall, useSaveGuard } from "@/lib/entitlement";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
@@ -159,9 +159,9 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
-  // Saving is Pro — route to the paywall before composing if not entitled.
+  // Saving needs Pro or a free save left — otherwise the paywall comes first.
   const { guard, loading: entitlementLoading } =
-    usePaywallGuard(PAYWALL_PLACEMENT);
+    useSaveGuard(PAYWALL_PLACEMENT);
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;

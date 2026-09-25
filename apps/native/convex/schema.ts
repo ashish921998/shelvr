@@ -469,6 +469,16 @@ export default defineSchema({
       "deliveryNextAttemptAt",
     ]),
 
+  // Saves a user without Pro has spent from the free allowance
+  // (`FREE_SAVE_LIMIT`). One row per user, written by `spendSaveAllowance`
+  // when a free save creates an item. Deleting an item never refunds it, so
+  // the allowance cannot be recycled.
+  freeSaveUsage: defineTable({
+    userId: v.string(),
+    used: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   // The pre-payment onboarding demo save. One row per user (the allowance is
   // server-enforced), pointing at the one real item the user saved during the
   // demo step. Written only by `createDemoItem`; the (empty-index read +

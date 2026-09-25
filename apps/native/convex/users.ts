@@ -49,6 +49,7 @@ export const getCurrentUser = query({
  *  - spaces
  *  - itemOperations (including pending upload storage)
  *  - onboardingDemos (the demo allowance row and its item reference)
+ *  - freeSaveUsage (the free save allowance counter)
  *  - subscriptions
  *  - cancelSurveys (the one-time cancel-survey ask row)
  *  - feedbackSubmissions (in-app feedback rows and their messages)
@@ -214,6 +215,16 @@ async function deleteUserOwnedDataBatch(
   // (see docs/architecture/feedback.md); it only removes the Convex copy.
   if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
 
+  await deleteSingletonRows(ctx, userKey);
+  return true;
+}
+
+/** Deletes the user's one-per-user rows: the entitlement, the free save
+ * counter, and the cancel-survey ask. */
+async function deleteSingletonRows(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<void> {
   // Does not cancel the App Store subscription — only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
@@ -221,6 +232,14 @@ async function deleteUserOwnedDataBatch(
     .unique();
   if (sub !== null) {
     await ctx.db.delete(sub._id);
+  }
+
+  const freeSaves = await ctx.db
+    .query("freeSaveUsage")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .unique();
+  if (freeSaves !== null) {
+    await ctx.db.delete(freeSaves._id);
   }
 
   // The cancel-survey ask row is user-owned state; drain it with the rest.
@@ -231,7 +250,6 @@ async function deleteUserOwnedDataBatch(
   if (survey !== null) {
     await ctx.db.delete(survey._id);
   }
-  return true;
 }
 
 /** Deletes up to one batch of the user's feedback submissions. Returns true

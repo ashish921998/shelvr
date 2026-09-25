@@ -18,6 +18,7 @@ import {
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import { requireSaveAllowance, spendSaveAllowance } from "./freeSaves";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
 import {
@@ -923,8 +924,9 @@ export const beginImageImport = mutation({
     }
 
     // Every remaining path creates, recycles, or refreshes work — gate once.
-    // Quota here saves the client an upload it could never finalize.
-    await requireProEntitlement(ctx, userId);
+    // Quota here saves the client an upload it could never finalize. The free
+    // allowance is only checked here; finalize spends it.
+    await requireSaveAllowance(ctx, userId);
     await requirePhotoQuota(ctx, userId);
 
     if (op === null) {
@@ -997,7 +999,7 @@ export const attachImageUpload = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    await requireSaveAllowance(ctx, userId);
     requireOperationId(args.operationId);
     const op = await loadItemOperation(ctx, userId, args.operationId);
     const now = Date.now();
@@ -1124,7 +1126,7 @@ export const finalizeImageImport = mutation({
     // Gate only new work (creating an item from a pending operation). Rate limit
     // sits here too — after the idempotent completed-return above, so a retry of
     // an already-finished import is never charged against the bucket.
-    await requireProEntitlement(ctx, userId);
+    await requireSaveAllowance(ctx, userId);
     const photoCount = await requirePhotoQuota(ctx, userId);
     let storedBytes: number | undefined;
     if (op?.storageId) {
@@ -1151,6 +1153,8 @@ export const finalizeImageImport = mutation({
       throw new Error("Operation has no attached upload");
     }
 
+    // The item is certain now: charge the free allowance (a no-op with Pro).
+    await spendSaveAllowance(ctx, userId);
     const run = beginProcessingRun();
     const itemId = await ctx.db.insert("items", {
       userId,
@@ -1287,7 +1291,7 @@ export const cleanupStaleImageImports = internalMutation({
  */
 async function createItemWithOperation(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1332,6 +1336,8 @@ async function createItemWithOperation(
     // so a retry of an already-finished operation is never billed a token —
     // mirrors finalizeImageImport's rate-limit-after-idempotency ordering.
     await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+    // Charged after the idempotent return, so a retried share is free.
+    await spendSaveAllowance(ctx, userId);
     const itemId = await insertLinkOrNote(ctx, userId, kind, payload, options);
     if (op === null) {
       await ctx.db.insert("itemOperations", {
@@ -1358,6 +1364,7 @@ async function createItemWithOperation(
 
   // Ordinary (non-idempotent) path: one item per call, no ledger row.
   await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+  await spendSaveAllowance(ctx, userId);
   return await insertLinkOrNote(ctx, userId, kind, payload, options);
 }
 
@@ -1455,7 +1462,8 @@ export const createLinkItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    // Pro, or a free save left. createItemWithOperation spends the allowance.
+    await requireSaveAllowance(ctx, userId);
     // Rate limiting is charged inside createItemWithOperation, after the
     // idempotent completed-operation return, so a retry of a finished share
     // isn't billed a token.
@@ -1491,7 +1499,7 @@ export const createNoteItem = mutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    await requireSaveAllowance(ctx, userId);
     // Rate limiting is charged inside createItemWithOperation, after the
     // idempotent completed-operation return (see createLinkItem).
     return await createItemWithOperation(
@@ -1683,7 +1691,8 @@ export const updateNoteItem = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    // Editing spends nothing, but stays open only while saving is.
+    await requireSaveAllowance(ctx, userId);
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId || item.type !== "note") {
       throw new Error("Item not found");

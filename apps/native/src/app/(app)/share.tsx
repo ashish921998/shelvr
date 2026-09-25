@@ -38,7 +38,7 @@ import {
 } from "@/lib/share/pending-share-store";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import { openPaywall, useCanSave } from "@/lib/entitlement";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -108,7 +108,9 @@ export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  // Pro, or a free save left. The owner calls it `entitled`: it only gates
+  // whether this share may save.
+  const { canSave: entitled, loading: entitlementLoading } = useCanSave();
   const {
     sharedPayloads,
     resolvedSharedPayloads,

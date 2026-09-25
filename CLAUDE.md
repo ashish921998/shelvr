@@ -68,6 +68,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `spaces` — themed collections owned by a user
   - `spaceItems` — item/space membership join, with a `suggested` / `saved` / `dismissed` status
   - `itemOperations` — per-import idempotency ledger for image, link, and note saves
+  - `freeSaveUsage` — how many of the free save allowance (`FREE_SAVE_LIMIT`) a user without
+    Pro has spent; deletes never refund it
   - `subscriptions` — one Pro entitlement row per user, written by the RevenueCat webhook
   - `paymentAnalyticsReceipts` — seen payment event ids, so telemetry is not double counted
   - `notificationDevices` — one Expo push token per device, scoped to a user
@@ -92,6 +94,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
   `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
   `storageId` to an `imageUrl` at read time.
+- **`freeSaves.ts`** — the free save allowance: `getSaveAllowance` for the client, plus the
+  `requireSaveAllowance` / `spendSaveAllowance` helpers the save mutations use in place of
+  `requireProEntitlement`. Spaces, Tidy, Map, Find links, and bulk import stay Pro-only.
 - **`spaces.ts`** — public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
   `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
@@ -286,8 +291,9 @@ needed at runtime by the features that use them:
   expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
   range. It cannot yet tell widening from narrowing, so an added field asks for the
   trailer too.
-- Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
-  `subscriptions.ts`.
+- Gate single saves (link, note, image) with `requireSaveAllowance` and charge them with
+  `spendSaveAllowance` from `freeSaves.ts`. Gate every Pro feature with
+  `requireProEntitlement(ctx, userId)` from `subscriptions.ts`.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
   `analytics.captureError` (native app) so events land in the Convex log stream or PostHog
   error tracking in a queryable shape. Keep messages, URLs, and user content out of log

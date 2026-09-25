@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TestConvexForDataModel } from "convex-test";
-import { newConvexTest } from "./test.setup";
+import { newConvexTest, spendFreeSaves } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -1799,8 +1799,9 @@ describe("Pro entitlement gate", () => {
   // A user with no subscription row at all — the brand-new-user case. Every
   // save and Pro mutation must throw `Pro required` so the client can route
   // to the paywall; reads (listItems, getItem, searchItems) stay open.
-  it("blocks saves for a user with no subscription", async () => {
+  it("blocks saves for a user with no subscription and no free saves left", async () => {
     const t = newConvexTest().withIdentity({ subject: "no-sub" });
+    await spendFreeSaves(t, "no-sub");
 
     // Both halves of the contract: the code the client routes to the paywall
     // on, and the unchanged sentence an already-installed bundle still sees.
@@ -1841,6 +1842,7 @@ describe("Pro entitlement gate", () => {
         });
       }
     });
+    await spendFreeSaves(t, "pend-lapse");
     // Retrying begin on the existing pending op must now throw Pro required.
     await expect(
       t.mutation(api.items.beginImageImport, { operationId: OP_ID }),

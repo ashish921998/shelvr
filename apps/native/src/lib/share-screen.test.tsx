@@ -74,8 +74,9 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   openPaywall: mock.openPaywall,
-  useEntitlement: () => ({
-    entitled: mock.entitled,
+  // `entitled` stands for "can save": Pro, or free saves left.
+  useCanSave: () => ({
+    canSave: mock.entitled,
     loading: mock.entitlementLoading,
   }),
 }));
