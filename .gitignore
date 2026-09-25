@@ -86,8 +86,10 @@ tmp/
 /ios/
 /app.json
 
-# App Store Connect CLI output; the analytics docs summarize what matters
-.asc/
+# App Store Connect CLI output; the analytics docs summarize what matters.
+# The workflow definition is code and is tracked; reports and run state are not.
+.asc/*
+!.asc/workflow.json
 
 # Store media and marketing assets live in the shelvr-notes repo
 apps/native/store-assets/
