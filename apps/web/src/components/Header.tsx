@@ -11,9 +11,10 @@ import AppStoreButton from "./AppStoreButton";
 import Logo from "./common/Logo";
 
 const navigation = [
-  { name: "How it works", href: "#how" },
-  { name: "Spaces", href: "#spaces" },
-  { name: "Search", href: "#search" },
+  { name: "How it works", href: "/#how" },
+  { name: "Spaces", href: "/#spaces" },
+  { name: "Search", href: "/#search" },
+  { name: "Play", href: "/play" },
 ];
 
 export default function Header() {

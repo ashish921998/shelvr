@@ -180,6 +180,54 @@ Installs from shares are App Store Connect's `share` campaign (section 1).
 Link previews fetched by chat apps do not run the page's script, so they are
 not counted as views.
 
+## 5. Screenshot reveals (`/play`)
+
+`/play/<lens>` lets a visitor upload a few screenshots and get a playful
+reading back: `era`, `roast`, `taste` or `find`. Nothing is stored. A share
+link (`/play/<lens>/s?c=…`) carries the reveal's text in the URL. All events
+come from the website and carry `lens`.
+
+| Event                 | When                                    | Other properties                                          |
+| --------------------- | --------------------------------------- | --------------------------------------------------------- |
+| `reveal_started`      | The upload begins                       | `image_count`; `heat` (`gentle` or `spicy`) on roast only |
+| `reveal_completed`    | The reveal renders                      | `duration_ms`, from tap to result                         |
+| `reveal_failed`       | The reveal did not render               | `status`: HTTP status, `network`, or `decode`             |
+| `reveal_shared`       | The visitor shared or copied the link   | `method`: `share` or `copy`                               |
+| `reveal_share_viewed` | Someone opened a shared card            | none                                                      |
+| `app_store_clicked`   | Download under a result or a share card | `source = play`, `campaign = play_<lens>[_share]`         |
+
+`decode` means the browser could not read one of the picked images, so the
+request never left the device. A 429 is the per-IP limit on `/api/reveal`.
+
+A visitor's own arrival campaign still wins (section 1). Opening a shared card
+also makes `play_<lens>_share` the campaign for the rest of that browser
+session, so later store clicks anywhere on the site credit the share.
+
+**Reveal funnel per lens, last 30 days**:
+
+```sql
+SELECT lens,
+  countIf(event = 'reveal_started') AS starts,
+  countIf(event = 'reveal_completed') AS completions,
+  countIf(event = 'reveal_shared') AS shares,
+  countIf(event = 'reveal_share_viewed') AS share_views,
+  countIf(event = 'app_store_clicked') AS store_clicks
+FROM (
+  SELECT event,
+    if(event = 'app_store_clicked',
+      splitByChar('_', properties.campaign)[2],
+      properties.lens) AS lens
+  FROM events
+  WHERE (event IN ('reveal_started', 'reveal_completed', 'reveal_shared', 'reveal_share_viewed')
+      OR (event = 'app_store_clicked' AND properties.campaign LIKE 'play_%'))
+    AND timestamp > now() - INTERVAL 30 DAY
+)
+GROUP BY lens
+ORDER BY starts DESC
+```
+
+Installs from reveals are App Store Connect's `play_*` campaigns (section 1).
+
 ## Not measured yet
 
 - A viewer's install cannot be joined to their new account. Apple does not

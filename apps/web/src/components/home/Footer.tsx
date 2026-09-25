@@ -7,6 +7,7 @@ const links = [
   { title: "How it works", url: "#how" },
   { title: "Spaces", url: "#spaces" },
   { title: "Search", url: "#search" },
+  { title: "Play", url: "/play" },
   { title: "Download for iPhone", url: APP_STORE_URL },
   { title: "Support", url: "/support" },
 ];

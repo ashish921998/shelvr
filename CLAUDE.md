@@ -155,6 +155,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
   for marketing forms such as platform waitlists
 - Landing page at `/` — product experience lives in the native app
+- `/play` — four no-signup screenshot "reveals" (`era`, `roast`, `taste`, `find`). One
+  registry, `src/lib/reveal/lenses.ts`, drives every lens; `POST /api/reveal` sends the
+  downscaled images to Gemini once and stores nothing. Share links carry the reveal's text
+  in `?c=`
 
 ### Native (`apps/native`)
 
@@ -191,6 +195,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
   it, App Store links carry `ct=` campaign tokens; see
   [growth funnel](docs/analytics/growth-funnel.md)
+- Web: `GOOGLE_GENERATIVE_AI_API_KEY` — server-only AI Studio key for `/api/reveal`, which
+  returns 503 without it
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds

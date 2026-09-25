@@ -13,7 +13,11 @@ export default function SharePageView({ lens }: { lens: Lens }) {
     if (!arrivalCampaign(window.location.search)) {
       arrivalCampaign(`?ct=play_${lens}_share`);
     }
-    captureWebAnalyticsEvent("reveal_share_viewed", { lens });
+    // The card's text rides in `?c=`, so the event keeps the path only.
+    captureWebAnalyticsEvent("reveal_share_viewed", {
+      lens,
+      $current_url: `${window.location.origin}/play/${lens}/s`,
+    });
   }, [lens]);
   return null;
 }
