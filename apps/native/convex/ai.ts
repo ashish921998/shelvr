@@ -13,7 +13,6 @@ import {
   fetchErrorCategory,
   linkEnrichment,
   PROMPT_CONTENT_CHARS,
-  readImageSize,
   readPage,
   storePoster,
   type LinkRead,
@@ -21,6 +20,7 @@ import {
   type ShortFormSource,
 } from "./model/pageRead";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
+import { readImageSize } from "./model/imageSize";
 import { INTENT_KINDS, type Recipe } from "./model/itemFields";
 import { logEvent, errorName } from "./model/log";
 import { sanitizeRecipe, type RecipeDraft } from "./model/recipeMarkup";

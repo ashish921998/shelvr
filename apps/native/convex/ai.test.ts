@@ -2192,6 +2192,21 @@ describe("readPage recipe eligibility", () => {
     expect(read.status === "ok" && read.askForRecipe).toBe(false);
   });
 
+  it("marks an Instagram reel short-form without asking for a recipe", async () => {
+    // Short-form, but its caption is not a caption source the model may
+    // transcribe a recipe from.
+    instagramAnswers(REEL_PAGE, REEL_EMBED);
+    const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
+    expect(read).toMatchObject({
+      status: "ok",
+      askForRecipe: false,
+      shortForm: { site: "Instagram", video: true },
+    });
+    expect(read.status === "ok" && read.page.content).toContain(
+      "Meet the National Geographic 33!",
+    );
+  });
+
   it("does not ask for an ordinary web page", async () => {
     safeFetch.mockImplementation(async (url: string) => ({
       ok: true,
