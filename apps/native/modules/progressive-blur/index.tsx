@@ -2,11 +2,15 @@ import { requireNativeView } from "expo";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import type { ComponentType } from "react";
 import { Platform, StyleSheet, type ViewProps } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 
 type NativeBlurProps = ViewProps & {
   // Points below the band over which the blur fades out. See `fadePastHeader`
   // on ProgressiveBlurHeader.
   fadePastHeader?: number;
+  // The page background laid over the blur, so the band stays the page's
+  // colour instead of the system chrome grey.
+  pageColor?: string;
 };
 
 // View modules resolve on iOS only; on Android (or an unlinked build) there's no
@@ -59,11 +63,13 @@ function IOSProgressiveBlurHeader({
   fadePastHeader: number | undefined;
 }) {
   const headerHeight = useAppHeaderHeight();
+  const { theme } = useUnistyles();
 
   return (
     <NativeComponent
       pointerEvents="none"
       fadePastHeader={fadePastHeader}
+      pageColor={theme.colors.background}
       // The computed height spans the status bar + nav bar — exactly the
       // screen-top -> header-bottom band we want to blur.
       style={[

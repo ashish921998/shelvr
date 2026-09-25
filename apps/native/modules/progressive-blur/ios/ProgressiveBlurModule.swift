@@ -12,6 +12,12 @@ public class ProgressiveBlurModule: Module {
       Prop("fadePastHeader") { (view: ProgressiveBlurView, points: Double) in
         view.fadePastHeader = CGFloat(points)
       }
+
+      // The page background laid over the blur so the band keeps the page's
+      // colour. Unset, the band is the bare blur.
+      Prop("pageColor") { (view: ProgressiveBlurView, color: UIColor?) in
+        view.pageColor = color
+      }
     }
   }
 }
