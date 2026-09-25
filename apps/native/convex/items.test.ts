@@ -7,7 +7,7 @@ import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { pageGone } from "./ai";
+import { pageGone } from "./model/pageRead";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   IMPORT_STAGGER_MS,
