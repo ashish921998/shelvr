@@ -1,5 +1,6 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
+import { recordShareSaved } from "@/lib/first-share";
 import { demoDestination } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -245,7 +246,7 @@ export function useDemoSave({
     async (request: PendingDemo) => {
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
-      const trimmed = { url, destination: request.destination };
+      const trimmed = { ...request, url };
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
@@ -265,11 +266,21 @@ export function useDemoSave({
         // A relaunch resubmits the persisted save and gets it back; that is
         // not a second submission.
         if (!result.reused) analytics.capture("onboarding_demo_submitted");
+        const sharedUrlSaved =
+          request.source === "share" && result.urlMatchesRequest;
         setPendingDemo({
           url: result.url,
           destination: result.savedSpaceNames[0] ?? null,
+          source: sharedUrlSaved ? "share" : "direct",
         });
         clearLegacyDemoUrlIfSaved(result.url);
+        if (sharedUrlSaved) {
+          try {
+            recordShareSaved(result.userId);
+          } catch (err) {
+            analytics.captureError("record_first_share_failed", err);
+          }
+        }
         dispatch({ type: "saved", itemId: result.itemId });
         onSaved({
           itemId: result.itemId,
@@ -298,6 +309,22 @@ export function useDemoSave({
         url,
         destination:
           preset === null ? null : resolveOnboardingSpaceName(preset),
+        source: "direct",
+      });
+    },
+    [spaces, submit],
+  );
+
+  // The onboarding share sheet routes its save here so it records the first
+  // share; paste and typed saves stay on submitUrl and keep the how-to card.
+  const submitSharedUrl = useCallback(
+    (url: string) => {
+      const preset = demoDestination(url.trim(), spaces);
+      void submit({
+        url,
+        destination:
+          preset === null ? null : resolveOnboardingSpaceName(preset),
+        source: "share",
       });
     },
     [spaces, submit],
@@ -389,6 +416,7 @@ export function useDemoSave({
     setError,
     cancelAuth,
     retry,
+    submitSharedUrl,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

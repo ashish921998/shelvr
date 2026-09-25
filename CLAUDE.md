@@ -188,6 +188,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
   Analytics is a no-op when either is unset
+- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
+  it, App Store links carry `ct=` campaign tokens; see
+  [growth funnel](docs/analytics/growth-funnel.md)
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds

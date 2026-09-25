@@ -65,11 +65,17 @@ export function LiveDemoStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const demo = useDemoSave({ spaces, resume, onSaved, onAdvance });
+  const demo = useDemoSave({
+    spaces,
+    resume,
+    onSaved,
+    onAdvance,
+  });
   const { shareSheetOpen, shareSample } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
-    onUrl: demo.submitUrl,
+    onSharedUrl: demo.submitSharedUrl,
+    onDirectUrl: demo.submitUrl,
     onError: demo.setError,
   });
   const [draft, setDraft] = useState("");

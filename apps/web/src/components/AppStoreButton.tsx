@@ -1,24 +1,27 @@
 "use client";
 
-import { captureWebAnalyticsEvent } from "@/lib/analytics";
-import { APP_STORE_URL } from "@/lib/appStore";
+import { useAppStoreLink } from "@/lib/appStoreLink";
 
 type AppStoreButtonProps = {
-  source: "header" | "hero" | "footer" | "footer-nav" | "share";
+  source: "header" | "hero" | "footer" | "share";
   compact?: boolean;
+  /** On a share page, the link's token, so the click credits that share. */
+  shareToken?: string;
 };
 
 export default function AppStoreButton({
   source,
   compact = false,
+  shareToken,
 }: AppStoreButtonProps) {
+  const { href, onClick } = useAppStoreLink(source, shareToken);
   return (
     <a
-      href={APP_STORE_URL}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Download Shelvr on the App Store"
-      onClick={() => captureWebAnalyticsEvent("app_store_clicked", { source })}
+      onClick={onClick}
       className={`inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#111] font-semibold text-white shadow-[0_12px_28px_rgba(43,36,24,0.2)] transition hover:-translate-y-0.5 hover:bg-[#282828] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
         compact ? "min-h-11 px-5 text-sm" : "min-h-14 px-6 text-left"
       }`}
