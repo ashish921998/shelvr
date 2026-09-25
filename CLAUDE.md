@@ -188,19 +188,26 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
   Analytics is a no-op when either is unset
+- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
+  it, App Store links carry `ct=` campaign tokens; see
+  [growth funnel](docs/analytics/growth-funnel.md)
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the dev-only passwordless button
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
-    non-production variant. `app.config.js` pins it to one exact value
+    to show the passwordless dev-login button and fixture reset on development builds
+    (release-mode included); preview and production builds never show either
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
+    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
+    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
+    to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
-    `expo-maps` on the map screen
+    `expo-maps` on the map screen. A production Android EAS build fails without it, so the map
+    screen never ships unconfigured
   - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
     `google-services.json`; required by every Android EAS build, with a Firebase
     client matching that variant's package, so `expo-notifications` can obtain an
@@ -208,6 +215,14 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
+  - `POSTHOG_CLI_API_KEY` — PostHog personal API key (scopes: error tracking write, organization
+    read). `app.config.js` adds the `posthog-react-native/expo` source map upload plugin only when
+    this is set, so a build without it keeps working and uploads switch on the moment the EAS
+    secret is added. The upload runs inside the native build and needs `@posthog/cli` available
+    there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
+    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
+    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
 `apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and

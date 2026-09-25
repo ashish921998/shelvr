@@ -33,6 +33,9 @@ export type MessageParams = {
   "products.noMatches": undefined;
   "item.untitledItem": undefined;
   "notifications.weeklyShelf": undefined;
+  "notifications.trialChannel": undefined;
+  "notifications.trialEndingTitle": undefined;
+  "notifications.trialEndingBody": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
   "digest.backHome": undefined;
@@ -439,6 +442,7 @@ export type MessageParams = {
   "reveal.emptyExplainer": undefined;
   "reveal.everySunday": undefined;
   "reveal.keepSaving": undefined;
+  "reveal.trialNote": undefined;
   "weekly.previewTime": undefined;
   "weekly.previewTitle": undefined;
   "weekly.previewBody": { title: string };

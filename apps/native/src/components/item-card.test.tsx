@@ -96,6 +96,10 @@ vi.mock("react-native-unistyles", () => ({
   }),
 }));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
+vi.mock("expo-crypto", () => ({
+  CryptoDigestAlgorithm: { SHA256: "SHA-256" },
+  digestStringAsync: vi.fn(async () => "0123456789abcdef0123"),
+}));
 vi.mock("expo-haptics", () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: "success" },

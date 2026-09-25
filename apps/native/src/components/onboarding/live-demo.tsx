@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import {
   DEMO_SAMPLES,
   type DemoKind,
@@ -65,11 +66,17 @@ export function LiveDemoStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const demo = useDemoSave({ spaces, resume, onSaved, onAdvance });
+  const demo = useDemoSave({
+    spaces,
+    resume,
+    onSaved,
+    onAdvance,
+  });
   const { shareSheetOpen, shareSample } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
-    onUrl: demo.submitUrl,
+    onSharedUrl: demo.submitSharedUrl,
+    onDirectUrl: demo.submitUrl,
     onError: demo.setError,
   });
   const [draft, setDraft] = useState("");
@@ -516,11 +523,12 @@ function DemoAuthSheet({
             <Text style={styles.authBtnText}>{t("account.google")}</Text>
           )}
         </Pressable>
-        {__DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true" ? (
+        {isAnonymousAuthEnabled() ? (
           <GhostButton
             label={t("account.anonymous")}
             onPress={() => signIn("anonymous")}
             disabled={busy}
+            testID="onboarding-dev-login"
           />
         ) : null}
         <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>

@@ -58,15 +58,18 @@ function ActionButton({
   label,
   onPress,
   disabled,
+  testID,
 }: {
   icon: AppSymbolName;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  testID?: string;
 }) {
   const { theme } = useUnistyles();
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={disabled}
       style={[styles.action, disabled && { opacity: 0.4 }]}
@@ -302,6 +305,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
       {isComposer ? (
         <TextInput
+          testID={isArticle ? "add-article-input" : "add-note-input"}
           style={isArticle ? styles.articleInput : styles.noteInput}
           value={value}
           onChangeText={setValue}
@@ -323,12 +327,14 @@ function AddContent({ close, openCamera }: AddContentProps) {
       ) : (
         <View style={styles.actions}>
           <ActionButton
+            testID="add-option-note"
             icon="square.and.pencil"
             label={t("item.note")}
             onPress={() => guard(() => openComposer("note"))}
             disabled={saving || entitlementLoading}
           />
           <ActionButton
+            testID="add-option-article"
             icon="link"
             label={t("item.article")}
             onPress={() => guard(() => openComposer("article"))}

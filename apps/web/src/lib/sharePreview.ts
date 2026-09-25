@@ -10,36 +10,49 @@ type SharePreview = {
   noteText?: string;
 };
 
+/** `missing` is an unknown or revoked token; `unavailable` is a
+ * configuration, network or backend failure, not the link's fault. */
+export type SharePreviewOutcome = "found" | "missing" | "unavailable";
+
 /**
- * Fetches the public preview for a branded item share link. Returns
- * `undefined` when Convex isn't configured, the token doesn't resolve to a
- * shareable item, or the request fails — every case the page renders as a
- * generic Shelvr promo rather than an error. Uncached, so a deleted item or
- * revoked link stops rendering at once.
+ * Fetches the public preview for a branded item share link, with why it is
+ * absent when it is. Uncached, so a deleted item or revoked link stops
+ * rendering at once.
  */
-export async function fetchSharePreview(
+export async function loadSharePreview(
   token: string,
-): Promise<SharePreview | undefined> {
+): Promise<{ outcome: SharePreviewOutcome; preview?: SharePreview }> {
   const siteUrl = convexSiteUrl();
-  if (!siteUrl) return undefined;
+  if (!siteUrl) return { outcome: "unavailable" };
 
   try {
     const response = await fetch(
       `${siteUrl}/share/links/${encodeURIComponent(token)}`,
       { cache: "no-store" },
     );
+    if (response.status === 404) return { outcome: "missing" };
     if (!response.ok) {
-      // 404 is an unknown or revoked token; anything else is an outage.
-      if (response.status !== 404) {
-        serverLog("error", "share_preview_failed", { status: response.status });
-      }
-      return undefined;
+      serverLog("error", "share_preview_failed", { status: response.status });
+      return { outcome: "unavailable" };
     }
-    return (await response.json()) as SharePreview;
+    return {
+      outcome: "found",
+      preview: (await response.json()) as SharePreview,
+    };
   } catch (error) {
     serverLog("error", "share_preview_failed", {
       error_name: error instanceof Error ? error.name : "unknown",
     });
-    return undefined;
+    return { outcome: "unavailable" };
   }
+}
+
+/**
+ * The preview alone: `undefined` in every case the page renders as a generic
+ * Shelvr promo rather than an error.
+ */
+export async function fetchSharePreview(
+  token: string,
+): Promise<SharePreview | undefined> {
+  return (await loadSharePreview(token)).preview;
 }
