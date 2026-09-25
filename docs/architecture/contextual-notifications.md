@@ -78,15 +78,33 @@ opened, cut it. Do not iterate on its copy indefinitely.
 - **Holdout groups wait.** "Does anyone open this" needs no control group.
   When it comes: 10% per kind, 8 weeks, then rotate in.
 
-### Deploy order
+### Server switch
 
-1. `npx convex deploy`.
-2. `npx convex run notifications:armSaveReminders`, once. It schedules a
-   first pass for every existing user. Without it a user is only picked up
+Reminders send only while the Convex environment variable
+`SAVE_REMINDERS_ENABLED` is `"true"`. With it unset, which is the default:
+
+- the hourly sweep does nothing;
+- a reminder already queued fails as `reminders_paused` at its next attempt;
+- users are still armed by `registerDevice`, so turning the switch on picks
+  them up.
+
+When it turns on, anyone whose pass is more than two hours overdue
+(`MAX_LATE_MS`) is booked for their next slot instead of being sent a
+reminder at whatever hour the switch flipped.
+
+### Launch order
+
+1. Merge. CI deploys Convex. Reminders stay off.
+2. `npx convex run notifications:armSaveReminders --prod`, once. It schedules
+   a first pass for every existing user. Without it a user is only picked up
    the next time they open the app, which misses exactly the people a
    reminder is for.
-3. Ship the client update. It adds the Profile switch and the Android
-   `save-reminders` channel.
+3. Ship the store build that carries the Profile switch and the Android
+   `save-reminders` channel. The native fingerprint already moved on `main`
+   before this change, so an OTA cannot reach the released builds.
+4. Once that build is live, turn reminders on:
+   `npx convex env set SAVE_REMINDERS_ENABLED true --prod`. To stop them,
+   `npx convex env set SAVE_REMINDERS_ENABLED false --prod`.
 
 Older clients handle reminders without the update:
 

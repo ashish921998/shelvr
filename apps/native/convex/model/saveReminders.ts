@@ -1,4 +1,5 @@
 import type { Doc } from "../_generated/dataModel";
+import { env } from "../_generated/server";
 
 /**
  * The rules for a save reminder: one push that names one save and asks for
@@ -38,6 +39,19 @@ export const WEEK_MS = 7 * DAY_MS;
 export const IGNORED_STREAK = 3;
 /** ...slows reminders to one a week until the user opens one again. */
 export const IGNORED_PAUSE_MS = WEEK_MS;
+
+/**
+ * A pass this late is not sent: it books the user's next slot instead. The
+ * hourly cron is never more than an hour late, so this only catches a
+ * backlog, such as every user armed while the server switch was off coming
+ * due at once when it turns on, which would otherwise send at any hour.
+ */
+export const MAX_LATE_MS = 2 * HOUR_MS;
+
+/** The server switch, `SAVE_REMINDERS_ENABLED`. Only "true" sends. */
+export function saveRemindersLive(): boolean {
+  return env.SAVE_REMINDERS_ENABLED === "true";
+}
 
 /** Used until the user has saved enough for their own hour to show. */
 export const DEFAULT_REMINDER_HOUR = 18;

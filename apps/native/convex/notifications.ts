@@ -17,12 +17,14 @@ import {
   DEFAULT_REMINDER_HOUR,
   HOUR_SAMPLE_WINDOW_MS,
   IGNORED_STREAK,
+  MAX_LATE_MS,
   WEEK_MS,
   WEEKLY_LIMIT,
   openedTooRecently,
   preferredReminderHour,
   reminderBlocked,
   reminderCandidates,
+  saveRemindersLive,
 } from "./model/saveReminders";
 
 const digestResponseValidator = v.object({
@@ -541,6 +543,7 @@ export const prepareDueSaveReminders = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    if (!saveRemindersLive()) return null;
     // A fixed `now` and a cursor, for the same reasons as the digest sweep.
     const now = args.now ?? Date.now();
     const due = await ctx.db
@@ -627,12 +630,14 @@ export const prepareSaveReminder = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     if (
+      !saveRemindersLive() ||
       preferences === null ||
       preferences.nextReminderAt === undefined ||
       preferences.nextReminderAt > now
     ) {
       return null;
     }
+    const late = now - preferences.nextReminderAt > MAX_LATE_MS;
     const device = await ctx.db
       .query("notificationDevices")
       .withIndex("by_user_and_enabled", (q) =>
@@ -667,6 +672,7 @@ export const prepareSaveReminder = internalMutation({
       nextReminderAt: nextLocalHourAt(now, preferences.timezone, hour),
       updatedAt: now,
     });
+    if (late) return null;
 
     // The budget counts what reached, or is still trying to reach, a device.
     const reminders = (

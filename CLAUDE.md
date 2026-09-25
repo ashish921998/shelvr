@@ -259,6 +259,10 @@ needed at runtime by the features that use them:
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
+- `SAVE_REMINDERS_ENABLED` — save reminders send only while this is `"true"`. Unset by
+  default, so a deploy never starts them; set it back to anything else to stop them, queued
+  ones included, without a deploy. See
+  [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent

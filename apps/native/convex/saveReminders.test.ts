@@ -11,10 +11,12 @@ const USER = "user-a";
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  vi.stubEnv("SAVE_REMINDERS_ENABLED", "true");
 });
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 const article = {
@@ -364,6 +366,64 @@ describe("reminder preferences", () => {
       .withIdentity({ subject: `${USER}|session-1` })
       .mutation(api.users.deleteCurrentUserAccount, {});
     expect(await reminders()).toEqual([]);
+  });
+});
+
+describe("the server switch", () => {
+  it.each([undefined, "false", "TRUE"])(
+    "sends nothing while SAVE_REMINDERS_ENABLED is %s",
+    async (value) => {
+      vi.stubEnv("SAVE_REMINDERS_ENABLED", value);
+      const { t, prepare, reminders, preferencesRow } = await setup({
+        saves: [[2, article]],
+      });
+      await t.mutation(internal.notifications.prepareDueSaveReminders, {});
+      await prepare();
+      expect(await reminders()).toEqual([]);
+      // Left armed, so turning the switch on picks the user up again.
+      expect((await preferencesRow())?.nextReminderAt).toBe(NOW);
+      const jobs = await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      expect(jobs).toEqual([]);
+    },
+  );
+
+  it("stops a reminder already queued when it is turned off", async () => {
+    const { t, prepare, reminders } = await setup({ saves: [[2, article]] });
+    await prepare();
+    const [reminder] = await reminders();
+    vi.stubEnv("SAVE_REMINDERS_ENABLED", "false");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "reminders_paused",
+    });
+  });
+
+  it("books the next slot instead of sending off-hours after a backlog", async () => {
+    // Armed long before the switch turned on: due, but hours past its slot.
+    const { prepare, reminders, preferencesRow } = await setup({
+      saves: [[2, article]],
+      preferences: { nextReminderAt: NOW - 3 * 60 * 60 * 1000 },
+    });
+    await prepare();
+    expect(await reminders()).toEqual([]);
+    expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
+  });
+
+  it("still sends a pass that is only as late as the hourly cron", async () => {
+    const { prepare, reminders } = await setup({
+      saves: [[2, article]],
+      preferences: { nextReminderAt: NOW - 59 * 60 * 1000 },
+    });
+    await prepare();
+    expect(await reminders()).toHaveLength(1);
   });
 });
 

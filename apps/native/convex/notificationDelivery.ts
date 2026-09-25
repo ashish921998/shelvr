@@ -13,7 +13,7 @@ import {
   reminderCopy,
   type Recipient,
 } from "./model/notificationFields";
-import { reminderSubject } from "./model/saveReminders";
+import { reminderSubject, saveRemindersLive } from "./model/saveReminders";
 
 /** Each kind rides in the payload and in telemetry, so an open is attributed
  * to what was sent. */
@@ -480,6 +480,7 @@ export const claimReminder = internalMutation({
       .unique();
     const attempts = reminder.deliveryAttempts ?? 0;
     const disabled = preferences?.remindersEnabled === false;
+    const paused = !saveRemindersLive();
     const fail = (deliveryError: string) =>
       ctx.db.patch(reminderId, {
         deliveryStatus: "failed",
@@ -487,11 +488,18 @@ export const claimReminder = internalMutation({
         deliveryError,
       });
     if (
+      paused ||
       disabled ||
       attempts >= MAX_ATTEMPTS ||
       now - reminder.createdAt >= REMINDER_MAX_AGE_MS
     ) {
-      await fail(disabled ? "notifications_disabled" : "retry_limit_reached");
+      await fail(
+        paused
+          ? "reminders_paused"
+          : disabled
+            ? "notifications_disabled"
+            : "retry_limit_reached",
+      );
       return null;
     }
     // Resolved on every attempt, so a save deleted or renamed since the
