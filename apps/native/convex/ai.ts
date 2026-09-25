@@ -53,7 +53,7 @@ import { readStoredImage, StoredImageError } from "./model/storedImage";
 const MODEL_NAME = "gemini-3.1-flash-lite";
 // Token usage lands in the Convex log stream of whichever action made the call,
 // so classification and product-search spend can be told apart per invocation.
-const MODEL = wrapLanguageModel({
+export const MODEL = wrapLanguageModel({
   model: google(MODEL_NAME),
   middleware: {
     wrapGenerate: async ({ doGenerate }) => {
@@ -86,7 +86,7 @@ const SMALL_TIMEOUT_MS = 30_000;
 // a flaky provider triple the wall-clock spend inside a single deadline.
 const MODEL_MAX_RETRIES = 1;
 
-function modelCallOptions(timeoutMs: number): {
+export function modelCallOptions(timeoutMs: number): {
   abortSignal: AbortSignal;
   maxRetries: number;
 } {
@@ -1811,7 +1811,7 @@ function captionText(page: PageData): string | undefined {
     : undefined;
 }
 
-async function readPage(url: string): Promise<PageRead> {
+export async function readPage(url: string): Promise<PageRead> {
   try {
     const page = isTikTokUrl(url)
       ? await withLinkedRecipe(await fetchTikTokOEmbed(url))

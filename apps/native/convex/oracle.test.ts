@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseOracleInput } from "./model/oracle";
+import { oraclePrompt } from "./oracle";
 
 const library = {
   kind: "library",
@@ -58,5 +59,67 @@ describe("parseOracleInput", () => {
     const image = { kind: "screenshot", mediaType: "image/jpeg" };
     expect(parseOracleInput({ ...image, imageBase64: huge })).toBeUndefined();
     expect(parseOracleInput({ ...image, imageBase64: "no!" })).toBeUndefined();
+  });
+});
+
+describe("oraclePrompt", () => {
+  it("carries each link, its page text, and flags an unread page", () => {
+    const prompt = oraclePrompt(
+      {
+        kind: "links",
+        urls: ["https://a.example/pasta", "https://b.example/x"],
+      },
+      [{ title: "Cacio e Pepe", excerpt: "Toast the pepper first." }],
+    );
+    expect(prompt).toContain("https://a.example/pasta");
+    expect(prompt).toContain("Cacio e Pepe");
+    expect(prompt).toContain("Toast the pepper first.");
+    expect(prompt).toContain("https://b.example/x");
+    expect(prompt).toContain("could not be read");
+  });
+
+  it("points a screenshot prompt at the attached image", () => {
+    const prompt = oraclePrompt({
+      kind: "screenshot",
+      imageBase64: "aGVsbG8=",
+      mediaType: "image/png",
+    });
+    expect(prompt).toContain("screenshot is attached");
+    expect(prompt).not.toContain("aGVsbG8=");
+  });
+
+  it("carries the tab count and every title", () => {
+    const prompt = oraclePrompt({
+      kind: "tabs",
+      count: 83,
+      titles: ["Flights to Lisbon", "How to quit your job"],
+    });
+    expect(prompt).toContain("Open tabs: 83");
+    expect(prompt).toContain("- Flights to Lisbon");
+    expect(prompt).toContain("- How to quit your job");
+  });
+
+  it("carries the library stats and sampled rows", () => {
+    const prompt = oraclePrompt({
+      kind: "library",
+      rows: [
+        {
+          label: "Sourdough starter guide",
+          domain: "kingarthur.com",
+          savedAt: Date.UTC(2019, 2, 4),
+        },
+      ],
+      stats: {
+        count: 412,
+        oldestAt: Date.UTC(2014, 0, 2),
+        topDomains: ["youtube.com", "kingarthur.com"],
+      },
+    });
+    expect(prompt).toContain("Total saves: 412");
+    expect(prompt).toContain("Oldest save: 2014-01-02");
+    expect(prompt).toContain("youtube.com, kingarthur.com");
+    expect(prompt).toContain(
+      "- Sourdough starter guide (kingarthur.com, saved 2019-03-04)",
+    );
   });
 });
