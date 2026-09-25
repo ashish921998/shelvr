@@ -92,6 +92,42 @@ describe("posthog before_send", () => {
     ]);
   });
 
+  it("keeps a generated Expo error code so the failing module is named", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "ERR_UNAVAILABLE",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "ERR_UNAVAILABLE",
+            stacktrace: "frame at app.js:1",
+          },
+        ],
+      }),
+    );
+    expect(sent.properties?.$exception_message).toBe("ERR_UNAVAILABLE");
+    const list = sent.properties?.$exception_list as ExceptionListEntry[];
+    expect(list[0].value).toBe("ERR_UNAVAILABLE");
+  });
+
+  it("redacts an all-caps message that is not a bare code token", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "FAILED saving https://private.example/note",
+        type: "Error",
+        list: [
+          { type: "Error", value: "FAILED saving https://private.example/note" },
+        ],
+      }),
+    );
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain("private.example");
+    expect(sent.properties?.$exception_message).toBe("Error");
+  });
+
   it("replaces content-carrying messages with the error class", () => {
     const beforeSend = sentBeforeSend();
     const noteUrl = "https://private.example/saved/note-42";
