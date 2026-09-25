@@ -32,12 +32,22 @@ export default function HomeScreen() {
   useReviewPrompt(items);
 
   const cancelSurvey = useCancelSurvey();
+  // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
+  // Home offers Pro instead of teaching a save that would only reopen it.
+  // The Pro card owns the header, so the recall and feedback prompts defer
+  // (and spend no one-shot claim) until entitlement is known and active.
+  const entitlement = useEntitlement();
+  const locked = !entitlement.loading && !entitlement.entitled;
+  const proPending = entitlement.loading || locked;
   // The cancel survey owns the Home moment when visible, then the save recall
   // card. Each later prompt defers its one-shot claim so it is never consumed
   // behind a card that holds the slot.
-  const recall = useSaveRecall(items, { defer: cancelSurvey.visible });
+  const recall = useSaveRecall(items, {
+    defer: cancelSurvey.visible || proPending,
+  });
   const feedback = useFeedbackInvitation(items, {
-    defer: cancelSurvey.visible || recall.visible || recall.pending,
+    defer:
+      cancelSurvey.visible || proPending || recall.visible || recall.pending,
   });
   const busySaving = useBusySaving(items);
   const { data: user } = useCurrentUser();
@@ -46,10 +56,6 @@ export default function HomeScreen() {
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
-  // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
-  // Home offers Pro instead of teaching a save that would only reopen it.
-  const entitlement = useEntitlement();
-  const locked = !entitlement.loading && !entitlement.entitled;
   const proCard = locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : null;
