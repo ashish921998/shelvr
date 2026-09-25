@@ -1,7 +1,13 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { recordShareSaved } from "@/lib/first-share";
 import {
-  classifyEntries,
+  initialIncomingShare,
+  stepIncomingShare,
+  type ShareEffect,
+  type ShareEvent,
+  type SharePhase,
+} from "@/lib/share/incoming-share";
+import {
   processSession,
   type ResolvedPayload,
   type ShareSaveDeps,
@@ -12,11 +18,9 @@ import {
   failedEntries,
   hasRetryableEntries,
   selectProcessorPayloads,
-  withEntry,
 } from "@/lib/share/session-view";
 import {
   deleteSession,
-  fingerprintSharePayloads,
   loadSession,
   markComplete,
   reconcileSession,
@@ -26,7 +30,6 @@ import {
   type RawSharePayload,
   type SessionStoreAdapter,
   type ShareEntry,
-  type ShareSession,
 } from "@/lib/share/storage";
 import {
   clearPendingShareOnDevice,
@@ -71,17 +74,10 @@ import {
 /**
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
  * etc.). Resolves the incoming payload and saves each piece through the same
- * idempotent operation ledger the in-app flows use, with an explicit state
- * machine so partial failures stay visible and retryable across remounts and
- * process restarts.
- *
- * Completion ordering (the crash-window reconciliation depends on this exact
- * sequence, centralized in completeSession):
- *   1. persist `phase: complete`
- *   2. native clearSharedPayloads() — if it throws, the completed session stays
- *      so a remount retries the clear
- *   3. delete the local session record (only after a successful clear)
- *   4. navigate Home exactly once
+ * idempotent operation ledger the in-app flows use. Every decision (phases,
+ * session guards, completion ordering, the tombstone, the ghost prompt, the
+ * Pro gate) belongs to the owner in lib/share/incoming-share.ts; this screen
+ * feeds it events, renders the phase it returns, and runs its effects.
  */
 
 // Dedicated MMKV instance for the one share session record. The adapter
@@ -107,32 +103,6 @@ const PHASE_EXIT = new Keyframe({
   },
 }).duration(motion.duration.exit);
 
-/** The session-driven UI states. The resolution-driven states (resolving,
- * empty) are pure functions of the `useIncomingShare` hook
- * props, so they are DERIVED during render rather than stored — storing them
- * would require synchronous setState in the effect (a cascading-render smell).
- * A terminal outcome with any failed/unsupported entry is reported as `partial`
- * so the user gets retry/continue/cancel — only an all-saved batch completes.
- *
- * `clearFailed` is the escape hatch for the throwing-native-clear window: the
- * completed session is retained (so a remount retries the clear) but the user
- * gets a manual "Try again" / "Cancel" rather than an eternal spinner.
- *
- * `locked` is the Pro-gate state. Saving is Pro-gated, so an unentitled user
- * sharing into Shelvr reaches the paywall instead of a save. If they purchase,
- * the entitlement flips and the save starts; if they cancel, this phase keeps
- * the screen on an explicit "Unlock Pro / Cancel" gate rather than falling
- * through to the terminal "Saved to Shelvr" spinner (which would otherwise
- * claim a save that never happened). */
-type Phase =
-  | { kind: "idle" }
-  | { kind: "locked" }
-  | { kind: "saving"; session: ShareSession }
-  | { kind: "partial"; session: ShareSession }
-  | { kind: "clearFailed"; session: ShareSession }
-  | { kind: "ghostConfirm"; fingerprint: string }
-  | { kind: "complete" };
-
 export default function ShareScreen() {
   useAppLocale();
   const router = useRouter();
@@ -150,33 +120,10 @@ export default function ShareScreen() {
   const createNoteItem = useMutation(api.items.createNoteItem);
   const saveImages = useSaveImages();
 
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  // The session id currently being saved, set when a run starts and cleared when
-  // it settles. A NEW share arriving mid-flight replaces the persisted record;
-  // this id lets persistEntry/completeSession no-op against that newer session
-  // and lets the effect detect+start the new run once the old one finishes.
-  const runningSessionId = useRef<string | null>(null);
-  // Guards navigation + clear so completion runs exactly once per session, keyed
-  // by session id so a later session can still complete after an earlier one.
-  const completingSessionId = useRef<string | null>(null);
-  // The session currently shown on the partial screen. A settled-partial session
-  // must NOT auto-restart on every re-render; only an explicit "Retry failed"
-  // press re-runs it. A NEW session (different id) bypasses this and starts.
-  const partialSessionId = useRef<string | null>(null);
-  // The session already routed to the paywall. The locked branch returns before
-  // any await, so the running claim cannot cover it, and the effect re-runs for
-  // the same session as soon as native resolution settles. Cleared when a run
-  // starts so a later lapse gates the session again.
-  const lockedSessionId = useRef<string | null>(null);
-  // Synchronous latch shared by the ghost prompt's Save again and Cancel: the
-  // first press claims the confirmation before any re-render, so a queued
-  // second press can neither start a second save (each press mints a NEW
-  // session id runSave cannot dedupe) nor save after Cancel, or vice versa.
-  // ghostConfirm never returns within this mount afterwards.
-  const ghostAnswered = useRef(false);
-  // The reconcile effect re-runs on dependency identity changes; count one
-  // share_ghost_prompt per mount, not per re-run.
-  const ghostPromptLogged = useRef(false);
+  // The owner's state. Read and written synchronously on every dispatch, so
+  // two presses landing before a re-render both see the first one's guards.
+  const owner = useRef(initialIncomingShare(Platform.OS === "android"));
+  const [phase, setPhase] = useState<SharePhase>(owner.current.phase);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. */
@@ -229,313 +176,53 @@ export default function ShareScreen() {
     [error, rawPayloads, resolvedSharedPayloads],
   );
 
-  /** The single idempotent completion path used by all-success, continue, AND
-   * cancel. Cancel reuses it deliberately so the same persist-complete → native
-   * clear → delete-session reconciliation applies unchanged.
-   *
-   * All three store mutations are scoped to `session.sessionId`: an in-flight
-   * run finishing after a newer share replaced its record must NOT mark/delete
-   * the newer session. A throwing native clear surfaces a `clearFailed` phase
-   * (with Try again / Cancel) instead of an eternal spinner — the completed
-   * session stays so a remount (or the manual retry) re-attempts the clear. */
-  const completeSession = useCallback(
-    (session: ShareSession) => {
-      if (completingSessionId.current === session.sessionId) return;
-      completingSessionId.current = session.sessionId;
-      const sid = session.sessionId;
-      // 1. Persist complete BEFORE the native clear. A crash between backend
-      //    success and clear is then reconciled on remount (a matching
-      //    completed session clears native payloads and deletes itself).
-      markComplete(shareStore, sid);
-      // 2. Tombstone the batch BEFORE the native clear: every later exit
-      //    (clear, a throwing clear then Cancel, a crash) can delete the
-      //    session, and without a tombstone the next Android task-restore
-      //    replay would mint a fresh operationId the ledger cannot dedupe.
-      //    User-scoped so one account's batch never matches another's.
-      //    Android only — iOS never replays a share, so it never prompts.
-      //    Skipped for a stale run whose record a newer share replaced, so it
-      //    cannot overwrite the newer batch's tombstone.
-      if (
-        Platform.OS === "android" &&
-        loadSession(shareStore)?.sessionId === sid
-      ) {
-        recordCompletedShare(shareStore, session.fingerprint, session.userId);
+  /** Steps the owner and runs the effects it returns, in order. A save that
+   * settles later reports through the dispatch it started with, so the owner
+   * sees the world as it was when it asked for the save. */
+  const dispatch = useCallback(
+    function dispatch(event: ShareEvent): void {
+      const next = stepIncomingShare(owner.current, event, {
+        userId: user?._id ?? null,
+        entitled,
+        entitlementLoading,
+        rawPayloads,
+        resolved: processorPayloads,
+      });
+      owner.current = next.state;
+      for (const effect of next.effects) {
+        runEffect(effect, dispatch, { clearSharedPayloads, router, saveDeps });
       }
-      try {
-        // 3. Native clear. A throwing clear keeps the completed session (no
-        //    delete, no navigation) and surfaces clearFailed for a manual retry.
-        clearSharedPayloads();
-      } catch (err) {
-        analytics.captureError("clear_shared_payloads_failed", err);
-        completingSessionId.current = null;
-        setPhase({ kind: "clearFailed", session });
-        return;
-      }
-      // The native store is empty now — a discard record from an earlier
-      // failed abandon no longer describes anything.
-      clearDiscardedRecord();
-      // 4. Delete the local session ONLY after a successful clear — otherwise a
-      //    later identical re-share would match a stale completed record and be
-      //    silently dropped. Scoped so a stale in-flight run can't delete the
-      //    newer session that replaced its record.
-      deleteSession(shareStore, sid);
-      // The share handoff is durable now — drop the deferred-share flag so the
-      // resume hook can't re-open /share after we land Home. Kept this late so
-      // a process death mid-share still resumes on next launch.
-      try {
-        clearPendingShareOnDevice();
-      } catch (err) {
-        // The share is already complete; a SecureStore failure must not trap
-        // the user on this screen or prevent navigation home.
-        analytics.captureError("clear_pending_share_failed", err);
-      }
-      if (user && session.entries.some((entry) => entry.status === "saved")) {
-        try {
-          recordShareSaved(user._id);
-        } catch (err) {
-          analytics.captureError("record_first_share_failed", err);
-        }
-      }
-      // 5. Navigate Home exactly once.
-      if (session.entries.every((entry) => entry.status === "saved")) {
-        analytics.capture("shared_content_saved", {
-          item_count: session.entries.length,
-        });
-      }
-      setPhase({ kind: "complete" });
-      router.replace("/");
+      setPhase(owner.current.phase);
     },
-    [clearSharedPayloads, router, user],
+    [
+      user,
+      entitled,
+      entitlementLoading,
+      rawPayloads,
+      processorPayloads,
+      clearSharedPayloads,
+      router,
+      saveDeps,
+    ],
   );
-
-  /** Runs the processor for `session`, persisting each settled entry (scoped to
-   * the session id) and advancing to the right terminal phase. Re-entrant guard
-   * is keyed by session id: a second run for a DIFFERENT (newer) session is
-   * allowed once the current one settles, but never two concurrent runs. */
-  const runSave = useCallback(
-    async (
-      session: ShareSession,
-      resolved: ResolvedPayload[],
-      deps: ShareSaveDeps,
-    ) => {
-      // A run is already in flight for this session — don't start a second.
-      if (runningSessionId.current === session.sessionId) return;
-      if (entitlementLoading) return;
-      // Saving is Pro — a lapsed user sharing into Shelvr is routed to the
-      // paywall instead of failing every entry against the server gate. Set
-      // the locked phase BEFORE presenting so a cancel lands on the explicit
-      // Pro-gate screen, not the terminal "Saved to Shelvr" spinner.
-      if (!entitled) {
-        if (lockedSessionId.current === session.sessionId) return;
-        lockedSessionId.current = session.sessionId;
-        setPhase({ kind: "locked" });
-        void openPaywall(router, "share");
-        return;
-      }
-      runningSessionId.current = session.sessionId;
-      // Starting (or retrying) a run clears the partial-settled marker for this
-      // session so the effect won't block a future legitimate restart.
-      partialSessionId.current = null;
-      lockedSessionId.current = null;
-      const sid = session.sessionId;
-
-      try {
-        // Classify entries (no side effects) if none have been processed yet,
-        // persisting terminal statuses so a crash before any save still records
-        // failed/unsupported entries on remount. Scoped to this session so a
-        // newer session that replaced the record mid-flight is not corrupted.
-        const fresh = session.entries.every((e) => e.status === "pending");
-        let working = session;
-        if (fresh) {
-          const classified = classifyEntries(session, resolved);
-          working = { ...session, entries: classified };
-          for (const entry of classified) {
-            if (entry.status !== "pending") {
-              persistEntry(entry, sid);
-            }
-          }
-        }
-
-        setPhase({ kind: "saving", session: working });
-
-        const result = await processSession(
-          working,
-          resolved,
-          deps,
-          (entry) => {
-            persistEntry(entry, sid);
-            // Reflect incremental progress: update the saving phase's session so
-            // "Saved N of M" advances as each entry settles, not just at the end.
-            setPhase((prev) =>
-              prev.kind === "saving" && prev.session.sessionId === sid
-                ? { kind: "saving", session: withEntry(prev.session, entry) }
-                : prev,
-            );
-          },
-        );
-
-        const allSaved = result.entries.every((e) => e.status === "saved");
-        if (allSaved) {
-          completeSession(result);
-        } else {
-          // Some entries failed or were unsupported: stay and offer retry/continue.
-          // Mark this session partial-settled so the effect won't auto-restart
-          // it; only the Retry button re-runs it.
-          partialSessionId.current = sid;
-          setPhase({ kind: "partial", session: result });
-        }
-      } catch (err) {
-        // processSession catches per-entry save failures as data, so an
-        // unexpected throw here is from persistence/classification, not a save.
-        // Reload whatever survived from the store and route to the partial phase
-        // so the user gets retry/continue/cancel — never an eternal "Saving…"
-        // spinner (the plan's "never spin forever" done criterion).
-        analytics.captureError("share_save_failed", err);
-        const live = loadSession(shareStore);
-        partialSessionId.current = sid;
-        setPhase({ kind: "partial", session: live ?? session });
-      } finally {
-        // Only clear the run guard if this run is still the active one — a newer
-        // session may have started (the effect allows a new run once the old
-        // settles), in which case leave the newer id in place.
-        if (runningSessionId.current === sid) {
-          runningSessionId.current = null;
-        }
-      }
-    },
-    [completeSession, entitled, entitlementLoading, router],
-  );
-
-  /** Drops any persisted session and pending flag, clears native payloads, and
-   * returns Home. Used by the terminal error/empty states and Cancel. Deleting
-   * the session is essential: a session may already exist (e.g. counts
-   * diverged after the record was created), and leaving it would let a later
-   * identical share resume the canceled work instead of starting fresh. A
-   * THROWING native clear is no longer merely best-effort: it leaves the
-   * discarded payload in the store, so the batch is fingerprinted as discarded
-   * to keep the resume path from resurrecting it (see below). */
-  const abandon = useCallback(() => {
-    deleteSession(shareStore);
-    // Explicit user discard — the deferred-share flag must not resurrect this.
-    try {
-      clearPendingShareOnDevice();
-    } catch (err) {
-      // Best-effort: abandoning the share must still clear native payloads and
-      // leave the screen if SecureStore is temporarily unavailable.
-      analytics.captureError("clear_pending_share_failed", err);
-    }
-    try {
-      clearSharedPayloads();
-    } catch (err) {
-      // The native clear failed, so this explicitly discarded batch is still
-      // sitting in the store — and the resume path treats an unread batch as
-      // owed. Record the fingerprint so the leftover is not routed straight
-      // back here and re-saved under new operation ids; in the clearFailed
-      // window the entries may already be saved, so a resurrection would
-      // duplicate them. completeSession owns the other half of that window:
-      // its retained completed session reconciles as a clear, not a fresh
-      // save, so only this explicit discard needs the marker.
-      analytics.captureError("clear_shared_payloads_failed", err);
-      try {
-        markShareDiscardedOnDevice(fingerprintSharePayloads(rawPayloads));
-      } catch (discardErr) {
-        analytics.captureError("mark_share_discarded_failed", discardErr);
-      }
-      router.replace("/");
-      return;
-    }
-    // The native store is empty: any discard record it still describes is
-    // moot.
-    clearDiscardedRecord();
-    router.replace("/");
-  }, [clearSharedPayloads, rawPayloads, router]);
 
   // Reconcile + drive the save. The resolution-driven phases (resolving /
   // empty) are derived in render below; this effect only runs once resolution
-  // has settled AND there are payloads to save, so it contains no synchronous
-  // setState for the derived states. A resolution failure no longer blocks the
-  // save: processorPayloads falls back to the raw payloads.
+  // has settled AND there are payloads to save. A resolution failure does not
+  // block the save: processorPayloads falls back to the raw payloads. The
+  // deferred-share flag is cleared on completion or discard, NOT here, so a
+  // process death mid-share still resumes on next launch.
   useEffect(() => {
     // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
-    // NOTE: the deferred-share flag is cleared in completeSession/abandon (the
-    // durable handoff points), NOT here — a process death mid-share must still
-    // resume the share on next launch.
-    const userId = user._id;
-    // Derived guards: while resolving, or with no payloads, render handles the
-    // phase — nothing for the effect to do.
-    if (isResolving || sharedPayloads.length === 0) {
-      return;
-    }
-
-    const reconciled = reconcileSession(shareStore, userId, rawPayloads, () =>
+    if (isResolving || sharedPayloads.length === 0) return;
+    const result = reconcileSession(shareStore, user._id, rawPayloads, () =>
       Crypto.randomUUID(),
     );
-
-    if (reconciled.kind === "empty") {
-      // No payloads resolved to anything saveable; render's empty branch covers it.
-      return;
-    }
-    if (reconciled.kind === "ghost") {
-      // No session record, but this exact batch was just handled — an Android
-      // task-restore replayed the last share intent after a process death
-      // (reopening from recents). Saving it again would mint a fresh
-      // operationId the backend ledger cannot dedupe: the reported duplicate.
-      // A deliberate identical re-share is indistinguishable from JS, so it
-      // always gets a confirmation — never a silent drop.
-      void Promise.resolve().then(() => {
-        if (!ghostPromptLogged.current) {
-          ghostPromptLogged.current = true;
-          analytics.capture("share_ghost_prompt");
-        }
-        setPhase({
-          kind: "ghostConfirm",
-          fingerprint: fingerprintSharePayloads(rawPayloads),
-        });
-      });
-      return;
-    }
-    if (reconciled.kind === "clear") {
-      // A previously-completed session matches: clear native payloads and leave.
-      // Deferred out of the synchronous effect body so completeSession's
-      // setState does not trigger a cascading render.
-      void Promise.resolve().then(() => completeSession(reconciled.session));
-      return;
-    }
-
-    const session = reconciled.session;
-
-    // A run is already in flight for THIS session: don't restart it (the user
-    // may be mid-save, or the saving phase is already shown). A run for a
-    // DIFFERENT session is allowed: runSave's guard only blocks the same id, and
-    // the newer run replaces the persisted record (the older run's mutations are
-    // session-scoped and no-op against the newer record).
-    if (runningSessionId.current === session.sessionId) {
-      return;
-    }
-    // A session already settled to the partial screen must not auto-restart on
-    // every re-render — only the explicit "Retry failed" button re-runs it. A
-    // new session (different id) is unaffected.
-    if (partialSessionId.current === session.sessionId) {
-      return;
-    }
-
-    // Fire and forget; runSave guards re-entrancy (per session id) and sets the
-    // terminal phase. Deferred out of the synchronous effect body so runSave's
-    // initial setPhase('saving') does not trip the cascading-render lint rule.
-    void Promise.resolve().then(() =>
-      runSave(session, processorPayloads, saveDeps),
-    );
-  }, [
-    user,
-    sharedPayloads,
-    rawPayloads,
-    processorPayloads,
-    isResolving,
-    saveDeps,
-    runSave,
-    completeSession,
-  ]);
+    // Deferred out of the synchronous effect body so the phase the owner
+    // returns is not set during the effect (a cascading render).
+    void Promise.resolve().then(() => dispatch({ type: "reconciled", result }));
+  }, [user, sharedPayloads, rawPayloads, isResolving, dispatch]);
 
   // --- Derived resolution state (pure functions of hook props) --------------
 
@@ -546,39 +233,6 @@ export default function ShareScreen() {
     !isResolving && sharedPayloads.length === 0 && phase.kind === "idle";
 
   // --- Phase render ---------------------------------------------------------
-
-  /** The Android task-restore ghost reached its confirmation: the redelivered
-   * batch matches the last handled one. Cancel → clear and leave; Save again →
-   * start the session reconcileSession deliberately did not. */
-  const onGhostDismiss = useCallback(() => {
-    if (ghostAnswered.current) return;
-    ghostAnswered.current = true;
-    analytics.capture("share_ghost_dismissed");
-    abandon();
-  }, [abandon]);
-
-  const onGhostSaveAgain = useCallback(() => {
-    if (
-      phase.kind !== "ghostConfirm" ||
-      user === null ||
-      user === undefined ||
-      ghostAnswered.current
-    ) {
-      return;
-    }
-    ghostAnswered.current = true;
-    analytics.capture("share_ghost_save_again");
-    const session = startNewSession(
-      shareStore,
-      user._id,
-      phase.fingerprint,
-      rawPayloads,
-      () => Crypto.randomUUID(),
-    );
-    void Promise.resolve().then(() =>
-      runSave(session, processorPayloads, saveDeps),
-    );
-  }, [phase, user, rawPayloads, processorPayloads, saveDeps, runSave]);
 
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
@@ -606,15 +260,13 @@ export default function ShareScreen() {
           <Button
             label={t("common.cancel")}
             theme={theme}
-            onPress={() => abandon()}
+            onPress={() => dispatch({ type: "cancel" })}
           />
           <Button
             label={t("pro.unlock")}
             theme={theme}
             primary
-            onPress={() => {
-              void openPaywall(router, "share");
-            }}
+            onPress={() => dispatch({ type: "unlock" })}
           />
         </View>
       </PhaseSurface>
@@ -633,13 +285,13 @@ export default function ShareScreen() {
           <Button
             label={t("common.cancel")}
             theme={theme}
-            onPress={onGhostDismiss}
+            onPress={() => dispatch({ type: "ghostDismiss" })}
           />
           <Button
             label={t("share.saveAgain")}
             theme={theme}
             primary
-            onPress={onGhostSaveAgain}
+            onPress={() => dispatch({ type: "ghostSaveAgain" })}
           />
         </View>
       </PhaseSurface>
@@ -666,7 +318,7 @@ export default function ShareScreen() {
         title={t("share.empty")}
         theme={theme}
         retryLabel={t("common.done")}
-        onRetry={abandon}
+        onRetry={() => dispatch({ type: "cancel" })}
         single
       />
     );
@@ -719,23 +371,25 @@ export default function ShareScreen() {
           <Button
             label={t("common.cancel")}
             theme={theme}
-            onPress={() => completeSession(phase.session)}
+            onPress={() =>
+              dispatch({ type: "complete", session: phase.session })
+            }
           />
           <Button
             label={t("share.continueSaved")}
             theme={theme}
-            onPress={() => completeSession(phase.session)}
+            onPress={() =>
+              dispatch({ type: "complete", session: phase.session })
+            }
           />
           {hasRetryable ? (
             <Button
               label={t("capture.retryFailed")}
               theme={theme}
               primary
-              onPress={() => {
-                const live = loadSession(shareStore);
-                if (live === null) return;
-                void runSave(live, processorPayloads, saveDeps);
-              }}
+              onPress={() =>
+                dispatch({ type: "retry", live: loadSession(shareStore) })
+              }
             />
           ) : null}
         </View>
@@ -752,9 +406,9 @@ export default function ShareScreen() {
         title={t("share.finishFailed")}
         theme={theme}
         cancelLabel={t("common.cancel")}
-        onCancel={abandon}
+        onCancel={() => dispatch({ type: "cancel" })}
         retryLabel={t("common.tryAgain")}
-        onRetry={() => completeSession(phase.session)}
+        onRetry={() => dispatch({ type: "complete", session: phase.session })}
       />
     );
   }
@@ -773,6 +427,120 @@ export default function ShareScreen() {
 // Helpers
 // ---------------------------------------------------------------------------
 
+type EffectDeps = {
+  clearSharedPayloads: () => void;
+  router: ReturnType<typeof useRouter>;
+  saveDeps: ShareSaveDeps;
+};
+
+/** Runs one owner effect. Best-effort effects report and carry on: the share
+ * is already durable, or the screen is leaving, so a SecureStore failure must
+ * not trap the user here. */
+function runEffect(
+  effect: ShareEffect,
+  dispatch: (event: ShareEvent) => void,
+  deps: EffectDeps,
+): void {
+  switch (effect.type) {
+    case "markComplete":
+      markComplete(shareStore, effect.sessionId);
+      return;
+    case "tombstone":
+      recordCompletedShare(shareStore, effect.fingerprint, effect.userId);
+      return;
+    case "nativeClear": {
+      let ok = true;
+      try {
+        deps.clearSharedPayloads();
+      } catch (err) {
+        analytics.captureError("clear_shared_payloads_failed", err);
+        ok = false;
+      }
+      dispatch({ type: "nativeClearSettled", ok, for: effect.for });
+      return;
+    }
+    case "deleteSession":
+      deleteSession(shareStore, effect.sessionId);
+      return;
+    case "clearPendingFlag":
+      bestEffort("clear_pending_share_failed", clearPendingShareOnDevice);
+      return;
+    case "clearDiscardRecord":
+      bestEffort("clear_share_discarded_failed", clearShareDiscardedOnDevice);
+      return;
+    case "markDiscarded":
+      bestEffort("mark_share_discarded_failed", () =>
+        markShareDiscardedOnDevice(effect.fingerprint),
+      );
+      return;
+    case "persistEntry":
+      persistEntry(effect.entry, effect.sessionId);
+      return;
+    case "save":
+      void save(effect, dispatch, deps.saveDeps);
+      return;
+    case "startSession": {
+      const session = startNewSession(
+        shareStore,
+        effect.userId,
+        effect.fingerprint,
+        effect.rawPayloads,
+        () => Crypto.randomUUID(),
+      );
+      void Promise.resolve().then(() =>
+        dispatch({ type: "sessionStarted", session }),
+      );
+      return;
+    }
+    case "recordFirstShare":
+      bestEffort("record_first_share_failed", () =>
+        recordShareSaved(effect.userId),
+      );
+      return;
+    case "capture":
+      analytics.capture(effect.event);
+      return;
+    case "sharedContentSaved":
+      analytics.capture("shared_content_saved", {
+        item_count: effect.itemCount,
+      });
+      return;
+    case "openPaywall":
+      void openPaywall(deps.router, "share");
+      return;
+    case "navigateHome":
+      deps.router.replace("/");
+      return;
+  }
+}
+
+/** Persists the classified entries, runs the processor, and reports each
+ * settled entry and the outcome back to the owner. */
+async function save(
+  effect: Extract<ShareEffect, { type: "save" }>,
+  dispatch: (event: ShareEvent) => void,
+  saveDeps: ShareSaveDeps,
+): Promise<void> {
+  const sid = effect.session.sessionId;
+  try {
+    for (const entry of effect.classified) persistEntry(entry, sid);
+    const result = await processSession(
+      effect.session,
+      effect.resolved,
+      saveDeps,
+      (entry) => dispatch({ type: "entrySettled", sessionId: sid, entry }),
+    );
+    dispatch({ type: "saveSettled", session: result });
+  } catch (err) {
+    analytics.captureError("share_save_failed", err);
+    dispatch({
+      type: "saveCrashed",
+      session: effect.input,
+      live: loadSession(shareStore),
+    });
+  }
+}
+
 /** Writes a single settled entry to the store, scoped to `sessionId`. The scope
  * makes the persist a no-op if a newer share has replaced this session's record
  * mid-flight, preventing cross-session corruption. Safe to call for any status. */
@@ -786,15 +554,11 @@ function persistEntry(entry: ShareEntry, sessionId: string): void {
   updateEntry(shareStore, entry.index, patch, sessionId);
 }
 
-/** Drops any discard record once the native store is confirmed empty — a
- * stale record can only wrongly suppress a later identical re-share.
- * Best-effort: the share is already durable (completeSession) or the screen
- * is leaving (abandon), so a SecureStore failure is reported, not fatal. */
-function clearDiscardedRecord(): void {
+function bestEffort(code: string, run: () => void): void {
   try {
-    clearShareDiscardedOnDevice();
+    run();
   } catch (err) {
-    analytics.captureError("clear_share_discarded_failed", err);
+    analytics.captureError(code, err);
   }
 }
 
