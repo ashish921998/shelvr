@@ -32,10 +32,25 @@ const captureExceptions = EXCEPTION_AUTOCAPTURE_VARIANTS.has(
 // `before_send` hook below extends it to SDK-autocaptured crashes.
 export const SAFE_ERROR_MESSAGES = new Set(["Network request failed"]);
 
+// Expo and other native modules reject with a `CodedError` whose message is a
+// generated code token — `ERR_UNAVAILABLE`, `E_NO_PERMISSION`. The token names
+// the failing module and holds no user content (no spaces, URLs, or free text),
+// so it is safe to keep. Without it a native crash reaches error tracking as the
+// bare class name ("Error"), naming nothing that failed. The pattern only admits
+// a single SCREAMING_SNAKE token, so an interpolated message (which carries
+// spaces, slashes, or lowercase) can never match.
+const SAFE_EXCEPTION_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+function isSafeExceptionValue(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    (SAFE_ERROR_MESSAGES.has(value) ||
+      (value.length <= 80 && SAFE_EXCEPTION_CODE.test(value)))
+  );
+}
+
 function sanitizeExceptionValue(value: unknown, fallback: unknown): unknown {
-  return typeof value === "string" && SAFE_ERROR_MESSAGES.has(value)
-    ? value
-    : fallback;
+  return isSafeExceptionValue(value) ? value : fallback;
 }
 
 function redactExceptionProperties(properties: unknown): void {

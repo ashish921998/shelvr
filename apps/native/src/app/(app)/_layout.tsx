@@ -5,6 +5,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
+import { useTrialReminder } from "@/lib/trial-reminder";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
@@ -25,6 +26,8 @@ export default function AppLayout() {
   useReplayOnboarding();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
   useResumePendingShare();
+  // Remind trialers two days before the yearly plan starts charging.
+  useTrialReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;

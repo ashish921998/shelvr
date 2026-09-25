@@ -141,7 +141,9 @@ type AnalyticsEventProperties = {
     space_id: string;
     undone: boolean;
   };
-  item_shared: Record<string, never>;
+  // `share_ref` is set when a branded link went out: a hash of its token that
+  // matches the web share page's `share_page_viewed` and `app_store_clicked`.
+  item_shared: { surface: "item_detail" | "feed"; share_ref?: string };
   item_link_copied: Record<string, never>;
   item_deleted: { item_type: AnalyticsItem["type"] };
   suggestion_accepted: Record<string, never>;
@@ -194,6 +196,7 @@ type AnalyticsEventProperties = {
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
+  trial_reminder_permission: { granted: boolean };
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —
   // only the server-side webhook events (trial_cancelled, …) count as

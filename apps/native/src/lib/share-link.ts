@@ -1,12 +1,32 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { useCallback } from "react";
 import { Platform, Share } from "react-native";
 
 /** Branded preview page for a shared item (`apps/web/src/app/i/[token]`). */
 function shareLinkUrl(token: string): string {
   return `https://shelvr-web.vercel.app/i/${token}`;
+}
+
+/**
+ * The analytics reference for a branded link: the first 16 hex characters of
+ * its token's SHA-256, never the token itself, which opens the preview. The
+ * web share page reports the same value, so a share joins to its views and
+ * App Store clicks. Undefined for any other URL.
+ */
+export async function shareRefOf(
+  url: string | undefined,
+): Promise<string | undefined> {
+  const token = url?.match(/\/i\/([^/?#]+)$/)?.[1];
+  if (!token) return undefined;
+  try {
+    const digest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, token);
+    return digest.slice(0, 16).toLowerCase();
+  } catch {
+    return undefined;
+  }
 }
 
 /** Convex queues mutations while offline and resolves only once the server

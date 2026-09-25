@@ -36,7 +36,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
-import { shareUrl, useShareLink } from "@/lib/share-link";
+import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -327,6 +327,13 @@ export const ItemCard = memo(function ItemCard({
     try {
       const link = item.type === "link" ? await shareLink(item._id) : undefined;
       const result = await shareUrl(link ?? item.url);
+      if (result.action === Share.sharedAction) {
+        const shareRef = await shareRefOf(link);
+        analytics.capture("item_shared", {
+          surface: "feed",
+          ...(shareRef ? { share_ref: shareRef } : {}),
+        });
+      }
       if (
         result.action === Share.sharedAction &&
         item._creationTime !== undefined
