@@ -13,6 +13,7 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
+import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
 import { LEGAL_URLS, SUPPORT_URL } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
@@ -54,8 +55,7 @@ export default function ProfileScreen() {
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
-  const fixtureResetEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
+  const fixtureResetEnabled = isAnonymousAuthEnabled();
   const { data: canResetFlowFixtures } = useQuery(
     convexQuery(
       api.devFixtures.canResetCurrentUser,
@@ -91,17 +91,20 @@ export default function ProfileScreen() {
   // — any non-`none` status. A `none` user has nothing to manage and should see
   // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== "none" && !loading;
+  // A lapsed trial or subscription has nothing left to manage: the way back is
+  // a new purchase, so that row opens the paywall rather than Customer Center.
+  const opensPaywall = status === "none" || status === "lapsed";
 
   // RevenueCat UI (paywall / Customer Center) presents from the root view
   // controller, and UIKit refuses to present while this profile sheet is up
   // ("already presenting RNSScreen"). Dismiss the sheet first, let it settle,
-  // then route: an active/lapsed subscriber to Customer Center (cancel/refund/
-  // change-plan/restore), a `none` user to the paywall to start a trial.
+  // then route: an active subscriber to Customer Center (cancel/refund/
+  // change-plan/restore), a `none` or lapsed user to the paywall.
   const manageSubscription = async () => {
     if (loading) return;
     router.back();
     await waitForSheetTransition();
-    if (hasSubscription) {
+    if (!opensPaywall) {
       const presented = await presentCustomerCenter();
       // Customer Center isn't linked/configured, or identity sync timed out —
       // fall back to the platform's own subscription management page rather
@@ -121,7 +124,10 @@ export default function ProfileScreen() {
         ]);
       }
     } else {
-      void openPaywall(router, "profile");
+      void openPaywall(
+        router,
+        status === "lapsed" ? "profile_lapsed" : "profile",
+      );
     }
   };
 

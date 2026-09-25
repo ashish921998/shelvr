@@ -99,9 +99,12 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change)
-  makes new updates invisible to binaries built from the old fingerprint:
-  cut a fresh store build before resuming OTA publishes.
+  fingerprint (a native dependency added or removed, a native config change,
+  or `version` in `app.json`) makes new updates invisible to binaries built
+  from the old fingerprint: cut a fresh store build before resuming OTA
+  publishes. The version is the easy one to miss — a bump must land on
+  `main` before any OTA aimed at the build carrying it. The build number is
+  not an input.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract — an installed

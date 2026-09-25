@@ -16,7 +16,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
@@ -79,7 +79,12 @@ function CoverStack({
   useAppLocale();
   const { theme } = useUnistyles();
   const ratio = cover
-    ? clampRatio(cover.aspectRatio, cover.type === "link" ? OG_RATIO : 1, 0.6, 1.9)
+    ? clampRatio(
+        cover.aspectRatio,
+        cover.type === "link" ? OG_RATIO : 1,
+        0.6,
+        1.9,
+      )
     : 1;
   const position = CARD_POSITION;
 
@@ -192,6 +197,11 @@ export default function SpacesScreen() {
     ]);
   };
 
+  // Staggered entrances replay on recycled cells and jank the masonry list,
+  // so spaces render without them. The zoom handoff stays, but not under
+  // Reduce Motion.
+  const reducedMotion = useReducedMotion();
+
   if (spaces === undefined) {
     return <ScreenLoader label={t("loading.spaces")} />;
   }
@@ -217,18 +227,15 @@ export default function SpacesScreen() {
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        renderItem={({ item: space, index }) => {
+        renderItem={({ item: space }) => {
           // `previews` can be briefly absent when the offline cache rehydrates an
           // older query shape before the live refetch lands. The newest item is
           // the cover; the rest of the pile is intentionally blank.
           const cover = (space.previews ?? [])[0];
           return (
-            <Animated.View
-              style={styles.cell}
-              entering={FadeInDown.delay(index * 60).duration(350)}
-            >
+            <Animated.View style={styles.cell}>
               <Link href={`/space/${space._id}`} asChild>
-                <Link.Trigger withAppleZoom>
+                <Link.Trigger withAppleZoom={!reducedMotion}>
                   {/* The whole card is the pressable that routes to the space. */}
                   <Pressable
                     testID={

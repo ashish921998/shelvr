@@ -3,9 +3,9 @@
 import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { GenericActionCtx } from "convex/server";
+import type { FunctionReturnType, GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
-import { generateObject, wrapLanguageModel } from "ai";
+import { embedMany, generateObject, wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { Readability } from "@mozilla/readability";
@@ -32,8 +32,15 @@ import {
   type PostMedia,
   type Recipe,
 } from "./model/itemFields";
-import { logEvent } from "./model/log";
+import { logEvent, errorName } from "./model/log";
 import { extractRecipeMarkup, type RecipeDraft } from "./model/recipeMarkup";
+import {
+  buildEmbeddingText,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+  normalizeEmbedding,
+} from "./model/embedding";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -87,6 +94,142 @@ function modelCallOptions(timeoutMs: number): {
     abortSignal: AbortSignal.timeout(timeoutMs),
     maxRetries: MODEL_MAX_RETRIES,
   };
+}
+
+/**
+ * The embedding model, called through the same provider and API key as
+ * classification. Separate from MODEL_NAME because they are different models
+ * on different release cadences, and because token usage is logged per call
+ * site: embedding spend should be legible on its own.
+ */
+const EMBEDDING_MODEL_NAME = "gemini-embedding-2";
+
+/**
+ * Deadline for one embedding batch. Embedding is a single forward pass with no
+ * generated tokens, so it is far quicker than classification; the allowance is
+ * generous only so a cold provider does not cost an item its vector. It adds
+ * to processItem's budget above, which stays well under the action limit.
+ */
+const EMBED_TIMEOUT_MS = 20_000;
+
+/**
+ * The two sides of retrieval.
+ *
+ * Google documents these task types as an asymmetric pair: items are the
+ * corpus, so they are embedded as documents, and anything searching the index
+ * embeds its query text as a query. The pairing lives in one place and callers
+ * pick a side by choosing `embedTexts` or `embedQuery` rather than by passing
+ * a string.
+ *
+ * Measured 2026-09-25 against the dev deployment: `gemini-embedding-2` returns
+ * the same vector for a query under either task type, so with this model the
+ * pairing changes nothing and ranking is plain symmetric similarity. It is
+ * kept because the provider forwards it and a later model may honour it; do
+ * not read it as a ranking guarantee, and do not expect a mismatch to show up
+ * as worse results.
+ */
+const EMBEDDING_DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT";
+const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
+
+/**
+ * What one embedding batch produced.
+ *
+ * `callFailed` is reported separately from an empty `vectors` slot on purpose.
+ * A slot is `undefined` for two unrelated reasons — the call never completed,
+ * or the call completed and that particular vector was unusable — and the two
+ * demand opposite handling. The first is nobody's fault and must be retried
+ * for free; the second is that item's own problem and has to spend an
+ * attempt, or a row the provider can never embed leads the sweep range
+ * forever. Inferring one from the other ("the batch produced nothing, so the
+ * provider must be down") gets it wrong in exactly the case that wedges the
+ * sweep: a completed call whose every vector is malformed.
+ */
+export type EmbedBatchResult = {
+  vectors: (number[] | undefined)[];
+  callFailed: boolean;
+};
+
+/**
+ * Embeds a batch of texts, in input order.
+ *
+ * Best effort by contract: it never throws and never rejects. Every failure
+ * mode — provider outage, timeout, a malformed vector, an empty input —
+ * collapses to `undefined` in that text's slot, because an item is worth
+ * saving whether or not it could be embedded. Callers write the vectors they
+ * got and leave the rest to the sweeper; `callFailed` tells them which kind
+ * of nothing they are looking at.
+ *
+ * Empty texts are never sent upstream; their slot is `undefined` from the
+ * start. Vectors are normalized and width-checked before being returned, so a
+ * caller can hand the result straight to a mutation: Convex rejects a vector
+ * whose width does not match the index, which would otherwise fail the whole
+ * classification transaction over an optional field.
+ *
+ * Batching is the SDK's: `embedMany` splits at the provider's documented
+ * 100-values ceiling on its own, so callers pass a whole page.
+ */
+async function embedBatch(
+  texts: string[],
+  taskType: string,
+): Promise<EmbedBatchResult> {
+  const vectors: (number[] | undefined)[] = texts.map(() => undefined);
+  const sendable = texts
+    .map((text, index) => ({ text, index }))
+    .filter((entry) => entry.text.length > 0);
+  if (sendable.length === 0) {
+    return { vectors, callFailed: false };
+  }
+  try {
+    const { embeddings } = await embedMany({
+      model: google.embedding(EMBEDDING_MODEL_NAME),
+      values: sendable.map((entry) => entry.text),
+      providerOptions: {
+        google: {
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+          taskType,
+        },
+      },
+      ...modelCallOptions(EMBED_TIMEOUT_MS),
+    });
+    embeddings.forEach((raw, position) => {
+      const vector = normalizeEmbedding(raw);
+      if (isValidEmbedding(vector)) {
+        vectors[sendable[position].index] = vector;
+      }
+    });
+  } catch (error) {
+    // Categories and counts only: an embedding error can echo the text.
+    logEvent("warn", "embedding_failed", {
+      model: EMBEDDING_MODEL_NAME,
+      task_type: taskType,
+      count: sendable.length,
+      timed_out: isModelTimeout(error),
+      error: errorName(error),
+    });
+    return { vectors, callFailed: true };
+  }
+  return { vectors, callFailed: false };
+}
+
+/** Embeds item texts for storage in the vector index. */
+export async function embedTexts(texts: string[]): Promise<EmbedBatchResult> {
+  return await embedBatch(texts, EMBEDDING_DOCUMENT_TASK_TYPE);
+}
+
+/**
+ * Embeds one search string for use as a `ctx.vectorSearch` vector.
+ *
+ * Same best-effort contract as `embedTexts`: `undefined` means the caller has
+ * no vector to search with and must fall back to whatever it did before, not
+ * that it should fail. Text bounding is the caller's, via
+ * `buildEmbeddingText`, so a query is composed exactly the way the stored
+ * summaries were.
+ */
+async function embedQuery(text: string): Promise<number[] | undefined> {
+  // A search has no sweep behind it to retry for it, so a failed call and an
+  // unusable vector mean the same thing here: no vector, take the fallback.
+  const { vectors } = await embedBatch([text], EMBEDDING_QUERY_TASK_TYPE);
+  return vectors[0];
 }
 
 /** True for the error a timed-out or aborted model call rejects with. The SDK
@@ -208,20 +351,22 @@ const SYSTEM_PROMPT =
 // zod enum below and the DB shape cannot drift. Anything outside it is
 // dropped in sanitizeIntents before finalize.
 
-// Appended to every classification prompt. Describes the catalog and the rules
-// that keep intents genuinely useful (and, for social posts, honest).
-const INTENTS_PROMPT_BLOCK = [
-  "Also propose up to 5 useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:",
-  "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
-  "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
-  "- web_search: search the web. value is the query.",
-  "- open_maps: open a place in maps. value is a place name or address.",
-  "- call: call a phone number. value is the phone number.",
-  "- message: text a phone number. value is the phone number.",
-  "- email: email someone. value is the email address.",
-  "- add_event: add a calendar event. value is the event title.",
-  "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
-].join("\n");
+// Appended to every classification and steering prompt. Describes the catalog
+// and the rules that keep intents genuinely useful (and, for social posts,
+// honest). The cap matches the caller's schema and sanitize limit.
+const intentsPromptBlock = (maxIntents: number): string =>
+  [
+    `Also propose up to ${maxIntents} useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:`,
+    "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
+    "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
+    "- web_search: search the web. value is the query.",
+    "- open_maps: open a place in maps. value is a place name or address.",
+    "- call: call a phone number. value is the phone number.",
+    "- message: text a phone number. value is the phone number.",
+    "- email: email someone. value is the email address.",
+    "- add_event: add a calendar event. value is the event title.",
+    "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
+  ].join("\n");
 
 // How much extracted text to feed the classifier. The model only needs enough
 // to understand the piece — it doesn't read the whole thing.
@@ -1887,7 +2032,7 @@ function spacesPromptBlock(
     candidates.push(line);
   }
   const lines = candidates.join("\n");
-  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
+  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, list the exact names of the spaces this item clearly belongs to, or an empty array if none do. Each name becomes a suggestion the user reviews, so leave out borderline matches.`;
 }
 
 /** The model's classification for one item, plus the link-read artifacts the
@@ -1945,7 +2090,7 @@ function linkAnalysisPrompt(
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
       : "",
-    INTENTS_PROMPT_BLOCK,
+    intentsPromptBlock(5),
   ]
     .filter((line) => line !== "")
     .join("\n\n");
@@ -2039,7 +2184,7 @@ async function analyzeImageItem(
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
               "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
               spacesBlock,
-              INTENTS_PROMPT_BLOCK,
+              intentsPromptBlock(5),
             ].join("\n\n"),
           },
           {
@@ -2075,7 +2220,7 @@ async function analyzeNoteItem(
         ? [`The user titled this note: ${item.title}`]
         : []),
       `Note:\n${item.note.slice(0, MAX_CONTENT_CHARS)}`,
-      INTENTS_PROMPT_BLOCK,
+      intentsPromptBlock(5),
     ].join("\n\n"),
   });
   return { result: object };
@@ -2222,6 +2367,47 @@ async function refreshClaimed(
   });
 }
 
+/**
+ * The vector for a classification about to be finalized.
+ *
+ * Best effort: a failure returns undefined, the item still finalizes, and the
+ * sweeper repairs it. Producing it here rather than in a later mutation is
+ * what lets it ride the same run-fenced write as the text it describes, so a
+ * superseded run can never leave a vector disagreeing with the row beside it.
+ *
+ * The title is resolved with finalizeItem's own rule — a title the owner typed
+ * (or one a note refresh keeps) outranks the classifier's — so the vector
+ * describes the title the row actually ends up with, not one this run proposed
+ * and the mutation then discarded.
+ */
+async function embedForRun(params: {
+  item: { title?: string; titleSource?: "user"; note?: string };
+  refresh: boolean;
+  title: string;
+  description: string;
+  tags: string[];
+  siteName?: string;
+  content?: string;
+}): Promise<number[] | undefined> {
+  const keepsExistingTitle =
+    params.item.titleSource === "user" || params.refresh;
+  const storedTitle =
+    keepsExistingTitle && params.item.title !== undefined
+      ? params.item.title
+      : params.title;
+  const { vectors } = await embedTexts([
+    buildEmbeddingText({
+      title: storedTitle,
+      description: params.description,
+      tags: params.tags,
+      siteName: params.siteName,
+      note: params.item.note,
+      content: params.content,
+    }),
+  ]);
+  return vectors[0];
+}
+
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -2292,15 +2478,33 @@ export const processItem = internalAction({
           ? await storePoster(ctx, page.heroImageUrl)
           : undefined;
 
+      const tags = result.tags
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      // `page` is undefined for anything that is not a link, so these need no
+      // type guard. Hoisted so the embedded text is exactly the stored text.
+      const pageContent = page?.content;
+      const pageSiteName = page?.siteName;
+      const embedding = await embedForRun({
+        item,
+        refresh: args.refresh === true,
+        title: result.title,
+        description: result.description,
+        tags,
+        siteName: pageSiteName,
+        content: pageContent,
+      });
+
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
         title: result.title,
         keepTitle: args.refresh === true,
         description: result.description,
-        tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-        content: page?.content,
-        siteName: page?.siteName,
+        tags,
+        content: pageContent,
+        siteName: pageSiteName,
+        embedding,
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
@@ -2387,6 +2591,85 @@ export const processItem = internalAction({
  * (older saves whose ratio was dropped before it was persisted). Reads the
  * stored file's header bytes directly — no re-upload needed.
  */
+/**
+ * Embeds one page of items whose vector is missing or from an older
+ * generation, then stamps the whole page.
+ *
+ * This is three jobs in one, which is why it runs on a schedule rather than
+ * once: it backfills saves made before embeddings existed, it repairs saves
+ * whose inline embed call failed during classification, and it is the
+ * migration path when CURRENT_EMBEDDING_VERSION is bumped. Once the range is
+ * empty it costs one indexed read per run and nothing else.
+ *
+ * A full page that actually embedded something chains itself immediately, the
+ * same way the stale-processing sweeper does, so a large existing shelf drains
+ * without waiting a cron interval per page. Nothing can sit at the front of
+ * the range forever: an item with no embeddable text is finished on sight, and
+ * one the provider keeps rejecting is stamped after MAX_EMBEDDING_ATTEMPTS.
+ * An item the provider merely could not reach is left exactly as it was.
+ */
+export const sweepItemEmbeddings = internalAction({
+  args: {},
+  returns: v.object({ scanned: v.number(), written: v.number() }),
+  handler: async (ctx): Promise<{ scanned: number; written: number }> => {
+    const pending = await ctx.runQuery(
+      internal.items.listItemsNeedingEmbeddingInternal,
+      { limit: EMBEDDING_SWEEP_PAGE },
+    );
+    if (pending.length === 0) {
+      return { scanned: 0, written: 0 };
+    }
+    const { vectors, callFailed } = await embedTexts(
+      pending.map((entry) => entry.text),
+    );
+
+    // Whether the provider answered at all, taken from the call itself rather
+    // than inferred from its output. Both directions matter. A real outage
+    // must not march the whole table stamping items as done with no vector —
+    // that is what the `deferred` outcome prevents. But a call that completes
+    // and returns nothing usable is not an outage, and deferring those rows
+    // would wedge the sweep: they lead the range every run, so the page would
+    // be re-read forever and every ready item behind it would never be
+    // reached. Those spend an attempt instead, and the cap eventually clears
+    // them.
+
+    const { written, stamped, deferred } = await ctx.runMutation(
+      internal.items.setEmbeddingsInternal,
+      {
+        entries: pending.map((entry, index) => ({
+          itemId: entry.itemId,
+          text: entry.text,
+          embedding: vectors[index],
+          outcome:
+            vectors[index] !== undefined
+              ? ("embedded" as const)
+              : entry.text.length === 0
+                ? ("nothing_to_embed" as const)
+                : callFailed
+                  ? ("deferred" as const)
+                  : ("failed" as const),
+        })),
+      },
+    );
+    logEvent("info", "embedding_sweep", {
+      scanned: pending.length,
+      written,
+      stamped,
+      deferred,
+      provider_down: callFailed,
+    });
+
+    // Chain only on real progress. Gating on `written` rather than on rows
+    // touched is what keeps a provider outage from accelerating: with nothing
+    // embedded there is nothing to chain for, and the next cron tick retries
+    // at its own pace.
+    if (pending.length === EMBEDDING_SWEEP_PAGE && written > 0) {
+      await ctx.scheduler.runAfter(0, internal.ai.sweepItemEmbeddings, {});
+    }
+    return { scanned: pending.length, written };
+  },
+});
+
 export const backfillImageAspectRatios = internalAction({
   args: {},
   returns: v.object({ scanned: v.number(), updated: v.number() }),
@@ -2426,9 +2709,149 @@ const recommendSchema = z.object({
 // sweep — the user can always add more by hand or ask again later.
 const MAX_RECOMMENDATIONS = 8;
 
+/** How many candidate items the recommendation prompt is handed. */
+const RECOMMEND_CANDIDATES = 100;
+
 /**
- * Recommend existing items for a space, off nothing but its title. Runs when
- * a space is created, and again whenever its dynamic toggle turns on. Writes
+ * How many hits the candidate vector search asks for.
+ *
+ * Wider than RECOMMEND_CANDIDATES because the hits are thinned afterwards:
+ * items already in the space drop out, and so do items whose stored vector
+ * outlived a change of status or belongs to an older generation. The headroom
+ * keeps a space whose strongest matches are already filed from arriving at the
+ * prompt short-handed.
+ *
+ * 256 is the most Convex will return from one `vectorSearch`, and a hit is an
+ * id and a score rather than a document, so the widest window the platform
+ * offers costs almost nothing here; the document reads are bounded separately,
+ * by `listReadyItemsByIdInternal`'s row and byte limits. Past 256 filed
+ * stronger matches the ranking cannot see further, and the recency half of
+ * `recommendationCandidates` is what fills the list instead.
+ */
+const RECOMMEND_VECTOR_LIMIT = 256;
+
+type RecommendationCandidate = FunctionReturnType<
+  typeof internal.items.listReadyItemsInternal
+>[number];
+
+/**
+ * The semantic half of `recommendationCandidates`.
+ *
+ * Returns an empty list rather than throwing on any failure. The outer action
+ * catches and logs, so an error escaping here would turn a transient search
+ * hiccup into no recommendations at all — strictly worse than the recency read
+ * this replaced. An empty list is the fallback signal.
+ */
+async function searchCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  vector: number[],
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  try {
+    const matches = await ctx.vectorSearch("items", "by_embedding", {
+      vector,
+      limit: RECOMMEND_VECTOR_LIMIT,
+      // The only filter the index carries, and deliberately so: Convex vector
+      // filters cannot AND across fields, and this is the one whose absence
+      // would leak another account's saves. Everything else the candidates
+      // have to satisfy is enforced when the ids are hydrated.
+      filter: (q) => q.eq("userId", space.userId),
+    });
+    const itemIds = matches
+      .map((match) => match._id)
+      .filter((itemId) => !memberIds.has(itemId));
+    if (itemIds.length === 0) {
+      return [];
+    }
+    return await ctx.runQuery(internal.items.listReadyItemsByIdInternal, {
+      userId: space.userId,
+      itemIds,
+      limit: RECOMMEND_CANDIDATES,
+    });
+  } catch (error) {
+    logEvent("warn", "recommend_vector_search_failed", {
+      space_id: space._id,
+      error: errorName(error),
+    });
+    return [];
+  }
+}
+
+/**
+ * Picks the items the recommendation prompt gets to choose from.
+ *
+ * Semantic first: the space's own name and description are embedded as a
+ * query and matched against the item vector index, so a user with a thousand
+ * saves is judged on the hundred most *relevant* rather than the hundred most
+ * *recent*. That difference is the whole point — the saves worth resurfacing
+ * when someone finally makes a "Recipes" space are the old ones they have
+ * forgotten, and those are exactly the ones a recency read cannot see.
+ *
+ * Recency is not an alternative to that, it is the floor underneath it, and
+ * it is not optional. A user whose backfill has not drained, whose items all
+ * failed to embed, or whose query text could not be embedded at all has no
+ * vectors — or too few — to match; unaided, the feature would hand such a
+ * user a shorter list than the "newest 100" read it replaced. So the two are
+ * combined rather than chosen between: ranked hits first, recency filling
+ * whatever is left of the candidate budget. Both halves return the same shape
+ * and feed the same prompt, and when the index covers the shelf the recency
+ * read is never reached.
+ */
+async function recommendationCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  // Composed exactly the way an item's own summary is, so the query sits in
+  // the same region of the space as the corpus text it has to match.
+  const queryText = buildEmbeddingText({
+    title: space.name,
+    description: space.description,
+  });
+  const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
+  const ranked =
+    vector === undefined
+      ? []
+      : await searchCandidates(ctx, space, vector, memberIds);
+
+  if (ranked.length >= RECOMMEND_CANDIDATES) {
+    logEvent("info", "recommend_candidates", {
+      space_id: space._id,
+      source: "vector",
+      count: ranked.length,
+    });
+    return ranked;
+  }
+
+  // A short ranked list does not mean the shelf is short. While the sweep is
+  // draining, a user can have a thousand saves and fifty vectors, and the
+  // index can only ever offer the fifty. Returning those alone would hand the
+  // prompt less than the newest-100 read this replaced, so partial coverage
+  // would be a regression for exactly the users the feature is for. The
+  // ranked hits lead — they are the relevant ones, and the prompt numbers
+  // what it is given — and recency fills the rest of the list behind them.
+  const seen = new Set(ranked.map((item) => item._id));
+  const recent = (
+    await ctx.runQuery(internal.items.listReadyItemsInternal, {
+      userId: space.userId,
+      limit: RECOMMEND_CANDIDATES,
+    })
+  ).filter((item) => !memberIds.has(item._id) && !seen.has(item._id));
+  const candidates = [...ranked, ...recent].slice(0, RECOMMEND_CANDIDATES);
+  logEvent("info", "recommend_candidates", {
+    space_id: space._id,
+    source: ranked.length === 0 ? "recent" : "mixed",
+    count: candidates.length,
+    ranked: ranked.length,
+  });
+  return candidates;
+}
+
+/**
+ * Recommend existing items for a space, off nothing but its name and
+ * description. Runs when a space is created, and again whenever its dynamic
+ * toggle turns on. Writes
  * `suggested` rows only — the user decides what actually enters the space —
  * and never re-suggests anything they already filed or dismissed.
  */
@@ -2448,12 +2871,7 @@ export const recommendForSpace = internalAction({
           spaceId: args.spaceId,
         }),
       );
-      const items = (
-        await ctx.runQuery(internal.items.listReadyItemsInternal, {
-          userId: space.userId,
-          limit: 100,
-        })
-      ).filter((item) => !memberIds.has(item._id));
+      const items = await recommendationCandidates(ctx, space, memberIds);
       if (items.length === 0) {
         return null;
       }
@@ -2476,7 +2894,7 @@ export const recommendForSpace = internalAction({
         prompt: [
           "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Shelvr recommends a few existing saves for it — the user decides which to keep.",
           `Space name: "${space.name}"${space.description ? `\nSpace description: ${space.description}` : ""}`,
-          "Below is a numbered list of the user's saved items. Return the numbers of a handful of items that CLEARLY belong in this space — quality over quantity, high-confidence picks only, at most 8. If nothing clearly fits, return an empty array.",
+          `Below is a numbered list of the user's saved items. Return the numbers of the items that clearly belong in this space, at most ${MAX_RECOMMENDATIONS}, or an empty array if none do. The user reviews each pick, so leave out borderline ones.`,
           itemLines,
         ].join("\n\n"),
       });
@@ -2757,7 +3175,7 @@ export const steerItemForSpace = internalAction({
           ]
             .filter((line) => line !== "")
             .join("\n"),
-          INTENTS_PROMPT_BLOCK,
+          intentsPromptBlock(3),
           "Steering by space purpose:",
           "- Shopping/wishlist space: identify the product and include an open_url intent to a Google Shopping search, https://www.google.com/search?tbm=shop&q=PRODUCT+QUERY, labeled like 'Shop this'.",
           "- Travel space: prefer open_maps for places and open_url for official/booking pages you can actually see.",

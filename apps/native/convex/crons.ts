@@ -60,10 +60,33 @@ crons.interval(
   {},
 );
 
+// Embed items whose vector is missing or from an older generation: the
+// backfill for saves made before embeddings existed, the repair path for a
+// classification whose embed call failed, and the migration path after a
+// version bump. A page that made progress chains itself, so this interval is
+// only how often a drained sweep re-checks; it costs one indexed read when
+// there is nothing to do.
+crons.interval(
+  "sweep item embeddings",
+  { minutes: 30 },
+  internal.ai.sweepItemEmbeddings,
+  {},
+);
+
 crons.interval(
   "recover weekly shelf deliveries",
   { minutes: 5 },
   internal.notificationDelivery.recover,
+  {},
+);
+
+// Drop payment-event dedupe rows past the retention window so the ledger does
+// not grow forever. RevenueCat retries deliveries for days, never months, so
+// a purged id cannot cause double counting.
+crons.interval(
+  "purge expired payment receipts",
+  { hours: 24 },
+  internal.paymentTelemetry.purgeExpiredReceipts,
   {},
 );
 

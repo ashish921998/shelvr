@@ -27,6 +27,7 @@ import type * as model_accountCreated from "../model/accountCreated.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
+import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_feedbackFields from "../model/feedbackFields.js";
@@ -41,6 +42,7 @@ import type * as model_notificationSchedule from "../model/notificationSchedule.
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_posthogCapture from "../model/posthogCapture.js";
 import type * as model_rateLimiter from "../model/rateLimiter.js";
+import type * as model_readBudget from "../model/readBudget.js";
 import type * as model_recipeMarkup from "../model/recipeMarkup.js";
 import type * as model_resend from "../model/resend.js";
 import type * as model_revenuecat from "../model/revenuecat.js";
@@ -86,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
   "model/demoErrors": typeof model_demoErrors;
+  "model/embedding": typeof model_embedding;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/feedbackFields": typeof model_feedbackFields;
@@ -100,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/posthogCapture": typeof model_posthogCapture;
   "model/rateLimiter": typeof model_rateLimiter;
+  "model/readBudget": typeof model_readBudget;
   "model/recipeMarkup": typeof model_recipeMarkup;
   "model/resend": typeof model_resend;
   "model/revenuecat": typeof model_revenuecat;

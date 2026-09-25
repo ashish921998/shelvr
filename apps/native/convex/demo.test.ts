@@ -42,10 +42,10 @@ const URL = "https://www.bbcgoodfood.com/recipes/classic-lasagne";
 describe("onboarding demo allowance", () => {
   it("creates one real processing item and schedules the AI pipeline once", async () => {
     const t = await asUser(newConvexTest(), "demo-user");
-    const { itemId, reused, savedSpaceNames } = await t.mutation(
-      api.demo.createDemoItem,
-      { url: URL },
-    );
+    const { itemId, userId, urlMatchesRequest, reused, savedSpaceNames } =
+      await t.mutation(api.demo.createDemoItem, { url: URL });
+    expect(userId).toBe("demo-user");
+    expect(urlMatchesRequest).toBe(true);
     expect(reused).toBe(false);
     expect(savedSpaceNames).toEqual([]);
 
@@ -81,6 +81,8 @@ describe("onboarding demo allowance", () => {
     });
 
     expect(second.itemId).toBe(first.itemId);
+    expect(second.userId).toBe("demo-user");
+    expect(second.urlMatchesRequest).toBe(false);
     expect(second.reused).toBe(true);
 
     // Client honesty: the original save — original URL and its real current
@@ -93,6 +95,18 @@ describe("onboarding demo allowance", () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
     expect(jobs.filter((job) => job.name === "ai:processItem")).toHaveLength(1);
+  });
+
+  it("matches a canonicalized repeat of the original URL", async () => {
+    const t = await asUser(newConvexTest(), "demo-user");
+    await t.mutation(api.demo.createDemoItem, { url: "example.com/path" });
+
+    const repeated = await t.mutation(api.demo.createDemoItem, {
+      url: " https://example.com/path ",
+    });
+
+    expect(repeated.reused).toBe(true);
+    expect(repeated.urlMatchesRequest).toBe(true);
   });
 
   it("rejects an unauthenticated caller — no allowance without an identity", async () => {

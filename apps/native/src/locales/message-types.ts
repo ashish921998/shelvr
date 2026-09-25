@@ -33,6 +33,9 @@ export type MessageParams = {
   "products.noMatches": undefined;
   "item.untitledItem": undefined;
   "notifications.weeklyShelf": undefined;
+  "notifications.trialChannel": undefined;
+  "notifications.trialEndingTitle": undefined;
+  "notifications.trialEndingBody": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
   "digest.backHome": undefined;
@@ -161,6 +164,9 @@ export type MessageParams = {
   "share.continueSaved": undefined;
   "share.finishFailed": undefined;
   "share.success": undefined;
+  "share.ghostTitle": undefined;
+  "share.ghostBody": undefined;
+  "share.saveAgain": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
   "account.signInNotFinished": undefined;
@@ -436,6 +442,7 @@ export type MessageParams = {
   "reveal.emptyExplainer": undefined;
   "reveal.everySunday": undefined;
   "reveal.keepSaving": undefined;
+  "reveal.trialNote": undefined;
   "weekly.previewTime": undefined;
   "weekly.previewTitle": undefined;
   "weekly.previewBody": { title: string };
@@ -451,6 +458,8 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.recallTitle": undefined;
+  "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
