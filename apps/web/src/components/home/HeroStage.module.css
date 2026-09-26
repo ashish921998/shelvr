@@ -1,8 +1,10 @@
-/* The stage is a fixed canvas scaled to fit its column. The wrapper reserves
-   the scaled height in CSS so nothing shifts when the script measures it.
+/* The stage is a fixed canvas scaled to fit its column, all in CSS: the
+   wrapper reserves the scaled height with aspect-ratio, and the canvas scales
+   by wrapper width / canvas width (tan(atan2(a, b)) is a / b as a number).
    Breakpoints: mobile < 760px, wide 760–999px, split >= 1000px. */
 
 .wrap {
+  container-type: inline-size;
   aspect-ratio: 400 / 920;
   max-height: 920px;
 }
@@ -11,7 +13,8 @@
   position: absolute;
   top: 0;
   left: 50%;
-  width: 400px;
+  --cw: 400px;
+  width: var(--cw);
   height: 920px;
   overflow: hidden;
   border: 1px solid #332c20;
@@ -20,7 +23,7 @@
   box-shadow:
     0 30px 60px -20px rgba(43, 36, 24, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transform: translateX(-50%) scale(var(--s, 1));
+  transform: translateX(-50%) scale(min(1, tan(atan2(100cqw, var(--cw)))));
   transform-origin: top center;
 }
 
@@ -192,7 +195,7 @@
   }
 
   .canvas {
-    width: 960px;
+    --cw: 960px;
     height: 590px;
   }
 
@@ -225,7 +228,7 @@
   }
 
   .canvas {
-    width: 672px;
+    --cw: 672px;
     height: 610px;
   }
 

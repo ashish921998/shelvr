@@ -9,7 +9,8 @@ import {
   PencilSquareIcon,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useInView, useReducedMotion } from "@/lib/motion";
 import { IntentChip, TagChip, type IntentKind } from "./Chips";
 
 type Result = {
@@ -105,39 +106,40 @@ const QUERIES: { q: string; results: Result[] }[] = [
 ];
 
 export default function Search() {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref);
+  const reduced = useReducedMotion();
   const [qi, setQi] = useState(0);
   const [typed, setTyped] = useState(0);
   const [out, setOut] = useState(false);
   const { q, results } = QUERIES[qi];
 
+  // Type the query, hold the results, fade out, next query. Only on screen,
+  // and never with reduced motion (which shows the first query in full).
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      // Reduced motion shows the first query in full and never cycles.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTyped(Infinity);
-      return;
-    }
-    const typing = setInterval(() => setTyped((n) => n + 1), 70);
-    let swap: ReturnType<typeof setTimeout> | undefined;
-    const cycle = setInterval(() => {
-      setOut(true);
-      swap = setTimeout(() => {
-        setQi((i) => (i + 1) % QUERIES.length);
-        setTyped(0);
-        setOut(false);
-      }, 350);
-    }, 4200);
-    return () => {
-      clearInterval(typing);
-      clearInterval(cycle);
-      clearTimeout(swap);
-    };
-  }, []);
+    if (!inView || reduced) return;
+    const [delay, step] =
+      typed < q.length
+        ? [70, () => setTyped(typed + 1)]
+        : !out
+          ? [2200, () => setOut(true)]
+          : [
+              350,
+              () => {
+                setQi((qi + 1) % QUERIES.length);
+                setTyped(0);
+                setOut(false);
+              },
+            ];
+    const timer = setTimeout(step, delay);
+    return () => clearTimeout(timer);
+  }, [inView, reduced, typed, out, qi, q.length]);
 
   const fade = out ? "translate-y-2 opacity-0" : "opacity-100";
 
   return (
     <section
+      ref={ref}
       id="find"
       className="mx-auto flex max-w-[1200px] flex-col items-center gap-7 px-5 pt-18 pb-10 text-center"
     >
@@ -155,7 +157,7 @@ export default function Search() {
       >
         <div className="flex h-14 items-center gap-3 rounded-full border-[1.5px] border-ink bg-cream px-5 text-lg font-medium shadow-[4px_4px_0_var(--color-ink)]">
           <MagnifyingGlassIcon className="size-5 flex-none" strokeWidth={2} />
-          <span className="truncate">{q.slice(0, typed)}</span>
+          <span className="truncate">{reduced ? q : q.slice(0, typed)}</span>
           <span className="h-[22px] w-0.5 flex-none bg-ink motion-safe:animate-[blink_1s_steps(1)_infinite]" />
         </div>
         <div

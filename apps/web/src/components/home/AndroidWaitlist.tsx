@@ -4,17 +4,16 @@ import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { FormEvent, useState } from "react";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 
-type AndroidWaitlistProps = {
-  source: "hero" | "footer";
-};
+// It lives in the closing panel; the event and route still call that "footer".
+const source = "footer";
+const inputId = "android-waitlist-email";
 
-export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
+export default function AndroidWaitlist() {
   const [opened, setOpened] = useState(false);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [message, setMessage] = useState("");
-  const inputId = `android-waitlist-${source}-email`;
 
   // The form is always visible now, so "opened" means the first focus.
   function open() {
@@ -63,7 +62,6 @@ export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
     <div
       id="android"
       className="relative flex w-full max-w-[440px] scroll-mt-24 flex-col items-center gap-2.5 mt-2"
-      aria-live="polite"
     >
       <label
         htmlFor={inputId}
@@ -71,15 +69,7 @@ export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
       >
         On Android? Leave your email and we’ll tell you the day it lands.
       </label>
-      {status === "success" ? (
-        <p
-          role="status"
-          className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light"
-        >
-          <CheckCircleIcon aria-hidden className="size-[18px]" />
-          You’re on the list.
-        </p>
-      ) : (
+      {status === "success" ? null : (
         <form onSubmit={submit} className="flex w-full gap-2">
           <input
             id={inputId}
@@ -109,6 +99,15 @@ export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
           </button>
         </form>
       )}
+      {/* Always mounted, so screen readers announce the success. */}
+      <div role="status">
+        {status === "success" ? (
+          <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light">
+            <CheckCircleIcon aria-hidden className="size-[18px]" />
+            You’re on the list.
+          </p>
+        ) : null}
+      </div>
       {status === "error" ? (
         <p role="alert" className="text-sm font-medium text-ember-light">
           {message}

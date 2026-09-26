@@ -39,7 +39,7 @@ export default function ClosingPanel() {
         <div className="relative">
           <StoreButton source="footer" />
         </div>
-        <AndroidWaitlist source="footer" />
+        <AndroidWaitlist />
       </div>
     </section>
   );

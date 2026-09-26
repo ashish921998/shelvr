@@ -223,19 +223,11 @@ function CardBody({ card }: { card: Card }) {
 /** The hero demo: a pile of saves that files itself onto labelled shelves. */
 export default function HeroStage() {
   const [tidy, setTidy] = useState(false);
-  const [scale, setScale] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef(() => {});
 
   useEffect(() => {
     const wrap = wrapRef.current!;
-    const canvas = canvasRef.current!;
-    const resize = new ResizeObserver(() =>
-      setScale(Math.min(1, wrap.clientWidth / canvas.offsetWidth)),
-    );
-    resize.observe(wrap);
-
     let current = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inView = false;
@@ -261,7 +253,7 @@ export default function HeroStage() {
     };
     if (reduced) {
       set(true);
-      return () => resize.disconnect();
+      return;
     }
 
     const io = new IntersectionObserver(
@@ -279,7 +271,6 @@ export default function HeroStage() {
     );
     io.observe(wrap);
     return () => {
-      resize.disconnect();
       io.disconnect();
       clearTimeout(timer);
     };
@@ -294,16 +285,7 @@ export default function HeroStage() {
       title={label}
       className={`${styles.wrap} relative w-full max-w-[960px] cursor-pointer justify-self-stretch`}
     >
-      <div
-        ref={canvasRef}
-        data-tidy={tidy}
-        className={styles.canvas}
-        style={
-          scale === null
-            ? { visibility: "hidden" }
-            : ({ "--s": scale } as CSSProperties)
-        }
-      >
+      <div data-tidy={tidy} className={styles.canvas}>
         <div className={styles.grain} />
 
         {[0, 1, 2, 3, 4].map((i) => (

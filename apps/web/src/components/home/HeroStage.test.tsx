@@ -14,7 +14,6 @@ class Observer {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("ResizeObserver", Observer);
   vi.stubGlobal("IntersectionObserver", Observer);
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
 });

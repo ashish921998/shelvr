@@ -2,7 +2,8 @@
 
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useInView, useReducedMotion } from "@/lib/motion";
 import { Eyebrow } from "./Chips";
 
 const DECK = [
@@ -34,35 +35,44 @@ function cardTransform(pos: number, swipe: Direction | null) {
 }
 
 export default function PhotoTidy() {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref);
+  const reduced = useReducedMotion();
   const [index, setIndex] = useState(0);
   const [kept, setKept] = useState(0);
   const [swipe, setSwipe] = useState<Direction | null>(null);
-  const busy = useRef(false);
 
-  const doSwipe = useCallback((dir: Direction) => {
-    if (busy.current) return;
-    busy.current = true;
-    setSwipe(dir);
-    setTimeout(() => {
-      busy.current = false;
+  const doSwipe = (dir: Direction) => {
+    if (!swipe) setSwipe(dir);
+  };
+
+  // A swipe flies the top card off, then the deck advances.
+  useEffect(() => {
+    if (!swipe) return;
+    const timer = setTimeout(() => {
       setSwipe(null);
       setIndex((i) => i + 1);
-      if (dir === "right") setKept((k) => k + 1);
+      if (swipe === "right") setKept((k) => k + 1);
     }, 750);
-  }, []);
+    return () => clearTimeout(timer);
+  }, [swipe]);
 
+  // Auto-swipe, alternating right and left, only while on screen.
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let n = 0;
-    const auto = setInterval(() => doSwipe(n++ % 2 ? "left" : "right"), 2800);
-    return () => clearInterval(auto);
-  }, [doSwipe]);
+    if (!inView || reduced || swipe) return;
+    const timer = setTimeout(
+      () => setSwipe(index % 2 ? "left" : "right"),
+      2050,
+    );
+    return () => clearTimeout(timer);
+  }, [inView, reduced, swipe, index]);
 
   const reviewed = index + 12;
   const percent = `${((reviewed / 4000) * 100).toFixed(1)}%`;
 
   return (
     <section
+      ref={ref}
       id="tidy"
       className="mx-auto grid max-w-[1200px] grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-10 px-5 pt-18 pb-10"
     >
