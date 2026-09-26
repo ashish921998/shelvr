@@ -1,0 +1,154 @@
+project: Shelvr
+platform: github
+# Detected at /opt/homebrew/bin/magick. Only used by screenshot-diff flows,
+# which run during local mobile QA, never in CI.
+imagemagick: true
+# Record each interactive flow. Mobile E2E is local-only: recordings stay in
+# qa-results/ as local artifacts and are never uploaded (CI is backend-only).
+video_evidence: true
+droid_control:
+  plugin: droid-control@factory-plugins
+  # Single runtime toggle for the optional edited-MP4 stage. Compose applies to
+  # droid-control browser/terminal captures; this project's interactive surface
+  # is the iOS simulator (not a droid-control route), so raw recordings are the
+  # final output. Flip to true only if browser/terminal flows are added later.
+  compose: false
+
+environments:
+  production:
+    url: https://amiable-setter-120.convex.cloud
+    site_url: https://amiable-setter-120.convex.site
+    restrictions:
+      - READ-ONLY. Health probe and negative auth tests only.
+      - Never create waitlist signups on production.
+      - Never POST a RevenueCat event carrying a valid webhook secret.
+      - Never invoke Convex queries/mutations/actions on production.
+  development:
+    url: https://amicable-antelope-639.convex.cloud
+    site_url: https://amicable-antelope-639.convex.site
+    restrictions:
+      - Waitlist signups only from qa+<RUN_ID>@example.com addresses.
+      - Mobile E2E signs in as the anonymous dev user only.
+      - End every mobile run with the fixture reset (resetCurrentUser).
+
+# Backend QA covers only the unauthenticated HTTP surface. Authenticated Convex
+# flows need an app-minted JWT (Google/Apple OAuth via Convex Auth), which is
+# out of scope for curl-driven QA by explicit user choice.
+default_target: production
+
+auth:
+  backend_surface: unauthenticated
+  app_method: oauth
+  app_provider: Convex Auth
+  app_notes: >
+    Google + Apple OAuth in the app; anonymous dev login enabled on the
+    development deployment (AUTH_ENABLE_ANONYMOUS=true, verified) and mirrored
+    client-side via EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS in apps/native/.env.local
+    (verified). Mobile E2E uses the anonymous dev persona exclusively.
+
+personas:
+  - name: anonymous_dev
+    description: >
+      Anonymous development user on the iOS simulator dev build. One-tap
+      sign-in via the Dev login button. The only automatable mobile persona.
+    credentials_source: none
+    test_focus:
+      - sign-in
+      - onboarding
+      - demo link save (one free save without Pro)
+      - Pro gate / paywall
+      - spaces create + suggestion accept/dismiss
+      - search
+      - item detail
+      - profile / entitlement state
+      - fixture reset (seed + cleanup)
+    cannot_do:
+      - Real RevenueCat purchases (no StoreKit sandbox account in scope)
+      - Push notification delivery (needs a real device + store credentials)
+      - Google/Apple OAuth account flows
+  - name: public_http
+    description: >
+      Unauthenticated HTTP caller driving the Convex site endpoints with curl.
+    credentials_source: env-var
+    # Dev-only positive waitlist flows (valid signup, validation errors, rate
+    # limit). Negative auth flows and /health need no secret. Same value as the
+    # WAITLIST_SHARED_SECRET Convex deployment env var on the dev deployment.
+    secret_name: QA_WAITLIST_SHARED_SECRET
+    test_focus:
+      - GET /health
+      - POST /waitlist/join auth + validation + rate limit
+      - POST /webhooks/revenuecat auth
+    cannot_do:
+      - Reach any endpoint behind the RevenueCat webhook secret
+      - Create any data on production
+
+apps:
+  backend:
+    path_patterns:
+      - apps/native/convex/**
+      - apps/native/convex.config.ts
+      - package.json
+      - pnpm-lock.yaml
+    skill: qa-backend
+    test_tool: curl
+    target: production (read-only) + development (positive flows)
+    # Subscription-free CI baseline: runs on every PR and push to main in
+    # .github/workflows/qa.yml, independent of any agent. Keep its URL
+    # defaults in sync with the site URLs above.
+    baseline_script: tools/qa-backend.sh
+  native:
+    path_patterns:
+      - apps/native/src/**
+      - apps/native/app.json
+      - apps/native/app.config.js
+      - apps/native/package.json
+      - apps/native/assets/**
+      - apps/native/locales/**
+      - apps/native/src/locales/**
+      - apps/native/localization.config.json
+      - apps/native/plugins/**
+      - apps/native/ios/**
+      - apps/native/eas.json
+      - .maestro/**
+      - package.json
+      - pnpm-lock.yaml
+    skill: qa-native
+    test_tool: ios-simulator (argent session tools; local-only)
+    build_command: pnpm --filter native-app ios
+    # Subscription-free mobile baseline: Maestro flows, nightly + manual
+    # dispatch on a macOS runner (.github/workflows/qa-mobile.yml). The
+    # agent layer above is the interactive, diff-aware complement.
+    maestro_flows: .maestro/
+
+feature_flags:
+  provider: none
+
+integrations:
+  revenuecat:
+    provider: RevenueCat
+    notes: >
+      Dev/preview builds pin the Shelvr Development Test Store key (app.config.js
+      enforces the exact value). QA never completes a purchase; paywall flows
+      verify UI rendering and entitlement gating only.
+  resend:
+    provider: Resend
+    notes: >
+      Waitlist contacts project from the dev deployment when RESEND_API_KEY is
+      set there. qa+ signups may appear in the dev Resend segment; harmless and
+      expected.
+  posthog:
+    provider: PostHog
+    notes: Analytics is a no-op without tokens. QA never asserts analytics delivery.
+
+cleanup:
+  auto_cleanup: true
+  strategy: api-call
+  instructions: >
+    Mobile: end every run by triggering the fixture reset for the anonymous dev
+    user (profile screen, testID reset-flow-fixtures, or the resetCurrentUser
+    mutation). It deletes the run's items/spaces/memberships and restores the
+    deterministic fixture library (4 items, 3 spaces, lifetime Pro row) in one
+    step. Waitlist: qa+<RUN_ID>@ rows stay in the dev deployment by design;
+    there is no delete endpoint. Never clean anything on production.
+
+failure_learning: suggest_in_report

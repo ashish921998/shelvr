@@ -1,0 +1,34 @@
+appId: app.shelvr.save.dev
+name: 02 Second save is Pro-gated
+---
+- launchApp
+# The home "+" affordance opens the add sheet; if the tap misses, deep-link
+# straight to the add route.
+- tapOn: ".*\\+.*"
+- runFlow:
+    when:
+      notVisible: "Save something"
+    commands:
+      - openLink: "shelvr://add"
+- assertVisible: "Save something"
+- tapOn: "Save an article"
+- tapOn: "Paste or type a link…"
+- inputText: "https://en.wikipedia.org/wiki/Shelf"
+- takeScreenshot: 02-second-url
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Save"
+    commands:
+      - tapOn: "Save"
+# With the demo save used and no entitlement, the paywall must appear
+# instead of the save completing.
+- extendedWaitUntil:
+    visible: "View Pro plans"
+    timeout: 60000
+- takeScreenshot: 02-paywall
+- tapOn: "Not now"

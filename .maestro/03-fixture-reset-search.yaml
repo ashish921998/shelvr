@@ -1,0 +1,30 @@
+appId: app.shelvr.save.dev
+name: 03 Fixture reset, Pro state, and search
+---
+- launchApp
+# The fixture reset (anonymous dev persona only) replaces this run's data
+# with the deterministic library — including the lifetime Pro row — so it
+# both seeds Pro state and cleans up what the run created.
+- tapOn: "Profile"
+- takeScreenshot: 03-profile
+- tapOn: "Reset flow fixtures"
+- assertVisible: "Reset flow fixtures?"
+- tapOn: "Reset"
+- extendedWaitUntil:
+    visible: "Flow fixtures ready"
+    timeout: 60000
+- takeScreenshot: 03-reset-done
+# Home now shows the fixture items.
+- tapOn: "Home"
+- extendedWaitUntil:
+    visible: "Weeknight Miso Ramen"
+    timeout: 30000
+- takeScreenshot: 03-shelf
+# Full-text search finds a fixture item.
+- tapOn: "Search"
+- tapOn: "Search your saves"
+- inputText: "ramen"
+- extendedWaitUntil:
+    visible: "Weeknight Miso Ramen"
+    timeout: 30000
+- takeScreenshot: 03-search

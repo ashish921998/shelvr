@@ -102,3 +102,9 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# QA run output (tools/qa-backend.sh, the qa skill, Maestro CI runs)
+qa-results/
+maestro-out/
+metro.log
+.worktrees/

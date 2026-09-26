@@ -1,0 +1,32 @@
+appId: app.shelvr.save.dev
+name: 01 Onboarding demo save (the one free link save)
+---
+- launchApp
+# The onboarding live demo offers exactly one real link save without Pro. If
+# onboarding already completed in a previous run on this simulator, this flow
+# passes trivially — flow 02 is what proves the allowance was consumed.
+- runFlow:
+    when:
+      visible: "Paste or type a link…"
+    commands:
+      - takeScreenshot: 01-demo-input
+      - tapOn: "Paste or type a link…"
+      - inputText: "https://en.wikipedia.org/wiki/Bookshelf"
+      - takeScreenshot: 01-demo-url
+      # The primary action label differs per onboarding step.
+      - runFlow:
+          when:
+            visible: "Continue"
+          commands:
+            - tapOn: "Continue"
+      - runFlow:
+          when:
+            visible: "Save"
+          commands:
+            - tapOn: "Save"
+      # Enrichment = a real page fetch + classification on the dev
+      # deployment; give it two minutes before failing.
+      - extendedWaitUntil:
+          visible: "Your link is saved."
+          timeout: 120000
+      - takeScreenshot: 01-demo-saved
