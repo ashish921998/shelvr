@@ -3,7 +3,6 @@
 import { type ComponentType, useEffect, useState } from "react";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
-import { useAppStoreLink } from "@/lib/appStoreLink";
 import type {
   OracleInput,
   OracleInputProps,
@@ -15,6 +14,7 @@ import LibraryInput from "./LibraryInput";
 import LinksInput from "./LinksInput";
 import ScreenshotInput from "./ScreenshotInput";
 import ShareRow from "./ShareRow";
+import StoreCta from "./StoreCta";
 import TabsInput from "./TabsInput";
 import VerdictCard from "./VerdictCard";
 
@@ -57,26 +57,6 @@ type OracleState =
 
 function isOracleMode(value: string | null): value is OracleMode {
   return value !== null && Object.hasOwn(MODES, value);
-}
-
-function StoreCta() {
-  const { href, onClick } = useAppStoreLink("oracle");
-  return (
-    <div className="mt-8 rounded-3xl bg-ink px-6 py-7 text-center text-white sm:px-8">
-      <p className="display text-2xl sm:text-3xl">
-        Shelvr already sorted these. Keep them.
-      </p>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onClick}
-        className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-ember px-6 text-base font-bold text-ink transition hover:-translate-y-0.5 hover:bg-ember-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-      >
-        Get Shelvr, free
-      </a>
-    </div>
-  );
 }
 
 export default function OracleApp() {
@@ -176,7 +156,7 @@ export default function OracleApp() {
             }
           />
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <ShareRow mode={state.mode} persona={state.verdict.persona} />
+            <ShareRow mode={state.mode} verdict={state.verdict} />
             <button
               type="button"
               onClick={() => setState({ phase: "picking" })}

@@ -188,17 +188,23 @@ an App Store link. Its link uses `source = oracle`, so a visitor who arrived
 without a campaign lands in App Store Connect's `web_oracle` campaign. A
 visitor who arrived with a creator's `?ct=` keeps that campaign instead.
 
-| Event            | When                         | Properties                                                                       |
-| ---------------- | ---------------------------- | -------------------------------------------------------------------------------- |
-| `oracle_opened`  | The page loads               | `mode` when the URL carries `?mode=`                                             |
-| `oracle_started` | The visitor submits an input | `mode`                                                                           |
-| `oracle_verdict` | A verdict renders            | `mode`, `persona`                                                                |
-| `oracle_failed`  | The request fails            | `mode`, `status` (HTTP status, `0` for a network error; `429` is the rate limit) |
-| `oracle_shared`  | The visitor shares a verdict | `mode`, `method` (`web_share` or `clipboard`)                                    |
+| Event                 | When                           | Properties                                                                       |
+| --------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
+| `oracle_opened`       | The page loads                 | `mode` when the URL carries `?mode=`                                             |
+| `oracle_started`      | The visitor submits an input   | `mode`                                                                           |
+| `oracle_verdict`      | A verdict renders              | `mode`, `persona`                                                                |
+| `oracle_failed`       | The request fails              | `mode`, `status` (HTTP status, `0` for a network error; `429` is the rate limit) |
+| `oracle_shared`       | The visitor shares a verdict   | `mode`, `method` (`web_share` or `clipboard`)                                    |
+| `oracle_share_viewed` | Someone opens a shared verdict | `mode`                                                                           |
 
 `mode` is `links`, `screenshot`, `tabs`, or `library`. A shared verdict links
-to `/oracle?mode=<mode>`, so `oracle_opened` with a `mode` is mostly share
-traffic.
+to its own page, `/oracle/s?c=…`, which carries the persona, tagline and
+spaces in the URL (never the per-item guesses) and renders them as the link
+preview image from `/oracle/og`. Nothing is stored. The page's "Ask the
+oracle" button opens `/oracle?mode=<mode>`, so `oracle_opened` with a `mode`
+is mostly share traffic. Opening a shared verdict also makes `oracle_share`
+the campaign for the rest of that browser session, unless the visitor arrived
+with a campaign of their own, so store clicks after a share credit it.
 
 **Oracle funnel by mode, last 30 days**:
 
@@ -208,9 +214,10 @@ SELECT
   countIf(event = 'oracle_started') AS started,
   countIf(event = 'oracle_verdict') AS verdicts,
   countIf(event = 'oracle_failed') AS failed,
-  countIf(event = 'oracle_shared') AS shared
+  countIf(event = 'oracle_shared') AS shared,
+  countIf(event = 'oracle_share_viewed') AS share_views
 FROM events
-WHERE event IN ('oracle_started', 'oracle_verdict', 'oracle_failed', 'oracle_shared')
+WHERE event IN ('oracle_started', 'oracle_verdict', 'oracle_failed', 'oracle_shared', 'oracle_share_viewed')
   AND timestamp > now() - INTERVAL 30 DAY
 GROUP BY mode
 ORDER BY started DESC

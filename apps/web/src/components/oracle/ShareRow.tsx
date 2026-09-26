@@ -3,20 +3,27 @@
 import { useState } from "react";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
-import type { OracleMode } from "@/lib/oracle";
+import type { OracleMode, OracleVerdict } from "@/lib/oracle";
+import { sharedVerdictPath } from "@/lib/oracleShare";
 
 export default function ShareRow({
   mode,
-  persona,
+  verdict,
 }: {
   mode: OracleMode;
-  persona: string;
+  verdict: OracleVerdict;
 }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const text = `The Shelvr Oracle says I'm ${persona}. What are you?`;
-    const url = `${window.location.origin}/oracle?mode=${mode}`;
+    const text = `The Shelvr Oracle says I'm ${verdict.persona}. What are you?`;
+    // The link opens this verdict's own page, whose preview card shows it.
+    const url = `${window.location.origin}${sharedVerdictPath({
+      mode,
+      persona: verdict.persona,
+      tagline: verdict.tagline,
+      spaces: verdict.spaces,
+    })}`;
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title: "The Shelvr Oracle", text, url });

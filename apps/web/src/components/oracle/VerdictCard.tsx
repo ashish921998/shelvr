@@ -19,14 +19,17 @@ function statsLine(stats: LibraryStats): string {
 export default function VerdictCard({
   verdict,
   stats,
+  kicker = "The oracle says you are",
 }: {
+  /** A shared verdict has no guesses, so that section is left out. */
   verdict: OracleVerdict;
   stats?: LibraryStats;
+  kicker?: string;
 }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-line bg-card shadow-lift">
       <div className="bg-ember-soft px-6 pb-6 pt-7 sm:px-8">
-        <p className="section-kicker">The oracle says you are</p>
+        <p className="section-kicker">{kicker}</p>
         <h2 className="display mt-3 text-4xl leading-tight text-ink sm:text-5xl">
           {verdict.persona}
         </h2>
@@ -41,21 +44,28 @@ export default function VerdictCard({
       </div>
 
       <div className="px-6 py-6 sm:px-8">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-          What the oracle sees
-        </h3>
-        <ul className="mt-3 flex flex-col gap-3">
-          {verdict.guesses.map((guess, i) => (
-            <li key={i} className="rounded-2xl border border-line bg-paper p-4">
-              <p className="font-semibold text-ink">{guess.label}</p>
-              <p className="mt-1 text-[15px] leading-6 text-ink-soft">
-                {guess.why}
-              </p>
-            </li>
-          ))}
-        </ul>
+        {verdict.guesses.length > 0 && (
+          <>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+              What the oracle sees
+            </h3>
+            <ul className="mb-7 flex flex-col gap-3">
+              {verdict.guesses.map((guess, i) => (
+                <li
+                  key={i}
+                  className="rounded-2xl border border-line bg-paper p-4"
+                >
+                  <p className="font-semibold text-ink">{guess.label}</p>
+                  <p className="mt-1 text-[15px] leading-6 text-ink-soft">
+                    {guess.why}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
-        <h3 className="mt-7 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
           Your spaces in Shelvr
         </h3>
         <ul className="mt-3 grid gap-3 sm:grid-cols-3">
