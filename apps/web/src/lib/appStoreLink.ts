@@ -6,7 +6,13 @@ import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
-type AppStoreLinkSource = "header" | "hero" | "footer" | "footer-nav" | "share";
+type AppStoreLinkSource =
+  | "header"
+  | "hero"
+  | "footer"
+  | "footer-nav"
+  | "share"
+  | "oracle";
 
 /**
  * The App Store link for one button, tagged with the campaign the visitor
@@ -27,7 +33,17 @@ export function useAppStoreLink(
 
   const onClick = () => {
     if (!shareToken) {
-      captureWebAnalyticsEvent("app_store_clicked", { source, campaign });
+      captureWebAnalyticsEvent("app_store_clicked", {
+        source,
+        campaign,
+        // A shared oracle verdict rides in `?c=`, so oracle pages keep the
+        // path only.
+        ...(source === "oracle"
+          ? {
+              $current_url: `${window.location.origin}${window.location.pathname}`,
+            }
+          : {}),
+      });
       return;
     }
     void shareRef(shareToken).then((ref) =>

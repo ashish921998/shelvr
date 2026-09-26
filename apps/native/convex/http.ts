@@ -14,6 +14,7 @@ import {
   reconcileRevenueCatTransfer,
 } from "./model/revenuecatTransfer";
 import { errorName, logEvent } from "./model/log";
+import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { secureCompare } from "./model/secureCompare";
 import {
@@ -230,6 +231,55 @@ http.route({
         error_name: errorName(error),
       });
       return json({ message: "Could not join right now." }, 500);
+    }
+  }),
+});
+
+/**
+ * The marketing site's no-login oracle. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter. The body is narrowed
+ * before a token is spent, so a malformed request costs the visitor nothing.
+ */
+http.route({
+  path: "/oracle",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Oracle secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    const input = parseOracleInput(body);
+    if (!input) {
+      return json({ message: "Invalid request." }, 400);
+    }
+
+    try {
+      await ctx.runMutation(internal.oracleLimits.claim, {
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+      });
+      const verdict = await ctx.runAction(internal.oracle.consult, { input });
+      return json(verdict, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "oracle_request_failed", {
+        kind: input.kind,
+        error_name: errorName(error),
+      });
+      return json({ message: "The oracle could not answer." }, 500);
     }
   }),
 });

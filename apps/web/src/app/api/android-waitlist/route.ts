@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 
+import {
+  WAITLIST_CLIENT_IP_HEADER,
+  WAITLIST_SECRET_HEADER,
+  clientIp,
+  forwardErrorCategory,
+} from "@/lib/convexForward";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 
@@ -9,19 +15,8 @@ type WaitlistSource = "hero" | "footer" | "unknown";
 
 type JoinWaitlistResult = { saved: boolean; emailProviderSynced: boolean };
 
-// Must match the header names in apps/native/convex/http.ts.
-const WAITLIST_SECRET_HEADER = "x-waitlist-secret";
-const WAITLIST_CLIENT_IP_HEADER = "x-shelvr-client-ip";
-
 function normalizeSource(value: unknown): WaitlistSource {
   return value === "hero" || value === "footer" ? value : "unknown";
-}
-
-function clientIp(request: Request): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const fromForwarded = forwarded?.split(",")[0]?.trim();
-  const ip = fromForwarded || request.headers.get("x-real-ip")?.trim() || "";
-  return ip.length > 0 && ip.length <= 64 ? ip : undefined;
 }
 
 export async function POST(request: Request) {
@@ -108,18 +103,8 @@ export async function POST(request: Request) {
       emailProviderSynced: result.emailProviderSynced === true,
     });
   } catch (error) {
-    // A fixed category, never message text: the upstream status code when our
-    // own error carries one, otherwise the error class name.
-    const statusMatch =
-      error instanceof Error
-        ? error.message.match(/returned (\d{3})/)
-        : undefined;
     serverLog("error", "android_waitlist_failed", {
-      error_category: statusMatch
-        ? `convex_status_${statusMatch[1]}`
-        : error instanceof Error
-          ? error.name
-          : typeof error,
+      error_category: forwardErrorCategory(error),
     });
     return NextResponse.json(
       { message: "Could not join right now. Please try again." },
