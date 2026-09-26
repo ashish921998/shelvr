@@ -183,12 +183,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .canvas[data-tidy="true"] .sparkle {
-    animation: none;
-  }
-}
-
 /* ---------- wide: 960 × 590 ---------- */
 
 @media (min-width: 760px) {
@@ -251,5 +245,27 @@
     --tidy: var(--tidy-s);
     --ch: var(--h-s);
     width: 150px;
+  }
+}
+
+/* Reduced motion: the stage starts tidy and toggles without moving. Last in
+   the file so it wins over the breakpoint rules. */
+@media (prefers-reduced-motion: reduce) {
+  .canvas .plank,
+  .canvas .label,
+  .canvas .card,
+  .canvas .chip,
+  .canvas .lift,
+  .canvas .messCaption,
+  .canvas .counter {
+    transition: none;
+  }
+
+  .lift:hover {
+    transform: none;
+  }
+
+  .canvas[data-tidy="true"] .sparkle {
+    animation: none;
   }
 }

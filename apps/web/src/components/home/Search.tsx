@@ -111,6 +111,12 @@ export default function Search() {
   const { q, results } = QUERIES[qi];
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Reduced motion shows the first query in full and never cycles.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTyped(Infinity);
+      return;
+    }
     const typing = setInterval(() => setTyped((n) => n + 1), 70);
     let swap: ReturnType<typeof setTimeout> | undefined;
     const cycle = setInterval(() => {
