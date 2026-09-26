@@ -5,10 +5,18 @@ import { oraclePrompt } from "./oracle";
 const library = {
   kind: "library",
   rows: [
-    { label: "Sourdough starter guide", domain: "kingarthur.com", savedAt: 1 },
+    {
+      label: "Sourdough starter guide",
+      domain: "kingarthur.com",
+      savedAt: Date.UTC(2019, 2, 4),
+    },
     { label: "https://example.com/a", domain: "example.com" },
   ],
-  stats: { count: 412, oldestAt: 1, topDomains: ["kingarthur.com"] },
+  stats: {
+    count: 412,
+    oldestAt: Date.UTC(2014, 0, 2),
+    topDomains: ["kingarthur.com"],
+  },
 };
 
 describe("parseOracleInput", () => {
@@ -52,6 +60,17 @@ describe("parseOracleInput", () => {
     ).toBeUndefined();
     const rows = Array.from({ length: 41 }, () => library.rows[1]);
     expect(parseOracleInput({ ...library, rows })).toBeUndefined();
+  });
+
+  it.each([
+    ["before 1990", Date.UTC(1989, 11, 31)],
+    ["after 2100", Date.UTC(2100, 0, 2)],
+    ["outside JavaScript's date range", 1e20],
+  ])("rejects a save dated %s", (_, savedAt) => {
+    const row = { ...library.rows[0], savedAt };
+    expect(parseOracleInput({ ...library, rows: [row] })).toBeUndefined();
+    const stats = { ...library.stats, oldestAt: savedAt };
+    expect(parseOracleInput({ ...library, stats })).toBeUndefined();
   });
 
   it("rejects an image over the size cap or outside base64", () => {

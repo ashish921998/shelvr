@@ -92,10 +92,9 @@ export default function OracleApp() {
       >;
       if (response.ok && body.persona) {
         const verdict = body as OracleVerdict;
-        captureWebAnalyticsEvent("oracle_verdict", {
-          mode,
-          persona: verdict.persona,
-        });
+        // The persona is read from the visitor's saves, so it stays out of
+        // analytics.
+        captureWebAnalyticsEvent("oracle_verdict", { mode });
         setState({ phase: "answered", mode, input, verdict });
         return;
       }

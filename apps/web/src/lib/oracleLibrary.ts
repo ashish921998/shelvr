@@ -24,9 +24,14 @@ function httpUrl(value: unknown): string | undefined {
   }
 }
 
+// The oracle accepts saves dated 1990 to 2100; a date outside that is a
+// malformed export, so it is dropped rather than sent.
+const MIN_SAVED_AT = Date.UTC(1990, 0, 1);
+const MAX_SAVED_AT = Date.UTC(2100, 0, 1);
+
 function epochSecondsToMs(value: unknown): number | undefined {
-  const seconds = Number(value);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+  const ms = Number(value) * 1000;
+  return ms >= MIN_SAVED_AT && ms <= MAX_SAVED_AT ? ms : undefined;
 }
 
 function decodeEntities(text: string): string {

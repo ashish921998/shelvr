@@ -192,7 +192,7 @@ visitor who arrived with a creator's `?ct=` keeps that campaign instead.
 | --------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
 | `oracle_opened`       | The page loads                 | `mode` when the URL carries `?mode=`                                             |
 | `oracle_started`      | The visitor submits an input   | `mode`                                                                           |
-| `oracle_verdict`      | A verdict renders              | `mode`, `persona`                                                                |
+| `oracle_verdict`      | A verdict renders              | `mode`                                                                           |
 | `oracle_failed`       | The request fails              | `mode`, `status` (HTTP status, `0` for a network error; `429` is the rate limit) |
 | `oracle_shared`       | The visitor shares a verdict   | `mode`, `method` (`web_share` or `clipboard`)                                    |
 | `oracle_share_viewed` | Someone opens a shared verdict | `mode`                                                                           |

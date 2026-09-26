@@ -73,6 +73,17 @@ describe("parseLibraryExport", () => {
     expect(stats.topDomains[0]).toBe("news.ycombinator.com");
   });
 
+  it("drops save dates outside 1990 to 2100", () => {
+    const rows = parseLibraryExport(`<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><A HREF="https://example.com/a" ADD_DATE="99999999999999">Far future</A>
+    <DT><A HREF="https://example.com/b" ADD_DATE="1">1970</A>
+</DL>`);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.savedAt === undefined)).toBe(true);
+    expect(libraryStats(rows).oldestAt).toBeUndefined();
+  });
+
   it("returns nothing for a blob in no known format", () => {
     expect(parseLibraryExport("lol what is an export {]")).toEqual([]);
     expect(parseLibraryExport('{"saved_saved_media": 3}')).toEqual([]);

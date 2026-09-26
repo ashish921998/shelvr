@@ -96,9 +96,18 @@ function boundedString(value: unknown, max = MAX_TEXT_CHARS) {
     : undefined;
 }
 
-function optionalNumber(value: unknown): number | undefined | null {
+// Epoch milliseconds between 1990 and 2100. Anything outside is a malformed
+// export, and a date outside JavaScript's range would make formatting throw.
+export const ORACLE_MIN_SAVED_AT = Date.UTC(1990, 0, 1);
+export const ORACLE_MAX_SAVED_AT = Date.UTC(2100, 0, 1);
+
+function optionalTimestamp(value: unknown): number | undefined | null {
   if (value === undefined) return undefined;
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  return typeof value === "number" &&
+    value >= ORACLE_MIN_SAVED_AT &&
+    value <= ORACLE_MAX_SAVED_AT
+    ? value
+    : null;
 }
 
 function everyOrNone<T>(
@@ -128,7 +137,7 @@ function libraryRow(value: unknown) {
   const { label, domain, savedAt } = value as Fields;
   const parsedLabel = boundedString(label);
   const parsedDomain = boundedString(domain, 253);
-  const parsedSavedAt = optionalNumber(savedAt);
+  const parsedSavedAt = optionalTimestamp(savedAt);
   if (!parsedLabel || !parsedDomain || parsedSavedAt === null) return undefined;
   return {
     label: parsedLabel,
@@ -140,7 +149,7 @@ function libraryRow(value: unknown) {
 function libraryStats(value: unknown) {
   if (typeof value !== "object" || value === null) return undefined;
   const { count, oldestAt, topDomains } = value as Fields;
-  const parsedOldest = optionalNumber(oldestAt);
+  const parsedOldest = optionalTimestamp(oldestAt);
   const domains = everyOrNone(topDomains, 3, (domain) =>
     boundedString(domain, 253),
   );

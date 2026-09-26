@@ -11,13 +11,33 @@ import {
 
 import { FieldHint, SubmitButton, fieldClass } from "./OracleFields";
 
+// Larger exports can freeze a phone while they are parsed, and 40 sampled
+// saves read the same from a smaller slice of history.
+const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
+
 export default function LibraryInput({ busy, onSubmit }: OracleInputProps) {
   const [blob, setBlob] = useState("");
-  const entries = useMemo(() => parseLibraryExport(blob), [blob]);
+  const [tooLarge, setTooLarge] = useState(false);
+  const entries = useMemo(
+    () => (tooLarge ? [] : parseLibraryExport(blob)),
+    [blob, tooLarge],
+  );
+
+  function take(text: string, bytes: number) {
+    const over = bytes > MAX_EXPORT_BYTES;
+    setTooLarge(over);
+    setBlob(over ? "" : text);
+  }
 
   async function pickFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file) setBlob(await file.text());
+    if (!file) return;
+    if (file.size > MAX_EXPORT_BYTES) {
+      take("", file.size);
+      return;
+    }
+    const text = await file.text();
+    take(text, file.size);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -40,7 +60,9 @@ export default function LibraryInput({ busy, onSubmit }: OracleInputProps) {
           rows={6}
           spellCheck={false}
           placeholder="Paste a bookmarks .html export, Instagram’s saved_posts.json, or one link per line"
-          onChange={(event) => setBlob(event.target.value)}
+          onChange={(event) =>
+            take(event.target.value, event.target.value.length)
+          }
           className={`${fieldClass} py-3 font-mono text-sm`}
         />
       </label>
@@ -54,7 +76,11 @@ export default function LibraryInput({ busy, onSubmit }: OracleInputProps) {
           className="sr-only"
         />
       </label>
-      {blob.trim() === "" ? (
+      {tooLarge ? (
+        <FieldHint tone="alert">
+          That export is over 5 MB. Try a smaller one, or paste part of it.
+        </FieldHint>
+      ) : blob.trim() === "" ? (
         <FieldHint>
           Chrome, Safari, and Firefox all export bookmarks as HTML. It is read
           in your browser; the oracle sees the totals and a sample of 40 saves.
