@@ -11,7 +11,7 @@ const FAQS = [
   },
   {
     q: "How does it know where things go?",
-    a: "Shelvr reads each save (the page, the text in a screenshot, your note) and files it into the Space it fits. You can always move or retag anything.",
+    a: "Shelvr reads each save (the page, the text in a screenshot, your note) and files it into the Space it fits. You can always move anything to another Space.",
   },
   {
     q: "Do I have to set up folders first?",

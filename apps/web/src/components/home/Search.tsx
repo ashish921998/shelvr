@@ -67,7 +67,7 @@ const QUERIES: { q: string; results: Result[] }[] = [
       },
       {
         title: "Ramen shop near the office",
-        snippet: "Text read from a photo of the sign",
+        snippet: "Photo of the shop front · saved in March",
         Icon: MapPinIcon,
         thumb: "#8d8271",
         intent: "open_maps",
@@ -145,7 +145,7 @@ export default function Search() {
         Find it the way you remember it.
       </h2>
       <p className="max-w-[46ch] text-[17px] leading-normal text-pretty text-muted">
-        Search the whole article, the note, even the text inside a screenshot.
+        Search whole articles and notes, and find photos by what’s in them.
         Places show up on a map. Every save keeps its AI summary.
       </p>
 
@@ -162,7 +162,7 @@ export default function Search() {
           className={`flex justify-between px-1.5 text-xs font-medium text-muted-soft transition-opacity duration-300 ${out ? "opacity-0" : ""}`}
         >
           <span>{results.length} results · 0.2s</span>
-          <span>full text · notes · text in photos</span>
+          <span>full text · notes · photos</span>
         </div>
         <div className={`flex flex-col gap-2 transition duration-300 ${fade}`}>
           {results.map((r) => (

@@ -59,7 +59,7 @@ export default function PhotoTidy() {
   }, [doSwipe]);
 
   const reviewed = index + 12;
-  const percent = `${Math.min(100, Math.round((reviewed / 4000) * 1200))}%`;
+  const percent = `${((reviewed / 4000) * 100).toFixed(1)}%`;
 
   return (
     <section
@@ -166,7 +166,7 @@ export default function PhotoTidy() {
           </div>
           <div className="h-1.5 overflow-hidden rounded-[3px] bg-paper-deep">
             <div
-              className="h-full rounded-[3px] bg-ember transition-[width] duration-600"
+              className="h-full min-w-1.5 rounded-[3px] bg-ember transition-[width] duration-600"
               style={{ width: percent }}
             />
           </div>
