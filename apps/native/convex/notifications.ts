@@ -56,6 +56,8 @@ const REMINDER_SCAN_ROWS = 500;
 const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
 /** Candidates of each kind checked against read state and history per pass. */
 const REMINDER_CHECKS_PER_KIND = 20;
+/** Failed attempts at one save before it is given up on. */
+const MAX_FAILED_REMINDERS = 2;
 
 function weekStart(now: number): number {
   const date = new Date(now);
@@ -275,9 +277,12 @@ export const setSaveReminders = mutation({
     const now = Date.now();
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
+    // A user who has travelled since their slot was booked would otherwise
+    // keep getting reminders, and the weekly shelf, at the old zone's hour.
+    const moved = existing !== null && existing.timezone !== timezone;
+    const booked = moved ? undefined : existing?.nextReminderAt;
     const nextReminderAt = args.enabled
-      ? (existing?.nextReminderAt ??
-        nextLocalHourAt(now, timezone, DEFAULT_REMINDER_HOUR))
+      ? (booked ?? nextLocalHourAt(now, timezone, DEFAULT_REMINDER_HOUR))
       : undefined;
     if (existing === null) {
       await ctx.db.insert("notificationPreferences", {
@@ -293,6 +298,8 @@ export const setSaveReminders = mutation({
       await ctx.db.patch(existing._id, {
         remindersEnabled: args.enabled,
         nextReminderAt,
+        timezone,
+        ...(moved ? { nextDigestAt: nextWeeklyDigestAt(now, timezone) } : {}),
         updatedAt: now,
       });
     }
@@ -716,13 +723,20 @@ export const prepareSaveReminder = internalMutation({
       reminders[0]?.kind,
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
-      const reminded = await ctx.db
+      // A failed reminder never reached the user (paused, expired, no
+      // device), so it does not use up the save. Two failures do, so one
+      // save that cannot be delivered never blocks every save behind it.
+      const earlier = await ctx.db
         .query("saveReminders")
         .withIndex("by_user_and_item", (q) =>
           q.eq("userId", userId).eq("itemId", candidate.item._id),
         )
-        .first();
-      if (reminded !== null) continue;
+        .take(MAX_FAILED_REMINDERS);
+      if (
+        earlier.length >= MAX_FAILED_REMINDERS ||
+        earlier.some((reminder) => reminder.deliveryStatus !== "failed")
+      )
+        continue;
       const read = await ctx.db
         .query("itemReads")
         .withIndex("by_user_and_item", (q) =>

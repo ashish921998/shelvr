@@ -49,6 +49,10 @@ export async function getExpoPushToken(
     });
   }
   let permission = await Notifications.getPermissionsAsync();
+  // Once the user has refused for good the OS shows no prompt, so a request
+  // would only replay the old denial as if it were a fresh decision.
+  if (permission.canAskAgain === false && !canReceiveNotifications(permission))
+    return null;
   if (!canReceiveNotifications(permission) && requestPermission) {
     permission = await Notifications.requestPermissionsAsync();
     analytics.capture("notification_permission_result", {

@@ -424,6 +424,39 @@ describe("durable digest delivery", () => {
     expect(await telemetry()).toHaveLength(1);
   });
 
+  it("keeps a shelf one device confirmed as delivered when time runs out on another", async () => {
+    const { t, digestId, digest, advance } = await seed(["token-a", "token-b"]);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          json([
+            { status: "ok", id: "ticket-a" },
+            { status: "ok", id: "ticket-b" },
+          ]),
+        )
+        .mockResolvedValue(json({ "ticket-a": { status: "ok" } })),
+    );
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "complete",
+      deliveryError: "retry_limit_reached",
+    });
+    expect((await digest())?.deliveredAt).toBeDefined();
+    const events = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).filter((job) => job.name.includes("captureNotification"));
+    expect(events).toHaveLength(1);
+    expect(events[0].args[0]).toMatchObject({ delivered: true });
+  });
+
   it("does not treat a malformed successful HTTP response as delivery", async () => {
     const { t, digestId, digest } = await seed();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json([])));

@@ -13,7 +13,11 @@ import {
   reminderCopy,
   type Recipient,
 } from "./model/notificationFields";
-import { reminderSubject, saveRemindersLive } from "./model/saveReminders";
+import {
+  openedTooRecently,
+  reminderSubject,
+  saveRemindersLive,
+} from "./model/saveReminders";
 
 /** Each kind rides in the payload and in telemetry, so an open is attributed
  * to what was sent. */
@@ -167,11 +171,14 @@ function settle(
   const anyDelivered = recipients.some(
     (recipient) => recipient.state === "delivered",
   );
+  // A device that confirmed delivery makes the notification delivered, even
+  // when another device's outcome is still unknown at the limit: the user
+  // saw it, so budgets and telemetry must count it.
   const status: "pending" | "complete" | "failed" = retry
     ? "pending"
-    : pending || !anyDelivered
-      ? "failed"
-      : "complete";
+    : anyDelivered
+      ? "complete"
+      : "failed";
   return {
     status,
     fields: {
@@ -181,13 +188,56 @@ function settle(
         ? now + Math.min(RECEIPT_DELAY_MS * 2 ** (attempt - 1), 60 * 60 * 1000)
         : undefined,
       // This records provider acceptance from receipts, not a device read acknowledgment.
-      deliveredAt: !pending && anyDelivered ? now : undefined,
+      deliveredAt: status === "complete" ? now : undefined,
       deliveryError:
         pending && exhausted
           ? "retry_limit_reached"
           : recipients.find((recipient) => recipient.error)?.error,
     },
   };
+}
+
+type Closed = {
+  deliveryStatus: "complete" | "failed";
+  deliveryNextAttemptAt: undefined;
+  deliveredAt: number | undefined;
+  deliveryError: string;
+};
+
+/**
+ * Ends delivery before the next attempt: the user or the server turned it
+ * off, attempts or age ran out, or there is nothing left to send or nowhere
+ * to send it. A device that already confirmed delivery makes the whole
+ * notification delivered. Once an attempt has been made, this is the terminal
+ * transition `finish` will never see, so the one send event is recorded here.
+ */
+async function closeBetweenAttempts(
+  ctx: MutationCtx,
+  close: (fields: Closed) => Promise<void>,
+  attempted: Recipient[] | undefined,
+  deliveryError: string,
+  event: {
+    userId: string;
+    notificationId: string;
+    kind: string;
+    itemCount: number;
+  },
+) {
+  const now = Date.now();
+  const delivered =
+    attempted?.some((recipient) => recipient.state === "delivered") ?? false;
+  await close({
+    deliveryStatus: delivered ? "complete" : "failed",
+    deliveryNextAttemptAt: undefined,
+    deliveredAt: delivered ? now : undefined,
+    deliveryError,
+  });
+  if (attempted !== undefined)
+    await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
+      ...event,
+      delivered,
+      sentAt: now,
+    });
 }
 
 export const claim = internalMutation({
@@ -217,18 +267,25 @@ export const claim = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", digest.userId))
       .unique();
     const attempts = digest.deliveryAttempts ?? 0;
-    if (
-      !preferences?.weeklyShelfEnabled ||
-      attempts >= MAX_ATTEMPTS ||
-      now - digest.createdAt >= MAX_AGE_MS
-    ) {
-      await ctx.db.patch(digestId, {
-        deliveryStatus: "failed",
-        deliveryNextAttemptAt: undefined,
-        deliveryError: !preferences?.weeklyShelfEnabled
-          ? "notifications_disabled"
-          : "retry_limit_reached",
-      });
+    const close = (deliveryError: string) =>
+      closeBetweenAttempts(
+        ctx,
+        (fields) => ctx.db.patch(digestId, fields),
+        digest.deliveryRecipients,
+        deliveryError,
+        {
+          userId: digest.userId,
+          notificationId: digestId,
+          kind: NOTIFICATION_KIND,
+          itemCount: digest.itemIds.length,
+        },
+      );
+    if (!preferences?.weeklyShelfEnabled) {
+      await close("notifications_disabled");
+      return null;
+    }
+    if (attempts >= MAX_ATTEMPTS || now - digest.createdAt >= MAX_AGE_MS) {
+      await close("retry_limit_reached");
       return null;
     }
     const recipients = await liveRecipients(
@@ -253,11 +310,7 @@ export const claim = internalMutation({
       ) ?? ready.find((item) => item.title !== undefined)
     )?.title;
     if (recipients.length === 0 || itemCount === 0) {
-      await ctx.db.patch(digestId, {
-        deliveryStatus: "failed",
-        deliveryNextAttemptAt: undefined,
-        deliveryError: itemCount === 0 ? "no_items" : "no_devices",
-      });
+      await close(itemCount === 0 ? "no_items" : "no_devices");
       return null;
     }
     const attempt = attempts + 1;
@@ -482,11 +535,18 @@ export const claimReminder = internalMutation({
     const disabled = preferences?.remindersEnabled === false;
     const paused = !saveRemindersLive();
     const fail = (deliveryError: string) =>
-      ctx.db.patch(reminderId, {
-        deliveryStatus: "failed",
-        deliveryNextAttemptAt: undefined,
+      closeBetweenAttempts(
+        ctx,
+        (fields) => ctx.db.patch(reminderId, fields),
+        reminder.deliveryRecipients,
         deliveryError,
-      });
+        {
+          userId: reminder.userId,
+          notificationId: reminderId,
+          kind: reminderNotificationKind(reminder.kind),
+          itemCount: 1,
+        },
+      );
     if (
       paused ||
       disabled ||
@@ -498,7 +558,9 @@ export const claimReminder = internalMutation({
           ? "reminders_paused"
           : disabled
             ? "notifications_disabled"
-            : "retry_limit_reached",
+            : attempts >= MAX_ATTEMPTS
+              ? "retry_limit_reached"
+              : "expired",
       );
       return null;
     }
@@ -511,10 +573,28 @@ export const claimReminder = internalMutation({
       item.status === "ready"
         ? reminderSubject(item, reminder.kind)
         : undefined;
-    const recipients = await liveRecipients(
-      ctx,
-      reminder.userId,
-      reminder.deliveryRecipients,
+    const read = await ctx.db
+      .query("itemReads")
+      .withIndex("by_user_and_item", (q) =>
+        q.eq("userId", reminder.userId).eq("itemId", reminder.itemId),
+      )
+      .unique();
+    // A retry must not tell someone they haven't read what they opened since
+    // the reminder was chosen. Unsent devices are dropped; tickets already
+    // accepted still finish their receipt check.
+    const opened = openedTooRecently(reminder.kind, read?.lastOpenedAt, now);
+    const recipients = (
+      await liveRecipients(ctx, reminder.userId, reminder.deliveryRecipients)
+    ).map(
+      (recipient): Recipient =>
+        opened && recipient.state === "pending"
+          ? {
+              token: recipient.token,
+              locale: recipient.locale,
+              state: "failed",
+              error: "item_opened",
+            }
+          : recipient,
     );
     if (subject === undefined || recipients.length === 0) {
       await fail(subject === undefined ? "no_items" : "no_devices");

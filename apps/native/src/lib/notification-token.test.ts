@@ -140,6 +140,13 @@ describe("notification permission telemetry", () => {
     );
   });
 
+  it("records nothing and asks nothing once the OS can no longer prompt", async () => {
+    mock.permission.mockResolvedValue({ granted: false, canAskAgain: false });
+    expect(await getExpoPushToken(true)).toBeNull();
+    expect(mock.request).not.toHaveBeenCalled();
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
+
   it("separates iOS provisional authorization from a full grant", async () => {
     mock.platform.OS = "ios";
     mock.permission.mockResolvedValue({ granted: false, ios: { status: 1 } });

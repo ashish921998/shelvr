@@ -225,6 +225,34 @@ describe("choosing a save reminder", () => {
     expect(await reminders()).toHaveLength(4);
   });
 
+  it("tries a save again after a reminder that never reached the user, but only once", async () => {
+    const { t, ids, prepare, due, reminders } = await setup({
+      saves: [[2, article]],
+    });
+    await t.run((ctx) =>
+      ctx.db.insert("saveReminders", {
+        userId: USER,
+        itemId: ids[0],
+        kind: "read",
+        createdAt: NOW - 3 * DAY,
+        deliveryStatus: "failed",
+        deliveryError: "reminders_paused",
+      }),
+    );
+    await prepare();
+    const sent = await reminders();
+    expect(sent).toHaveLength(2);
+    await t.run((ctx) =>
+      ctx.db.patch(sent[1]._id, {
+        deliveryStatus: "failed",
+        deliveryError: "no_devices",
+      }),
+    );
+    await due(NOW + DAY);
+    await prepare(NOW + DAY);
+    expect(await reminders()).toHaveLength(2);
+  });
+
   it("leaves out saves it cannot name an action for", async () => {
     const { prepare, reminders } = await setup({
       saves: [
@@ -299,6 +327,29 @@ describe("reminder preferences", () => {
     expect((await row())?.nextReminderAt).toBe(
       Date.parse("2026-09-26T12:30:00Z"),
     );
+  });
+
+  it("follows a user to a new timezone when they switch reminders on", async () => {
+    const t = newConvexTest();
+    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    await user.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      timezone: "UTC",
+    });
+    await user.mutation(api.notifications.setSaveReminders, {
+      enabled: true,
+      timezone: "Asia/Kolkata",
+    });
+    const row = await t.run((ctx) =>
+      ctx.db.query("notificationPreferences").unique(),
+    );
+    expect(row).toMatchObject({
+      timezone: "Asia/Kolkata",
+      // 18:00 and Sunday 09:00 in Kolkata, no longer in UTC.
+      nextReminderAt: Date.parse("2026-09-26T12:30:00Z"),
+      nextDigestAt: Date.parse("2026-09-27T03:30:00Z"),
+    });
   });
 
   it("sweeps only users who are due", async () => {
@@ -562,7 +613,75 @@ describe("delivering a save reminder", () => {
     await send();
     expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
       deliveryStatus: "failed",
-      deliveryError: "retry_limit_reached",
+      deliveryError: "expired",
     });
+  });
+
+  it("does not say an article is unread once it was opened before a retry", async () => {
+    const { t, reminder, open } = await queued();
+    const fetchMock = vi.fn().mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    const send = () =>
+      t.action(internal.notificationDelivery.sendReminder, {
+        reminderId: reminder._id,
+      });
+    await send();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await open(reminder.itemId, NOW + 60_000);
+    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    vi.setSystemTime(row!.deliveryNextAttemptAt!);
+    await send();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "item_opened",
+    });
+  });
+
+  it("counts a reminder one device confirmed, even if another never answered", async () => {
+    const { t, reminder } = await queued();
+    await t.run((ctx) =>
+      ctx.db.insert("notificationDevices", {
+        userId: USER,
+        token: "token-b",
+        platform: "android",
+        enabled: true,
+        lastSeenAt: NOW,
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          json([
+            { status: "ok", id: "ticket-a" },
+            { status: "ok", id: "ticket-b" },
+          ]),
+        )
+        // Device b's receipt never arrives.
+        .mockResolvedValue(json({ "ticket-a": { status: "ok" } })),
+    );
+    const send = () =>
+      t.action(internal.notificationDelivery.sendReminder, {
+        reminderId: reminder._id,
+      });
+    await send();
+    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    vi.setSystemTime(row!.deliveryNextAttemptAt!);
+    await send();
+    // Out of time before device b answers.
+    vi.setSystemTime(NOW + 6 * 60 * 60 * 1000);
+    await send();
+    const final = await t.run((ctx) => ctx.db.get(reminder._id));
+    expect(final).toMatchObject({ deliveryStatus: "complete" });
+    expect(final?.deliveredAt).toBeDefined();
+    const events = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).filter((job) => job.name.includes("captureNotification"));
+    expect(events).toHaveLength(1);
+    expect(events[0].args[0]).toMatchObject({ delivered: true });
   });
 });

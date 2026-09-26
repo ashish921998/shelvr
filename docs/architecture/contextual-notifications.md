@@ -29,8 +29,10 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
   `media`. A recipe is a save with a `recipe`. Anything else never gets a
   reminder, because a vague "remember this?" is the notification people
   turn off. The notification names a recipe by `recipe.name` (the dish), and
-  anything else by its title. Each save is reminded about at most once. The
-  two kinds take turns, newest save first within each kind.
+  anything else by its title. Each save is reminded about at most once; a
+  reminder that never reached the user (paused, expired, no device) does not
+  count, up to two tries. The two kinds take turns, newest save first within
+  each kind.
 - **When.** At the local hour the user saved the most over the past 30 days,
   clamped to 10:00 to 19:00. It stays at 18:00 until there are 5 saves to go
   on. Most saves come from the share sheet while the user is scrolling
