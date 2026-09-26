@@ -19,6 +19,9 @@ export type OracleVerdict = {
   tagline: string;
   spaces: { name: string; reason: string }[];
   guesses: { label: string; why: string }[];
+  // Optional while an older backend may still answer without them.
+  score?: number;
+  moreSpaces?: string[];
 };
 
 export type OracleInputProps = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOracleInput } from "./model/oracle";
+import { parseOracleInput, settleVerdict } from "./model/oracle";
 import { oraclePrompt } from "./oracle";
 
 const library = {
@@ -140,5 +140,35 @@ describe("oraclePrompt", () => {
     expect(prompt).toContain(
       "- Sourdough starter guide (kingarthur.com, saved 2019-03-04)",
     );
+  });
+});
+
+describe("settleVerdict", () => {
+  const verdict = {
+    persona: "The Someday Chef",
+    tagline: "Recipes for a kitchen you keep meaning to use.",
+    spaces: [{ name: "Pasta", reason: "The ones you cook." }],
+    guesses: [],
+  };
+
+  it.each([
+    [87.4, 87],
+    [140, 100],
+    [-3, 0],
+    [Number.NaN, 0],
+  ])("holds a score of %s to %s", (score, expected) => {
+    expect(settleVerdict({ ...verdict, score, moreSpaces: [] }).score).toBe(
+      expected,
+    );
+  });
+
+  it("keeps at most 3 named extra spaces", () => {
+    expect(
+      settleVerdict({
+        ...verdict,
+        score: 50,
+        moreSpaces: [" Lisbon ", "", "Kitchen Kit", "Wine", "Plants"],
+      }).moreSpaces,
+    ).toEqual(["Lisbon", "Kitchen Kit", "Wine"]);
   });
 });
