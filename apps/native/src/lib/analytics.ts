@@ -185,11 +185,9 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
-  // Android task-restore ghost: the share screen re-offered a batch that was
-  // already handled (recordCompletedShare tombstone matched).
-  share_ghost_prompt: Record<string, never>;
-  share_ghost_save_again: Record<string, never>;
-  share_ghost_dismissed: Record<string, never>;
+  // Android task-restore ghost: the share screen skipped a replayed batch
+  // that was already handled (recordCompletedShare tombstone matched).
+  share_ghost_skipped: Record<string, never>;
   // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
   // saved item's title, tags, or URL.
   save_recall_shown: { match_count: number };

@@ -164,9 +164,6 @@ export type MessageParams = {
   "share.continueSaved": undefined;
   "share.finishFailed": undefined;
   "share.success": undefined;
-  "share.ghostTitle": undefined;
-  "share.ghostBody": undefined;
-  "share.saveAgain": undefined;
   "account.signingIn": undefined;
   "account.signInTitle": undefined;
   "account.signInNotFinished": undefined;
