@@ -405,8 +405,8 @@
     "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
   },
   "digest.namedSingle": "«%{title}», guardado esta semana",
-  "reminder.readTitle": "Sigue en tu lista",
-  "reminder.readBody": "Todavía no has leído «%{title}».",
+  "reminder.readTitle": "Guardado para después",
+  "reminder.readBody": "«%{title}» te espera cuando quieras.",
   "reminder.cookTitle": "De tus recetas guardadas",
   "reminder.cookBody": "¿Se te antoja preparar «%{title}» hoy?",
   "search.noResults": "Ningún contenido coincide con «%{query}».",

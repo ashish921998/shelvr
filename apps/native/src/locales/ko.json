@@ -387,8 +387,8 @@
     "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
   },
   "digest.namedSingle": "이번 주에 저장한 '%{title}'",
-  "reminder.readTitle": "저장한 글",
-  "reminder.readBody": "'%{title}'을(를) 아직 읽지 않았어요.",
+  "reminder.readTitle": "나중에 볼 글",
+  "reminder.readBody": "'%{title}', 여유 있을 때 읽어 보세요.",
   "reminder.cookTitle": "저장한 레시피에서",
   "reminder.cookBody": "오늘 '%{title}' 만들어 볼까요?",
   "search.noResults": "“%{query}”에 맞는 저장 항목이 없어요.",

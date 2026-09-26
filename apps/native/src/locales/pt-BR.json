@@ -405,8 +405,8 @@
     "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
   },
   "digest.namedSingle": "“%{title}”, salvo esta semana",
-  "reminder.readTitle": "Ainda na sua lista",
-  "reminder.readBody": "Você ainda não leu “%{title}”.",
+  "reminder.readTitle": "Salvo para depois",
+  "reminder.readBody": "“%{title}” te espera quando você quiser.",
   "reminder.cookTitle": "Das suas receitas salvas",
   "reminder.cookBody": "Que tal fazer “%{title}” hoje?",
   "search.noResults": "Nenhum conteúdo corresponde a «%{query}».",

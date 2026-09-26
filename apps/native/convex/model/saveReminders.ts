@@ -6,7 +6,7 @@ import { env } from "../_generated/server";
  * the thing the user saved it to do. Everything here is pure so the policy is
  * testable without a database; `convex/saveReminders.ts` does the reads.
  *
- * - `read`: an article the user has never opened. "You haven't read X."
+ * - `read`: an article the user has never opened. "X is ready when you are."
  * - `cook`: a recipe that has had time to be forgotten. "Want to make X today?"
  *
  * A save earns at most one reminder, ever. Anything that is not clearly an

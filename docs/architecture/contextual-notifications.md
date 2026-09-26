@@ -15,7 +15,7 @@ Every notification about saves names one of them, or it is not sent.
 | Kind            | Example                                                  | When                                                         | Switch         |
 | --------------- | -------------------------------------------------------- | ------------------------------------------------------------ | -------------- |
 | `weekly_shelf`  | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3+ unopened saves from the week     | Weekly shelf   |
-| `read_reminder` | _You haven't read "Why bread rises" yet._                | An article unopened for a day or more (up to 90 days)        | Save reminders |
+| `read_reminder` | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)        | Save reminders |
 | `cook_reminder` | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week      | Save reminders |
 | trial reminder  | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`) | OS permission  |
 

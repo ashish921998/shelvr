@@ -387,8 +387,8 @@
     "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
   },
   "digest.namedSingle": "「%{title}」を今週保存しました",
-  "reminder.readTitle": "保存した記事",
-  "reminder.readBody": "「%{title}」をまだ読んでいません。",
+  "reminder.readTitle": "あとで読む",
+  "reminder.readBody": "「%{title}」、時間のあるときにどうぞ。",
   "reminder.cookTitle": "保存したレシピから",
   "reminder.cookBody": "今日は「%{title}」を作ってみませんか？",
   "search.noResults": "「%{query}」に一致する保存項目はありません。",

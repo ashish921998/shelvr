@@ -88,10 +88,10 @@ describe("title truncation", () => {
 });
 
 describe("reminder copy", () => {
-  it("asks about the article by name", () => {
+  it("invites the article back by name", () => {
     expect(reminderCopy("en", "read", "Why bread rises")).toEqual({
-      title: "Still on your list",
-      body: "You haven’t read “Why bread rises” yet.",
+      title: "Saved for later",
+      body: "“Why bread rises” is ready when you are.",
     });
   });
 
@@ -113,7 +113,7 @@ describe("reminder copy", () => {
 
   it("keeps replacement patterns in a title literal and trims long ones", () => {
     expect(reminderCopy("en", "read", "Cost of $& and $`").body).toBe(
-      "You haven’t read “Cost of $& and $`” yet.",
+      "“Cost of $& and $`” is ready when you are.",
     );
     const long = reminderCopy("en", "read", "word ".repeat(30)).body;
     expect(long).toContain("…”");

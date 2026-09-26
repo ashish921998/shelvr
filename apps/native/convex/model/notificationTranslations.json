@@ -12,8 +12,8 @@
     "namedSingle": "„%{title}“ – diese Woche gespeichert",
     "reminder": {
       "read": {
-        "title": "Noch auf deiner Liste",
-        "body": "Du hast „%{title}“ noch nicht gelesen."
+        "title": "Für später gespeichert",
+        "body": "„%{title}“ wartet auf dich, wenn du Zeit hast."
       },
       "cook": {
         "title": "Aus deinen gespeicherten Rezepten",
@@ -34,8 +34,8 @@
     "namedSingle": "“%{title}”, saved this week",
     "reminder": {
       "read": {
-        "title": "Still on your list",
-        "body": "You haven’t read “%{title}” yet."
+        "title": "Saved for later",
+        "body": "“%{title}” is ready when you are."
       },
       "cook": {
         "title": "From your saved recipes",
@@ -58,8 +58,8 @@
     "namedSingle": "«%{title}», guardado esta semana",
     "reminder": {
       "read": {
-        "title": "Sigue en tu lista",
-        "body": "Aún no has leído «%{title}»."
+        "title": "Guardado para después",
+        "body": "«%{title}» te espera cuando quieras."
       },
       "cook": {
         "title": "De tus recetas guardadas",
@@ -82,8 +82,8 @@
     "namedSingle": "«%{title}», guardado esta semana",
     "reminder": {
       "read": {
-        "title": "Sigue en tu lista",
-        "body": "Todavía no has leído «%{title}»."
+        "title": "Guardado para después",
+        "body": "«%{title}» te espera cuando quieras."
       },
       "cook": {
         "title": "De tus recetas guardadas",
@@ -106,8 +106,8 @@
     "namedSingle": "« %{title} », enregistré cette semaine",
     "reminder": {
       "read": {
-        "title": "Toujours sur votre liste",
-        "body": "Vous n'avez pas encore lu « %{title} »."
+        "title": "Enregistré pour plus tard",
+        "body": "« %{title} » vous attend quand vous voulez."
       },
       "cook": {
         "title": "Parmi vos recettes enregistrées",
@@ -130,8 +130,8 @@
     "namedSingle": "« %{title} », enregistré cette semaine",
     "reminder": {
       "read": {
-        "title": "Toujours sur votre liste",
-        "body": "Vous n'avez pas encore lu « %{title} »."
+        "title": "Enregistré pour plus tard",
+        "body": "« %{title} » vous attend quand vous voulez."
       },
       "cook": {
         "title": "Parmi vos recettes enregistrées",
@@ -150,8 +150,8 @@
     "namedSingle": "「%{title}」を今週保存しました",
     "reminder": {
       "read": {
-        "title": "保存した記事",
-        "body": "「%{title}」をまだ読んでいません。"
+        "title": "あとで読む",
+        "body": "「%{title}」、時間のあるときにどうぞ。"
       },
       "cook": {
         "title": "保存したレシピから",
@@ -170,8 +170,8 @@
     "namedSingle": "이번 주에 저장한 '%{title}'",
     "reminder": {
       "read": {
-        "title": "저장한 글",
-        "body": "'%{title}'을(를) 아직 읽지 않았어요."
+        "title": "나중에 볼 글",
+        "body": "'%{title}', 여유 있을 때 읽어 보세요."
       },
       "cook": {
         "title": "저장한 레시피에서",
@@ -194,8 +194,8 @@
     "namedSingle": "“%{title}”, salvo esta semana",
     "reminder": {
       "read": {
-        "title": "Ainda na sua lista",
-        "body": "Você ainda não leu “%{title}”."
+        "title": "Salvo para depois",
+        "body": "“%{title}” te espera quando você quiser."
       },
       "cook": {
         "title": "Das suas receitas salvas",

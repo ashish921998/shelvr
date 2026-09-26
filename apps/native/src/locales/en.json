@@ -395,8 +395,8 @@
     "other": "“%{title}” and %{formattedCount} more you saved this week"
   },
   "digest.namedSingle": "“%{title}”, saved this week",
-  "reminder.readTitle": "Still on your list",
-  "reminder.readBody": "You haven’t read “%{title}” yet.",
+  "reminder.readTitle": "Saved for later",
+  "reminder.readBody": "“%{title}” is ready when you are.",
   "reminder.cookTitle": "From your saved recipes",
   "reminder.cookBody": "Want to make “%{title}” today?",
   "search.noResults": "No saves match “%{query}”.",

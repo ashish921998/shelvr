@@ -395,8 +395,8 @@
     "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
   },
   "digest.namedSingle": "„%{title}“ – diese Woche gespeichert",
-  "reminder.readTitle": "Noch auf deiner Liste",
-  "reminder.readBody": "Du hast „%{title}“ noch nicht gelesen.",
+  "reminder.readTitle": "Für später gespeichert",
+  "reminder.readBody": "„%{title}“ wartet auf dich, wenn du Zeit hast.",
   "reminder.cookTitle": "Aus deinen gespeicherten Rezepten",
   "reminder.cookBody": "Lust, heute „%{title}“ zu kochen?",
   "search.noResults": "Keine gespeicherten Inhalte passen zu „%{query}“.",

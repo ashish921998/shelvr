@@ -561,8 +561,8 @@ describe("delivering a save reminder", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual([
       {
         to: "token-a",
-        title: "Still on your list",
-        body: "You haven’t read “Why bread rises” yet.",
+        title: "Saved for later",
+        body: "“Why bread rises” is ready when you are.",
         data: {
           url: `/item/${reminder.itemId}`,
           kind: "read_reminder",

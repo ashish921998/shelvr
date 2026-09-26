@@ -405,8 +405,8 @@
     "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
   },
   "digest.namedSingle": "« %{title} », enregistré cette semaine",
-  "reminder.readTitle": "Toujours sur votre liste",
-  "reminder.readBody": "Vous n'avez pas encore lu « %{title} ».",
+  "reminder.readTitle": "Enregistré pour plus tard",
+  "reminder.readBody": "« %{title} » vous attend quand vous voulez.",
   "reminder.cookTitle": "Parmi vos recettes enregistrées",
   "reminder.cookBody": "Envie de préparer « %{title} » aujourd'hui ?",
   "search.noResults": "Aucun contenu ne correspond à « %{query} ».",
