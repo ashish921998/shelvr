@@ -61,7 +61,10 @@ export default function LibraryInput({ busy, onSubmit }: OracleInputProps) {
           spellCheck={false}
           placeholder="Paste a bookmarks .html export, Instagram’s saved_posts.json, or one link per line"
           onChange={(event) =>
-            take(event.target.value, event.target.value.length)
+            take(
+              event.target.value,
+              new TextEncoder().encode(event.target.value).byteLength,
+            )
           }
           className={`${fieldClass} py-3 font-mono text-sm`}
         />
