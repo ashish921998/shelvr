@@ -127,6 +127,34 @@ describe("the budget", () => {
     expect(reminderBlocked(NOW, [], [])).toBeUndefined();
   });
 
+  it("stays clear of a weekly shelf due within the day", () => {
+    const shelf = (hours: number) => ({
+      nextAt: NOW + hours * 60 * 60 * 1000,
+      sentThisWeek: false,
+    });
+    // Saturday 18:00 before a Sunday 09:00 shelf.
+    expect(reminderBlocked(NOW, [], [], shelf(15))).toBe("too_soon");
+    // An overdue shelf is about to go out too.
+    expect(reminderBlocked(NOW, [], [], shelf(-1))).toBe("too_soon");
+    expect(reminderBlocked(NOW, [], [], shelf(21))).toBeUndefined();
+  });
+
+  it("keeps a weekly slot for the shelf until it has gone out", () => {
+    const three = [2, 3, 4].map((days) => NOW - days * DAY);
+    const nextWeek = NOW + 3 * DAY;
+    expect(
+      reminderBlocked(NOW, three, [], {
+        nextAt: nextWeek,
+        sentThisWeek: false,
+      }),
+    ).toBe("weekly_limit");
+    // Once this week's shelf is among the three, it needs no second slot.
+    expect(
+      reminderBlocked(NOW, three, [], { nextAt: nextWeek, sentThisWeek: true }),
+    ).toBeUndefined();
+    expect(reminderBlocked(NOW, three, [])).toBeUndefined();
+  });
+
   it("never sends two in one day, counting the weekly shelf", () => {
     expect(reminderBlocked(NOW, [NOW - MIN_GAP_MS + 1], [])).toBe("too_soon");
     expect(reminderBlocked(NOW, [NOW - MIN_GAP_MS], [])).toBeUndefined();

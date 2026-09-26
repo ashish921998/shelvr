@@ -73,6 +73,9 @@ vi.mock("react-native", () => ({
 vi.mock("expo-notifications", () => ({
   setNotificationHandler: vi.fn(),
   getLastNotificationResponse: () => mock.lastResponse,
+  clearLastNotificationResponse: () => {
+    mock.lastResponse = null;
+  },
   addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
   addPushTokenListener: (listener: typeof mock.rotated) => {
     mock.rotated = listener;
@@ -255,6 +258,19 @@ describe("notification opens", () => {
       notification_id: "",
     });
     expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+  });
+
+  it("handles a tap once, however often the observer remounts", () => {
+    mock.lastResponse = opened({
+      url: "/item/abc",
+      kind: "read_reminder",
+      notificationId: "r1",
+    });
+    renderHook(() => useNotificationObserver()).unmount();
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledTimes(1);
+    expect(mock.push).toHaveBeenCalledTimes(1);
+    expect(mock.lastResponse).toBeNull();
   });
 
   it("records nothing when a notification carries no destination", () => {

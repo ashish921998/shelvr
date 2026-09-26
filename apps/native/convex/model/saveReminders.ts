@@ -147,14 +147,27 @@ export type BudgetBlock = "too_soon" | "weekly_limit" | "ignored";
  * `sentAt` holds when every push of the past week went out, of any kind.
  * `recentReminders` is the user's latest reminders, newest first, each marked
  * with whether its save was opened after it was sent.
+ *
+ * `shelf` is the user's weekly shelf, when it is on. The shelf is never held
+ * back for a reminder: it is opt-in and weekly, so skipping it would cost a
+ * whole week. Reminders make room for it instead, so the day and week limits
+ * hold across both kinds: none goes out within `MIN_GAP_MS` before the shelf
+ * is due, and until a shelf has gone out in the past week one weekly slot is
+ * kept for it.
  */
 export function reminderBlocked(
   now: number,
   sentAt: readonly number[],
   recentReminders: readonly { createdAt: number; opened: boolean }[],
+  shelf?: { nextAt: number; sentThisWeek: boolean },
 ): BudgetBlock | undefined {
-  if (sentAt.some((at) => now - at < MIN_GAP_MS)) return "too_soon";
-  if (sentAt.filter((at) => now - at < WEEK_MS).length >= WEEKLY_LIMIT)
+  if (
+    sentAt.some((at) => now - at < MIN_GAP_MS) ||
+    (shelf !== undefined && shelf.nextAt - now < MIN_GAP_MS)
+  )
+    return "too_soon";
+  const kept = shelf !== undefined && !shelf.sentThisWeek ? 1 : 0;
+  if (sentAt.filter((at) => now - at < WEEK_MS).length + kept >= WEEKLY_LIMIT)
     return "weekly_limit";
   const streak = recentReminders.slice(0, IGNORED_STREAK);
   if (

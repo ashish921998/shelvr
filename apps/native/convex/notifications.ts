@@ -246,20 +246,35 @@ export const registerDevice = mutation({
         nextReminderAt: nextLocalHourAt(now, timezone, DEFAULT_REMINDER_HOUR),
         updatedAt: now,
       });
-    } else if (
-      existingPreferences.remindersEnabled !== false &&
-      existingPreferences.nextReminderAt === undefined
-    ) {
-      // Arms reminders for a user who had none scheduled: one whose rows
-      // predate reminders, or whose last pass found no device to send to.
-      await ctx.db.patch(existingPreferences._id, {
-        nextReminderAt: nextLocalHourAt(
-          now,
-          existingPreferences.timezone,
-          DEFAULT_REMINDER_HOUR,
-        ),
-        updatedAt: now,
-      });
+    } else {
+      // Every launch registers with the device's current zone. A user who has
+      // travelled would otherwise keep reminders and the weekly shelf booked
+      // at home hours, which can be the middle of their night.
+      const moved =
+        timezone !== undefined && timezone !== existingPreferences.timezone;
+      const zone = moved ? timezone : existingPreferences.timezone;
+      // Also arms reminders for a user who had none scheduled: one whose row
+      // predates reminders, or whose last pass found no device to send to.
+      const arm =
+        existingPreferences.remindersEnabled !== false &&
+        (moved || existingPreferences.nextReminderAt === undefined);
+      if (moved || arm) {
+        await ctx.db.patch(existingPreferences._id, {
+          ...(moved
+            ? { timezone, nextDigestAt: nextWeeklyDigestAt(now, timezone) }
+            : {}),
+          ...(arm
+            ? {
+                nextReminderAt: nextLocalHourAt(
+                  now,
+                  zone,
+                  DEFAULT_REMINDER_HOUR,
+                ),
+              }
+            : {}),
+          updatedAt: now,
+        });
+      }
     }
     return null;
   },
@@ -694,11 +709,12 @@ export const prepareSaveReminder = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(2);
+    const shelvesSent = digests
+      .filter((digest) => digest.deliveryStatus !== "failed")
+      .map((digest) => digest.createdAt);
     const sentAt = [
       ...reminders.map((reminder) => reminder.createdAt),
-      ...digests
-        .filter((digest) => digest.deliveryStatus !== "failed")
-        .map((digest) => digest.createdAt),
+      ...shelvesSent,
     ].filter((at) => now - at < WEEK_MS);
     const streak = await Promise.all(
       reminders.slice(0, IGNORED_STREAK).map(async (reminder) => {
@@ -714,7 +730,13 @@ export const prepareSaveReminder = internalMutation({
         };
       }),
     );
-    if (reminderBlocked(now, sentAt, streak) !== undefined) return null;
+    const shelf = preferences.weeklyShelfEnabled
+      ? {
+          nextAt: preferences.nextDigestAt,
+          sentThisWeek: shelvesSent.some((at) => now - at < WEEK_MS),
+        }
+      : undefined;
+    if (reminderBlocked(now, sentAt, streak, shelf) !== undefined) return null;
 
     const checks = { read: 0, cook: 0 };
     for (const candidate of reminderCandidates(

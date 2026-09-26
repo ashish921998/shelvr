@@ -197,6 +197,19 @@ describe("choosing a save reminder", () => {
     expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
   });
 
+  it("makes room for a weekly shelf due within the day", async () => {
+    const { prepare, reminders, preferencesRow } = await setup({
+      saves: [[2, article]],
+      preferences: {
+        weeklyShelfEnabled: true,
+        nextDigestAt: NOW + 15 * 60 * 60 * 1000,
+      },
+    });
+    await prepare();
+    expect(await reminders()).toEqual([]);
+    expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
+  });
+
   it("slows down after three ignored reminders and recovers on an open", async () => {
     const { t, ids, prepare, due, reminders, open } = await setup({
       saves: [
@@ -350,6 +363,54 @@ describe("reminder preferences", () => {
       nextReminderAt: Date.parse("2026-09-26T12:30:00Z"),
       nextDigestAt: Date.parse("2026-09-27T03:30:00Z"),
     });
+  });
+
+  it("follows a device that registers from a new timezone", async () => {
+    const t = newConvexTest();
+    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    const register = (timezone?: string) =>
+      user.mutation(api.notifications.registerDevice, {
+        token: "token-a",
+        platform: "ios",
+        timezone,
+      });
+    const row = () =>
+      t.run((ctx) => ctx.db.query("notificationPreferences").unique());
+    await register("UTC");
+    const home = await row();
+    // An older client that sends no zone changes nothing.
+    await register();
+    expect(await row()).toMatchObject({
+      timezone: "UTC",
+      nextReminderAt: home?.nextReminderAt,
+    });
+    await register("Asia/Kolkata");
+    expect(await row()).toMatchObject({
+      timezone: "Asia/Kolkata",
+      nextReminderAt: Date.parse("2026-09-26T12:30:00Z"),
+      nextDigestAt: Date.parse("2026-09-27T03:30:00Z"),
+    });
+  });
+
+  it("moves the shelf but not reminders the user turned off", async () => {
+    const t = newConvexTest();
+    const user = t.withIdentity({ subject: `${USER}|session-1` });
+    await user.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      timezone: "UTC",
+    });
+    await user.mutation(api.notifications.setSaveReminders, { enabled: false });
+    await user.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      timezone: "Asia/Kolkata",
+    });
+    const row = await t.run((ctx) =>
+      ctx.db.query("notificationPreferences").unique(),
+    );
+    expect(row?.timezone).toBe("Asia/Kolkata");
+    expect(row?.nextReminderAt).toBeUndefined();
   });
 
   it("sweeps only users who are due", async () => {

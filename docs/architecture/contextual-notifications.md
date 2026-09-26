@@ -38,9 +38,12 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
   on. Most saves come from the share sheet while the user is scrolling
   another app. So this is the closest proxy for "while they are scrolling"
   that needs no tracking, and it answers the Instagram and TikTok feedback
-  without Screen Time.
+  without Screen Time. The zone is the one the device last registered
+  from, so a user who travels is not reminded at home hours.
 - **How often.** At most one push a day (20 hours apart) and four a week,
-  counting the weekly shelf. After three reminders in a row whose save
+  counting the weekly shelf. The shelf is never held back for a reminder;
+  reminders make room for it instead, skipping the 20 hours before it and
+  keeping it a weekly slot. After three reminders in a row whose save
   stayed unopened, it drops to one a week until the user opens one. A
   reminder that cannot go out within 6 hours is dropped, because it says
   "today".

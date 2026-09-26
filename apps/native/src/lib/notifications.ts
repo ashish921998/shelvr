@@ -221,15 +221,18 @@ export function useNotificationObserver(): void {
       nav.push(url as never);
     };
 
-    const response = Notifications.getLastNotificationResponse();
-    if (response?.notification) {
+    // Expo keeps the last tap until it is cleared, so a remount of this
+    // observer would otherwise navigate and record the same open again.
+    // Cleared after handling, never before: the splash gate reads it once
+    // per process during the first render, ahead of this effect.
+    const handle = (response: Notifications.NotificationResponse) => {
       redirect(response.notification);
-    }
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        redirect(response.notification);
-      },
-    );
+      Notifications.clearLastNotificationResponse();
+    };
+    const response = Notifications.getLastNotificationResponse();
+    if (response?.notification) handle(response);
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(handle);
     return () => subscription.remove();
   }, [nav]);
 }
