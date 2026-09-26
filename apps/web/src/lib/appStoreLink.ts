@@ -33,7 +33,17 @@ export function useAppStoreLink(
 
   const onClick = () => {
     if (!shareToken) {
-      captureWebAnalyticsEvent("app_store_clicked", { source, campaign });
+      captureWebAnalyticsEvent("app_store_clicked", {
+        source,
+        campaign,
+        // A shared oracle verdict rides in `?c=`, so oracle pages keep the
+        // path only.
+        ...(source === "oracle"
+          ? {
+              $current_url: `${window.location.origin}${window.location.pathname}`,
+            }
+          : {}),
+      });
       return;
     }
     void shareRef(shareToken).then((ref) =>

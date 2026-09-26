@@ -14,9 +14,18 @@ import {
   type OracleKind,
 } from "./model/oracle";
 
-const ORACLE_TIMEOUT_MS = 30_000;
-// The web route gives a links verdict 20 s end to end, and a slow page would
-// otherwise spend safeFetch's full 15 s deadline before the model starts.
+// The web route gives a screenshot 45 s end to end and every other kind 20 s.
+// Page reads plus the model call must finish inside that, or the visitor gets
+// a 502 while the model keeps spending. A links verdict reads pages for up to
+// 6 s first, so its model gets 12 s.
+const ORACLE_TIMEOUT_MS: Record<OracleKind, number> = {
+  links: 12_000,
+  tabs: 15_000,
+  library: 15_000,
+  screenshot: 35_000,
+};
+// A slow page would otherwise spend safeFetch's full 15 s deadline before the
+// model starts.
 const PAGE_READ_BUDGET_MS = 6_000;
 const PAGE_EXCERPT_CHARS = 1_500;
 
@@ -152,7 +161,9 @@ export const consult = internalAction({
           : [];
       const { object } = await generateObject({
         model: MODEL,
-        ...modelCallOptions(ORACLE_TIMEOUT_MS),
+        ...modelCallOptions(ORACLE_TIMEOUT_MS[input.kind]),
+        // A retry could not finish inside the web route's deadline.
+        maxRetries: 0,
         system: ORACLE_SYSTEM,
         schema: oracleVerdictSchema,
         messages: [
