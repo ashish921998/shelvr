@@ -1,6 +1,7 @@
 "use client";
 
 import { PlusIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { useState } from "react";
 
 const FAQS = [
@@ -39,13 +40,10 @@ export default function Faq() {
           Questions, shelved.
         </h2>
         <p className="max-w-[36ch] text-[17px] leading-normal text-pretty text-muted">
-          Anything else? Write to{" "}
-          <a
-            href="mailto:support@shelvr.app"
-            className="text-ember-deep underline"
-          >
-            support@shelvr.app
-          </a>
+          Anything else?{" "}
+          <Link href="/support" className="text-ember-deep underline">
+            Ask us on the support page
+          </Link>
           .
         </p>
       </div>
