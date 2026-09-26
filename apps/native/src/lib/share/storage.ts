@@ -265,10 +265,7 @@ export function reconcileSession(
   if (existing === null || existing.userId !== userId) {
     const settled = ghostRedelivery(store, currentFp, userId);
     // Every entry already settled: nothing left to save, skip the replay.
-    if (
-      settled === "all" ||
-      (settled !== null && settled.length === rawPayloads.length)
-    ) {
+    if (settled !== null && settled.length === rawPayloads.length) {
       return { kind: "ghost" };
     }
     // A match whose batch only partly saved (or failed) is not skipped: the
@@ -422,12 +419,13 @@ function digestFingerprint(fingerprint: string): string {
 
 /** The settled entries of the user's last handled batch when this
  * fingerprint matches it, else null. A tombstone written before settled
- * entries were recorded reads as "all": it only ever gated a prompt. */
+ * entries were recorded reads as null: it was written for failed batches
+ * too, so it cannot prove anything saved, and a retry must not be dropped. */
 function ghostRedelivery(
   store: SessionStoreAdapter,
   fingerprint: string,
   userId: string,
-): SettledEntry[] | "all" | null {
+): SettledEntry[] | null {
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
   if (raw === undefined) return null;
   try {
@@ -444,7 +442,6 @@ function ghostRedelivery(
     ) {
       return null;
     }
-    if (parsed.settled === undefined) return "all";
     if (!Array.isArray(parsed.settled) || !parsed.settled.every(isSettled)) {
       store.remove(LAST_COMPLETED_SHARE_KEY);
       return null;

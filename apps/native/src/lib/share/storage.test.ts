@@ -349,8 +349,9 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     expect(entries.slice(1).every((e) => e.status === "pending")).toBe(true);
   });
 
-  it("skips a replay whose tombstone predates settled entries", () => {
-    // Tombstones written before this change only ever gated the prompt.
+  it("saves a replay whose tombstone predates settled entries", () => {
+    // Older tombstones were written for failed batches too, so they cannot
+    // prove the batch saved: treat the match as a new share.
     const store = memoryStore();
     completedBatchA(store);
     const legacy = JSON.parse(store.getString(LAST_COMPLETED_SHARE_KEY)!) as {
@@ -358,9 +359,7 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     };
     delete legacy.settled;
     store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify(legacy));
-    expect(reconcileSession(store, USER, BATCH_A, id)).toEqual({
-      kind: "ghost",
-    });
+    expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
   });
 
   it("starts a session with a fresh id via startNewSession", () => {
