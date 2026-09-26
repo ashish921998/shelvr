@@ -1,22 +1,24 @@
 "use client";
 
+import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { FormEvent, useState } from "react";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 
-type AndroidWaitlistProps = {
-  source: "hero" | "footer";
-};
+// It lives in the closing panel; the event and route still call that "footer".
+const source = "footer";
+const inputId = "android-waitlist-email";
 
-export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
-  const [expanded, setExpanded] = useState(false);
+export default function AndroidWaitlist() {
+  const [opened, setOpened] = useState(false);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [message, setMessage] = useState("");
-  const panelId = `android-waitlist-${source}`;
 
-  function reveal() {
-    setExpanded(true);
+  // The form is always visible now, so "opened" means the first focus.
+  function open() {
+    if (opened) return;
+    setOpened(true);
     captureWebAnalyticsEvent("android_waitlist_opened", { source });
   }
 
@@ -46,8 +48,6 @@ export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
       }
 
       setStatus("success");
-      setMessage("You’re on the Android list. We’ll email you at launch.");
-      form.reset();
       captureWebAnalyticsEvent("android_waitlist_joined", { source });
     } catch (error) {
       setStatus("error");
@@ -58,75 +58,61 @@ export default function AndroidWaitlist({ source }: AndroidWaitlistProps) {
     }
   }
 
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        aria-expanded="false"
-        aria-controls={panelId}
-        onClick={reveal}
-        className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-sm font-semibold text-muted underline decoration-line-strong underline-offset-4 transition hover:text-ember-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-deep"
-      >
-        On Android? Join the waitlist →
-      </button>
-    );
-  }
-
   return (
-    <div id={panelId} className="mt-4 w-full max-w-md" aria-live="polite">
-      {status === "success" ? (
-        <p
-          role="status"
-          className="rounded-xl border border-shelf/20 bg-ember-soft px-4 py-3 text-sm font-medium text-shelf"
-        >
-          {message}
-        </p>
-      ) : (
-        <form onSubmit={submit}>
-          <label htmlFor={`${panelId}-email`} className="sr-only">
-            Email address for the Android waitlist
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id={`${panelId}-email`}
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              autoFocus
-              placeholder="you@example.com"
-              className="min-h-12 min-w-0 flex-1 rounded-xl border border-line-strong bg-white px-4 text-base text-ink outline-none transition placeholder:text-muted-soft focus:border-ember-deep focus:ring-2 focus:ring-ember/25"
-            />
-            <input
-              name="company"
-              type="text"
-              tabIndex={-1}
-              autoComplete="off"
-              aria-hidden="true"
-              className="hidden"
-            />
-            <button
-              type="submit"
-              disabled={status === "loading"}
-              className="min-h-12 shrink-0 rounded-xl bg-ink px-5 text-sm font-semibold text-white transition hover:bg-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-wait disabled:opacity-60"
-            >
-              {status === "loading" ? "Joining…" : "Notify me"}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            One Android launch email. No newsletter, no noise.
-          </p>
-          {status === "error" ? (
-            <p
-              role="alert"
-              className="mt-2 text-sm font-medium text-ember-deep"
-            >
-              {message}
-            </p>
-          ) : null}
+    <div
+      id="android"
+      className="relative flex w-full max-w-[440px] scroll-mt-24 flex-col items-center gap-2.5 mt-2"
+    >
+      <label
+        htmlFor={inputId}
+        className="text-[13px] font-medium text-dark-muted"
+      >
+        On Android? Leave your email and we’ll tell you the day it lands.
+      </label>
+      {status === "success" ? null : (
+        <form onSubmit={submit} className="flex w-full gap-2">
+          <input
+            id={inputId}
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            required
+            onFocus={open}
+            placeholder="you@example.com"
+            className="h-11 min-w-0 flex-1 rounded-[11px] border border-dark-plank-2 bg-dark-2 px-3.5 text-[15px] font-medium text-dark-text outline-none placeholder:text-dark-muted focus:border-ember"
+          />
+          <input
+            name="company"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
+          <button
+            type="submit"
+            disabled={status === "loading"}
+            className="h-11 shrink-0 rounded-[11px] border border-dark-plank-2 px-[18px] text-[15px] font-bold whitespace-nowrap text-dark-text transition-colors hover:bg-dark-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember disabled:cursor-wait disabled:opacity-60"
+          >
+            {status === "loading" ? "Joining…" : "Join waitlist"}
+          </button>
         </form>
       )}
+      {/* Always mounted, so screen readers announce the success. */}
+      <div role="status">
+        {status === "success" ? (
+          <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light">
+            <CheckCircleIcon aria-hidden className="size-[18px]" />
+            You’re on the list.
+          </p>
+        ) : null}
+      </div>
+      {status === "error" ? (
+        <p role="alert" className="text-sm font-medium text-ember-light">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

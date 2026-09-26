@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { captureWebException } from "@/lib/analytics";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 // Replaces the root layout when it throws, so this file must render its own
 // <html>/<body> and cannot rely on the layout's global styles — inline styles
@@ -36,7 +37,7 @@ export default function GlobalError({
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
             The page hit an unexpected error. You can try again, or email
-            support@shelvr.app if it keeps happening.
+            {SUPPORT_EMAIL} if it keeps happening.
           </p>
           <button
             onClick={reset}

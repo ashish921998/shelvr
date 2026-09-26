@@ -123,7 +123,7 @@
   "account.subscriptionWarning": "Das Löschen deines Shelvr-Kontos kündigt kein App Store-Abo. Verwalte oder kündige Pro bei Bedarf in den Abo-Einstellungen deiner Apple ID.",
   "account.delete": "Konto löschen",
   "account.deleteFailed": "Konto konnte nicht gelöscht werden",
-  "errors.contactSupport": "Etwas ist schiefgelaufen. Prüfe deine Verbindung und versuche es erneut oder schreibe an support@shelvr.app.",
+  "errors.contactSupport": "Etwas ist schiefgelaufen. Prüfe deine Verbindung und versuche es erneut oder schreibe an %{supportEmail}.",
   "dev.resetTitle": "Ablauf-Testdaten zurücksetzen?",
   "dev.resetBody": "Dies ersetzt die gespeicherten Inhalte und Sammlungen dieses anonymen Entwicklungskontos durch festgelegte Ablauf-Testdaten.",
   "dev.reset": "Zurücksetzen",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Shelvr",
@@ -110,7 +111,7 @@ export default function TermsPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">9. Contact</h2>
         <p className="mt-2">
-          Questions: <strong>support@shelvr.app</strong>
+          Questions: <strong>{SUPPORT_EMAIL}</strong>
         </p>
       </section>
     </LegalPage>

@@ -15,7 +15,7 @@ import {
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { LEGAL_URLS, SUPPORT_URL } from "@/lib/legal";
+import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -237,7 +237,7 @@ export default function ProfileScreen() {
                 analytics.captureError("account_deletion_failed", err);
                 Alert.alert(
                   t("account.deleteFailed"),
-                  t("errors.contactSupport"),
+                  t("errors.contactSupport", { supportEmail: SUPPORT_EMAIL }),
                 );
               }
             })();

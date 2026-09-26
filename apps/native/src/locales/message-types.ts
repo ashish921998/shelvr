@@ -124,7 +124,7 @@ export type MessageParams = {
   "account.subscriptionWarning": undefined;
   "account.delete": undefined;
   "account.deleteFailed": undefined;
-  "errors.contactSupport": undefined;
+  "errors.contactSupport": { supportEmail: string };
   "dev.resetTitle": undefined;
   "dev.resetBody": undefined;
   "dev.reset": undefined;

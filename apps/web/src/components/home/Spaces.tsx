@@ -1,77 +1,156 @@
 import Image from "next/image";
+import { Eyebrow, SuggestedBadge, TagChip } from "./Chips";
 
-const photos = [
+type Book = {
+  title: string;
+  w: number;
+  h: number;
+  bg: string;
+  fg: string;
+  lean?: number;
+};
+
+const SHELVES: { name: string; count: number; src: string; books: Book[] }[] = [
   {
-    src: "/images/spaces/gifts.jpg",
-    alt: "Espresso machine saved into Gift ideas",
-    className: "left-[6%] top-[8%] h-[40%] w-[44%] rotate-[-6deg]",
-  },
-  {
-    src: "/images/spaces/office.jpg",
-    alt: "Dashboard screenshot saved into Home office",
-    className: "right-[6%] top-[14%] h-[30%] w-[42%] rotate-[5deg]",
-  },
-  {
+    name: "Recipes",
+    count: 31,
     src: "/images/spaces/recipes.jpg",
-    alt: "Ramen bowl saved into Recipes",
-    className: "left-[34%] top-[36%] z-10 h-[24%] w-[30%] rotate-[8deg]",
+    books: [
+      { title: "weeknight ramen", w: 34, h: 104, bg: "#e6a23c", fg: "#2b2418" },
+      { title: "cacio e pepe", w: 28, h: 92, bg: "#c05a3a", fg: "#faf6ee" },
+      {
+        title: "the only vinaigrette",
+        w: 40,
+        h: 110,
+        bg: "#2b2418",
+        fg: "#faf6ee",
+        lean: -6,
+      },
+      { title: "dad’s chili", w: 30, h: 84, bg: "#f7e8cd", fg: "#2b2418" },
+    ],
   },
   {
-    src: "/images/spaces/reading.jpg",
-    alt: "Bookshelf saved into Reading list",
-    className: "bottom-[8%] left-[8%] h-[34%] w-[38%] rotate-[3deg]",
-  },
-  {
+    name: "Trips",
+    count: 14,
     src: "/images/spaces/trips.jpg",
-    alt: "Riverside city saved into Trips",
-    className: "bottom-[8%] right-[6%] h-[36%] w-[40%] rotate-[-4deg]",
+    books: [
+      { title: "lisbon weekend", w: 36, h: 100, bg: "#2b2418", fg: "#faf6ee" },
+      { title: "prague someday", w: 30, h: 116, bg: "#e6a23c", fg: "#2b2418" },
+      {
+        title: "kyoto in november",
+        w: 28,
+        h: 90,
+        bg: "#8d8271",
+        fg: "#faf6ee",
+        lean: -5,
+      },
+    ],
+  },
+  {
+    name: "Reading list",
+    count: 22,
+    src: "/images/spaces/reading.jpg",
+    books: [
+      {
+        title: "the quiet joy of keeping things",
+        w: 32,
+        h: 112,
+        bg: "#c05a3a",
+        fg: "#faf6ee",
+      },
+      { title: "smart notes", w: 26, h: 96, bg: "#f7e8cd", fg: "#2b2418" },
+      {
+        title: "slow productivity",
+        w: 38,
+        h: 104,
+        bg: "#2b2418",
+        fg: "#faf6ee",
+      },
+      { title: "essays", w: 28, h: 88, bg: "#e6a23c", fg: "#2b2418", lean: -7 },
+    ],
   },
 ];
 
+const lift =
+  "origin-bottom [transform:rotate(var(--lean,0deg))] transition-transform duration-250 hover:[transform:translateY(-10px)_rotate(0deg)]";
+
 export default function Spaces() {
   return (
-    <section id="spaces" className="border-t border-line py-20 sm:py-28">
-      <div className="container grid items-stretch gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
-        <div className="relative min-h-[26rem] overflow-hidden rounded-[1.75rem] bg-paper-deep sm:min-h-[32rem] lg:min-h-[38rem]">
-          {photos.map((photo) => (
-            <div
-              key={photo.src}
-              className={`absolute overflow-hidden rounded-[1.4rem] bg-cream shadow-[0_24px_50px_rgba(43,36,24,0.18)] ${photo.className}`}
-            >
-              <Image
-                src={photo.src}
-                alt={photo.alt}
-                fill
-                sizes="(max-width: 1024px) 45vw, 280px"
-                className="object-cover"
-              />
-            </div>
-          ))}
+    <section
+      id="shelves"
+      className="mx-auto grid max-w-[1200px] grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-10 px-5 pt-22 pb-10"
+    >
+      <div className="flex flex-col gap-4">
+        <Eyebrow>Living collections</Eyebrow>
+        <h2 className="font-display text-[clamp(36px,4.4vw,64px)] leading-[.98] text-balance">
+          Spaces fill themselves.
+        </h2>
+        <p className="max-w-[42ch] text-[17px] leading-normal text-pretty text-muted">
+          Name a Space: Recipes, Gift ideas, Trips. Shelvr reaches back through
+          everything you’ve ever saved, pulls out what belongs, and keeps adding
+          as you go.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <TagChip label="retroactive" emphasized />
+          <TagChip label="automatic" emphasized />
+          <TagChip label="always editable" emphasized />
         </div>
+      </div>
 
-        <div className="flex flex-col justify-center text-center lg:text-left">
-          <p className="section-kicker justify-center lg:justify-start">
-            Living collections
-          </p>
-          <h2 className="mt-4 text-5xl font-bold leading-[0.96] tracking-[-0.06em] text-ink sm:text-6xl">
-            Spaces fill themselves.
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-muted sm:text-lg">
-            Create a space like Recipes, Gift ideas, or Trips. Shelvr reaches
-            back through your library, finds what belongs, and keeps adding
-            matching saves over time.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start">
-            {["Retroactive", "Automatic", "Always editable"].map((item) => (
-              <span
-                key={item}
-                className="rounded-full bg-ember-soft px-3 py-2 text-xs font-bold text-ember-deep"
+      <div className="flex flex-col gap-[34px] py-2.5">
+        {SHELVES.map((shelf) => (
+          <div key={shelf.name} className="flex flex-col">
+            <div
+              className="flex min-h-[130px] items-end gap-2.5 px-[18px]"
+              aria-hidden
+            >
+              {shelf.books.map((book) => (
+                <div
+                  key={book.title}
+                  className={`${lift} relative flex items-end justify-center rounded-[6px_6px_2px_2px] px-1 py-2 shadow-[inset_-3px_0_0_rgba(0,0,0,.14),inset_2px_0_0_rgba(255,255,255,.12)]`}
+                  style={{
+                    width: book.w,
+                    height: book.h,
+                    background: book.bg,
+                    color: book.fg,
+                    ["--lean" as string]: `${book.lean ?? 0}deg`,
+                  }}
+                >
+                  <span className="max-h-full rotate-180 overflow-hidden text-[11px] font-bold text-ellipsis whitespace-nowrap [writing-mode:vertical-rl]">
+                    {book.title}
+                  </span>
+                  <span className="absolute inset-x-1.5 top-2.5 h-px bg-current opacity-35" />
+                  <span className="absolute inset-x-1.5 top-3.5 h-px bg-current opacity-35" />
+                </div>
+              ))}
+              <div
+                className={`${lift} relative ml-auto w-[92px] rounded-[10px] bg-cream px-1.5 pt-1.5 pb-2 shadow-[0_10px_20px_rgba(43,36,24,.18)]`}
+                style={{ ["--lean" as string]: "3deg" }}
               >
-                {item}
+                <span className="absolute -top-2 left-1/2 h-3 w-[34px] -translate-x-1/2 -rotate-4 rounded-[2px] bg-[rgba(230,162,60,.55)]" />
+                <div className="relative h-[78px] overflow-hidden rounded-[6px]">
+                  <Image
+                    src={shelf.src}
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="h-3 rounded-[3px] bg-linear-to-b from-dark-plank to-ink shadow-[0_14px_22px_-8px_rgba(43,36,24,.5),inset_0_1px_0_rgba(255,255,255,.1)]" />
+            <div className="flex items-center justify-between px-1 pt-2.5">
+              <div className="flex items-center gap-2">
+                <SuggestedBadge />
+                <span className="font-display text-xl">{shelf.name}</span>
+              </div>
+              <span className="text-xs font-medium text-muted">
+                {shelf.count} saves
               </span>
-            ))}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </section>
   );

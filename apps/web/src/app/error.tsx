@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { captureWebException } from "@/lib/analytics";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function Error({
   error,
@@ -23,7 +24,7 @@ export default function Error({
         </h1>
         <p className="mt-3 text-[15px] leading-7 text-ink/90">
           The page hit an unexpected error. You can try again, or email
-          support@shelvr.app if it keeps happening.
+          {SUPPORT_EMAIL} if it keeps happening.
         </p>
         <button
           className="mt-8 inline-flex rounded-full bg-ink px-6 py-3 font-semibold text-paper transition-opacity hover:opacity-80"
