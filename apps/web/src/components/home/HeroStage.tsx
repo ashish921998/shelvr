@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useInView, useReducedMotion } from "@/lib/motion";
 import { IntentChip, TagChip, type IntentKind } from "./Chips";
 import styles from "./HeroStage.module.css";
 
@@ -222,66 +223,41 @@ function CardBody({ card }: { card: Card }) {
 
 /** The hero demo: a pile of saves that files itself onto labelled shelves. */
 export default function HeroStage() {
-  const [tidy, setTidy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef(() => {});
+  const inView = useInView(wrapRef, 0.45);
+  const reduced = useReducedMotion();
+  const [tidy, setTidy] = useState(false);
+  // A click holds the new state longer before the loop takes over again.
+  const [held, setHeld] = useState(false);
 
+  // While on screen, alternate mess and shelf. Reduced motion never loops.
   useEffect(() => {
-    const wrap = wrapRef.current!;
-    let current = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let inView = false;
-    let seen = false;
-    const set = (next: boolean) => {
-      current = next;
-      setTidy(next);
-    };
-    const loop = (delay: number) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (!inView) return;
-        set(!current);
-        loop(current ? 6500 : 2600);
-      }, delay);
-    };
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    toggleRef.current = () => {
-      set(!current);
-      if (!reduced) loop(current ? 9000 : 4000);
-    };
-    if (reduced) {
-      set(true);
-      return;
-    }
+    if (!inView || reduced) return;
+    const hold = tidy ? (held ? 9000 : 6500) : held ? 4000 : 2000;
+    const timer = setTimeout(() => {
+      setHeld(false);
+      setTidy((t) => !t);
+    }, hold);
+    return () => clearTimeout(timer);
+  }, [inView, reduced, tidy, held]);
 
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        inView = entry.isIntersecting;
-        if (inView) {
-          loop(seen ? 1400 : 2000);
-          seen = true;
-        } else if (seen) {
-          clearTimeout(timer);
-          set(false);
-        }
-      },
-      { threshold: 0.45 },
-    );
-    io.observe(wrap);
-    return () => {
-      io.disconnect();
-      clearTimeout(timer);
-    };
-  }, []);
+  // Scrolled away: back to the mess, ready to replay. Reduced motion rests tidy.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!inView || reduced) setTidy(reduced);
+  }, [inView, reduced]);
+
+  const toggle = () => {
+    setHeld(true);
+    setTidy((t) => !t);
+  };
 
   const label = tidy ? "Make a mess again" : "Let Shelvr file it";
 
   return (
     <div
       ref={wrapRef}
-      onClick={() => toggleRef.current()}
+      onClick={toggle}
       title={label}
       className={`${styles.wrap} relative w-full max-w-[960px] cursor-pointer justify-self-stretch`}
     >
@@ -356,7 +332,7 @@ export default function HeroStage() {
           title={label}
           onClick={(event) => {
             event.stopPropagation();
-            toggleRef.current();
+            toggle();
           }}
           className="absolute bottom-3.5 left-4 z-[5] flex size-10 items-center justify-center rounded-full border border-dark-line bg-dark-3 text-ember-light transition-colors hover:bg-dark-plank focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember"
         >

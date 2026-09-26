@@ -123,7 +123,7 @@
   "account.subscriptionWarning": "Deleting your Shelvr account does not cancel an App Store subscription. Manage or cancel Pro in your Apple ID subscription settings if needed.",
   "account.delete": "Delete account",
   "account.deleteFailed": "Couldn’t delete account",
-  "errors.contactSupport": "Something went wrong. Check your connection and try again, or email ashish921998@zohomail.in.",
+  "errors.contactSupport": "Something went wrong. Check your connection and try again, or email %{supportEmail}.",
   "dev.resetTitle": "Reset flow fixtures?",
   "dev.resetBody": "This replaces this anonymous development account’s saves and spaces with deterministic flow data.",
   "dev.reset": "Reset",

@@ -102,3 +102,8 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Design handoffs and scraped research are reference material for shelvr-notes,
+# not product code. Keep local copies out of commits.
+design_handoff_*/
+.firecrawl/

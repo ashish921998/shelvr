@@ -123,7 +123,7 @@
   "account.subscriptionWarning": "Eliminar tu cuenta de Shelvr no cancela una suscripción del App Store. Administra o cancela Pro en la configuración de suscripciones de tu Apple ID si lo necesitas.",
   "account.delete": "Eliminar cuenta",
   "account.deleteFailed": "No se ha podido eliminar la cuenta",
-  "errors.contactSupport": "Algo ha salido mal. Revisa tu conexión y vuelve a intentarlo, o escribe a ashish921998@zohomail.in.",
+  "errors.contactSupport": "Algo ha salido mal. Revisa tu conexión y vuelve a intentarlo, o escribe a %{supportEmail}.",
   "dev.resetTitle": "¿Restablecer los datos de prueba del recorrido?",
   "dev.resetBody": "Esto sustituye los contenidos y colecciones de esta cuenta anónima de desarrollo por datos de recorrido deterministas.",
   "dev.reset": "Restablecer",

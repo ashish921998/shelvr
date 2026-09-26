@@ -123,7 +123,7 @@
   "account.subscriptionWarning": "Shelvr 계정을 삭제해도 App Store 구독은 취소되지 않아요. 필요한 경우 Apple ID 구독 설정에서 Pro를 관리하거나 취소하세요.",
   "account.delete": "계정 삭제",
   "account.deleteFailed": "계정을 삭제하지 못했어요",
-  "errors.contactSupport": "문제가 발생했어요. 연결을 확인하고 다시 시도하거나 ashish921998@zohomail.in으로 이메일을 보내 주세요.",
+  "errors.contactSupport": "문제가 발생했어요. 연결을 확인하고 다시 시도하거나 %{supportEmail}으로 이메일을 보내 주세요.",
   "dev.resetTitle": "흐름 테스트 데이터를 초기화할까요?",
   "dev.resetBody": "이 익명 개발 계정의 저장 항목과 공간을 미리 정해진 흐름 테스트 데이터로 바꿔요.",
   "dev.reset": "초기화",

@@ -40,7 +40,7 @@ const placeholders = (text: string) => (text.match(/%\{[^}]+\}/g) ?? []).sort();
 const atoms = (text: string) =>
   (
     text.match(
-      /\b(?:Shelvr|Pro|iPhone|iPad|Apple Watch|App Store|Google Play|TikTok|Instagram)\b|ashish921998@zohomail\.in/g,
+      /\b(?:Shelvr|Pro|iPhone|iPad|Apple Watch|App Store|Google Play|TikTok|Instagram)\b/g,
     ) ?? []
   ).sort();
 

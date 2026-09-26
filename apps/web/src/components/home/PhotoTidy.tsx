@@ -29,8 +29,8 @@ function cardTransform(pos: number, swipe: Direction | null) {
       ? "translate(340px,-40px) rotate(18deg)"
       : "translate(-340px,-40px) rotate(-18deg)";
   }
-  const x = pos ? (pos % 2 ? 14 : -12) * pos : 0;
-  const r = pos ? (pos % 2 ? 5 : -4) * pos : 0;
+  const x = (pos % 2 ? 14 : -12) * pos;
+  const r = (pos % 2 ? 5 : -4) * pos;
   return `translate(${x}px, ${pos * -8}px) scale(${1 - pos * 0.04}) rotate(${r}deg)`;
 }
 
@@ -87,7 +87,7 @@ export default function PhotoTidy() {
             return (
               <div
                 key={card.src}
-                className="absolute inset-0 flex flex-col gap-2 rounded-[18px] bg-cream p-2 shadow-[0_20px_40px_-10px_rgba(43,36,24,.35)] transition-[transform,opacity] duration-[700ms,500ms] ease-[cubic-bezier(.2,.8,.2,1)]"
+                className="absolute inset-0 flex flex-col gap-2 rounded-[18px] bg-cream p-2 shadow-[0_20px_40px_-10px_rgba(43,36,24,.35)] transition-[transform,opacity] duration-[700ms,500ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none"
                 style={{
                   transform: cardTransform(pos, swipe),
                   opacity: pos < 3 && !flying ? 1 : 0,

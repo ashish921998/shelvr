@@ -28,7 +28,7 @@ const FAQS = [
 ];
 
 export default function Faq() {
-  const [open, setOpen] = useState(0);
+  const [open, setOpen] = useState<number | null>(0);
 
   return (
     <section
@@ -57,7 +57,7 @@ export default function Faq() {
                 type="button"
                 aria-expanded={isOpen}
                 aria-controls={`faq-${i}`}
-                onClick={() => setOpen(isOpen ? -1 : i)}
+                onClick={() => setOpen(isOpen ? null : i)}
                 className="flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left text-[17px] font-bold"
               >
                 <span>{faq.q}</span>
