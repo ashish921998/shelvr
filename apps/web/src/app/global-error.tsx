@@ -36,7 +36,7 @@ export default function GlobalError({
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
             The page hit an unexpected error. You can try again, or email
-            support@shelvr.app if it keeps happening.
+            ashish921998@zohomail.in if it keeps happening.
           </p>
           <button
             onClick={reset}

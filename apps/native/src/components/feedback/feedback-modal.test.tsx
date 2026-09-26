@@ -219,7 +219,7 @@ describe("FeedbackModal", () => {
     const support = await screen.findByLabelText("support.email");
     fireEvent.click(support);
     expect(mocks.openURL).toHaveBeenCalledWith(
-      "mailto:support@shelvr.app?subject=Shelvr%20Support",
+      "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support",
     );
   });
 });

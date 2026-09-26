@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Get help with Shelvr, subscriptions, privacy, or your account.",
 };
 
-const SUPPORT_EMAIL = "support@shelvr.app";
+const SUPPORT_EMAIL = "ashish921998@zohomail.in";
 
 export default function SupportPage() {
   return (

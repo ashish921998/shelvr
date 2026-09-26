@@ -40,7 +40,7 @@ export default function PrivacyPage() {
             relevant launch notification. The address is stored with our backend
             (Convex) and may be synced to our email-delivery provider (Resend)
             for that purpose. To unsubscribe or have your address deleted, email{" "}
-            <strong>support@shelvr.app</strong>.
+            <strong>ashish921998@zohomail.in</strong>.
           </li>
           <li>
             <strong>Content you save.</strong> The links, notes, and images you
@@ -139,13 +139,13 @@ export default function PrivacyPage() {
           records. Waitlist email addresses are kept until you ask us to remove
           them (or unsubscribe). Product analytics events already recorded by
           PostHog or ActivationPal are not automatically erased by in-app
-          deletion; email <strong>support@shelvr.app</strong> to request
+          deletion; email <strong>ashish921998@zohomail.in</strong> to request
           deletion of analytics data linked to your account. Clearing your
           browser’s local storage only discards this browser’s anonymous
           identifier: already-recorded events remain, and the next event starts
           a new identifier. Deleting your Shelvr account does not cancel an App
           Store subscription — manage that in your Apple ID settings. You can
-          also email <strong>support@shelvr.app</strong> for help.
+          also email <strong>ashish921998@zohomail.in</strong> for help.
         </p>
         <p className="mt-2">
           Account deletion also requests that refund data sharing stop. A
@@ -182,7 +182,7 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Contact</h2>
         <p className="mt-2">
-          Questions or requests: <strong>support@shelvr.app</strong>
+          Questions or requests: <strong>ashish921998@zohomail.in</strong>
         </p>
       </section>
     </LegalPage>

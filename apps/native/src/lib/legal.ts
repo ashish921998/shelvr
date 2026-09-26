@@ -6,4 +6,5 @@ export const LEGAL_URLS = {
   privacy: "https://shelvr-web.vercel.app/privacy",
 } as const;
 
-export const SUPPORT_URL = "mailto:support@shelvr.app?subject=Shelvr%20Support";
+export const SUPPORT_URL =
+  "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support";

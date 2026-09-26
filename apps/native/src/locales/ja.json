@@ -123,7 +123,7 @@
   "account.subscriptionWarning": "Shelvrのアカウントを削除しても、App Storeのサブスクリプションは解約されません。必要に応じてApple IDのサブスクリプション設定でProを管理または解約してください。",
   "account.delete": "アカウントを削除",
   "account.deleteFailed": "アカウントを削除できませんでした",
-  "errors.contactSupport": "問題が発生しました。接続を確認して再試行するか、support@shelvr.appにメールしてください。",
+  "errors.contactSupport": "問題が発生しました。接続を確認して再試行するか、ashish921998@zohomail.inにメールしてください。",
   "dev.resetTitle": "フローのテストデータをリセットしますか？",
   "dev.resetBody": "この匿名開発アカウントの保存項目とスペースを、再現可能なフロー用データに置き換えます。",
   "dev.reset": "リセット",

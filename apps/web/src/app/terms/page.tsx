@@ -110,7 +110,7 @@ export default function TermsPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">9. Contact</h2>
         <p className="mt-2">
-          Questions: <strong>support@shelvr.app</strong>
+          Questions: <strong>ashish921998@zohomail.in</strong>
         </p>
       </section>
     </LegalPage>

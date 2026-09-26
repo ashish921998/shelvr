@@ -23,7 +23,7 @@ export default function Error({
         </h1>
         <p className="mt-3 text-[15px] leading-7 text-ink/90">
           The page hit an unexpected error. You can try again, or email
-          support@shelvr.app if it keeps happening.
+          ashish921998@zohomail.in if it keeps happening.
         </p>
         <button
           className="mt-8 inline-flex rounded-full bg-ink px-6 py-3 font-semibold text-paper transition-opacity hover:opacity-80"
