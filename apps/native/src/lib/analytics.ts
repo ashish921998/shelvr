@@ -185,11 +185,9 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
-  // Android task-restore ghost: the share screen re-offered a batch that was
-  // already handled (recordCompletedShare tombstone matched).
-  share_ghost_prompt: Record<string, never>;
-  share_ghost_save_again: Record<string, never>;
-  share_ghost_dismissed: Record<string, never>;
+  // Android task-restore ghost: the share screen skipped a replayed batch
+  // that was already handled (recordCompletedShare tombstone matched).
+  share_ghost_skipped: Record<string, never>;
   // Save recall card on Home (lib/use-save-recall.ts). Counts only: never the
   // saved item's title, tags, or URL.
   save_recall_shown: { match_count: number };
@@ -201,6 +199,15 @@ type AnalyticsEventProperties = {
   // never free text. A response is stated intent, NOT proof of cancellation —
   // only the server-side webhook events (trial_cancelled, …) count as
   // cancellations; funnels must never divide by survey responses.
+  // Only the prompted outcome: a cold start that finds an existing grant is
+  // not a decision the user just made.
+  notification_permission_result: {
+    outcome: "granted" | "provisional" | "denied";
+  };
+  notification_opened: { notification_kind: string; notification_id: string };
+  notification_disabled: {
+    notification_kind: "weekly_shelf" | "save_reminders";
+  };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
   cancel_survey_submitted: {

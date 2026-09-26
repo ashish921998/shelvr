@@ -22,6 +22,10 @@ const app = defineApp({
     // stay `unconfigured` until they are set.
     RESEND_FEEDBACK_INBOX_EMAIL: v.optional(v.string()),
     RESEND_FEEDBACK_FROM_EMAIL: v.optional(v.string()),
+    // Save reminders (convex/notifications.ts) send only while this is "true".
+    // Unset, a deploy never starts them; set back to anything else, queued
+    // reminders stop at their next attempt, with no deploy.
+    SAVE_REMINDERS_ENABLED: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
     // Shared with the marketing site's server; authenticates POST /waitlist/join.
     WAITLIST_SHARED_SECRET: v.optional(v.string()),

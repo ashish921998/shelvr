@@ -25,6 +25,15 @@ const source = readJson("src/locales/en.json");
 const placeholders = (value) =>
   (value.match(/%\{[^}]+\}/g) ?? []).sort().join("|");
 
+/** Keys pushed to a device, and the exact placeholder set each one must carry. */
+const notificationPlaceholders = {
+  "digest.waitingCount": "%{formattedCount}",
+  "digest.namedCount": "%{formattedCount}|%{title}",
+  "digest.namedSingle": "%{title}",
+  "reminder.readBody": "%{title}",
+  "reminder.cookBody": "%{title}",
+};
+
 // Validate the whole input before writing any native resources.
 const catalogs = locales.map((locale) => {
   const messages = readJson(`src/locales/${locale}.json`);
@@ -51,13 +60,17 @@ const catalogs = locales.map((locale) => {
     const variants = isPlural ? Object.values(value) : [value];
     const reference = isPlural ? original.other : original;
     for (const variant of variants) {
+      // Notification bodies are built by convex/model/notificationFields.ts,
+      // which substitutes a fixed placeholder set per key. A catalog that
+      // drops or adds one would render a literal `%{...}` on a lock screen,
+      // so the exact set is pinned here rather than only compared to English.
+      const required = notificationPlaceholders[key];
       if (
-        key === "digest.waitingCount" &&
-        (typeof variant !== "string" ||
-          placeholders(variant) !== "%{formattedCount}")
+        required !== undefined &&
+        (typeof variant !== "string" || placeholders(variant) !== required)
       )
         throw new Error(
-          `${locale}: digest.waitingCount must contain exactly one %{formattedCount} placeholder and no others`,
+          `${locale}: ${key} must contain exactly these placeholders: ${required}`,
         );
       if (
         typeof variant !== "string" ||
@@ -116,6 +129,18 @@ const notificationCopy = Object.fromEntries(
     {
       title: messages["digest.title"],
       body: messages["digest.waitingCount"],
+      named: messages["digest.namedCount"],
+      namedSingle: messages["digest.namedSingle"],
+      reminder: {
+        read: {
+          title: messages["reminder.readTitle"],
+          body: messages["reminder.readBody"],
+        },
+        cook: {
+          title: messages["reminder.cookTitle"],
+          body: messages["reminder.cookBody"],
+        },
+      },
     },
   ]),
 );

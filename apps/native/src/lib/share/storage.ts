@@ -27,9 +27,8 @@
 //                                     reopening the app from recents replays the previous share
 //                                     as if it were fresh. A fresh sessionId would mint a fresh
 //                                     operationId and the backend ledger could not dedupe — the
-//                                     last-saved item would be saved again. The caller must ask
-//                                     before saving again: a deliberate identical re-share looks
-//                                     the same from JS, so this is never auto-saved nor dropped.
+//                                     last-saved item would be saved again. The caller skips it
+//                                     quietly: the batch is already in Shelvr.
 //      Sessions are scoped to userId: a record left by a different user (account
 //      switch) is treated as no session, never matched.
 //   3. updateEntry / markComplete / deleteSession — mutate the persisted session
@@ -264,9 +263,17 @@ export function reconcileSession(
   // DIFFERENT batch stays a genuine 'new' (its own fingerprint mismatch path
   // below handles it).
   if (existing === null || existing.userId !== userId) {
-    if (isGhostRedelivery(store, currentFp, userId)) {
+    const settled = ghostRedelivery(store, currentFp, userId);
+    // Every entry already settled: nothing left to save, skip the replay.
+    if (
+      settled !== null &&
+      rawPayloads.every((_, i) => settled.some((e) => e.index === i))
+    ) {
       return { kind: "ghost" };
     }
+    // A match whose batch only partly saved (or failed) is not skipped: the
+    // settled entries carry over so only the rest is attempted, and a retry
+    // after a failure is never swallowed.
     return {
       kind: "new",
       session: startNewSession(
@@ -275,6 +282,7 @@ export function reconcileSession(
         currentFp,
         rawPayloads,
         generateSessionId,
+        settled ?? [],
       ),
     };
   }
@@ -313,29 +321,35 @@ export function reconcileSession(
 
 /** Allocates a brand-new active session for `rawPayloads` and persists it. All
  * entries start `pending`; the processor assigns their kind/status as it
- * resolves and saves them. Exported so the caller can start the session a
- * ghost confirmation explicitly approved — reconcileSession deliberately does
- * not start one for a ghost batch. */
+ * resolves and saves them. `settled` entries (from a partly saved replay)
+ * start in their settled status, so the processor never saves them again. */
 export function startNewSession(
   store: SessionStoreAdapter,
   userId: string,
   fp: string,
   rawPayloads: RawSharePayload[],
   generateSessionId: () => string,
+  settled: SettledEntry[] = [],
 ): ShareSession {
   const sessionId = generateSessionId();
+  const byIndex = new Map(settled.map((e) => [e.index, e]));
   const session: ShareSession = {
     version: SESSION_SCHEMA_VERSION,
     fingerprint: fp,
     userId,
     sessionId,
     phase: "active",
-    entries: rawPayloads.map((_, index) => ({
-      index,
-      operationId: operationIdFor(sessionId, index),
-      kind: "link", // placeholder; the processor classifies each entry
-      status: "pending",
-    })),
+    entries: rawPayloads.map((_, index): ShareEntry => {
+      const done = byIndex.get(index);
+      return {
+        index,
+        operationId: operationIdFor(sessionId, index),
+        // "link" is a placeholder; the processor classifies each entry.
+        kind: done?.status === "unsupported" ? "unsupported" : "link",
+        status: done?.status ?? "pending",
+        ...(done?.itemId !== undefined ? { itemId: done.itemId } : {}),
+      };
+    }),
   };
   saveSession(store, session);
   return session;
@@ -345,28 +359,52 @@ export function startNewSession(
 // Ghost-redelivery tombstone (Android task restore)
 // ---------------------------------------------------------------------------
 
+/** An entry of a completed batch that needs no further attempt: saved (with
+ * its item id, so a sibling link reuses it) or unsupported. */
+export type SettledEntry = {
+  index: number;
+  status: "saved" | "unsupported";
+  itemId?: string;
+};
+
+/** The entries of `entries` that need no further attempt. */
+export function settledEntries(entries: ShareEntry[]): SettledEntry[] {
+  const settled: SettledEntry[] = [];
+  for (const e of entries) {
+    if (e.status !== "saved" && e.status !== "unsupported") continue;
+    settled.push({
+      index: e.index,
+      status: e.status,
+      ...(e.itemId !== undefined ? { itemId: e.itemId } : {}),
+    });
+  }
+  return settled;
+}
+
 /** Records the batch that just finished its handoff (saved, continued, or
- * cancelled — any path through the share screen's completion). Replaces any
- * prior tombstone. Android only: iOS never replays a share. Takes the
- * completing user's id so a tombstone left by one account never matches
+ * cancelled — any path through the share screen's completion), with which of
+ * its entries settled, so a replay skips only what is already in Shelvr.
+ * Replaces any prior tombstone. Android only: iOS never replays a share. Takes
+ * the completing user's id so a tombstone left by one account never matches
  * another account's identical batch (the ghost check is user-scoped). */
 export function recordCompletedShare(
   store: SessionStoreAdapter,
   fingerprint: string,
   userId: string,
+  settled: SettledEntry[],
 ): void {
   store.set(
     LAST_COMPLETED_SHARE_KEY,
-    JSON.stringify({ digest: digestFingerprint(fingerprint), userId }),
+    JSON.stringify({ digest: digestFingerprint(fingerprint), userId, settled }),
   );
 }
 
 /** A one-way digest of a fingerprint. The tombstone outlives the session, so
  * it keeps only this digest, never the shared URLs or note text themselves.
  * Sync because reconcileSession is sync (expo-crypto only hashes async).
- * ponytail: cyrb53, 53 bits, not cryptographic; a collision only shows the
- * ghost prompt for a genuinely new share, so move to SHA-256 only if the
- * reconcile path goes async. */
+ * ponytail: cyrb53, 53 bits, not cryptographic; a collision would skip a
+ * genuinely new share, so move to SHA-256 only if the reconcile path goes
+ * async. */
 function digestFingerprint(fingerprint: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
@@ -382,26 +420,52 @@ function digestFingerprint(fingerprint: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-/** True when this fingerprint matches the user's last handled batch. */
-function isGhostRedelivery(
+/** The settled entries of the user's last handled batch when this
+ * fingerprint matches it, else null. A tombstone written before settled
+ * entries were recorded reads as null: it was written for failed batches
+ * too, so it cannot prove anything saved, and a retry must not be dropped. */
+function ghostRedelivery(
   store: SessionStoreAdapter,
   fingerprint: string,
   userId: string,
-): boolean {
+): SettledEntry[] | null {
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
-  if (raw === undefined) return false;
+  if (raw === undefined) return null;
   try {
-    const parsed = JSON.parse(raw) as { digest?: unknown; userId?: unknown };
+    const parsed = JSON.parse(raw) as {
+      digest?: unknown;
+      userId?: unknown;
+      settled?: unknown;
+    };
     // A tombstone from a different account is not this user's ghost: their
     // identical share is a genuine new share.
-    return (
-      parsed.userId === userId &&
-      parsed.digest === digestFingerprint(fingerprint)
-    );
+    if (
+      parsed.userId !== userId ||
+      parsed.digest !== digestFingerprint(fingerprint)
+    ) {
+      return null;
+    }
+    if (!Array.isArray(parsed.settled) || !parsed.settled.every(isSettled)) {
+      store.remove(LAST_COMPLETED_SHARE_KEY);
+      return null;
+    }
+    return parsed.settled;
   } catch {
     store.remove(LAST_COMPLETED_SHARE_KEY);
-    return false;
+    return null;
   }
+}
+
+function isSettled(value: unknown): value is SettledEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.index === "number" &&
+    Number.isInteger(e.index) &&
+    e.index >= 0 &&
+    (e.status === "saved" || e.status === "unsupported") &&
+    (e.itemId === undefined || typeof e.itemId === "string")
+  );
 }
 
 // ---------------------------------------------------------------------------

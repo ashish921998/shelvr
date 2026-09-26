@@ -23,6 +23,7 @@ type SessionDependencies = {
   getLocale?: () => string;
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
+  setSaveReminders: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
   clearWidget: () => Promise<unknown>;
@@ -153,10 +154,22 @@ export class NotificationDeviceSession {
   }
 
   setWeeklyShelf(enabled: boolean) {
+    return this.setPreference(enabled, this.deps.setWeeklyShelf);
+  }
+
+  setSaveReminders(enabled: boolean) {
+    return this.setPreference(enabled, this.deps.setSaveReminders);
+  }
+
+  /** Turning a kind on asks for permission first; `false` means it was denied. */
+  private setPreference(
+    enabled: boolean,
+    save: (enabled: boolean) => Promise<unknown>,
+  ) {
     return this.runOperation("preferences", async () => {
       if (enabled && !(await this.register(() => this.deps.getToken(true))))
         return false;
-      await this.deps.setWeeklyShelf(enabled);
+      await save(enabled);
       return true;
     });
   }

@@ -25,7 +25,6 @@ import {
   markComplete,
   reconcileSession,
   recordCompletedShare,
-  startNewSession,
   updateEntry,
   type RawSharePayload,
   type SessionStoreAdapter,
@@ -75,8 +74,8 @@ import {
  * Landing screen for content shared into Shelvr from another app (Safari, Photos,
  * etc.). Resolves the incoming payload and saves each piece through the same
  * idempotent operation ledger the in-app flows use. Every decision (phases,
- * session guards, completion ordering, the tombstone, the ghost prompt, the
- * Pro gate) belongs to the owner in lib/share/incoming-share.ts; this screen
+ * session guards, completion ordering, the tombstone, the ghost-replay skip,
+ * the Pro gate) belongs to the owner in lib/share/incoming-share.ts; this screen
  * feeds it events, renders the phase it returns, and runs its effects.
  */
 
@@ -274,31 +273,6 @@ export default function ShareScreen() {
     );
   }
 
-  // Ghost confirmation: the redelivered batch matches the last handled one.
-  // Never auto-save (that minted the duplicate), never silent-drop a genuine
-  // re-share — one explicit question, then proceed either way.
-  if (phase.kind === "ghostConfirm") {
-    return (
-      <PhaseSurface key="ghost-confirm" phaseKey="ghost-confirm">
-        <Text style={styles.title(theme)}>{t("share.ghostTitle")}</Text>
-        <Text style={styles.subtitle(theme)}>{t("share.ghostBody")}</Text>
-        <View style={styles.actions}>
-          <Button
-            label={t("common.cancel")}
-            theme={theme}
-            onPress={() => dispatch({ type: "ghostDismiss" })}
-          />
-          <Button
-            label={t("share.saveAgain")}
-            theme={theme}
-            primary
-            onPress={() => dispatch({ type: "ghostSaveAgain" })}
-          />
-        </View>
-      </PhaseSurface>
-    );
-  }
-
   // Derived resolution states take precedence over the session-driven phases
   // stored in `phase`: they are pure functions of the hook props and avoid the
   // synchronous-in-effect setState that storing them would require.
@@ -447,7 +421,12 @@ function runEffect(
       markComplete(shareStore, effect.sessionId);
       return;
     case "tombstone":
-      recordCompletedShare(shareStore, effect.fingerprint, effect.userId);
+      recordCompletedShare(
+        shareStore,
+        effect.fingerprint,
+        effect.userId,
+        effect.settled,
+      );
       return;
     case "nativeClear": {
       let ok = true;
@@ -488,19 +467,6 @@ function runEffect(
         live: loadSession(shareStore),
       });
       return;
-    case "startSession": {
-      const session = startNewSession(
-        shareStore,
-        effect.userId,
-        effect.fingerprint,
-        effect.rawPayloads,
-        () => Crypto.randomUUID(),
-      );
-      void Promise.resolve().then(() =>
-        dispatch({ type: "sessionStarted", session }),
-      );
-      return;
-    }
     case "recordFirstShare":
       bestEffort("record_first_share_failed", () =>
         recordShareSaved(effect.userId),

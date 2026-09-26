@@ -80,31 +80,62 @@ function wallClockFormatter(timezone: string | undefined): Intl.DateTimeFormat {
   });
 }
 
+/** The instant's wall-clock reading in the formatter's zone, as a UTC timestamp. */
+function localTimestamp(formatter: Intl.DateTimeFormat, instant: number) {
+  const parts = formatter.formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((entry) => entry.type === type)?.value);
+  return Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+}
+
+/** The instant at which the zone's clock reads `wallTime`. A few fixed-point
+ * passes settle the offset across a DST change. */
+function instantAt(formatter: Intl.DateTimeFormat, wallTime: number) {
+  let instant = wallTime;
+  for (let pass = 0; pass < 4; pass++) {
+    instant += wallTime - localTimestamp(formatter, instant);
+  }
+  return instant;
+}
+
 export function nextWeeklyDigestAt(now: number, timezone = "UTC"): number {
   const formatter = wallClockFormatter(timezone);
-  const localTimestamp = (instant: number) => {
-    const parts = formatter.formatToParts(instant);
-    const part = (type: Intl.DateTimeFormatPartTypes) =>
-      Number(parts.find((entry) => entry.type === type)?.value);
-    return Date.UTC(
-      part("year"),
-      part("month") - 1,
-      part("day"),
-      part("hour"),
-      part("minute"),
-      part("second"),
-    );
-  };
-  const local = new Date(localTimestamp(now));
+  const local = new Date(localTimestamp(formatter, now));
   local.setUTCHours(9, 0, 0, 0);
   local.setUTCDate(local.getUTCDate() + ((7 - local.getUTCDay()) % 7));
   for (let week = 0; week < 2; week++) {
-    const wallTime = local.getTime() + week * 7 * DAY_MS;
-    let instant = wallTime;
-    for (let pass = 0; pass < 4; pass++) {
-      instant += wallTime - localTimestamp(instant);
-    }
+    const instant = instantAt(formatter, local.getTime() + week * 7 * DAY_MS);
     if (instant > now) return instant;
   }
   throw new Error("Could not calculate weekly notification time");
+}
+
+/** The hour (0-23) the zone's clock shows at `instant`. */
+export function localHour(instant: number, timezone?: string): number {
+  return new Date(
+    localTimestamp(wallClockFormatter(timezone), instant),
+  ).getUTCHours();
+}
+
+/** The next instant after `now` at which the zone's clock reads `hour`:00. */
+export function nextLocalHourAt(
+  now: number,
+  timezone: string | undefined,
+  hour: number,
+): number {
+  const formatter = wallClockFormatter(timezone);
+  const local = new Date(localTimestamp(formatter, now));
+  local.setUTCHours(hour, 0, 0, 0);
+  for (let day = 0; day < 3; day++) {
+    const instant = instantAt(formatter, local.getTime() + day * DAY_MS);
+    if (instant > now) return instant;
+  }
+  throw new Error("Could not calculate daily notification time");
 }
