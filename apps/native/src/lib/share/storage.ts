@@ -265,7 +265,10 @@ export function reconcileSession(
   if (existing === null || existing.userId !== userId) {
     const settled = ghostRedelivery(store, currentFp, userId);
     // Every entry already settled: nothing left to save, skip the replay.
-    if (settled !== null && settled.length === rawPayloads.length) {
+    if (
+      settled !== null &&
+      rawPayloads.every((_, i) => settled.some((e) => e.index === i))
+    ) {
       return { kind: "ghost" };
     }
     // A match whose batch only partly saved (or failed) is not skipped: the

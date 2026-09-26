@@ -349,6 +349,18 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     expect(entries.slice(1).every((e) => e.status === "pending")).toBe(true);
   });
 
+  it("does not skip a replay when settled entries miss an index", () => {
+    // Matching counts are not enough: a duplicate index must not hide an
+    // entry that never saved.
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+      { index: 0, status: "saved", itemId: "items-1" },
+    ]);
+    expect(reconcileSession(store, USER, batch, id).kind).toBe("new");
+  });
+
   it("saves a replay whose tombstone predates settled entries", () => {
     // Older tombstones were written for failed batches too, so they cannot
     // prove the batch saved: treat the match as a new share.
