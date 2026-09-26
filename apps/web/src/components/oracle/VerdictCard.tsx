@@ -16,6 +16,35 @@ function statsLine(stats: LibraryStats): string {
   return parts.join(" · ");
 }
 
+function SomedayScore({ score }: { score: number }) {
+  return (
+    <div className="mt-5">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-ember-deep">
+          Someday score
+        </p>
+        <p className="display text-4xl text-ink">{score}%</p>
+      </div>
+      <div
+        role="meter"
+        aria-label="Someday score"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={score}
+        className="mt-2 h-3 overflow-hidden rounded-full bg-white/70"
+      >
+        <div
+          className="h-full rounded-full bg-ember"
+          style={{ width: `${score}%` }}
+        />
+      </div>
+      <p className="mt-2 text-sm text-ink-soft">
+        How much of this is saved for a someday that never comes.
+      </p>
+    </div>
+  );
+}
+
 export default function VerdictCard({
   verdict,
   stats,
@@ -36,6 +65,7 @@ export default function VerdictCard({
         <p className="mt-3 text-lg leading-7 text-ink-soft">
           {verdict.tagline}
         </p>
+        {verdict.score !== undefined && <SomedayScore score={verdict.score} />}
         {stats && (
           <p className="mt-4 text-sm font-medium text-shelf">
             {statsLine(stats)}
