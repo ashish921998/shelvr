@@ -56,6 +56,16 @@
   --color-mint: #f7e8cd;
   --color-peach: #f5e5d2;
   --color-butter: #fff8eb;
+  --color-terracotta: #c05a3a;
+  --color-ember-light: #f0c078;
+  --color-dark: #191510;
+  --color-dark-2: #241d14;
+  --color-dark-3: #2c261c;
+  --color-dark-line: #332c20;
+  --color-dark-plank: #3a2f1c;
+  --color-dark-plank-2: #4a3c24;
+  --color-dark-text: #f4eddd;
+  --color-dark-muted: #a2977f;
 
   --font-display: "Crimson Pro", ui-serif, georgia, serif;
   --font-sans: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -133,4 +143,27 @@
   font-weight: 400;
   font-style: normal;
   letter-spacing: 0.02em;
+}
+
+/* ---------- landing demos ---------- */
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes stamp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6) rotate(var(--r, 0deg));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(var(--r, 0deg));
+  }
 }

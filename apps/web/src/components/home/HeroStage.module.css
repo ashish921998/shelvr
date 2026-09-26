@@ -1,0 +1,255 @@
+/* The stage is a fixed canvas scaled to fit its column. The wrapper reserves
+   the scaled height in CSS so nothing shifts when the script measures it.
+   Breakpoints: mobile < 760px, wide 760–999px, split >= 1000px. */
+
+.wrap {
+  aspect-ratio: 400 / 920;
+  max-height: 920px;
+}
+
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 400px;
+  height: 920px;
+  overflow: hidden;
+  border: 1px solid #332c20;
+  border-radius: 28px;
+  background: radial-gradient(120% 80% at 50% 0%, #241d14 0%, #191510 60%);
+  box-shadow:
+    0 30px 60px -20px rgba(43, 36, 24, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateX(-50%) scale(var(--s, 1));
+  transform-origin: top center;
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.012) 0 2px,
+    transparent 2px 7px
+  );
+}
+
+/* ---------- planks ---------- */
+
+.plank {
+  position: absolute;
+  right: 24px;
+  left: 24px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(#4a3c24, #3a2f1c 55%, #2c261c);
+  box-shadow:
+    0 12px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    opacity 0.7s ease var(--pd),
+    transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--pd);
+}
+
+.canvas[data-tidy="true"] .plank {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* row y + 156 */
+.plank0 { top: 180px; }
+.plank1 { top: 356px; }
+.plank2 { top: 532px; }
+.plank3 { top: 708px; }
+.plank4 { top: 884px; }
+
+/* ---------- space labels (wide and split only) ---------- */
+
+.label {
+  position: absolute;
+  top: 18px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    opacity 0.6s ease var(--ld),
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) var(--ld);
+}
+
+.canvas[data-tidy="true"] .label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.labelName {
+  font-size: 20px;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  --mess: var(--mess-m);
+  --tidy: var(--tidy-m);
+  --td: var(--td-m);
+  --ch: var(--h);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z);
+  width: 180px;
+  transform: var(--mess);
+  transition: transform 0.95s cubic-bezier(0.34, 1.4, 0.64, 1) var(--md);
+}
+
+.canvas[data-tidy="true"] .card {
+  z-index: 1;
+  transform: var(--tidy);
+  transition-delay: var(--td);
+}
+
+.cardHeight {
+  height: var(--ch);
+}
+
+.lift {
+  cursor: default;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lift > * {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
+}
+
+.lift:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+.chip {
+  opacity: 0;
+  transition: opacity 0.5s ease calc(var(--md) + 700ms);
+}
+
+.canvas[data-tidy="true"] .chip {
+  opacity: 1;
+  transition-delay: calc(var(--td) + 700ms);
+}
+
+/* ---------- captions and controls ---------- */
+
+.messCaption {
+  position: absolute;
+  right: 0;
+  bottom: 16px;
+  left: 0;
+  text-align: center;
+  transition: opacity 0.5s;
+}
+
+.canvas[data-tidy="true"] .messCaption {
+  opacity: 0;
+}
+
+.counter {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.canvas[data-tidy="true"] .counter {
+  opacity: 1;
+  transition-delay: 1.4s;
+}
+
+.canvas[data-tidy="true"] .sparkle {
+  animation: sparkle 1.4s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  50% {
+    transform: scale(1.25) rotate(20deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas[data-tidy="true"] .sparkle {
+    animation: none;
+  }
+}
+
+/* ---------- wide: 960 × 590 ---------- */
+
+@media (min-width: 760px) {
+  .wrap {
+    aspect-ratio: 960 / 590;
+    max-height: 590px;
+  }
+
+  .canvas {
+    width: 960px;
+    height: 590px;
+  }
+
+  .plank0 { top: 220px; }
+  .plank1 { top: 394px; }
+  .plank2 { top: 568px; }
+  .plank3,
+  .plank4 { display: none; }
+
+  .label { display: flex; }
+  .label0 { left: 30px; }
+  .label1 { left: 262px; }
+  .label2 { left: 494px; }
+  .label3 { left: 726px; }
+
+  .card {
+    --mess: var(--mess-w);
+    --tidy: var(--tidy-w);
+    --td: var(--td-w);
+    width: 190px;
+  }
+}
+
+/* ---------- split: 672 × 610 ---------- */
+
+@media (min-width: 1000px) {
+  .wrap {
+    aspect-ratio: 672 / 610;
+    max-height: 610px;
+  }
+
+  .canvas {
+    width: 672px;
+    height: 610px;
+  }
+
+  .plank0 { top: 220px; }
+  .plank1 { top: 402px; }
+  .plank2 { top: 584px; }
+
+  .label0 { left: 24px; }
+  .label1 { left: 182px; }
+  .label2 { left: 340px; }
+  .label3 { left: 498px; }
+  .labelName { font-size: 17px; }
+  .labelCount { display: none; }
+
+  .card {
+    --mess: var(--mess-s);
+    --tidy: var(--tidy-s);
+    --ch: var(--h-s);
+    width: 150px;
+  }
+}
