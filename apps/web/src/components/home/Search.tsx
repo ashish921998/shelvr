@@ -135,7 +135,9 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [inView, reduced, typed, out, qi, q.length]);
 
-  const fade = out ? "translate-y-2 opacity-0" : "opacity-100";
+  // Reduced motion can switch on mid-fade; results must not stay hidden then.
+  const hidden = out && !reduced;
+  const fade = hidden ? "translate-y-2 opacity-0" : "opacity-100";
 
   return (
     <section
@@ -161,7 +163,7 @@ export default function Search() {
           <span className="h-[22px] w-0.5 flex-none bg-ink motion-safe:animate-[blink_1s_steps(1)_infinite]" />
         </div>
         <div
-          className={`flex justify-between px-1.5 text-xs font-medium text-muted-soft transition-opacity duration-300 ${out ? "opacity-0" : ""}`}
+          className={`flex justify-between px-1.5 text-xs font-medium text-muted-soft transition-opacity duration-300 ${hidden ? "opacity-0" : ""}`}
         >
           <span>{results.length} results · 0.2s</span>
           <span>full text · notes · photos</span>
