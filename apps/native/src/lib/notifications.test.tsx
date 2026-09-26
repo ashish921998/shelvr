@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
+  useNotificationObserver,
   useNotificationSession,
 } from "./notifications";
 
@@ -16,6 +17,9 @@ const mock = vi.hoisted(() => ({
   signOut: vi.fn(),
   clearWidget: vi.fn(async () => true),
   captureError: vi.fn(),
+  capture: vi.fn(),
+  push: vi.fn(),
+  lastResponse: null as null | { notification: unknown },
   appState: null as null | ((state: string) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
 }));
@@ -24,7 +28,7 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => mock.locale,
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { captureError: mock.captureError },
+  analytics: { captureError: mock.captureError, capture: mock.capture },
 }));
 vi.mock("./notification-token", () => ({ getExpoPushToken: mock.token }));
 vi.mock("@/lib/widget-sync", () => ({
@@ -48,7 +52,7 @@ vi.mock("convex/react", () => ({
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
 }));
-vi.mock("expo-router", () => ({ useRouter: vi.fn() }));
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async () => "[]",
   setItemAsync: vi.fn(),
@@ -68,6 +72,11 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("expo-notifications", () => ({
   setNotificationHandler: vi.fn(),
+  getLastNotificationResponse: () => mock.lastResponse,
+  clearLastNotificationResponse: () => {
+    mock.lastResponse = null;
+  },
+  addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
   addPushTokenListener: (listener: typeof mock.rotated) => {
     mock.rotated = listener;
     return {
@@ -82,6 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.authenticated = true;
   mock.locale = "en";
+  mock.lastResponse = null;
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
 });
@@ -216,5 +226,57 @@ describe("notification session lifecycle", () => {
     rerender();
     expect(mock.appState).toBeNull();
     expect(mock.rotated).toBeNull();
+  });
+});
+
+const opened = (data: Record<string, unknown>) => ({
+  notification: { request: { content: { data } } },
+});
+
+describe("notification opens", () => {
+  it("records the kind and id before navigating", () => {
+    mock.lastResponse = opened({
+      url: "/digest/abc",
+      kind: "weekly_shelf",
+      notificationId: "abc",
+    });
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledWith("notification_opened", {
+      notification_kind: "weekly_shelf",
+      notification_id: "abc",
+    });
+    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+  });
+
+  // Installed builds keep receiving payloads from the currently deployed
+  // backend until it ships, and those carry a url and nothing else.
+  it("still records an open for a payload that predates the kind field", () => {
+    mock.lastResponse = opened({ url: "/digest/abc" });
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledWith("notification_opened", {
+      notification_kind: "unknown",
+      notification_id: "",
+    });
+    expect(mock.push).toHaveBeenCalledWith("/digest/abc");
+  });
+
+  it("handles a tap once, however often the observer remounts", () => {
+    mock.lastResponse = opened({
+      url: "/item/abc",
+      kind: "read_reminder",
+      notificationId: "r1",
+    });
+    renderHook(() => useNotificationObserver()).unmount();
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledTimes(1);
+    expect(mock.push).toHaveBeenCalledTimes(1);
+    expect(mock.lastResponse).toBeNull();
+  });
+
+  it("records nothing when a notification carries no destination", () => {
+    mock.lastResponse = opened({ kind: "weekly_shelf" });
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).not.toHaveBeenCalled();
+    expect(mock.push).not.toHaveBeenCalled();
   });
 });

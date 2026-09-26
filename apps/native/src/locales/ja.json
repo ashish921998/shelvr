@@ -140,6 +140,11 @@
   "profile.appearance": "外観",
   "notifications.weeklyHelp": "毎週日曜日に、まだ開いていない項目をお届け",
   "notifications.toggleLabel": "今週のシェルフの通知",
+  "notifications.remindersLabel": "保存アイテムのリマインダー",
+  "notifications.remindersHelp": "未読の記事や試したいレシピを、1日1回まで",
+  "notifications.remindersToggle": "保存アイテムのリマインダー通知",
+  "notifications.remindersChannel": "保存アイテムのリマインダー",
+  "notifications.remindersDisabledBody": "保存アイテムのリマインダーを受け取るには、端末の設定でShelvrの通知を許可してください。",
   "feedback.open": "フィードバックを送る",
   "support.contact": "サポートに問い合わせる",
   "pro.restoring": "購入を復元中…",
@@ -378,6 +383,14 @@
   "digest.waitingCount": {
     "other": "%{formattedCount}件の保存項目があなたを待っています"
   },
+  "digest.namedCount": {
+    "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
+  },
+  "digest.namedSingle": "「%{title}」を今週保存しました",
+  "reminder.readTitle": "あとで読む",
+  "reminder.readBody": "「%{title}」、時間のあるときにどうぞ。",
+  "reminder.cookTitle": "保存したレシピから",
+  "reminder.cookBody": "今日は「%{title}」を作ってみませんか？",
   "search.noResults": "「%{query}」に一致する保存項目はありません。",
   "spaces.addedTo": "%{space}に追加しました",
   "spaces.removedFrom": "%{space}から取り除きました",

@@ -73,6 +73,7 @@ export function NotificationSessionProvider({
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const setPreferences = useMutation(api.notifications.setPreferences);
+  const setSaveReminders = useMutation(api.notifications.setSaveReminders);
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
   const session = useMemo(
     () =>
@@ -92,6 +93,8 @@ export function NotificationSessionProvider({
             weeklyShelfEnabled: enabled,
             timezone: getNotificationTimezone(),
           }),
+        setSaveReminders: (enabled) =>
+          setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
         signOut,
         deleteAccount: () => deleteAccount({}),
         clearWidget: clearRecentSavesWidget,
@@ -107,7 +110,14 @@ export function NotificationSessionProvider({
           analytics.captureError(event, error);
         },
       }),
-    [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
+    [
+      registerDevice,
+      unregisterDevice,
+      setPreferences,
+      setSaveReminders,
+      signOut,
+      deleteAccount,
+    ],
   );
   useEffect(() => {
     if (!isAuthenticated) {
@@ -170,6 +180,17 @@ export function NotificationSessionProvider({
   );
 }
 
+function notificationField(
+  notification: Notifications.Notification,
+  field: string,
+): string | null {
+  const data = notification.request.content.data as
+    | Record<string, unknown>
+    | undefined;
+  const value = data?.[field];
+  return typeof value === "string" ? value : null;
+}
+
 /**
  * The route a notification carries, if any. Exported because the splash gate
  * decides whether to stand down from the same rule this navigates by — a push
@@ -178,10 +199,7 @@ export function NotificationSessionProvider({
 export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
-  const data = notification.request.content.data as
-    | { url?: unknown }
-    | undefined;
-  return typeof data?.url === "string" ? data.url : null;
+  return notificationField(notification, "url");
 }
 
 export function useNotificationObserver(): void {
@@ -193,18 +211,28 @@ export function useNotificationObserver(): void {
       const url = getNotificationUrl(notification);
       if (!url || url === lastUrl) return;
       lastUrl = url;
+      // Recorded before navigating: a push that throws must not lose the one
+      // signal V1 exists to collect.
+      analytics.capture("notification_opened", {
+        notification_kind: notificationField(notification, "kind") ?? "unknown",
+        notification_id:
+          notificationField(notification, "notificationId") ?? "",
+      });
       nav.push(url as never);
     };
 
-    const response = Notifications.getLastNotificationResponse();
-    if (response?.notification) {
+    // Expo keeps the last tap until it is cleared, so a remount of this
+    // observer would otherwise navigate and record the same open again.
+    // Cleared after handling, never before: the splash gate reads it once
+    // per process during the first render, ahead of this effect.
+    const handle = (response: Notifications.NotificationResponse) => {
       redirect(response.notification);
-    }
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        redirect(response.notification);
-      },
-    );
+      Notifications.clearLastNotificationResponse();
+    };
+    const response = Notifications.getLastNotificationResponse();
+    if (response?.notification) handle(response);
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(handle);
     return () => subscription.remove();
   }, [nav]);
 }

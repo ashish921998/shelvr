@@ -200,14 +200,7 @@ async function deleteUserOwnedDataBatch(
   }
   if (preferences.length === DELETE_BATCH) return false;
 
-  const digests = await ctx.db
-    .query("weeklyDigests")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
-  for (const digest of digests) {
-    await ctx.db.delete(digest._id);
-  }
-  if (digests.length === DELETE_BATCH) return false;
+  if (!(await deleteSentNotificationsBatch(ctx, userKey))) return false;
 
   // Feedback rows hold the user's authored messages, so they drain with the
   // account. Deleting a row cannot retract an already-delivered inbox email
@@ -232,6 +225,30 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(survey._id);
   }
   return true;
+}
+
+/** Deletes up to one batch each of the user's weekly digests and save
+ * reminders. Returns true when both tables are drained for this user. */
+async function deleteSentNotificationsBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const digests = await ctx.db
+    .query("weeklyDigests")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const digest of digests) {
+    await ctx.db.delete(digest._id);
+  }
+  if (digests.length === DELETE_BATCH) return false;
+  const reminders = await ctx.db
+    .query("saveReminders")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const reminder of reminders) {
+    await ctx.db.delete(reminder._id);
+  }
+  return reminders.length !== DELETE_BATCH;
 }
 
 /** Deletes up to one batch of the user's feedback submissions. Returns true

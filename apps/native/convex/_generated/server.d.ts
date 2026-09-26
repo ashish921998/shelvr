@@ -39,6 +39,7 @@ type Env = {
   readonly REVENUECAT_API_KEY: string | undefined;
   readonly REVENUECAT_ENTITLEMENT_ID: string | undefined;
   readonly REVENUECAT_WEBHOOK_SECRET: string | undefined;
+  readonly SAVE_REMINDERS_ENABLED: string | undefined;
   readonly SERPAPI_KEY: string | undefined;
   readonly WAITLIST_SHARED_SECRET: string | undefined;
 };

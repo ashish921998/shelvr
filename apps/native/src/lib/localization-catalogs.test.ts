@@ -109,11 +109,29 @@ describe("shipped localization resources", () => {
     expect(Object.keys(messages).sort()).toEqual(Object.keys(en).sort());
     const notificationCopy: Record<
       string,
-      { title: string; body: Record<string, string> }
+      {
+        title: string;
+        body: Record<string, string>;
+        named: Record<string, string>;
+        namedSingle: string;
+        reminder: Record<"read" | "cook", { title: string; body: string }>;
+      }
     > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
       title: messages["digest.title"],
       body: messages["digest.waitingCount"],
+      named: messages["digest.namedCount"],
+      namedSingle: messages["digest.namedSingle"],
+      reminder: {
+        read: {
+          title: messages["reminder.readTitle"],
+          body: messages["reminder.readBody"],
+        },
+        cook: {
+          title: messages["reminder.cookTitle"],
+          body: messages["reminder.cookBody"],
+        },
+      },
     });
     const navigation = [
       "navigation.home",
@@ -255,7 +273,7 @@ it.each([
     );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      "digest.waitingCount must contain exactly one %{formattedCount} placeholder and no others",
+      "digest.waitingCount must contain exactly these placeholders: %{formattedCount}",
     );
     expect(existsSync(join(fixture, "apps/native/locales"))).toBe(false);
   } finally {

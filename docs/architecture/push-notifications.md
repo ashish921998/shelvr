@@ -1,5 +1,9 @@
 # Push notification builds and updates
 
+This is the build, credential and OTA reference. For what Shelvr sends, when it
+sends it, and the budget every notification kind competes for, see
+[contextual notifications](contextual-notifications.md).
+
 Weekly shelf notifications use Expo Push Service, APNs on iOS, and FCM v1 on
 Android. Permission, a registered device token, an enabled weekly shelf preference,
 and unread eligible saves are all required for a digest. Token-service failures

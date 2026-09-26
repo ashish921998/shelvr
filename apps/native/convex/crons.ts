@@ -60,6 +60,16 @@ crons.interval(
   {},
 );
 
+// Consider each due user for one save reminder: an unread article or a recipe
+// to cook, at the hour that user tends to save. Hourly, because each user's
+// hour is their own; a user is only due once a day.
+crons.interval(
+  "prepare save reminders",
+  { hours: 1 },
+  internal.notifications.prepareDueSaveReminders,
+  {},
+);
+
 // Embed items whose vector is missing or from an older generation: the
 // backfill for saves made before embeddings existed, the repair path for a
 // classification whose embed call failed, and the migration path after a

@@ -71,11 +71,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `subscriptions` — one Pro entitlement row per user, written by the RevenueCat webhook
   - `paymentAnalyticsReceipts` — seen payment event ids, so telemetry is not double counted
   - `notificationDevices` — one Expo push token per device, scoped to a user
-  - `notificationPreferences` — weekly shelf opt-in, timezone, and the next digest instant
+  - `notificationPreferences` — weekly shelf opt-in, save reminder opt-out, timezone, and the
+    next digest and reminder instants
   - `itemReads` — per-user read state, kept out of the item row
   - `shareLinks` — one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
+  - `saveReminders` — one push naming one save (an unread article or a recipe),
+    with its delivery state; also the reminder budget's memory
   - `waitlistSignups` — waitlist source of truth, projected to Resend
   - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
@@ -103,10 +106,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
-- **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
-  `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
-  plus internal digest preparation and send. `notificationDelivery.ts` holds the
-  claim/finish/recover delivery machine.
+- **`notifications.ts`** — push, weekly shelf and save reminder API: `getPreferences`,
+  `setPreferences`, `setSaveReminders`, `registerDevice`, `unregisterDevice`, `markItemOpened`,
+  `getDigest`, and `markDigestOpened`, plus internal digest and reminder preparation.
+  `notificationDelivery.ts` holds the claim/finish/recover delivery machine for both, and
+  `model/saveReminders.ts` the reminder rules. See
+  [contextual notifications](docs/architecture/contextual-notifications.md).
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
 - **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
@@ -117,8 +122,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
-  failure, waitlist Resend retry, weekly shelf preparation, weekly shelf delivery recovery, hourly
-  feedback inbox delivery retry, and daily payment-receipt retention purge.
+  failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
+  recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
+  retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
@@ -253,6 +259,10 @@ needed at runtime by the features that use them:
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
+- `SAVE_REMINDERS_ENABLED` — save reminders send only while this is `"true"`. Unset by
+  default, so a deploy never starts them; set it back to anything else to stop them, queued
+  ones included, without a deploy. See
+  [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent

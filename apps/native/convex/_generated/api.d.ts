@@ -51,6 +51,7 @@ import type * as model_revenuecat from "../model/revenuecat.js";
 import type * as model_revenuecatTransfer from "../model/revenuecatTransfer.js";
 import type * as model_safeFetch from "../model/safeFetch.js";
 import type * as model_saveErrors from "../model/saveErrors.js";
+import type * as model_saveReminders from "../model/saveReminders.js";
 import type * as model_saveSource from "../model/saveSource.js";
 import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_spaceName from "../model/spaceName.js";
@@ -114,6 +115,7 @@ declare const fullApi: ApiFromModules<{
   "model/revenuecatTransfer": typeof model_revenuecatTransfer;
   "model/safeFetch": typeof model_safeFetch;
   "model/saveErrors": typeof model_saveErrors;
+  "model/saveReminders": typeof model_saveReminders;
   "model/saveSource": typeof model_saveSource;
   "model/secureCompare": typeof model_secureCompare;
   "model/spaceName": typeof model_spaceName;

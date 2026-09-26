@@ -414,13 +414,20 @@ export default defineSchema({
     weeklyShelfEnabled: v.boolean(),
     nextDigestAt: v.number(),
     timezone: v.optional(v.string()),
+    // Save reminders are on for anyone who allowed notifications; only an
+    // explicit `false` turns them off. Absent on rows written before they existed.
+    remindersEnabled: v.optional(v.boolean()),
+    // When the next reminder is due to be considered. Absent while reminders
+    // are off or the user has no device; `registerDevice` sets it again.
+    nextReminderAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_enabled_and_next_digest_at", [
       "weeklyShelfEnabled",
       "nextDigestAt",
-    ]),
+    ])
+    .index("by_next_reminder_at", ["nextReminderAt"]),
 
   // Read state is separate from items so opening a save does not rewrite the
   // item row that is rendered throughout the feed.
@@ -464,6 +471,32 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_week", ["userId", "weekStart"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
+
+  // One push that names one save: an unread article or a recipe to cook. A
+  // save is reminded about at most once, and these rows are also the budget's
+  // memory of what was sent and when. Delivery fields mirror weeklyDigests.
+  saveReminders: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    kind: v.union(v.literal("read"), v.literal("cook")),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_item", ["userId", "itemId"])
     .index("by_delivery_status_and_attempt", [
       "deliveryStatus",
       "deliveryNextAttemptAt",

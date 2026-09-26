@@ -119,7 +119,10 @@ describe("posthog before_send", () => {
         message: "FAILED saving https://private.example/note",
         type: "Error",
         list: [
-          { type: "Error", value: "FAILED saving https://private.example/note" },
+          {
+            type: "Error",
+            value: "FAILED saving https://private.example/note",
+          },
         ],
       }),
     );
