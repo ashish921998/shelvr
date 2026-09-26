@@ -206,54 +206,30 @@ describe("incoming share owner", () => {
     ]);
   });
 
-  it("logs the ghost prompt once and ignores Save again after Cancel", () => {
+  it("skips a ghost replay once, clearing it and going Home without a save", () => {
+    const fingerprint = fingerprintSharePayloads(raw);
     const { state, effects } = run([
       { type: "reconciled", result: { kind: "ghost" } },
       { type: "reconciled", result: { kind: "ghost" } },
-      { type: "ghostDismiss" },
-      { type: "ghostSaveAgain" },
-      { type: "ghostDismiss" },
-    ]);
-    expect(effects[0]).toEqual([
-      { type: "capture", event: "share_ghost_prompt" },
-    ]);
-    expect(effects[1]).toEqual([]);
-    expect(types(effects[2])).toEqual([
-      "capture",
-      "deleteSession",
-      "clearPendingFlag",
-      "nativeClear",
-    ]);
-    expect(effects[3]).toEqual([]);
-    expect(effects[4]).toEqual([]);
-    expect(state.phase).toEqual({
-      kind: "ghostConfirm",
-      fingerprint: fingerprintSharePayloads(raw),
-    });
-  });
-
-  it("starts exactly one session on Save again and ignores a queued Cancel", () => {
-    const s1 = session("s1");
-    const { state, effects } = run([
-      { type: "reconciled", result: { kind: "ghost" } },
-      { type: "ghostSaveAgain" },
-      { type: "ghostSaveAgain" },
-      { type: "ghostDismiss" },
-      { type: "sessionStarted", session: s1 },
-    ]);
-    expect(effects[1]).toEqual([
-      { type: "capture", event: "share_ghost_save_again" },
       {
-        type: "startSession",
-        userId: "user-1",
-        fingerprint: fingerprintSharePayloads(raw),
-        rawPayloads: raw,
+        type: "nativeClearSettled",
+        ok: true,
+        for: { kind: "abandon", fingerprint },
       },
     ]);
-    expect(effects[2]).toEqual([]);
-    expect(effects[3]).toEqual([]);
-    expect(types(effects[4])).toEqual(["save"]);
-    expect(state.recordId).toBe("s1");
+    expect(effects[0]).toEqual([
+      { type: "capture", event: "share_ghost_skipped" },
+      { type: "deleteSession" },
+      { type: "clearPendingFlag" },
+      { type: "nativeClear", for: { kind: "abandon", fingerprint } },
+    ]);
+    expect(effects[1]).toEqual([]);
+    expect(effects[2]).toEqual([
+      { type: "clearDiscardRecord" },
+      { type: "navigateHome" },
+    ]);
+    expect(state.phase).toEqual({ kind: "complete" });
+    expect(state.running).toBeNull();
   });
 
   it("presents one paywall per locked session, then saves once entitled", () => {

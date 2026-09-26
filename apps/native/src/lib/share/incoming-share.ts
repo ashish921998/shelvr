@@ -3,7 +3,7 @@
 // press) and gets back the next state, including the phase it renders, and
 // an ordered list of effects to run. Every rule the flow depends on lives
 // here: effect ordering, which session is current, the per-session guards,
-// the Android-only tombstone, the ghost-prompt latch, and the Pro gate.
+// the Android-only tombstone, the ghost-replay skip, and the Pro gate.
 //
 // No React, Convex, storage, or native imports: the screen runs each effect
 // against MMKV, SecureStore, expo-sharing, the router, and analytics, and
@@ -14,8 +14,10 @@ import { classifyEntries, type ResolvedPayload } from "./process-share";
 import { withEntry } from "./session-view";
 import {
   fingerprintSharePayloads,
+  settledEntries,
   type RawSharePayload,
   type reconcileSession,
+  type SettledEntry,
   type ShareEntry,
   type ShareSession,
 } from "./storage";
@@ -36,7 +38,6 @@ export type SharePhase =
   | { kind: "saving"; session: ShareSession }
   | { kind: "partial"; session: ShareSession }
   | { kind: "clearFailed"; session: ShareSession }
-  | { kind: "ghostConfirm"; fingerprint: string }
   | { kind: "complete" };
 
 export type IncomingShareState = {
@@ -59,11 +60,9 @@ export type IncomingShareState = {
    * does not present a second one. Cleared when a run starts, so a later
    * lapse gates the session again. */
   locked: string | null;
-  /** The ghost prompt's first answer claims it: a queued second press can
-   * neither start a second save nor save after Cancel, or the reverse. */
-  ghostAnswered: boolean;
-  /** One share_ghost_prompt per mount, however often reconcile re-runs. */
-  ghostPromptLogged: boolean;
+  /** A ghost replay is skipped once per mount, however often reconcile
+   * re-runs before the native clear lands. */
+  ghostSkipped: boolean;
 };
 
 /** The world as the screen sees it when it dispatches. */
@@ -89,23 +88,23 @@ export type ShareEvent =
   | { type: "saveSettled"; session: ShareSession }
   | { type: "saveCrashed"; session: ShareSession; live: ShareSession | null }
   | { type: "nativeClearSettled"; ok: boolean; for: ClearFor }
-  | { type: "sessionStarted"; session: ShareSession }
   | { type: "complete"; session: ShareSession }
   | { type: "retry"; live: ShareSession | null }
   | { type: "cancel" }
-  | { type: "unlock" }
-  | { type: "ghostDismiss" }
-  | { type: "ghostSaveAgain" };
+  | { type: "unlock" };
 
 /** Effects run in order. `nativeClear` is always last in its list: its
  * outcome comes back as a `nativeClearSettled` event, which decides the rest.
  * `save` runs classified persists then the processor, reporting each settled
- * entry, the result, or a crash back as events. `startSession` writes the
- * session the ghost prompt approved and reports it as `sessionStarted` on the
- * next microtask, so the prompt stays up until the press has settled. */
+ * entry, the result, or a crash back as events. */
 export type ShareEffect =
   | { type: "markComplete"; sessionId: string }
-  | { type: "tombstone"; fingerprint: string; userId: string }
+  | {
+      type: "tombstone";
+      fingerprint: string;
+      userId: string;
+      settled: SettledEntry[];
+    }
   | { type: "nativeClear"; for: ClearFor }
   | { type: "deleteSession"; sessionId?: string }
   | { type: "clearPendingFlag" }
@@ -119,21 +118,9 @@ export type ShareEffect =
       classified: ShareEntry[];
       resolved: ResolvedPayload[];
     }
-  | {
-      type: "startSession";
-      userId: string;
-      fingerprint: string;
-      rawPayloads: RawSharePayload[];
-    }
   | { type: "saveFailed"; session: ShareSession; error: unknown }
   | { type: "recordFirstShare"; userId: string }
-  | {
-      type: "capture";
-      event:
-        | "share_ghost_prompt"
-        | "share_ghost_save_again"
-        | "share_ghost_dismissed";
-    }
+  | { type: "capture"; event: "share_ghost_skipped" }
   | { type: "sharedContentSaved"; itemCount: number }
   | { type: "openPaywall" }
   | { type: "navigateHome" };
@@ -149,8 +136,7 @@ export function initialIncomingShare(android: boolean): IncomingShareState {
     completing: null,
     partial: null,
     locked: null,
-    ghostAnswered: false,
-    ghostPromptLogged: false,
+    ghostSkipped: false,
   };
 }
 
@@ -228,12 +214,6 @@ export function stepIncomingShare(
     }
     case "nativeClearSettled":
       return clearSettled(state, event.ok, event.for, ctx);
-    case "sessionStarted":
-      return requestSave(
-        { ...state, recordId: event.session.sessionId },
-        event.session,
-        ctx,
-      );
     case "complete":
       return complete(state, event.session, ctx);
     case "retry":
@@ -244,38 +224,6 @@ export function stepIncomingShare(
       return abandon(state, ctx);
     case "unlock":
       return { state, effects: [{ type: "openPaywall" }] };
-    case "ghostDismiss": {
-      if (state.ghostAnswered) return none(state);
-      const next = abandon({ ...state, ghostAnswered: true }, ctx);
-      return {
-        state: next.state,
-        effects: [
-          { type: "capture", event: "share_ghost_dismissed" },
-          ...next.effects,
-        ],
-      };
-    }
-    case "ghostSaveAgain":
-      // Start the session reconcileSession deliberately did not.
-      if (
-        state.phase.kind !== "ghostConfirm" ||
-        ctx.userId === null ||
-        state.ghostAnswered
-      ) {
-        return none(state);
-      }
-      return {
-        state: { ...state, ghostAnswered: true },
-        effects: [
-          { type: "capture", event: "share_ghost_save_again" },
-          {
-            type: "startSession",
-            userId: ctx.userId,
-            fingerprint: state.phase.fingerprint,
-            rawPayloads: ctx.rawPayloads,
-          },
-        ],
-      };
   }
 }
 
@@ -288,25 +236,25 @@ function reconciled(
     case "empty":
       return none(state);
     case "ghost": {
-      // No session record, but this exact batch was just handled: an Android
-      // task-restore replayed the last share intent after a process death.
-      // Saving it again would mint an operationId the backend ledger cannot
-      // dedupe, and a deliberate identical re-share looks the same from JS,
-      // so it always gets a confirmation, never a silent save or drop.
-      const next: IncomingShareState = {
-        ...state,
-        recordId: null,
-        ghostPromptLogged: true,
-        phase: {
-          kind: "ghostConfirm",
-          fingerprint: fingerprintSharePayloads(ctx.rawPayloads),
-        },
-      };
+      // No session record, but this exact batch was the user's last completed
+      // share and every entry settled: Android restored the task after a
+      // process death and replayed the old share intent. It is already in
+      // Shelvr, so consume it quietly
+      // and go Home. Saving would mint an operationId the backend ledger
+      // cannot dedupe (a duplicate), and asking made every cold start after
+      // a share look like a new one.
+      if (state.ghostSkipped) return none(state);
+      const dropped = abandon(state, ctx);
       return {
-        state: next,
-        effects: state.ghostPromptLogged
-          ? []
-          : [{ type: "capture", event: "share_ghost_prompt" }],
+        state: {
+          ...dropped.state,
+          ghostSkipped: true,
+          phase: { kind: "complete" },
+        },
+        effects: [
+          { type: "capture", event: "share_ghost_skipped" },
+          ...dropped.effects,
+        ],
       };
     }
     case "clear":
@@ -424,6 +372,7 @@ function complete(
       type: "tombstone",
       fingerprint: session.fingerprint,
       userId: session.userId,
+      settled: settledEntries(session.entries),
     });
   }
   effects.push({ type: "nativeClear", for: { kind: "complete", session } });
