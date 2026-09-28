@@ -36,6 +36,10 @@ export type MessageParams = {
   "notifications.trialChannel": undefined;
   "notifications.trialEndingTitle": undefined;
   "notifications.trialEndingBody": undefined;
+  "notifications.trialFirstDayTitle": undefined;
+  "notifications.trialFirstDayBody": undefined;
+  "notifications.trialThirdDayTitle": undefined;
+  "notifications.trialThirdDayBody": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
   "digest.backHome": undefined;
@@ -466,6 +470,9 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.progressTitle": undefined;
+  "home.progressBody": undefined;
+  "home.progressCount": { saved: number; total: number };
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
   "demo.pickHelp": undefined;

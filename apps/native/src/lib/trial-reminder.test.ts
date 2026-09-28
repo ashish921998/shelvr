@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   scheduleTrialReminder,
+  TRIAL_NUDGES,
   TRIAL_REMINDER_ID,
+  trialNudgeAt,
+  trialNudgesAllowed,
   trialReminderAt,
 } from "./trial-reminder";
 
@@ -20,6 +23,9 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: vi.fn() },
 }));
 vi.mock("@/lib/current-user", () => ({ useCurrentUser: vi.fn() }));
+vi.mock("@convex/_generated/api", () => ({ api: {} }));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn() }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
   waitForSheetTransition: vi.fn(),
@@ -126,6 +132,78 @@ describe("scheduleTrialReminder", () => {
     expect(
       await scheduleTrialReminder(NOW + 7 * DAY, NOW, false, () => current),
     ).toBe(false);
-    expect(mock.cancel).toHaveBeenLastCalledWith(TRIAL_REMINDER_ID);
+    expect(mock.cancel.mock.calls.slice(-3).flat()).toEqual([
+      TRIAL_REMINDER_ID,
+      ...TRIAL_NUDGES.map((nudge) => nudge.id),
+    ]);
+  });
+});
+
+describe("trial nudges", () => {
+  // Local noon, so the nudges keep the trial's hour.
+  const noon = new Date(2027, 0, 4, 12, 0, 0, 0).getTime();
+  const nudgeIds = TRIAL_NUDGES.map((nudge) => nudge.id);
+
+  it("lands on day 1 and day 3 of the trial", () => {
+    const expiresAt = noon + 7 * DAY;
+    expect(trialNudgeAt(expiresAt, 1, noon)).toBe(noon + DAY);
+    expect(trialNudgeAt(expiresAt, 3, noon)).toBe(noon + 3 * DAY);
+  });
+
+  it("moves a nudge out of the night", () => {
+    const late = new Date(2027, 0, 4, 23, 30).getTime();
+    expect(new Date(trialNudgeAt(late + 7 * DAY, 1, late)!).getHours()).toBe(
+      19,
+    );
+    const early = new Date(2027, 0, 4, 6, 15).getTime();
+    const at = new Date(trialNudgeAt(early + 7 * DAY, 1, early)!);
+    expect([at.getHours(), at.getMinutes()]).toEqual([10, 0]);
+  });
+
+  it("skips a nudge whose day has passed", () => {
+    expect(trialNudgeAt(noon + 5 * DAY, 1, noon)).toBeNull();
+  });
+
+  it("follows the Save reminders switch, not a missing preferences row", () => {
+    expect(
+      trialNudgesAllowed({ remindersEnabled: false, timezone: null }),
+    ).toBe(true);
+    expect(
+      trialNudgesAllowed({ remindersEnabled: true, timezone: "Asia/Kolkata" }),
+    ).toBe(true);
+    expect(
+      trialNudgesAllowed({ remindersEnabled: false, timezone: "Asia/Kolkata" }),
+    ).toBe(false);
+  });
+
+  it("schedules both nudges with the reminder when allowed", async () => {
+    expect(
+      await scheduleTrialReminder(noon + 7 * DAY, noon, false, undefined, true),
+    ).toBe(true);
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_REMINDER_ID, ...nudgeIds]);
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: "shelvr.trial-day-1",
+        content: expect.objectContaining({
+          data: { url: "/add", kind: "trial_nudge" },
+        }),
+        trigger: expect.objectContaining({ date: new Date(noon + DAY) }),
+      }),
+    );
+  });
+
+  it("clears the nudges when they are switched off", async () => {
+    await scheduleTrialReminder(noon + 7 * DAY, noon, false);
+    expect(mock.schedule).toHaveBeenCalledTimes(1);
+    for (const id of nudgeIds) expect(mock.cancel).toHaveBeenCalledWith(id);
+  });
+
+  it("schedules no nudges without permission", async () => {
+    mock.permission.mockResolvedValue(undetermined);
+    await scheduleTrialReminder(noon + 7 * DAY, noon, false, undefined, true);
+    expect(mock.schedule).not.toHaveBeenCalled();
   });
 });

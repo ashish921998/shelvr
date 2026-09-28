@@ -2,6 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
 import { ProCard } from "@/components/home/pro-card";
 import { SaveHowTo } from "@/components/home/save-how-to";
+import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
+import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
@@ -39,18 +41,18 @@ export default function HomeScreen() {
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
   const proPending = entitlement.loading || locked;
-  // The cancel survey owns the Home moment when visible, then the save recall
-  // card. Each later prompt defers its one-shot claim so it is never consumed
-  // behind a card that holds the slot.
-  const recall = useSaveRecall(items, {
+  const { data: user } = useCurrentUser();
+  // The cancel survey owns the Home moment when visible, then the save
+  // progress card, then the save recall card. Each later prompt defers its
+  // one-shot claim so it is never consumed behind a card that holds the slot.
+  const progress = useSaveProgress(user?._id, {
     defer: cancelSurvey.visible || proPending,
   });
+  const recall = useSaveRecall(items, { defer: progress.deferLater });
   const feedback = useFeedbackInvitation(items, {
-    defer:
-      cancelSurvey.visible || proPending || recall.visible || recall.pending,
+    defer: progress.deferLater || recall.visible || recall.pending,
   });
   const busySaving = useBusySaving(items);
-  const { data: user } = useCurrentUser();
   // The share screen records the first save while Home stays mounted below
   // it, so re-read the flag on focus.
   const [, setFocusCount] = useState(0);
@@ -81,7 +83,11 @@ export default function HomeScreen() {
     itemCount: items.length,
   });
   const nudge = user ? (
-    <WeeklyNudgeSheet userId={user._id} previewTitle={items[0]?.title} />
+    <WeeklyNudgeSheet
+      userId={user._id}
+      previewTitle={items[0]?.title}
+      ready={progress.nudgeReady}
+    />
   ) : null;
 
   if (items.length === 0) {
@@ -133,10 +139,12 @@ export default function HomeScreen() {
         loadingMore={loadingMore}
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS and the invitation scrolls with the content. The
-        // cancel survey claims the slot first, then the save recall card.
+        // cancel survey claims the slot first, then the save progress card,
+        // then the save recall card.
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
+          saveProgressCard(progress) ??
           recallCard ??
           (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
@@ -153,6 +161,16 @@ export default function HomeScreen() {
       ) : null}
     </View>
   );
+}
+
+function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
+  return progress.card ? (
+    <SaveProgressCard
+      saved={progress.card.saved}
+      goal={progress.card.goal}
+      onDismiss={progress.dismiss}
+    />
+  ) : null;
 }
 
 const styles = StyleSheet.create((theme) => ({
