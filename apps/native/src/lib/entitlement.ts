@@ -7,6 +7,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
+import {
+  exitOfferDue,
+  exitOfferShownKey,
+  findExitOffering,
+  parseShownAt,
+} from "@/lib/exit-offer";
+import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
@@ -381,9 +388,75 @@ async function presentPaywallImpl(
       rcui.presentPaywall(),
     );
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
-    return mapPaywallResult(result);
+    const outcome = mapPaywallResult(result);
+    if (outcome !== "cancelled") return outcome;
+    return (await presentExitOffer(rcui, placement)) ?? outcome;
   } catch {
     return "unavailable";
+  }
+}
+
+/**
+ * After a paywall close, present the discounted exit offering once (see
+ * `exit-offer.ts`). Runs inside the same sheet latch as the paywall it
+ * follows. Returns null when nothing was shown; a failure after the user
+ * already closed the paywall stays a cancel, never the fallback screen.
+ */
+async function presentExitOffer(
+  rcui: NonNullable<ReturnType<typeof getRCUI>>,
+  sourcePlacement: string,
+): Promise<PaywallOutcome | null> {
+  const userId = _rcSyncedUserId;
+  const rc = getPurchases();
+  if (!userId || !rc) return null;
+  const key = exitOfferShownKey(userId);
+  const now = Date.now();
+  let lastShownAt: number | null;
+  try {
+    lastShownAt = parseShownAt(SecureStore.getItem(key));
+  } catch {
+    return null;
+  }
+  if (!exitOfferDue(sourcePlacement, lastShownAt, now)) return null;
+  const offering = await findExitOffering({
+    getOfferings: () => rc.getOfferings(),
+    checkEligibility: (ids) => rc.checkTrialOrIntroductoryPriceEligibility(ids),
+  });
+  if (!offering) return null;
+  try {
+    // Claim the week before presenting, so a crash mid-sheet can't repeat it.
+    SecureStore.setItem(key, String(now));
+  } catch {
+    return null;
+  }
+  // UIKit refuses to present while the first paywall is still dismissing.
+  await waitForSheetTransition();
+  const properties = {
+    placement: "exit_offer",
+    source_placement: sourcePlacement,
+    paywall_attempt_id: randomUUID(),
+  };
+  analytics.capture("paywall_requested", properties);
+  // A sheet that never appeared must not use up the week.
+  const release = () => {
+    try {
+      if (lastShownAt === null)
+        SecureStore.deleteItemAsync(key).catch(() => {});
+      else SecureStore.setItem(key, String(lastShownAt));
+    } catch {
+      // Best-effort; the worst case is one skipped week.
+    }
+  };
+  try {
+    const result = await observePaywallPresentation(properties, () =>
+      rcui.presentPaywall({ offering }),
+    );
+    if (result === "NOT_PRESENTED" || result === "ERROR") release();
+    const outcome = mapPaywallResult(result);
+    return outcome === "success" ? outcome : "cancelled";
+  } catch {
+    release();
+    return "cancelled";
   }
 }
 
