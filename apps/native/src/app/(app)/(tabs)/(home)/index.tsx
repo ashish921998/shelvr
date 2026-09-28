@@ -28,6 +28,14 @@ import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
+/** The weekly sheet is modal, so it waits while any inline prompt is up. */
+function nudgeSheetReady(
+  nudgeReady: boolean,
+  ...inlinePromptsVisible: boolean[]
+) {
+  return nudgeReady && !inlinePromptsVisible.some(Boolean);
+}
+
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
@@ -87,8 +95,12 @@ export default function HomeScreen() {
     <WeeklyNudgeSheet
       userId={user._id}
       previewTitle={items[0]?.title}
-      // A modal sheet, so it waits while an inline prompt is up.
-      ready={progress.nudgeReady && !feedback.invitationVisible}
+      ready={nudgeSheetReady(
+        progress.nudgeReady,
+        cancelSurvey.visible,
+        recall.visible,
+        feedback.invitationVisible,
+      )}
     />
   ) : null;
 
