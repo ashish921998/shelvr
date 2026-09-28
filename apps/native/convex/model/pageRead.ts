@@ -1137,11 +1137,12 @@ async function pinterestIdFor(url: string): Promise<string | undefined> {
   return pinterestPinId(result.finalUrl);
 }
 
-/** The pin the widget endpoint returns, or undefined when it returns none or
- * cannot be read. Never throws: the page read is the fallback. */
+/** The pin the widget endpoint returns, "transient" when the endpoint failed
+ * in a way a retry may not (timeout, 429, 5xx), or undefined when it has no
+ * pin. Never throws: the page read is the fallback. */
 async function readPinterestWidget(
   id: string,
-): Promise<PinterestPin | undefined> {
+): Promise<PinterestPin | "transient" | undefined> {
   try {
     const result = await safeFetch(
       `https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=${id}`,
@@ -1160,7 +1161,9 @@ async function readPinterestWidget(
         error_category: result.code,
         ...(result.status !== undefined ? { status: result.status } : {}),
       });
-      return undefined;
+      return isTransientFetchFailure(result.code, result.status)
+        ? "transient"
+        : undefined;
     }
     const body = pinterestWidgetSchema.safeParse(parseJson(result.bytes));
     const pin = body.success
@@ -1247,10 +1250,15 @@ export function pinterestPage(pin: PinterestPin): PageData | undefined {
 }
 
 /** A pin read from the widget endpoint, or the pin's page when the endpoint
- * has nothing for it (a deleted pin 404s there and fails as gone). */
+ * has nothing for it (a deleted pin 404s there and fails as gone). A page read
+ * after the endpoint failed transiently is marked incomplete, so the save can
+ * be retried for the widget's caption and image. */
 async function fetchPinterestPin(url: string): Promise<PageData> {
   const id = await pinterestIdFor(url);
   const pin = id === undefined ? undefined : await readPinterestWidget(id);
+  if (pin === "transient") {
+    return { ...(await fetchPage(url)), incomplete: true };
+  }
   const page = pin === undefined ? undefined : pinterestPage(pin);
   return page ?? fetchPage(url);
 }

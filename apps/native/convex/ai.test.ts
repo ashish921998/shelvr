@@ -2387,6 +2387,24 @@ describe("readPage for Pinterest pins", () => {
     expect(read.status === "ok" && read.page.title).toBe("Chicken | recipes");
   });
 
+  it("marks the page read incomplete when the widget fails transiently", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === WIDGET_URL
+        ? { ok: false, code: "http_error", status: 503 }
+        : url === PIN_URL
+          ? html(
+              url,
+              '<html><head><meta property="og:title" content="Chicken | recipes"></head><body></body></html>',
+            )
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(PIN_URL);
+    expect(read.status === "ok" && read.page.incomplete).toBe(true);
+    expect(
+      linkEnrichment(read.status === "ok" ? read : { status: "unreadable" }),
+    ).toBe("partial");
+  });
+
   it("fails as gone when a deleted pin's page 404s", async () => {
     safeFetch.mockImplementation(async (url: string) =>
       url === WIDGET_URL
