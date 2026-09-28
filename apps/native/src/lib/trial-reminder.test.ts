@@ -160,6 +160,14 @@ describe("trial nudges", () => {
     expect([at.getHours(), at.getMinutes()]).toEqual([10, 0]);
   });
 
+  it("keeps the local date across a DST change", () => {
+    // A late-evening trial start in a zone that springs forward that week
+    // still lands on the calendar day after.
+    const start = new Date(2027, 2, 13, 18, 30).getTime();
+    const at = new Date(trialNudgeAt(start + 7 * DAY, 1, start)!);
+    expect([at.getMonth(), at.getDate(), at.getHours()]).toEqual([2, 14, 18]);
+  });
+
   it("skips a nudge whose day has passed", () => {
     expect(trialNudgeAt(noon + 5 * DAY, 1, noon)).toBeNull();
   });
@@ -205,5 +213,11 @@ describe("trial nudges", () => {
     mock.permission.mockResolvedValue(undetermined);
     await scheduleTrialReminder(noon + 7 * DAY, noon, false, undefined, true);
     expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("clears nudges on opt-out even without permission", async () => {
+    mock.permission.mockResolvedValue(undetermined);
+    await scheduleTrialReminder(noon + 7 * DAY, noon, false);
+    for (const id of nudgeIds) expect(mock.cancel).toHaveBeenCalledWith(id);
   });
 });

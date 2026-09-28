@@ -87,7 +87,9 @@ export function trialNudgeAt(
   day: number,
   now: number,
 ): number | null {
-  const at = new Date(expiresAt - TRIAL_MS + day * DAY_MS);
+  // Calendar days, not 24-hour steps, so a DST change keeps the local hour.
+  const at = new Date(expiresAt - TRIAL_MS);
+  at.setDate(at.getDate() + day);
   const hour = at.getHours();
   if (hour < NUDGE_EARLIEST_HOUR) at.setHours(NUDGE_EARLIEST_HOUR, 0, 0, 0);
   else if (hour >= NUDGE_LATEST_HOUR) at.setHours(NUDGE_LATEST_HOUR, 0, 0, 0);
@@ -152,6 +154,9 @@ export async function scheduleTrialReminder(
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
+  // Cleared before the permission check, so switching nudges off takes
+  // effect even while permission is denied.
+  await cancelTrialNudges();
   let permission = await Notifications.getPermissionsAsync();
   if (!canNotify(permission) && mayAsk && permission.canAskAgain) {
     permission = await Notifications.requestPermissionsAsync();
@@ -175,7 +180,6 @@ export async function scheduleTrialReminder(
       channelId: CHANNEL_ID,
     },
   });
-  await cancelTrialNudges();
   if (nudges) {
     for (const nudge of TRIAL_NUDGES) {
       const nudgeAt = trialNudgeAt(expiresAt, nudge.day, now);
