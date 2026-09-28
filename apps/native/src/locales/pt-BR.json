@@ -568,5 +568,12 @@
   "exitOffer.title": "Seu primeiro ano com desconto",
   "exitOffer.endsIn": "A oferta termina em %{time}",
   "exitOffer.cta": "Ver a oferta",
-  "exitOffer.sheetEndsIn": "A oferta termina em %{hours} h %{minutes} min."
+  "exitOffer.sheetEndsIn": "A oferta termina em %{hours} h %{minutes} min.",
+  "exitOffer.reminderTitle": "Sua oferta termina em uma hora",
+  "exitOffer.reminderBody": "Seu primeiro ano de Shelvr Pro com desconto termina em breve.",
+  "exitOffer.remindMe": "Me lembre antes de acabar",
+  "exitOffer.reminderConsent": "Vamos enviar uma notificação sobre esta oferta, uma hora antes de ela acabar. Você pode cancelar quando quiser.",
+  "exitOffer.reminderSet": "Lembrete marcado para uma hora antes do fim da oferta.",
+  "exitOffer.reminderCancel": "Cancelar lembrete",
+  "exitOffer.reminderDenied": "As notificações do Shelvr estão desativadas. Ative-as em Ajustes para receber o lembrete."
 }

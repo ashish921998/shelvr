@@ -41,7 +41,7 @@ function nudgeSheetReady(
 function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
   const exitOfferEndsAt = useExitOfferEndsAt(userId);
   return exitOfferEndsAt !== null ? (
-    <ExitOfferCard endsAt={exitOfferEndsAt} />
+    <ExitOfferCard endsAt={exitOfferEndsAt} userId={userId} />
   ) : (
     <ProCard lapsed={lapsed} />
   );

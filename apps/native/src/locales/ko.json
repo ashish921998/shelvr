@@ -534,5 +534,12 @@
   "exitOffer.title": "할인된 첫 1년",
   "exitOffer.endsIn": "오퍼 종료까지 %{time}",
   "exitOffer.cta": "오퍼 보기",
-  "exitOffer.sheetEndsIn": "오퍼 종료까지 %{hours}시간 %{minutes}분"
+  "exitOffer.sheetEndsIn": "오퍼 종료까지 %{hours}시간 %{minutes}분",
+  "exitOffer.reminderTitle": "오퍼가 1시간 후 종료돼요",
+  "exitOffer.reminderBody": "Shelvr Pro 첫 1년 할인이 곧 끝나요.",
+  "exitOffer.remindMe": "끝나기 전에 알려 주세요",
+  "exitOffer.reminderConsent": "이 혜택이 끝나기 1시간 전에 알림을 한 번 보내 드려요. 언제든 취소할 수 있어요.",
+  "exitOffer.reminderSet": "혜택 종료 1시간 전에 알려 드릴게요.",
+  "exitOffer.reminderCancel": "알림 취소",
+  "exitOffer.reminderDenied": "Shelvr 알림이 꺼져 있어요. 알림을 받으려면 설정에서 켜 주세요."
 }
