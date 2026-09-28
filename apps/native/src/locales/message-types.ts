@@ -473,6 +473,7 @@ export type MessageParams = {
   "home.progressTitle": undefined;
   "home.progressBody": undefined;
   "home.progressCount": { saved: number; total: number };
+  "home.progressAdd": undefined;
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
   "demo.pickHelp": undefined;

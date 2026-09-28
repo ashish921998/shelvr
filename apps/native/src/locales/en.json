@@ -520,6 +520,7 @@
   "home.progressTitle": "Save three things you want to come back to",
   "home.progressBody": "Share a page, post or screenshot to Shelvr from any app. It lands here with a title and tags.",
   "home.progressCount": "%{saved} of %{total} saved",
+  "home.progressAdd": "Save something",
   "home.recallTitle": "You've saved things like this before",
   "home.recallBody": {
     "one": "%{formattedCount} earlier save goes with what you just added.",

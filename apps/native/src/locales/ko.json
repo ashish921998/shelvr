@@ -504,6 +504,7 @@
   "home.progressTitle": "다시 보고 싶은 것 3개를 저장해 보세요",
   "home.progressBody": "어떤 앱에서든 페이지, 게시물, 스크린샷을 Shelvr로 공유하세요. 제목과 태그가 붙어 여기에 담겨요.",
   "home.progressCount": "%{total}개 중 %{saved}개 저장됨",
+  "home.progressAdd": "저장하기",
   "home.recallTitle": "비슷한 항목을 이전에도 저장했어요",
   "home.recallBody": {
     "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."

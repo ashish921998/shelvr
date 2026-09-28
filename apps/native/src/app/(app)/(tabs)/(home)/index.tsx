@@ -31,7 +31,6 @@ import { StyleSheet } from "react-native-unistyles";
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
-  useReviewPrompt(items);
 
   const cancelSurvey = useCancelSurvey();
   // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
@@ -48,6 +47,8 @@ export default function HomeScreen() {
   const progress = useSaveProgress(user?._id, {
     defer: cancelSurvey.visible || proPending,
   });
+  // No rating prompt in an account's first session.
+  useReviewPrompt(items, { defer: progress.firstSession });
   const recall = useSaveRecall(items, { defer: progress.deferLater });
   const feedback = useFeedbackInvitation(items, {
     defer: progress.deferLater || recall.visible || recall.pending,
@@ -86,7 +87,8 @@ export default function HomeScreen() {
     <WeeklyNudgeSheet
       userId={user._id}
       previewTitle={items[0]?.title}
-      ready={progress.nudgeReady}
+      // A modal sheet, so it waits while an inline prompt is up.
+      ready={progress.nudgeReady && !feedback.invitationVisible}
     />
   ) : null;
 

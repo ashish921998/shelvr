@@ -520,6 +520,7 @@
   "home.progressTitle": "Speichere drei Dinge, auf die du zurückkommen willst",
   "home.progressBody": "Teile eine Seite, einen Post oder einen Screenshot aus jeder App mit Shelvr. Er landet hier mit Titel und Tags.",
   "home.progressCount": "%{saved} von %{total} gespeichert",
+  "home.progressAdd": "Etwas speichern",
   "home.recallTitle": "Du hast so etwas schon mal gespeichert",
   "home.recallBody": {
     "one": "%{formattedCount} früher gespeicherter Inhalt passt zu dem, was du gerade hinzugefügt hast.",

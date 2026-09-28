@@ -49,6 +49,7 @@ export function useSaveProgress(
     /** Later Home prompts wait while an earlier card holds the slot, and
      * while this one is up or may still come. */
     deferLater: defer || visible || pending,
+    firstSession,
     nudgeReady: shouldOfferWeeklyNudge({ firstSession, progress }),
     dismiss,
   };

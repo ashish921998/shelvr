@@ -39,7 +39,7 @@ export function SaveProgressCard({
         <Text style={styles.count}>{count}</Text>
       </View>
       <CtaButton
-        label={t("home.pasteLink")}
+        label={t("home.progressAdd")}
         onPress={() => router.push("/add")}
       />
       <View style={styles.buttonRow}>

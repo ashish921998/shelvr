@@ -16,7 +16,12 @@ import * as SecureStore from "expo-secure-store";
 const PROMPTED_KEY = "shelvr.review.prompted";
 const READY_ITEM_THRESHOLD = 3;
 
-export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
+/** `defer` holds the prompt back, e.g. through an account's first session:
+ * asking for a rating before real use is what people resent. */
+export function useReviewPrompt(
+  items: FeedbackFeedItem[] | undefined,
+  { defer = false }: { defer?: boolean } = {},
+) {
   const triggered = useRef(false);
   const home = isHomeRootRoute(useSegments());
   const homeRef = useRef(home);
@@ -27,6 +32,7 @@ export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
   useEffect(() => {
     if (
       !home ||
+      defer ||
       !items ||
       triggered.current ||
       isPaywallPending() ||
@@ -76,5 +82,5 @@ export function useReviewPrompt(items: FeedbackFeedItem[] | undefined) {
         if (!prompted) triggered.current = false;
       }
     })();
-  }, [items, home]);
+  }, [items, home, defer]);
 }

@@ -536,6 +536,7 @@
   "home.progressTitle": "Guarda tres cosas a las que quieras volver",
   "home.progressBody": "Comparte una página, una publicación o una captura con Shelvr desde cualquier app. Llega aquí con título y etiquetas.",
   "home.progressCount": "%{saved} de %{total} guardados",
+  "home.progressAdd": "Guardar algo",
   "home.recallTitle": "Ya guardaste cosas parecidas",
   "home.recallBody": {
     "one": "%{formattedCount} contenido guardado antes encaja con lo que acabas de agregar.",

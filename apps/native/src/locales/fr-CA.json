@@ -536,6 +536,7 @@
   "home.progressTitle": "Enregistrez trois choses à retrouver plus tard",
   "home.progressBody": "Partagez une page, une publication ou une capture d’écran vers Shelvr depuis n’importe quelle app. Elle arrive ici avec un titre et des tags.",
   "home.progressCount": "%{saved} sur %{total} enregistrés",
+  "home.progressAdd": "Enregistrer quelque chose",
   "home.recallTitle": "Vous avez déjà enregistré des contenus similaires",
   "home.recallBody": {
     "one": "%{formattedCount} contenu enregistré plus tôt va avec ce que vous venez d'ajouter.",

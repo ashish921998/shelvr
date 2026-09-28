@@ -504,6 +504,7 @@
   "home.progressTitle": "あとで見返したいものを3つ保存しましょう",
   "home.progressBody": "どのアプリからでも、ページや投稿、スクリーンショットを Shelvr に共有できます。タイトルとタグ付きでここに届きます。",
   "home.progressCount": "%{total}件中%{saved}件保存済み",
+  "home.progressAdd": "保存する",
   "home.recallTitle": "似たものを前にも保存しています",
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
