@@ -35,6 +35,10 @@
   "notifications.trialChannel": "체험 알림",
   "notifications.trialEndingTitle": "무료 체험이 2일 후에 끝나요",
   "notifications.trialEndingBody": "Shelvr Pro를 계속 사용하거나, 갱신 전에 프로필에서 언제든 해지할 수 있어요.",
+  "notifications.trialFirstDayTitle": "간직하고 싶은 걸 봤나요?",
+  "notifications.trialFirstDayBody": "어떤 앱에서든 Shelvr로 공유하거나 여기에 링크를 붙여넣으세요. 제목과 태그가 붙어 책장에 담겨요.",
+  "notifications.trialThirdDayTitle": "책장이 기다리고 있어요",
+  "notifications.trialThirdDayBody": "Shelvr를 열어 이번 주에 저장한 항목을 확인하거나 새로 추가해 보세요.",
   "errors.searchTitle": "검색하지 못했어요",
   "loading.app": "Shelvr 여는 중",
   "digest.backHome": "홈으로 돌아가기",
@@ -497,6 +501,10 @@
   "home.howToMoreHelp": "그다음 Shelvr를 즐겨찾기에 추가하면 앞쪽에 계속 보여요.",
   "home.pasteLink": "링크 붙여넣기",
   "home.onYourShelf": "내 책장",
+  "home.progressTitle": "다시 보고 싶은 것 3개를 저장해 보세요",
+  "home.progressBody": "어떤 앱에서든 페이지, 게시물, 스크린샷을 Shelvr로 공유하세요. 제목과 태그가 붙어 여기에 담겨요.",
+  "home.progressCount": "%{total}개 중 %{saved}개 저장됨",
+  "home.progressAdd": "저장하기",
   "home.recallTitle": "비슷한 항목을 이전에도 저장했어요",
   "home.recallBody": {
     "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."

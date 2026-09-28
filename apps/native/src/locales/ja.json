@@ -35,6 +35,10 @@
   "notifications.trialChannel": "トライアルのリマインダー",
   "notifications.trialEndingTitle": "無料トライアルはあと2日で終了します",
   "notifications.trialEndingBody": "Shelvr Proを続けるか、更新前ならプロフィールからいつでも解約できます。",
+  "notifications.trialFirstDayTitle": "残しておきたいものはありましたか？",
+  "notifications.trialFirstDayBody": "どのアプリからでも Shelvr に共有するか、ここにリンクを貼り付けてください。タイトルとタグ付きでシェルフに届きます。",
+  "notifications.trialThirdDayTitle": "シェルフが待っています",
+  "notifications.trialThirdDayBody": "Shelvr を開いて今週保存したものを見るか、新しく追加しましょう。",
   "errors.searchTitle": "検索できませんでした",
   "loading.app": "Shelvrを開いています",
   "digest.backHome": "ホームに戻る",
@@ -497,6 +501,10 @@
   "home.howToMoreHelp": "Shelvrをよく使う項目に追加すると、先頭に表示されます。",
   "home.pasteLink": "リンクを貼り付ける",
   "home.onYourShelf": "シェルフ",
+  "home.progressTitle": "あとで見返したいものを3つ保存しましょう",
+  "home.progressBody": "どのアプリからでも、ページや投稿、スクリーンショットを Shelvr に共有できます。タイトルとタグ付きでここに届きます。",
+  "home.progressCount": "%{total}件中%{saved}件保存済み",
+  "home.progressAdd": "保存する",
   "home.recallTitle": "似たものを前にも保存しています",
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
