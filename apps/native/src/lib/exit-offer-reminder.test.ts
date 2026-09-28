@@ -133,4 +133,19 @@ describe("clearExitOfferReminder", () => {
     expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
     expect(mock.schedule).not.toHaveBeenCalled();
   });
+
+  it("forgets an opt-in still waiting on permission", async () => {
+    let grant: (value: unknown) => void = () => {};
+    mock.permission.mockResolvedValue({
+      ios: { status: 1 },
+      canAskAgain: true,
+    });
+    mock.request.mockReturnValue(new Promise((resolve) => (grant = resolve)));
+    const pending = optInToExitOfferReminder("user1", now + 24 * HOUR);
+    await vi.waitFor(() => expect(mock.request).toHaveBeenCalled());
+    await clearExitOfferReminder();
+    grant({ ios: { status: 2 } });
+    await expect(pending).resolves.toBe(false);
+    expect(mock.setItem).not.toHaveBeenCalled();
+  });
 });

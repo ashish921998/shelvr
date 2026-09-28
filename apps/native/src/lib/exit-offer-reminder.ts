@@ -24,6 +24,10 @@ const CHANNEL_ID = "trial-reminder";
 
 const optInKey = (userId: string) => `shelvr.exitOffer.remind.${userId}`;
 
+// Bumped when the session ends, so an opt-in still waiting on the
+// permission prompt cannot record itself afterwards.
+let sessionGeneration = 0;
+
 // The opt-in stores the window it was given for, so a later window starts
 // without a reminder until the user asks again.
 function readOptIn(userId: string): number | null {
@@ -70,6 +74,7 @@ export async function optInToExitOfferReminder(
   userId: string,
   endsAt: number,
 ): Promise<boolean> {
+  const session = sessionGeneration;
   await ensureChannel();
   let permission = await Notifications.getPermissionsAsync();
   if (!canNotify(permission) && permission.canAskAgain) {
@@ -77,7 +82,8 @@ export async function optInToExitOfferReminder(
   }
   const granted = canNotify(permission);
   analytics.capture("exit_offer_reminder_opt_in", { granted });
-  if (!granted) return false;
+  // Signed out while the permission prompt was up: nothing to remember.
+  if (!granted || session !== sessionGeneration) return false;
   try {
     SecureStore.setItem(optInKey(userId), String(endsAt));
   } catch {
@@ -154,6 +160,7 @@ let activeUserId: string | null = null;
  * so nothing about this offer arrives once the account has left the device.
  */
 export async function clearExitOfferReminder(): Promise<void> {
+  sessionGeneration += 1;
   const userId = activeUserId;
   activeUserId = null;
   try {
