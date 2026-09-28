@@ -195,6 +195,9 @@ type AnalyticsEventProperties = {
   save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
+  exit_offer_reminder_opt_in: { granted: boolean };
+  exit_offer_reminder_opt_out: Record<string, never>;
+  exit_offer_expired_open: Record<string, never>;
   // Next-visit cancel survey (lib/cancel-survey.ts). Bounded reason ids only,
   // never free text. A response is stated intent, NOT proof of cancellation —
   // only the server-side webhook events (trial_cancelled, …) count as

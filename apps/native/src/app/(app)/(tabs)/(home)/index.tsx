@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { ExitOfferCard } from "@/components/home/exit-offer-card";
 import { ProCard } from "@/components/home/pro-card";
 import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveProgressCard } from "@/components/home/save-progress-card";
@@ -11,7 +12,7 @@ import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
-import { useEntitlement } from "@/lib/entitlement";
+import { useEntitlement, useExitOfferEndsAt } from "@/lib/entitlement";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
@@ -34,6 +35,16 @@ function nudgeSheetReady(
   ...inlinePromptsVisible: boolean[]
 ) {
   return nudgeReady && !inlinePromptsVisible.some(Boolean);
+}
+
+/** While the exit offer's window is open, its countdown takes the Pro slot. */
+function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
+  const exitOfferEndsAt = useExitOfferEndsAt(userId);
+  return exitOfferEndsAt !== null ? (
+    <ExitOfferCard endsAt={exitOfferEndsAt} userId={userId} />
+  ) : (
+    <ProCard lapsed={lapsed} />
+  );
 }
 
 export default function HomeScreen() {
@@ -68,7 +79,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
   const proCard = locked ? (
-    <ProCard lapsed={entitlement.status === "lapsed"} />
+    <ProSlot userId={user?._id} lapsed={entitlement.status === "lapsed"} />
   ) : null;
 
   // One element, two slots (empty feed and feed header) — the survey claims

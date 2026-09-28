@@ -1,3 +1,4 @@
+import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
@@ -95,8 +96,14 @@ export function NotificationSessionProvider({
           }),
         setSaveReminders: (enabled) =>
           setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
-        signOut,
-        deleteAccount: () => deleteAccount({}),
+        signOut: async () => {
+          await signOut();
+          await clearExitOfferReminder();
+        },
+        deleteAccount: async () => {
+          await deleteAccount({});
+          await clearExitOfferReminder();
+        },
         clearWidget: clearRecentSavesWidget,
         // Fallback for a failed post-deletion sign-out: no auth edge may fire
         // promptly, so clear the identity here (idempotent with the hook's).
