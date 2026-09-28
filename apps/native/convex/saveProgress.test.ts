@@ -59,13 +59,15 @@ describe("saveProgress", () => {
         createdAt: Date.now(),
       }),
     );
-    await insertItem(backend, "u1", { fixtureKey: "seed-1" });
+    for (let i = 0; i < 5; i += 1)
+      await insertItem(backend, "u1", { fixtureKey: `seed-${i}` });
     await insertItem(backend, "u1", { status: "processing" });
     await insertItem(backend, "u1", { status: "failed" });
     await insertItem(backend, "u2");
     await insertItem(backend, "u1");
+    await insertItem(backend, "u1");
     expect(await t.query(api.items.saveProgress, {})).toEqual({
-      saved: 1,
+      saved: 2,
       goal: 3,
     });
   });

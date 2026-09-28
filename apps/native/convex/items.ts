@@ -328,10 +328,12 @@ export const listItems = query({
 /** Ready saves a new account needs before its shelf counts as started. The
  * Home "save your next two" card and the weekly shelf nudge both wait on it. */
 export const SAVE_PROGRESS_GOAL = 3;
+const SAVE_PROGRESS_MAX_READ = 20;
 
 /** How many real saves the user has, counted up to `SAVE_PROGRESS_GOAL`. The
  * onboarding demo save is excluded (the app picked it for them), as are
- * fixture seeds and saves not yet `ready`. Reads at most goal + 2 rows. */
+ * fixture seeds and saves not yet `ready`. Reads at most
+ * `SAVE_PROGRESS_MAX_READ` rows. */
 export const saveProgress = query({
   args: {},
   returns: v.object({ saved: v.number(), goal: v.number() }),
@@ -341,15 +343,19 @@ export const saveProgress = query({
       .query("onboardingDemos")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-    const ready = await ctx.db
+    // Walk ready saves until the goal is met, skipping excluded rows (the dev
+    // fixture reset seeds several), with a hard bound on rows read.
+    let saved = 0;
+    let read = 0;
+    for await (const item of ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
         q.eq("userId", userId).eq("status", "ready"),
-      )
-      .take(SAVE_PROGRESS_GOAL + 2);
-    const saved = ready.filter(
-      (item) => item._id !== demo?.itemId && item.fixtureKey === undefined,
-    ).length;
+      )) {
+      if (item._id !== demo?.itemId && item.fixtureKey === undefined) saved++;
+      read++;
+      if (saved >= SAVE_PROGRESS_GOAL || read >= SAVE_PROGRESS_MAX_READ) break;
+    }
     return {
       saved: Math.min(saved, SAVE_PROGRESS_GOAL),
       goal: SAVE_PROGRESS_GOAL,
