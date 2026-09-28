@@ -454,19 +454,15 @@ async function presentExitOffer(
   // UIKit refuses to present while the first paywall is still dismissing.
   await waitForSheetTransition();
   // A sheet that never appeared must not open the window.
-  const release = () => {
+  // Awaited before the sheet latch clears, so a later claim can't race it.
+  const release = async () => {
     try {
-      if (lastShownAt === null)
-        SecureStore.deleteItemAsync(key)
-          .then(notifyExitOffer)
-          .catch(() => {});
-      else {
-        SecureStore.setItem(key, String(lastShownAt));
-        notifyExitOffer();
-      }
+      if (lastShownAt === null) await SecureStore.deleteItemAsync(key);
+      else SecureStore.setItem(key, String(lastShownAt));
     } catch {
       // Best-effort; the worst case is one skipped offer.
     }
+    notifyExitOffer();
   };
   return showExitOffering(
     rcui,
@@ -482,7 +478,7 @@ async function showExitOffering(
   offering: import("react-native-purchases").PurchasesOffering,
   sourcePlacement: string,
   endsAt: number | null,
-  onNotPresented: () => void = () => {},
+  onNotPresented: () => void | Promise<void> = () => {},
 ): Promise<PaywallOutcome> {
   const properties = {
     placement: "exit_offer",
@@ -497,12 +493,16 @@ async function showExitOffering(
         customVariables: exitOfferVariables(endsAt),
       }),
     );
-    if (result === "NOT_PRESENTED" || result === "ERROR") onNotPresented();
+    if (result === "NOT_PRESENTED" || result === "ERROR")
+      await onNotPresented();
     const outcome = mapPaywallResult(result);
+    // A Home tap that shows nothing falls back to the regular paywall; after
+    // a paywall close, a failed exit offer stays a plain cancel.
+    if (sourcePlacement === "home_countdown") return outcome;
     return outcome === "success" ? outcome : "cancelled";
   } catch {
-    onNotPresented();
-    return "cancelled";
+    await onNotPresented();
+    return sourcePlacement === "home_countdown" ? "unavailable" : "cancelled";
   }
 }
 
@@ -537,7 +537,9 @@ async function presentOpenExitOfferImpl(): Promise<PaywallOutcome> {
   if (!rc || !rcui || endsAt === null) return presentPaywallImpl("home_card");
   if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
   const offering = await findExitOffering(exitOfferDeps(rc));
-  if (!offering) return presentPaywallImpl("home_card");
+  // The lookup can outlast the window; never sell the offer after it closes.
+  if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
+    return presentPaywallImpl("home_card");
   return showExitOffering(rcui, offering, "home_countdown", endsAt);
 }
 
