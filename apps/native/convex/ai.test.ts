@@ -146,6 +146,11 @@ describe("firstLinkedUrl", () => {
     expect(
       firstLinkedUrl("watch https://youtu.be/abc and https://x.com/a"),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
+      ),
+    ).toBe(undefined);
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });

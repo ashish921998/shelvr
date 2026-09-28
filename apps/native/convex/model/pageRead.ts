@@ -302,7 +302,6 @@ const LINK_HUB_HOSTS = new Set([
   "twitter.com",
   "youtube.com",
   "youtu.be",
-  "pinterest.com",
   "pin.it",
 ]);
 
@@ -316,7 +315,7 @@ export function firstLinkedUrl(text: string | undefined): string | undefined {
     const candidate = match[0].replace(/[.,;:!?]+$/, "");
     try {
       const host = new URL(candidate).hostname.replace(/^www\./, "");
-      if (!LINK_HUB_HOSTS.has(host)) {
+      if (!LINK_HUB_HOSTS.has(host) && !isPinterestHost(host)) {
         return candidate;
       }
     } catch {
