@@ -467,17 +467,19 @@ export function forgetDeletedShareItem(
 ): void {
   const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
   if (raw === undefined) return;
+  let parsed: { settled?: unknown };
   try {
-    const parsed = JSON.parse(raw) as { settled?: unknown };
-    if (!Array.isArray(parsed.settled)) return;
-    const settled = parsed.settled.filter(
-      (e) => !(isSettled(e) && e.itemId === itemId),
-    );
-    if (settled.length === parsed.settled.length) return;
-    store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ ...parsed, settled }));
+    parsed = JSON.parse(raw) as { settled?: unknown };
   } catch {
     store.remove(LAST_COMPLETED_SHARE_KEY);
+    return;
   }
+  if (!Array.isArray(parsed.settled)) return;
+  const settled = parsed.settled.filter(
+    (e) => !(isSettled(e) && e.itemId === itemId),
+  );
+  if (settled.length === parsed.settled.length) return;
+  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ ...parsed, settled }));
 }
 
 function isSettled(value: unknown): value is SettledEntry {

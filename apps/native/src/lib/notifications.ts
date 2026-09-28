@@ -210,13 +210,15 @@ export function useNotificationObserver(): void {
     // same tap can arrive both as the last response and through the listener,
     // but a later push to the same screen (two trial nudges to /add) is a new
     // open and must navigate and be recorded again.
-    let lastHandled: string | null = null;
+    const handled = new Set<string>();
     const redirect = (notification: Notifications.Notification) => {
       const url = getNotificationUrl(notification);
       if (!url) return;
       const id = notification.request.identifier;
-      if (id && id === lastHandled) return;
-      lastHandled = id || null;
+      if (id) {
+        if (handled.has(id)) return;
+        handled.add(id);
+      }
       // Recorded before navigating: a push that throws must not lose the one
       // signal V1 exists to collect.
       analytics.capture("notification_opened", {

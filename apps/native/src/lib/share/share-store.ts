@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { createMMKV } from "react-native-mmkv";
 
 import { forgetDeletedShareItem, type SessionStoreAdapter } from "./storage";
@@ -11,7 +12,12 @@ export const shareStore: SessionStoreAdapter = createMMKV({
 });
 
 /** Call after an item is deleted, so sharing the same content again saves it
- * instead of being skipped as an Android replay. */
+ * instead of being skipped as an Android replay. Never throws: the delete has
+ * already succeeded and must not be reported as failed. */
 export function forgetDeletedSharedItem(itemId: string): void {
-  forgetDeletedShareItem(shareStore, itemId);
+  try {
+    forgetDeletedShareItem(shareStore, itemId);
+  } catch (err) {
+    analytics.captureError("forget_deleted_share_item_failed", err);
+  }
 }

@@ -286,6 +286,15 @@ describe("notification opens", () => {
     expect(mock.push).toHaveBeenCalledTimes(2);
   });
 
+  it("does not reopen a handled tap after another one arrives", () => {
+    const a = opened({ url: "/item/a", kind: "read_reminder" }, "a");
+    renderHook(() => useNotificationObserver());
+    act(() => mock.tapped?.(a));
+    act(() => mock.tapped?.(opened({ url: "/add" }, "b")));
+    act(() => mock.tapped?.(a));
+    expect(mock.push).toHaveBeenCalledTimes(2);
+  });
+
   it("handles a launch tap once when the listener delivers it too", () => {
     const tap = opened({ url: "/item/abc", kind: "read_reminder" }, "r1");
     mock.lastResponse = tap;
