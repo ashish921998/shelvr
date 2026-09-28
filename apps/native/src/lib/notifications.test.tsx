@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => ({
   push: vi.fn(),
   lastResponse: null as null | { notification: unknown },
   appState: null as null | ((state: string) => void),
+  tapped: null as null | ((response: unknown) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -76,7 +77,10 @@ vi.mock("expo-notifications", () => ({
   clearLastNotificationResponse: () => {
     mock.lastResponse = null;
   },
-  addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
+  addNotificationResponseReceivedListener: (listener: typeof mock.tapped) => {
+    mock.tapped = listener;
+    return { remove: vi.fn() };
+  },
   addPushTokenListener: (listener: typeof mock.rotated) => {
     mock.rotated = listener;
     return {
@@ -229,8 +233,8 @@ describe("notification session lifecycle", () => {
   });
 });
 
-const opened = (data: Record<string, unknown>) => ({
-  notification: { request: { content: { data } } },
+const opened = (data: Record<string, unknown>, identifier = "n1") => ({
+  notification: { request: { identifier, content: { data } } },
 });
 
 describe("notification opens", () => {
@@ -271,6 +275,24 @@ describe("notification opens", () => {
     expect(mock.capture).toHaveBeenCalledTimes(1);
     expect(mock.push).toHaveBeenCalledTimes(1);
     expect(mock.lastResponse).toBeNull();
+  });
+
+  it("opens a second, distinct notification to the same screen", () => {
+    // Two trial nudges both point at /add; the second tap is its own open.
+    renderHook(() => useNotificationObserver());
+    act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "a")));
+    act(() => mock.tapped?.(opened({ url: "/add", kind: "trial_nudge" }, "b")));
+    expect(mock.capture).toHaveBeenCalledTimes(2);
+    expect(mock.push).toHaveBeenCalledTimes(2);
+  });
+
+  it("handles a launch tap once when the listener delivers it too", () => {
+    const tap = opened({ url: "/item/abc", kind: "read_reminder" }, "r1");
+    mock.lastResponse = tap;
+    renderHook(() => useNotificationObserver());
+    act(() => mock.tapped?.(tap));
+    expect(mock.capture).toHaveBeenCalledTimes(1);
+    expect(mock.push).toHaveBeenCalledTimes(1);
   });
 
   it("records nothing when a notification carries no destination", () => {

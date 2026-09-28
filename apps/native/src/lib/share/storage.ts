@@ -456,6 +456,30 @@ function ghostRedelivery(
   }
 }
 
+/** Forgets a deleted item in the last-share tombstone. The tombstone can only
+ * tell a replay from a deliberate re-share by content, so without this, sharing
+ * a link again after deleting its save would be skipped as a replay and the
+ * save lost. Dropping just this item's settled entries makes a later identical
+ * batch save it again, while its other still-saved entries are still skipped. */
+export function forgetDeletedShareItem(
+  store: SessionStoreAdapter,
+  itemId: string,
+): void {
+  const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
+  if (raw === undefined) return;
+  try {
+    const parsed = JSON.parse(raw) as { settled?: unknown };
+    if (!Array.isArray(parsed.settled)) return;
+    const settled = parsed.settled.filter(
+      (e) => !(isSettled(e) && e.itemId === itemId),
+    );
+    if (settled.length === parsed.settled.length) return;
+    store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ ...parsed, settled }));
+  } catch {
+    store.remove(LAST_COMPLETED_SHARE_KEY);
+  }
+}
+
 function isSettled(value: unknown): value is SettledEntry {
   if (typeof value !== "object" || value === null) return false;
   const e = value as Record<string, unknown>;

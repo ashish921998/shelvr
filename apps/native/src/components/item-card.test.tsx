@@ -105,6 +105,9 @@ vi.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
+vi.mock("@/lib/share/share-store", () => ({
+  forgetDeletedSharedItem: vi.fn(),
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn(), itemAction: vi.fn() },
 }));
