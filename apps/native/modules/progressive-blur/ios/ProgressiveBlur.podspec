@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
   s.name           = 'ProgressiveBlur'
   s.version        = '1.0.0'
-  s.summary        = 'iOS progressive/variable blur band for transparent headers.'
-  s.description    = 'A native view that applies a top-to-bottom gradient variable blur behind transparent navigation headers.'
+  s.summary        = 'iOS feathered blur band for transparent headers.'
+  s.description    = 'A native view that renders a fixed UIBlurEffect whose opacity feathers to zero behind transparent navigation headers.'
   s.author         = ''
   s.homepage       = 'https://docs.expo.dev/modules/'
   s.platforms      = {

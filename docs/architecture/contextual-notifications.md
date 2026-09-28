@@ -179,24 +179,24 @@ you` is the copy we are replacing.
 
 Verified against the repository.
 
-| Piece                         | State                                                             |
-| ----------------------------- | ----------------------------------------------------------------- |
-| Expo Push, APNs, FCM v1       | Working; see `push-notifications.md`                              |
-| `notificationDevices`         | One token per device, guarded against takeover                    |
-| `notificationPreferences`     | A single `weeklyShelfEnabled` boolean, `nextDigestAt`, `timezone` |
-| `weeklyDigests`               | Persisted shelf contents **and** its delivery state               |
-| `notificationDelivery.ts`     | claim / finish / recover, 8 attempts, receipt polling, backoff    |
-| `crons.ts`                    | Hourly `prepareDueWeeklyDigests`, 5-minute recovery               |
-| `model/notificationFields.ts` | `digestCopy` plus nine locale catalogs                            |
-| `itemReads`                   | Per-user read state; already the digest's unread filter           |
-| Deep links                    | `data.url` routed by `useNotificationObserver`                    |
-| Android channel               | `weekly-shelf`, created in `notification-token.ts`                |
-| Opt-in prompt                 | `WeeklyNudgeSheet`, once, after the first share-sheet save        |
+| Piece                         | State                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| Expo Push, APNs, FCM v1       | Working; see `push-notifications.md`                                                   |
+| `notificationDevices`         | One token per device, guarded against takeover                                         |
+| `notificationPreferences`     | `weeklyShelfEnabled`, `remindersEnabled`, `nextDigestAt`, `nextReminderAt`, `timezone` |
+| `weeklyDigests`               | Persisted shelf contents **and** its delivery state                                    |
+| `notificationDelivery.ts`     | claim / finish / recover, 8 attempts, receipt polling, backoff                         |
+| `crons.ts`                    | Hourly `prepareDueWeeklyDigests`, 5-minute recovery                                    |
+| `model/notificationFields.ts` | `digestCopy` plus nine locale catalogs                                                 |
+| `itemReads`                   | Per-user read state; already the digest's unread filter                                |
+| Deep links                    | `data.url` routed by `useNotificationObserver`                                         |
+| Android channel               | `weekly-shelf`, created in `notification-token.ts`                                     |
+| Opt-in prompt                 | `WeeklyNudgeSheet`, once, after the first share-sheet save                             |
 
 The delivery machine is the strongest part of this system. The design below
 reuses it rather than replacing it.
 
-Gaps, all verified:
+Gaps at the time this design was written:
 
 - **One kind behind one boolean.** A second kind on `weeklyShelfEnabled`
   means one bad notification costs us every notification.
@@ -208,6 +208,12 @@ Gaps, all verified:
   that reorders the whole plan.
 - **No budget.** Nothing prevents two kinds landing in the same hour.
 - **Generic copy.** `digestCopy` interpolates a count and nothing else.
+
+Since implemented: notification analytics
+(`notification_permission_result`, `notification_opened`,
+`notification_disabled`), a save-reminder budget in `model/saveReminders.ts`
+(a 20-hour minimum gap and four per week), and `%{title}` named copy in
+`digestCopy`.
 
 Two schema facts that kill otherwise good ideas. `intents` of kind
 `add_event` carry **an event title only, never a date**, so time-based event

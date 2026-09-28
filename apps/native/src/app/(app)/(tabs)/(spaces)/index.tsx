@@ -312,8 +312,9 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.85,
   },
-  // Square area the pile is centered within. Kept square so every cell is the
-  // same height and the 2-column grid stays tidy regardless of cover shape.
+  // Square area the pile is centered within. Fixed so every cell in the
+  // 2-column grid has the same height regardless of cover shape; the covers
+  // scale themselves to fit.
   stack: {
     width: "100%",
     aspectRatio: 1,

@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
   s.name           = 'SubjectLift'
   s.version        = '1.0.0'
-  s.summary        = 'On-device subject lifting (die-cut sticker) via VisionKit.'
+  s.summary        = 'On-device subject lifting (die-cut sticker) via Vision.'
   s.description    = 'Lifts a photo subject with VNGenerateForegroundInstanceMaskRequest and bakes a white die-cut outline into a transparent PNG.'
   s.author         = ''
   s.homepage       = 'https://docs.expo.dev/modules/'

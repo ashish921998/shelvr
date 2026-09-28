@@ -1242,9 +1242,8 @@ export const getImportOperation = query({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    // Deliberately kind-agnostic: this probe serves every operation kind
-    // (plans 004/005 add link/note), so it must not throw a kind mismatch the
-    // way the image mutations do.
+    // Deliberately kind-agnostic: this probe serves every operation kind, so it
+    // must not throw a kind mismatch the way the image mutations do.
     const op = await ctx.db
       .query("itemOperations")
       .withIndex("by_user_operation", (q) =>
@@ -1266,15 +1265,15 @@ export const getImportOperation = query({
  * and eligible for the cleanup sweep. Tests derive staleness from this. */
 export const STALE_IMPORT_CUTOFF_MS = 24 * 60 * 60 * 1000;
 
-/** Sweep a bounded page of pending image operations older than the cutoff:
- * delete the unreferenced attached upload (the blob the process never
- * finalized), then the ledger row. Complete rows stay as the permanent
- * idempotency record. The index leads with kind so stale link/note rows
- * (plans 004/005) can never fill the page and starve image cleanup. */
 /** Rows swept per transaction. A full page chains a follow-up run, so backlog
  * drains at scheduler speed instead of one page per cron interval. */
 const CLEANUP_PAGE_SIZE = 100;
 
+/** Sweep a bounded page of pending image operations older than the cutoff:
+ * delete the unreferenced attached upload (the blob the process never
+ * finalized), then the ledger row. Complete rows stay as the permanent
+ * idempotency record. The index leads with kind so stale rows of other kinds
+ * can never fill the page and starve image cleanup. */
 export const cleanupStaleImageImports = internalMutation({
   args: {},
   returns: v.null(),
