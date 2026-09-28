@@ -13,6 +13,9 @@ const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
   presentCustomerCenter: vi.fn(),
   captureError: vi.fn(),
+  getOfferings: vi.fn(),
+  checkEligibility: vi.fn(),
+  store: new Map<string, string>(),
   apiKey: {
     REVENUECAT_API_KEY: "appl_test" as string | undefined,
     REVENUECAT_DISABLED_BY_BUILD: false,
@@ -38,6 +41,8 @@ seedRequire("react-native-purchases", {
     configure: async () => {},
     logIn: async () => {},
     overridePreferredLocale: async () => {},
+    getOfferings: mock.getOfferings,
+    checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
   },
 });
 seedRequire("react-native-purchases-ui", {
@@ -47,6 +52,11 @@ seedRequire("react-native-purchases-ui", {
   },
 });
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("expo-secure-store", () => ({
+  getItem: (key: string) => mock.store.get(key) ?? null,
+  setItem: (key: string, value: string) => void mock.store.set(key, value),
+  deleteItemAsync: async (key: string) => void mock.store.delete(key),
+}));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "attempt-1" }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: () => {}, captureError: mock.captureError },
@@ -103,6 +113,9 @@ beforeEach(() => {
   mock.presentPaywall.mockReset();
   mock.presentCustomerCenter.mockReset();
   mock.captureError.mockReset();
+  mock.getOfferings.mockReset().mockResolvedValue({ all: {} });
+  mock.checkEligibility.mockReset();
+  mock.store.clear();
   mock.apiKey.REVENUECAT_API_KEY = "appl_test";
   mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
   push.mockClear();
@@ -233,5 +246,79 @@ describe("customer center latch", () => {
     expect(purchased).toBe(false);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("exit offer after a paywall close", () => {
+  const exitOffering = {
+    identifier: "exit_offer",
+    availablePackages: [
+      { product: { identifier: "annual_exit", introPrice: { price: 19.99 } } },
+    ],
+  };
+
+  beforeEach(() => {
+    mock.getOfferings.mockResolvedValue({ all: { exit_offer: exitOffering } });
+    mock.checkEligibility.mockResolvedValue({ annual_exit: { status: 2 } });
+  });
+
+  it("presents the exit offering once and reports its purchase", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall
+      .mockResolvedValueOnce("CANCELLED")
+      .mockResolvedValueOnce("PURCHASED");
+
+    await expect(openPaywall(router, "onboarding")).resolves.toBe(true);
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+    expect(mock.presentPaywall).toHaveBeenLastCalledWith({
+      offering: exitOffering,
+    });
+  });
+
+  it("waits a week before offering it again", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(openPaywall(router, "home_card")).resolves.toBe(false);
+    await openPaywall(router, "home_card");
+
+    // First close: paywall + exit offer. Second close: paywall only.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(3);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed exit offer a plain cancel", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall
+      .mockResolvedValueOnce("CANCELLED")
+      .mockResolvedValueOnce("ERROR");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the week when the exit sheet never appeared", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall
+      .mockResolvedValueOnce("CANCELLED")
+      .mockResolvedValueOnce("NOT_PRESENTED")
+      .mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "share");
+    await openPaywall(router, "share");
+
+    // Close, failed exit sheet, close, exit sheet shown this time.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not follow a purchase", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.getOfferings).not.toHaveBeenCalled();
   });
 });
