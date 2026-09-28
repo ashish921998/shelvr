@@ -206,11 +206,19 @@ export function useNotificationObserver(): void {
   const nav = useRouter();
 
   useEffect(() => {
-    let lastUrl: string | null = null;
+    // Keyed by the notification's own id, not its destination: at launch the
+    // same tap can arrive both as the last response and through the listener,
+    // but a later push to the same screen (two trial nudges to /add) is a new
+    // open and must navigate and be recorded again.
+    const handled = new Set<string>();
     const redirect = (notification: Notifications.Notification) => {
       const url = getNotificationUrl(notification);
-      if (!url || url === lastUrl) return;
-      lastUrl = url;
+      if (!url) return;
+      const id = notification.request.identifier;
+      if (id) {
+        if (handled.has(id)) return;
+        handled.add(id);
+      }
       // Recorded before navigating: a push that throws must not lose the one
       // signal V1 exists to collect.
       analytics.capture("notification_opened", {

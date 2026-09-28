@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
+import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
@@ -401,7 +402,10 @@ export const ItemCard = memo(function ItemCard({
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () => deleteItem({ id: item._id }),
+        onPress: () =>
+          deleteItem({ id: item._id }).then(() =>
+            forgetDeletedSharedItem(item._id),
+          ),
       },
     ]);
   };

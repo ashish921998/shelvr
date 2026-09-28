@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -453,6 +454,7 @@ function ItemScreenContent() {
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
+      forgetDeletedSharedItem(activeItem._id);
       analytics.capture("item_deleted", { item_type: activeItem.type });
       if (neighbor) {
         goTo(neighbor._id);
