@@ -28,7 +28,10 @@ import {
 import {
   instagramMedia,
   isInstagramUrl,
+  isPinterestHost,
+  isPinterestShortUrl,
   isTikTokUrl,
+  pinterestPinId,
   isXHost,
   shortFormSource,
   xStatusId,
@@ -299,6 +302,8 @@ const LINK_HUB_HOSTS = new Set([
   "twitter.com",
   "youtube.com",
   "youtu.be",
+  "pinterest.com",
+  "pin.it",
 ]);
 
 /** First http(s) URL in a caption worth following for a recipe, with trailing
@@ -1070,6 +1075,188 @@ export async function fetchInstagram(url: string): Promise<PageData> {
 }
 
 /**
+ * A Pinterest pin page runs past the 1 MiB page read, and its meta tags sit
+ * near the end: on a real pin `og:image` started at byte 1.24M, so a plain
+ * read saved no image. What does fit is Pinterest's keyword-stuffed SEO title
+ * and a cut description. Pinterest's public pin widget endpoint answers with
+ * the pin itself in a few KB instead: the uploader's description, the source
+ * link, the board, and the image. Every field is optional, since the endpoint
+ * is undocumented; a pin it does not return falls back to the page read.
+ */
+const pinterestImageSchema = z.object({
+  url: z.url(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+
+const pinterestPinSchema = z.object({
+  title: z.string().nullish(),
+  grid_title: z.string().nullish(),
+  description: z.string().nullish(),
+  link: z.string().nullish(),
+  images: z.record(z.string(), pinterestImageSchema).nullish(),
+  // A video pin says is_video: false; only its video list gives it away.
+  videos: z.object({ video_list: z.record(z.string(), z.unknown()) }).nullish(),
+  board: z.object({ name: z.string().nullish() }).nullish(),
+  pinner: z
+    .object({
+      full_name: z.string().nullish(),
+      username: z.string().nullish(),
+    })
+    .nullish(),
+  rich_metadata: z
+    .object({
+      title: z.string().nullish(),
+      site_name: z.string().nullish(),
+    })
+    .nullish(),
+});
+
+const pinterestWidgetSchema = z.object({
+  data: z.array(z.unknown()),
+});
+
+type PinterestPin = z.infer<typeof pinterestPinSchema>;
+
+/** The pin's id, following a `pin.it` short link's redirects to find it.
+ * Undefined when the URL is not a pin, or the short link lands elsewhere. */
+async function pinterestIdFor(url: string): Promise<string | undefined> {
+  const id = pinterestPinId(url);
+  if (id !== undefined || !isPinterestShortUrl(url)) {
+    return id;
+  }
+  const result = await safeFetch(url, {
+    ...PAGE_FETCH_OPTIONS,
+    // Only the landing URL matters, not the page.
+    maxBytes: 64 * 1024,
+    // pin.it hops through api.pinterest.com and a /sent/ share URL.
+    maxRedirects: 5,
+  });
+  if (!result.ok) {
+    throw new PageFetchError(result.code, result.status);
+  }
+  return pinterestPinId(result.finalUrl);
+}
+
+/** The pin the widget endpoint returns, or undefined when it returns none or
+ * cannot be read. Never throws: the page read is the fallback. */
+async function readPinterestWidget(
+  id: string,
+): Promise<PinterestPin | undefined> {
+  try {
+    const result = await safeFetch(
+      `https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=${id}`,
+      {
+        timeoutMs: 15000,
+        maxBytes: 256 * 1024,
+        allowContentType: (ct) => ct.startsWith("application/json"),
+        headers: {
+          "User-Agent": BROWSER_USER_AGENT,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!result.ok) {
+      logEvent("warn", "pinterest_widget_failed", {
+        error_category: result.code,
+        ...(result.status !== undefined ? { status: result.status } : {}),
+      });
+      return undefined;
+    }
+    const body = pinterestWidgetSchema.safeParse(parseJson(result.bytes));
+    const pin = body.success
+      ? pinterestPinSchema.safeParse(body.data.data[0])
+      : undefined;
+    return pin?.success ? pin.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The pin's largest image, as the 736px copy the pin page itself shows. The
+ * widget lists only 236x and 564x copies; every pinimg size shares one path. */
+function pinterestImage(
+  images: PinterestPin["images"],
+): { url: string; aspectRatio: number } | undefined {
+  const largest = Object.values(images ?? {}).sort(
+    (a, b) => b.width - a.width,
+  )[0];
+  if (largest === undefined) {
+    return undefined;
+  }
+  const url = new URL(largest.url);
+  if (url.hostname === "i.pinimg.com") {
+    url.pathname = url.pathname.replace(/^\/\d+x\//, "/736x/");
+  }
+  return {
+    url: url.toString(),
+    aspectRatio: largest.width / largest.height,
+  };
+}
+
+/** The pin's outbound source link, when it leads off Pinterest. */
+function pinterestSourceLink(link: string | null | undefined) {
+  if (!link) {
+    return undefined;
+  }
+  try {
+    const url = new URL(link);
+    return (url.protocol === "https:" || url.protocol === "http:") &&
+      !isPinterestHost(url.hostname) &&
+      url.hostname !== "pin.it"
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The pin as a page: its description is the caption, the board and source
+ * page give the model context the description often lacks. */
+export function pinterestPage(pin: PinterestPin): PageData | undefined {
+  const image = pinterestImage(pin.images);
+  const description = pin.description
+    ? decodeEntities(pin.description).trim()
+    : "";
+  const sourceLink = pinterestSourceLink(pin.link);
+  const sourceTitle = pin.rich_metadata?.title?.trim();
+  const board = pin.board?.name?.trim();
+  const video = Object.keys(pin.videos?.video_list ?? {}).length > 0;
+  if (image === undefined && description === "") {
+    return undefined;
+  }
+  const content = [
+    description,
+    video ? "This pin is a video." : "",
+    board ? `Saved to the Pinterest board: ${board}` : "",
+    sourceLink
+      ? `Links to: ${sourceTitle ? `${decodeEntities(sourceTitle)} ` : ""}${sourceLink}`
+      : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+  const title = (pin.grid_title || pin.title)?.trim();
+  return {
+    ...(title ? { title: decodeEntities(title) } : {}),
+    siteName: "Pinterest",
+    author: pin.pinner?.full_name?.trim() || pin.pinner?.username || undefined,
+    heroImageUrl: image?.url,
+    heroAspectRatio: image?.aspectRatio,
+    content,
+    ...(sourceLink ? { linkedUrl: sourceLink } : {}),
+  };
+}
+
+/** A pin read from the widget endpoint, or the pin's page when the endpoint
+ * has nothing for it (a deleted pin 404s there and fails as gone). */
+async function fetchPinterestPin(url: string): Promise<PageData> {
+  const id = await pinterestIdFor(url);
+  const pin = id === undefined ? undefined : await readPinterestWidget(id);
+  const page = pin === undefined ? undefined : pinterestPage(pin);
+  return page ?? fetchPage(url);
+}
+
+/**
  * Copy a poster into Convex storage. TikTok and Instagram poster URLs are
  * signed and expire, so the card would go blank without this. Best-effort:
  * a blocked or oversized image leaves the (short-lived) URL as the fallback.
@@ -1351,11 +1538,18 @@ export type ShortFormSource = NonNullable<ReturnType<typeof shortFormSource>>;
  * sanitized log rereads it. */
 export type LinkRead = PageReadOk | { status: "unreadable" };
 
+/** A pin link, full or `pin.it` short. */
+function isPinterestUrl(url: string): boolean {
+  return pinterestPinId(url) !== undefined || isPinterestShortUrl(url);
+}
+
 /** True for saves whose readable text is a post caption rather than a page
  * body. Only these let the model propose a recipe: a caption has no schema.org
  * markup to read. Real web pages use their markup instead. */
 function isCaptionSource(url: string): boolean {
-  return isTikTokUrl(url) || xStatusId(url) !== undefined;
+  return (
+    isTikTokUrl(url) || xStatusId(url) !== undefined || isPinterestUrl(url)
+  );
 }
 
 /** The page's text when the model receives all of it, which is what makes it a
@@ -1391,7 +1585,9 @@ export async function readPage(url: string): Promise<PageRead> {
         ? await withLinkedRecipe(await fetchXPost(url))
         : isInstagramUrl(url)
           ? await withLinkedRecipe(await fetchInstagram(url))
-          : await fetchPage(url);
+          : isPinterestUrl(url)
+            ? await withLinkedRecipe(await fetchPinterestPin(url))
+            : await fetchPage(url);
     const shortForm = shortFormSource(url);
     return {
       status: "ok",

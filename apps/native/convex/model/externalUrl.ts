@@ -239,3 +239,40 @@ export function xStatusId(url: string | undefined): string | undefined {
     return undefined;
   }
 }
+
+/** True for Pinterest's own hosts: pinterest.com and its country domains
+ * (pinterest.co.uk, pinterest.com.au, pinterest.de), with or without a
+ * subdomain such as www or in. */
+export function isPinterestHost(hostname: string): boolean {
+  return /(?:^|\.)pinterest\.(?:com|co\.[a-z]{2}|com\.[a-z]{2}|[a-z]{2})$/.test(
+    hostname.toLowerCase(),
+  );
+}
+
+/** The numeric id of a Pinterest pin URL: `/pin/{id}/` and the slugged
+ * `/pin/{slug}--{id}/` shape Pinterest serves, with any trailing segment such
+ * as `/sent/` after a share. Boards, profiles, and look-alike hosts are not
+ * pins and return undefined. */
+export function pinterestPinId(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (!isPinterestHost(parsed.hostname)) {
+      return undefined;
+    }
+    return parsed.pathname.match(/^\/pin\/(?:[^/]*--)?(\d+)(?:\/.*)?$/)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for a `pin.it` short link, what the Pinterest app shares. It redirects
+ * to the pin, so its id is only known after the redirect. */
+export function isPinterestShortUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).hostname.toLowerCase() === "pin.it";
+  } catch {
+    return false;
+  }
+}

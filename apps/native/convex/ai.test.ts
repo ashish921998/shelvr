@@ -2222,3 +2222,173 @@ describe("readPage recipe eligibility", () => {
     expect(read).not.toHaveProperty("shortForm");
   });
 });
+
+describe("readPage for Pinterest pins", () => {
+  const PIN_URL =
+    "https://www.pinterest.com/pin/25-easy-chicken-recipes-for-quick-healthy-dinners--643944446743403202/";
+  const WIDGET_URL =
+    "https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=643944446743403202";
+  const SOURCE_URL = "https://neutraleating.com/chicken-recipes/";
+
+  // Trimmed from a real widget answer for this pin (2026-09-28).
+  const widgetPin = {
+    id: "643944446743403202",
+    description:
+      "These chicken recipes are all under 30 minutes &#127831; start to finish",
+    link: SOURCE_URL,
+    domain: "neutraleating.com",
+    is_video: false,
+    images: {
+      "236x": {
+        url: "https://i.pinimg.com/236x/7a/11/ce/7a11ce62e83fa836834f96c2e609c759.jpg",
+        width: 236,
+        height: 354,
+      },
+      "564x": {
+        url: "https://i.pinimg.com/564x/7a/11/ce/7a11ce62e83fa836834f96c2e609c759.jpg",
+        width: 564,
+        height: 846,
+      },
+    },
+    videos: {
+      video_list: { V_HLSV4: { url: "https://v1.pinimg.com/x.m3u8" } },
+    },
+    board: { name: "Dinner Ideas" },
+    pinner: { full_name: "Neutral Eating", username: "neutraleating" },
+    rich_metadata: {
+      title: "25 Healthy Chicken Recipes - Neutral Eating",
+      site_name: "Neutral Eating",
+    },
+  };
+
+  function json(url: string, body: unknown) {
+    return {
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      bytes: new TextEncoder().encode(JSON.stringify(body)),
+    };
+  }
+
+  function html(url: string, body: string) {
+    return {
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(body),
+    };
+  }
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    decodeWithContentType.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+  });
+
+  it("reads the pin from the widget endpoint, not the oversized page", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === WIDGET_URL
+        ? json(url, { status: "success", data: [widgetPin] })
+        : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(PIN_URL);
+    expect(read.status).toBe("ok");
+    if (read.status !== "ok") return;
+    expect(read.page).toEqual({
+      siteName: "Pinterest",
+      author: "Neutral Eating",
+      heroImageUrl:
+        "https://i.pinimg.com/736x/7a/11/ce/7a11ce62e83fa836834f96c2e609c759.jpg",
+      heroAspectRatio: 564 / 846,
+      content: [
+        "These chicken recipes are all under 30 minutes 🍗 start to finish",
+        "This pin is a video.",
+        "Saved to the Pinterest board: Dinner Ideas",
+        `Links to: 25 Healthy Chicken Recipes - Neutral Eating ${SOURCE_URL}`,
+      ].join("\n"),
+      linkedUrl: SOURCE_URL,
+    });
+    expect(read.askForRecipe).toBe(true);
+    expect(read).not.toHaveProperty("shortForm");
+    // The pin page itself is never fetched.
+    expect(safeFetch).not.toHaveBeenCalledWith(PIN_URL, expect.anything());
+  });
+
+  it("takes the recipe from the pin's source page markup", async () => {
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Honey garlic chicken",
+      recipeIngredient: ["2 chicken breasts", "3 tbsp honey"],
+      recipeInstructions: ["Sear the chicken.", "Glaze with honey."],
+    };
+    safeFetch.mockImplementation(async (url: string) =>
+      url === WIDGET_URL
+        ? json(url, { status: "success", data: [widgetPin] })
+        : url === SOURCE_URL
+          ? html(
+              url,
+              `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+            )
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(PIN_URL);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+    expect(read.status === "ok" && read.askForRecipe).toBe(false);
+  });
+
+  it("follows a pin.it short link to the pin id", async () => {
+    const shortUrl = "https://pin.it/4Vw0y6Zab";
+    safeFetch.mockImplementation(async (url: string) =>
+      url === shortUrl
+        ? html(
+            "https://www.pinterest.com/pin/643944446743403202/sent/?invite_code=x",
+            "<html></html>",
+          )
+        : url === WIDGET_URL
+          ? json(url, { status: "success", data: [widgetPin] })
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(shortUrl);
+    expect(read.status === "ok" && read.page.siteName).toBe("Pinterest");
+    expect(safeFetch).toHaveBeenCalledWith(
+      shortUrl,
+      expect.objectContaining({ maxRedirects: 5 }),
+    );
+  });
+
+  it("falls back to the pin page when the widget has no pin", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === WIDGET_URL
+        ? json(url, { status: "success", data: [null] })
+        : url === PIN_URL
+          ? html(
+              url,
+              '<html><head><meta property="og:title" content="Chicken | recipes"></head><body></body></html>',
+            )
+          : { ok: false, code: "http_error", status: 599 },
+    );
+    const read = await readPage(PIN_URL);
+    expect(read.status === "ok" && read.page.title).toBe("Chicken | recipes");
+  });
+
+  it("fails as gone when a deleted pin's page 404s", async () => {
+    safeFetch.mockImplementation(async (url: string) =>
+      url === WIDGET_URL
+        ? json(url, { status: "success", data: [] })
+        : { ok: false, code: "http_error", status: 404 },
+    );
+    const read = await readPage(PIN_URL);
+    expect(read.status).toBe("gone");
+  });
+});
