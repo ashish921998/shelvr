@@ -67,6 +67,26 @@ describe("findExitOffering", () => {
     expect(d.checkEligibility).toHaveBeenCalledWith(["annual_exit"]);
   });
 
+  it("requires every discounted package to qualify", async () => {
+    const exit = {
+      identifier: EXIT_OFFERING_ID,
+      availablePackages: [
+        {
+          product: { identifier: "annual_exit", introPrice: { price: 19.99 } },
+        },
+        { product: { identifier: "other", introPrice: { price: 1 } } },
+      ],
+    };
+    const d = {
+      getOfferings: async () => ({ all: { [EXIT_OFFERING_ID]: exit } }),
+      checkEligibility: async () => ({
+        annual_exit: { status: INELIGIBLE },
+        other: { status: ELIGIBLE },
+      }),
+    };
+    await expect(findExitOffering(d)).resolves.toBeNull();
+  });
+
   it("does nothing until the offering exists in RevenueCat", async () => {
     await expect(findExitOffering(deps({}))).resolves.toBeNull();
   });

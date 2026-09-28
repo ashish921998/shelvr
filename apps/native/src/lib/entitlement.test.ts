@@ -55,6 +55,7 @@ vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
   setItem: (key: string, value: string) => void mock.store.set(key, value),
+  deleteItemAsync: async (key: string) => void mock.store.delete(key),
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "attempt-1" }));
 vi.mock("@/lib/analytics", () => ({
@@ -295,6 +296,20 @@ describe("exit offer after a paywall close", () => {
 
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the week when the exit sheet never appeared", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall
+      .mockResolvedValueOnce("CANCELLED")
+      .mockResolvedValueOnce("NOT_PRESENTED")
+      .mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "share");
+    await openPaywall(router, "share");
+
+    // Close, failed exit sheet, close, exit sheet shown this time.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(4);
   });
 
   it("does not follow a purchase", async () => {

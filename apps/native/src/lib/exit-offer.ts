@@ -53,6 +53,9 @@ type ExitOffering = {
  * apply. Apple grants an introductory offer once per subscription group, so
  * someone who already had the annual trial would only see full price; for
  * them the exit offer is skipped rather than shown without its discount.
+ *
+ * iOS only for now: RevenueCat's eligibility check reports "unknown" on
+ * Android, so the offer never shows there until a Play offer is set up.
  */
 export async function findExitOffering<O extends ExitOffering>(deps: {
   getOfferings: () => Promise<{ all: Record<string, O> }>;
@@ -68,7 +71,9 @@ export async function findExitOffering<O extends ExitOffering>(deps: {
       .map((pkg) => pkg.product.identifier);
     if (ids.length === 0) return null;
     const eligibility = await deps.checkEligibility(ids);
-    return ids.some((id) => eligibility[id]?.status === INTRO_ELIGIBLE)
+    // Every discounted package must qualify, so the sheet never shows a
+    // plan without the price it promises.
+    return ids.every((id) => eligibility[id]?.status === INTRO_ELIGIBLE)
       ? offering
       : null;
   } catch {

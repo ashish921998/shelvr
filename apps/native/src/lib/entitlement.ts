@@ -437,13 +437,25 @@ async function presentExitOffer(
     paywall_attempt_id: randomUUID(),
   };
   analytics.capture("paywall_requested", properties);
+  // A sheet that never appeared must not use up the week.
+  const release = () => {
+    try {
+      if (lastShownAt === null)
+        SecureStore.deleteItemAsync(key).catch(() => {});
+      else SecureStore.setItem(key, String(lastShownAt));
+    } catch {
+      // Best-effort; the worst case is one skipped week.
+    }
+  };
   try {
     const result = await observePaywallPresentation(properties, () =>
       rcui.presentPaywall({ offering }),
     );
+    if (result === "NOT_PRESENTED" || result === "ERROR") release();
     const outcome = mapPaywallResult(result);
     return outcome === "success" ? outcome : "cancelled";
   } catch {
+    release();
     return "cancelled";
   }
 }
