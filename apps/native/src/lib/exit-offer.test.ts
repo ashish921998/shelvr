@@ -9,6 +9,7 @@ import {
   findExitOffering,
   formatCountdown,
   parseShownAt,
+  timeLeft,
 } from "./exit-offer";
 
 const ELIGIBLE = 2;
@@ -73,6 +74,16 @@ describe("formatCountdown", () => {
 
   it("stops at zero", () => {
     expect(formatCountdown(-5000)).toBe("00:00:00");
+  });
+});
+
+describe("timeLeft", () => {
+  it("rounds down so it never promises more time than is left", () => {
+    expect(timeLeft(EXIT_OFFER_WINDOW_MS - 1)).toEqual({
+      hours: 23,
+      minutes: 59,
+    });
+    expect(timeLeft(-1)).toEqual({ hours: 0, minutes: 0 });
   });
 });
 

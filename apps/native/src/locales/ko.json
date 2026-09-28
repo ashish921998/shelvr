@@ -533,5 +533,8 @@
   "refundConsent.review": "업데이트된 약관 검토",
   "exitOffer.title": "할인된 첫 1년",
   "exitOffer.endsIn": "오퍼 종료까지 %{time}",
-  "exitOffer.cta": "오퍼 보기"
+  "exitOffer.cta": "오퍼 보기",
+  "exitOffer.sheetEndsIn": "오퍼 종료까지 %{hours}시간 %{minutes}분",
+  "exitOffer.reminderTitle": "오퍼가 1시간 후 종료돼요",
+  "exitOffer.reminderBody": "Shelvr Pro 첫 1년 할인이 곧 끝나요."
 }

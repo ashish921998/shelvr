@@ -533,5 +533,8 @@
   "refundConsent.review": "更新された利用規約を確認",
   "exitOffer.title": "初年度が割引価格に",
   "exitOffer.endsIn": "オファー終了まで %{time}",
-  "exitOffer.cta": "オファーを見る"
+  "exitOffer.cta": "オファーを見る",
+  "exitOffer.sheetEndsIn": "オファー終了まで %{hours}時間%{minutes}分",
+  "exitOffer.reminderTitle": "オファーはあと1時間で終了します",
+  "exitOffer.reminderBody": "Shelvr Pro の初年度割引がまもなく終了します。"
 }

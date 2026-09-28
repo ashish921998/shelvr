@@ -13,7 +13,9 @@ import {
   exitOfferShownKey,
   findExitOffering,
   parseShownAt,
+  timeLeft,
 } from "@/lib/exit-offer";
+import { t } from "@/lib/i18n";
 import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
@@ -466,13 +468,20 @@ async function presentExitOffer(
       // Best-effort; the worst case is one skipped offer.
     }
   };
-  return showExitOffering(rcui, offering, sourcePlacement, release);
+  return showExitOffering(
+    rcui,
+    offering,
+    sourcePlacement,
+    exitOfferEndsAt(now, now),
+    release,
+  );
 }
 
 async function showExitOffering(
   rcui: NonNullable<ReturnType<typeof getRCUI>>,
   offering: import("react-native-purchases").PurchasesOffering,
   sourcePlacement: string,
+  endsAt: number | null,
   onNotPresented: () => void = () => {},
 ): Promise<PaywallOutcome> {
   const properties = {
@@ -483,7 +492,10 @@ async function showExitOffering(
   analytics.capture("paywall_requested", properties);
   try {
     const result = await observePaywallPresentation(properties, () =>
-      rcui.presentPaywall({ offering }),
+      rcui.presentPaywall({
+        offering,
+        customVariables: exitOfferVariables(endsAt),
+      }),
     );
     if (result === "NOT_PRESENTED" || result === "ERROR") onNotPresented();
     const outcome = mapPaywallResult(result);
@@ -492,6 +504,21 @@ async function showExitOffering(
     onNotPresented();
     return "cancelled";
   }
+}
+
+/**
+ * The time left, filled into the paywall's `{{ custom.offer_ends }}` line when
+ * the sheet opens. The dashboard default ("Available for a limited time.")
+ * covers older builds that pass nothing.
+ */
+function exitOfferVariables(endsAt: number | null) {
+  if (endsAt === null) return undefined;
+  const { hours, minutes } = timeLeft(endsAt - Date.now());
+  const value = t("exitOffer.sheetEndsIn", {
+    hours: String(hours),
+    minutes: String(minutes),
+  });
+  return { offer_ends: { type: "string", value } as const };
 }
 
 /**
@@ -504,18 +531,14 @@ async function presentOpenExitOfferImpl(): Promise<PaywallOutcome> {
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   const rcui = getRCUI();
-  if (
-    !userId ||
-    !rc ||
-    !rcui ||
-    exitOfferEndsAt(readShownAt(userId), Date.now()) === null
-  ) {
-    return presentPaywallImpl("home_card");
-  }
+  const endsAt = userId
+    ? exitOfferEndsAt(readShownAt(userId), Date.now())
+    : null;
+  if (!rc || !rcui || endsAt === null) return presentPaywallImpl("home_card");
   if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
   const offering = await findExitOffering(exitOfferDeps(rc));
   if (!offering) return presentPaywallImpl("home_card");
-  return showExitOffering(rcui, offering, "home_countdown");
+  return showExitOffering(rcui, offering, "home_countdown", endsAt);
 }
 
 function subscribeExitOffer(onChange: () => void): () => void {

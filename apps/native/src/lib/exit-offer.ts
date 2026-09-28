@@ -54,6 +54,24 @@ export function exitOfferEndsAt(
   return now < endsAt ? endsAt : null;
 }
 
+/** The honest reminder goes out this long before the offer closes. */
+export const EXIT_OFFER_REMINDER_LEAD_MS = HOUR_MS;
+
+/** When to remind that the offer is closing, or null when it is too late. */
+export function exitOfferReminderAt(
+  endsAt: number,
+  now: number,
+): number | null {
+  const fireAt = endsAt - EXIT_OFFER_REMINDER_LEAD_MS;
+  return fireAt - now > 60_000 ? fireAt : null;
+}
+
+/** Whole hours and minutes left, rounded down so it never overstates. */
+export function timeLeft(ms: number): { hours: number; minutes: number } {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  return { hours: Math.floor(minutes / 60), minutes: minutes % 60 };
+}
+
 /** "23:05:09" for the time left; never negative. */
 export function formatCountdown(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

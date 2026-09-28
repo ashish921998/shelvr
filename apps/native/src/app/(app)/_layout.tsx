@@ -1,3 +1,4 @@
+import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
@@ -28,6 +29,7 @@ export default function AppLayout() {
   useResumePendingShare();
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
+  useExitOfferReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;

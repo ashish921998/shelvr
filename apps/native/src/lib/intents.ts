@@ -1,12 +1,12 @@
 // SDK 57's top-level createEventInCalendarAsync is a throwing deprecation stub;
 // the working "present the system Add-Event sheet" helper lives in /legacy.
-import { createEventInCalendarAsync } from 'expo-calendar/legacy';
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import type { IntentKind } from '@convex/model/itemFields';
+import { createEventInCalendarAsync } from "expo-calendar/legacy";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
+import { Platform } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import type { IntentKind } from "@convex/model/itemFields";
 
 // The closed set of action kinds the AI can attach to an item, derived from
 // the same INTENT_KINDS tuple the Convex validators use so the exhaustive
@@ -19,39 +19,42 @@ export type { IntentKind };
  * matching native app via universal links — e.g. an x.com URL opens the X app
  * if installed — falling back to the in-app browser only if nothing handles it.
  */
-export async function runIntent(kind: IntentKind, value: string): Promise<void> {
+export async function runIntent(
+  kind: IntentKind,
+  value: string,
+): Promise<void> {
   switch (kind) {
-    case 'open_url':
+    case "open_url":
       await Linking.openURL(value).catch(() =>
         WebBrowser.openBrowserAsync(value),
       );
       break;
-    case 'copy':
+    case "copy":
       await Clipboard.setStringAsync(value);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       break;
-    case 'web_search':
+    case "web_search":
       await WebBrowser.openBrowserAsync(
         `https://www.google.com/search?q=${encodeURIComponent(value)}`,
       );
       break;
-    case 'open_maps':
+    case "open_maps":
       await Linking.openURL(
-        Platform.OS === 'ios'
+        Platform.OS === "ios"
           ? `https://maps.apple.com/?q=${encodeURIComponent(value)}`
           : `geo:0,0?q=${encodeURIComponent(value)}`,
       );
       break;
-    case 'call':
-      await Linking.openURL(`tel:${value.replace(/[^\d+]/g, '')}`);
+    case "call":
+      await Linking.openURL(`tel:${value.replace(/[^\d+]/g, "")}`);
       break;
-    case 'message':
-      await Linking.openURL(`sms:${value.replace(/[^\d+]/g, '')}`);
+    case "message":
+      await Linking.openURL(`sms:${value.replace(/[^\d+]/g, "")}`);
       break;
-    case 'email':
+    case "email":
       await Linking.openURL(`mailto:${value}`);
       break;
-    case 'add_event':
+    case "add_event":
       // Presents the system "Add Event" sheet prefilled with the title; the
       // user picks the date/time. Requires calendar permission.
       await createEventInCalendarAsync({ title: value });

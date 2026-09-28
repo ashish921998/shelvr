@@ -273,6 +273,9 @@ describe("exit offer after a paywall close", () => {
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
     expect(mock.presentPaywall).toHaveBeenLastCalledWith({
       offering: exitOffering,
+      customVariables: {
+        offer_ends: { type: "string", value: expect.any(String) },
+      },
     });
   });
 
@@ -326,6 +329,9 @@ describe("exit offer after a paywall close", () => {
     expect(mock.presentPaywall).toHaveBeenCalledTimes(3);
     expect(mock.presentPaywall).toHaveBeenLastCalledWith({
       offering: exitOffering,
+      customVariables: {
+        offer_ends: { type: "string", value: expect.any(String) },
+      },
     });
   });
 

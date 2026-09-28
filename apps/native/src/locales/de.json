@@ -550,5 +550,8 @@
   "refundConsent.review": "Aktualisierte Bedingungen ansehen",
   "exitOffer.title": "Dein vergünstigtes erstes Jahr",
   "exitOffer.endsIn": "Angebot endet in %{time}",
-  "exitOffer.cta": "Angebot ansehen"
+  "exitOffer.cta": "Angebot ansehen",
+  "exitOffer.sheetEndsIn": "Angebot endet in %{hours} Std. %{minutes} Min.",
+  "exitOffer.reminderTitle": "Dein Angebot endet in einer Stunde",
+  "exitOffer.reminderBody": "Dein vergünstigtes erstes Jahr Shelvr Pro endet bald."
 }

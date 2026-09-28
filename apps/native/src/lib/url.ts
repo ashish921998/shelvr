@@ -26,8 +26,8 @@ function trimTrailingPunctuation(url: string) {
     const last = trimmed[trimmed.length - 1];
     const drop =
       TRAILING_PUNCTUATION.test(last) ||
-      (last === ')' && closesMoreThanItOpens(trimmed, '(', ')')) ||
-      (last === ']' && closesMoreThanItOpens(trimmed, '[', ']'));
+      (last === ")" && closesMoreThanItOpens(trimmed, "(", ")")) ||
+      (last === "]" && closesMoreThanItOpens(trimmed, "[", "]"));
     if (!drop) break;
     trimmed = trimmed.slice(0, -1);
   }
@@ -47,12 +47,11 @@ export function extractFirstUrl(text: string): string | null {
 }
 
 export function displayHost(url: string | undefined) {
-  if (!url) return '';
+  if (!url) return "";
   try {
-    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(
-      /^www\./,
-      '',
-    );
+    return new URL(
+      /^https?:\/\//i.test(url) ? url : `https://${url}`,
+    ).hostname.replace(/^www\./, "");
   } catch {
     return url;
   }

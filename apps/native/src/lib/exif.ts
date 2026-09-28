@@ -13,8 +13,18 @@ export function parseExifLocation(
   exif: Record<string, unknown> | null | undefined,
 ): ExifLocation | undefined {
   if (!exif) return undefined;
-  const latitude = readCoordinate(exif.GPSLatitude, exif.GPSLatitudeRef, 'S', 90);
-  const longitude = readCoordinate(exif.GPSLongitude, exif.GPSLongitudeRef, 'W', 180);
+  const latitude = readCoordinate(
+    exif.GPSLatitude,
+    exif.GPSLatitudeRef,
+    "S",
+    90,
+  );
+  const longitude = readCoordinate(
+    exif.GPSLongitude,
+    exif.GPSLongitudeRef,
+    "W",
+    180,
+  );
   if (latitude === undefined || longitude === undefined) return undefined;
   if (latitude === 0 && longitude === 0) return undefined;
   return { latitude, longitude };
@@ -23,10 +33,10 @@ export function parseExifLocation(
 function readCoordinate(
   raw: unknown,
   ref: unknown,
-  negativeRef: 'S' | 'W',
+  negativeRef: "S" | "W",
   max: number,
 ): number | undefined {
-  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
   const value = ref === negativeRef ? -Math.abs(raw) : raw;
   return Math.abs(value) <= max ? value : undefined;
 }

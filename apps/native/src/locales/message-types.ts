@@ -501,6 +501,9 @@ export type MessageParams = {
   "exitOffer.title": undefined;
   "exitOffer.endsIn": { time: string };
   "exitOffer.cta": undefined;
+  "exitOffer.sheetEndsIn": { hours: string; minutes: string };
+  "exitOffer.reminderTitle": undefined;
+  "exitOffer.reminderBody": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
