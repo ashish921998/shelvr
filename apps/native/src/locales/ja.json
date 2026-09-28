@@ -530,5 +530,8 @@
   "refundConsent.disabled": "返金審査のデータ共有はオフです。",
   "refundConsent.syncPending": "選択を保存しました。RevenueCatを更新中です。完了までは以前の設定が適用される場合があります。",
   "refundConsent.withdraw": "共有をオフにする",
-  "refundConsent.review": "更新された利用規約を確認"
+  "refundConsent.review": "更新された利用規約を確認",
+  "exitOffer.title": "初年度が割引価格に",
+  "exitOffer.endsIn": "オファー終了まで %{time}",
+  "exitOffer.cta": "オファーを見る"
 }

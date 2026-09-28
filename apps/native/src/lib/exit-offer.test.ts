@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   EXIT_OFFER_COOLDOWN_MS,
+  EXIT_OFFER_WINDOW_MS,
   EXIT_OFFERING_ID,
   exitOfferDue,
+  exitOfferEndsAt,
   findExitOffering,
+  formatCountdown,
   parseShownAt,
 } from "./exit-offer";
 
@@ -23,7 +26,7 @@ describe("exitOfferDue", () => {
     expect(exitOfferDue("onboarding", null, now)).toBe(true);
   });
 
-  it("waits a week between offers", () => {
+  it("waits a month between offers", () => {
     expect(
       exitOfferDue("home_card", now - EXIT_OFFER_COOLDOWN_MS + 1, now),
     ).toBe(false);
@@ -34,6 +37,42 @@ describe("exitOfferDue", () => {
 
   it("never follows the retry screen", () => {
     expect(exitOfferDue("retry", null, now)).toBe(false);
+  });
+});
+
+describe("exitOfferEndsAt", () => {
+  const shownAt = 1_000_000_000_000;
+
+  it("keeps the offer open for its window", () => {
+    expect(exitOfferEndsAt(shownAt, shownAt)).toBe(
+      shownAt + EXIT_OFFER_WINDOW_MS,
+    );
+    expect(exitOfferEndsAt(shownAt, shownAt + EXIT_OFFER_WINDOW_MS - 1)).toBe(
+      shownAt + EXIT_OFFER_WINDOW_MS,
+    );
+  });
+
+  it("closes the offer at the deadline", () => {
+    expect(exitOfferEndsAt(shownAt, shownAt + EXIT_OFFER_WINDOW_MS)).toBeNull();
+    expect(exitOfferEndsAt(null, shownAt)).toBeNull();
+  });
+
+  it("never reopens an expired offer before the cooldown", () => {
+    const expired = shownAt + EXIT_OFFER_WINDOW_MS;
+    expect(exitOfferDue("home_card", shownAt, expired)).toBe(false);
+  });
+});
+
+describe("formatCountdown", () => {
+  it("shows hours, minutes and seconds", () => {
+    expect(formatCountdown(EXIT_OFFER_WINDOW_MS)).toBe("24:00:00");
+    expect(formatCountdown(((23 * 60 + 5) * 60 + 9) * 1000 + 999)).toBe(
+      "23:05:09",
+    );
+  });
+
+  it("stops at zero", () => {
+    expect(formatCountdown(-5000)).toBe("00:00:00");
   });
 });
 

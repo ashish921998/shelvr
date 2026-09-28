@@ -547,5 +547,8 @@
   "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
   "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
   "refundConsent.withdraw": "Weitergabe ausschalten",
-  "refundConsent.review": "Aktualisierte Bedingungen ansehen"
+  "refundConsent.review": "Aktualisierte Bedingungen ansehen",
+  "exitOffer.title": "Dein vergünstigtes erstes Jahr",
+  "exitOffer.endsIn": "Angebot endet in %{time}",
+  "exitOffer.cta": "Angebot ansehen"
 }

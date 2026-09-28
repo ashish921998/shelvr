@@ -276,7 +276,7 @@ describe("exit offer after a paywall close", () => {
     });
   });
 
-  it("waits a week before offering it again", async () => {
+  it("waits a month before offering it again", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("CANCELLED");
 
@@ -298,7 +298,7 @@ describe("exit offer after a paywall close", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("keeps the week when the exit sheet never appeared", async () => {
+  it("keeps the offer unclaimed when the exit sheet never appeared", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall
       .mockResolvedValueOnce("CANCELLED")
@@ -310,6 +310,40 @@ describe("exit offer after a paywall close", () => {
 
     // Close, failed exit sheet, close, exit sheet shown this time.
     expect(mock.presentPaywall).toHaveBeenCalledTimes(4);
+  });
+
+  it("reopens from the Home countdown while the window is open", async () => {
+    const { openPaywall, openExitOffer, useExitOfferEndsAt } =
+      await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "home_card");
+    const { result } = renderHook(() => useExitOfferEndsAt("user_1"));
+    expect(result.current).not.toBeNull();
+
+    mock.presentPaywall.mockResolvedValueOnce("PURCHASED");
+    await expect(openExitOffer(router)).resolves.toBe(true);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(3);
+    expect(mock.presentPaywall).toHaveBeenLastCalledWith({
+      offering: exitOffering,
+    });
+  });
+
+  it("opens the regular paywall once the window has closed", async () => {
+    mock.store.set(
+      "shelvr.exitOffer.shownAt.user_1",
+      String(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    const { openExitOffer, useExitOfferEndsAt } = await loadReady();
+    const { result } = renderHook(() => useExitOfferEndsAt("user_1"));
+    expect(result.current).toBeNull();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(openExitOffer(router)).resolves.toBe(false);
+
+    // The main paywall only: an expired offer does not return on close.
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).toHaveBeenCalledWith();
   });
 
   it("does not follow a purchase", async () => {

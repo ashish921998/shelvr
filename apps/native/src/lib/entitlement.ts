@@ -9,6 +9,7 @@ import { analytics } from "@/lib/analytics";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import {
   exitOfferDue,
+  exitOfferEndsAt,
   exitOfferShownKey,
   findExitOffering,
   parseShownAt,
@@ -30,7 +31,7 @@ import {
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState, NativeModules } from "react-native";
 
 /**
@@ -396,11 +397,32 @@ async function presentPaywallImpl(
   }
 }
 
+// Home re-reads the open offer whenever it is claimed or released.
+const exitOfferListeners = new Set<() => void>();
+const notifyExitOffer = () => exitOfferListeners.forEach((read) => read());
+
+function readShownAt(userId: string): number | null {
+  try {
+    return parseShownAt(SecureStore.getItem(exitOfferShownKey(userId)));
+  } catch {
+    return null;
+  }
+}
+
+function exitOfferDeps(rc: NonNullable<ReturnType<typeof getPurchases>>) {
+  return {
+    getOfferings: () => rc.getOfferings(),
+    checkEligibility: (ids: string[]) =>
+      rc.checkTrialOrIntroductoryPriceEligibility(ids),
+  };
+}
+
 /**
  * After a paywall close, present the discounted exit offering once (see
- * `exit-offer.ts`). Runs inside the same sheet latch as the paywall it
- * follows. Returns null when nothing was shown; a failure after the user
- * already closed the paywall stays a cancel, never the fallback screen.
+ * `exit-offer.ts`). Showing it opens the offer's 24-hour window. Runs inside
+ * the same sheet latch as the paywall it follows. Returns null when nothing
+ * was shown; a failure after the user already closed the paywall stays a
+ * cancel, never the fallback screen.
  */
 async function presentExitOffer(
   rcui: NonNullable<ReturnType<typeof getRCUI>>,
@@ -418,46 +440,115 @@ async function presentExitOffer(
     return null;
   }
   if (!exitOfferDue(sourcePlacement, lastShownAt, now)) return null;
-  const offering = await findExitOffering({
-    getOfferings: () => rc.getOfferings(),
-    checkEligibility: (ids) => rc.checkTrialOrIntroductoryPriceEligibility(ids),
-  });
+  const offering = await findExitOffering(exitOfferDeps(rc));
   if (!offering) return null;
   try {
-    // Claim the week before presenting, so a crash mid-sheet can't repeat it.
+    // Claim before presenting, so a crash mid-sheet can't repeat it.
     SecureStore.setItem(key, String(now));
   } catch {
     return null;
   }
+  notifyExitOffer();
   // UIKit refuses to present while the first paywall is still dismissing.
   await waitForSheetTransition();
+  // A sheet that never appeared must not open the window.
+  const release = () => {
+    try {
+      if (lastShownAt === null)
+        SecureStore.deleteItemAsync(key)
+          .then(notifyExitOffer)
+          .catch(() => {});
+      else {
+        SecureStore.setItem(key, String(lastShownAt));
+        notifyExitOffer();
+      }
+    } catch {
+      // Best-effort; the worst case is one skipped offer.
+    }
+  };
+  return showExitOffering(rcui, offering, sourcePlacement, release);
+}
+
+async function showExitOffering(
+  rcui: NonNullable<ReturnType<typeof getRCUI>>,
+  offering: import("react-native-purchases").PurchasesOffering,
+  sourcePlacement: string,
+  onNotPresented: () => void = () => {},
+): Promise<PaywallOutcome> {
   const properties = {
     placement: "exit_offer",
     source_placement: sourcePlacement,
     paywall_attempt_id: randomUUID(),
   };
   analytics.capture("paywall_requested", properties);
-  // A sheet that never appeared must not use up the week.
-  const release = () => {
-    try {
-      if (lastShownAt === null)
-        SecureStore.deleteItemAsync(key).catch(() => {});
-      else SecureStore.setItem(key, String(lastShownAt));
-    } catch {
-      // Best-effort; the worst case is one skipped week.
-    }
-  };
   try {
     const result = await observePaywallPresentation(properties, () =>
       rcui.presentPaywall({ offering }),
     );
-    if (result === "NOT_PRESENTED" || result === "ERROR") release();
+    if (result === "NOT_PRESENTED" || result === "ERROR") onNotPresented();
     const outcome = mapPaywallResult(result);
     return outcome === "success" ? outcome : "cancelled";
   } catch {
-    release();
+    onNotPresented();
     return "cancelled";
   }
+}
+
+/**
+ * Reopen the exit offer from its Home countdown while the window is open.
+ * If the window closed or the offering vanished since Home rendered, the
+ * regular paywall opens instead, so the tap never dead-ends.
+ */
+async function presentOpenExitOfferImpl(): Promise<PaywallOutcome> {
+  if (!(await awaitRcSyncReady())) return presentPaywallImpl("home_card");
+  const userId = _rcSyncedUserId;
+  const rc = getPurchases();
+  const rcui = getRCUI();
+  if (
+    !userId ||
+    !rc ||
+    !rcui ||
+    exitOfferEndsAt(readShownAt(userId), Date.now()) === null
+  ) {
+    return presentPaywallImpl("home_card");
+  }
+  if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
+  const offering = await findExitOffering(exitOfferDeps(rc));
+  if (!offering) return presentPaywallImpl("home_card");
+  return showExitOffering(rcui, offering, "home_countdown");
+}
+
+function subscribeExitOffer(onChange: () => void): () => void {
+  exitOfferListeners.add(onChange);
+  const sub = AppState.addEventListener("change", (state) => {
+    if (state === "active") onChange();
+  });
+  return () => {
+    exitOfferListeners.delete(onChange);
+    sub.remove();
+  };
+}
+
+/**
+ * The open exit offer's closing time for this account, or null. Updates when
+ * the offer is claimed, released, or expires, and on return to the app.
+ */
+export function useExitOfferEndsAt(userId: string | undefined): number | null {
+  const shownAt = useSyncExternalStore(subscribeExitOffer, () =>
+    userId ? readShownAt(userId) : null,
+  );
+  // Re-render at the deadline so the card disappears on time.
+  const [now, setNow] = useState(Date.now);
+  const endsAt = exitOfferEndsAt(shownAt, now);
+  useEffect(() => {
+    if (endsAt === null) return;
+    const timer = setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, endsAt - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [endsAt]);
+  return endsAt;
 }
 
 // A RevenueCat promise that never settles must not hold the latch for the
@@ -487,7 +578,10 @@ export function isPaywallPending(): boolean {
 /** `owned` is false when this call joined a presentation someone else opened. */
 type Presentation = { outcome: PaywallOutcome; owned: boolean };
 
-async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
+async function presentPaywall(
+  placement = "pro_gate",
+  present: () => Promise<PaywallOutcome> = () => presentPaywallImpl(placement),
+): Promise<Presentation> {
   // iOS presents one sheet at a time. A second presentation raced against a
   // live one leaves both RevenueCat promises unsettled, so neither reports an
   // outcome and the user sees at most one paywall. The `share` placement
@@ -501,7 +595,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     return { outcome, owned: false };
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
-  sheet.paywall = presentPaywallImpl(placement).finally(() => {
+  sheet.paywall = present().finally(() => {
     // A stale sheet may already have been replaced; only release our own.
     if (openSheet === sheet) openSheet = null;
   });
@@ -522,6 +616,20 @@ export async function openPaywall(
   const { outcome, owned } = await presentPaywall(placement);
   // Only the caller that opened the sheet may route. Joined callers share the
   // same `unavailable`, and a second push stacks a second paywall screen.
+  if (owned && shouldOpenPaywallFallback(outcome)) {
+    router.push("/(app)/paywall");
+  }
+  return outcome === "success";
+}
+
+/** `openPaywall` for the Home countdown: reopens the open exit offer. */
+export async function openExitOffer(
+  router: ReturnType<typeof useRouter>,
+): Promise<boolean> {
+  const { outcome, owned } = await presentPaywall(
+    "home_countdown",
+    presentOpenExitOfferImpl,
+  );
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }

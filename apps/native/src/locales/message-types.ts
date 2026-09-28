@@ -498,6 +498,9 @@ export type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
+  "exitOffer.title": undefined;
+  "exitOffer.endsIn": { time: string };
+  "exitOffer.cta": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

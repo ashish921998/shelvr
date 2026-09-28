@@ -564,5 +564,8 @@
   "refundConsent.disabled": "O compartilhamento de dados para reembolsos está desativado.",
   "refundConsent.syncPending": "Sua escolha foi salva. Atualizando o RevenueCat; a configuração anterior pode valer até a conclusão.",
   "refundConsent.withdraw": "Desativar compartilhamento",
-  "refundConsent.review": "Revisar termos atualizados"
+  "refundConsent.review": "Revisar termos atualizados",
+  "exitOffer.title": "Seu primeiro ano com desconto",
+  "exitOffer.endsIn": "A oferta termina em %{time}",
+  "exitOffer.cta": "Ver a oferta"
 }

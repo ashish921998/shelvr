@@ -547,5 +547,8 @@
   "refundConsent.disabled": "Refund data sharing is off.",
   "refundConsent.syncPending": "Your choice is saved. Updating RevenueCat; the previous setting may apply until this finishes.",
   "refundConsent.withdraw": "Turn off sharing",
-  "refundConsent.review": "Review updated terms"
+  "refundConsent.review": "Review updated terms",
+  "exitOffer.title": "Your discounted first year",
+  "exitOffer.endsIn": "Offer ends in %{time}",
+  "exitOffer.cta": "See the offer"
 }
