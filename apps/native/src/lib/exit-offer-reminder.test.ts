@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EXIT_OFFER_REMINDER_ID,
+  clearExitOfferReminder,
   optInToExitOfferReminder,
   syncExitOfferReminder,
 } from "./exit-offer-reminder";
@@ -113,6 +114,22 @@ describe("syncExitOfferReminder", () => {
     await expect(syncExitOfferReminder(now + 30 * 60_000, now)).resolves.toBe(
       false,
     );
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("does not schedule a reminder cancelled while it waited", async () => {
+    await expect(
+      syncExitOfferReminder(now + 24 * HOUR, now, () => false),
+    ).resolves.toBe(false);
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearExitOfferReminder", () => {
+  it("cancels the scheduled reminder when the session ends", async () => {
+    await clearExitOfferReminder();
     expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
     expect(mock.schedule).not.toHaveBeenCalled();
   });

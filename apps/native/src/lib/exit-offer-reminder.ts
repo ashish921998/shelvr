@@ -100,15 +100,22 @@ export function optOutOfExitOfferReminder(userId: string): void {
   notify();
 }
 
+/**
+ * Cancels, then schedules the reminder for `endsAt`. `stillWanted` is checked
+ * just before scheduling, so a sync that was waiting on the OS never brings
+ * back a reminder the user cancelled in the meantime.
+ */
 export async function syncExitOfferReminder(
   endsAt: number | null,
   now: number,
+  stillWanted: () => boolean = () => true,
 ): Promise<boolean> {
   await Notifications.cancelScheduledNotificationAsync(EXIT_OFFER_REMINDER_ID);
   const fireAt = endsAt === null ? null : exitOfferReminderAt(endsAt, now);
   if (fireAt === null) return false;
   if (!canNotify(await Notifications.getPermissionsAsync())) return false;
   await ensureChannel();
+  if (!stillWanted()) return false;
   await Notifications.scheduleNotificationAsync({
     identifier: EXIT_OFFER_REMINDER_ID,
     content: {
@@ -125,6 +132,41 @@ export async function syncExitOfferReminder(
   return true;
 }
 
+// Every sync shares one notification id, so they run one at a time, and each
+// schedules only while its target is still the latest one asked for.
+let wanted: number | null = null;
+let queue: Promise<unknown> = Promise.resolve();
+function applyTarget(target: number | null): Promise<boolean> {
+  wanted = target;
+  const next = queue.then(() =>
+    syncExitOfferReminder(target, Date.now(), () => wanted === target),
+  );
+  queue = next.catch(() => undefined);
+  return next;
+}
+
+// The account whose opt-in the mounted hook last saw, so ending the session
+// can clear it after the app screens have unmounted.
+let activeUserId: string | null = null;
+
+/**
+ * Sign-out and account deletion: drops the opt-in and the scheduled reminder,
+ * so nothing about this offer arrives once the account has left the device.
+ */
+export async function clearExitOfferReminder(): Promise<void> {
+  const userId = activeUserId;
+  activeUserId = null;
+  try {
+    if (userId) await SecureStore.deleteItemAsync(optInKey(userId));
+  } catch (error) {
+    analytics.captureError("exit_offer_reminder_failed", error);
+  }
+  notify();
+  await applyTarget(null).catch((error) =>
+    analytics.captureError("exit_offer_reminder_failed", error),
+  );
+}
+
 export function useExitOfferReminder(): void {
   const { entitled, loading } = useEntitlement();
   const { data: user } = useCurrentUser();
@@ -134,7 +176,11 @@ export function useExitOfferReminder(): void {
   const target = !loading && !entitled && optedIn ? endsAt : null;
 
   useEffect(() => {
-    syncExitOfferReminder(target, Date.now()).catch((error) =>
+    if (userId) activeUserId = userId;
+  }, [userId]);
+
+  useEffect(() => {
+    applyTarget(target).catch((error) =>
       analytics.captureError("exit_offer_reminder_failed", error),
     );
   }, [target]);

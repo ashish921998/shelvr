@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { openExitOffer } from "@/lib/entitlement";
@@ -60,9 +61,12 @@ export function ExitOfferCard({
             <GhostButton
               label={t("exitOffer.remindMe")}
               onPress={() =>
-                void optInToExitOfferReminder(userId, endsAt).then((ok) =>
-                  setDenied(!ok),
-                )
+                void optInToExitOfferReminder(userId, endsAt)
+                  .catch((error) => {
+                    analytics.captureError("exit_offer_reminder_failed", error);
+                    return false;
+                  })
+                  .then((ok) => setDenied(!ok))
               }
             />
             <Text style={styles.note}>
