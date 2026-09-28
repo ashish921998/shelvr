@@ -3,6 +3,7 @@ import {
   EXIT_OFFER_REMINDER_ID,
   clearExitOfferReminder,
   optInToExitOfferReminder,
+  optOutOfExitOfferReminder,
   syncExitOfferReminder,
 } from "./exit-offer-reminder";
 
@@ -10,6 +11,7 @@ const mock = vi.hoisted(() => ({
   permission: vi.fn(),
   request: vi.fn(),
   setItem: vi.fn(),
+  deleteItem: vi.fn(),
   schedule: vi.fn(),
   cancel: vi.fn(),
 }));
@@ -27,7 +29,7 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("expo-secure-store", () => ({
   getItem: vi.fn(),
   setItem: mock.setItem,
-  deleteItemAsync: vi.fn(async () => {}),
+  deleteItemAsync: mock.deleteItem,
 }));
 vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 3 },
@@ -46,6 +48,7 @@ beforeEach(() => {
   mock.permission.mockReset().mockResolvedValue({ ios: { status: 2 } });
   mock.request.mockReset();
   mock.setItem.mockReset();
+  mock.deleteItem.mockReset().mockResolvedValue(undefined);
   mock.schedule.mockReset();
   mock.cancel.mockReset();
 });
@@ -84,6 +87,27 @@ describe("optInToExitOfferReminder", () => {
       optInToExitOfferReminder("user1", now + 24 * HOUR),
     ).resolves.toBe(false);
     expect(mock.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("optOutOfExitOfferReminder", () => {
+  it("cancels the reminder and forgets the opt-in", async () => {
+    await optOutOfExitOfferReminder("user1");
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.deleteItem).toHaveBeenCalledWith(
+      "shelvr.exitOffer.remind.user1",
+    );
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("still opts out when the stored opt-in cannot be deleted", async () => {
+    mock.deleteItem.mockRejectedValue(new Error("keychain"));
+    await optOutOfExitOfferReminder("user1");
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.setItem).toHaveBeenCalledWith(
+      "shelvr.exitOffer.remind.user1",
+      "0",
+    );
   });
 });
 

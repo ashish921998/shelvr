@@ -56,7 +56,11 @@ export function ExitOfferCard({
           <Text style={styles.note}>{t("exitOffer.reminderSet")}</Text>
           <GhostButton
             label={t("exitOffer.reminderCancel")}
-            onPress={() => optOutOfExitOfferReminder(userId)}
+            onPress={() =>
+              void optOutOfExitOfferReminder(userId).catch((error) =>
+                analytics.captureError("exit_offer_reminder_failed", error),
+              )
+            }
           />
         </View>
       ) : null}

@@ -8,6 +8,7 @@ import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import {
+  EXIT_OFFER_WINDOW_MS,
   exitOfferDue,
   exitOfferEndsAt,
   exitOfferShownKey,
@@ -464,20 +465,22 @@ async function presentExitOffer(
     }
     notifyExitOffer();
   };
-  return showExitOffering(
+  const outcome = await showExitOffering(
     rcui,
     offering,
     sourcePlacement,
-    exitOfferEndsAt(now, now),
+    now + EXIT_OFFER_WINDOW_MS,
     release,
   );
+  // The user already closed the paywall, so a failed offer stays a cancel.
+  return outcome === "success" ? outcome : "cancelled";
 }
 
 async function showExitOffering(
   rcui: NonNullable<ReturnType<typeof getRCUI>>,
   offering: import("react-native-purchases").PurchasesOffering,
   sourcePlacement: string,
-  endsAt: number | null,
+  endsAt: number,
   onNotPresented: () => void | Promise<void> = () => {},
 ): Promise<PaywallOutcome> {
   const properties = {
@@ -495,14 +498,10 @@ async function showExitOffering(
     );
     if (result === "NOT_PRESENTED" || result === "ERROR")
       await onNotPresented();
-    const outcome = mapPaywallResult(result);
-    // A Home tap that shows nothing falls back to the regular paywall; after
-    // a paywall close, a failed exit offer stays a plain cancel.
-    if (sourcePlacement === "home_countdown") return outcome;
-    return outcome === "success" ? outcome : "cancelled";
+    return mapPaywallResult(result);
   } catch {
     await onNotPresented();
-    return sourcePlacement === "home_countdown" ? "unavailable" : "cancelled";
+    return "unavailable";
   }
 }
 
@@ -511,8 +510,7 @@ async function showExitOffering(
  * the sheet opens. The dashboard default ("Available for a limited time.")
  * covers older builds that pass nothing.
  */
-function exitOfferVariables(endsAt: number | null) {
-  if (endsAt === null) return undefined;
+function exitOfferVariables(endsAt: number) {
   const { hours, minutes } = timeLeft(endsAt - Date.now());
   const value = t("exitOffer.sheetEndsIn", {
     hours: String(hours),

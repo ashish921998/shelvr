@@ -93,16 +93,21 @@ export async function optInToExitOfferReminder(
   return true;
 }
 
-/** "Cancel reminder": the opt-out. */
-export function optOutOfExitOfferReminder(userId: string): void {
-  try {
-    SecureStore.deleteItemAsync(optInKey(userId))
-      .then(notify)
-      .catch(() => {});
-  } catch {
-    // Best-effort; the sync below still cancels the scheduled reminder.
-  }
+/** "Cancel reminder": the opt-out. Cancels the scheduled reminder first. */
+export async function optOutOfExitOfferReminder(userId: string): Promise<void> {
   analytics.capture("exit_offer_reminder_opt_out", {});
+  await applyTarget(null);
+  try {
+    await SecureStore.deleteItemAsync(optInKey(userId));
+  } catch {
+    // An unreadable value counts as opted out, so a failed delete can't
+    // bring the reminder back on the next launch.
+    try {
+      SecureStore.setItem(optInKey(userId), "0");
+    } catch {
+      // Nothing more to try; the reminder itself is already cancelled.
+    }
+  }
   notify();
 }
 
