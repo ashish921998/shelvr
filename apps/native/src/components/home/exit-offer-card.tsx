@@ -2,7 +2,11 @@ import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { openExitOffer } from "@/lib/entitlement";
-import { exitOfferReminderAt, formatCountdown } from "@/lib/exit-offer";
+import {
+  exitOfferReminderAt,
+  exitOfferReminderPending,
+  formatCountdown,
+} from "@/lib/exit-offer";
 import {
   optInToExitOfferReminder,
   optOutOfExitOfferReminder,
@@ -47,37 +51,34 @@ export function ExitOfferCard({
         label={t("exitOffer.cta")}
         onPress={() => void openExitOffer(router)}
       />
-      {userId && exitOfferReminderAt(endsAt, now) !== null ? (
-        optedIn ? (
-          <View style={styles.reminder}>
-            <Text style={styles.note}>{t("exitOffer.reminderSet")}</Text>
-            <GhostButton
-              label={t("exitOffer.reminderCancel")}
-              onPress={() => optOutOfExitOfferReminder(userId)}
-            />
-          </View>
-        ) : (
-          <View style={styles.reminder}>
-            <GhostButton
-              label={t("exitOffer.remindMe")}
-              onPress={() =>
-                void optInToExitOfferReminder(userId, endsAt)
-                  .catch((error) => {
-                    analytics.captureError("exit_offer_reminder_failed", error);
-                    return false;
-                  })
-                  .then((ok) => setDenied(!ok))
-              }
-            />
-            <Text style={styles.note}>
-              {t(
-                denied
-                  ? "exitOffer.reminderDenied"
-                  : "exitOffer.reminderConsent",
-              )}
-            </Text>
-          </View>
-        )
+      {userId && optedIn && exitOfferReminderPending(endsAt, now) ? (
+        <View style={styles.reminder}>
+          <Text style={styles.note}>{t("exitOffer.reminderSet")}</Text>
+          <GhostButton
+            label={t("exitOffer.reminderCancel")}
+            onPress={() => optOutOfExitOfferReminder(userId)}
+          />
+        </View>
+      ) : null}
+      {userId && !optedIn && exitOfferReminderAt(endsAt, now) !== null ? (
+        <View style={styles.reminder}>
+          <GhostButton
+            label={t("exitOffer.remindMe")}
+            onPress={() =>
+              void optInToExitOfferReminder(userId, endsAt)
+                .catch((error) => {
+                  analytics.captureError("exit_offer_reminder_failed", error);
+                  return false;
+                })
+                .then((ok) => setDenied(!ok))
+            }
+          />
+          <Text style={styles.note}>
+            {t(
+              denied ? "exitOffer.reminderDenied" : "exitOffer.reminderConsent",
+            )}
+          </Text>
+        </View>
       ) : null}
     </View>
   );

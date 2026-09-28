@@ -66,6 +66,14 @@ export function exitOfferReminderAt(
   return fireAt - now > 60_000 ? fireAt : null;
 }
 
+/**
+ * Whether an opted-in reminder has yet to fire. Cancelling stays possible
+ * until then, even once it is too late to schedule a new one.
+ */
+export function exitOfferReminderPending(endsAt: number, now: number): boolean {
+  return now < endsAt - EXIT_OFFER_REMINDER_LEAD_MS;
+}
+
 /** Whole hours and minutes left, rounded down so it never overstates. */
 export function timeLeft(ms: number): { hours: number; minutes: number } {
   const minutes = Math.max(0, Math.floor(ms / 60_000));

@@ -6,6 +6,8 @@ import {
   EXIT_OFFERING_ID,
   exitOfferDue,
   exitOfferEndsAt,
+  exitOfferReminderAt,
+  exitOfferReminderPending,
   findExitOffering,
   formatCountdown,
   parseShownAt,
@@ -61,6 +63,21 @@ describe("exitOfferEndsAt", () => {
   it("never reopens an expired offer before the cooldown", () => {
     const expired = shownAt + EXIT_OFFER_WINDOW_MS;
     expect(exitOfferDue("home_card", shownAt, expired)).toBe(false);
+  });
+});
+
+describe("reminder controls", () => {
+  const endsAt = 1_000_000_000_000;
+  const HOUR = 60 * 60 * 1000;
+
+  it("keeps cancelling possible after scheduling a new reminder is too late", () => {
+    const now = endsAt - HOUR - 60_000; // 1:01:00 left, fires at 1:00:00
+    expect(exitOfferReminderAt(endsAt, now)).toBeNull();
+    expect(exitOfferReminderPending(endsAt, now)).toBe(true);
+  });
+
+  it("stops offering cancel once the reminder has fired", () => {
+    expect(exitOfferReminderPending(endsAt, endsAt - HOUR)).toBe(false);
   });
 });
 
