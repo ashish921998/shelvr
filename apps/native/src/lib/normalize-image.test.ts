@@ -21,9 +21,7 @@ vi.mock("expo-image-manipulator", () => ({
           return context;
         },
         renderAsync: async () => {
-          const size = record.resizedTo
-            ? resized(record.resizedTo)
-            : renderedSize;
+          const size = record.resizedTo ? resized(record.resizedTo) : renderedSize;
           return {
             ...size,
             saveAsync: async (options: { format: string }) => ({
@@ -39,9 +37,7 @@ vi.mock("expo-image-manipulator", () => ({
 }));
 
 function resized(size: Size) {
-  const scale = size.width
-    ? size.width / renderedSize.width
-    : size.height! / renderedSize.height;
+  const scale = size.width ? size.width / renderedSize.width : size.height! / renderedSize.height;
   return {
     width: Math.round(renderedSize.width * scale),
     height: Math.round(renderedSize.height * scale),
@@ -65,28 +61,15 @@ describe("normalizeImage", () => {
 
   it("keeps PNG input as PNG by MIME, by extension when MIME is missing, and case-insensitively", async () => {
     setup(900, 900);
-    expect(
-      (await normalizeImage({ uri: "file:///a.tmp", mimeType: "image/png" }))
-        .mimeType,
-    ).toBe("image/png");
-    expect(
-      (await normalizeImage({ uri: "file:///shot.PNG?x=1" })).mimeType,
-    ).toBe("image/png");
-    expect(
-      (await normalizeImage({ uri: "file:///a.tmp", mimeType: "IMAGE/PNG" }))
-        .mimeType,
-    ).toBe("image/png");
+    expect((await normalizeImage({ uri: "file:///a.tmp", mimeType: "image/png" })).mimeType).toBe("image/png");
+    expect((await normalizeImage({ uri: "file:///shot.PNG?x=1" })).mimeType).toBe("image/png");
+    expect((await normalizeImage({ uri: "file:///a.tmp", mimeType: "IMAGE/PNG" })).mimeType).toBe("image/png");
   });
 
   it("encodes photos and HEIC as JPEG", async () => {
     setup(900, 900);
-    expect(
-      (await normalizeImage({ uri: "file:///a.heic", mimeType: "image/heic" }))
-        .mimeType,
-    ).toBe("image/jpeg");
-    expect((await normalizeImage({ uri: "file:///a.tmp" })).mimeType).toBe(
-      "image/jpeg",
-    );
+    expect((await normalizeImage({ uri: "file:///a.heic", mimeType: "image/heic" })).mimeType).toBe("image/jpeg");
+    expect((await normalizeImage({ uri: "file:///a.tmp" })).mimeType).toBe("image/jpeg");
   });
 
   it("does not resize at or below the cap", async () => {
@@ -99,11 +82,7 @@ describe("normalizeImage", () => {
   it("resizes the long edge from the oriented dimensions, reusing one context", async () => {
     // A 4000x3000 capture with EXIF orientation 6 renders as 3000x4000.
     setup(3000, 4000);
-    const out = await normalizeImage({
-      uri: "file:///rot.jpg",
-      width: 4000,
-      height: 3000,
-    });
+    const out = await normalizeImage({ uri: "file:///rot.jpg", width: 4000, height: 3000 });
     expect(contexts).toHaveLength(1);
     expect(contexts[0].resizedTo).toEqual({ height: MAX_IMAGE_EDGE });
     expect(out).toMatchObject({ width: 1200, height: MAX_IMAGE_EDGE });

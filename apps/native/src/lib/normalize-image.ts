@@ -1,5 +1,5 @@
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
-import type { LocalImage } from "@/lib/use-save-image";
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import type { LocalImage } from '@/lib/use-save-image';
 
 /** Long edge of the stored copy. Plenty for the feed and detail views, and
  * Gemini bills by 768px tiles rather than bytes, so a camera original buys
@@ -13,8 +13,8 @@ const JPEG_QUALITY = 0.8;
 function keepPng(image: LocalImage): boolean {
   return (
     image.isSticker === true ||
-    image.mimeType?.toLowerCase() === "image/png" ||
-    /\.png$/i.test(image.uri.split("?")[0])
+    image.mimeType?.toLowerCase() === 'image/png' ||
+    /\.png$/i.test(image.uri.split('?')[0])
   );
 }
 

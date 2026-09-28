@@ -15,16 +15,14 @@ describe("isProbablyUrl", () => {
 
 describe("extractFirstUrl", () => {
   it("pulls the URL out of caption text", () => {
-    expect(
-      extractFirstUrl("Check out this video! https://tiktok.com/@a/video/1"),
-    ).toBe("https://tiktok.com/@a/video/1");
+    expect(extractFirstUrl("Check out this video! https://tiktok.com/@a/video/1")).toBe(
+      "https://tiktok.com/@a/video/1",
+    );
   });
 
   it("keeps a closing paren the URL itself opened", () => {
     expect(
-      extractFirstUrl(
-        "read this https://en.wikipedia.org/wiki/Function_(mathematics)",
-      ),
+      extractFirstUrl("read this https://en.wikipedia.org/wiki/Function_(mathematics)"),
     ).toBe("https://en.wikipedia.org/wiki/Function_(mathematics)");
   });
 
@@ -36,9 +34,7 @@ describe("extractFirstUrl", () => {
 
   it("strips sentence punctuation after a balanced paren", () => {
     expect(
-      extractFirstUrl(
-        "go to https://en.wikipedia.org/wiki/Function_(mathematics).",
-      ),
+      extractFirstUrl("go to https://en.wikipedia.org/wiki/Function_(mathematics)."),
     ).toBe("https://en.wikipedia.org/wiki/Function_(mathematics)");
   });
 

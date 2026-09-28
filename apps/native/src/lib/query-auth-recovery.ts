@@ -1,4 +1,4 @@
-import type { Query, QueryClient } from "@tanstack/react-query";
+import type { Query, QueryClient } from '@tanstack/react-query';
 
 /** Recover live queries once per error category during each authenticated session. */
 export function observeAuthQueryErrors(
@@ -12,12 +12,12 @@ export function observeAuthQueryErrors(
   const recover = (query: Query) => {
     if (stopped) return;
     if (
-      query.queryKey[0] !== "convexQuery" ||
-      query.state.status !== "error" ||
+      query.queryKey[0] !== 'convexQuery' ||
+      query.state.status !== 'error' ||
       query.getObserversCount() === 0
     )
       return;
-    const attempted = String(query.state.error).includes("Not authenticated")
+    const attempted = String(query.state.error).includes('Not authenticated')
       ? attemptedAuth
       : attemptedOther;
     if (attempted.has(query.queryHash)) return;
@@ -25,9 +25,9 @@ export function observeAuthQueryErrors(
     restart(query.queryHash);
   };
   const unsubscribe = client.getQueryCache().subscribe((event) => {
-    if (event.type !== "updated" && event.type !== "observerAdded") return;
+    if (event.type !== 'updated' && event.type !== 'observerAdded') return;
     const { query } = event;
-    if (query.state.status !== "error" || queued.has(query.queryHash)) return;
+    if (query.state.status !== 'error' || queued.has(query.queryHash)) return;
     queued.add(query.queryHash);
     queueMicrotask(() => {
       queued.delete(query.queryHash);

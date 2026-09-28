@@ -9,32 +9,21 @@ const mock = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 vi.mock("react", () => ({ useCallback: (callback: unknown) => callback }));
-vi.mock("expo-router", () => ({
-  useFocusEffect: (callback: typeof mock.focus) => {
-    mock.focus = callback;
-  },
-}));
+vi.mock("expo-router", () => ({ useFocusEffect: (callback: typeof mock.focus) => { mock.focus = callback; } }));
 vi.mock("@/lib/analytics", () => ({ analytics: { itemOpened: mock.opened } }));
-vi.mock("react-native", () => ({
-  AppState: Object.assign(mock.appState, {
-    addEventListener: (_event: string, listener: () => void) => {
-      mock.listener = listener;
-      return { remove: mock.remove };
-    },
-  }),
-}));
+vi.mock("react-native", () => ({ AppState: Object.assign(mock.appState, {
+  addEventListener: (_event: string, listener: () => void) => {
+    mock.listener = listener;
+    return { remove: mock.remove };
+  },
+}) }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   mock.appState.currentState = "active";
 });
 
-const item = {
-  _id: "item-1",
-  _creationTime: 1000,
-  type: "note",
-  status: "ready",
-} as const;
+const item = { _id: "item-1", _creationTime: 1000, type: "note", status: "ready" } as const;
 
 it("records once per focus across app state transitions, and records a new focus", () => {
   const markOpened = vi.fn().mockResolvedValue(null);
