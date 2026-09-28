@@ -10,7 +10,11 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
-const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
+const REPLAY_VARIANTS = new Set<unknown>([
+  "development",
+  "preview",
+  "production",
+]);
 
 // Distributed builds report crashes; local development does not. A dev machine
 // crash on an unmerged branch would otherwise open an error issue next to
@@ -106,9 +110,10 @@ export const posthog =
         // product gain. Fail closed, as replay and exception autocapture do.
         capturePushNotificationSubscriptions: false,
         capturePushNotificationOpened: false,
-        // Replay stays off in production until visual masking is verified on a
-        // signed build. Fail closed: only builds that declare a non-production
-        // variant record, so a missing `extra` can never turn replay on.
+        // Visual masking was verified on a signed preview build on 2026-09-28,
+        // so production records too, at the same sample rate. Fail closed: only
+        // builds that declare a known variant record, so a missing `extra` can
+        // never turn replay on.
         enableSessionReplay: REPLAY_VARIANTS.has(
           Constants.expoConfig?.extra?.variant,
         ),

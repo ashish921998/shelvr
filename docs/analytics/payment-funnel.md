@@ -79,9 +79,9 @@ Recorded 13 September 2026 from RevenueCat's cancellation-flow guidance, Apple t
 
 For failure recordings, open **Paywall attempt to actual payment**, click the dropped-off people at the payment step, then inspect their matching recordings. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
 
-For the 1.0.2 release, native replay is disabled for the production build variant
-until its visual masking check is complete. Production funnel events remain enabled.
-Development replay samples 20% of sessions, masks all text, images, and sandboxed
+Native replay was disabled for the production build variant from 1.0.2 until
+visual masking was verified on a signed preview build on 2026-09-28. Production,
+preview and development builds now all record. Replay samples 20% of sessions, masks all text, images, and sandboxed
 system views, disables logs/network telemetry, and captures at most one snapshot
 per second. Not every failed journey will have a recording. Native dead-tap
 detection is not promised. Replay requires a rebuilt native binary; an OTA
