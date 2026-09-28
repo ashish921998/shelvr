@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  dismissSaveProgressCard,
   finishWeeklyNudge,
   hasSavedFirstShare,
+  isFirstSession,
+  isSaveProgressCardDismissed,
   isWeeklyNudgePending,
   recordShareSaved,
+  shouldOfferWeeklyNudge,
   shouldShowHowTo,
 } from "./first-share";
 
@@ -65,4 +69,36 @@ describe("shouldShowHowTo", () => {
       expect(shouldShowHowTo({ firstShareSaved, itemCount })).toBe(expected);
     },
   );
+});
+
+describe("weekly nudge timing", () => {
+  beforeEach(() => store.clear());
+
+  it("treats the launch that first sees an account as its first session", () => {
+    expect(isFirstSession("user_a")).toBe(true);
+    // Same launch, asked again.
+    expect(isFirstSession("user_a")).toBe(true);
+    // A later launch stored a different id first.
+    store.set("shelvr.firstLaunch.user_b", "an-earlier-launch");
+    expect(isFirstSession("user_b")).toBe(false);
+  });
+
+  it("waits for three real saves outside the first session", () => {
+    const three = { saved: 3, goal: 3 };
+    const base = { firstSession: false, progress: three };
+    expect(shouldOfferWeeklyNudge(base)).toBe(true);
+    expect(shouldOfferWeeklyNudge({ ...base, firstSession: true })).toBe(false);
+    expect(
+      shouldOfferWeeklyNudge({ ...base, progress: { saved: 2, goal: 3 } }),
+    ).toBe(false);
+    expect(shouldOfferWeeklyNudge({ ...base, progress: undefined })).toBe(
+      false,
+    );
+  });
+
+  it("remembers a dismissed progress card per account", () => {
+    dismissSaveProgressCard("user_a");
+    expect(isSaveProgressCardDismissed("user_a")).toBe(true);
+    expect(isSaveProgressCardDismissed("user_b")).toBe(false);
+  });
 });
