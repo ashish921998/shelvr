@@ -6,15 +6,19 @@ requires a recorded choice in `legalConsents` and a matching RevenueCat policy.
 
 ## User flow
 
-On iOS, after authentication and onboarding, the app asks users to review terms
-version `2026-09-19` before mounting screens that can present the paywall. It
+On iOS, Profile offers the review of terms version `2026-09-19`. It
 highlights the optional Apple disclosure and links to Terms and Privacy.
 “Agree and allow sharing” records acceptance; “Not now” records that the version
-was reviewed without authorizing sharing. Either successful decision continues
-to the app. No acceptance is inferred from existing accounts, purchases, or
-opening Customer Center. Android does not show the Apple consent flow.
+was reviewed without authorizing sharing. No acceptance is inferred from
+existing accounts, purchases, or opening Customer Center. Android does not show
+the Apple consent flow.
 
-Profile provides review/opt-in and withdrawal. Withdrawing keeps the terms
+The review is not a blocking screen. It first shipped as a gate after
+onboarding, which showed brand-new users an "Updated terms" wall right after
+the paywall. Declining it changed nothing, because without an opt-in RevenueCat
+already does not respond to refund requests, so the gate was removed.
+
+Profile also provides withdrawal. Withdrawing keeps the terms
 acceptance receipt but changes the sharing preference. A pending status makes
 clear that RevenueCat can still use the previous setting until sync completes.
 
