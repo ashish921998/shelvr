@@ -27,7 +27,6 @@ import {
   recordCompletedShare,
   updateEntry,
   type RawSharePayload,
-  type SessionStoreAdapter,
   type ShareEntry,
 } from "@/lib/share/storage";
 import {
@@ -60,7 +59,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { createMMKV } from "react-native-mmkv";
+import { shareStore } from "@/lib/share/share-store";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
@@ -78,11 +77,6 @@ import {
  * the Pro gate) belongs to the owner in lib/share/incoming-share.ts; this screen
  * feeds it events, renders the phase it returns, and runs its effects.
  */
-
-// Dedicated MMKV instance for the one share session record. The adapter
-// interface lives in storage.ts so its reconciliation rules stay pure and
-// unit-testable with a Map; only this native binding is owned here.
-const shareStore: SessionStoreAdapter = createMMKV({ id: "incoming-share" });
 
 const PHASE_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 6 }] },

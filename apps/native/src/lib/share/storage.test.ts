@@ -7,6 +7,7 @@ import {
   deleteSession,
   entriesToProcess,
   fingerprintSharePayloads,
+  forgetDeletedShareItem,
   LAST_COMPLETED_SHARE_KEY,
   loadSession,
   markComplete,
@@ -372,6 +373,40 @@ describe("ghost redelivery (Android task-restore replay)", () => {
     delete legacy.settled;
     store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify(legacy));
     expect(reconcileSession(store, USER, BATCH_A, id).kind).toBe("new");
+  });
+
+  it("saves an identical re-share after its item was deleted", () => {
+    // Save a link, delete the item, share the same link again: content alone
+    // cannot tell this from a replay, so the delete must unmark the entry.
+    const store = memoryStore();
+    completedBatchA(store);
+    forgetDeletedShareItem(store, "items-1");
+    const result = reconcileSession(store, USER, BATCH_A, () => "sess-9");
+    expect(result.kind).toBe("new");
+    expect(loadSession(store)?.entries[0].status).toBe("pending");
+  });
+
+  it("keeps skipping the other saved entries after one item is deleted", () => {
+    const store = memoryStore();
+    const batch = [...BATCH_A, ...BATCH_B];
+    recordCompletedShare(store, fingerprintSharePayloads(batch), USER, [
+      { index: 0, status: "saved", itemId: "items-1" },
+      { index: 1, status: "saved", itemId: "items-2" },
+    ]);
+    forgetDeletedShareItem(store, "items-2");
+    reconcileSession(store, USER, batch, () => "sess-9");
+    const entries = loadSession(store)?.entries ?? [];
+    expect(entries[0]).toMatchObject({ status: "saved", itemId: "items-1" });
+    expect(entries[1].status).toBe("pending");
+  });
+
+  it("still skips a replay when an unrelated item is deleted", () => {
+    const store = memoryStore();
+    completedBatchA(store);
+    forgetDeletedShareItem(store, "items-other");
+    expect(reconcileSession(store, USER, BATCH_A, id)).toEqual({
+      kind: "ghost",
+    });
   });
 
   it("starts a session with a fresh id via startNewSession", () => {
