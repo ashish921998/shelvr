@@ -55,7 +55,7 @@ export function exitOfferEndsAt(
 }
 
 /** The honest reminder goes out this long before the offer closes. */
-export const EXIT_OFFER_REMINDER_LEAD_MS = HOUR_MS;
+const EXIT_OFFER_REMINDER_LEAD_MS = HOUR_MS;
 
 /** When to remind that the offer is closing, or null when it is too late. */
 export function exitOfferReminderAt(
