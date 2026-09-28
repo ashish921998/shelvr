@@ -116,9 +116,7 @@ async function cancelTrialNudges(): Promise<void> {
   }
 }
 
-export function canNotify(
-  permission: Notifications.NotificationPermissionsStatus,
-) {
+function canNotify(permission: Notifications.NotificationPermissionsStatus) {
   if (Platform.OS !== "ios") return permission.granted;
   const status = permission.ios?.status;
   return (

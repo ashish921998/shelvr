@@ -551,7 +551,5 @@
   "exitOffer.title": "Your discounted first year",
   "exitOffer.endsIn": "Offer ends in %{time}",
   "exitOffer.cta": "See the offer",
-  "exitOffer.sheetEndsIn": "Offer ends in %{hours} h %{minutes} min.",
-  "exitOffer.reminderTitle": "Your offer ends in an hour",
-  "exitOffer.reminderBody": "Your discounted first year of Shelvr Pro closes soon."
+  "exitOffer.sheetEndsIn": "Offer ends in %{hours} h %{minutes} min."
 }
