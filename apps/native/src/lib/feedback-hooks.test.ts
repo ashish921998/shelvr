@@ -254,4 +254,18 @@ describe("useReviewPrompt", () => {
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
   });
+
+  it("waits while deferred, as in an account's first session", async () => {
+    const items = threeReady();
+    let defer = true;
+    react.mount(() => useReviewPrompt(items, { defer }));
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    defer = false;
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
 });

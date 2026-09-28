@@ -325,6 +325,44 @@ export const listItems = query({
   },
 });
 
+/** Ready saves a new account needs before its shelf counts as started. The
+ * Home "save your next two" card and the weekly shelf nudge both wait on it. */
+export const SAVE_PROGRESS_GOAL = 3;
+const SAVE_PROGRESS_MAX_READ = 20;
+
+/** How many real saves the user has, counted up to `SAVE_PROGRESS_GOAL`. The
+ * onboarding demo save is excluded (the app picked it for them), as are
+ * fixture seeds and saves not yet `ready`. Reads at most
+ * `SAVE_PROGRESS_MAX_READ` rows. */
+export const saveProgress = query({
+  args: {},
+  returns: v.object({ saved: v.number(), goal: v.number() }),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const demo = await ctx.db
+      .query("onboardingDemos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    // Walk ready saves until the goal is met, skipping excluded rows (the dev
+    // fixture reset seeds several), with a hard bound on rows read.
+    let saved = 0;
+    let read = 0;
+    for await (const item of ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )) {
+      if (item._id !== demo?.itemId && item.fixtureKey === undefined) saved++;
+      read++;
+      if (saved >= SAVE_PROGRESS_GOAL || read >= SAVE_PROGRESS_MAX_READ) break;
+    }
+    return {
+      saved: Math.min(saved, SAVE_PROGRESS_GOAL),
+      goal: SAVE_PROGRESS_GOAL,
+    };
+  },
+});
+
 /** The home feed, newest first, one page at a time. Card shape only — see
  * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
  * untouched so the client's reactive page splitting keeps working; the size
