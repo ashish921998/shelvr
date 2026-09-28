@@ -1,4 +1,5 @@
 import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
@@ -44,6 +45,7 @@ export default function AppLayout() {
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
+      <ExitOfferSheetHost />
       <Stack
         screenOptions={{
           animation: reducedMotion ? "fade" : "default",

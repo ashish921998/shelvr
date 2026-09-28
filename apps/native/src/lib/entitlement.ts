@@ -33,6 +33,7 @@ import {
   REVENUECAT_DISABLED_BY_BUILD,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
+import { presentExitSheet } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState, NativeModules } from "react-native";
@@ -491,9 +492,12 @@ async function showExitOffering(
   analytics.capture("paywall_requested", properties);
   try {
     const result = await observePaywallPresentation(properties, () =>
-      rcui.presentPaywall({
+      // Our own sheet, so the offer can close at its deadline.
+      presentExitSheet({
+        Paywall: rcui.Paywall,
         offering,
         customVariables: exitOfferVariables(endsAt),
+        endsAt,
       }),
     );
     if (result === "NOT_PRESENTED" || result === "ERROR")
