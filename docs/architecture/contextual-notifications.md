@@ -186,7 +186,7 @@ Verified against the repository.
 | `notificationPreferences`     | `weeklyShelfEnabled`, `remindersEnabled`, `nextDigestAt`, `nextReminderAt`, `timezone` |
 | `weeklyDigests`               | Persisted shelf contents **and** its delivery state                                    |
 | `notificationDelivery.ts`     | claim / finish / recover, 8 attempts, receipt polling, backoff                         |
-| `crons.ts`                    | Hourly `prepareDueWeeklyDigests`, 5-minute recovery                                    |
+| `crons.ts`                    | Hourly `prepareDueWeeklyDigests` and `prepareDueSaveReminders`, 5-minute recovery      |
 | `model/notificationFields.ts` | `digestCopy` plus nine locale catalogs                                                 |
 | `itemReads`                   | Per-user read state; already the digest's unread filter                                |
 | Deep links                    | `data.url` routed by `useNotificationObserver`                                         |
