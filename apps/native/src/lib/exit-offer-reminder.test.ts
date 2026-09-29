@@ -1,13 +1,19 @@
+// @vitest-environment jsdom
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useCurrentUser } from "@/lib/current-user";
+import { useEntitlement, useExitOfferEndsAt } from "@/lib/entitlement";
 import {
   EXIT_OFFER_REMINDER_ID,
   clearExitOfferReminder,
   optInToExitOfferReminder,
   optOutOfExitOfferReminder,
   syncExitOfferReminder,
+  useExitOfferReminder,
 } from "./exit-offer-reminder";
 
 const mock = vi.hoisted(() => ({
+  getItem: vi.fn(),
   permission: vi.fn(),
   request: vi.fn(),
   setItem: vi.fn(),
@@ -27,7 +33,7 @@ vi.mock("@/lib/entitlement", () => ({
   waitForSheetTransition: vi.fn(),
 }));
 vi.mock("expo-secure-store", () => ({
-  getItem: vi.fn(),
+  getItem: mock.getItem,
   setItem: mock.setItem,
   deleteItemAsync: mock.deleteItem,
 }));
@@ -45,6 +51,7 @@ const HOUR = 60 * 60 * 1000;
 const now = 1_000_000_000_000;
 
 beforeEach(() => {
+  mock.getItem.mockReset().mockReturnValue(null);
   mock.permission.mockReset().mockResolvedValue({ ios: { status: 2 } });
   mock.request.mockReset();
   mock.setItem.mockReset();
@@ -182,5 +189,59 @@ describe("clearExitOfferReminder", () => {
     grant({ ios: { status: 2 } });
     await expect(pending).resolves.toBe(false);
     expect(mock.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("useExitOfferReminder", () => {
+  const entitlement = vi.mocked(useEntitlement);
+  const currentUser = vi.mocked(useCurrentUser);
+  const offerEndsAt = vi.mocked(useExitOfferEndsAt);
+  type Entitlement = ReturnType<typeof useEntitlement>;
+  type CurrentUser = ReturnType<typeof useCurrentUser>;
+
+  /** An opted-in user whose offer ends at `endsAt`, first loading, then known. */
+  function optedIn(endsAt: number) {
+    vi.setSystemTime(now);
+    offerEndsAt.mockReturnValue(endsAt);
+    mock.getItem.mockReturnValue(String(endsAt));
+    entitlement.mockReturnValue({
+      loading: true,
+      entitled: false,
+    } as Entitlement);
+    currentUser.mockReturnValue({ data: undefined } as CurrentUser);
+    const hook = renderHook(() => useExitOfferReminder());
+    const resolve = () => {
+      entitlement.mockReturnValue({
+        loading: false,
+        entitled: false,
+      } as Entitlement);
+      currentUser.mockReturnValue({ data: { _id: "user-a" } } as CurrentUser);
+      hook.rerender();
+    };
+    return { hook, resolve };
+  }
+
+  it("does not cancel a due reminder while the account is still loading", async () => {
+    vi.useFakeTimers();
+    try {
+      // Cold launch 30 seconds before the reminder fires.
+      const { resolve } = optedIn(now + HOUR + 30_000);
+      await Promise.resolve();
+      expect(mock.cancel).not.toHaveBeenCalled();
+      resolve();
+      await vi.runAllTimersAsync();
+      expect(mock.cancel).not.toHaveBeenCalled();
+      expect(mock.schedule).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("schedules once the account is known and the offer has time left", async () => {
+    const { resolve } = optedIn(now + 24 * HOUR);
+    expect(mock.cancel).not.toHaveBeenCalled();
+    resolve();
+    await waitFor(() => expect(mock.schedule).toHaveBeenCalledTimes(1));
+    expect(mock.cancel).toHaveBeenCalledTimes(1);
   });
 });

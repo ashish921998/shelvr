@@ -194,15 +194,20 @@ export function useExitOfferReminder(): void {
   const userId = user?._id;
   const endsAt = useExitOfferEndsAt(userId);
   const optedIn = useExitOfferReminderOptIn(userId, endsAt);
-  const target = !loading && !entitled && optedIn ? endsAt : null;
+  // Until entitlement and the account have loaded, nothing is known about the
+  // offer: a null target here means "not yet", not "no reminder", and syncing
+  // it would cancel a reminder that turns out to be wanted.
+  const ready = !loading && userId !== undefined;
+  const target = ready && !entitled && optedIn ? endsAt : null;
 
   useEffect(() => {
     if (userId) activeUserId = userId;
   }, [userId]);
 
   useEffect(() => {
+    if (!ready) return;
     applyTarget(target).catch((error) =>
       analytics.captureError("exit_offer_reminder_failed", error),
     );
-  }, [target]);
+  }, [ready, target]);
 }
