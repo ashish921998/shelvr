@@ -47,7 +47,13 @@ vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.icon }));
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string) => key,
+  useAppLocale: () => "en",
+}));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: (sheet: unknown) => sheet },
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture },
 }));

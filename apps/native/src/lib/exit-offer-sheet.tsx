@@ -6,8 +6,9 @@ import type { PurchasesOffering } from "react-native-purchases";
 import { useEffect, useSyncExternalStore } from "react";
 import { AppState, Modal, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 
 /**
  * The exit offer's own full-screen sheet. RevenueCat's `presentPaywall` sheet
@@ -66,6 +67,7 @@ const DISMISS_SETTLE_MS = 500;
 export function ExitOfferSheetHost() {
   const current = useSyncExternalStore(subscribe, () => request);
   const insets = useSafeAreaInsets();
+  useAppLocale();
 
   useEffect(() => {
     hosts += 1;
@@ -133,17 +135,7 @@ export function ExitOfferSheetHost() {
           accessibilityRole="button"
           accessibilityLabel={t("common.close")}
           hitSlop={12}
-          style={{
-            position: "absolute",
-            top: insets.top + 8,
-            left: 16,
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.35)",
-          }}
+          style={[styles.close, { top: insets.top + 8 }]}
         >
           <AppSymbolIcon
             name="xmark"
@@ -156,3 +148,16 @@ export function ExitOfferSheetHost() {
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  close: {
+    position: "absolute",
+    left: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+});
