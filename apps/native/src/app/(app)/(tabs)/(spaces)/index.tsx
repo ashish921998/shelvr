@@ -243,38 +243,43 @@ export default function SpacesScreen() {
                         ? `fixture-space-${space.fixtureKey}`
                         : undefined
                     }
-                    style={({ pressed }) => pressed && styles.pressed}
                   >
-                    <CoverStack
-                      cover={cover}
-                      seed={space._id}
-                      name={space.name}
-                      itemCount={space.itemCount}
-                      suggestionCount={space.suggestionCount}
-                    />
-                    <View style={styles.caption}>
-                      <Text style={styles.title} numberOfLines={1}>
-                        {space.name}
-                      </Text>
-                      <ActionMenu
-                        label={t("spaces.actions")}
-                        title={t("spaces.actions")}
-                        actions={[
-                          {
-                            label: t("common.delete"),
-                            destructive: true,
-                            onPress: () => confirmDelete(space._id),
-                          },
-                        ]}
-                        style={styles.menuButton}
-                      >
-                        <AppSymbolIcon
-                          name="ellipsis"
-                          size={15}
-                          tintColor={theme.colors.foreground}
+                    {/* Link.Trigger's Slot drops a Pressable style function,
+                        so press feedback lives on this inner View. */}
+                    {({ pressed }) => (
+                      <View style={pressed ? styles.pressed : undefined}>
+                        <CoverStack
+                          cover={cover}
+                          seed={space._id}
+                          name={space.name}
+                          itemCount={space.itemCount}
+                          suggestionCount={space.suggestionCount}
                         />
-                      </ActionMenu>
-                    </View>
+                        <View style={styles.caption}>
+                          <Text style={styles.title} numberOfLines={1}>
+                            {space.name}
+                          </Text>
+                          <ActionMenu
+                            label={t("spaces.actions")}
+                            title={t("spaces.actions")}
+                            actions={[
+                              {
+                                label: t("common.delete"),
+                                destructive: true,
+                                onPress: () => confirmDelete(space._id),
+                              },
+                            ]}
+                            style={styles.menuButton}
+                          >
+                            <AppSymbolIcon
+                              name="ellipsis"
+                              size={15}
+                              tintColor={theme.colors.foreground}
+                            />
+                          </ActionMenu>
+                        </View>
+                      </View>
+                    )}
                   </Pressable>
                 </Link.Trigger>
                 <Link.Preview />
