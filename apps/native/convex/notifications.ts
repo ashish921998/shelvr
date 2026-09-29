@@ -10,6 +10,7 @@ import {
   nextLocalHourAt,
   nextWeeklyDigestAt,
   parseTimezoneInput,
+  rebookedSchedule,
   resolveTimezone,
 } from "./model/notificationSchedule";
 import { takeWithinBytes } from "./model/readBudget";
@@ -22,7 +23,6 @@ import {
   WEEKLY_LIMIT,
   openedTooRecently,
   preferredReminderHour,
-  rebookedSchedule,
   reminderBlocked,
   remindersOn,
   reminderCandidates,
@@ -173,15 +173,26 @@ export const setPreferences = mutation({
     // A zone change rebooks the shelf and the reminder slot, as registerDevice
     // and setSaveReminders do, so a traveller's reminders follow the shelf.
     const rebooked =
-      existing === null ? undefined : rebookedSchedule(existing, timezone, now);
+      existing === null
+        ? undefined
+        : rebookedSchedule(
+            existing,
+            timezone,
+            now,
+            remindersOn(existing) ? DEFAULT_REMINDER_HOUR : null,
+          );
+    // The shelf slot is rebooked whether or not the shelf is on, so turning it
+    // on later lands in the right zone; a supplied slot still wins.
     const nextDigestAt = rebooked?.nextDigestAt ?? kept;
     const fields = {
-      ...rebooked,
       weeklyShelfEnabled: args.weeklyShelfEnabled,
       nextDigestAt: args.weeklyShelfEnabled
         ? (args.nextDigestAt ?? nextDigestAt)
         : nextDigestAt,
       timezone,
+      ...(rebooked?.nextReminderAt !== undefined
+        ? { nextReminderAt: rebooked.nextReminderAt }
+        : {}),
       updatedAt: now,
     };
     if (existing === null) {
@@ -269,7 +280,12 @@ export const registerDevice = mutation({
       const rebooked =
         timezone === undefined
           ? undefined
-          : rebookedSchedule(existingPreferences, timezone, now);
+          : rebookedSchedule(
+              existingPreferences,
+              timezone,
+              now,
+              remindersOn(existingPreferences) ? DEFAULT_REMINDER_HOUR : null,
+            );
       // Also arms reminders for a user who had none scheduled: one whose row
       // predates reminders, or whose last pass found no device to send to.
       const arm =
@@ -309,9 +325,11 @@ export const setSaveReminders = mutation({
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
     // A zone change rebooks the weekly shelf and drops the booked reminder
-    // slot, so the switch books a fresh one in the new zone.
+    // slot; the switch books its own fresh one below, so no hour is passed.
     const rebooked =
-      existing === null ? undefined : rebookedSchedule(existing, timezone, now);
+      existing === null
+        ? undefined
+        : rebookedSchedule(existing, timezone, now, null);
     const booked =
       rebooked === undefined ? existing?.nextReminderAt : undefined;
     const nextReminderAt = args.enabled
@@ -329,10 +347,12 @@ export const setSaveReminders = mutation({
       });
     } else {
       await ctx.db.patch(existing._id, {
-        ...rebooked,
         remindersEnabled: args.enabled,
         nextReminderAt,
         timezone,
+        ...(rebooked === undefined
+          ? {}
+          : { nextDigestAt: rebooked.nextDigestAt }),
         updatedAt: now,
       });
     }

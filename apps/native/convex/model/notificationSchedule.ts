@@ -139,3 +139,29 @@ export function nextLocalHourAt(
   }
   throw new Error("Could not calculate daily notification time");
 }
+
+/**
+ * The fields a change of zone rebooks, or undefined when the zone is the one
+ * already stored. Every launch, the shelf settings and the reminder switch all
+ * report the device's zone, and a traveller would otherwise keep the weekly
+ * shelf and reminders booked at home hours, which can be the middle of their
+ * night. `reminderHour` is the hour to book the reminder slot at, or null to
+ * leave the slot alone: the caller knows whether reminders are on.
+ */
+export function rebookedSchedule(
+  existing: { timezone?: string },
+  timezone: string,
+  now: number,
+  reminderHour: number | null,
+):
+  | { timezone: string; nextDigestAt: number; nextReminderAt?: number }
+  | undefined {
+  if (timezone === existing.timezone) return undefined;
+  return {
+    timezone,
+    nextDigestAt: nextWeeklyDigestAt(now, timezone),
+    ...(reminderHour === null
+      ? {}
+      : { nextReminderAt: nextLocalHourAt(now, timezone, reminderHour) }),
+  };
+}

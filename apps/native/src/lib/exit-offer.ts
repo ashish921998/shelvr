@@ -66,6 +66,11 @@ export function exitOfferReminderAt(
   return fireAt - now > 60_000 ? fireAt : null;
 }
 
+type ReminderPlan =
+  | { kind: "schedule"; fireAt: number }
+  | { kind: "keep" }
+  | { kind: "cancel" };
+
 /**
  * What a sync should do with the scheduled reminder for the window ending at
  * `endsAt`, or for no window when `endsAt` is null. "keep" covers a reminder
@@ -74,11 +79,6 @@ export function exitOfferReminderAt(
  * for because they opened the app. The window is derived here and nowhere
  * else, so the sync never re-reads it.
  */
-type ReminderPlan =
-  | { kind: "schedule"; fireAt: number }
-  | { kind: "keep" }
-  | { kind: "cancel" };
-
 export function exitOfferReminderPlan(
   endsAt: number | null,
   now: number,
