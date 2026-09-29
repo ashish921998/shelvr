@@ -243,38 +243,43 @@ export default function SpacesScreen() {
                         ? `fixture-space-${space.fixtureKey}`
                         : undefined
                     }
-                    style={({ pressed }) => pressed && styles.pressed}
                   >
-                    <CoverStack
-                      cover={cover}
-                      seed={space._id}
-                      name={space.name}
-                      itemCount={space.itemCount}
-                      suggestionCount={space.suggestionCount}
-                    />
-                    <View style={styles.caption}>
-                      <Text style={styles.title} numberOfLines={1}>
-                        {space.name}
-                      </Text>
-                      <ActionMenu
-                        label={t("spaces.actions")}
-                        title={t("spaces.actions")}
-                        actions={[
-                          {
-                            label: t("common.delete"),
-                            destructive: true,
-                            onPress: () => confirmDelete(space._id),
-                          },
-                        ]}
-                        style={styles.menuButton}
-                      >
-                        <AppSymbolIcon
-                          name="ellipsis"
-                          size={15}
-                          tintColor={theme.colors.foreground}
+                    {/* Link.Trigger's Slot drops a Pressable style function,
+                        so press feedback lives on this inner View. */}
+                    {({ pressed }) => (
+                      <View style={pressed ? styles.pressed : undefined}>
+                        <CoverStack
+                          cover={cover}
+                          seed={space._id}
+                          name={space.name}
+                          itemCount={space.itemCount}
+                          suggestionCount={space.suggestionCount}
                         />
-                      </ActionMenu>
-                    </View>
+                        <View style={styles.caption}>
+                          <Text style={styles.title} numberOfLines={1}>
+                            {space.name}
+                          </Text>
+                          <ActionMenu
+                            label={t("spaces.actions")}
+                            title={t("spaces.actions")}
+                            actions={[
+                              {
+                                label: t("common.delete"),
+                                destructive: true,
+                                onPress: () => confirmDelete(space._id),
+                              },
+                            ]}
+                            style={styles.menuButton}
+                          >
+                            <AppSymbolIcon
+                              name="ellipsis"
+                              size={15}
+                              tintColor={theme.colors.foreground}
+                            />
+                          </ActionMenu>
+                        </View>
+                      </View>
+                    )}
                   </Pressable>
                 </Link.Trigger>
                 <Link.Preview />
@@ -312,8 +317,9 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.85,
   },
-  // Square area the pile is centered within. Kept square so every cell is the
-  // same height and the 2-column grid stays tidy regardless of cover shape.
+  // Square area the pile is centered within. Fixed so every cell in the
+  // 2-column grid has the same height regardless of cover shape; the covers
+  // scale themselves to fit.
   stack: {
     width: "100%",
     aspectRatio: 1,

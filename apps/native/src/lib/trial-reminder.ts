@@ -2,6 +2,10 @@ import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement, waitForSheetTransition } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import type { TextMessageKey } from "@/locales/message-types";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef } from "react";
@@ -12,6 +16,11 @@ import { Platform } from "react-native";
  * charges on day 7 unless cancelled, and a reminder is what makes starting a
  * trial feel safe. It is scheduled on the device, so it works without the
  * weekly shelf opt-in or a push token, and it ships over the air.
+ *
+ * Two earlier nudges ride along with it: day 1 asks for the next save and day
+ * 3 points back to the shelf. Trials that ended in cancellation mostly held a
+ * single save, so the week has to show the app doing something before the
+ * day-5 reminder asks the user to decide.
  */
 
 export const TRIAL_REMINDER_ID = "shelvr.trial-ending";
@@ -19,6 +28,36 @@ const CHANNEL_ID = "trial-reminder";
 const LEAD_MS = 2 * 24 * 60 * 60 * 1000;
 // A reminder due within this window is pointless: the trial ends first.
 const MIN_LEAD_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TRIAL_MS = 7 * DAY_MS;
+// Nudges land in the day, never overnight.
+const NUDGE_EARLIEST_HOUR = 10;
+const NUDGE_LATEST_HOUR = 19;
+
+type TrialNudge = {
+  id: string;
+  day: number;
+  titleKey: TextMessageKey;
+  bodyKey: TextMessageKey;
+  url: string;
+};
+
+export const TRIAL_NUDGES: readonly TrialNudge[] = [
+  {
+    id: "shelvr.trial-day-1",
+    day: 1,
+    titleKey: "notifications.trialFirstDayTitle",
+    bodyKey: "notifications.trialFirstDayBody",
+    url: "/add",
+  },
+  {
+    id: "shelvr.trial-day-3",
+    day: 3,
+    titleKey: "notifications.trialThirdDayTitle",
+    bodyKey: "notifications.trialThirdDayBody",
+    url: "/",
+  },
+];
 
 // Every schedule and cancel shares one notification id, so they run one at a
 // time: a slow, stale call can never finish after a newer one and undo it.
@@ -37,7 +76,49 @@ export function trialReminderAt(expiresAt: number, now: number): number | null {
   return fireAt - now > MIN_LEAD_MS ? fireAt : null;
 }
 
-function canNotify(permission: Notifications.NotificationPermissionsStatus) {
+/**
+ * When the nudge for `day` of a 7-day trial ending at `expiresAt` goes out:
+ * that many days after the trial started, moved into daytime local hours.
+ * Null once that moment has passed, which is also every trial shorter than a
+ * week (store sandboxes).
+ */
+export function trialNudgeAt(
+  expiresAt: number,
+  day: number,
+  now: number,
+): number | null {
+  // Calendar days, not 24-hour steps, so a DST change keeps the local hour.
+  const at = new Date(expiresAt - TRIAL_MS);
+  at.setDate(at.getDate() + day);
+  const hour = at.getHours();
+  if (hour < NUDGE_EARLIEST_HOUR) at.setHours(NUDGE_EARLIEST_HOUR, 0, 0, 0);
+  else if (hour >= NUDGE_LATEST_HOUR) at.setHours(NUDGE_LATEST_HOUR, 0, 0, 0);
+  const fireAt = at.getTime();
+  return fireAt - now > MIN_LEAD_MS ? fireAt : null;
+}
+
+/**
+ * The nudges follow the Save reminders switch in Profile. `getPreferences`
+ * reports reminders off both for a user who turned them off and for one with
+ * no preferences row yet (no device ever registered), and only the first is
+ * an opt-out. A row always carries a timezone, so that tells them apart.
+ */
+export function trialNudgesAllowed(preferences: {
+  remindersEnabled: boolean;
+  timezone: string | null;
+}): boolean {
+  return preferences.remindersEnabled || preferences.timezone === null;
+}
+
+async function cancelTrialNudges(): Promise<void> {
+  for (const nudge of TRIAL_NUDGES) {
+    await Notifications.cancelScheduledNotificationAsync(nudge.id);
+  }
+}
+
+export function canNotify(
+  permission: Notifications.NotificationPermissionsStatus,
+) {
   if (Platform.OS !== "ios") return permission.granted;
   const status = permission.ios?.status;
   return (
@@ -60,10 +141,12 @@ export async function scheduleTrialReminder(
   now: number,
   mayAsk: boolean,
   isCurrent: () => boolean = () => true,
+  nudges = false,
 ): Promise<boolean> {
   const fireAt = trialReminderAt(expiresAt, now);
   if (fireAt === null) {
     await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
+    await cancelTrialNudges();
     return false;
   }
   // Android 13 cannot request notification permission before a channel exists.
@@ -73,6 +156,9 @@ export async function scheduleTrialReminder(
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
+  // Cleared before the permission check, so switching nudges off takes
+  // effect even while permission is denied.
+  await cancelTrialNudges();
   let permission = await Notifications.getPermissionsAsync();
   if (!canNotify(permission) && mayAsk && permission.canAskAgain) {
     permission = await Notifications.requestPermissionsAsync();
@@ -96,8 +182,28 @@ export async function scheduleTrialReminder(
       channelId: CHANNEL_ID,
     },
   });
+  if (nudges) {
+    for (const nudge of TRIAL_NUDGES) {
+      const nudgeAt = trialNudgeAt(expiresAt, nudge.day, now);
+      if (nudgeAt === null) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: nudge.id,
+        content: {
+          title: t(nudge.titleKey),
+          body: t(nudge.bodyKey),
+          data: { url: nudge.url, kind: "trial_nudge" },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(nudgeAt),
+          channelId: CHANNEL_ID,
+        },
+      });
+    }
+  }
   if (!isCurrent()) {
     await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
+    await cancelTrialNudges();
     return false;
   }
   return true;
@@ -105,6 +211,7 @@ export async function scheduleTrialReminder(
 
 async function cancelTrialReminder(): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
+  await cancelTrialNudges();
   // A reminder already delivered is wrong once the trial converts or ends.
   await Notifications.dismissNotificationAsync(TRIAL_REMINDER_ID);
 }
@@ -120,10 +227,18 @@ export function useTrialReminder(): void {
   const { status, expiresAt, loading } = useEntitlement();
   const { data: user } = useCurrentUser();
   const userId = user?._id ?? null;
+  const preferences = useQuery({
+    ...convexQuery(api.notifications.getPreferences, userId ? {} : "skip"),
+  });
+  // Until the switch is known, hold off; if it cannot be read, the day-5
+  // reminder still goes out, without the nudges.
+  const nudgesKnown = preferences.data !== undefined || preferences.isError;
+  const nudges =
+    preferences.data !== undefined && trialNudgesAllowed(preferences.data);
   // The last settled status for this account, so a trial that begins while
   // the app is open can be told apart from one that was already running.
   const previous = useRef<{ userId: string; status: string } | null>(null);
-  const scheduledFor = useRef<number | null>(null);
+  const scheduledFor = useRef<string | null>(null);
   // Bumped whenever the reminder should no longer exist, so scheduling work
   // still in flight from an earlier trial knows it is stale.
   const generation = useRef(0);
@@ -141,11 +256,16 @@ export function useTrialReminder(): void {
       previous.current = null;
       return;
     }
+    // Waiting leaves `previous` alone, so a trial that just started is still
+    // told apart once the switch loads.
+    if (status === "trialing" && expiresAt !== undefined && !nudgesKnown)
+      return;
     const before =
       previous.current?.userId === userId ? previous.current.status : null;
     previous.current = { userId, status };
     if (status !== "trialing" || expiresAt === undefined) return;
-    if (scheduledFor.current === expiresAt) return;
+    const key = `${expiresAt}:${nudges}`;
+    if (scheduledFor.current === key) return;
 
     const justStarted = before !== null && before !== "trialing";
     let mayAsk = false;
@@ -159,7 +279,7 @@ export function useTrialReminder(): void {
       analytics.captureError("trial_reminder_flag_failed", error);
     }
 
-    scheduledFor.current = expiresAt;
+    scheduledFor.current = key;
     generation.current += 1;
     const mine = generation.current;
     const isCurrent = () => generation.current === mine;
@@ -168,12 +288,12 @@ export function useTrialReminder(): void {
       if (mayAsk) await waitForSheetTransition();
       if (!isCurrent()) return;
       const scheduled = await serial(() =>
-        scheduleTrialReminder(expiresAt, Date.now(), mayAsk, isCurrent),
+        scheduleTrialReminder(expiresAt, Date.now(), mayAsk, isCurrent, nudges),
       );
       if (!scheduled && isCurrent()) scheduledFor.current = null;
     })().catch((error) => {
       if (isCurrent()) scheduledFor.current = null;
       analytics.captureError("trial_reminder_schedule_failed", error);
     });
-  }, [status, expiresAt, loading, userId]);
+  }, [status, expiresAt, loading, userId, nudges, nudgesKnown]);
 }

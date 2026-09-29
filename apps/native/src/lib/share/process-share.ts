@@ -3,7 +3,7 @@
 // image save, persistence) is injected, so the orchestration is unit-testable
 // with fakes and so a partial failure can never erase sibling successes.
 //
-// The contract (plan 004):
+// The contract:
 //   - classify(): convert resolved payloads into entries WITHOUT side effects,
 //     treating malformed input (no contentUri, blank text, bad website URL,
 //     unsupported types) as explicit failed/unsupported entries.

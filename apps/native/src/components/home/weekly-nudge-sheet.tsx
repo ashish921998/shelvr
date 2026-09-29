@@ -12,13 +12,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** Asks once, after the first share-sheet save, whether to turn on the weekly shelf. */
+/**
+ * Asks once whether to turn on the weekly shelf. Queued by the first
+ * share-sheet save; `ready` holds it back until Home says the moment is right
+ * (see `shouldOfferWeeklyNudge`).
+ */
 export function WeeklyNudgeSheet({
   userId,
   previewTitle,
+  ready,
 }: {
   userId: string;
   previewTitle?: string;
+  ready: boolean;
 }) {
   useAppLocale();
   const { session } = useNotificationSession();
@@ -32,7 +38,7 @@ export function WeeklyNudgeSheet({
       api.notifications.getPreferences,
       // 'skip', not `enabled`: a disabled React Query still subscribes
       // through the Convex adapter (see the pager).
-      pending ? {} : "skip",
+      pending && ready ? {} : "skip",
     ),
   });
   const alreadyOn = preferences?.weeklyShelfEnabled === true;
@@ -84,7 +90,7 @@ export function WeeklyNudgeSheet({
     }
   };
 
-  const visible = pending && preferences !== undefined && !alreadyOn;
+  const visible = pending && ready && preferences !== undefined && !alreadyOn;
 
   return (
     <Modal

@@ -1,7 +1,9 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { EmptyState } from "@/components/empty-state";
+import { ExitOfferCard } from "@/components/home/exit-offer-card";
 import { ProCard } from "@/components/home/pro-card";
 import { SaveHowTo } from "@/components/home/save-how-to";
+import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
@@ -10,7 +12,7 @@ import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
-import { useEntitlement } from "@/lib/entitlement";
+import { useEntitlement, useExitOfferEndsAt } from "@/lib/entitlement";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
@@ -19,6 +21,7 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
+import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
@@ -26,10 +29,27 @@ import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
+/** The weekly sheet is modal, so it waits while any inline prompt is up. */
+function nudgeSheetReady(
+  nudgeReady: boolean,
+  ...inlinePromptsVisible: boolean[]
+) {
+  return nudgeReady && !inlinePromptsVisible.some(Boolean);
+}
+
+/** While the exit offer's window is open, its countdown takes the Pro slot. */
+function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
+  const exitOfferEndsAt = useExitOfferEndsAt(userId);
+  return exitOfferEndsAt !== null ? (
+    <ExitOfferCard endsAt={exitOfferEndsAt} userId={userId} />
+  ) : (
+    <ProCard lapsed={lapsed} />
+  );
+}
+
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
-  useReviewPrompt(items);
 
   const cancelSurvey = useCancelSurvey();
   // Saving is Pro-only. Without Pro (the paywall was closed, or Pro lapsed),
@@ -39,25 +59,27 @@ export default function HomeScreen() {
   const entitlement = useEntitlement();
   const locked = !entitlement.loading && !entitlement.entitled;
   const proPending = entitlement.loading || locked;
-  // The cancel survey owns the Home moment when visible, then the save recall
-  // card. Each later prompt defers its one-shot claim so it is never consumed
-  // behind a card that holds the slot.
-  const recall = useSaveRecall(items, {
+  const { data: user } = useCurrentUser();
+  // The cancel survey owns the Home moment when visible, then the save
+  // progress card, then the save recall card. Each later prompt defers its
+  // one-shot claim so it is never consumed behind a card that holds the slot.
+  const progress = useSaveProgress(user?._id, {
     defer: cancelSurvey.visible || proPending,
   });
+  // No rating prompt in an account's first session.
+  useReviewPrompt(items, { defer: progress.firstSession });
+  const recall = useSaveRecall(items, { defer: progress.deferLater });
   const feedback = useFeedbackInvitation(items, {
-    defer:
-      cancelSurvey.visible || proPending || recall.visible || recall.pending,
+    defer: progress.deferLater || recall.visible || recall.pending,
   });
   const busySaving = useBusySaving(items);
-  const { data: user } = useCurrentUser();
   // The share screen records the first save while Home stays mounted below
   // it, so re-read the flag on focus.
   const [, setFocusCount] = useState(0);
   useFocusEffect(useCallback(() => setFocusCount((n) => n + 1), []));
   const firstShareSaved = user ? hasSavedFirstShare(user._id) : true;
   const proCard = locked ? (
-    <ProCard lapsed={entitlement.status === "lapsed"} />
+    <ProSlot userId={user?._id} lapsed={entitlement.status === "lapsed"} />
   ) : null;
 
   // One element, two slots (empty feed and feed header) — the survey claims
@@ -81,7 +103,16 @@ export default function HomeScreen() {
     itemCount: items.length,
   });
   const nudge = user ? (
-    <WeeklyNudgeSheet userId={user._id} previewTitle={items[0]?.title} />
+    <WeeklyNudgeSheet
+      userId={user._id}
+      previewTitle={items[0]?.title}
+      ready={nudgeSheetReady(
+        progress.nudgeReady,
+        cancelSurvey.visible,
+        recall.visible,
+        feedback.invitationVisible,
+      )}
+    />
   ) : null;
 
   if (items.length === 0) {
@@ -133,10 +164,12 @@ export default function HomeScreen() {
         loadingMore={loadingMore}
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS and the invitation scrolls with the content. The
-        // cancel survey claims the slot first, then the save recall card.
+        // cancel survey claims the slot first, then the save progress card,
+        // then the save recall card.
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
+          saveProgressCard(progress) ??
           recallCard ??
           (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
@@ -153,6 +186,16 @@ export default function HomeScreen() {
       ) : null}
     </View>
   );
+}
+
+function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
+  return progress.card ? (
+    <SaveProgressCard
+      saved={progress.card.saved}
+      goal={progress.card.goal}
+      onDismiss={progress.dismiss}
+    />
+  ) : null;
 }
 
 const styles = StyleSheet.create((theme) => ({

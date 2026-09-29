@@ -36,6 +36,10 @@ export type MessageParams = {
   "notifications.trialChannel": undefined;
   "notifications.trialEndingTitle": undefined;
   "notifications.trialEndingBody": undefined;
+  "notifications.trialFirstDayTitle": undefined;
+  "notifications.trialFirstDayBody": undefined;
+  "notifications.trialThirdDayTitle": undefined;
+  "notifications.trialThirdDayBody": undefined;
   "errors.searchTitle": undefined;
   "loading.app": undefined;
   "digest.backHome": undefined;
@@ -466,6 +470,10 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
+  "home.progressTitle": undefined;
+  "home.progressBody": undefined;
+  "home.progressCount": { saved: number; total: number };
+  "home.progressAdd": undefined;
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
@@ -490,6 +498,17 @@ export type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
+  "exitOffer.title": undefined;
+  "exitOffer.endsIn": { time: string };
+  "exitOffer.cta": undefined;
+  "exitOffer.sheetEndsIn": { hours: string; minutes: string };
+  "exitOffer.reminderTitle": undefined;
+  "exitOffer.reminderBody": undefined;
+  "exitOffer.remindMe": undefined;
+  "exitOffer.reminderConsent": undefined;
+  "exitOffer.reminderSet": undefined;
+  "exitOffer.reminderCancel": undefined;
+  "exitOffer.reminderDenied": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

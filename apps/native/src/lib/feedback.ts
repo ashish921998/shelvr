@@ -66,7 +66,7 @@ type InvitationGate = {
 
 /**
  * The single decision for whether the inline home invitation may appear.
- * Caps: once per account, at most twice with a 14-day gap, never after a
+ * Caps: at most twice per account with a 14-day gap between, never after a
  * submission, and never in the same breath as the native review prompt.
  */
 export function canShowInvitation(

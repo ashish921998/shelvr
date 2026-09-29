@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   Linking,
   Platform,
@@ -8,29 +8,14 @@ import {
   View,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { TERMS_VERSION } from "@convex/model/legalConsent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { analytics } from "@/lib/analytics";
-import { useOnboarding } from "@/lib/onboarding";
-import { ScreenLoader } from "@/components/ui/screen-loader";
 
-/** Review follows sign-in/onboarding, before purchase UI can be presented. */
-export function LegalConsentBoundary({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const { onboarded } = useOnboarding();
-  const enabled = isAuthenticated && onboarded && Platform.OS === "ios";
-  const consent = useQuery(api.legalConsent.get, enabled ? {} : "skip");
-  if (isLoading) return <ScreenLoader label={t("loading.app")} />;
-  if (!enabled) return children;
-  if (consent === undefined) return <ScreenLoader label={t("loading.app")} />;
-  if (consent?.reviewedVersion !== TERMS_VERSION) return <LegalConsentReview />;
-  return children;
-}
-
-function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
+function LegalConsentReview({ onComplete }: { onComplete: () => void }) {
   useAppLocale();
   const review = useMutation(api.legalConsent.review);
   const [pending, setPending] = useState(false);
@@ -41,7 +26,7 @@ function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
     setFailed(false);
     try {
       await review({ version: TERMS_VERSION, accepted });
-      onComplete?.();
+      onComplete();
     } catch {
       analytics.captureError(
         "legal_consent_save_failed",

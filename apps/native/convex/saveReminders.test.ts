@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { newConvexTest } from "./test.setup";
+import { nextLocalHourAt } from "./model/notificationSchedule";
+import { DEFAULT_REMINDER_HOUR } from "./model/saveReminders";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-25T18:00:00Z");
@@ -306,6 +308,21 @@ describe("reminder preferences", () => {
         platform: "android",
       });
     expect((await preferencesRow())?.nextReminderAt).toBe(NOW + DAY);
+  });
+
+  it("moves the reminder slot when the shelf settings change timezone", async () => {
+    const { t, preferencesRow } = await setup();
+    await t
+      .withIdentity({ subject: `${USER}|session-1` })
+      .mutation(api.notifications.setPreferences, {
+        weeklyShelfEnabled: false,
+        timezone: "Asia/Kolkata",
+      });
+    const row = await preferencesRow();
+    expect(row?.timezone).toBe("Asia/Kolkata");
+    expect(row?.nextReminderAt).toBe(
+      nextLocalHourAt(NOW, "Asia/Kolkata", DEFAULT_REMINDER_HOUR),
+    );
   });
 
   it("turns reminders on and off from the client", async () => {
@@ -629,6 +646,35 @@ describe("delivering a save reminder", () => {
     });
     expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
       deliveryStatus: "complete",
+    });
+  });
+
+  it("counts a push Expo accepted as delivered when the switch turns off", async () => {
+    const { t, reminder } = await queued();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json([{ status: "ok", id: "ticket-a" }])),
+    );
+    const send = () =>
+      t.action(internal.notificationDelivery.sendReminder, {
+        reminderId: reminder._id,
+      });
+    await send();
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "pending",
+      deliveryRecipients: [{ state: "receipt" }],
+    });
+    await t.run(async (ctx) => {
+      const row = await ctx.db.query("notificationPreferences").unique();
+      await ctx.db.patch(row!._id, { remindersEnabled: false });
+    });
+    const row = await t.run((ctx) => ctx.db.get(reminder._id));
+    vi.setSystemTime(row!.deliveryNextAttemptAt!);
+    await send();
+    // The push most likely reached the phone, so it keeps its budget slot.
+    expect(await t.run((ctx) => ctx.db.get(reminder._id))).toMatchObject({
+      deliveryStatus: "complete",
+      deliveryError: "notifications_disabled",
     });
   });
 

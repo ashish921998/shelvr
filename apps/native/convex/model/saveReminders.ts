@@ -55,6 +55,21 @@ export function saveRemindersLive(): boolean {
 
 /** Used until the user has saved enough for their own hour to show. */
 export const DEFAULT_REMINDER_HOUR = 18;
+
+/**
+ * Whether this preferences row wants save reminders. The switch is on unless
+ * the user turned it off: rows written before the switch existed have no
+ * value, and they get reminders. A caller with no row decides for itself what
+ * "no row" means, because it differs: nothing can arrive for a user who never
+ * registered a device, while a reminder already in flight is not stopped by
+ * the absence of a row.
+ */
+export function remindersOn(preferences: {
+  remindersEnabled?: boolean;
+}): boolean {
+  return preferences.remindersEnabled !== false;
+}
+
 /** "Today" still means something at 19:00, and nothing lands before 10:00. */
 const EARLIEST_HOUR = 10;
 const LATEST_HOUR = 19;

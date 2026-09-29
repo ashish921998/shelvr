@@ -1,3 +1,5 @@
+import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
@@ -28,6 +30,7 @@ export default function AppLayout() {
   useResumePendingShare();
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
+  useExitOfferReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -42,6 +45,7 @@ export default function AppLayout() {
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
+      <ExitOfferSheetHost />
       <Stack
         screenOptions={{
           animation: reducedMotion ? "fade" : "default",
@@ -101,18 +105,13 @@ export default function AppLayout() {
                   }
                 : {
                     presentation: "formSheet",
-                    // Android form sheets do not reliably render native-stack header
-                    // controls. Add owns an in-content toolbar there; iOS keeps the
-                    // native title and toolbar.
                     headerShown: true,
                     headerTransparent: false,
                     headerStyle: { backgroundColor: theme.colors.background },
                     sheetGrabberVisible: true,
-                    // Android does not resize a fit-to-content form sheet when Add
-                    // switches from the compact action menu to the note/article
-                    // composer. Use a large detent there so the native Back/Save
-                    // header and editor remain reachable; iOS can keep its compact,
-                    // dynamically sized sheet.
+                    // Sized to its content so the compact action menu and the
+                    // taller note/article composer both fit without a fixed
+                    // detent leaving the editor unreachable.
                     sheetAllowedDetents: "fitToContents",
                     contentStyle: { backgroundColor: theme.colors.background },
                   }

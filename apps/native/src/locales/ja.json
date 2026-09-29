@@ -35,6 +35,10 @@
   "notifications.trialChannel": "トライアルのリマインダー",
   "notifications.trialEndingTitle": "無料トライアルはあと2日で終了します",
   "notifications.trialEndingBody": "Shelvr Proを続けるか、更新前ならプロフィールからいつでも解約できます。",
+  "notifications.trialFirstDayTitle": "残しておきたいものはありましたか？",
+  "notifications.trialFirstDayBody": "どのアプリからでも Shelvr に共有するか、ここにリンクを貼り付けてください。タイトルとタグ付きでシェルフに届きます。",
+  "notifications.trialThirdDayTitle": "シェルフが待っています",
+  "notifications.trialThirdDayBody": "Shelvr を開いて今週保存したものを見るか、新しく追加しましょう。",
   "errors.searchTitle": "検索できませんでした",
   "loading.app": "Shelvrを開いています",
   "digest.backHome": "ホームに戻る",
@@ -497,6 +501,10 @@
   "home.howToMoreHelp": "Shelvrをよく使う項目に追加すると、先頭に表示されます。",
   "home.pasteLink": "リンクを貼り付ける",
   "home.onYourShelf": "シェルフ",
+  "home.progressTitle": "あとで見返したいものを3つ保存しましょう",
+  "home.progressBody": "どのアプリからでも、ページや投稿、スクリーンショットを Shelvr に共有できます。タイトルとタグ付きでここに届きます。",
+  "home.progressCount": "%{total}件中%{saved}件保存済み",
+  "home.progressAdd": "保存する",
   "home.recallTitle": "似たものを前にも保存しています",
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
@@ -522,5 +530,16 @@
   "refundConsent.disabled": "返金審査のデータ共有はオフです。",
   "refundConsent.syncPending": "選択を保存しました。RevenueCatを更新中です。完了までは以前の設定が適用される場合があります。",
   "refundConsent.withdraw": "共有をオフにする",
-  "refundConsent.review": "更新された利用規約を確認"
+  "refundConsent.review": "更新された利用規約を確認",
+  "exitOffer.title": "初年度が割引価格に",
+  "exitOffer.endsIn": "オファー終了まで %{time}",
+  "exitOffer.cta": "オファーを見る",
+  "exitOffer.sheetEndsIn": "オファー終了まで %{hours}時間%{minutes}分",
+  "exitOffer.reminderTitle": "オファーはあと1時間で終了します",
+  "exitOffer.reminderBody": "Shelvr Pro の初年度割引がまもなく終了します。",
+  "exitOffer.remindMe": "終了前にリマインド",
+  "exitOffer.reminderConsent": "このオファーについて、終了の1時間前に通知を1回お送りします。いつでも取り消せます。",
+  "exitOffer.reminderSet": "オファー終了の1時間前にリマインドします。",
+  "exitOffer.reminderCancel": "リマインドを取り消す",
+  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。"
 }

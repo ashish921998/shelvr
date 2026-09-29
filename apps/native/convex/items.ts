@@ -325,6 +325,44 @@ export const listItems = query({
   },
 });
 
+/** Ready saves a new account needs before its shelf counts as started. The
+ * Home "save your next two" card and the weekly shelf nudge both wait on it. */
+export const SAVE_PROGRESS_GOAL = 3;
+const SAVE_PROGRESS_MAX_READ = 20;
+
+/** How many real saves the user has, counted up to `SAVE_PROGRESS_GOAL`. The
+ * onboarding demo save is excluded (the app picked it for them), as are
+ * fixture seeds and saves not yet `ready`. Reads at most
+ * `SAVE_PROGRESS_MAX_READ` rows. */
+export const saveProgress = query({
+  args: {},
+  returns: v.object({ saved: v.number(), goal: v.number() }),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const demo = await ctx.db
+      .query("onboardingDemos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    // Walk ready saves until the goal is met, skipping excluded rows (the dev
+    // fixture reset seeds several), with a hard bound on rows read.
+    let saved = 0;
+    let read = 0;
+    for await (const item of ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )) {
+      if (item._id !== demo?.itemId && item.fixtureKey === undefined) saved++;
+      read++;
+      if (saved >= SAVE_PROGRESS_GOAL || read >= SAVE_PROGRESS_MAX_READ) break;
+    }
+    return {
+      saved: Math.min(saved, SAVE_PROGRESS_GOAL),
+      goal: SAVE_PROGRESS_GOAL,
+    };
+  },
+});
+
 /** The home feed, newest first, one page at a time. Card shape only — see
  * `itemCardValidator`. The cursor fields of `paginationOpts` pass through
  * untouched so the client's reactive page splitting keeps working; the size
@@ -1204,9 +1242,8 @@ export const getImportOperation = query({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    // Deliberately kind-agnostic: this probe serves every operation kind
-    // (plans 004/005 add link/note), so it must not throw a kind mismatch the
-    // way the image mutations do.
+    // Deliberately kind-agnostic: this probe serves every operation kind, so it
+    // must not throw a kind mismatch the way the image mutations do.
     const op = await ctx.db
       .query("itemOperations")
       .withIndex("by_user_operation", (q) =>
@@ -1228,15 +1265,15 @@ export const getImportOperation = query({
  * and eligible for the cleanup sweep. Tests derive staleness from this. */
 export const STALE_IMPORT_CUTOFF_MS = 24 * 60 * 60 * 1000;
 
-/** Sweep a bounded page of pending image operations older than the cutoff:
- * delete the unreferenced attached upload (the blob the process never
- * finalized), then the ledger row. Complete rows stay as the permanent
- * idempotency record. The index leads with kind so stale link/note rows
- * (plans 004/005) can never fill the page and starve image cleanup. */
 /** Rows swept per transaction. A full page chains a follow-up run, so backlog
  * drains at scheduler speed instead of one page per cron interval. */
 const CLEANUP_PAGE_SIZE = 100;
 
+/** Sweep a bounded page of pending image operations older than the cutoff:
+ * delete the unreferenced attached upload (the blob the process never
+ * finalized), then the ledger row. Complete rows stay as the permanent
+ * idempotency record. The index leads with kind so stale rows of other kinds
+ * can never fill the page and starve image cleanup. */
 export const cleanupStaleImageImports = internalMutation({
   args: {},
   returns: v.null(),

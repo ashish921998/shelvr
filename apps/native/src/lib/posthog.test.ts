@@ -240,6 +240,56 @@ describe("posthog exception autocapture gate", () => {
   });
 });
 
+describe("posthog session replay gate", () => {
+  it("records a production build with masking and sampling intact", async () => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+            variant: "production",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as {
+      enableSessionReplay: boolean;
+      sessionReplayConfig: Record<string, unknown>;
+    };
+    expect(options.enableSessionReplay).toBe(true);
+    expect(options.sessionReplayConfig).toMatchObject({
+      maskAllTextInputs: true,
+      maskAllImages: true,
+      maskAllSandboxedViews: true,
+      captureLog: false,
+      captureNetworkTelemetry: false,
+      sampleRate: 1,
+    });
+    vi.doUnmock("expo-constants");
+  });
+
+  it("stays off when the build declares no variant", async () => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as { enableSessionReplay: boolean };
+    expect(options.enableSessionReplay).toBe(false);
+    vi.doUnmock("expo-constants");
+  });
+});
+
 describe("superProperties", () => {
   it("tags events with the running OTA update and the store platform", () => {
     expect(superProperties()).toEqual({

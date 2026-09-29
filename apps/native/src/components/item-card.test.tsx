@@ -28,7 +28,22 @@ vi.mock("react-native", () => {
   );
   return {
     View: vi.fn(a11yElement),
-    Pressable: vi.fn(a11yElement),
+    // The card's look lives in render-prop children (see item-card.tsx).
+    Pressable: vi.fn(
+      ({
+        children,
+        ...props
+      }: Omit<A11yProps, "children"> & {
+        children?: ReactNode | ((state: { pressed: boolean }) => ReactNode);
+      }) =>
+        a11yElement({
+          ...props,
+          children:
+            typeof children === "function"
+              ? children({ pressed: false })
+              : children,
+        }),
+    ),
     Text: vi.fn(({ children }: { children?: ReactNode }) => (
       <span>{children}</span>
     )),
@@ -105,6 +120,9 @@ vi.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
+vi.mock("@/lib/share/share-store", () => ({
+  forgetDeletedSharedItem: vi.fn(),
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn(), itemAction: vi.fn() },
 }));

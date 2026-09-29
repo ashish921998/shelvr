@@ -9,9 +9,13 @@
 //
 //   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
 //      current raw shared payload batch (order + duplicates included). Two
-//      distinct batches must never share a fingerprint, so a deliberate later
-//      re-share of identical content is its own fresh session rather than
-//      matching a stale completed one.
+//      distinct batches must never share a fingerprint. On Android the last
+//      completed batch also leaves a tombstone (recordCompletedShare), and a
+//      later batch with the same fingerprint from the same user is treated as
+//      the OS replaying that share: entries it already saved are skipped
+//      silently. So a deliberate re-share of identical content is a fresh
+//      session only once another share has replaced the tombstone, or the
+//      saved item was deleted in the app (forgetDeletedShareItem).
 //   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
@@ -236,11 +240,11 @@ type ReconcileResult =
  * session and a fresh one starts, so a prior account's completed session can
  * never silently drop the new user's identical share.
  *
- * Completed-state is single-use: a fingerprint (and user) match alone is NOT a
- * durable "drop this share" signal. The caller clears native payloads and
+ * Completed-state is single-use: the caller clears native payloads and
  * deletes the record only after a non-throwing clear — reconcileSession itself
  * does NOT delete a completed record, so a throwing clear stays retryable on
- * remount. */
+ * remount. The durable "skip this share" signal is the separate Android
+ * tombstone read by ghostRedelivery, which outlives the session record. */
 export function reconcileSession(
   store: SessionStoreAdapter,
   userId: string,
@@ -402,7 +406,7 @@ export function recordCompletedShare(
 /** A one-way digest of a fingerprint. The tombstone outlives the session, so
  * it keeps only this digest, never the shared URLs or note text themselves.
  * Sync because reconcileSession is sync (expo-crypto only hashes async).
- * ponytail: cyrb53, 53 bits, not cryptographic; a collision would skip a
+ * cyrb53, 53 bits, not cryptographic; a collision would skip a
  * genuinely new share, so move to SHA-256 only if the reconcile path goes
  * async. */
 function digestFingerprint(fingerprint: string): string {
@@ -454,6 +458,32 @@ function ghostRedelivery(
     store.remove(LAST_COMPLETED_SHARE_KEY);
     return null;
   }
+}
+
+/** Forgets a deleted item in the last-share tombstone. The tombstone can only
+ * tell a replay from a deliberate re-share by content, so without this, sharing
+ * a link again after deleting its save would be skipped as a replay and the
+ * save lost. Dropping just this item's settled entries makes a later identical
+ * batch save it again, while its other still-saved entries are still skipped. */
+export function forgetDeletedShareItem(
+  store: SessionStoreAdapter,
+  itemId: string,
+): void {
+  const raw = store.getString(LAST_COMPLETED_SHARE_KEY);
+  if (raw === undefined) return;
+  let parsed: { settled?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { settled?: unknown };
+  } catch {
+    store.remove(LAST_COMPLETED_SHARE_KEY);
+    return;
+  }
+  if (!Array.isArray(parsed.settled)) return;
+  const settled = parsed.settled.filter(
+    (e) => !(isSettled(e) && e.itemId === itemId),
+  );
+  if (settled.length === parsed.settled.length) return;
+  store.set(LAST_COMPLETED_SHARE_KEY, JSON.stringify({ ...parsed, settled }));
 }
 
 function isSettled(value: unknown): value is SettledEntry {

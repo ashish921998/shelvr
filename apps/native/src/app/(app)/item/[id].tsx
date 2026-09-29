@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -201,11 +202,7 @@ function ItemScreenContent() {
   // The home feed is paginated and shared through HomeFeedProvider, so every
   // page the user scrolled to is already here; the other two queries are warm
   // in the cache from the source screen. Either way this is a cache read, not
-  // a network round-trip.
-  // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
-  // React Query still subscribes through the Convex adapter, and an invalid
-  // arg (e.g. an empty-string id) throws ArgumentValidationError on every
-  // socket reconnect, which the server answers by closing the WebSocket.
+  // a network round-trip. The conditional args use the 'skip' sentinel above.
   const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
     convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
@@ -453,6 +450,7 @@ function ItemScreenContent() {
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
+      forgetDeletedSharedItem(activeItem._id);
       analytics.capture("item_deleted", { item_type: activeItem.type });
       if (neighbor) {
         goTo(neighbor._id);

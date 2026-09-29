@@ -677,12 +677,6 @@ async function safeDump(body: BodyReadable | null | undefined): Promise<void> {
 // Convenience readers (operate on the already-bounded bytes)
 // ---------------------------------------------------------------------------
 
-/** Decode bounded bytes as text using UTF-8. The stream cap already bounded
- * the size; this just converts. Callers should still slice for their needs. */
-export function decodeUtf8(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8").decode(bytes);
-}
-
 /**
  * Charset labels the WHATWG Encoding Standard maps to windows-1252. Browsers
  * treat a page declared as ISO-8859-1 or ASCII as windows-1252, so the C1
@@ -766,5 +760,5 @@ export function decodeWithContentType(
 
 /** Parse bounded bytes as JSON. Throws on invalid JSON. */
 export function parseJson(bytes: Uint8Array): unknown {
-  return JSON.parse(decodeUtf8(bytes));
+  return JSON.parse(new TextDecoder("utf-8").decode(bytes));
 }
