@@ -1281,7 +1281,7 @@ async function fetchPinterestPin(url: string): Promise<PageData> {
   if (widget.status === "ok") {
     const page = pinterestPage(widget.pin);
     if (page !== undefined) {
-      return page;
+      return withLinkedRecipe(page);
     }
   }
   if (widget.status === "transient") {
@@ -1606,12 +1606,15 @@ async function asCaption(read: Promise<PageData>): Promise<PageData> {
   return { ...(await read), caption: true };
 }
 
-/** The reader for each platform with its own. Pinterest marks its own page a
- * caption, because its page fallback is not one. */
+/** The reader for each platform with its own, each following its caption's
+ * link to a recipe. Pinterest does that only for a pin it read from the
+ * widget: its page fallback is not a caption, so it neither is marked one nor
+ * has its links followed. */
 const SOURCE_READERS = {
-  tiktok: (url) => asCaption(fetchTikTokOEmbed(url)),
-  x: (url) => asCaption(fetchXPost(url)),
-  instagram: fetchInstagram,
+  tiktok: async (url) =>
+    withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
+  x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
+  instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
   pinterest: fetchPinterestPin,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
 
@@ -1619,7 +1622,7 @@ export async function readPage(url: string): Promise<PageRead> {
   try {
     const source = linkSource(url);
     const page = source
-      ? await withLinkedRecipe(await SOURCE_READERS[source](url))
+      ? await SOURCE_READERS[source](url)
       : await fetchPage(url);
     const shortForm = shortFormSource(url);
     return {

@@ -237,4 +237,17 @@ describe("readPage for Pinterest pins", () => {
     expect((await readPage(shortUrl)).status).toBe("gone");
     expect(safeFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("does not follow links in the page fallback's body", async () => {
+    const outside = "https://recipes.test/other";
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
+      [PIN_URL]: html(
+        PIN_URL,
+        `<html><head><meta property="og:title" content="Pin"></head><body><article><p>See ${outside} for the full recipe, and more text so the article body is long enough to be extracted as content here.</p></article></body></html>`,
+      ),
+    });
+    await readPage(PIN_URL);
+    expect(safeFetch).not.toHaveBeenCalledWith(outside, expect.anything());
+  });
 });
