@@ -79,10 +79,7 @@ export default function PrivacyPage() {
             CTA clicks, waitlist form interactions, and the page URL) to PostHog
             before you have an account. Website identifiers are not linked to
             your account or to your saved content, and no analytics data is used
-            for advertising. We also use sampled session recordings in the app
-            to investigate onboarding and purchase difficulties. Text and images
-            are masked, and recording of console logs and network requests is
-            disabled.
+            for advertising.
           </li>{" "}
         </ul>
         <p className="mt-3">
