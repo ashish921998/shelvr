@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isValidTimezone,
+  rebookedSchedule,
   localHour,
   nextLocalHourAt,
   nextWeeklyDigestAt,
@@ -77,5 +78,34 @@ describe("timezone validation", () => {
     expect(parseTimezoneInput(undefined)).toBeUndefined();
     expect(parseTimezoneInput("  Europe/Paris ")).toBe("Europe/Paris");
     expect(resolveTimezone(undefined)).toBe("UTC");
+  });
+});
+
+describe("rebookedSchedule", () => {
+  const now = Date.UTC(2026, 8, 29, 12);
+
+  it("leaves an unchanged zone alone", () => {
+    expect(
+      rebookedSchedule({ timezone: "Asia/Kolkata" }, "Asia/Kolkata", now, 18),
+    ).toBeUndefined();
+  });
+
+  it("rebooks the shelf and the reminder slot in the new zone", () => {
+    expect(
+      rebookedSchedule({ timezone: "UTC" }, "Asia/Kolkata", now, 18),
+    ).toEqual({
+      timezone: "Asia/Kolkata",
+      nextDigestAt: nextWeeklyDigestAt(now, "Asia/Kolkata"),
+      nextReminderAt: nextLocalHourAt(now, "Asia/Kolkata", 18),
+    });
+  });
+
+  it("books no reminder slot when the caller passes no hour", () => {
+    expect(
+      rebookedSchedule({ timezone: "UTC" }, "Asia/Kolkata", now, null),
+    ).toEqual({
+      timezone: "Asia/Kolkata",
+      nextDigestAt: nextWeeklyDigestAt(now, "Asia/Kolkata"),
+    });
   });
 });
