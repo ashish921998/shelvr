@@ -251,3 +251,33 @@ describe("readPage for Pinterest pins", () => {
     expect(safeFetch).not.toHaveBeenCalledWith(outside, expect.anything());
   });
 });
+
+describe("readPage for Instagram posts", () => {
+  it("still follows the caption's link to its recipe", async () => {
+    const postUrl = "https://www.instagram.com/p/ABC123/";
+    const embedUrl = "https://www.instagram.com/p/ABC123/embed/captioned/";
+    const recipeUrl = "https://example.com/honey-chicken/";
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "Honey chicken",
+      recipeIngredient: ["2 chicken breasts", "3 tbsp honey"],
+      recipeInstructions: ["Sear the chicken.", "Glaze with honey."],
+    };
+    serve({
+      [postUrl]: html(postUrl, "<html><head></head><body></body></html>"),
+      [embedUrl]: html(
+        embedUrl,
+        `<div class="Caption"><a class="CaptionUsername">cook</a>Honey chicken, recipe at ${recipeUrl}<div class="CaptionComments"></div></div>`,
+      ),
+      [recipeUrl]: html(
+        recipeUrl,
+        `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+  });
+});

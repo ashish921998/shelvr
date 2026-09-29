@@ -1443,10 +1443,10 @@ function recipeFromMarkup(
 }
 
 /**
- * A caption source (TikTok, X) carries only a caption, and the caption often
- * links to the full recipe write-up. Follow that one link and read its
- * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
- * leaves the post exactly as it was.
+ * A caption source (TikTok, X, Instagram, a Pinterest pin) carries only a
+ * caption, and the caption often links to the full recipe write-up. Follow
+ * that one link and read its structured recipe markup. Best-effort: a
+ * blocked, slow, or markup-less page leaves the post exactly as it was.
  */
 async function withLinkedRecipe(page: PageData): Promise<PageData> {
   const caption = captionText(page);
