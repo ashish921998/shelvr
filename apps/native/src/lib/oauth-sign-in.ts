@@ -1,6 +1,7 @@
 import { analytics, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { makeRedirectUri } from "expo-auth-session";
+import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
 
@@ -72,7 +73,14 @@ export function useOAuthSignIn(surface: OAuthSurface) {
 
   const signInWith = useCallback(
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
-      analytics.capture("auth_started", { provider, surface });
+      // One id per attempt, shared by the start, cancel, failure, and success
+      // events, so a funnel can pair each start with the outcome that ended it.
+      const attemptId = randomUUID();
+      analytics.capture("auth_started", {
+        provider,
+        surface,
+        auth_attempt_id: attemptId,
+      });
       setPendingProvider(provider);
       setLastError(null);
       setInterrupted(false);
@@ -94,6 +102,7 @@ export function useOAuthSignIn(surface: OAuthSurface) {
             provider,
             surface,
             elapsed_ms: elapsedMs(),
+            auth_attempt_id: attemptId,
           });
           return "completed";
         }
@@ -114,6 +123,7 @@ export function useOAuthSignIn(surface: OAuthSurface) {
             result: result.type,
             elapsed_ms: elapsedMs(),
             browser_ms: Date.now() - browserStartedAt,
+            auth_attempt_id: attemptId,
             ...nativeError(result),
           });
           setInterrupted(true);
@@ -137,6 +147,7 @@ export function useOAuthSignIn(surface: OAuthSurface) {
           provider,
           surface,
           elapsed_ms: elapsedMs(),
+          auth_attempt_id: attemptId,
         });
         return "completed";
       } catch (err) {
@@ -145,6 +156,7 @@ export function useOAuthSignIn(surface: OAuthSurface) {
           surface,
           stage,
           elapsed_ms: elapsedMs(),
+          auth_attempt_id: attemptId,
         });
         const detail =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);

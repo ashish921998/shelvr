@@ -116,9 +116,11 @@ describe("categorization telemetry delivery", () => {
 
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
 
-    const jobs = await t.run((ctx) =>
-      ctx.db.system.query("_scheduled_functions").collect(),
-    );
+    const jobs = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).filter((job) => job.name === "ai:retryCategorizationTelemetry");
     expect(jobs).toHaveLength(1);
     const first = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(first.event).toBe("ai_categorization_succeeded");

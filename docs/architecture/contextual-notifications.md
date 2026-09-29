@@ -60,8 +60,16 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
 `notification_permission_result` (only when the user was actually prompted),
 `notification_sent` (once per digest or reminder at a terminal state, with
 its `notification_kind`), `notification_opened`, and `notification_disabled`
-(with the kind switched off). The trial reminder carries no `kind` yet, so
-its opens record as `unknown`.
+(with the kind switched off). Trial reminders now carry
+`kind: "trial_reminder"` and `notificationId: "shelvr.trial-ending"`; trial
+nudges carry `kind: "trial_nudge"` and their scheduled identifier, so their
+opens are attributed to a known kind instead of `unknown`.
+
+For server-delivered notifications, the `notification_sent` event timestamp is
+the first time Expo accepted a push ticket, not the later
+receipt-confirmation time. Rows created before this field existed fall back to
+the first terminal delivery observation when a recipient shows provider
+acceptance, and to the terminal time only when no send evidence exists.
 
 ### What we learn
 

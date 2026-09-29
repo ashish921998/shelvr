@@ -35,6 +35,7 @@ describe("save telemetry delivery", () => {
       savedAt: 1000,
       sessionId: "save-session",
       saveSource: "share_extension" as const,
+      operationId: "share:session-1:0",
     };
     await t.action(internal.analytics.captureSave, args);
     const jobs = await t.run((ctx) =>
@@ -55,7 +56,51 @@ describe("save telemetry delivery", () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(firstBody);
     expect(firstBody.properties.save_session_id).toBe("save-session");
     expect(firstBody.properties.save_source).toBe("share_extension");
+    expect(firstBody.properties.operation_id).toBe("share:session-1:0");
     expect(firstBody.properties.environment).toBe("development");
+  });
+
+  it("delivers processing outcomes with bounded fields and the original time", async () => {
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
+    vi.stubEnv("POSTHOG_HOST", "https://analytics.example");
+    vi.stubEnv("OBSERVABILITY_ENV", "development");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const t = newConvexTest();
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "qa",
+        type: "link",
+        status: "processing",
+        tags: [],
+        searchText: "",
+      }),
+    );
+
+    await t.action(internal.analytics.captureItemProcessed, {
+      itemId,
+      userId: "qa",
+      itemType: "link",
+      outcome: "ready",
+      enrichment: "partial",
+      processingMs: 250,
+      finishedAt: 2000,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.event).toBe("item_processed");
+    expect(body.timestamp).toBe("1970-01-01T00:00:02.000Z");
+    expect(body.properties).toMatchObject({
+      item_id: itemId,
+      item_type: "link",
+      outcome: "ready",
+      enrichment: "partial",
+      processing_ms: 250,
+      analytics_version: 1,
+    });
+    expect(body.properties).not.toHaveProperty("failure_reason");
   });
 
   it("is a no-op when analytics is not configured", async () => {

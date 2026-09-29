@@ -624,6 +624,7 @@ describe("canonical save telemetry", () => {
         savedAt: item?._creationTime,
         sessionId: "save-session",
         saveSource: "note",
+        operationId: "note:telemetry-1",
       },
     ]);
   });
@@ -2909,6 +2910,88 @@ describe("stale processing runs", () => {
       status: "ready",
       title: "Current result",
     });
+  });
+
+  it("schedules one processed event for each applied terminal outcome", async () => {
+    const t = newConvexTest();
+    const readyId = await processingLink(t, "processed", FRESH_AGE);
+    const readyRun = (await t.run((ctx) => ctx.db.get(readyId)))!
+      .processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId: readyId,
+      runId: readyRun,
+      title: "Ready",
+      description: "Usable",
+      tags: [],
+      status: "ready",
+      enrichment: "partial",
+    });
+
+    const failedId = await processingLink(t, "processed", FRESH_AGE);
+    const failedRun = (await t.run((ctx) => ctx.db.get(failedId)))!
+      .processingRunId;
+    await t.mutation(internal.items.failItem, {
+      itemId: failedId,
+      reason: "not_found",
+      runId: failedRun,
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const processed = jobs.filter(
+      (job) => job.name === "analytics:captureItemProcessed",
+    );
+    expect(processed).toHaveLength(2);
+    expect(processed.map((job) => job.args[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: readyId,
+          outcome: "ready",
+          enrichment: "partial",
+          processingMs: expect.any(Number),
+        }),
+        expect.objectContaining({
+          itemId: failedId,
+          outcome: "failed",
+          failureReason: "not_found",
+          processingMs: expect.any(Number),
+        }),
+      ]),
+    );
+  });
+
+  it("does not report a processed event for a ready note refresh", async () => {
+    const t = newConvexTest();
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "refresh",
+        type: "note",
+        note: "Updated note",
+        status: "ready",
+        processingRunId: "refresh-run",
+        processingStartedAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
+        tags: [],
+        searchText: "updated note",
+      }),
+    );
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId: "refresh-run",
+      keepTitle: true,
+      title: "Updated note",
+      description: "The refreshed note",
+      tags: ["note"],
+      status: "ready",
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(
+      jobs.filter((job) => job.name === "analytics:captureItemProcessed"),
+    ).toHaveLength(0);
   });
 
   it("finalizeItem reports a deleted item as missing", async () => {

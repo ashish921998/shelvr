@@ -1,9 +1,11 @@
+import { imageSizeError } from "@convex/model/imagePolicy";
 import {
-  IMAGE_TOO_LARGE_MESSAGE,
-  imageSizeError,
-  PHOTO_LIMIT_MESSAGE,
-} from "@convex/model/imagePolicy";
-import { saveErrorCode, type SaveErrorCode } from "@convex/model/saveErrors";
+  SAVE_ERROR_CODES,
+  SAVE_ERROR_MESSAGES,
+  saveErrorCode,
+  saveFailureStage,
+  type SaveErrorCode,
+} from "@convex/model/saveErrors";
 import type { SaveSource } from "@convex/model/saveSource";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -112,16 +114,21 @@ const REASON_BY_CODE: Record<SaveErrorCode, ImageSaveFailureReason> = {
 };
 
 /** Buckets a failed result for analytics. Prefers the structured code, so a
- * copy edit on the server cannot re-bucket every installed client. The message
- * comparison is the fallback for a server that still throws bare sentences and
- * for the client-side size check; delete it once no such server is live. */
+ * copy edit on the server cannot re-bucket every installed client. The
+ * message comparison is the fallback for a server that still throws bare
+ * sentences and for the client-side size check, and matches the canonical
+ * sentences from `saveErrors` so both failure events bucket alike; delete it
+ * once no such server is live. */
 export function saveFailureReason(
   message: string,
   code?: SaveErrorCode,
 ): ImageSaveFailureReason {
   if (code) return REASON_BY_CODE[code];
-  if (message === PHOTO_LIMIT_MESSAGE) return "photo_limit";
-  if (message === IMAGE_TOO_LARGE_MESSAGE) return "too_large";
+  for (const saveCode of SAVE_ERROR_CODES) {
+    if (message === SAVE_ERROR_MESSAGES[saveCode]) {
+      return REASON_BY_CODE[saveCode];
+    }
+  }
   return "other";
 }
 
@@ -195,6 +202,13 @@ async function saveImageOperation(
     // `||` (not `??`): the empty-string placeholder from a mint failure
     // must also get a fresh id on retry.
     operationId = operationId || generateOperationId();
+    if (options?.saveSource !== undefined) {
+      analytics.capture("save_attempt_started", {
+        save_source: options.saveSource,
+        save_kind: "image",
+        operation_id: operationId,
+      });
+    }
     const began = await deps.begin(operationId);
     if (began.kind === "complete") {
       // Already finalized server-side (a previous attempt landed); skip the
@@ -231,6 +245,14 @@ async function saveImageOperation(
     });
     return { status: "saved", operationId, image, itemId };
   } catch (error) {
+    if (options?.saveSource !== undefined) {
+      analytics.capture("save_failed", {
+        save_source: options.saveSource,
+        save_kind: "image",
+        stage: saveFailureStage(error),
+        ...(operationId !== undefined && { operation_id: operationId }),
+      });
+    }
     return {
       status: "failed",
       // Only undefined if minting itself threw; the placeholder keeps the

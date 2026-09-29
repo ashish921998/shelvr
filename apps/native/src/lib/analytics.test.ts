@@ -77,6 +77,14 @@ describe("item analytics", () => {
     });
   });
 
+  it.each(["digest", "map"])("preserves %s item-open attribution", (source) => {
+    analytics.itemOpened(item, source);
+    expect(mock.capture).toHaveBeenCalledWith(
+      "item_opened",
+      expect.objectContaining({ source }),
+    );
+  });
+
   it("excludes development fixtures", () => {
     analytics.itemOpened({ ...item, fixtureKey: "qa" }, "direct");
     analytics.itemAction({ ...item, fixtureKey: "qa" }, "copy");

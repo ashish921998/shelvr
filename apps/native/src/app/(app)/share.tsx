@@ -36,6 +36,7 @@ import {
 } from "@/lib/share/pending-share-store";
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
+import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
@@ -96,6 +97,32 @@ const PHASE_EXIT = new Keyframe({
   },
 }).duration(motion.duration.exit);
 
+/** Wraps one share save entry with the first-save funnel's client legs: the
+ * attempt event fires when the entry is submitted, and a rejection fires its
+ * bounded `save_failed` stage before the error re-reaches the session state
+ * machine unchanged. A share entry otherwise has no batch reporter the
+ * in-app paths use. */
+function withSaveTelemetry<T>(
+  saveKind: "link" | "note",
+  operationId: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  analytics.capture("save_attempt_started", {
+    save_source: "share_extension",
+    save_kind: saveKind,
+    operation_id: operationId,
+  });
+  return run().catch((error: unknown) => {
+    analytics.capture("save_failed", {
+      save_source: "share_extension",
+      save_kind: saveKind,
+      stage: saveFailureStage(error),
+      operation_id: operationId,
+    });
+    throw error;
+  });
+}
+
 export default function ShareScreen() {
   useAppLocale();
   const router = useRouter();
@@ -119,23 +146,29 @@ export default function ShareScreen() {
   const [phase, setPhase] = useState<SharePhase>(owner.current.phase);
 
   /** The injected save operations, built once. Both the initial run and a
-   * "Retry failed" press share this so the deps object is never rebuilt. */
+   * "Retry failed" press share this so the deps object is never rebuilt. Each
+   * link and note entry carries its own save-funnel telemetry (see
+   * `withSaveTelemetry`); image entries get theirs from `useSaveImages`. */
   const saveDeps = useMemo<ShareSaveDeps>(
     () => ({
       saveLink: ({ url, operationId }) =>
-        createLinkItem({
-          url,
-          operationId,
-          analyticsSessionId: analytics.sessionId(),
-          saveSource: "share_extension",
-        }),
+        withSaveTelemetry("link", operationId, () =>
+          createLinkItem({
+            url,
+            operationId,
+            analyticsSessionId: analytics.sessionId(),
+            saveSource: "share_extension",
+          }),
+        ),
       saveNote: ({ text, operationId }) =>
-        createNoteItem({
-          text,
-          operationId,
-          analyticsSessionId: analytics.sessionId(),
-          saveSource: "share_extension",
-        }),
+        withSaveTelemetry("note", operationId, () =>
+          createNoteItem({
+            text,
+            operationId,
+            analyticsSessionId: analytics.sessionId(),
+            saveSource: "share_extension",
+          }),
+        ),
       saveImage: ({ image, operationId }) =>
         saveImages([{ image, operationId }], {
           saveSource: "share_extension",

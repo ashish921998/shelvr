@@ -8,11 +8,12 @@ import {
 import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
-import { saveErrorCode } from "@convex/model/saveErrors";
+import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
+import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
@@ -193,11 +194,22 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
+    // The first-save funnel: the submission's attempt event, with the entry
+    // source the server's `item_saved` will carry too.
+    const saveSource = mode === "article" ? "manual_link" : "note";
+    const saveKind = mode === "article" ? "link" : "note";
+    const operationId = `${saveKind}:${Crypto.randomUUID()}`;
+    analytics.capture("save_attempt_started", {
+      save_source: saveSource,
+      save_kind: saveKind,
+      operation_id: operationId,
+    });
     try {
       if (mode === "article") {
         await createLinkItem({
           url: trimmed,
           spaceId: pinnedSpaceId,
+          operationId,
           analyticsSessionId: analytics.sessionId(),
           saveSource: "manual_link",
         });
@@ -205,12 +217,21 @@ function AddContent({ close, openCamera }: AddContentProps) {
         await createNoteItem({
           text: trimmed,
           spaceId: pinnedSpaceId,
+          operationId,
           analyticsSessionId: analytics.sessionId(),
         });
       }
       analytics.capture(mode === "article" ? "article_saved" : "note_saved");
       success();
     } catch (error) {
+      // The bounded stage: the server's structured refusal code when it sent
+      // one, `other` for a network failure or a redacted error.
+      analytics.capture("save_failed", {
+        save_source: saveSource,
+        save_kind: saveKind,
+        stage: saveFailureStage(error),
+        operation_id: operationId,
+      });
       setSaving(false);
       // Pro can lapse while the composer is open. The paywall is the only
       // useful next step, so show it instead of a generic failure alert.
