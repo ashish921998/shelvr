@@ -5,7 +5,7 @@ import { displayHost } from "@/lib/url";
 import type { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -69,30 +69,35 @@ function RecallThumb({
     item.title ??
     item.note ??
     (item.url ? displayHost(item.url) : t("item.untitledItem"));
+  const router = useRouter();
+  // No `Link asChild` here: its Slot merges the child's style as an object, so
+  // a Pressable style function is dropped and the thumbnail loses its size.
+  // On Android that left the card as a tall empty box.
   return (
-    <Link href={{ pathname: "/item/[id]", params: { id: item._id } }} asChild>
-      <Pressable
-        // Link asChild supplies the link role; a button role would conflict.
-        accessibilityLabel={title}
-        onPress={onOpen}
-        style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.7 }]}
-      >
-        {imageUri ? (
-          <Image
-            source={{ uri: imageUri }}
-            recyclingKey={item._id}
-            contentFit={item.isSticker ? "contain" : "cover"}
-            style={styles.thumbImage}
-          />
-        ) : (
-          <View style={styles.thumbTextFace}>
-            <Text style={styles.thumbTitle} numberOfLines={4}>
-              {title}
-            </Text>
-          </View>
-        )}
-      </Pressable>
-    </Link>
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={title}
+      onPress={() => {
+        onOpen();
+        router.push({ pathname: "/item/[id]", params: { id: item._id } });
+      }}
+      style={({ pressed }) => [styles.thumb, pressed && { opacity: 0.7 }]}
+    >
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri }}
+          recyclingKey={item._id}
+          contentFit={item.isSticker ? "contain" : "cover"}
+          style={styles.thumbImage}
+        />
+      ) : (
+        <View style={styles.thumbTextFace}>
+          <Text style={styles.thumbTitle} numberOfLines={4}>
+            {title}
+          </Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
