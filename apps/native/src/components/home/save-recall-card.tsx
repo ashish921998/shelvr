@@ -64,15 +64,16 @@ function RecallThumb({
   item: RecallItem;
   onOpen: () => void;
 }) {
+  const router = useRouter();
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const title =
     item.title ??
     item.note ??
     (item.url ? displayHost(item.url) : t("item.untitledItem"));
-  const router = useRouter();
   // No `Link asChild` here: its Slot merges the child's style as an object, so
-  // a Pressable style function is dropped and the thumbnail loses its size.
-  // On Android that left the card as a tall empty box.
+  // a Pressable style function is dropped on every platform and the thumbnail
+  // loses its size. The card then collapsed into a tall empty box (first seen
+  // on Android, and it reproduces on iOS too).
   return (
     <Pressable
       accessibilityRole="link"

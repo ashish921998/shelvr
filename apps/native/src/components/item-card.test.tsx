@@ -28,7 +28,22 @@ vi.mock("react-native", () => {
   );
   return {
     View: vi.fn(a11yElement),
-    Pressable: vi.fn(a11yElement),
+    // The card's look lives in render-prop children (see item-card.tsx).
+    Pressable: vi.fn(
+      ({
+        children,
+        ...props
+      }: Omit<A11yProps, "children"> & {
+        children?: ReactNode | ((state: { pressed: boolean }) => ReactNode);
+      }) =>
+        a11yElement({
+          ...props,
+          children:
+            typeof children === "function"
+              ? children({ pressed: false })
+              : children,
+        }),
+    ),
     Text: vi.fn(({ children }: { children?: ReactNode }) => (
       <span>{children}</span>
     )),
