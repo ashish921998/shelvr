@@ -4,7 +4,11 @@ import type RevenueCatUI from "react-native-purchases-ui";
 import type { CustomVariables } from "react-native-purchases-ui";
 import type { PurchasesOffering } from "react-native-purchases";
 import { useEffect, useSyncExternalStore } from "react";
-import { AppState, Modal } from "react-native";
+import { AppState, Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
+import { AppSymbolIcon } from "@/components/symbol";
+import { t, useAppLocale } from "@/lib/i18n";
 
 /**
  * The exit offer's own full-screen sheet. RevenueCat's `presentPaywall` sheet
@@ -62,6 +66,8 @@ const DISMISS_SETTLE_MS = 500;
 
 export function ExitOfferSheetHost() {
   const current = useSyncExternalStore(subscribe, () => request);
+  const insets = useSafeAreaInsets();
+  useAppLocale();
 
   useEffect(() => {
     hosts += 1;
@@ -98,28 +104,60 @@ export function ExitOfferSheetHost() {
       presentationStyle="fullScreen"
       onRequestClose={() => finish("CANCELLED")}
     >
-      <Paywall
-        style={{ flex: 1 }}
-        options={{
-          offering: current.offering,
-          customVariables: current.customVariables,
-        }}
-        onPurchasePackageInitiated={({ resume }) => {
-          const open = Date.now() < current.endsAt;
-          resume(open);
-          if (!open) {
-            analytics.capture("exit_offer_expired_open", {});
-            finish("CANCELLED");
+      <View style={{ flex: 1 }}>
+        <Paywall
+          style={{ flex: 1 }}
+          options={{
+            offering: current.offering,
+            customVariables: current.customVariables,
+          }}
+          onPurchasePackageInitiated={({ resume }) => {
+            const open = Date.now() < current.endsAt;
+            resume(open);
+            if (!open) {
+              analytics.capture("exit_offer_expired_open", {});
+              finish("CANCELLED");
+            }
+          }}
+          onPurchaseCompleted={() => finish("PURCHASED")}
+          onRestoreCompleted={() => finish("RESTORED")}
+          onDismiss={() =>
+            setTimeout(() => {
+              if (request === current) finish("CANCELLED");
+            }, DISMISS_SETTLE_MS)
           }
-        }}
-        onPurchaseCompleted={() => finish("PURCHASED")}
-        onRestoreCompleted={() => finish("RESTORED")}
-        onDismiss={() =>
-          setTimeout(() => {
-            if (request === current) finish("CANCELLED");
-          }, DISMISS_SETTLE_MS)
-        }
-      />
+        />
+        {/* The paywall design carries its own close, but RevenueCat's fallback
+          screen (shown when a design fails to render) has none, so the app
+          always keeps a way out. */}
+        <Pressable
+          onPress={() => finish("CANCELLED")}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.close")}
+          hitSlop={12}
+          style={[styles.close, { top: insets.top + 8 }]}
+        >
+          <AppSymbolIcon
+            name="xmark"
+            size={14}
+            weight="semibold"
+            tintColor="#fff"
+          />
+        </Pressable>
+      </View>
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  close: {
+    position: "absolute",
+    left: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+});
