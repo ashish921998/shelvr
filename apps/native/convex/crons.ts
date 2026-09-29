@@ -84,7 +84,7 @@ crons.interval(
 );
 
 crons.interval(
-  "recover weekly shelf deliveries",
+  "recover notification deliveries",
   { minutes: 5 },
   internal.notificationDelivery.recover,
   {},

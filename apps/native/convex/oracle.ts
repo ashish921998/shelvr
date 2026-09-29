@@ -4,7 +4,7 @@ import { generateObject } from "ai";
 import { internalAction } from "./_generated/server";
 import { MODEL, modelCallOptions } from "./ai";
 import { readPage } from "./model/pageRead";
-import { errorName, logEvent } from "./model/log";
+import { logEvent } from "./model/log";
 import {
   oracleInputValidator,
   oracleVerdictSchema,
@@ -154,39 +154,31 @@ export const consult = internalAction({
   returns: oracleVerdictValidator,
   handler: async (_ctx, { input }) => {
     const startedAt = Date.now();
-    try {
-      const pages =
-        input.kind === "links"
-          ? await Promise.all(input.urls.map(readLinkPage))
-          : [];
-      const { object } = await generateObject({
-        model: MODEL,
-        ...modelCallOptions(ORACLE_TIMEOUT_MS[input.kind]),
-        // A retry could not finish inside the web route's deadline.
-        maxRetries: 0,
-        system: ORACLE_SYSTEM,
-        schema: oracleVerdictSchema,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: oraclePrompt(input, pages) },
-              ...imageParts(input),
-            ],
-          },
-        ],
-      });
-      logEvent("info", "oracle_consulted", {
-        kind: input.kind,
-        duration_ms: Date.now() - startedAt,
-      });
-      return object;
-    } catch (error) {
-      logEvent("error", "oracle_failed", {
-        kind: input.kind,
-        error_name: errorName(error),
-      });
-      throw error;
-    }
+    const pages =
+      input.kind === "links"
+        ? await Promise.all(input.urls.map(readLinkPage))
+        : [];
+    const { object } = await generateObject({
+      model: MODEL,
+      ...modelCallOptions(ORACLE_TIMEOUT_MS[input.kind]),
+      // A retry could not finish inside the web route's deadline.
+      maxRetries: 0,
+      system: ORACLE_SYSTEM,
+      schema: oracleVerdictSchema,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: oraclePrompt(input, pages) },
+            ...imageParts(input),
+          ],
+        },
+      ],
+    });
+    logEvent("info", "oracle_consulted", {
+      kind: input.kind,
+      duration_ms: Date.now() - startedAt,
+    });
+    return object;
   },
 });

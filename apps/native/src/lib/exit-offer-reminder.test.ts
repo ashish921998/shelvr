@@ -133,12 +133,23 @@ describe("syncExitOfferReminder", () => {
     expect(mock.schedule).not.toHaveBeenCalled();
   });
 
-  it("clears the reminder once the offer is gone or nearly over", async () => {
+  it("clears the reminder once the offer is gone", async () => {
     await expect(syncExitOfferReminder(null, now)).resolves.toBe(false);
+    await expect(syncExitOfferReminder(now - 1, now)).resolves.toBe(false);
+    expect(mock.cancel).toHaveBeenCalledTimes(2);
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("leaves a reminder alone once it is due within a minute", async () => {
+    // Opening the app just before the reminder fires must not cancel it.
+    await expect(syncExitOfferReminder(now + HOUR + 30_000, now)).resolves.toBe(
+      false,
+    );
     await expect(syncExitOfferReminder(now + 30 * 60_000, now)).resolves.toBe(
       false,
     );
-    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.cancel).not.toHaveBeenCalled();
     expect(mock.schedule).not.toHaveBeenCalled();
   });
 

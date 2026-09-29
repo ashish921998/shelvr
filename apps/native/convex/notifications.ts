@@ -54,8 +54,12 @@ export const DUE_REMINDER_BATCH_SIZE = 50;
  * article bodies make item rows large, and the pass runs daily per user. */
 const REMINDER_SCAN_ROWS = 500;
 const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
-/** Candidates of each kind checked against read state and history per pass. */
-const REMINDER_CHECKS_PER_KIND = 20;
+/** Candidates of each kind checked against read state and history per pass.
+ * Every opened or already-reminded save spends one check, so the bound is the
+ * number of such saves a reader can have inside the reminder window before the
+ * unread ones behind them stop being reached. Two point reads per check keep
+ * a daily per-user pass cheap at this size. */
+const REMINDER_CHECKS_PER_KIND = 100;
 /** Failed attempts at one save before it is given up on. */
 const MAX_FAILED_REMINDERS = 2;
 
@@ -158,6 +162,9 @@ export const setPreferences = mutation({
       previous <= now + DIGEST_WINDOW_MS
         ? previous
         : fallback;
+    // A zone change moves the reminder slot too, as registerDevice and
+    // setSaveReminders do, so a traveller's reminders follow the shelf.
+    const moved = existing !== null && timezone !== existing.timezone;
     const fields = {
       weeklyShelfEnabled: args.weeklyShelfEnabled,
       nextDigestAt: args.weeklyShelfEnabled
@@ -165,6 +172,15 @@ export const setPreferences = mutation({
           (timezone === existing?.timezone ? schedule : fallback))
         : schedule,
       timezone,
+      ...(moved && existing.remindersEnabled !== false
+        ? {
+            nextReminderAt: nextLocalHourAt(
+              now,
+              timezone,
+              DEFAULT_REMINDER_HOUR,
+            ),
+          }
+        : {}),
       updatedAt: now,
     };
     if (existing === null) {

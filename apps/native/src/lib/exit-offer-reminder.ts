@@ -114,16 +114,25 @@ export async function optOutOfExitOfferReminder(userId: string): Promise<void> {
 /**
  * Cancels, then schedules the reminder for `endsAt`. `stillWanted` is checked
  * just before scheduling, so a sync that was waiting on the OS never brings
- * back a reminder the user cancelled in the meantime.
+ * back a reminder the user cancelled in the meantime. Once the reminder is
+ * due within a minute, or has fired, the offer is still open and whatever the
+ * OS holds is already right, so the sync leaves it alone: cancelling there
+ * would drop a reminder the user asked for because they opened the app.
  */
 export async function syncExitOfferReminder(
   endsAt: number | null,
   now: number,
   stillWanted: () => boolean = () => true,
 ): Promise<boolean> {
-  await Notifications.cancelScheduledNotificationAsync(EXIT_OFFER_REMINDER_ID);
   const fireAt = endsAt === null ? null : exitOfferReminderAt(endsAt, now);
-  if (fireAt === null) return false;
+  if (fireAt === null) {
+    if (endsAt === null || endsAt <= now)
+      await Notifications.cancelScheduledNotificationAsync(
+        EXIT_OFFER_REMINDER_ID,
+      );
+    return false;
+  }
+  await Notifications.cancelScheduledNotificationAsync(EXIT_OFFER_REMINDER_ID);
   if (!canNotify(await Notifications.getPermissionsAsync())) return false;
   await ensureChannel();
   if (!stillWanted()) return false;

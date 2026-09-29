@@ -32,7 +32,7 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** A reminder says "today", so one that could not go out within a few hours
  * is dropped rather than delivered late with the wrong day in it. */
 const REMINDER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-const MAX_DEVICES_PER_DIGEST = 20;
+const MAX_DEVICES_PER_NOTIFICATION = 20;
 const resultSchema = z.object({
   status: z.enum(["ok", "error"]),
   id: z.string().optional(),
@@ -109,7 +109,7 @@ async function liveRecipients(
     .withIndex("by_user_and_enabled", (q) =>
       q.eq("userId", userId).eq("enabled", true),
     )
-    .take(MAX_DEVICES_PER_DIGEST);
+    .take(MAX_DEVICES_PER_NOTIFICATION);
   const tokens = new Set(devices.map((device) => device.token));
   return (
     stored ??
@@ -207,8 +207,10 @@ type Closed = {
 /**
  * Ends delivery before the next attempt: the user or the server turned it
  * off, attempts or age ran out, or there is nothing left to send or nowhere
- * to send it. A device that already confirmed delivery makes the whole
- * notification delivered. Once an attempt has been made, this is the terminal
+ * to send it. A device that confirmed delivery, or whose ticket Expo accepted
+ * and never faulted, makes the whole notification delivered: that push most
+ * likely reached the phone, so it counts against the reminder budget rather
+ * than freeing a slot. Once an attempt has been made, this is the terminal
  * transition `finish` will never see, so the one send event is recorded here.
  */
 async function closeBetweenAttempts(
@@ -225,7 +227,10 @@ async function closeBetweenAttempts(
 ) {
   const now = Date.now();
   const delivered =
-    attempted?.some((recipient) => recipient.state === "delivered") ?? false;
+    attempted?.some(
+      (recipient) =>
+        recipient.state === "delivered" || recipient.state === "receipt",
+    ) ?? false;
   await close({
     deliveryStatus: delivered ? "complete" : "failed",
     deliveryNextAttemptAt: undefined,
