@@ -105,18 +105,13 @@ export default function AppLayout() {
                   }
                 : {
                     presentation: "formSheet",
-                    // Android form sheets do not reliably render native-stack header
-                    // controls. Add owns an in-content toolbar there; iOS keeps the
-                    // native title and toolbar.
                     headerShown: true,
                     headerTransparent: false,
                     headerStyle: { backgroundColor: theme.colors.background },
                     sheetGrabberVisible: true,
-                    // Android does not resize a fit-to-content form sheet when Add
-                    // switches from the compact action menu to the note/article
-                    // composer. Use a large detent there so the native Back/Save
-                    // header and editor remain reachable; iOS can keep its compact,
-                    // dynamically sized sheet.
+                    // Sized to its content so the compact action menu and the
+                    // taller note/article composer both fit without a fixed
+                    // detent leaving the editor unreachable.
                     sheetAllowedDetents: "fitToContents",
                     contentStyle: { backgroundColor: theme.colors.background },
                   }

@@ -1062,11 +1062,6 @@ export const processItem = internalAction({
 });
 
 /**
- * One-off: fill in aspectRatio for existing image items that don't have one
- * (older saves whose ratio was dropped before it was persisted). Reads the
- * stored file's header bytes directly — no re-upload needed.
- */
-/**
  * Embeds one page of items whose vector is missing or from an older
  * generation, then stamps the whole page.
  *

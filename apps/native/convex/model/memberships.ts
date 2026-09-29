@@ -135,7 +135,7 @@ export async function summarizeMemberships(
  * positive. Legacy rows store no `status` yet read as saved, so the saved
  * bucket merges the explicit and the absent key.
  */
-export async function previewItemIdsForStatus(
+async function previewItemIdsForStatus(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   status: CountedStatus,
@@ -230,10 +230,10 @@ async function applyTransition(
   if (isCounted(to)) {
     patch[countField(to)] = space[countField(to)] + 1;
     const list = patch[previewField(to)] ?? space[previewField(to)];
-    patch[previewField(to)] = [itemId, ...list.filter((id) => id !== itemId)].slice(
-      0,
-      PREVIEW_LIMIT,
-    );
+    patch[previewField(to)] = [
+      itemId,
+      ...list.filter((id) => id !== itemId),
+    ].slice(0, PREVIEW_LIMIT);
   }
   // A bucket that lost a previewed member may still have more rows than the
   // shortened list shows; top it up from that bucket alone. This is the only
