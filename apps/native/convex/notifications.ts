@@ -22,7 +22,9 @@ import {
   WEEKLY_LIMIT,
   openedTooRecently,
   preferredReminderHour,
+  rebookedSchedule,
   reminderBlocked,
+  remindersOn,
   reminderCandidates,
   saveRemindersLive,
 } from "./model/saveReminders";
@@ -54,11 +56,19 @@ export const DUE_REMINDER_BATCH_SIZE = 50;
  * article bodies make item rows large, and the pass runs daily per user. */
 const REMINDER_SCAN_ROWS = 500;
 const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
-/** Candidates of each kind checked against read state and history per pass.
- * Every opened or already-reminded save spends one check, so the bound is the
- * number of such saves a reader can have inside the reminder window before the
- * unread ones behind them stop being reached. Two point reads per check keep
- * a daily per-user pass cheap at this size. */
+/**
+ * Candidates of each kind checked against reminder history and read state per
+ * pass. Every opened or already-reminded save spends one check, so the bound
+ * is the number of such saves a reader can have inside the reminder window
+ * before the unread ones behind them stop being reached.
+ *
+ * The worst case is one pass that finds nothing to send: two kinds, this many
+ * checks each, two index point reads per check, so 400 serialized reads on
+ * top of the item scan (up to `REMINDER_SCAN_ROWS` rows or
+ * `REMINDER_SCAN_BYTES`). Each read returns at most one or two small rows, so
+ * the pass stays well inside a Convex transaction's 16,384-document and 8 MiB
+ * read limits, and a daily per-user pass at this size is still cheap.
+ */
 const REMINDER_CHECKS_PER_KIND = 100;
 /** Failed attempts at one save before it is given up on. */
 const MAX_FAILED_REMINDERS = 2;
@@ -120,8 +130,7 @@ export const getPreferences = query({
         : null,
       timezone: preferences?.timezone ?? null,
       // No row means no device was ever registered, so nothing can arrive.
-      remindersEnabled:
-        preferences !== null && preferences.remindersEnabled !== false,
+      remindersEnabled: preferences !== null && remindersOn(preferences),
     };
   },
 });
@@ -154,33 +163,25 @@ export const setPreferences = mutation({
     // predates validation is repaired to UTC here instead of being written back.
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
-    const fallback = nextWeeklyDigestAt(now, timezone);
     const previous = existing?.nextDigestAt;
-    const schedule =
+    const kept =
       previous !== undefined &&
       previous > now &&
       previous <= now + DIGEST_WINDOW_MS
         ? previous
-        : fallback;
-    // A zone change moves the reminder slot too, as registerDevice and
-    // setSaveReminders do, so a traveller's reminders follow the shelf.
-    const moved = existing !== null && timezone !== existing.timezone;
+        : nextWeeklyDigestAt(now, timezone);
+    // A zone change rebooks the shelf and the reminder slot, as registerDevice
+    // and setSaveReminders do, so a traveller's reminders follow the shelf.
+    const rebooked =
+      existing === null ? undefined : rebookedSchedule(existing, timezone, now);
+    const nextDigestAt = rebooked?.nextDigestAt ?? kept;
     const fields = {
+      ...rebooked,
       weeklyShelfEnabled: args.weeklyShelfEnabled,
       nextDigestAt: args.weeklyShelfEnabled
-        ? (args.nextDigestAt ??
-          (timezone === existing?.timezone ? schedule : fallback))
-        : schedule,
+        ? (args.nextDigestAt ?? nextDigestAt)
+        : nextDigestAt,
       timezone,
-      ...(moved && existing.remindersEnabled !== false
-        ? {
-            nextReminderAt: nextLocalHourAt(
-              now,
-              timezone,
-              DEFAULT_REMINDER_HOUR,
-            ),
-          }
-        : {}),
       updatedAt: now,
     };
     if (existing === null) {
@@ -263,27 +264,26 @@ export const registerDevice = mutation({
         updatedAt: now,
       });
     } else {
-      // Every launch registers with the device's current zone. A user who has
-      // travelled would otherwise keep reminders and the weekly shelf booked
-      // at home hours, which can be the middle of their night.
-      const moved =
-        timezone !== undefined && timezone !== existingPreferences.timezone;
-      const zone = moved ? timezone : existingPreferences.timezone;
+      // Every launch registers with the device's current zone, and a zone
+      // change rebooks the shelf and the reminder slot.
+      const rebooked =
+        timezone === undefined
+          ? undefined
+          : rebookedSchedule(existingPreferences, timezone, now);
       // Also arms reminders for a user who had none scheduled: one whose row
       // predates reminders, or whose last pass found no device to send to.
       const arm =
-        existingPreferences.remindersEnabled !== false &&
-        (moved || existingPreferences.nextReminderAt === undefined);
-      if (moved || arm) {
+        rebooked === undefined &&
+        remindersOn(existingPreferences) &&
+        existingPreferences.nextReminderAt === undefined;
+      if (rebooked !== undefined || arm) {
         await ctx.db.patch(existingPreferences._id, {
-          ...(moved
-            ? { timezone, nextDigestAt: nextWeeklyDigestAt(now, timezone) }
-            : {}),
+          ...rebooked,
           ...(arm
             ? {
                 nextReminderAt: nextLocalHourAt(
                   now,
-                  zone,
+                  existingPreferences.timezone,
                   DEFAULT_REMINDER_HOUR,
                 ),
               }
@@ -308,10 +308,12 @@ export const setSaveReminders = mutation({
     const now = Date.now();
     const timezone =
       parseTimezoneInput(args.timezone) ?? resolveTimezone(existing?.timezone);
-    // A user who has travelled since their slot was booked would otherwise
-    // keep getting reminders, and the weekly shelf, at the old zone's hour.
-    const moved = existing !== null && existing.timezone !== timezone;
-    const booked = moved ? undefined : existing?.nextReminderAt;
+    // A zone change rebooks the weekly shelf and drops the booked reminder
+    // slot, so the switch books a fresh one in the new zone.
+    const rebooked =
+      existing === null ? undefined : rebookedSchedule(existing, timezone, now);
+    const booked =
+      rebooked === undefined ? existing?.nextReminderAt : undefined;
     const nextReminderAt = args.enabled
       ? (booked ?? nextLocalHourAt(now, timezone, DEFAULT_REMINDER_HOUR))
       : undefined;
@@ -327,10 +329,10 @@ export const setSaveReminders = mutation({
       });
     } else {
       await ctx.db.patch(existing._id, {
+        ...rebooked,
         remindersEnabled: args.enabled,
         nextReminderAt,
         timezone,
-        ...(moved ? { nextDigestAt: nextWeeklyDigestAt(now, timezone) } : {}),
         updatedAt: now,
       });
     }
@@ -634,7 +636,7 @@ export const armSaveReminders = internalMutation({
       )
       .paginate({ cursor: args.cursor ?? null, numItems: 100 });
     for (const preferences of page.page) {
-      if (preferences.remindersEnabled === false) continue;
+      if (!remindersOn(preferences)) continue;
       await ctx.db.patch(preferences._id, {
         nextReminderAt: nextLocalHourAt(
           now,
@@ -682,7 +684,7 @@ export const prepareSaveReminder = internalMutation({
         q.eq("userId", userId).eq("enabled", true),
       )
       .first();
-    if (preferences.remindersEnabled === false || device === null) {
+    if (!remindersOn(preferences) || device === null) {
       // Parked rather than advanced, so a user nobody can reach costs nothing
       // each day. `setSaveReminders` or the next `registerDevice` re-arms it.
       await ctx.db.patch(preferences._id, {

@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
+import { nextLocalHourAt, nextWeeklyDigestAt } from "./notificationSchedule";
 
 /**
  * The rules for a save reminder: one push that names one save and asks for
@@ -55,6 +56,47 @@ export function saveRemindersLive(): boolean {
 
 /** Used until the user has saved enough for their own hour to show. */
 export const DEFAULT_REMINDER_HOUR = 18;
+
+/**
+ * Whether this preferences row wants save reminders. The switch is on unless
+ * the user turned it off: rows written before the switch existed have no
+ * value, and they get reminders. A caller with no row decides for itself what
+ * "no row" means, because it differs: nothing can arrive for a user who never
+ * registered a device, while a reminder already in flight is not stopped by
+ * the absence of a row.
+ */
+export function remindersOn(preferences: {
+  remindersEnabled?: boolean;
+}): boolean {
+  return preferences.remindersEnabled !== false;
+}
+
+/**
+ * The fields a change of zone rebooks, or undefined when the zone is the one
+ * already stored. Every launch, the shelf settings and the reminder switch all
+ * report the device's zone, and a traveller would otherwise keep the weekly
+ * shelf and reminders booked at home hours, which can be the middle of their
+ * night. The reminder slot moves only while reminders are on; a row with them
+ * off keeps no slot to move.
+ */
+export function rebookedSchedule(
+  existing: { timezone?: string; remindersEnabled?: boolean },
+  timezone: string,
+  now: number,
+):
+  | { timezone: string; nextDigestAt: number; nextReminderAt?: number }
+  | undefined {
+  if (timezone === existing.timezone) return undefined;
+  return {
+    timezone,
+    nextDigestAt: nextWeeklyDigestAt(now, timezone),
+    ...(remindersOn(existing)
+      ? {
+          nextReminderAt: nextLocalHourAt(now, timezone, DEFAULT_REMINDER_HOUR),
+        }
+      : {}),
+  };
+}
 /** "Today" still means something at 19:00, and nothing lands before 10:00. */
 const EARLIEST_HOUR = 10;
 const LATEST_HOUR = 19;

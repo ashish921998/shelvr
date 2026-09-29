@@ -8,6 +8,7 @@ import {
   exitOfferEndsAt,
   exitOfferReminderAt,
   exitOfferReminderPending,
+  exitOfferReminderPlan,
   findExitOffering,
   formatCountdown,
   parseShownAt,
@@ -78,6 +79,35 @@ describe("reminder controls", () => {
 
   it("stops offering cancel once the reminder has fired", () => {
     expect(exitOfferReminderPending(endsAt, endsAt - HOUR)).toBe(false);
+  });
+});
+
+describe("exitOfferReminderPlan", () => {
+  const endsAt = 1_000_000_000_000;
+  const HOUR = 60 * 60 * 1000;
+
+  it("schedules an hour before the offer closes", () => {
+    expect(exitOfferReminderPlan(endsAt, endsAt - 24 * HOUR)).toEqual({
+      kind: "schedule",
+      fireAt: endsAt - HOUR,
+    });
+  });
+
+  it("keeps whatever the OS holds once the reminder is due within a minute", () => {
+    expect(exitOfferReminderPlan(endsAt, endsAt - HOUR - 30_000)).toEqual({
+      kind: "keep",
+    });
+    expect(exitOfferReminderPlan(endsAt, endsAt - 30 * 60_000)).toEqual({
+      kind: "keep",
+    });
+  });
+
+  it("cancels when there is no offer or the window has closed", () => {
+    expect(exitOfferReminderPlan(null, endsAt)).toEqual({ kind: "cancel" });
+    expect(exitOfferReminderPlan(endsAt, endsAt)).toEqual({ kind: "cancel" });
+    expect(exitOfferReminderPlan(endsAt, endsAt + 1)).toEqual({
+      kind: "cancel",
+    });
   });
 });
 

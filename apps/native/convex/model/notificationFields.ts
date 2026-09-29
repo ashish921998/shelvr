@@ -39,6 +39,19 @@ export const recipientValidator = v.union(
 
 export type Recipient = Infer<typeof recipientValidator>;
 
+/**
+ * The push most likely reached the phone: Expo confirmed it with a receipt,
+ * or accepted the ticket and never reported a fault. Anything that counts a
+ * notification as delivered, for the reminder budget and for telemetry, asks
+ * this, so the two places a delivery closes cannot disagree.
+ */
+export const reachedDevice = (recipient: Recipient): boolean =>
+  recipient.state === "delivered" || recipient.state === "receipt";
+
+/** Still has a send or a receipt check ahead of it. */
+export const awaitingOutcome = (recipient: Recipient): boolean =>
+  recipient.state === "pending" || recipient.state === "receipt";
+
 export function recipientError(recipient: Recipient, error: string): Recipient {
   const terminal = [
     "DeviceNotRegistered",

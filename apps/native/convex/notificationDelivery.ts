@@ -7,14 +7,17 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
+  awaitingOutcome,
   recipientValidator,
   digestCopy,
+  reachedDevice,
   recipientError,
   reminderCopy,
   type Recipient,
 } from "./model/notificationFields";
 import {
   openedTooRecently,
+  remindersOn,
   reminderSubject,
   saveRemindersLive,
 } from "./model/saveReminders";
@@ -119,10 +122,7 @@ async function liveRecipients(
       state: "pending" as const,
     }))
   ).map((recipient): Recipient => {
-    if (
-      (recipient.state === "pending" || recipient.state === "receipt") &&
-      !tokens.has(recipient.token)
-    ) {
+    if (awaitingOutcome(recipient) && !tokens.has(recipient.token)) {
       return {
         token: recipient.token,
         locale: recipient.locale,
@@ -162,21 +162,16 @@ function settle(
   maxAge: number,
   now: number,
 ) {
-  const pending = recipients.some(
-    (recipient) =>
-      recipient.state === "pending" || recipient.state === "receipt",
-  );
+  const pending = recipients.some(awaitingOutcome);
   const exhausted = attempt >= MAX_ATTEMPTS || age >= maxAge;
   const retry = pending && !exhausted;
-  const anyDelivered = recipients.some(
-    (recipient) => recipient.state === "delivered",
-  );
-  // A device that confirmed delivery makes the notification delivered, even
-  // when another device's outcome is still unknown at the limit: the user
-  // saw it, so budgets and telemetry must count it.
+  // A device the push reached makes the notification delivered, even when
+  // another device's outcome is still unknown at the limit: the user most
+  // likely saw it, so budgets and telemetry must count it. The same rule
+  // closes a delivery between attempts, in `closeBetweenAttempts`.
   const status: "pending" | "complete" | "failed" = retry
     ? "pending"
-    : anyDelivered
+    : recipients.some(reachedDevice)
       ? "complete"
       : "failed";
   return {
@@ -187,7 +182,7 @@ function settle(
       deliveryNextAttemptAt: retry
         ? now + Math.min(RECEIPT_DELAY_MS * 2 ** (attempt - 1), 60 * 60 * 1000)
         : undefined,
-      // This records provider acceptance from receipts, not a device read acknowledgment.
+      // When Expo confirmed or accepted the push, not when the user read it.
       deliveredAt: status === "complete" ? now : undefined,
       deliveryError:
         pending && exhausted
@@ -226,11 +221,7 @@ async function closeBetweenAttempts(
   },
 ) {
   const now = Date.now();
-  const delivered =
-    attempted?.some(
-      (recipient) =>
-        recipient.state === "delivered" || recipient.state === "receipt",
-    ) ?? false;
+  const delivered = attempted?.some(reachedDevice) ?? false;
   await close({
     deliveryStatus: delivered ? "complete" : "failed",
     deliveryNextAttemptAt: undefined,
@@ -537,7 +528,7 @@ export const claimReminder = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", reminder.userId))
       .unique();
     const attempts = reminder.deliveryAttempts ?? 0;
-    const disabled = preferences?.remindersEnabled === false;
+    const disabled = preferences !== null && !remindersOn(preferences);
     const paused = !saveRemindersLive();
     const fail = (deliveryError: string) =>
       closeBetweenAttempts(
