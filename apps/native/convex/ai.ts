@@ -569,6 +569,11 @@ function linkAnalysisPrompt(
     page?.siteName ? `Site: ${page.siteName}` : "",
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
+    page?.board ? `Saved to the board: ${page.board}` : "",
+    page?.video ? "The post is a video." : "",
+    page?.linkedTitle && page.linkedUrl
+      ? `Links to: ${page.linkedTitle} (${page.linkedUrl})`
+      : "",
     page?.content
       ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",

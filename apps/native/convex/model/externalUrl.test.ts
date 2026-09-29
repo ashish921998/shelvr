@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   instagramMedia,
   isInstagramUrl,
+  isPinterestHost,
+  isPinterestShortUrl,
+  linkSource,
+  pinterestPinId,
   isTikTokUrl,
   shortFormSource,
   isUrlPolicyError,
@@ -274,5 +278,98 @@ describe("shortFormSource", () => {
       { site: "Instagram", video: false },
     );
     expect(shortFormSource("https://example.com/reel/abc/")).toBeUndefined();
+  });
+});
+
+describe("pinterestPinId", () => {
+  it("reads the id from bare, slugged, country, and shared pin URLs", () => {
+    expect(
+      pinterestPinId("https://www.pinterest.com/pin/33777065951313270/"),
+    ).toBe("33777065951313270");
+    expect(
+      pinterestPinId(
+        "https://www.pinterest.com/pin/25-easy-chicken-recipes-for-quick-healthy-dinners--643944446743403202/",
+      ),
+    ).toBe("643944446743403202");
+    expect(
+      pinterestPinId("https://in.pinterest.com/pin/760756562077599386"),
+    ).toBe("760756562077599386");
+    expect(
+      pinterestPinId("https://www.pinterest.co.uk/pin/760756562077599386/"),
+    ).toBe("760756562077599386");
+    expect(
+      pinterestPinId(
+        "https://www.pinterest.com/pin/760756562077599386/sent/?invite_code=x&sfo=1",
+      ),
+    ).toBe("760756562077599386");
+  });
+
+  it("rejects boards, profiles, bad ids, look-alike hosts, and bad input", () => {
+    expect(
+      pinterestPinId(
+        "https://www.pinterest.com/damndelicious/easy-chicken-recipes/",
+      ),
+    ).toBeUndefined();
+    expect(pinterestPinId("https://www.pinterest.com/pin/")).toBeUndefined();
+    expect(
+      pinterestPinId("https://www.pinterest.com/pin/123abc/"),
+    ).toBeUndefined();
+    expect(
+      pinterestPinId("https://pinterest.com.evil.example/pin/123/"),
+    ).toBeUndefined();
+    expect(pinterestPinId("https://notpinterest.com/pin/123/")).toBeUndefined();
+    expect(pinterestPinId("not a url")).toBeUndefined();
+    expect(pinterestPinId(undefined)).toBeUndefined();
+  });
+});
+
+describe("isPinterestShortUrl", () => {
+  it("accepts pin.it only", () => {
+    expect(isPinterestShortUrl("https://pin.it/4Vw0y6Zab")).toBe(true);
+    expect(isPinterestShortUrl("https://pin.it.evil.example/4Vw0y6Z")).toBe(
+      false,
+    );
+    expect(isPinterestShortUrl("https://www.pinterest.com/pin/1/")).toBe(false);
+    expect(isPinterestShortUrl(undefined)).toBe(false);
+  });
+});
+
+describe("isPinterestHost", () => {
+  it("accepts Pinterest's domains and pin.it, and nothing else", () => {
+    for (const host of [
+      "pinterest.com",
+      "www.pinterest.com",
+      "in.pinterest.com",
+      "www.pinterest.co.uk",
+      "pinterest.com.au",
+      "pinterest.de",
+      "pin.it",
+    ]) {
+      expect(isPinterestHost(host)).toBe(true);
+    }
+    for (const host of [
+      "pinterest.io",
+      "pinterest.cc",
+      "notpinterest.com",
+      "pinterest.com.evil.example",
+      "example.com",
+    ]) {
+      expect(isPinterestHost(host)).toBe(false);
+    }
+  });
+});
+
+describe("linkSource", () => {
+  it("names the platform reader for each kind of link", () => {
+    expect(linkSource("https://www.tiktok.com/@a/video/1")).toBe("tiktok");
+    expect(linkSource("https://x.com/nasa/status/1")).toBe("x");
+    expect(linkSource("https://www.instagram.com/reel/abc/")).toBe("instagram");
+    expect(linkSource("https://www.pinterest.com/pin/1/")).toBe("pinterest");
+    expect(linkSource("https://pin.it/abc")).toBe("pinterest");
+    expect(
+      linkSource("https://www.pinterest.com/cook/dinners/"),
+    ).toBeUndefined();
+    expect(linkSource("https://example.com/post")).toBeUndefined();
+    expect(linkSource(undefined)).toBeUndefined();
   });
 });
