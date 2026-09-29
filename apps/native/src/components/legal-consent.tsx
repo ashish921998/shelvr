@@ -15,7 +15,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { analytics } from "@/lib/analytics";
 
-function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
+function LegalConsentReview({ onComplete }: { onComplete: () => void }) {
   useAppLocale();
   const review = useMutation(api.legalConsent.review);
   const [pending, setPending] = useState(false);
@@ -26,7 +26,7 @@ function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
     setFailed(false);
     try {
       await review({ version: TERMS_VERSION, accepted });
-      onComplete?.();
+      onComplete();
     } catch {
       analytics.captureError(
         "legal_consent_save_failed",

@@ -274,6 +274,31 @@ describe("durable digest delivery", () => {
     expect((await digest())?.deliveredAt).toBeUndefined();
   });
 
+  it("counts a ticket Expo accepted but never confirmed as delivered at the limit", async () => {
+    // Expo answers getReceipts with nothing for a while after accepting a
+    // ticket, so a recipient can sit in "receipt" through every attempt.
+    const { t, digestId, advance, digest } = await seed();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
+        .mockImplementation(() => Promise.resolve(json({}))),
+    );
+    for (let i = 0; i < 8; i++) {
+      await t.action(internal.notificationDelivery.send, { digestId });
+      await advance();
+    }
+    // The same pairing `closeBetweenAttempts` writes: the retries ran out,
+    // and the push most likely reached the phone all the same.
+    expect(await digest()).toMatchObject({
+      deliveryStatus: "complete",
+      deliveryError: "retry_limit_reached",
+      deliveryAttempts: 8,
+    });
+    expect((await digest())?.deliveredAt).toBeDefined();
+  });
+
   it("bounds retries and preserves the final failure", async () => {
     const { t, digestId, advance, digest } = await seed();
     vi.stubGlobal(

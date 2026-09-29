@@ -1,7 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement, useExitOfferEndsAt } from "@/lib/entitlement";
-import { exitOfferReminderAt } from "@/lib/exit-offer";
+import { exitOfferReminderPlan } from "@/lib/exit-offer";
 import { t } from "@/lib/i18n";
 import { canNotify } from "@/lib/trial-reminder";
 import * as Notifications from "expo-notifications";
@@ -112,18 +112,20 @@ export async function optOutOfExitOfferReminder(userId: string): Promise<void> {
 }
 
 /**
- * Cancels, then schedules the reminder for `endsAt`. `stillWanted` is checked
- * just before scheduling, so a sync that was waiting on the OS never brings
- * back a reminder the user cancelled in the meantime.
+ * Brings the scheduled reminder in line with `exitOfferReminderPlan`: cancels
+ * it, and then schedules it again when the window still has time for one.
+ * `stillWanted` is checked just before scheduling, so a sync that was waiting
+ * on the OS never brings back a reminder the user cancelled in the meantime.
  */
 export async function syncExitOfferReminder(
   endsAt: number | null,
   now: number,
   stillWanted: () => boolean = () => true,
 ): Promise<boolean> {
+  const plan = exitOfferReminderPlan(endsAt, now);
+  if (plan.kind === "keep") return false;
   await Notifications.cancelScheduledNotificationAsync(EXIT_OFFER_REMINDER_ID);
-  const fireAt = endsAt === null ? null : exitOfferReminderAt(endsAt, now);
-  if (fireAt === null) return false;
+  if (plan.kind === "cancel") return false;
   if (!canNotify(await Notifications.getPermissionsAsync())) return false;
   await ensureChannel();
   if (!stillWanted()) return false;
@@ -136,7 +138,7 @@ export async function syncExitOfferReminder(
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(fireAt),
+      date: new Date(plan.fireAt),
       channelId: CHANNEL_ID,
     },
   });
@@ -185,13 +187,23 @@ export function useExitOfferReminder(): void {
   const userId = user?._id;
   const endsAt = useExitOfferEndsAt(userId);
   const optedIn = useExitOfferReminderOptIn(userId, endsAt);
-  const target = !loading && !entitled && optedIn ? endsAt : null;
+  // The window to hold a reminder for: null for none, and undefined while
+  // entitlement and the account are still loading. Nothing is known about the
+  // offer until then, and syncing "none" would cancel a reminder that turns
+  // out to be wanted.
+  const target: number | null | undefined =
+    loading || userId === undefined
+      ? undefined
+      : !entitled && optedIn
+        ? endsAt
+        : null;
 
   useEffect(() => {
     if (userId) activeUserId = userId;
   }, [userId]);
 
   useEffect(() => {
+    if (target === undefined) return;
     applyTarget(target).catch((error) =>
       analytics.captureError("exit_offer_reminder_failed", error),
     );

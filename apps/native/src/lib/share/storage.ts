@@ -9,9 +9,13 @@
 //
 //   1. fingerprintSharePayloads(rawPayloads) — a collision-free encoding of the
 //      current raw shared payload batch (order + duplicates included). Two
-//      distinct batches must never share a fingerprint, so a deliberate later
-//      re-share of identical content is its own fresh session rather than
-//      matching a stale completed one.
+//      distinct batches must never share a fingerprint. On Android the last
+//      completed batch also leaves a tombstone (recordCompletedShare), and a
+//      later batch with the same fingerprint from the same user is treated as
+//      the OS replaying that share: entries it already saved are skipped
+//      silently. So a deliberate re-share of identical content is a fresh
+//      session only once another share has replaced the tombstone, or the
+//      saved item was deleted in the app (forgetDeletedShareItem).
 //   2. reconcileSession(userId, rawPayloads) — returns exactly one of:
 //        { kind: 'new', session }     start a brand-new session for this batch
 //        { kind: 'resume', session }  same batch + user as an active session: retry pending/failed
@@ -236,11 +240,11 @@ type ReconcileResult =
  * session and a fresh one starts, so a prior account's completed session can
  * never silently drop the new user's identical share.
  *
- * Completed-state is single-use: a fingerprint (and user) match alone is NOT a
- * durable "drop this share" signal. The caller clears native payloads and
+ * Completed-state is single-use: the caller clears native payloads and
  * deletes the record only after a non-throwing clear — reconcileSession itself
  * does NOT delete a completed record, so a throwing clear stays retryable on
- * remount. */
+ * remount. The durable "skip this share" signal is the separate Android
+ * tombstone read by ghostRedelivery, which outlives the session record. */
 export function reconcileSession(
   store: SessionStoreAdapter,
   userId: string,

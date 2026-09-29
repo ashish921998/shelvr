@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ChatBubbleLeftIcon,
   DocumentTextIcon,
   LinkIcon,
   MagnifyingGlassIcon,
@@ -88,9 +87,9 @@ const QUERIES: { q: string; results: Result[] }[] = [
         intentLabel: "Find it",
       },
       {
-        title: "Marta · iMessage",
+        title: "Screenshot of Marta’s message",
         snippet: "“…it’s the one with the green door by the bridge”",
-        Icon: ChatBubbleLeftIcon,
+        Icon: PhotoIcon,
         thumb: "#2b2418",
         tag: "places",
       },
@@ -165,7 +164,7 @@ export default function Search() {
         <div
           className={`flex justify-between px-1.5 text-xs font-medium text-muted-soft transition-opacity duration-300 ${hidden ? "opacity-0" : ""}`}
         >
-          <span>{results.length} results · 0.2s</span>
+          <span>{results.length} results</span>
           <span>full text · notes · photos</span>
         </div>
         <div className={`flex flex-col gap-2 transition duration-300 ${fade}`}>
