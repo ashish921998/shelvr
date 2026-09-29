@@ -6,13 +6,7 @@ import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import { appStoreUrl, arrivalCampaign } from "@/lib/appStore";
 import { sharePageUrl, shareRef } from "@/lib/shareRef";
 
-type AppStoreLinkSource =
-  | "header"
-  | "hero"
-  | "footer"
-  | "footer-nav"
-  | "share"
-  | "oracle";
+type AppStoreLinkSource = "header" | "hero" | "footer" | "share" | "oracle";
 
 /**
  * The App Store link for one button, tagged with the campaign the visitor

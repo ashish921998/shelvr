@@ -406,7 +406,7 @@ export function recordCompletedShare(
 /** A one-way digest of a fingerprint. The tombstone outlives the session, so
  * it keeps only this digest, never the shared URLs or note text themselves.
  * Sync because reconcileSession is sync (expo-crypto only hashes async).
- * ponytail: cyrb53, 53 bits, not cryptographic; a collision would skip a
+ * cyrb53, 53 bits, not cryptographic; a collision would skip a
  * genuinely new share, so move to SHA-256 only if the reconcile path goes
  * async. */
 function digestFingerprint(fingerprint: string): string {

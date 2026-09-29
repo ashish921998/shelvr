@@ -569,6 +569,11 @@ function linkAnalysisPrompt(
     page?.siteName ? `Site: ${page.siteName}` : "",
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
+    page?.board ? `Saved to the board: ${page.board}` : "",
+    page?.video ? "The post is a video." : "",
+    page?.linkedTitle && page.linkedUrl
+      ? `Links to: ${page.linkedTitle} (${page.linkedUrl})`
+      : "",
     page?.content
       ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
@@ -1061,11 +1066,6 @@ export const processItem = internalAction({
   },
 });
 
-/**
- * One-off: fill in aspectRatio for existing image items that don't have one
- * (older saves whose ratio was dropped before it was persisted). Reads the
- * stored file's header bytes directly — no re-upload needed.
- */
 /**
  * Embeds one page of items whose vector is missing or from an older
  * generation, then stamps the whole page.

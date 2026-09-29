@@ -370,10 +370,8 @@ async function presentPaywallImpl(
       reason,
       duration_ms: Math.max(0, Date.now() - requestedAt),
     });
-  // Block until RC identity sync completes — a purchase before login would be
-  // attributed to an anonymous RC user, breaking the webhook's userId mapping.
-  // The awaitRcSyncReady timeout returns unavailable so the caller can show a
-  // retryable fallback without opening a purchase flow under an unsafe identity.
+  // A purchase before RC identity sync would be attributed to an anonymous RC
+  // user, breaking the webhook's userId mapping, so block until it completes.
   if (!(await awaitRcSyncReady())) {
     failed("identity_not_ready");
     return "unavailable";

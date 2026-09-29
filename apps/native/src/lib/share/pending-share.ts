@@ -78,37 +78,6 @@ export function clearShareDiscardedInStore(store: PendingShareStore): void {
 }
 
 /**
- * Decides where an incoming share deep link should go given the current
- * onboarding and authentication state.
- *
- * - Fully ready → open the share receiver immediately
- * - Still onboarding → stay on the current path (onboarding owns the stack) but
- *   mark the share pending so finish() can resume it
- * - Onboarded but signed out → send the user to sign-in and mark pending
- */
-type ShareRouteDecision =
-  | { action: "open-share" }
-  | { action: "defer-onboarding"; markPending: true }
-  | { action: "defer-sign-in"; markPending: true; href: "/(auth)/sign-in" };
-
-export function decideShareRoute(state: {
-  onboarded: boolean;
-  isAuthenticated: boolean;
-}): ShareRouteDecision {
-  if (state.onboarded && state.isAuthenticated) {
-    return { action: "open-share" };
-  }
-  if (!state.onboarded) {
-    return { action: "defer-onboarding", markPending: true };
-  }
-  return {
-    action: "defer-sign-in",
-    markPending: true,
-    href: "/(auth)/sign-in",
-  };
-}
-
-/**
  * After onboarding completes and/or the user signs in, choose the next route.
  * `hasOwedShare` merges the two signals that both mean "a share is waiting":
  * the deferred flag (the launch routed but sign-in/onboarding was not done)

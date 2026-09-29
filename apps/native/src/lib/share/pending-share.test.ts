@@ -4,7 +4,6 @@ import {
   clearPendingShareInStore,
   clearShareDiscardedInStore,
   decidePostAuthRoute,
-  decideShareRoute,
   hasPendingShareInStore,
   markPendingShareInStore,
   markShareDiscardedInStore,
@@ -68,33 +67,6 @@ describe("discarded share record", () => {
     markShareDiscardedInStore(store, batchA);
     clearShareDiscardedInStore(store);
     expect(shareWasDiscardedInStore(store, batchA)).toBe(false);
-  });
-});
-
-describe("decideShareRoute", () => {
-  it("opens the share screen when the user is onboarded and signed in", () => {
-    expect(
-      decideShareRoute({ onboarded: true, isAuthenticated: true }),
-    ).toEqual({ action: "open-share" });
-  });
-
-  it("defers during onboarding so the share can resume after finish", () => {
-    expect(
-      decideShareRoute({ onboarded: false, isAuthenticated: false }),
-    ).toEqual({ action: "defer-onboarding", markPending: true });
-    expect(
-      decideShareRoute({ onboarded: false, isAuthenticated: true }),
-    ).toEqual({ action: "defer-onboarding", markPending: true });
-  });
-
-  it("defers to sign-in when onboarded but signed out", () => {
-    expect(
-      decideShareRoute({ onboarded: true, isAuthenticated: false }),
-    ).toEqual({
-      action: "defer-sign-in",
-      markPending: true,
-      href: "/(auth)/sign-in",
-    });
   });
 });
 
