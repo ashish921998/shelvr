@@ -18,6 +18,30 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
 - `paywall_presentation_started`: before calling the native presentation API. This is an attempt, not a confirmed impression. It includes sessions interrupted before the promise settles.
 - `paywall_shown`: emitted after a cancel, purchase, or restore confirms the sheet was presented. The imperative API has no on-show callback. **Never use this event as the abandonment denominator.**
 - `paywall_cancelled`, `paywall_purchase_completed`, `paywall_restored`, `paywall_failed`: client outcomes. A completed checkout can start a free trial and is not evidence of payment. Attempts/outcomes share `paywall_attempt_id` and `placement`. Failures use bounded reasons and no raw error text.
+- The presentation, shown, cancelled, completed, restored, and failed events
+  carry `offering_id` and `trial_eligible` when RevenueCat can read the current
+  offering before the sheet opens. `trial_eligible` is one of `eligible`,
+  `ineligible`, `no_intro`, or `unknown`; missing SDK context is omitted rather
+  than guessed.
+- `paywall_purchase_started` records a purchase tap in the mounted exit-offer
+  component. RevenueCat's imperative `presentPaywall` API does not expose the
+  equivalent callback, so the event is intentionally not emitted for the main
+  paywall. Its `package_id` is the SDK package identifier.
+- `entitlement_activated` records the later client observation that the
+  Convex entitlement became active after a purchase or restore. It carries
+  `source`, the bounded entitlement `status`, and `delay_ms`. A Profile
+  restore reports nothing while an entitlement is already visible — restoring
+  an already-active entitlement made nothing new visible.
+- `paywall_blocked_action_resumed` records a gated action that later passed at
+  the same placement within 30 minutes of the block. `purchased_since_block`
+  distinguishes a post-purchase retry from a later independent visit. The
+  memory is one action deep (a new block replaces it), and a resume is only
+  reported where a `usePaywallGuard` backs the placement: a screen-level gate
+  (Tidy, Map) blocks through its Pro gate CTA, and no guard runs there after
+  the purchase, so those placements report requests and outcomes but never a
+  resume.
+- Purchase and restore outcomes add `product_id` when RevenueCat returns the
+  active store product. It is absent when the SDK cannot provide it.
 - `trial_started`: authenticated RevenueCat INITIAL_PURCHASE with TRIAL period.
 - `payment_succeeded`: authenticated RevenueCat INITIAL_PURCHASE, RENEWAL, or NON_RENEWING_PURCHASE with a finite positive USD `price`. Excludes trial/promotional periods, family sharing, zero-price transactions, restores, cancellations, and transfers. `payment_kind` distinguishes initial, trial_conversion, renewal, and one_time. This measures positive charges, not net revenue after refunds or fees.
 - `trial_cancelled`: authenticated RevenueCat CANCELLATION with a TRIAL period — auto-renew was turned off, or a refund hit the trial. `payment_kind` is `trial`.

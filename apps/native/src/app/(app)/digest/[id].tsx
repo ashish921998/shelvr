@@ -71,7 +71,7 @@ export default function DigestScreen() {
     if (!first) return;
     router.push({
       pathname: "/item/[id]",
-      params: { id: first._id, from: "home" },
+      params: { id: first._id, from: "digest" },
     });
   };
 
@@ -81,7 +81,7 @@ export default function DigestScreen() {
       <MasonryFeed
         items={digest.items}
         numColumns={2}
-        source={{ from: "home" }}
+        source={{ from: "digest" }}
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.eyebrow}>{t("digest.eyebrow")}</Text>

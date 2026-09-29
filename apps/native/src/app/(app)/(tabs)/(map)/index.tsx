@@ -147,10 +147,17 @@ export default function MapScreen() {
   }
 
   // Map is a Pro feature — a lapsed user who deep-links here is bounced to the
-  // paywall instead of seeing the map. ProGate's default CTA already presents
-  // the paywall, so no guard wrapper is needed.
+  // paywall instead of seeing the map. ProGate's CTA presents the paywall
+  // under this screen's own placement, so its attempts stay separable from
+  // Tidy's in the paywall funnel.
   if (!entitled) {
-    return <ProGateView title={t("map.proTitle")} message={t("map.proBody")} />;
+    return (
+      <ProGateView
+        title={t("map.proTitle")}
+        message={t("map.proBody")}
+        placement="map"
+      />
+    );
   }
 
   if (items === undefined) {
@@ -167,7 +174,10 @@ export default function MapScreen() {
 
   const openItem = (id: string | undefined) => {
     if (!id) return;
-    router.push({ pathname: "/item/[id]", params: { id } });
+    // `from: "map"` attributes the open to the map instead of `direct`, and
+    // the item screen falls back to the home feed for pager siblings exactly
+    // as it did when the param was absent.
+    router.push({ pathname: "/item/[id]", params: { id, from: "map" } });
   };
 
   const withThumb = located.filter((item) => thumbs[item.id]);

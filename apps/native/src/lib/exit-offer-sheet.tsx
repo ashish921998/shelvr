@@ -24,6 +24,9 @@ type Request = {
   offering: PurchasesOffering;
   customVariables?: CustomVariables;
   endsAt: number;
+  /** Fires with the package's identifier the moment the user taps purchase —
+   * the one purchase-start signal RevenueCat's component API exposes. */
+  onPurchaseStarted?: (packageId: string) => void;
   resolve: (result: RevenueCatPaywallResult) => void;
 };
 
@@ -118,6 +121,9 @@ export function ExitOfferSheetHost() {
               analytics.capture("exit_offer_expired_open", {});
               finish("CANCELLED");
             }
+          }}
+          onPurchaseStarted={({ packageBeingPurchased }) => {
+            current.onPurchaseStarted?.(packageBeingPurchased.identifier);
           }}
           onPurchaseCompleted={() => finish("PURCHASED")}
           onRestoreCompleted={() => finish("RESTORED")}

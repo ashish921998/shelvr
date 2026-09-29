@@ -18,14 +18,21 @@ The app records behavior; this dashboard is for the product team. It does not ad
 
 ## Events
 
-| Event                           | Origin                                                                                                  | Important fields                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `item_saved`                    | Convex, once per creation transaction                                                                   | `item_id`, `item_type`, `saved_at`, `save_session_id`                          |
-| `item_opened`                   | Focused item pager / foreground return                                                                  | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id` |
-| `item_action`                   | Item detail actions, feed sharing, and the first saved edit per note page visit (`action: note_edited`) | Same item fields, `action`, SDK `$session_id`                                  |
-| `item_space_membership_changed` | Space corrections and Undo                                                                              | `item_id`, `space_id`, `membership_added`, `undone`                            |
+| Event                           | Origin                                                                                                  | Important fields                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `item_saved`                    | Convex, once per creation transaction                                                                   | `item_id`, `item_type`, `saved_at`, `save_session_id`, `save_source`, optional `operation_id` |
+| `item_processed`                | Convex, once per applied processing outcome                                                             | `item_id`, `item_type`, `outcome`, optional `failure_reason`/`enrichment`, `processing_ms`    |
+| `save_attempt_started`          | Native client, once per submitted save operation                                                        | `save_source`, `save_kind`, optional `operation_id`                                           |
+| `save_failed`                   | Native client, once per failed save operation                                                           | `save_source`, `save_kind`, `stage`, optional `operation_id`                                  |
+| `item_opened`                   | Focused item pager / foreground return                                                                  | `item_id`, `item_type`, `saved_at`, `item_age_ms`, `source`, SDK `$session_id`                |
+| `item_action`                   | Item detail actions, feed sharing, and the first saved edit per note page visit (`action: note_edited`) | Same item fields, `action`, SDK `$session_id`                                                 |
+| `item_space_membership_changed` | Space corrections and Undo                                                                              | `item_id`, `space_id`, `membership_added`, `undone`                                           |
 
-All four include `environment` and `analytics_version`. These new events send identifiers and categorical metadata, not saved text, URLs, images, or Space names. Existing event contracts remain available.
+All events include `environment` and `analytics_version`. `item_saved` and
+`item_processed` join on `item_id`; `operation_id` additionally joins a client
+attempt to an idempotent link, note, share, or image operation when one exists.
+These events send identifiers and categorical metadata, not saved text, URLs,
+images, or Space names. Existing event contracts remain available.
 
 Server delivery retries up to three times with the same event UUID and original timestamp. Failed telemetry delivery never rolls back an already committed save. Item-level aggregation also prevents duplicate deliveries from inflating the denominator.
 
