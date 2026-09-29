@@ -74,7 +74,7 @@ export function exitOfferReminderAt(
  * for because they opened the app. The window is derived here and nowhere
  * else, so the sync never re-reads it.
  */
-export type ReminderPlan =
+type ReminderPlan =
   | { kind: "schedule"; fireAt: number }
   | { kind: "keep" }
   | { kind: "cancel" };
