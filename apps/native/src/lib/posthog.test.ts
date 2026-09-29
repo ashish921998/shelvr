@@ -266,7 +266,7 @@ describe("posthog session replay gate", () => {
       maskAllSandboxedViews: true,
       captureLog: false,
       captureNetworkTelemetry: false,
-      sampleRate: 0.2,
+      sampleRate: 1,
     });
     vi.doUnmock("expo-constants");
   });

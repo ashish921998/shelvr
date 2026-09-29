@@ -123,7 +123,10 @@ export const posthog =
           maskAllSandboxedViews: true,
           captureLog: false,
           captureNetworkTelemetry: false,
-          sampleRate: 0.2,
+          // Every session, while the user base is small enough that a 20%
+          // sample would yield a handful of recordings a week. Lower it once
+          // volume makes sampling worth it. Decided 2026-09-29.
+          sampleRate: 1,
           throttleDelayMs: 1000,
         },
         // The object form resolves omitted keys to false — an empty
