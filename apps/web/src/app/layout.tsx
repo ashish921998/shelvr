@@ -34,8 +34,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <PageViewTracker />
         {children}
+        {/* After the page, so its effects run first: a share or oracle
+            verdict page sets the visit's campaign before this counts it. */}
+        <PageViewTracker />
       </body>
     </html>
   );
