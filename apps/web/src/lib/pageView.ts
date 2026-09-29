@@ -6,7 +6,7 @@ type PageLocation = Pick<Location, "origin" | "pathname" | "search">;
  * The path a page view reports. A share page's path carries the token that
  * opens the shared item, so it is replaced, the same way `sharePageUrl` does.
  */
-export function pageViewPath(pathname: string): string {
+function pageViewPath(pathname: string): string {
   return pathname.startsWith("/i/") ? "/i/[token]" : pathname;
 }
 
