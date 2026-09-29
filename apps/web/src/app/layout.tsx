@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageViewTracker from "@/components/PageViewTracker";
 import { APP_STORE_ID } from "@/lib/appStore";
 import "./globals.css";
 
@@ -32,7 +33,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PageViewTracker />
+        {children}
+      </body>
     </html>
   );
 }

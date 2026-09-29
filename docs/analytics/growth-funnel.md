@@ -31,7 +31,26 @@ Connect → App Analytics → Sources → Campaigns. Apple reports only campaign
 with enough users, and none of this reaches PostHog, so installs cannot be
 joined to an account.
 
-**Store clicks per campaign** (the top of that funnel) are in PostHog:
+**Visitors per campaign** come from the website's `$pageview`, which carries
+the arrival `campaign`, the path without its query, and `$referring_domain`
+(the linking site's host only). Page views start with the release that added
+them; earlier visits left no trace.
+
+```sql
+SELECT properties.campaign AS campaign,
+  count(DISTINCT distinct_id) AS visitors,
+  count() AS page_views
+FROM events
+WHERE event = '$pageview'
+  AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY campaign
+ORDER BY visitors DESC
+```
+
+Swap `properties.campaign` for `properties.$referring_domain` to see visits a
+link brought without its `?ct=` tag.
+
+**Store clicks per campaign** (the next step of that funnel) are in PostHog:
 
 ```sql
 SELECT properties.campaign AS campaign, count() AS store_clicks
