@@ -27,14 +27,14 @@ import {
 } from "./safeFetch";
 import {
   instagramMedia,
-  isInstagramUrl,
   isPinterestHost,
   isPinterestShortUrl,
-  isTikTokUrl,
-  pinterestPinId,
   isXHost,
+  linkSource,
+  pinterestPinId,
   shortFormSource,
   xStatusId,
+  type LinkSource,
 } from "./externalUrl";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
 import { logEvent } from "./log";
@@ -282,6 +282,15 @@ export type PageData = {
   /** The recipe the page declares in schema.org markup (or, for a caption
    * source, the recipe page its caption links to). Already sanitized. */
   recipe?: Recipe;
+  /** The reader returned a post's caption rather than a page body, so the
+   * model may be asked to transcribe a recipe from it. */
+  caption?: true;
+  /** The Pinterest board a pin was saved to. */
+  board?: string;
+  /** The post is a video, though only its caption was read. */
+  video?: true;
+  /** The title of the page `linkedUrl` leads to, when the source names it. */
+  linkedTitle?: string;
   /** The caption's first outside link, when the reader saw the real href
    * rather than the display text. Readers that don't set it fall back to
    * scanning the caption in `withLinkedRecipe`. */
@@ -302,7 +311,6 @@ const LINK_HUB_HOSTS = new Set([
   "twitter.com",
   "youtube.com",
   "youtu.be",
-  "pin.it",
 ]);
 
 /** First http(s) URL in a caption worth following for a recipe, with trailing
@@ -1094,7 +1102,8 @@ const pinterestPinSchema = z.object({
   description: z.string().nullish(),
   link: z.string().nullish(),
   images: z.record(z.string(), pinterestImageSchema).nullish(),
-  // A video pin says is_video: false; only its video list gives it away.
+  // Probed on real video pins (2026-09-28): every one said is_video: false,
+  // and only a non-empty video list gave it away.
   videos: z.object({ video_list: z.record(z.string(), z.unknown()) }).nullish(),
   board: z.object({ name: z.string().nullish() }).nullish(),
   pinner: z
@@ -1103,26 +1112,32 @@ const pinterestPinSchema = z.object({
       username: z.string().nullish(),
     })
     .nullish(),
-  rich_metadata: z
-    .object({
-      title: z.string().nullish(),
-      site_name: z.string().nullish(),
-    })
-    .nullish(),
+  rich_metadata: z.object({ title: z.string().nullish() }).nullish(),
 });
 
 const pinterestWidgetSchema = z.object({
-  data: z.array(z.unknown()),
+  data: z.array(pinterestPinSchema.nullish().catch(null)),
 });
 
 type PinterestPin = z.infer<typeof pinterestPinSchema>;
 
-/** The pin's id, following a `pin.it` short link's redirects to find it.
- * Undefined when the URL is not a pin, or the short link lands elsewhere. */
-async function pinterestIdFor(url: string): Promise<string | undefined> {
+/** The widget endpoint's answer, in the same three states as InstagramEmbed:
+ * a pin, no pin (deleted, or a shape we cannot read), or a failure a retry
+ * may not repeat. */
+type PinterestWidget =
+  | { status: "ok"; pin: PinterestPin }
+  | { status: "missing" }
+  | { status: "transient"; errorCategory: string };
+
+/** The pin's id, and the URL it was found at: a `pin.it` short link is
+ * followed to the pin it redirects to, so the page fallback reads that pin
+ * directly instead of walking the redirects again. */
+async function resolvePinterestUrl(
+  url: string,
+): Promise<{ id?: string; url: string }> {
   const id = pinterestPinId(url);
   if (id !== undefined || !isPinterestShortUrl(url)) {
-    return id;
+    return { id, url };
   }
   const result = await safeFetch(url, {
     ...PAGE_FETCH_OPTIONS,
@@ -1134,17 +1149,18 @@ async function pinterestIdFor(url: string): Promise<string | undefined> {
   if (!result.ok) {
     throw new PageFetchError(result.code, result.status);
   }
-  return pinterestPinId(result.finalUrl);
+  // A code Pinterest does not know redirects to its home page rather than
+  // 404ing. Saving that page would save Pinterest itself, so it is gone.
+  if (new URL(result.finalUrl).pathname === "/") {
+    throw new PageFetchError("http_error", 404);
+  }
+  return { id: pinterestPinId(result.finalUrl), url: result.finalUrl };
 }
 
-/** The pin the widget endpoint returns, "transient" when the endpoint failed
- * in a way a retry may not (timeout, 429, 5xx), or undefined when it has no
- * pin. Never throws: the page read is the fallback. */
-async function readPinterestWidget(
-  id: string,
-): Promise<PinterestPin | "transient" | undefined> {
+async function readPinterestWidget(id: string): Promise<PinterestWidget> {
+  let result: Awaited<ReturnType<typeof safeFetch>>;
   try {
-    const result = await safeFetch(
+    result = await safeFetch(
       `https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=${id}`,
       {
         timeoutMs: 15000,
@@ -1156,23 +1172,26 @@ async function readPinterestWidget(
         },
       },
     );
-    if (!result.ok) {
-      logEvent("warn", "pinterest_widget_failed", {
-        error_category: result.code,
-        ...(result.status !== undefined ? { status: result.status } : {}),
-      });
-      return isTransientFetchFailure(result.code, result.status)
-        ? "transient"
-        : undefined;
-    }
-    const body = pinterestWidgetSchema.safeParse(parseJson(result.bytes));
-    const pin = body.success
-      ? pinterestPinSchema.safeParse(body.data.data[0])
-      : undefined;
-    return pin?.success ? pin.data : undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    return { status: "transient", errorCategory: fetchErrorCategory(error) };
   }
+  if (!result.ok) {
+    return isTransientFetchFailure(result.code, result.status)
+      ? {
+          status: "transient",
+          errorCategory: `page_fetch_error:${result.code}`,
+        }
+      : { status: "missing" };
+  }
+  let body: unknown;
+  try {
+    body = parseJson(result.bytes);
+  } catch {
+    // A 200 that is not JSON is the endpoint misbehaving, not a missing pin.
+    return { status: "transient", errorCategory: "invalid_json" };
+  }
+  const pin = pinterestWidgetSchema.safeParse(body).data?.data[0];
+  return pin ? { status: "ok", pin } : { status: "missing" };
 }
 
 /** The pin's largest image, as the 736px copy the pin page itself shows. The
@@ -1180,9 +1199,13 @@ async function readPinterestWidget(
 function pinterestImage(
   images: PinterestPin["images"],
 ): { url: string; aspectRatio: number } | undefined {
-  const largest = Object.values(images ?? {}).sort(
-    (a, b) => b.width - a.width,
-  )[0];
+  const largest = Object.values(images ?? {}).reduce<
+    z.infer<typeof pinterestImageSchema> | undefined
+  >(
+    (best, image) =>
+      best === undefined || image.width > best.width ? image : best,
+    undefined,
+  );
   if (largest === undefined) {
     return undefined;
   }
@@ -1197,15 +1220,16 @@ function pinterestImage(
 }
 
 /** The pin's outbound source link, when it leads off Pinterest. */
-function pinterestSourceLink(link: string | null | undefined) {
+function pinterestSourceLink(
+  link: string | null | undefined,
+): string | undefined {
   if (!link) {
     return undefined;
   }
   try {
     const url = new URL(link);
     return (url.protocol === "https:" || url.protocol === "http:") &&
-      !isPinterestHost(url.hostname) &&
-      url.hostname !== "pin.it"
+      !isPinterestHost(url.hostname)
       ? url.toString()
       : undefined;
   } catch {
@@ -1213,39 +1237,34 @@ function pinterestSourceLink(link: string | null | undefined) {
   }
 }
 
-/** The pin as a page: its description is the caption, the board and source
- * page give the model context the description often lacks. */
+/** The pin as a page. Its description is the caption and the only content;
+ * the board, video flag, and source page title travel as their own fields
+ * for the prompt to render. */
 export function pinterestPage(pin: PinterestPin): PageData | undefined {
   const image = pinterestImage(pin.images);
   const description = pin.description
     ? decodeEntities(pin.description).trim()
     : "";
-  const sourceLink = pinterestSourceLink(pin.link);
-  const sourceTitle = pin.rich_metadata?.title?.trim();
-  const board = pin.board?.name?.trim();
-  const video = Object.keys(pin.videos?.video_list ?? {}).length > 0;
   if (image === undefined && description === "") {
     return undefined;
   }
-  const content = [
-    description,
-    video ? "This pin is a video." : "",
-    board ? `Saved to the Pinterest board: ${board}` : "",
-    sourceLink
-      ? `Links to: ${sourceTitle ? `${decodeEntities(sourceTitle)} ` : ""}${sourceLink}`
-      : "",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
   const title = (pin.grid_title || pin.title)?.trim();
+  const sourceLink = pinterestSourceLink(pin.link);
+  const sourceTitle = pin.rich_metadata?.title?.trim();
   return {
-    ...(title ? { title: decodeEntities(title) } : {}),
+    title: title ? decodeEntities(title) : undefined,
     siteName: "Pinterest",
     author: pin.pinner?.full_name?.trim() || pin.pinner?.username || undefined,
     heroImageUrl: image?.url,
     heroAspectRatio: image?.aspectRatio,
-    content,
-    ...(sourceLink ? { linkedUrl: sourceLink } : {}),
+    content: description || undefined,
+    caption: true,
+    board: pin.board?.name?.trim() || undefined,
+    video:
+      Object.keys(pin.videos?.video_list ?? {}).length > 0 ? true : undefined,
+    linkedUrl: sourceLink,
+    linkedTitle:
+      sourceLink && sourceTitle ? decodeEntities(sourceTitle) : undefined,
   };
 }
 
@@ -1254,13 +1273,24 @@ export function pinterestPage(pin: PinterestPin): PageData | undefined {
  * after the endpoint failed transiently is marked incomplete, so the save can
  * be retried for the widget's caption and image. */
 async function fetchPinterestPin(url: string): Promise<PageData> {
-  const id = await pinterestIdFor(url);
-  const pin = id === undefined ? undefined : await readPinterestWidget(id);
-  if (pin === "transient") {
-    return { ...(await fetchPage(url)), incomplete: true };
+  const resolved = await resolvePinterestUrl(url);
+  const widget =
+    resolved.id === undefined
+      ? ({ status: "missing" } as const)
+      : await readPinterestWidget(resolved.id);
+  if (widget.status === "ok") {
+    const page = pinterestPage(widget.pin);
+    if (page !== undefined) {
+      return page;
+    }
   }
-  const page = pin === undefined ? undefined : pinterestPage(pin);
-  return page ?? fetchPage(url);
+  if (widget.status === "transient") {
+    logEvent("warn", "pinterest_widget_failed", {
+      error_category: widget.errorCategory,
+    });
+    return { ...(await fetchPage(resolved.url)), incomplete: true };
+  }
+  return fetchPage(resolved.url);
 }
 
 /**
@@ -1545,20 +1575,6 @@ export type ShortFormSource = NonNullable<ReturnType<typeof shortFormSource>>;
  * sanitized log rereads it. */
 export type LinkRead = PageReadOk | { status: "unreadable" };
 
-/** A pin link, full or `pin.it` short. */
-function isPinterestUrl(url: string): boolean {
-  return pinterestPinId(url) !== undefined || isPinterestShortUrl(url);
-}
-
-/** True for saves whose readable text is a post caption rather than a page
- * body. Only these let the model propose a recipe: a caption has no schema.org
- * markup to read. Real web pages use their markup instead. */
-function isCaptionSource(url: string): boolean {
-  return (
-    isTikTokUrl(url) || xStatusId(url) !== undefined || isPinterestUrl(url)
-  );
-}
-
 /** The page's text when the model receives all of it, which is what makes it a
  * caption rather than a body. A longer read (an X Article, a blog post) is
  * neither text whose one outbound link is the recipe it describes, nor text a
@@ -1573,33 +1589,43 @@ function captionText(page: PageData): string | undefined {
 /** The model proposes a recipe only from a caption it can read in full, and
  * only when the caption's own link did not already yield the structured
  * recipe. Web pages and URL-only reads never ask: nothing to read exactly. */
-function mayAskForRecipe(url: string, page: PageData): boolean {
+function mayAskForRecipe(page: PageData): boolean {
   return (
     page.recipe === undefined &&
     // A cut caption reads as complete at any length, so the length check alone
     // would let the model transcribe a recipe that stops mid-ingredient.
     page.truncated !== true &&
-    isCaptionSource(url) &&
+    page.caption === true &&
     captionText(page) !== undefined
   );
 }
 
+/** Marks a reader's page as a caption: TikTok and X readers only ever return
+ * a post's caption. */
+async function asCaption(read: Promise<PageData>): Promise<PageData> {
+  return { ...(await read), caption: true };
+}
+
+/** The reader for each platform with its own. Pinterest marks its own page a
+ * caption, because its page fallback is not one. */
+const SOURCE_READERS = {
+  tiktok: (url) => asCaption(fetchTikTokOEmbed(url)),
+  x: (url) => asCaption(fetchXPost(url)),
+  instagram: fetchInstagram,
+  pinterest: fetchPinterestPin,
+} satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
+
 export async function readPage(url: string): Promise<PageRead> {
   try {
-    const page = isTikTokUrl(url)
-      ? await withLinkedRecipe(await fetchTikTokOEmbed(url))
-      : xStatusId(url)
-        ? await withLinkedRecipe(await fetchXPost(url))
-        : isInstagramUrl(url)
-          ? await withLinkedRecipe(await fetchInstagram(url))
-          : isPinterestUrl(url)
-            ? await withLinkedRecipe(await fetchPinterestPin(url))
-            : await fetchPage(url);
+    const source = linkSource(url);
+    const page = source
+      ? await withLinkedRecipe(await SOURCE_READERS[source](url))
+      : await fetchPage(url);
     const shortForm = shortFormSource(url);
     return {
       status: "ok",
       page,
-      askForRecipe: mayAskForRecipe(url, page),
+      askForRecipe: mayAskForRecipe(page),
       ...(shortForm ? { shortForm } : {}),
     };
   } catch (error) {

@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   instagramMedia,
   isInstagramUrl,
+  isPinterestHost,
   isPinterestShortUrl,
+  linkSource,
   pinterestPinId,
   isTikTokUrl,
   shortFormSource,
@@ -329,5 +331,45 @@ describe("isPinterestShortUrl", () => {
     );
     expect(isPinterestShortUrl("https://www.pinterest.com/pin/1/")).toBe(false);
     expect(isPinterestShortUrl(undefined)).toBe(false);
+  });
+});
+
+describe("isPinterestHost", () => {
+  it("accepts Pinterest's domains and pin.it, and nothing else", () => {
+    for (const host of [
+      "pinterest.com",
+      "www.pinterest.com",
+      "in.pinterest.com",
+      "www.pinterest.co.uk",
+      "pinterest.com.au",
+      "pinterest.de",
+      "pin.it",
+    ]) {
+      expect(isPinterestHost(host)).toBe(true);
+    }
+    for (const host of [
+      "pinterest.io",
+      "pinterest.cc",
+      "notpinterest.com",
+      "pinterest.com.evil.example",
+      "example.com",
+    ]) {
+      expect(isPinterestHost(host)).toBe(false);
+    }
+  });
+});
+
+describe("linkSource", () => {
+  it("names the platform reader for each kind of link", () => {
+    expect(linkSource("https://www.tiktok.com/@a/video/1")).toBe("tiktok");
+    expect(linkSource("https://x.com/nasa/status/1")).toBe("x");
+    expect(linkSource("https://www.instagram.com/reel/abc/")).toBe("instagram");
+    expect(linkSource("https://www.pinterest.com/pin/1/")).toBe("pinterest");
+    expect(linkSource("https://pin.it/abc")).toBe("pinterest");
+    expect(
+      linkSource("https://www.pinterest.com/cook/dinners/"),
+    ).toBeUndefined();
+    expect(linkSource("https://example.com/post")).toBeUndefined();
+    expect(linkSource(undefined)).toBeUndefined();
   });
 });
