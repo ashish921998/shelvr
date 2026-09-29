@@ -13,8 +13,17 @@
 /** Offering identifier in the RevenueCat dashboard. */
 export const EXIT_OFFERING_ID = "exit_offer";
 
-/** At most one exit offer per account per week. */
-export const EXIT_OFFER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Once shown, the offer stays open for this long: Home counts it down and can
+ * reopen it. When the window closes the offer is really gone, so the
+ * countdown never lies (Apple rejects fake urgency).
+ */
+export const EXIT_OFFER_WINDOW_MS = 24 * HOUR_MS;
+
+/** An expired offer does not come back for a month, keeping the deadline honest. */
+export const EXIT_OFFER_COOLDOWN_MS = 30 * 24 * HOUR_MS;
 
 // A retry follows a failed load, not a decision to leave.
 const SKIPPED_PLACEMENTS = new Set(["retry"]);
@@ -33,6 +42,49 @@ export function exitOfferDue(
 ): boolean {
   if (SKIPPED_PLACEMENTS.has(placement)) return false;
   return lastShownAt === null || now - lastShownAt >= EXIT_OFFER_COOLDOWN_MS;
+}
+
+/** When the open offer closes, or null when no offer is open. */
+export function exitOfferEndsAt(
+  shownAt: number | null,
+  now: number,
+): number | null {
+  if (shownAt === null) return null;
+  const endsAt = shownAt + EXIT_OFFER_WINDOW_MS;
+  return now < endsAt ? endsAt : null;
+}
+
+/** The honest reminder goes out this long before the offer closes. */
+const EXIT_OFFER_REMINDER_LEAD_MS = HOUR_MS;
+
+/** When to remind that the offer is closing, or null when it is too late. */
+export function exitOfferReminderAt(
+  endsAt: number,
+  now: number,
+): number | null {
+  const fireAt = endsAt - EXIT_OFFER_REMINDER_LEAD_MS;
+  return fireAt - now > 60_000 ? fireAt : null;
+}
+
+/**
+ * Whether an opted-in reminder has yet to fire. Cancelling stays possible
+ * until then, even once it is too late to schedule a new one.
+ */
+export function exitOfferReminderPending(endsAt: number, now: number): boolean {
+  return now < endsAt - EXIT_OFFER_REMINDER_LEAD_MS;
+}
+
+/** Whole hours and minutes left, rounded down so it never overstates. */
+export function timeLeft(ms: number): { hours: number; minutes: number } {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  return { hours: Math.floor(minutes / 60), minutes: minutes % 60 };
+}
+
+/** "23:05:09" for the time left; never negative. */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
 }
 
 /** Parses the stored timestamp; anything unreadable counts as never shown. */

@@ -441,37 +441,49 @@ export const ItemCard = memo(function ItemCard({
             testID={
               item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
             }
-            style={({ pressed }) => [
-              styles.card,
-              item.isSticker && styles.cardSticker,
-              pressed && { opacity: 0.85 },
-            ]}
           >
-            <CardMedia item={item} failedLabel={failedLabel} theme={theme} />
-            <CardCaption
-              item={item}
-              captionTitle={captionTitle}
-              menuActions={menuActions}
-              theme={theme}
-            />
-
-            {isSuggested && (
-              // The badge pops off with a spring when the suggestion resolves
-              // (accepted here or anywhere else — the prop flip unmounts it).
-              <Animated.View
-                exiting={
-                  reducedMotion
-                    ? REDUCED_FADE_OUT
-                    : ZoomOut.springify().damping(14).stiffness(300)
-                }
-                style={styles.suggestedBadge}
+            {/* Link.Trigger's Slot drops a Pressable style function (it merges
+                style by object spread), so the card's look lives on this inner
+                View, driven by the Pressable's render-prop children. */}
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.card,
+                  item.isSticker && styles.cardSticker,
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                <SuggestedBadge onPress={accept} />
-              </Animated.View>
-            )}
+                <CardMedia
+                  item={item}
+                  failedLabel={failedLabel}
+                  theme={theme}
+                />
+                <CardCaption
+                  item={item}
+                  captionTitle={captionTitle}
+                  menuActions={menuActions}
+                  theme={theme}
+                />
 
-            {(item.status === "processing" || item.status === "failed") && (
-              <CardStatusCorner item={item} theme={theme} />
+                {isSuggested && (
+                  // The badge pops off with a spring when the suggestion resolves
+                  // (accepted here or anywhere else — the prop flip unmounts it).
+                  <Animated.View
+                    exiting={
+                      reducedMotion
+                        ? REDUCED_FADE_OUT
+                        : ZoomOut.springify().damping(14).stiffness(300)
+                    }
+                    style={styles.suggestedBadge}
+                  >
+                    <SuggestedBadge onPress={accept} />
+                  </Animated.View>
+                )}
+
+                {(item.status === "processing" || item.status === "failed") && (
+                  <CardStatusCorner item={item} theme={theme} />
+                )}
+              </View>
             )}
           </Pressable>
         </Link.Trigger>

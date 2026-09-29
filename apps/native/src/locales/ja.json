@@ -530,5 +530,16 @@
   "refundConsent.disabled": "返金審査のデータ共有はオフです。",
   "refundConsent.syncPending": "選択を保存しました。RevenueCatを更新中です。完了までは以前の設定が適用される場合があります。",
   "refundConsent.withdraw": "共有をオフにする",
-  "refundConsent.review": "更新された利用規約を確認"
+  "refundConsent.review": "更新された利用規約を確認",
+  "exitOffer.title": "初年度が割引価格に",
+  "exitOffer.endsIn": "オファー終了まで %{time}",
+  "exitOffer.cta": "オファーを見る",
+  "exitOffer.sheetEndsIn": "オファー終了まで %{hours}時間%{minutes}分",
+  "exitOffer.reminderTitle": "オファーはあと1時間で終了します",
+  "exitOffer.reminderBody": "Shelvr Pro の初年度割引がまもなく終了します。",
+  "exitOffer.remindMe": "終了前にリマインド",
+  "exitOffer.reminderConsent": "このオファーについて、終了の1時間前に通知を1回お送りします。いつでも取り消せます。",
+  "exitOffer.reminderSet": "オファー終了の1時間前にリマインドします。",
+  "exitOffer.reminderCancel": "リマインドを取り消す",
+  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。"
 }

@@ -564,5 +564,16 @@
   "refundConsent.disabled": "Le partage de données pour les remboursements est désactivé.",
   "refundConsent.syncPending": "Votre choix est enregistré. Mise à jour de RevenueCat ; le réglage précédent peut s’appliquer jusqu’à la fin.",
   "refundConsent.withdraw": "Désactiver le partage",
-  "refundConsent.review": "Consulter les nouvelles conditions"
+  "refundConsent.review": "Consulter les nouvelles conditions",
+  "exitOffer.title": "Votre première année à prix réduit",
+  "exitOffer.endsIn": "L’offre se termine dans %{time}",
+  "exitOffer.cta": "Voir l’offre",
+  "exitOffer.sheetEndsIn": "L’offre se termine dans %{hours} h %{minutes} min.",
+  "exitOffer.reminderTitle": "Votre offre se termine dans une heure",
+  "exitOffer.reminderBody": "Votre première année de Shelvr Pro à prix réduit se termine bientôt.",
+  "exitOffer.remindMe": "Me le rappeler avant la fin",
+  "exitOffer.reminderConsent": "Nous vous enverrons une notification à propos de cette offre, une heure avant sa fin. Vous pouvez l’annuler à tout moment.",
+  "exitOffer.reminderSet": "Rappel prévu une heure avant la fin de l’offre.",
+  "exitOffer.reminderCancel": "Annuler le rappel",
+  "exitOffer.reminderDenied": "Les notifications de Shelvr sont désactivées. Activez-les dans Réglages pour recevoir le rappel."
 }
