@@ -45,13 +45,6 @@ export function newDeliveryId(): string {
   return crypto.randomUUID();
 }
 
-/** The deployment's event environment tag. Only the production deployment
- * labels events `production`, so a staging or local run can never land in a
- * production dashboard. */
-export function captureEnvironment(): string {
-  return env.OBSERVABILITY_ENV === "production" ? "production" : "development";
-}
-
 export async function deliverPostHogEvent(
   request: PostHogEvent,
 ): Promise<PostHogDelivery> {
@@ -75,7 +68,12 @@ export async function deliverPostHogEvent(
           : {}),
         properties: {
           distinct_id: request.distinctId,
-          environment: captureEnvironment(),
+          // Only the production deployment labels events `production`, so a
+          // staging or local run can never land in a production dashboard.
+          environment:
+            env.OBSERVABILITY_ENV === "production"
+              ? "production"
+              : "development",
           ...request.properties,
         },
       }),

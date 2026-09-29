@@ -30,9 +30,8 @@ export type SaveErrorCode = (typeof SAVE_ERROR_CODES)[number];
 
 export type SaveErrorData = { code: SaveErrorCode; message: string };
 
-/** Byte-identical to the sentences the server throws today. `localizeError`
- * keys its translations off them, and the tolerant client half of this change
- * must not move user-visible copy. */
+/** Byte-identical to the sentences the server throws. `localizeError` keys its
+ * translations off them, so user-visible copy must not move. */
 export const SAVE_ERROR_MESSAGES: Record<SaveErrorCode, string> = {
   // Never rendered — the client opens the paywall — and production redacts it
   // anyway. Mirrors `PRO_REQUIRED` in `subscriptions.ts`.
@@ -50,8 +49,7 @@ export function saveError(code: SaveErrorCode): ConvexError<SaveErrorData> {
 }
 
 /** The save error code carried by a thrown value, or null for anything else:
- * a redacted server error, a network failure, or the bare-sentence
- * `ConvexError` today's server still throws. */
+ * a redacted server error, a network failure, or an error without `data`. */
 export function saveErrorCode(error: unknown): SaveErrorCode | null {
   if (!(error instanceof ConvexError)) return null;
   const data: unknown = error.data;

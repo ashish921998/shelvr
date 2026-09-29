@@ -8,6 +8,7 @@ import {
 } from "./exit-offer-reminder";
 
 const mock = vi.hoisted(() => ({
+  getItem: vi.fn(),
   permission: vi.fn(),
   request: vi.fn(),
   setItem: vi.fn(),
@@ -24,10 +25,9 @@ vi.mock("@/lib/current-user", () => ({ useCurrentUser: vi.fn() }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
   useExitOfferEndsAt: vi.fn(),
-  waitForSheetTransition: vi.fn(),
 }));
 vi.mock("expo-secure-store", () => ({
-  getItem: vi.fn(),
+  getItem: mock.getItem,
   setItem: mock.setItem,
   deleteItemAsync: mock.deleteItem,
 }));
@@ -45,6 +45,7 @@ const HOUR = 60 * 60 * 1000;
 const now = 1_000_000_000_000;
 
 beforeEach(() => {
+  mock.getItem.mockReset().mockReturnValue(null);
   mock.permission.mockReset().mockResolvedValue({ ios: { status: 2 } });
   mock.request.mockReset();
   mock.setItem.mockReset();
@@ -133,12 +134,23 @@ describe("syncExitOfferReminder", () => {
     expect(mock.schedule).not.toHaveBeenCalled();
   });
 
-  it("clears the reminder once the offer is gone or nearly over", async () => {
+  it("clears the reminder once the offer is gone", async () => {
     await expect(syncExitOfferReminder(null, now)).resolves.toBe(false);
+    await expect(syncExitOfferReminder(now - 1, now)).resolves.toBe(false);
+    expect(mock.cancel).toHaveBeenCalledTimes(2);
+    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.schedule).not.toHaveBeenCalled();
+  });
+
+  it("leaves a reminder alone once it is due within a minute", async () => {
+    // Opening the app just before the reminder fires must not cancel it.
+    await expect(syncExitOfferReminder(now + HOUR + 30_000, now)).resolves.toBe(
+      false,
+    );
     await expect(syncExitOfferReminder(now + 30 * 60_000, now)).resolves.toBe(
       false,
     );
-    expect(mock.cancel).toHaveBeenCalledWith(EXIT_OFFER_REMINDER_ID);
+    expect(mock.cancel).not.toHaveBeenCalled();
     expect(mock.schedule).not.toHaveBeenCalled();
   });
 

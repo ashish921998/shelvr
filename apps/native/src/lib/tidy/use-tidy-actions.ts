@@ -85,14 +85,14 @@ export function useTidyActions({ batch, noteDeleted }: Params) {
           { saveSource: "photo_import" },
         );
         if (result.status === "saved") {
-          // Plan 005 owns durable Tidy save state; here we return the created
-          // itemId so undo can delete the item even mid-upload.
+          // Return the created itemId so undo can delete the item even
+          // mid-upload.
           return result.itemId;
         }
         // A settled failure no longer rejects (the hook returns a failed
         // result instead), so restore the prior behavior explicitly: unmark the
         // photo so it resurfaces in a future batch, and resolve to null so undo
-        // no-ops. The result carries the stable operation id for plan 005.
+        // no-ops. The result carries the stable operation id for recovery.
         console.warn("Tidy save failed", result.stage, result.operationId);
         unmarkReviewed(photo.id);
         return null;
