@@ -241,7 +241,7 @@ describe("posthog exception autocapture gate", () => {
 });
 
 describe("posthog session replay gate", () => {
-  it("records a production build with masking and sampling intact", async () => {
+  it("records a preview build with masking and sampling intact", async () => {
     vi.resetModules();
     vi.doMock("expo-constants", () => ({
       default: {
@@ -249,7 +249,7 @@ describe("posthog session replay gate", () => {
           extra: {
             posthogProjectToken: "phc_test",
             posthogHost: "https://test.i.posthog.com",
-            variant: "production",
+            variant: "preview",
           },
         },
       },
@@ -268,6 +268,27 @@ describe("posthog session replay gate", () => {
       captureNetworkTelemetry: false,
       sampleRate: 0.2,
     });
+    vi.doUnmock("expo-constants");
+  });
+
+  it("never records a production build", async () => {
+    // App Review guideline 2.5.14 wants consent and an indicator for screen
+    // recording; the app has neither, so the store build must not record.
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+            variant: "production",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as { enableSessionReplay: boolean };
+    expect(options.enableSessionReplay).toBe(false);
     vi.doUnmock("expo-constants");
   });
 

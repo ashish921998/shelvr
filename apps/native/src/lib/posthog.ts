@@ -10,11 +10,11 @@ const posthogHost = Constants.expoConfig?.extra?.posthogHost as
   | string
   | undefined;
 
-const REPLAY_VARIANTS = new Set<unknown>([
-  "development",
-  "preview",
-  "production",
-]);
+// Session replay records screen activity, and App Review guideline 2.5.14
+// requires explicit consent and a visible indication for that. Shelvr asks
+// for neither, so production never records; dev and preview builds keep it
+// for our own testing. Decided 2026-09-29 rather than gamble on review.
+const REPLAY_VARIANTS = new Set<unknown>(["development", "preview"]);
 
 // Distributed builds report crashes; local development does not. A dev machine
 // crash on an unmerged branch would otherwise open an error issue next to
@@ -110,10 +110,9 @@ export const posthog =
         // product gain. Fail closed, as replay and exception autocapture do.
         capturePushNotificationSubscriptions: false,
         capturePushNotificationOpened: false,
-        // Visual masking was verified on a signed preview build on 2026-09-28,
-        // so production records too, at the same sample rate. Fail closed: only
-        // builds that declare a known variant record, so a missing `extra` can
-        // never turn replay on.
+        // Fail closed: only builds that declare a known variant record, so a
+        // missing `extra` can never turn replay on. Masking was verified on a
+        // signed preview build on 2026-09-28.
         enableSessionReplay: REPLAY_VARIANTS.has(
           Constants.expoConfig?.extra?.variant,
         ),
