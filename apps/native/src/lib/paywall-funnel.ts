@@ -151,6 +151,8 @@ function foldTrialEligibility(
   statuses: (number | undefined)[],
   intro: IntroEligibilityStatuses,
 ): TrialEligibility {
+  // An offering with no products has no answer to fold.
+  if (statuses.length === 0) return "unknown";
   if (statuses.includes(intro.INTRO_ELIGIBILITY_STATUS_ELIGIBLE)) {
     return "eligible";
   }
@@ -195,15 +197,27 @@ export async function readPaywallContext(): Promise<PaywallContext> {
       ),
     };
   };
+  return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
+}
+
+/** Resolves to `{}` when `read` rejects or outlasts `ms`, so a stalled SDK
+ * call can never hold up the paywall flow for a telemetry property. */
+async function withTimeout<T extends object>(
+  read: Promise<T>,
+  ms: number,
+): Promise<T | Record<string, never>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      read(),
-      new Promise<PaywallContext>((resolve) =>
-        setTimeout(() => resolve({}), PAYWALL_CONTEXT_TIMEOUT_MS),
-      ),
+      read,
+      new Promise<Record<string, never>>((resolve) => {
+        timer = setTimeout(() => resolve({}), ms);
+      }),
     ]);
   } catch {
     return {};
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -214,13 +228,14 @@ export async function readPaywallContext(): Promise<PaywallContext> {
 export async function activeProductId(): Promise<{ product_id?: string }> {
   const rc = getPurchases();
   if (!rc) return {};
-  try {
+  const read = async (): Promise<{ product_id?: string }> => {
     const info = await rc.getCustomerInfo();
     const entitlement = Object.values(info.entitlements.active)[0];
     return entitlement?.productIdentifier
       ? { product_id: entitlement.productIdentifier }
       : {};
-  } catch {
-    return {};
-  }
+  };
+  // Bounded: the purchase result waits on this read before it reaches the
+  // caller, so a stalled SDK call must not hold up the unlocked action.
+  return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
 }

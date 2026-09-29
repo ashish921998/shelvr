@@ -118,3 +118,19 @@ describe("blocked action resume", () => {
     expect(mock.capture).not.toHaveBeenCalled();
   });
 });
+
+describe("activeProductId", () => {
+  it("resolves empty when RevenueCat's customer info read stalls", async () => {
+    vi.useFakeTimers();
+    vi.doMock("@/lib/revenuecat-module", () => ({
+      getPurchases: () => ({
+        getCustomerInfo: () => new Promise(() => {}),
+      }),
+    }));
+    const funnel = await loadFunnel();
+    const read = funnel.activeProductId();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(read).resolves.toEqual({});
+    vi.doUnmock("@/lib/revenuecat-module");
+  });
+});
