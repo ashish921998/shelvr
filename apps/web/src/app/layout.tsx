@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageView from "@/components/PageView";
 import { APP_STORE_ID } from "@/lib/appStore";
 import "./globals.css";
 
@@ -32,7 +33,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PageView />
+      </body>
     </html>
   );
 }

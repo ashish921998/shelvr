@@ -31,6 +31,24 @@ Connect → App Analytics → Sources → Campaigns. Apple reports only campaign
 with enough users, and none of this reaches PostHog, so installs cannot be
 joined to an account.
 
+**Visitors per campaign** come first. Every page view sends `$pageview` with
+the visit's `campaign` and the referring site's host (`$referring_domain`, the
+host only). Share pages send `/i/[token]` in place of the token. Page views
+start with the release that added them, so earlier posts have no visitor count.
+
+```sql
+SELECT
+  coalesce(properties.campaign, 'none') AS campaign,
+  coalesce(properties.$referring_domain, 'direct') AS referrer,
+  count(DISTINCT distinct_id) AS visitors,
+  count() AS pageviews
+FROM events
+WHERE event = '$pageview'
+  AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY campaign, referrer
+ORDER BY visitors DESC
+```
+
 **Store clicks per campaign** (the top of that funnel) are in PostHog:
 
 ```sql
