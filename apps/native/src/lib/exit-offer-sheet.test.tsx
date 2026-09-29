@@ -17,6 +17,19 @@ const mock = vi.hoisted(() => ({
   paywall: null as PaywallProps | null,
   capture: vi.fn(),
   modal: ({ children }: { children: ReactNode }) => children,
+  icon: () => null,
+  view: ({ children }: { children: ReactNode }) => children,
+  pressable: ({
+    onPress,
+    accessibilityLabel,
+  }: {
+    onPress: () => void;
+    accessibilityLabel: string;
+  }) => (
+    <button type="button" onClick={onPress}>
+      {accessibilityLabel}
+    </button>
+  ),
 }));
 
 vi.mock("react-native", () => ({
@@ -27,6 +40,19 @@ vi.mock("react-native", () => ({
     },
   },
   Modal: mock.modal,
+  View: mock.view,
+  Pressable: mock.pressable,
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.icon }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string) => key,
+  useAppLocale: () => "en",
+}));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: (sheet: unknown) => sheet },
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture },
@@ -148,6 +174,15 @@ describe("presentExitSheet", () => {
     await act(async () => {});
     act(() => mock.paywall!.onDismiss());
     await act(async () => vi.advanceTimersByTime(1_000));
+    await expect(result).resolves.toBe("CANCELLED");
+    host.unmount();
+  });
+
+  it("closes from the app's own close button", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    const result = open();
+    await act(async () => {});
+    act(() => host.getByText("common.close").click());
     await expect(result).resolves.toBe("CANCELLED");
     host.unmount();
   });

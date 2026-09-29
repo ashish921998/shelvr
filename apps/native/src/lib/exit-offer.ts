@@ -66,6 +66,28 @@ export function exitOfferReminderAt(
   return fireAt - now > 60_000 ? fireAt : null;
 }
 
+type ReminderPlan =
+  | { kind: "schedule"; fireAt: number }
+  | { kind: "keep" }
+  | { kind: "cancel" };
+
+/**
+ * What a sync should do with the scheduled reminder for the window ending at
+ * `endsAt`, or for no window when `endsAt` is null. "keep" covers a reminder
+ * due within a minute or already fired while the offer is still open: whatever
+ * the OS holds is right, and cancelling would drop a reminder the user asked
+ * for because they opened the app. The window is derived here and nowhere
+ * else, so the sync never re-reads it.
+ */
+export function exitOfferReminderPlan(
+  endsAt: number | null,
+  now: number,
+): ReminderPlan {
+  if (endsAt === null || now >= endsAt) return { kind: "cancel" };
+  const fireAt = exitOfferReminderAt(endsAt, now);
+  return fireAt === null ? { kind: "keep" } : { kind: "schedule", fireAt };
+}
+
 /**
  * Whether an opted-in reminder has yet to fire. Cancelling stays possible
  * until then, even once it is too late to schedule a new one.

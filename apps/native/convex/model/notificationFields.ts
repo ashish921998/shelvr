@@ -3,7 +3,8 @@ import translations from "./notificationTranslations.json";
 import { pluralRules } from "./localization";
 
 /**
- * The non-function half of weekly-shelf push: the per-recipient delivery-state
+ * The non-function half of push delivery (weekly shelf and save reminders):
+ * the per-recipient delivery-state
  * validator `schema.ts` stores and `notificationDelivery.ts` advances, plus the
  * localized title/body that goes into the notification payload. Named for the
  * fields rather than the machine so it is not confused with
@@ -37,6 +38,19 @@ export const recipientValidator = v.union(
 );
 
 export type Recipient = Infer<typeof recipientValidator>;
+
+/**
+ * The push most likely reached the phone: Expo confirmed it with a receipt,
+ * or accepted the ticket and never reported a fault. Anything that counts a
+ * notification as delivered, for the reminder budget and for telemetry, asks
+ * this, so the two places a delivery closes cannot disagree.
+ */
+export const reachedDevice = (recipient: Recipient): boolean =>
+  recipient.state === "delivered" || recipient.state === "receipt";
+
+/** Still has a send or a receipt check ahead of it. */
+export const awaitingOutcome = (recipient: Recipient): boolean =>
+  recipient.state === "pending" || recipient.state === "receipt";
 
 export function recipientError(recipient: Recipient, error: string): Recipient {
   const terminal = [
