@@ -12,6 +12,7 @@ import {
 } from "./first-share";
 
 const store = vi.hoisted(() => new Map<string, string>());
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => store.get(key) ?? null,
   setItem: (key: string, value: string) => {

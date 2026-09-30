@@ -1,16 +1,15 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { finishWeeklyNudge, isWeeklyNudgePending } from "@/lib/first-share";
+import { weeklyNudge } from "@/lib/first-share";
 import { useNotificationSession } from "@/lib/notifications";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { PromptSheet } from "@/components/ui/prompt-sheet";
+import { useEffect, useState } from "react";
+import { Alert, Linking } from "react-native";
 
 /**
  * Asks once whether to turn on the weekly shelf. Queued by the first
@@ -28,11 +27,8 @@ export function WeeklyNudgeSheet({
 }) {
   useAppLocale();
   const { session } = useNotificationSession();
-  const [pending, setPending] = useState(() => isWeeklyNudgePending(userId));
+  const pending = weeklyNudge.usePending(userId);
   const [busy, setBusy] = useState(false);
-  useFocusEffect(
-    useCallback(() => setPending(isWeeklyNudgePending(userId)), [userId]),
-  );
   const { data: preferences } = useQuery({
     ...convexQuery(
       api.notifications.getPreferences,
@@ -44,22 +40,11 @@ export function WeeklyNudgeSheet({
   const alreadyOn = preferences?.weeklyShelfEnabled === true;
 
   useEffect(() => {
-    if (pending && alreadyOn) {
-      // Finish AND clear the local flag: the persisted flag alone leaves
-      // `pending` true, so the preferences query stays subscribed instead of
-      // flipping to "skip". The flip cannot be a render-phase adjustment
-      // (it would discard the pass this effect commits) and the write must
-      // not run during render.
-      finishWeeklyNudge(userId);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPending(false);
-    }
+    // Finishing flips `pending`, so the preferences query goes back to "skip".
+    if (pending && alreadyOn) weeklyNudge.finish(userId);
   }, [pending, alreadyOn, userId]);
 
-  const close = () => {
-    finishWeeklyNudge(userId);
-    setPending(false);
-  };
+  const close = () => weeklyNudge.finish(userId);
 
   const remind = async () => {
     setBusy(true);
@@ -93,89 +78,33 @@ export function WeeklyNudgeSheet({
   const visible = pending && ready && preferences !== undefined && !alreadyOn;
 
   return (
-    <Modal
+    <PromptSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={close}
-    >
-      <View style={styles.backdrop}>
-        <Pressable
-          style={styles.scrim}
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel={t("common.notNow")}
-        />
-        <View style={styles.sheet}>
-          <View style={styles.grabber} />
-          <Text style={styles.title}>{t("weekly.nudgeTitle")}</Text>
-          <Text style={styles.body}>{t("weekly.nudgeBody")}</Text>
-          <NotificationPreview
-            body={
-              previewTitle
-                ? t("weekly.previewBody", { title: previewTitle })
-                : t("weekly.previewFallback")
-            }
+      onClose={close}
+      title={t("weekly.nudgeTitle")}
+      body={t("weekly.nudgeBody")}
+      actions={
+        <>
+          <CtaButton
+            label={t("weekly.remindMe")}
+            onPress={() => void remind()}
+            busy={busy}
           />
-          <View style={styles.actions}>
-            <CtaButton
-              label={t("weekly.remindMe")}
-              onPress={() => void remind()}
-              busy={busy}
-            />
-            <GhostButton
-              label={t("common.notNow")}
-              onPress={close}
-              disabled={busy}
-            />
-          </View>
-        </View>
-      </View>
-    </Modal>
+          <GhostButton
+            label={t("common.notNow")}
+            onPress={close}
+            disabled={busy}
+          />
+        </>
+      }
+    >
+      <NotificationPreview
+        body={
+          previewTitle
+            ? t("weekly.previewBody", { title: previewTitle })
+            : t("weekly.previewFallback")
+        }
+      />
+    </PromptSheet>
   );
 }
-
-const styles = StyleSheet.create((theme, rt) => ({
-  backdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlay,
-  },
-  sheet: {
-    gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(3),
-    paddingTop: theme.gap(1.5),
-    paddingBottom: rt.insets.bottom + theme.gap(2),
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.background,
-  },
-  grabber: {
-    alignSelf: "center",
-    width: 36,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.gap(1),
-  },
-  title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    color: theme.colors.foreground,
-  },
-  body: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
-    color: theme.colors.muted,
-  },
-  actions: {
-    gap: theme.gap(0.5),
-    marginTop: theme.gap(1),
-  },
-}));

@@ -8,7 +8,9 @@ import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 export default function SpacesStackLayout() {
   useAppLocale();
   const { theme } = useUnistyles();
-  const { labelColor, screenOptions, tap } = useTabStackChrome();
+  const { labelColor, screenOptions, tap } = useTabStackChrome({
+    softScrollEdge: true,
+  });
   const newSpace = tap("/new-space");
 
   return (

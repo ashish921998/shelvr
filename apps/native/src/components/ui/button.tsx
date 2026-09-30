@@ -1,16 +1,14 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  View,
-  type PressableProps,
-} from "react-native";
+import { Pressable, View, type PressableProps } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { GlassView, hasLiquidGlass } from "@/components/glass";
 import { motion, motionCSS } from "@/lib/motion";
 import { ThemedText } from "@/components/ui/themed-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+type Visual = "idle" | "pressed" | "disabled" | "loading";
 
 type Props = Omit<PressableProps, "children" | "style"> & {
   title: string;
@@ -18,7 +16,13 @@ type Props = Omit<PressableProps, "children" | "style"> & {
   style?: React.ComponentProps<typeof AnimatedPressable>["style"];
 };
 
-/** Primary action. The label stays mounted and visible beside the spinner. */
+/**
+ * Shelvr's capsule action for a screen's main step. Where iOS supports Liquid
+ * Glass it is interactive glass and the system owns the press response;
+ * elsewhere it is a solid capsule that dims and scales in. Loading dims the
+ * button instead of swapping in a spinner, so the label stays put and nothing
+ * around it reflows. Ported from Amber (#13).
+ */
 export function Button({
   title,
   loading = false,
@@ -32,7 +36,28 @@ export function Button({
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const [pressed, setPressed] = useState(false);
-  const inactive = disabled || loading;
+  const inactive = !!disabled || loading;
+  // Glass animates its own press natively, so only the solid capsule tracks it.
+  const visual: Visual = loading
+    ? "loading"
+    : inactive
+      ? "disabled"
+      : pressed && !hasLiquidGlass
+        ? "pressed"
+        : "idle";
+  const opacity: Record<Visual, number> = {
+    idle: 1,
+    pressed: theme.opacity.pressed,
+    loading: theme.opacity.pressed,
+    disabled: theme.opacity.disabled,
+  };
+  const scale =
+    visual === "pressed" && !reducedMotion ? motion.scale.pressed : 1;
+  const label = (
+    <ThemedText variant="button" style={styles.label}>
+      {title}
+    </ThemedText>
+  );
 
   return (
     <AnimatedPressable
@@ -40,36 +65,24 @@ export function Button({
       accessibilityLabel={title}
       accessibilityState={{
         ...accessibilityState,
-        disabled: !!inactive,
+        disabled: inactive,
         busy: loading,
       }}
       pressRetentionOffset={theme.control.pressRetentionOffset}
       {...props}
       disabled={inactive}
       onPressIn={(event) => {
-        setPressed(true);
+        if (!hasLiquidGlass) setPressed(true);
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
-        setPressed(false);
+        if (!hasLiquidGlass) setPressed(false);
         onPressOut?.(event);
       }}
       style={[
-        styles.button,
         {
-          opacity: inactive
-            ? theme.opacity.disabled
-            : pressed
-              ? theme.opacity.pressed
-              : 1,
-          transform: [
-            {
-              scale:
-                pressed && !inactive && !reducedMotion
-                  ? motion.scale.pressed
-                  : 1,
-            },
-          ],
+          opacity: opacity[visual],
+          transform: [{ scale }],
           transitionProperty: ["opacity", "transform"],
           transitionDuration: motion.duration.feedback,
           transitionTimingFunction: motionCSS.out,
@@ -77,31 +90,36 @@ export function Button({
         style,
       ]}
     >
-      <View style={styles.content}>
-        {loading ? <ActivityIndicator color={theme.colors.onTint} /> : null}
-        <ThemedText variant="button" style={styles.label}>
-          {title}
-        </ThemedText>
-      </View>
+      {hasLiquidGlass ? (
+        <GlassView
+          testID="button-glass"
+          glassEffectStyle="regular"
+          isInteractive={!inactive}
+          tintColor={theme.colors.primary}
+          style={styles.surface}
+        >
+          {label}
+        </GlassView>
+      ) : (
+        <View testID="button-solid" style={[styles.surface, styles.filled]}>
+          {label}
+        </View>
+      )}
     </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  button: {
+  surface: {
     minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.gap(3),
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1),
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(3),
+    paddingVertical: theme.gap(1.5),
+    borderRadius: 999,
+    overflow: "hidden",
   },
-  label: { color: theme.colors.onTint, textAlign: "center" },
+  filled: { backgroundColor: theme.colors.primary },
+  label: { flexShrink: 1, textAlign: "center", color: theme.colors.onTint },
 }));
