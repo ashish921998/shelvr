@@ -32,7 +32,17 @@ class RecentSavesWidgetProvider : AppWidgetProvider() {
       render(context, manager, ids)
     }
 
+    private val renderLock = Any()
+
+    // The app publishes from the module thread and the launcher calls in on
+    // the main thread. Holding one lock from the snapshot read to the last
+    // update keeps an older render, begun before a sign-out clear, from
+    // publishing the previous account's saves after the locked widget.
     private fun render(context: Context, manager: AppWidgetManager, ids: IntArray) {
+      synchronized(renderLock) { renderLocked(context, manager, ids) }
+    }
+
+    private fun renderLocked(context: Context, manager: AppWidgetManager, ids: IntArray) {
       val snapshot = RecentSavesSnapshot.read(context)
       val now = System.currentTimeMillis()
       val locked = snapshot.isLocked(now)
