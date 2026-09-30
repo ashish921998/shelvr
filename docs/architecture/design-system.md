@@ -132,11 +132,15 @@ into `ReduceMotion.Never` to keep state changes legible.
 
 ## Primitives
 
-`Button` is the primary action component: it exposes `accessibilityRole`,
-`accessibilityLabel`, and `accessibilityState` (disabled/busy), keeps its
-label rendered while loading beside the spinner, consumes the control and
-opacity tokens, and scales/opacity-shifts on press with a Reduce Motion
-branch. `ThemedText` maps the type ramp. Prefer both over raw `Pressable`/
+`Button` is the one capsule action. Where iOS supports Liquid Glass it is an
+interactive `expo-glass-effect` capsule and the system owns the press response;
+elsewhere (Android, older iOS) it is a solid capsule that opacity-shifts and
+scales on press with a Reduce Motion branch. `variant` is `primary` (amber
+fill), `secondary` (surface) or `destructive` (danger label); `size` is `md`
+(the control minimum) or `lg` (56). Loading dims the button instead of adding a
+spinner, so the label stays put and nothing around it reflows. It exposes
+`accessibilityRole`, `accessibilityLabel`, and `accessibilityState`
+(disabled/busy), and consumes the control and opacity tokens. `ThemedText` maps the type ramp. Prefer both over raw `Pressable`/
 `Text` in new UI; raw components are for cases the primitives genuinely
 cannot express.
 
