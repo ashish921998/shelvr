@@ -509,6 +509,9 @@ export type MessageParams = {
   "exitOffer.reminderSet": undefined;
   "exitOffer.reminderCancel": undefined;
   "exitOffer.reminderDenied": undefined;
+  "welcome.title": undefined;
+  "welcome.body": undefined;
+  "welcome.trialBody": { date: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

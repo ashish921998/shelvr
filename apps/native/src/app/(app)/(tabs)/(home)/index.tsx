@@ -6,6 +6,7 @@ import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
+import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -23,6 +24,7 @@ import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
+import { isWelcomePending } from "@/lib/welcome-save";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -44,6 +46,37 @@ function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
     <ExitOfferCard endsAt={exitOfferEndsAt} userId={userId} />
   ) : (
     <ProCard lapsed={lapsed} />
+  );
+}
+
+/** Home's modal prompts. Pro just started: one real save comes first. */
+function HomeSheets({
+  userId,
+  entitlement,
+  surveyVisible,
+  previewTitle,
+  nudgeReady,
+}: {
+  userId: string;
+  entitlement: ReturnType<typeof useEntitlement>;
+  surveyVisible: boolean;
+  previewTitle?: string;
+  nudgeReady: boolean;
+}) {
+  const trialing = entitlement.status === "trialing";
+  return (
+    <>
+      <WelcomeSaveSheet
+        userId={userId}
+        ready={entitlement.entitled && !surveyVisible}
+        trialEndsAt={trialing ? entitlement.expiresAt : undefined}
+      />
+      <WeeklyNudgeSheet
+        userId={userId}
+        previewTitle={previewTitle}
+        ready={nudgeReady}
+      />
+    </>
   );
 }
 
@@ -103,14 +136,17 @@ export default function HomeScreen() {
     itemCount: items.length,
   });
   const nudge = user ? (
-    <WeeklyNudgeSheet
+    <HomeSheets
       userId={user._id}
+      entitlement={entitlement}
+      surveyVisible={cancelSurvey.visible}
       previewTitle={items[0]?.title}
-      ready={nudgeSheetReady(
+      nudgeReady={nudgeSheetReady(
         progress.nudgeReady,
         cancelSurvey.visible,
         recall.visible,
         feedback.invitationVisible,
+        isWelcomePending(user._id),
       )}
     />
   ) : null;

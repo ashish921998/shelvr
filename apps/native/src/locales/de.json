@@ -558,5 +558,8 @@
   "exitOffer.reminderConsent": "Wir senden dir eine Mitteilung zu diesem Angebot, eine Stunde bevor es endet. Du kannst sie jederzeit abbestellen.",
   "exitOffer.reminderSet": "Erinnerung eine Stunde vor Angebotsende eingestellt.",
   "exitOffer.reminderCancel": "Erinnerung abbestellen",
-  "exitOffer.reminderDenied": "Mitteilungen für Shelvr sind aus. Aktiviere sie in den Einstellungen, um erinnert zu werden."
+  "exitOffer.reminderDenied": "Mitteilungen für Shelvr sind aus. Aktiviere sie in den Einstellungen, um erinnert zu werden.",
+  "welcome.title": "Du bist dabei. Jetzt speichere etwas Echtes.",
+  "welcome.body": "Speichere etwas, das du wirklich behalten willst. Shelvr gibt ihm Titel und Tags und sortiert es für dich ein.",
+  "welcome.trialBody": "Deine kostenlose Testphase läuft bis %{date}. Speichere etwas, das du wirklich behalten willst, und Shelvr gibt ihm Titel und Tags und sortiert es für dich ein."
 }
