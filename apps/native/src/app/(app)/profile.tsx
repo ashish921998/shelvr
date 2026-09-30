@@ -1,6 +1,8 @@
 import { LegalConsentPreference } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { UpdateSetting } from "@/components/update-setting";
+import { SettingCard } from "@/components/ui/setting-card";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
@@ -397,54 +399,48 @@ export default function ProfileScreen() {
         })}
       </View>
 
-      <View style={styles.preferenceRow}>
-        <View style={styles.preferenceCopy}>
-          <Text style={styles.preferenceLabel}>
-            {t("notifications.weeklyShelf")}
-          </Text>
-          <Text style={styles.preferenceDescription}>
-            {t("notifications.weeklyHelp")}
-          </Text>
-        </View>
-        <Switch
-          accessibilityLabel={t("notifications.toggleLabel")}
-          value={notificationPreferences?.weeklyShelfEnabled ?? false}
-          disabled={notificationPreferences === undefined || busy}
-          onValueChange={(value) =>
-            void toggleNotifications("weekly_shelf", value)
-          }
-          trackColor={{
-            false: theme.colors.border,
-            true: theme.colors.primary,
-          }}
-          thumbColor="#fff"
-        />
-      </View>
+      <SettingCard
+        title={t("notifications.weeklyShelf")}
+        description={t("notifications.weeklyHelp")}
+        accessory={
+          <Switch
+            accessibilityLabel={t("notifications.toggleLabel")}
+            value={notificationPreferences?.weeklyShelfEnabled ?? false}
+            disabled={notificationPreferences === undefined || busy}
+            onValueChange={(value) =>
+              void toggleNotifications("weekly_shelf", value)
+            }
+            trackColor={{
+              false: theme.colors.border,
+              true: theme.colors.primary,
+            }}
+            thumbColor="#fff"
+          />
+        }
+      />
 
-      <View style={styles.preferenceRow}>
-        <View style={styles.preferenceCopy}>
-          <Text style={styles.preferenceLabel}>
-            {t("notifications.remindersLabel")}
-          </Text>
-          <Text style={styles.preferenceDescription}>
-            {t("notifications.remindersHelp")}
-          </Text>
-        </View>
-        <Switch
-          accessibilityLabel={t("notifications.remindersToggle")}
-          // Older backends return no field; show it off rather than guess.
-          value={notificationPreferences?.remindersEnabled ?? false}
-          disabled={notificationPreferences === undefined || busy}
-          onValueChange={(value) =>
-            void toggleNotifications("save_reminders", value)
-          }
-          trackColor={{
-            false: theme.colors.border,
-            true: theme.colors.primary,
-          }}
-          thumbColor="#fff"
-        />
-      </View>
+      <SettingCard
+        title={t("notifications.remindersLabel")}
+        description={t("notifications.remindersHelp")}
+        accessory={
+          <Switch
+            accessibilityLabel={t("notifications.remindersToggle")}
+            // Older backends return no field; show it off rather than guess.
+            value={notificationPreferences?.remindersEnabled ?? false}
+            disabled={notificationPreferences === undefined || busy}
+            onValueChange={(value) =>
+              void toggleNotifications("save_reminders", value)
+            }
+            trackColor={{
+              false: theme.colors.border,
+              true: theme.colors.primary,
+            }}
+            thumbColor="#fff"
+          />
+        }
+      />
+
+      <UpdateSetting />
 
       <View style={styles.linkGroup}>
         <Pressable
@@ -618,27 +614,6 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-  },
-  preferenceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    alignSelf: "stretch",
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  preferenceCopy: {
-    flex: 1,
-    gap: theme.gap(0.25),
-  },
-  preferenceLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
   },
   preferenceDescription: {
     fontFamily: theme.fonts.regular,
