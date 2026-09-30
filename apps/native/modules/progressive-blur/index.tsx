@@ -1,7 +1,8 @@
 import { requireNativeView } from "expo";
 import { useAppHeaderHeight } from "@/lib/header-layout";
+import { withAlpha } from "@/lib/tab-bar-motion";
 import type { ComponentType } from "react";
-import { Platform, StyleSheet, type ViewProps } from "react-native";
+import { Platform, StyleSheet, View, type ViewProps } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
 type NativeBlurProps = ViewProps & {
@@ -84,10 +85,52 @@ function IOSProgressiveBlurHeader({
 }
 
 /**
- * For screens whose stack sets `scrollEdgeEffects: { top: "soft" }`. iOS 26
- * fades content under the header natively there, so this renders the blur band
- * only on older iOS, where that option does nothing.
+ * The band behind the transparent header on screens whose stack sets
+ * `scrollEdgeEffects: { top: "soft" }`. Render it as a sibling AFTER the
+ * scrolling content, so the scroll view stays the screen's first descendant
+ * (the native edge effect relies on that).
+ *
+ * iOS 26 blurs content under the header natively, but only washes it lightly,
+ * so photos stay visible behind the title. There this lays a page-colored
+ * fade on top: solid under the status bar, eased out just past the header.
+ * Older iOS, where the option does nothing, gets ProgressiveBlurHeader.
+ * Android renders nothing: its header is an opaque bar.
  */
-export function ScrollEdgeBlurFallback() {
-  return hasNativeSoftScrollEdge ? null : <ProgressiveBlurHeader />;
+export function ScrollEdgeHeader() {
+  if (Platform.OS !== "ios") return null;
+  return hasNativeSoftScrollEdge ? <HeaderFade /> : <ProgressiveBlurHeader />;
+}
+
+// How far past the header's bottom edge the fade keeps going.
+const FADE_TAIL = 24;
+
+function HeaderFade() {
+  const headerHeight = useAppHeaderHeight();
+  // Read in render, not in StyleSheet.create: Unistyles doesn't re-apply
+  // `experimental_backgroundImage` on a live theme change.
+  const { theme } = useUnistyles();
+  const bg = theme.colors.background;
+  // Eased so the fade has no visible band where it ends.
+  const stops = [
+    `${bg} 0%`,
+    `${bg} 40%`,
+    `${withAlpha(bg, 0.85)} 62%`,
+    `${withAlpha(bg, 0.45)} 82%`,
+    `${withAlpha(bg, 0.12)} 94%`,
+    `${withAlpha(bg, 0)} 100%`,
+  ];
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          bottom: undefined,
+          height: headerHeight + FADE_TAIL,
+          experimental_backgroundImage: `linear-gradient(to bottom, ${stops.join(", ")})`,
+        },
+      ]}
+    />
+  );
 }

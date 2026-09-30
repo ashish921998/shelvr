@@ -7,7 +7,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { ScrollEdgeBlurFallback } from "progressive-blur";
+import { ScrollEdgeHeader } from "progressive-blur";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -74,7 +74,7 @@ export default function SearchScreen() {
           onScrollBeginDrag={() => searchBarRef.current?.blur()}
         />
       )}
-      <ScrollEdgeBlurFallback />
+      <ScrollEdgeHeader />
     </View>
   );
 }
