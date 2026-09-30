@@ -4,6 +4,8 @@ import {
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
+import type { SaveSource } from "@convex/model/saveSource";
+import type { SaveFailureStage } from "@convex/model/saveErrors";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -42,6 +44,39 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  */
 export type OAuthSurface = "sign_in_view" | "demo_sheet";
 
+/** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
+ * products on the presented offering, folded to one bounded word: the trial is
+ * available, it is not, the products carry no intro offer at all, or the SDK
+ * could not tell. */
+export type TrialEligibility =
+  | "eligible"
+  | "ineligible"
+  | "no_intro"
+  | "unknown";
+
+/** The paywall context read from RevenueCat while the sheet opens. Optional
+ * on every event that carries it: an SDK without cached offerings, or a read
+ * that raced its deadline, reports nothing rather than a guess. */
+export type PaywallContext = {
+  offering_id?: string;
+  trial_eligible?: TrialEligibility;
+};
+
+export type PaywallAttemptProperties = {
+  placement: string;
+  paywall_attempt_id: string;
+  source_placement?: string;
+} & PaywallContext;
+
+/** A paywall attempt's outcome events: the attempt's identity, the context
+ * read while the sheet opened, and how long the sheet was up. */
+type PaywallOutcomeProperties = PaywallAttemptProperties & {
+  duration_ms: number;
+};
+
+/** The funnel stage vocabulary for `save_kind`. */
+type SaveKind = "link" | "note" | "image";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: { step_id: string; step_index: number };
   onboarding_step_completed: {
@@ -49,12 +84,20 @@ type AnalyticsEventProperties = {
     step_index: number;
     duration_ms: number;
   };
-  auth_started: { provider: string; surface: OAuthSurface };
+  // The four OAuth flow events share one `auth_attempt_id` per
+  // `signInWith` call, so a funnel can pair each start with the outcome that
+  // ended it and count repeat starts by one person without guessing on time.
+  auth_started: {
+    provider: string;
+    surface: OAuthSurface;
+    auth_attempt_id: string;
+  };
   auth_cancelled: {
     provider: string;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
+    auth_attempt_id: string;
     // iOS reports a person backing out and a session that never presented as
     // the same `cancel`, so the fields below carry what the OS said. The
     // NSError domain and code are bounded and carry no user content; the
@@ -69,6 +112,7 @@ type AnalyticsEventProperties = {
     stage: "request" | "browser" | "exchange";
     elapsed_ms: number;
     surface: OAuthSurface;
+    auth_attempt_id: string;
   };
   // A sign-in that finished in this session. `auth_completed` below is the
   // identify-time signal and also fires on every signed-in cold start.
@@ -76,6 +120,7 @@ type AnalyticsEventProperties = {
     provider: string;
     elapsed_ms: number;
     surface: OAuthSurface;
+    auth_attempt_id: string;
   };
   auth_completed: Record<string, never>;
   // Widget snapshot and file cleanup completed, including signed-out startup
@@ -87,39 +132,69 @@ type AnalyticsEventProperties = {
   // decode) from any other download or decode error. It never carries the
   // image URL or any saved content.
   widget_sync_failed: { reason: "timeout" | "error" };
-  paywall_requested: { placement: string; paywall_attempt_id: string };
-  paywall_presentation_started: {
-    placement: string;
-    paywall_attempt_id: string;
+  paywall_requested: PaywallAttemptProperties;
+  // Every event after the request carries the context fields (`offering_id`,
+  // `trial_eligible`) read from RevenueCat while the sheet opens, joining
+  // back to the request through the shared attempt id. `paywall_requested`
+  // stays lean on purpose: it fires before any SDK read.
+  paywall_presentation_started: PaywallAttemptProperties;
+  paywall_shown: PaywallOutcomeProperties;
+  paywall_cancelled: PaywallOutcomeProperties;
+  // `product_id` is the store product behind the now-active entitlement, read
+  // from RevenueCat's customer info right after the sheet resolved.
+  paywall_purchase_completed: PaywallOutcomeProperties & {
+    product_id?: string;
   };
-  paywall_shown: {
-    placement: string;
-    paywall_attempt_id: string;
-    duration_ms: number;
-  };
-  paywall_cancelled: {
-    placement: string;
-    paywall_attempt_id: string;
-    duration_ms: number;
-  };
-  paywall_purchase_completed: {
-    placement: string;
-    paywall_attempt_id: string;
-    duration_ms: number;
-  };
-  paywall_restored: {
-    placement: string;
-    paywall_attempt_id: string;
-    duration_ms: number;
-  };
-  paywall_failed: {
-    placement: string;
-    paywall_attempt_id: string;
+  paywall_restored: PaywallOutcomeProperties & { product_id?: string };
+  paywall_failed: PaywallAttemptProperties & {
     reason: string;
     duration_ms: number;
   };
+  // The user tapped purchase inside the exit-offer sheet. The imperative
+  // `presentPaywall` API reports no purchase-start callback, so for the main
+  // paywall this signal does not exist; the tap-to-checkout gap is only
+  // measurable where the paywall is a mounted component.
+  paywall_purchase_started: {
+    placement: string;
+    paywall_attempt_id: string;
+    package_id: string;
+  };
+  // A purchase or restore made the Convex `subscriptions` row visible to the
+  // client — the webhook delivered, the query updated. `delay_ms` measures
+  // the purchase-to-entitlement path, not the whole funnel.
+  entitlement_activated: {
+    status: "trialing" | "pro" | "lifetime";
+    source: "purchase" | "restore";
+    delay_ms: number;
+  };
+  // A gated action at `placement` that was blocked by the paywall later ran.
+  // `purchased_since_block` says whether the same session's sheet resolved in
+  // a purchase or restore between the block and the retry.
+  paywall_blocked_action_resumed: {
+    placement: string;
+    delay_ms: number;
+    purchased_since_block: boolean;
+  };
   item_opened: ItemProperties & { source: string };
   item_action: ItemProperties & { action: ItemAction };
+  // The first-save funnel's client legs. `save_attempt_started` fires when a
+  // submission actually begins (a composer save tap, a share entry, or an
+  // image operation) — after the auth and Pro gates, which the paywall and
+  // auth events already cover. `save_source` matches the server's
+  // `item_saved`, and idempotent operations join on `operation_id`.
+  // `save_failed` carries the bounded stage; content, URLs, and error text
+  // never appear.
+  save_attempt_started: {
+    save_source: SaveSource;
+    save_kind: SaveKind;
+    operation_id?: string;
+  };
+  save_failed: {
+    save_source: SaveSource;
+    save_kind: SaveKind;
+    stage: SaveFailureStage;
+    operation_id?: string;
+  };
   article_saved: Record<string, never>;
   note_saved: Record<string, never>;
   images_saved: { image_count: number };
@@ -303,11 +378,15 @@ function itemProperties(item: AnalyticsItem): ItemProperties {
   };
 }
 
+/** The feeds an open is attributed to. Anything else (a deep link, a share
+ * preview) is `direct`. */
+const OPENED_SOURCES = new Set(["home", "space", "search", "digest", "map"]);
+
 function itemOpened(item: AnalyticsItem, source: string): void {
   if (!item.fixtureKey)
     capture("item_opened", {
       ...itemProperties(item),
-      source: ["home", "space", "search"].includes(source) ? source : "direct",
+      source: OPENED_SOURCES.has(source) ? source : "direct",
     });
 }
 

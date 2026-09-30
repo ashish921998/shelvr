@@ -1218,6 +1218,7 @@ export const finalizeImageImport = mutation({
     await scheduleSaveTelemetry(ctx, itemId, {
       sessionId: args.analyticsSessionId,
       saveSource: args.saveSource,
+      operationId: args.operationId,
       photoCount: photoCount + 1,
       storedBytes,
     });
@@ -1319,8 +1320,9 @@ export const cleanupStaleImageImports = internalMutation({
  * item insert, optional space membership, operation completion, and scheduler
  * job all land in this one transaction so a crash mid-mutation never leaves a
  * completed item without its ledger row (or vice versa). Calls without an
- * operationId skip the ledger entirely and always create a fresh item — the
- * ordinary Add UI path.
+ * operationId skip the ledger entirely and always create a fresh item. The
+ * composer now supplies an operation id too, so its save attempt can join the
+ * client and server telemetry; share retries use the same idempotency record.
  */
 async function createItemWithOperation(
   ctx: MutationCtx,
@@ -1433,6 +1435,7 @@ async function insertLinkOrNote(
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
     saveSource?: SaveSource;
+    operationId?: string;
   },
 ): Promise<Id<"items">> {
   const run = beginProcessingRun();
@@ -1455,6 +1458,7 @@ async function insertLinkOrNote(
   await scheduleSaveTelemetry(ctx, itemId, {
     sessionId: options.analyticsSessionId,
     saveSource: options.saveSource,
+    operationId: options.operationId,
   });
   return itemId;
 }
@@ -1465,6 +1469,7 @@ async function scheduleSaveTelemetry(
   telemetry?: {
     sessionId?: string;
     saveSource?: SaveSource;
+    operationId?: string;
     photoCount?: number;
     storedBytes?: number;
   },
@@ -1478,6 +1483,45 @@ async function scheduleSaveTelemetry(
     savedAt: item._creationTime,
     ...telemetry,
     sessionId: telemetry?.sessionId?.slice(0, 128),
+  });
+}
+
+/**
+ * Schedules the one processing-outcome event per applied transition: the save
+ * funnel's last leg, `did the persisted item become usable`, joined to
+ * `item_saved` by `item_id`. Called only for processing -> terminal writes
+ * that own the row — `finalizeItem`, `failItem`, and the stale-processing
+ * sweeper — so note refreshes and superseded runs never land in the funnel.
+ * `processingMs` measures the run that just settled, from its own start rather
+ * than `_creationTime`, so a `reprocessItem` retry is timed on its own.
+ */
+async function scheduleProcessedTelemetry(
+  ctx: MutationCtx,
+  item: Pick<
+    Doc<"items">,
+    "_id" | "_creationTime" | "userId" | "type" | "processingStartedAt"
+  >,
+  outcome:
+    | { status: "ready"; enrichment?: Infer<typeof enrichmentValidator> }
+    | {
+        status: "failed";
+        failureReason: Infer<typeof failureReasonValidator>;
+      },
+): Promise<void> {
+  const now = Date.now();
+  await ctx.scheduler.runAfter(0, internal.analytics.captureItemProcessed, {
+    itemId: item._id,
+    userId: item.userId,
+    itemType: item.type,
+    outcome: outcome.status,
+    ...(outcome.status === "failed"
+      ? { failureReason: outcome.failureReason }
+      : { enrichment: outcome.enrichment }),
+    processingMs: Math.max(
+      0,
+      now - (item.processingStartedAt ?? item._creationTime),
+    ),
+    finishedAt: now,
   });
 }
 
@@ -2277,6 +2321,17 @@ export const finalizeItem = internalMutation({
     ) {
       await safeDeleteStorage(ctx, item.storageId);
     }
+    // The save funnel's last leg: the persisted item became usable (a
+    // `partial`/`no_article` enrichment is usable and retryable, not a
+    // failure). Only the run that owns the row reports; the fence above
+    // already returned for superseded runs. The `failed` transition is
+    // failItem's to write, and it reports its own event with the reason.
+    if (args.status === "ready" && item.status !== "ready") {
+      await scheduleProcessedTelemetry(ctx, item, {
+        status: "ready",
+        enrichment: args.enrichment,
+      });
+    }
     return "applied";
   },
 });
@@ -2609,6 +2664,12 @@ export const failItem = internalMutation({
       status: "failed",
       failureReason: args.reason,
     });
+    // The save funnel's failure leg, with the bounded reason the client
+    // already renders. Only the run that owns the row reports.
+    await scheduleProcessedTelemetry(ctx, item, {
+      status: "failed",
+      failureReason: args.reason,
+    });
     return "applied";
   },
 });
@@ -2654,6 +2715,14 @@ export const failStaleProcessingItems = internalMutation({
         continue;
       }
       await ctx.db.patch(item._id, {
+        status: "failed",
+        failureReason: "error",
+      });
+      // The action died outside its try block, so this sweep is the only
+      // witness of the outcome — the funnel event fires here or never. The
+      // run id is deliberately left so a late finish can still repair the
+      // item, which its own finalize will then report.
+      await scheduleProcessedTelemetry(ctx, item, {
         status: "failed",
         failureReason: "error",
       });

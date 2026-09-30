@@ -174,7 +174,14 @@ export async function scheduleTrialReminder(
     content: {
       title: t("notifications.trialEndingTitle"),
       body: t("notifications.trialEndingBody"),
-      data: { url: "/profile" },
+      // `kind` and `notificationId` ride along so `notification_opened` can
+      // attribute the tap to this reminder, the same way push notifications
+      // carry theirs. Without them the open records as kind `unknown`.
+      data: {
+        url: "/profile",
+        kind: "trial_reminder",
+        notificationId: TRIAL_REMINDER_ID,
+      },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -191,7 +198,13 @@ export async function scheduleTrialReminder(
         content: {
           title: t(nudge.titleKey),
           body: t(nudge.bodyKey),
-          data: { url: nudge.url, kind: "trial_nudge" },
+          // The nudge's own id, so a day-1 and a day-3 open are told apart by
+          // `notification_id` under the shared `trial_nudge` kind.
+          data: {
+            url: nudge.url,
+            kind: "trial_nudge",
+            notificationId: nudge.id,
+          },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,

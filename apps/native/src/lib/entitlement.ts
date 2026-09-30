@@ -6,6 +6,17 @@ import { useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
+import {
+  activeProductId,
+  forgetPaywallFunnel,
+  hasActiveEntitlement,
+  readPaywallContext,
+  recordAccess,
+  recordBlockedAction,
+  resumeBlockedAction,
+  useEntitlementActivation,
+} from "@/lib/paywall-funnel";
+import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
 import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import {
   EXIT_OFFER_WINDOW_MS,
@@ -36,7 +47,7 @@ import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { presentExitSheet } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { AppState, NativeModules } from "react-native";
+import { AppState } from "react-native";
 
 /**
  * Shelvr Pro entitlement.
@@ -56,60 +67,6 @@ import { AppState, NativeModules } from "react-native";
  * the RevenueCat dashboard Paywall Editor). We call `presentPaywall()` which
  * presents a native sheet — no custom paywall view code needed.
  */
-
-// ---------------------------------------------------------------------------
-// Lazy module loaders — the native modules may not be linked in Expo Go or a
-// dev build without `expo prebuild`. We check NativeModules first so require()
-// never runs (and the dev error overlay never fires) when the native side is
-// missing.
-// ---------------------------------------------------------------------------
-
-/**
- * Builds a lazy accessor for a native module: returns the module's default
- * export once it's been confirmed linked (via one of `nativeNames` on
- * NativeModules). Failed loads can be retried. The `require` lives in a
- * static thunk so Metro can statically discover and bundle it.
- */
-function makeLazyModule<T>(
-  nativeNames: string[],
-  load: () => { default: T },
-): () => T | null {
-  let cached: T | null | undefined;
-  return () => {
-    if (cached !== undefined) return cached;
-    const linked = nativeNames.some(
-      (n) => NativeModules[n as keyof typeof NativeModules],
-    );
-    if (!linked) {
-      return null;
-    }
-    try {
-      cached = load().default;
-    } catch {
-      return null;
-    }
-    return cached;
-  };
-}
-
-const getPurchases = makeLazyModule<
-  typeof import("react-native-purchases").default
->(
-  ["RNPurchases", "RNPurchasesModule"],
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  () => require("react-native-purchases"),
-);
-
-const getRCUI = makeLazyModule<
-  typeof import("react-native-purchases-ui").default
->(
-  // react-native-purchases-ui registers its native module as `RNPaywalls`
-  // (plural). The older `RNPaywall` (singular) name is retained as a fallback
-  // for any older linking variant.
-  ["RNPaywalls", "RNPaywall", "RNRevenueCatUI", "RCPurchasesUiModule"],
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  () => require("react-native-purchases-ui"),
-);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -229,10 +186,25 @@ export function useEntitlementSync(): void {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const sub = isAuthenticated ? (user?._id ?? null) : null;
+  const entitlement = useEntitlement();
+  // The status an `entitlement_activated` event may report: narrowed from
+  // `useEntitlement`'s wider union to the entitled statuses.
+  const activeStatus =
+    entitlement.entitled &&
+    (entitlement.status === "trialing" ||
+      entitlement.status === "pro" ||
+      entitlement.status === "lifetime")
+      ? entitlement.status
+      : null;
 
   useEffect(() => {
     setRcTargetUserId(sub);
-    if (sub === null) return;
+    if (sub === null) {
+      // The funnel memory belongs to the account that earned it, so a
+      // sign-out or account change drops it (see `forgetPaywallFunnel`).
+      forgetPaywallFunnel();
+      return;
+    }
     // A build that deliberately has no key would only burn the retry budget
     // and report the absence as a sync failure on every foreground. Readiness
     // stays false, so purchase entry points still degrade to unavailable.
@@ -267,6 +239,10 @@ export function useEntitlementSync(): void {
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
   }, [sub]);
+
+  // Purchase/restore -> backend entitlement available: the RevenueCat webhook
+  // has written the row and the client's query now shows it.
+  useEntitlementActivation(activeStatus);
 }
 
 function reportRevenueCatIdentityError(error: unknown) {
@@ -282,7 +258,12 @@ function reportRevenueCatIdentityError(error: unknown) {
     const code = String(error.code);
     if (/^\d{1,3}$/.test(code)) reason = `revenuecat_error_${code}`;
   }
-  analytics.captureError("purchase_identity_sync_failed", new Error(reason));
+  // The bounded reason travels as a property, not an error message:
+  // `captureError` redacts any message outside its fixed allowlist (free-form
+  // text can carry user content), so a reason wrapped in an Error never
+  // reaches PostHog. The original error keeps its class and stack, which name
+  // the real failure site better than a synthetic error would.
+  analytics.captureError("purchase_identity_sync_failed", error, { reason });
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +345,9 @@ async function presentPaywallImpl(
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
   analytics.capture("paywall_requested", properties);
+  // Started before the identity gate and awaited after it, so the cached
+  // RevenueCat reads never add their own wait in front of the sheet.
+  const context = readPaywallContext();
   const failed = (reason: string) =>
     analytics.capture("paywall_failed", {
       ...properties,
@@ -387,9 +371,15 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const result = await observePaywallPresentation(properties, () =>
-      rcui.presentPaywall(),
+    const enriched = { ...properties, ...(await context) };
+    const result = await observePaywallPresentation(
+      enriched,
+      () => rcui.presentPaywall(),
+      activeProductId,
     );
+    if (result === "PURCHASED" || result === "RESTORED") {
+      recordAccess(result === "RESTORED" ? "restore" : "purchase");
+    }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
     if (outcome !== "cancelled") return outcome;
@@ -486,18 +476,34 @@ async function showExitOffering(
     placement: "exit_offer",
     source_placement: sourcePlacement,
     paywall_attempt_id: randomUUID(),
+    // The exit sheet renders a known offering, so its id needs no SDK read.
+    offering_id: offering.identifier,
   };
   analytics.capture("paywall_requested", properties);
   try {
-    const result = await observePaywallPresentation(properties, () =>
-      // Our own sheet, so the offer can close at its deadline.
-      presentExitSheet({
-        Paywall: rcui.Paywall,
-        offering,
-        customVariables: exitOfferVariables(endsAt),
-        endsAt,
-      }),
+    const result = await observePaywallPresentation(
+      properties,
+      () =>
+        // Our own sheet, so the offer can close at its deadline.
+        presentExitSheet({
+          Paywall: rcui.Paywall,
+          offering,
+          customVariables: exitOfferVariables(endsAt),
+          endsAt,
+          // The one paywall mounted as a component, so the one place the
+          // purchase tap itself is observable.
+          onPurchaseStarted: (packageId) =>
+            analytics.capture("paywall_purchase_started", {
+              placement: "exit_offer",
+              paywall_attempt_id: properties.paywall_attempt_id,
+              package_id: packageId,
+            }),
+        }),
+      activeProductId,
     );
+    if (result === "PURCHASED" || result === "RESTORED") {
+      recordAccess(result === "RESTORED" ? "restore" : "purchase");
+    }
     if (result === "NOT_PRESENTED" || result === "ERROR")
       await onNotPresented();
     return mapPaywallResult(result);
@@ -644,6 +650,10 @@ export async function openPaywall(
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
+  // The gated action did not run — whatever the sheet resolved to, the caller
+  // re-taps. Remember the block so the guard that later lets the action
+  // through can report the resume, and whether a purchase sits between.
+  recordBlockedAction(placement, outcome === "success");
   return outcome === "success";
 }
 
@@ -719,9 +729,13 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   if (!rc) return "unavailable";
   try {
     const customerInfo = await rc.restorePurchases();
-    return Object.keys(customerInfo.entitlements.active).length > 0
-      ? "restored"
-      : "none";
+    if (Object.keys(customerInfo.entitlements.active).length === 0)
+      return "none";
+    // A Profile restore arms the same activation measurement a sheet restore
+    // does — but only while nothing is entitled: restoring an already-visible
+    // entitlement made nothing new visible, so it reports nothing.
+    if (!hasActiveEntitlement()) recordAccess("restore");
+    return "restored";
   } catch {
     return "unavailable";
   }
@@ -772,6 +786,9 @@ export function usePaywallGuard(placement = "pro_gate"): {
     async (action?: () => void) => {
       if (loading) return false;
       if (entitled) {
+        // A pass at the same placement that a paywall recently blocked reports
+        // the resume — the funnel's last leg after purchase/restore.
+        resumeBlockedAction(placement);
         action?.();
         return true;
       }

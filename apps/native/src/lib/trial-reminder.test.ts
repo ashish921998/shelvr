@@ -72,7 +72,13 @@ describe("scheduleTrialReminder", () => {
     expect(mock.schedule).toHaveBeenCalledWith(
       expect.objectContaining({
         identifier: TRIAL_REMINDER_ID,
-        content: expect.objectContaining({ data: { url: "/profile" } }),
+        content: expect.objectContaining({
+          data: {
+            url: "/profile",
+            kind: "trial_reminder",
+            notificationId: TRIAL_REMINDER_ID,
+          },
+        }),
         trigger: expect.objectContaining({ date: new Date(NOW + 5 * DAY) }),
       }),
     );
@@ -196,7 +202,11 @@ describe("trial nudges", () => {
       expect.objectContaining({
         identifier: "shelvr.trial-day-1",
         content: expect.objectContaining({
-          data: { url: "/add", kind: "trial_nudge" },
+          data: {
+            url: "/add",
+            kind: "trial_nudge",
+            notificationId: "shelvr.trial-day-1",
+          },
         }),
         trigger: expect.objectContaining({ date: new Date(noon + DAY) }),
       }),

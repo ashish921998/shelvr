@@ -60,3 +60,26 @@ export function saveErrorCode(error: unknown): SaveErrorCode | null {
     ? (code as SaveErrorCode)
     : null;
 }
+
+/** The bounded failure stage a `save_failed` event reports: one of the
+ * refusal codes above, or `other` for everything else — a network failure, a
+ * redacted server error, or a thrown non-Error. */
+export type SaveFailureStage = SaveErrorCode | "other";
+
+/** Buckets a failed save submission for analytics. Prefers the structured
+ * code, so a copy edit on the server cannot re-bucket every installed client.
+ * The message comparison is the fallback for a plain Error carrying a fixed
+ * refusal sentence — the legacy transport shape, or a stage that rethrows a
+ * returned error string — and matches the canonical sentences above so the
+ * stage stays bounded. Production redaction sends most of those to `other`,
+ * which is the honest answer for an unknowable failure. */
+export function saveFailureStage(error: unknown): SaveFailureStage {
+  const code = saveErrorCode(error);
+  if (code !== null) return code;
+  if (error instanceof Error) {
+    for (const candidate of SAVE_ERROR_CODES) {
+      if (error.message === SAVE_ERROR_MESSAGES[candidate]) return candidate;
+    }
+  }
+  return "other";
+}

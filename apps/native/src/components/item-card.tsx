@@ -90,11 +90,16 @@ function failureLabel(item: FeedItem): string | undefined {
 }
 
 // Describes which list a card belongs to, so the detail screen can rebuild the
-// same ordered sibling set for horizontal swipe-paging.
+// same ordered sibling set for horizontal swipe-paging. `digest` and `map` open
+// onto the home feed's pager (anything not `space`/`search` does), but the
+// `from` value still reaches `item_opened` so the open is attributed to the
+// screen it came from instead of collapsing into `direct`.
 export type ItemSource =
   | { from: "home" }
   | { from: "space"; spaceId: string }
-  | { from: "search"; q: string };
+  | { from: "search"; q: string }
+  | { from: "digest" }
+  | { from: "map" };
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.

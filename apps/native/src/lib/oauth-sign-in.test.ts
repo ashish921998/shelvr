@@ -10,6 +10,7 @@ const mock = vi.hoisted(() => ({
   openAuthSessionAsync: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
+  uuid: 0,
 }));
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signIn: mock.signIn }),
@@ -20,6 +21,9 @@ vi.mock("expo-auth-session", () => ({
 vi.mock("expo-web-browser", () => ({
   openAuthSessionAsync: mock.openAuthSessionAsync,
 }));
+vi.mock("expo-crypto", () => ({
+  randomUUID: () => `attempt-${++mock.uuid}`,
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: mock.captureError },
 }));
@@ -28,6 +32,7 @@ const redirect = new URL("https://auth.example/start");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.uuid = 0;
 });
 
 async function run(
@@ -61,6 +66,7 @@ describe("useOAuthSignIn", () => {
       result: "cancel",
       elapsed_ms: expect.any(Number),
       browser_ms: expect.any(Number),
+      auth_attempt_id: "attempt-1",
     });
     expect(captured("auth_succeeded")).toBeUndefined();
   });
@@ -190,6 +196,7 @@ describe("useOAuthSignIn", () => {
       provider: "google",
       surface: "sign_in_view",
       elapsed_ms: expect.any(Number),
+      auth_attempt_id: "attempt-1",
     });
   });
 
@@ -211,6 +218,7 @@ describe("useOAuthSignIn", () => {
       surface: "sign_in_view",
       stage: "exchange",
       elapsed_ms: expect.any(Number),
+      auth_attempt_id: "attempt-1",
     });
     expect(captured("auth_succeeded")).toBeUndefined();
   });
@@ -238,6 +246,25 @@ describe("useOAuthSignIn", () => {
     expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
     expect(captured("auth_succeeded")).toMatchObject({
       provider: "anonymous",
+    });
+  });
+
+  it("shares one attempt id across an attempt's events and mints a fresh one per call", async () => {
+    mock.signIn.mockResolvedValue({ signingIn: true });
+
+    await run("anonymous");
+    await run("apple");
+
+    const started = mock.capture.mock.calls
+      .filter(([name]) => name === "auth_started")
+      .map(([, properties]) => properties);
+    expect(started).toHaveLength(2);
+    // A funnel pairs each start with the outcome that ended it through the
+    // shared id, and tells repeat starts by one person apart by the new one.
+    expect(started[0].auth_attempt_id).toBe("attempt-1");
+    expect(started[1].auth_attempt_id).toBe("attempt-2");
+    expect(captured("auth_succeeded")).toMatchObject({
+      auth_attempt_id: "attempt-1",
     });
   });
 });

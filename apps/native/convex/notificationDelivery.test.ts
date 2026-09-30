@@ -418,7 +418,9 @@ describe("durable digest delivery", () => {
   });
 
   it("records one send event when delivery reaches a terminal state", async () => {
+    vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
     const { t, digestId, advance } = await seed();
+    const firstSendAt = Date.now();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
@@ -434,6 +436,7 @@ describe("durable digest delivery", () => {
     // Still awaiting a receipt, so nothing is terminal yet.
     expect(await telemetry()).toHaveLength(0);
     await advance();
+    vi.setSystemTime(firstSendAt + 45 * 60 * 1000);
     await t.action(internal.notificationDelivery.send, { digestId });
     const jobs = await telemetry();
     expect(jobs).toHaveLength(1);
@@ -443,6 +446,10 @@ describe("durable digest delivery", () => {
       kind: "weekly_shelf",
       itemCount: 1,
       delivered: true,
+      sentAt: firstSendAt,
+    });
+    expect(await t.run((ctx) => ctx.db.get(digestId))).toMatchObject({
+      deliverySentAt: firstSendAt,
     });
     // A further run must not mint a second event for the same digest.
     await t.action(internal.notificationDelivery.send, { digestId });

@@ -8,6 +8,10 @@ type Props = {
   title: string;
   message: string;
   ctaLabel?: string;
+  /** Which Pro-gated surface this card sits on, so its paywall attempts land
+   * in the funnel under the screen that earned them instead of collapsing
+   * into `pro_gate`. Defaults to `pro_gate` for unattributed call sites. */
+  placement?: string;
   /** Override the CTA action. Defaults to presenting the paywall / fallback. */
   onPress?: () => void;
 };
@@ -22,11 +26,12 @@ export function ProGate({
   title,
   message,
   ctaLabel = t("pro.viewPlans"),
+  placement = "pro_gate",
   onPress,
 }: Props) {
   useAppLocale();
   const router = useRouter();
-  const handlePress = onPress ?? (() => openPaywall(router, "pro_gate"));
+  const handlePress = onPress ?? (() => openPaywall(router, placement));
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
