@@ -10,6 +10,7 @@ const mock = vi.hoisted(() => ({
   alert: vi.fn(),
   settings: vi.fn(),
   shelfEnabled: false,
+  pending: true,
   queries: [] as unknown[],
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -17,10 +18,27 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
-vi.mock("@/lib/first-share", () => ({
-  finishWeeklyNudge: mock.finish,
-  isWeeklyNudgePending: () => true,
-}));
+vi.mock("@/lib/first-share", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const listeners = new Set<() => void>();
+  return {
+    weeklyNudge: {
+      finish: (userId: string) => {
+        mock.finish(userId);
+        mock.pending = false;
+        for (const listener of listeners) listener();
+      },
+      usePending: () =>
+        useSyncExternalStore(
+          (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          () => mock.pending,
+        ),
+    },
+  };
+});
 vi.mock("@/lib/notifications", () => ({
   useNotificationSession: () => ({
     session: { setWeeklyShelf: mock.setWeeklyShelf },
@@ -74,7 +92,6 @@ vi.mock("@convex-dev/react-query", () => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: { weeklyShelfEnabled: mock.shelfEnabled } }),
 }));
-vi.mock("expo-router", () => ({ useFocusEffect: vi.fn() }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -96,6 +113,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.setWeeklyShelf.mockReset().mockResolvedValue(true);
   mock.shelfEnabled = false;
+  mock.pending = true;
   mock.queries.length = 0;
 });
 

@@ -72,9 +72,14 @@ import { AppState } from "react-native";
 // Types
 // ---------------------------------------------------------------------------
 
-type EntitlementStatus = "trialing" | "pro" | "lapsed" | "lifetime" | "none";
+export type EntitlementStatus =
+  | "trialing"
+  | "pro"
+  | "lapsed"
+  | "lifetime"
+  | "none";
 
-type Entitlement = {
+export type Entitlement = {
   status: EntitlementStatus;
   entitled: boolean;
   loading: boolean;
@@ -601,6 +606,44 @@ function liveSheet(): OpenSheet | null {
   return null;
 }
 
+// Callers waiting for the live sheet to close (see `whenSheetSettled`).
+const sheetWaiters = new Set<() => void>();
+
+function releaseSheet(sheet: OpenSheet): void {
+  if (openSheet !== sheet) return;
+  openSheet = null;
+  const waiters = [...sheetWaiters];
+  sheetWaiters.clear();
+  for (const waiter of waiters) waiter();
+}
+
+/**
+ * Resolves once no RevenueCat sheet is up and the last one has finished
+ * sliding away, so a React Native modal can present. A sheet whose promise
+ * never settles is presumed gone at the same age `liveSheet` drops it.
+ */
+export function whenSheetSettled(): Promise<void> {
+  return new Promise((resolve) => {
+    const live = liveSheet();
+    if (!live) {
+      setTimeout(resolve, SHEET_SETTLE_MS);
+      return;
+    }
+    const onRelease = () => {
+      clearTimeout(stale);
+      setTimeout(resolve, SHEET_SETTLE_MS);
+    };
+    const stale = setTimeout(
+      () => {
+        sheetWaiters.delete(onRelease);
+        resolve();
+      },
+      SHEET_STALE_MS - (Date.now() - live.startedAt),
+    );
+    sheetWaiters.add(onRelease);
+  });
+}
+
 /** True while a native RevenueCat sheet (paywall or Customer Center) is up. */
 export function isPaywallPending(): boolean {
   return liveSheet() !== null;
@@ -628,7 +671,7 @@ async function presentPaywall(
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   sheet.paywall = present().finally(() => {
     // A stale sheet may already have been replaced; only release our own.
-    if (openSheet === sheet) openSheet = null;
+    releaseSheet(sheet);
   });
   openSheet = sheet;
   return { outcome: await sheet.paywall, owned: true };
@@ -711,7 +754,7 @@ export async function presentCustomerCenter(): Promise<boolean> {
       return false;
     }
   } finally {
-    if (openSheet === sheet) openSheet = null;
+    releaseSheet(sheet);
   }
 }
 

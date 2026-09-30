@@ -578,5 +578,6 @@
   "exitOffer.reminderDenied": "As notificações do Shelvr estão desativadas. Ative-as em Ajustes para receber o lembrete.",
   "welcome.title": "Tudo pronto. Agora salve algo de verdade.",
   "welcome.body": "Salve uma coisa que você quer mesmo guardar. O Shelvr dá título, tags e organiza para você.",
-  "welcome.trialBody": "Seu teste grátis vai até %{date}. Salve uma coisa que você quer mesmo guardar, e o Shelvr dá título, tags e organiza para você."
+  "welcome.trialBody": "Seu teste grátis vai até %{date}. Salve uma coisa que você quer mesmo guardar, e o Shelvr dá título, tags e organiza para você.",
+  "welcome.cta": "Salvar algo"
 }

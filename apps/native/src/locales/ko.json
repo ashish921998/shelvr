@@ -544,5 +544,6 @@
   "exitOffer.reminderDenied": "Shelvr 알림이 꺼져 있어요. 알림을 받으려면 설정에서 켜 주세요.",
   "welcome.title": "준비됐어요. 이제 진짜 남기고 싶은 걸 저장해 보세요.",
   "welcome.body": "정말 간직하고 싶은 것 하나를 저장해 보세요. Shelvr가 제목과 태그를 붙여 정리해 드려요.",
-  "welcome.trialBody": "무료 체험은 %{date}까지예요. 정말 간직하고 싶은 것 하나를 저장하면 Shelvr가 제목과 태그를 붙여 정리해 드려요."
+  "welcome.trialBody": "무료 체험은 %{date}까지예요. 정말 간직하고 싶은 것 하나를 저장하면 Shelvr가 제목과 태그를 붙여 정리해 드려요.",
+  "welcome.cta": "저장하기"
 }

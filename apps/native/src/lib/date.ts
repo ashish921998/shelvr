@@ -18,7 +18,7 @@ export function parseExifDate(
 }
 
 /** Formats an epoch-ms timestamp as a short display date, e.g. "Jul 5, 2026". */
-export function formatItemDate(ms: number): string {
+export function formatShortDate(ms: number): string {
   return new Date(ms).toLocaleDateString(formattingLocale(), {
     month: "short",
     day: "numeric",
