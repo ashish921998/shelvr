@@ -213,6 +213,24 @@ describe("POST /app-intents/capture", () => {
     expect(memberships[0]).toMatchObject({ spaceId: mine, status: "saved" });
   });
 
+  it("refuses a link the URL policy rejects instead of failing", async () => {
+    const { t, token } = await setup();
+    const response = await post(
+      t,
+      "/app-intents/capture",
+      {
+        operationId: OP,
+        kind: "link",
+        url: `https://example.com/${"a".repeat(3000)}`,
+      },
+      token,
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "invalid_url" });
+    const items = await t.run((ctx) => ctx.db.query("items").collect());
+    expect(items).toHaveLength(0);
+  });
+
   it("rejects malformed bodies", async () => {
     const { t, token } = await setup();
     for (const body of [

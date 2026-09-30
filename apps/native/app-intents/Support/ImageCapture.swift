@@ -32,9 +32,12 @@ enum ImageCapture {
     }
 
     var savedIds: [String] = []
-    var unsaved: [CaptureRouter.Attachment] = []
+    // Each image keeps one operation id from here to the app's retry, so an upload the server
+    // saved before its reply was lost is not saved twice.
+    var unsaved: [(image: CaptureRouter.Attachment, operationId: String)] = []
     var refusal: IntentDialog?
     for image in images {
+      let operationId = ShelvrCapture.newOperationId()
       do {
         let prepared = await Task.detached(priority: .userInitiated) { await CaptureRouter.prepare(image) }.value
         guard let prepared else {
@@ -46,7 +49,7 @@ enum ImageCapture {
         ].compactMap { $0 }.joined(separator: "\n\n")
         let itemId = try await ShelvrCapture.saveImage(
           prepared.data, contentType: prepared.contentType, aspectRatio: prepared.aspectRatio,
-          spaceId: spaceId, context: context)
+          spaceId: spaceId, context: context, operationId: operationId)
         ShelvrIntentLog.record("\(intent) saved image \(itemId)")
         savedIds.append(itemId)
       } catch {
@@ -56,7 +59,7 @@ enum ImageCapture {
           refusal = dialog
           break
         }
-        unsaved.append(image)
+        unsaved.append((image, operationId))
       }
     }
 
@@ -66,11 +69,12 @@ enum ImageCapture {
 
     if !unsaved.isEmpty && refusal == nil {
       do {
-        let paths = try stage(unsaved)
+        let paths = try stage(unsaved.map(\.image))
         await AppIntentDispatcher.shared.dispatch(
           name: "saveImages",
           params: [
             "paths": .array(paths.map(AppIntentValue.string)),
+            "operationIds": .array(unsaved.map { AppIntentValue.string($0.operationId) }),
             "spaceId": spaceId.map { .string($0) } ?? .null,
           ]
         )
@@ -126,11 +130,12 @@ enum ImageCapture {
         return (cut.sticker.png, Double(cut.sticker.width) / Double(max(cut.sticker.height, 1)), cut.name)
       }.value
       guard let cut else {
-        ShelvrIntentLog.record("\(intent) no object matched \(target.nouns); saving the photo")
+        ShelvrIntentLog.record("\(intent) no object matched; saving the photo")
         return .noMatch
       }
       let itemId = try await ShelvrCapture.saveImage(
-        cut.png, contentType: "image/png", aspectRatio: cut.ratio, isSticker: true, spaceId: spaceId)
+        cut.png, contentType: "image/png", aspectRatio: cut.ratio, isSticker: true, spaceId: spaceId,
+        operationId: ShelvrCapture.newOperationId())
       ShelvrIntentLog.record("\(intent) saved sticker \(itemId)")
       return .saved(itemId: itemId, name: cut.name)
     } catch {

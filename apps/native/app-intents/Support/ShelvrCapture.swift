@@ -77,10 +77,12 @@ enum ShelvrCapture {
   }
 
   /// Saves a link or a note and returns the new item id.
-  static func save(kind: String, text: String? = nil, url: String? = nil, spaceId: String? = nil)
-    async throws -> String
-  {
-    var body: [String: Any] = ["kind": kind, "operationId": newOperationId()]
+  /// Pass the same `operationId` to the app when queuing a failed save, so a save the server
+  /// committed before its reply was lost is recognized instead of saved again.
+  static func save(
+    kind: String, text: String? = nil, url: String? = nil, spaceId: String? = nil, operationId: String
+  ) async throws -> String {
+    var body: [String: Any] = ["kind": kind, "operationId": operationId]
     body["text"] = text
     body["url"] = url
     body["spaceId"] = spaceId
@@ -95,9 +97,8 @@ enum ShelvrCapture {
   /// pixels (the user's words, text read on the device); it steers the classifier only.
   static func saveImage(
     _ data: Data, contentType: String, aspectRatio: Double?, isSticker: Bool = false,
-    spaceId: String? = nil, context: String? = nil
+    spaceId: String? = nil, context: String? = nil, operationId: String
   ) async throws -> String {
-    let operationId = newOperationId()
     let begin = try await post(path: "/app-intents/image/begin", body: ["operationId": operationId])
     if let itemId = begin["itemId"] as? String {
       return itemId
@@ -164,7 +165,7 @@ enum ShelvrCapture {
     }
   }
 
-  private static func newOperationId() -> String {
+  static func newOperationId() -> String {
     return "siri:\(UUID().uuidString.lowercased())"
   }
 

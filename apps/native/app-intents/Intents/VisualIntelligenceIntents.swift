@@ -16,7 +16,7 @@ struct VisualSearchIntent {
   @MainActor
   func perform() async throws -> some IntentResult {
     let query = semanticContent.labels.prefix(3).joined(separator: " ")
-    ShelvrIntentLog.record("VisualSearchIntent.perform labels=\(semanticContent.labels)")
+    ShelvrIntentLog.record("VisualSearchIntent.perform labels=\(semanticContent.labels.count)")
     await AppIntentDispatcher.shared.dispatch(name: "search", params: ["query": .string(query)])
     return .result()
   }
@@ -27,7 +27,7 @@ struct VisualSearchIntent {
 struct ItemVisualQuery: IntentValueQuery {
   func values(for input: SemanticContentDescriptor) async throws -> [ItemEntity] {
     let labels = input.labels
-    ShelvrIntentLog.record("ItemVisualQuery labels=\(labels)")
+    ShelvrIntentLog.record("ItemVisualQuery labels=\(labels.count)")
     guard !labels.isEmpty else { return [] }
     return await ShelvrCatalog.items()
       .map { ($0, ShelvrCatalog.score($0, labels: labels)) }

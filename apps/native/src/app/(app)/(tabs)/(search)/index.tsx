@@ -27,13 +27,13 @@ export default function SearchScreen() {
   const searchBarRef = useRef<ComponentRef<typeof Stack.SearchBar>>(null);
   // iOS types into the native header search bar. Everywhere else the floating
   // tab bar owns the field and shares its text through the tab search store.
-  const [iosSearch, setIosSearch] = useState("");
   // Siri's "search Shelvr for ..." opens this tab with `q`; `t` marks each new
   // request so asking for the same words twice still fills the bar again.
   const { q, t: requestedAt } = useLocalSearchParams<{
     q?: string;
     t?: string;
   }>();
+  const [iosSearch, setIosSearch] = useState(q ?? "");
   const request = q ? `${requestedAt ?? ""}|${q}` : null;
   const [appliedRequest, setAppliedRequest] = useState(request);
   if (request !== appliedRequest) {

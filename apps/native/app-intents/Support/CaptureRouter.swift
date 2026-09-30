@@ -43,8 +43,7 @@ enum CaptureRouter {
     if !images.isEmpty {
       return .images(Array(images.prefix(maxImages)))
     }
-    let textURLs = Set(webURLs(in: text))
-    if textURLs.count == 1, let url = textURLs.first, text.count <= maxLinkTextLength {
+    if let url = bareURL(text) {
       return .link(url)
     }
     return .note
@@ -64,6 +63,24 @@ enum CaptureRouter {
 
   static func isWebURL(_ url: URL) -> Bool {
     return url.scheme == "https" || url.scheme == "http"
+  }
+
+  /// The URL when the text is nothing but one web link (a note that mentions a link stays a note).
+  static func bareURL(_ text: String) -> URL? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed.count <= maxLinkTextLength,
+      let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    else {
+      return nil
+    }
+    let whole = NSRange(trimmed.startIndex..., in: trimmed)
+    let matches = detector.matches(in: trimmed, range: whole)
+    guard matches.count == 1, let match = matches.first, match.range == whole, let url = match.url,
+      isWebURL(url)
+    else {
+      return nil
+    }
+    return url
   }
 
   static func webURLs(in text: String) -> [URL] {

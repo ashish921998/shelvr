@@ -16,7 +16,7 @@ struct SearchShelvrIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    ShelvrIntentLog.record("SearchShelvrIntent.perform term=\(criteria.term)")
+    ShelvrIntentLog.record("SearchShelvrIntent.perform")
     await AppIntentDispatcher.shared.dispatch(name: "search", params: ["query": .string(criteria.term)])
     return .result()
   }

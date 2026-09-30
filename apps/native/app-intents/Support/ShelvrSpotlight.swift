@@ -47,11 +47,14 @@ enum ShelvrSpotlight {
   }
 
   /// Removes everything Shelvr put in Spotlight (sign-out, app lock).
+  /// The indexed ids are forgotten only once Spotlight confirms the deletion, so a failed or
+  /// timed-out clear is retried by the next clear or sync instead of leaving the previous
+  /// account's saves searchable.
   static func clear() async throws {
-    UserDefaults.standard.removeObject(forKey: indexedKey)
     try await withDeadline("clearing saves") {
       try await CSSearchableIndex.default().deleteAllSearchableItems()
     }
+    UserDefaults.standard.removeObject(forKey: indexedKey)
   }
 
   /// Waits for `work` or the deadline, whichever comes first. A hung Spotlight call keeps running

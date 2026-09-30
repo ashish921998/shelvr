@@ -120,7 +120,9 @@ extension ItemEntity: Transferable {
     }
     .exportingCondition { $0.url != nil }
 
-    FileRepresentation(exportedContentType: .jpeg) { item in
+    // Saves keep their original format (PNG screenshots and stickers, JPEG photos), so the file
+    // is declared as an image and named by the type the server sends.
+    FileRepresentation(exportedContentType: .image) { item in
       let file = try await item.downloadImage()
       return SentTransferredFile(file)
     }
@@ -131,11 +133,12 @@ extension ItemEntity: Transferable {
 
   func downloadImage() async throws -> URL {
     guard let imageUrl else { throw CocoaError(.fileNoSuchFile) }
-    let (temporary, _) = try await URLSession.shared.download(from: imageUrl)
+    let (temporary, response) = try await URLSession.shared.download(from: imageUrl)
+    let ext = response.mimeType.flatMap { UTType(mimeType: $0) }?.preferredFilenameExtension ?? "jpg"
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
       UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let destination = directory.appendingPathComponent("\(safeFilename).jpg")
+    let destination = directory.appendingPathComponent("\(safeFilename).\(ext)")
     try FileManager.default.moveItem(at: temporary, to: destination)
     return destination
   }

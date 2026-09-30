@@ -19,6 +19,7 @@ import {
   parseImageFinish,
   parseLinkOrNote,
 } from "./model/captureRequest";
+import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
@@ -329,6 +330,16 @@ function captureUnauthorized(): Response {
 }
 
 /** Maps a refused capture to its response. Never logs content or URLs. */
+function isSavableUrl(url: string): boolean {
+  try {
+    normalizeExternalUrl(url);
+    return true;
+  } catch (error) {
+    if (isUrlPolicyError(error)) return false;
+    throw error;
+  }
+}
+
 function captureFailure(route: CaptureRoute, error: unknown): Response {
   const code = saveErrorCode(error);
   if (code === "pro_required") return json({ error: code }, 402);
@@ -431,6 +442,11 @@ http.route({
     if (read instanceof Response) return read;
     const request = parseLinkOrNote(read.body);
     if (!request) return json({ error: "bad_request" }, 400);
+    // A link the URL policy refuses is the caller's to report, not a server
+    // failure the app would queue and retry forever.
+    if (request.kind === "link" && !isSavableUrl(request.url)) {
+      return json({ error: "invalid_url" }, 422);
+    }
     try {
       const saved = await ctx.runMutation(
         internal.appIntents.captureLinkOrNote,

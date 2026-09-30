@@ -7,6 +7,7 @@ import { displayHost } from "@/lib/url";
 import { useSaveImages } from "@/lib/use-save-image";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { MAX_URL_LENGTH } from "@convex/model/externalUrl";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -260,8 +261,20 @@ export function useAppIntentsSignOutReset(): void {
  * Intelligence. Saves are Pro content, like the widget: without an active
  * entitlement the catalogs are emptied instead. */
 function useCatalogSync(entitled: boolean, entitlementLoading: boolean) {
-  const { items } = useHomeFeed();
+  const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   const enabled = entitled && AppIntents.isAvailable();
+  // The feed loads one page at a time as it scrolls; Spotlight should find
+  // older saves without that, so keep paging up to the catalog limit.
+  const loadedCount = items?.length ?? 0;
+  useEffect(() => {
+    if (
+      enabled &&
+      canLoadMore &&
+      !loadingMore &&
+      loadedCount < ITEM_CATALOG_LIMIT
+    )
+      loadMore();
+  }, [enabled, canLoadMore, loadingMore, loadedCount, loadMore]);
   // "skip", not `enabled`: see RecentSavesWidgetSync.
   const { data: spaces } = useQuery(
     convexQuery(api.spaces.listSpaces, enabled ? {} : "skip"),
@@ -334,6 +347,13 @@ function param(
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/** A cheap stand-in for the server's URL policy (React Native's URL is too
+ * partial to run it here): an oversized or non-web link would be refused on
+ * every launch, so it is dropped instead of queued forever. */
+function isSavableUrl(url: string): boolean {
+  return url.length <= MAX_URL_LENGTH && /^https?:\/\//i.test(url.trim());
+}
+
 function spaceParam(
   invocation: AppIntents.AppIntentInvocation,
 ): Id<"spaces"> | undefined {
@@ -357,8 +377,11 @@ function useInvocationHandler() {
   }
 
   async function handle(invocation: AppIntents.AppIntentInvocation) {
-    // The invocation id makes a replayed capture idempotent on the server.
-    const operationId = `siri:${invocation.id}`;
+    // Siri sends the operation id it already tried, so a save the server
+    // committed before its reply was lost is not saved twice. Older queued
+    // invocations fall back to the invocation id.
+    const operationId =
+      param(invocation, "operationId") ?? `siri:${invocation.id}`;
     switch (invocation.name) {
       case "search": {
         await whenNavigationReady();
@@ -399,7 +422,8 @@ function useInvocationHandler() {
       }
       case "saveLink": {
         const url = param(invocation, "url");
-        if (url)
+        // A link the server's URL policy refuses would fail on every launch.
+        if (url && isSavableUrl(url))
           await createLinkItem({
             url,
             spaceId: spaceParam(invocation),
@@ -411,15 +435,30 @@ function useInvocationHandler() {
       case "saveImages": {
         const paths = invocation.params.paths;
         if (!Array.isArray(paths)) return;
-        const files = paths
-          .filter((path): path is string => typeof path === "string")
-          .map((path) => new File(`file://${encodeURI(path)}`))
-          .filter((file) => file.exists);
+        const operationIds = invocation.params.operationIds;
+        const staged = paths.flatMap((path, index) => {
+          if (typeof path !== "string") return [];
+          const file = new File(`file://${encodeURI(path)}`);
+          if (!file.exists) return [];
+          const sent = Array.isArray(operationIds)
+            ? operationIds[index]
+            : undefined;
+          return [
+            {
+              file,
+              operationId:
+                typeof sent === "string" && sent.length > 0
+                  ? sent
+                  : `${operationId}:${index}`,
+            },
+          ];
+        });
+        const files = staged.map(({ file }) => file);
         if (files.length === 0) return;
         const results = await saveImages(
-          files.map((file, index) => ({
+          staged.map(({ file, operationId: imageOperationId }) => ({
             image: { uri: file.uri },
-            operationId: `${operationId}:${index}`,
+            operationId: imageOperationId,
           })),
           { spaceId: spaceParam(invocation), saveSource: "siri" },
         );

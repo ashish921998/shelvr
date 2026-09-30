@@ -61,8 +61,10 @@ struct SaveNoteIntent {
   @MainActor
   private func saveLink(_ url: URL) async -> (NoteEntity, IntentDialog) {
     let title = url.host()?.replacingOccurrences(of: "www.", with: "") ?? url.absoluteString
+    let operationId = ShelvrCapture.newOperationId()
     do {
-      let itemId = try await ShelvrCapture.save(kind: "link", url: url.absoluteString, spaceId: folder?.id)
+      let itemId = try await ShelvrCapture.save(
+        kind: "link", url: url.absoluteString, spaceId: folder?.id, operationId: operationId)
       ShelvrIntentLog.record("SaveNoteIntent saved link \(itemId)")
       let dialog: IntentDialog =
         folder.map { "Saved \(title) to \($0.name) in Shelvr." } ?? "Saved \(title) to Shelvr."
@@ -71,7 +73,10 @@ struct SaveNoteIntent {
       ShelvrIntentLog.record("SaveNoteIntent link capture failed: \(error)")
       let queued = await CaptureFallback.queue(
         error, name: "saveLink",
-        params: ["url": .string(url.absoluteString), "spaceId": folder.map { .string($0.id) } ?? .null])
+        params: [
+          "url": .string(url.absoluteString), "spaceId": folder.map { .string($0.id) } ?? .null,
+          "operationId": .string(operationId),
+        ])
       return (
         NoteEntity(id: queued.id, text: url.absoluteString, folder: folder),
         queued.dialog ?? "Shelvr will finish saving \(title)\(whereSuffix) the next time you open it."
@@ -95,8 +100,10 @@ struct SaveNoteIntent {
 
   @MainActor
   private func saveNote(_ text: String) async -> (NoteEntity, IntentDialog) {
+    let operationId = ShelvrCapture.newOperationId()
     do {
-      let itemId = try await ShelvrCapture.save(kind: "note", text: text, spaceId: folder?.id)
+      let itemId = try await ShelvrCapture.save(
+        kind: "note", text: text, spaceId: folder?.id, operationId: operationId)
       ShelvrIntentLog.record("SaveNoteIntent saved \(itemId)")
       let dialog: IntentDialog = folder.map { "Saved to \($0.name) in Shelvr." } ?? "Saved to Shelvr."
       return (NoteEntity(id: itemId, text: text, folder: folder), dialog)
@@ -104,7 +111,10 @@ struct SaveNoteIntent {
       ShelvrIntentLog.record("SaveNoteIntent capture failed: \(error)")
       let queued = await CaptureFallback.queue(
         error, name: "saveNote",
-        params: ["text": .string(text), "spaceId": folder.map { .string($0.id) } ?? .null])
+        params: [
+          "text": .string(text), "spaceId": folder.map { .string($0.id) } ?? .null,
+          "operationId": .string(operationId),
+        ])
       return (
         NoteEntity(id: queued.id, text: text, folder: folder),
         queued.dialog ?? "Shelvr will finish saving your note\(whereSuffix) the next time you open it."
@@ -162,7 +172,7 @@ struct SaveImageIntent: AppIntent {
       route: .images(batch))
     ShelvrIntentLog.record("SaveImageIntent.perform \(trace)")
     let saved = try await ImageCapture.save(
-      batch, words: words, sticker: StickerTarget(words: words, explicit: true), spaceId: nil, spaceName: nil,
+      batch, words: words, sticker: words.isEmpty ? nil : StickerTarget(words: words, explicit: true), spaceId: nil, spaceName: nil,
       intent: "SaveImageIntent")
     return .result(dialog: saved.dialog)
   }
@@ -192,14 +202,16 @@ struct SaveLinkIntent: AppIntent {
   func perform() async throws -> some IntentResult & ProvidesDialog {
     ShelvrIntentLog.record("SaveLinkIntent.perform host=\(url.host() ?? "?")")
     let title = name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? url.host() ?? url.absoluteString
+    let operationId = ShelvrCapture.newOperationId()
     do {
-      let itemId = try await ShelvrCapture.save(kind: "link", url: url.absoluteString)
+      let itemId = try await ShelvrCapture.save(kind: "link", url: url.absoluteString, operationId: operationId)
       ShelvrIntentLog.record("SaveLinkIntent saved \(itemId)")
       return .result(dialog: "Saved \(title) to Shelvr.")
     } catch {
       ShelvrIntentLog.record("SaveLinkIntent capture failed: \(error)")
       let queued = await CaptureFallback.queue(
-        error, name: "saveLink", params: ["url": .string(url.absoluteString)])
+        error, name: "saveLink",
+        params: ["url": .string(url.absoluteString), "operationId": .string(operationId)])
       return .result(dialog: queued.dialog ?? "Shelvr will finish saving \(title) the next time you open it.")
     }
   }
@@ -220,6 +232,8 @@ enum CaptureFallback {
       return "Your Shelvr photo limit is full. Delete some photos in Shelvr to save more."
     case .refused("image_too_large"):
       return "That image is too large for Shelvr."
+    case .refused("invalid_url"):
+      return "Shelvr can't save that link."
     default:
       return "Shelvr couldn't save that."
     }
