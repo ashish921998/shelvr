@@ -24,7 +24,7 @@ import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
-import { isWelcomePending } from "@/lib/welcome-save";
+import { useWelcomePending } from "@/lib/welcome-save";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -64,6 +64,7 @@ function HomeSheets({
   nudgeReady: boolean;
 }) {
   const trialing = entitlement.status === "trialing";
+  const welcomePending = useWelcomePending(userId);
   return (
     <>
       <WelcomeSaveSheet
@@ -74,7 +75,7 @@ function HomeSheets({
       <WeeklyNudgeSheet
         userId={userId}
         previewTitle={previewTitle}
-        ready={nudgeReady}
+        ready={nudgeReady && !welcomePending}
       />
     </>
   );
@@ -146,7 +147,6 @@ export default function HomeScreen() {
         cancelSurvey.visible,
         recall.visible,
         feedback.invitationVisible,
-        isWelcomePending(user._id),
       )}
     />
   ) : null;

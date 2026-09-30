@@ -2,23 +2,15 @@ import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
 import { formatItemDate } from "@/lib/date";
-import { waitForSheetTransition } from "@/lib/entitlement";
-import {
-  finishWelcome,
-  isWelcomePending,
-  subscribeWelcome,
-} from "@/lib/welcome-save";
+import { isPaywallPending, waitForSheetTransition } from "@/lib/entitlement";
+import { finishWelcome, useWelcomePending } from "@/lib/welcome-save";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { useFocusEffect, useRouter } from "expo-router";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+
+const SHEET_POLL_MS = 250;
 
 const STEPS: TextMessageKey[] = ["home.howToShare", "home.howToPick"];
 
@@ -38,9 +30,7 @@ export function WelcomeSaveSheet({
 }) {
   useAppLocale();
   const router = useRouter();
-  const pending = useSyncExternalStore(subscribeWelcome, () =>
-    isWelcomePending(userId),
-  );
+  const pending = useWelcomePending(userId);
   // A modal only presents from the focused screen: a purchase behind an item
   // or the share screen waits until the user is back on Home.
   const [focused, setFocused] = useState(false);
@@ -50,14 +40,19 @@ export function WelcomeSaveSheet({
       return () => setFocused(false);
     }, []),
   );
-  // iOS cannot present over the RevenueCat sheet while it is still closing.
+  // iOS cannot present over the RevenueCat sheet. The entitlement can flip
+  // while it is still up, so wait for it to close, then for its slide-out.
   const [settled, setSettled] = useState(false);
   useEffect(() => {
     if (!pending) return;
     let live = true;
-    void waitForSheetTransition().then(() => {
+    void (async () => {
+      while (live && isPaywallPending()) {
+        await new Promise((resolve) => setTimeout(resolve, SHEET_POLL_MS));
+      }
+      await waitForSheetTransition();
       if (live) setSettled(true);
-    });
+    })();
     return () => {
       live = false;
     };

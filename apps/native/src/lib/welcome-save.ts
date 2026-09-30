@@ -2,7 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
 import * as SecureStore from "expo-secure-store";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * The "save your next real thing" step right after someone starts Pro.
@@ -49,6 +49,13 @@ export function markWelcomePending(userId: string): void {
 
 export function isWelcomePending(userId: string): boolean {
   return SecureStore.getItem(welcomeKey(userId)) === "pending";
+}
+
+/** `isWelcomePending`, re-rendering when the flag is queued or finished. */
+export function useWelcomePending(userId: string | undefined): boolean {
+  return useSyncExternalStore(subscribeWelcome, () =>
+    userId ? isWelcomePending(userId) : false,
+  );
 }
 
 export function finishWelcome(userId: string): void {
