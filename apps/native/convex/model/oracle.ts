@@ -48,6 +48,11 @@ export const oracleVerdictValidator = v.object({
   tagline: v.string(),
   spaces: v.array(v.object({ name: v.string(), reason: v.string() })),
   guesses: v.array(v.object({ label: v.string(), why: v.string() })),
+  // 0-100: how much of what they showed is saved for a someday that never
+  // comes.
+  score: v.number(),
+  // Space names the page keeps locked until the visitor shares the verdict.
+  moreSpaces: v.array(v.string()),
 });
 
 export type OracleInput = Infer<typeof oracleInputValidator>;
@@ -86,7 +91,32 @@ export const oracleVerdictSchema = z.object({
       }),
     )
     .describe("One guess per item, in the order the items were given."),
+  score: z
+    .number()
+    .describe(
+      "Their Someday score, an integer from 0 to 100: how much of what they showed is saved for a someday that never comes. Commit to a specific number that fits the evidence, not a round one.",
+    ),
+  moreSpaces: z
+    .array(z.string().describe("A short space name, 1-3 words."))
+    .describe(
+      "Exactly 3 more spaces Shelvr would build for them, different from the first 3.",
+    ),
 });
+
+const MAX_MORE_SPACES = 3;
+
+/** Holds the model to the ranges the page draws: a whole score from 0 to 100,
+ * and at most 3 named extra spaces. */
+export function settleVerdict(verdict: OracleVerdict): OracleVerdict {
+  const score = Number.isFinite(verdict.score)
+    ? Math.min(100, Math.max(0, Math.round(verdict.score)))
+    : 0;
+  const moreSpaces = verdict.moreSpaces
+    .map((name) => name.trim())
+    .filter((name) => name !== "")
+    .slice(0, MAX_MORE_SPACES);
+  return { ...verdict, score, moreSpaces };
+}
 
 type Fields = Record<string, unknown>;
 
