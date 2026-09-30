@@ -23,7 +23,7 @@ import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
-import { ProgressiveBlurHeader } from "progressive-blur";
+import { HeaderFade } from "@/components/header-fade";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -162,7 +162,7 @@ export default function HomeScreen() {
         source={{ from: "home" }}
         onEndReached={canLoadMore ? loadMore : undefined}
         loadingMore={loadingMore}
-        // Inside the feed so contentInsetAdjustmentBehavior clears the blur
+        // Inside the feed so contentInsetAdjustmentBehavior clears the transparent
         // header on iOS and the invitation scrolls with the content. The
         // cancel survey claims the slot first, then the save progress card,
         // then the save recall card.
@@ -179,7 +179,7 @@ export default function HomeScreen() {
           ) : undefined)
         }
       />
-      <ProgressiveBlurHeader />
+      <HeaderFade />
       {nudge}
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
