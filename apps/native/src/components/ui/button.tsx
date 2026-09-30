@@ -1,26 +1,38 @@
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  View,
-  type PressableProps,
-} from "react-native";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { useState, type ReactNode } from "react";
+import { Pressable, View, type PressableProps } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { motion, motionCSS } from "@/lib/motion";
 import { ThemedText } from "@/components/ui/themed-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const glass = isLiquidGlassAvailable();
+
+type Variant = "primary" | "secondary" | "destructive";
+type Size = "md" | "lg";
 
 type Props = Omit<PressableProps, "children" | "style"> & {
   title: string;
+  variant?: Variant;
+  size?: Size;
+  icon?: ReactNode;
   loading?: boolean;
   style?: React.ComponentProps<typeof AnimatedPressable>["style"];
 };
 
-/** Primary action. The label stays mounted and visible beside the spinner. */
+/**
+ * Shelvr's capsule action. Where iOS supports Liquid Glass it is interactive
+ * glass and the system owns the press response; elsewhere it is a solid fill
+ * that dims and scales in. Loading dims the button instead of swapping in a
+ * spinner, so the label stays put and nothing around the button reflows.
+ * Ported from Amber (#13).
+ */
 export function Button({
   title,
+  variant = "primary",
+  size = "md",
+  icon,
   loading = false,
   disabled,
   style,
@@ -33,6 +45,25 @@ export function Button({
   const reducedMotion = useReducedMotion();
   const [pressed, setPressed] = useState(false);
   const inactive = disabled || loading;
+  // Glass animates its own press natively; the solid fallback mimics it in JS.
+  const held = loading || (!glass && pressed && !inactive);
+  const filled = variant === "primary";
+  const labelColor = filled
+    ? theme.colors.onTint
+    : variant === "destructive"
+      ? theme.colors.danger
+      : theme.colors.foreground;
+  const content = (
+    <>
+      {icon}
+      <ThemedText
+        variant="button"
+        style={[styles.label, { color: labelColor }]}
+      >
+        {title}
+      </ThemedText>
+    </>
+  );
 
   return (
     <AnimatedPressable
@@ -55,19 +86,16 @@ export function Button({
         onPressOut?.(event);
       }}
       style={[
-        styles.button,
         {
-          opacity: inactive
-            ? theme.opacity.disabled
-            : pressed
-              ? theme.opacity.pressed
+          opacity: held
+            ? theme.opacity.pressed
+            : inactive
+              ? theme.opacity.disabled
               : 1,
           transform: [
             {
               scale:
-                pressed && !inactive && !reducedMotion
-                  ? motion.scale.pressed
-                  : 1,
+                held && !glass && !reducedMotion ? motion.scale.pressed : 1,
             },
           ],
           transitionProperty: ["opacity", "transform"],
@@ -77,31 +105,47 @@ export function Button({
         style,
       ]}
     >
-      <View style={styles.content}>
-        {loading ? <ActivityIndicator color={theme.colors.onTint} /> : null}
-        <ThemedText variant="button" style={styles.label}>
-          {title}
-        </ThemedText>
-      </View>
+      {glass ? (
+        <GlassView
+          glassEffectStyle="regular"
+          isInteractive={!inactive}
+          tintColor={filled ? theme.colors.primary : undefined}
+          style={[styles.surface, styles[size]]}
+        >
+          {content}
+        </GlassView>
+      ) : (
+        <View
+          style={[
+            styles.surface,
+            styles[size],
+            filled
+              ? { backgroundColor: theme.colors.primary }
+              : {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderWidth: StyleSheet.hairlineWidth,
+                },
+          ]}
+        >
+          {content}
+        </View>
+      )}
     </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  button: {
-    minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.gap(3),
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
+  surface: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: theme.gap(1),
+    paddingHorizontal: theme.gap(3),
+    borderRadius: 999,
+    overflow: "hidden",
   },
-  label: { color: theme.colors.onTint, textAlign: "center" },
+  md: { minHeight: theme.control.minHeight, paddingVertical: theme.gap(1.5) },
+  lg: { minHeight: 56, paddingVertical: theme.gap(2) },
+  label: { flexShrink: 1, textAlign: "center" },
 }));
