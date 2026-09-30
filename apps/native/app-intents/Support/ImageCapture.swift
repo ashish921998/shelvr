@@ -111,13 +111,16 @@ enum ImageCapture {
     if savedIds.isEmpty && skipped == nil {
       return (nil, "Your images will be saved\(whereSuffix) when you open Shelvr.")
     }
-    if unsaved.isEmpty {
-      return (savedIds.first, "Saved \(savedIds.count) of \(images.count) images. Shelvr couldn't save the rest.")
-    }
-    return (
-      savedIds.first,
-      "Saved \(savedIds.count) of \(images.count) images. Shelvr will try the rest when you open it."
-    )
+    // Only `unsaved` images were queued; `skipped` ones were refused and are not retried.
+    let saved = savedIds.isEmpty ? "" : "Saved \(savedIds.count) of \(images.count) images. "
+    let dropped = images.count - savedIds.count - unsaved.count
+    let queued =
+      unsaved.isEmpty
+      ? ""
+      : "Shelvr will try \(unsaved.count == 1 ? "1 more" : "\(unsaved.count) more") when you open it."
+    let refused = dropped == 0 ? "" : " \(dropped == 1 ? "1 image" : "\(dropped) images") couldn't be saved."
+    let text = "\(saved)\(queued)\(refused)".trimmingCharacters(in: .whitespaces)
+    return (savedIds.first, "\(text)")
   }
 
   private enum StickerOutcome {
