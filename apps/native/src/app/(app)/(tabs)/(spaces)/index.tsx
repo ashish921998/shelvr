@@ -13,7 +13,7 @@ import { useMutation } from "convex/react";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ScrollEdgeHeader } from "progressive-blur";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { Alert, Pressable, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -296,7 +296,7 @@ export default function SpacesScreen() {
           );
         }}
       />
-      <ScrollEdgeHeader />
+      <HeaderScrim />
     </View>
   );
 }

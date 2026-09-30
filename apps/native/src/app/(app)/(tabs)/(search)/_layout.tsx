@@ -6,14 +6,13 @@ import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 
 export default function SearchStackLayout() {
   useAppLocale();
-  const { screenOptions } = useTabStackChrome({ headerTransparent: true });
+  const { screenOptions } = useTabStackChrome({
+    headerTransparent: true,
+    softScrollEdge: true,
+  });
   return (
     <Stack screenOptions={screenOptions}>
-      <Stack.Screen
-        name="index"
-        // iOS 26 native soft scroll edge: results fade out under the header.
-        options={{ scrollEdgeEffects: { top: "soft" } }}
-      >
+      <Stack.Screen name="index">
         <Stack.Title asChild>
           <Text style={styles.title}>{t("navigation.searchHeader")}</Text>
         </Stack.Title>

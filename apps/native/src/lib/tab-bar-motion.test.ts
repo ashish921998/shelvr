@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   RUBBER_BAND_LIMIT,
-  isDarkColor,
   overflowPast,
   rubberBand,
   tabIndexAt,
   tabSlotX,
-  withAlpha,
 } from "./tab-bar-motion";
 
 describe("rubberBand", () => {
@@ -67,18 +65,5 @@ describe("tabSlotX", () => {
     expect(tabSlotX(3, 216, 4, 8)).toBe(158);
     // Halfway through a spring from tab 1 to tab 2.
     expect(tabSlotX(1.5, 216, 4, 8)).toBe(83);
-  });
-});
-
-describe("colour helpers", () => {
-  it("converts a hex theme colour to rgba", () => {
-    expect(withAlpha("#e6a23c", 0.25)).toBe("rgba(230, 162, 60, 0.25)");
-    expect(withAlpha("not-a-colour", 0.5)).toBe("not-a-colour");
-  });
-
-  it("tells the light and dark app backgrounds apart", () => {
-    expect(isDarkColor("#faf6ee")).toBe(false);
-    expect(isDarkColor("#191510")).toBe(true);
-    expect(isDarkColor("#111417")).toBe(true);
   });
 });

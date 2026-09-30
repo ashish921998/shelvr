@@ -15,7 +15,7 @@ import { useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ScrollEdgeHeader } from "progressive-blur";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useMemo } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -225,7 +225,7 @@ export default function SpaceScreen() {
             />
           }
         />
-        <ScrollEdgeHeader />
+        <HeaderScrim />
       </View>
     </>
   );
