@@ -21,9 +21,6 @@ const NativeBlur =
     ? requireNativeView<NativeBlurProps>("ProgressiveBlur")
     : null;
 
-const hasNativeSoftScrollEdge =
-  Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) >= 26;
-
 /**
  * A blurred band pinned to the top of the screen, sized to the
  * navigation header. Sits behind the (transparent) native header so scrolling
@@ -90,15 +87,14 @@ function IOSProgressiveBlurHeader({
  * scrolling content, so the scroll view stays the screen's first descendant
  * (the native edge effect relies on that).
  *
- * iOS 26 blurs content under the header natively, but only washes it lightly,
- * so photos stay visible behind the title. There this lays a page-colored
- * fade on top: solid under the status bar, eased out just past the header.
- * Older iOS, where the option does nothing, gets ProgressiveBlurHeader.
- * Android renders nothing: its header is an opaque bar.
+ * A page-colored fade: solid under the status bar, eased out just past the
+ * header. On iOS 26 it sits over the native soft edge, which only washes
+ * content lightly and would leave photos visible behind the title; below iOS
+ * 26 the fade alone does the job. Android renders nothing: its header is an
+ * opaque bar.
  */
 export function ScrollEdgeHeader() {
-  if (Platform.OS !== "ios") return null;
-  return hasNativeSoftScrollEdge ? <HeaderFade /> : <ProgressiveBlurHeader />;
+  return Platform.OS === "ios" ? <HeaderFade /> : null;
 }
 
 // How far past the header's bottom edge the fade keeps going.
