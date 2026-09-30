@@ -157,6 +157,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
+  const inputRef = useRef<TextInput>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -177,6 +178,14 @@ function AddContent({ close, openCamera }: AddContentProps) {
     return () => {
       active = false;
     };
+  }, [mode]);
+
+  // Android's Material sheet resizes to the composer over ~300ms, and a
+  // keyboard opened mid-resize can land behind it, so focus once it settles.
+  useEffect(() => {
+    if (Platform.OS !== "android" || mode === "menu") return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 350);
+    return () => clearTimeout(timer);
   }, [mode]);
 
   const success = () => {
@@ -326,6 +335,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
       {isComposer ? (
         <TextInput
+          ref={inputRef}
           testID={isArticle ? "add-article-input" : "add-note-input"}
           style={isArticle ? styles.articleInput : styles.noteInput}
           value={value}
@@ -336,7 +346,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
               : t("capture.notePlaceholder")
           }
           placeholderTextColor={theme.colors.muted}
-          autoFocus
+          autoFocus={Platform.OS !== "android"}
           multiline={!isArticle}
           autoCapitalize={isArticle ? "none" : "sentences"}
           autoCorrect={!isArticle}
@@ -502,6 +512,10 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 18,
     color: theme.colors.foreground,
     minHeight: 120,
+    // The Android sheet sizes to its content above the keyboard. An uncapped
+    // note would grow the sheet until the header and its Save button leave
+    // the screen, so long notes scroll inside the field instead.
+    maxHeight: Platform.OS === "android" ? 240 : undefined,
     padding: theme.gap(1.5),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
