@@ -28,8 +28,8 @@ import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { welcomeSave } from "@/lib/welcome-save";
-import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -244,7 +244,7 @@ export default function HomeScreen() {
           ) : undefined)
         }
       />
-      <ProgressiveBlurHeader />
+      <HeaderScrim />
       {nudge}
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />

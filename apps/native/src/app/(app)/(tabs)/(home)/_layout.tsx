@@ -9,7 +9,9 @@ import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 export default function HomeStackLayout() {
   useAppLocale();
   const router = useRouter();
-  const { haptic, labelColor, screenOptions, tap } = useTabStackChrome();
+  const { haptic, labelColor, screenOptions, tap } = useTabStackChrome({
+    softScrollEdge: true,
+  });
   const { guard, loading: entitlementLoading } = usePaywallGuard("home");
 
   // Add and Map are Pro features — route to the paywall unless entitled.

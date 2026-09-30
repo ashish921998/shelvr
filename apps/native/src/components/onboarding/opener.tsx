@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
-import { withAlpha } from "@/lib/tab-bar-motion";
+import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
