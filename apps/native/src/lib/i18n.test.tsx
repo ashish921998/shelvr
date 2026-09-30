@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { t, useAppLocale, localizeError, formattingLocale } from "./i18n";
 import { canonicalizeTag, resolveLocale, translate } from "./i18n-core";
-import { formatItemDate } from "./date";
+import { formatShortDate } from "./date";
 import de from "@/locales/de.json";
 import ja from "@/locales/ja.json";
 
@@ -149,7 +149,7 @@ describe("translated copy", () => {
     expect(t("navigation.search")).toBe("Search");
     expect(formattingLocale()).toBe("en-IN");
     expect(t("spaces.saveCount", { count: 1234567 })).toBe("12,34,567 saves");
-    expect(formatItemDate(Date.UTC(2026, 8, 13, 12))).toContain("Sep");
+    expect(formatShortDate(Date.UTC(2026, 8, 13, 12))).toContain("Sep");
   });
   it("preserves regional number formatting when markets share translations", () => {
     changeLanguage("en-IN");
