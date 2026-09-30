@@ -18,7 +18,17 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // made every sparse detail page noisier). Post-search states still render
 // inline: results as product cards, a spinner while searching, and a retry
 // chip when the search failed.
-export function ProductsSection({ item }: { item: DetailItem }) {
+//
+// `inset` is the parent's horizontal padding. The shop row bleeds out of it so
+// cards scroll to the screen edge instead of clipping at the padded bounds,
+// and its content padding restores the same inset at rest.
+export function ProductsSection({
+  item,
+  inset,
+}: {
+  item: DetailItem;
+  inset: number;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   const { findLinks, finding, disabled } = useFindLinks(item);
@@ -51,7 +61,11 @@ export function ProductsSection({ item }: { item: DetailItem }) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsRow}
+          style={{ marginHorizontal: -inset }}
+          contentContainerStyle={[
+            styles.productsRow,
+            { paddingHorizontal: inset },
+          ]}
         >
           {products.map((product, index) => (
             <Pressable
