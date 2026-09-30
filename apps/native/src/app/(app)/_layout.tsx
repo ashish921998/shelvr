@@ -8,6 +8,7 @@ import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
+import { useWelcomeSaveTracker } from "@/lib/welcome-save";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
@@ -30,6 +31,8 @@ export default function AppLayout() {
   useResumePendingShare();
   // Remind trialers two days before the yearly plan starts charging.
   useTrialReminder();
+  // Right after Pro starts, Home hands off to one real save.
+  useWelcomeSaveTracker();
   useExitOfferReminder();
 
   if (isLoading) {

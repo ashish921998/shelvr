@@ -575,5 +575,9 @@
   "exitOffer.reminderConsent": "Vamos enviar uma notificação sobre esta oferta, uma hora antes de ela acabar. Você pode cancelar quando quiser.",
   "exitOffer.reminderSet": "Lembrete marcado para uma hora antes do fim da oferta.",
   "exitOffer.reminderCancel": "Cancelar lembrete",
-  "exitOffer.reminderDenied": "As notificações do Shelvr estão desativadas. Ative-as em Ajustes para receber o lembrete."
+  "exitOffer.reminderDenied": "As notificações do Shelvr estão desativadas. Ative-as em Ajustes para receber o lembrete.",
+  "welcome.title": "Tudo pronto. Agora salve algo de verdade.",
+  "welcome.body": "Salve uma coisa que você quer mesmo guardar. O Shelvr dá título, tags e organiza para você.",
+  "welcome.trialBody": "Seu teste grátis vai até %{date}. Salve uma coisa que você quer mesmo guardar, e o Shelvr dá título, tags e organiza para você.",
+  "welcome.cta": "Salvar algo"
 }

@@ -558,5 +558,9 @@
   "exitOffer.reminderConsent": "We'll send one notification about this offer, an hour before it ends. You can cancel anytime.",
   "exitOffer.reminderSet": "Reminder set for an hour before the offer ends.",
   "exitOffer.reminderCancel": "Cancel reminder",
-  "exitOffer.reminderDenied": "Notifications are off for Shelvr. Turn them on in Settings to get a reminder."
+  "exitOffer.reminderDenied": "Notifications are off for Shelvr. Turn them on in Settings to get a reminder.",
+  "welcome.title": "You're in. Now save something real.",
+  "welcome.body": "Save one thing you actually want to keep. Shelvr titles, tags and files it for you.",
+  "welcome.trialBody": "Your free trial runs until %{date}. Save one thing you actually want to keep, and Shelvr titles, tags and files it for you.",
+  "welcome.cta": "Save something"
 }

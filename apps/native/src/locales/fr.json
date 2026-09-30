@@ -575,5 +575,9 @@
   "exitOffer.reminderConsent": "Nous vous enverrons une notification à propos de cette offre, une heure avant sa fin. Vous pouvez l’annuler à tout moment.",
   "exitOffer.reminderSet": "Rappel prévu une heure avant la fin de l’offre.",
   "exitOffer.reminderCancel": "Annuler le rappel",
-  "exitOffer.reminderDenied": "Les notifications de Shelvr sont désactivées. Activez-les dans Réglages pour recevoir le rappel."
+  "exitOffer.reminderDenied": "Les notifications de Shelvr sont désactivées. Activez-les dans Réglages pour recevoir le rappel.",
+  "welcome.title": "C'est parti. Enregistrez maintenant quelque chose de vrai.",
+  "welcome.body": "Enregistrez une chose que vous voulez vraiment garder. Shelvr lui donne un titre et des tags, puis la range pour vous.",
+  "welcome.trialBody": "Votre essai gratuit dure jusqu'au %{date}. Enregistrez une chose que vous voulez vraiment garder : Shelvr lui donne un titre et des tags, puis la range pour vous.",
+  "welcome.cta": "Enregistrer quelque chose"
 }
