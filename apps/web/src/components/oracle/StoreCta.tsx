@@ -4,8 +4,10 @@ import { useAppStoreLink } from "@/lib/appStoreLink";
 
 export default function StoreCta({
   headline = "Shelvr already sorted these. Keep them.",
+  note,
 }: {
   headline?: string;
+  note?: string;
 }) {
   const { href, onClick } = useAppStoreLink("oracle");
   return (
@@ -20,6 +22,7 @@ export default function StoreCta({
       >
         Get Shelvr on the App Store
       </a>
+      {note && <p className="mt-3 text-sm text-white/70">{note}</p>}
     </div>
   );
 }

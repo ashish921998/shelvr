@@ -9,6 +9,7 @@ import {
   oracleInputValidator,
   oracleVerdictSchema,
   oracleVerdictValidator,
+  settleVerdict,
   type OracleInput,
   type OracleInputOf,
   type OracleKind,
@@ -179,6 +180,6 @@ export const consult = internalAction({
       kind: input.kind,
       duration_ms: Date.now() - startedAt,
     });
-    return object;
+    return settleVerdict(object);
   },
 });

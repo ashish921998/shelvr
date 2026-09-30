@@ -4,7 +4,7 @@ import Logo from "@/components/common/Logo";
 import OracleApp from "@/components/oracle/OracleApp";
 
 const description =
-  "Show me three things you saved and I’ll tell you who you are. A free verdict from Shelvr, no sign-up.";
+  "Show me what you saved and I’ll tell you who you are. One screenshot is enough, and there’s no sign-up.";
 
 export const metadata: Metadata = {
   title: "The Shelvr Oracle",

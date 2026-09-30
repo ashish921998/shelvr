@@ -1,7 +1,8 @@
 import type { OracleMode } from "@/lib/oracle";
 
 /**
- * What a shared verdict carries: the mode, persona, tagline and spaces. The
+ * What a shared verdict carries: the mode, persona, tagline, spaces and
+ * Someday score (absent from links made before it existed). The
  * per-item guesses stay out, because they describe what the sharer saved.
  * The share link holds this in `?c=`, so nothing is stored server side.
  */
@@ -10,6 +11,7 @@ export type SharedVerdict = {
   persona: string;
   tagline: string;
   spaces: { name: string; reason: string }[];
+  score?: number;
 };
 
 const MODES: readonly OracleMode[] = ["links", "screenshot", "tabs", "library"];
@@ -20,7 +22,13 @@ const MAX_SPACE_NAME = 40;
 const MAX_SPACE_REASON = 140;
 const MAX_SPACES = 3;
 
-type Wire = { m: string; p: string; t: string; s: [string, string][] };
+type Wire = {
+  m: string;
+  p: string;
+  t: string;
+  s: [string, string][];
+  n?: number;
+};
 
 function clip(text: string, max: number): string {
   const trimmed = text.trim();
@@ -57,8 +65,17 @@ export function encodeSharedVerdict(verdict: SharedVerdict): string {
         clip(space.name, MAX_SPACE_NAME),
         clip(space.reason, MAX_SPACE_REASON),
       ]),
+    ...(isScore(verdict.score) ? { n: verdict.score } : {}),
   };
   return toBase64Url(JSON.stringify(wire));
+}
+
+function isScore(value: unknown): value is number {
+  return (
+    Number.isInteger(value) &&
+    (value as number) >= 0 &&
+    (value as number) <= 100
+  );
 }
 
 function boundedText(value: unknown, max: number): string | undefined {
@@ -76,12 +93,13 @@ export function decodeSharedVerdict(code: string): SharedVerdict | undefined {
     return undefined;
   }
   if (typeof wire !== "object" || wire === null) return undefined;
-  const { m, p, t, s } = wire as Partial<Record<keyof Wire, unknown>>;
+  const { m, p, t, s, n } = wire as Partial<Record<keyof Wire, unknown>>;
   const mode = MODES.find((candidate) => candidate === m);
   const persona = boundedText(p, MAX_PERSONA);
   const tagline = boundedText(t, MAX_TAGLINE);
   if (!mode || !persona || !tagline) return undefined;
   if (!Array.isArray(s) || s.length > MAX_SPACES) return undefined;
+  if (n !== undefined && !isScore(n)) return undefined;
   const spaces: SharedVerdict["spaces"] = [];
   for (const entry of s) {
     if (!Array.isArray(entry) || entry.length !== 2) return undefined;
@@ -90,10 +108,22 @@ export function decodeSharedVerdict(code: string): SharedVerdict | undefined {
     if (!name || !reason) return undefined;
     spaces.push({ name, reason });
   }
-  return { mode, persona, tagline, spaces };
+  return {
+    mode,
+    persona,
+    tagline,
+    spaces,
+    ...(n === undefined ? {} : { score: n }),
+  };
 }
 
 /** The share page for one verdict, relative to the site origin. */
 export function sharedVerdictPath(verdict: SharedVerdict): string {
   return `/oracle/s?c=${encodeSharedVerdict(verdict)}`;
+}
+
+/** The verdict's card image. `story` is the 9:16 cut for saving and posting;
+ * the default is the 1200×630 link preview. */
+export function sharedVerdictImagePath(code: string, format?: "story"): string {
+  return `/oracle/og?c=${code}${format ? `&format=${format}` : ""}`;
 }

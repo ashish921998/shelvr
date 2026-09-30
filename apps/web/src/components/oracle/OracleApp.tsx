@@ -12,40 +12,52 @@ import type {
 
 import LibraryInput from "./LibraryInput";
 import LinksInput from "./LinksInput";
+import LockedSpaces from "./LockedSpaces";
 import ScreenshotInput from "./ScreenshotInput";
 import ShareRow from "./ShareRow";
 import StoreCta from "./StoreCta";
 import TabsInput from "./TabsInput";
 import VerdictCard from "./VerdictCard";
 
+// Screenshot is the default: one tap into the camera roll, nothing to find.
+const DEFAULT_MODE: OracleMode = "screenshot";
+
 const MODES: Record<
   OracleMode,
-  { name: string; hook: string; Input: ComponentType<OracleInputProps> }
+  {
+    name: string;
+    short: string;
+    hook: string;
+    Input: ComponentType<OracleInputProps>;
+  }
 > = {
-  links: {
-    name: "Saver Oracle",
-    hook: "Paste 3 links you saved. I’ll guess why.",
-    Input: LinksInput,
-  },
   screenshot: {
     name: "Screenshot Confession",
+    short: "A screenshot",
     hook: "One screenshot from your camera roll. I’ll guess what it was for.",
     Input: ScreenshotInput,
   },
+  links: {
+    name: "Saver Oracle",
+    short: "3 saved links",
+    hook: "Paste 3 links you saved. I’ll guess why.",
+    Input: LinksInput,
+  },
   tabs: {
     name: "Tab Roast",
+    short: "My open tabs",
     hook: "How many tabs are open right now? Be honest.",
     Input: TabsInput,
   },
   library: {
     name: "Saved-but-never-opened report",
+    short: "A bookmarks export",
     hook: "Paste your bookmarks export. Get the damage report.",
     Input: LibraryInput,
   },
 };
 
 type OracleState =
-  | { phase: "picking" }
   | { phase: "asking"; mode: OracleMode; error?: string }
   | { phase: "consulting"; mode: OracleMode }
   | {
@@ -53,6 +65,7 @@ type OracleState =
       mode: OracleMode;
       input: OracleInput;
       verdict: OracleVerdict;
+      unlocked: boolean;
     };
 
 function isOracleMode(value: string | null): value is OracleMode {
@@ -60,7 +73,10 @@ function isOracleMode(value: string | null): value is OracleMode {
 }
 
 export default function OracleApp() {
-  const [state, setState] = useState<OracleState>({ phase: "picking" });
+  const [state, setState] = useState<OracleState>({
+    phase: "asking",
+    mode: DEFAULT_MODE,
+  });
 
   useEffect(() => {
     const mode = new URLSearchParams(window.location.search).get("mode");
@@ -95,7 +111,7 @@ export default function OracleApp() {
         // The persona is read from the visitor's saves, so it stays out of
         // analytics.
         captureWebAnalyticsEvent("oracle_verdict", { mode });
-        setState({ phase: "answered", mode, input, verdict });
+        setState({ phase: "answered", mode, input, verdict, unlocked: false });
         return;
       }
       message = body.message;
@@ -114,34 +130,13 @@ export default function OracleApp() {
     <div className="container max-w-2xl pb-16 pt-10 sm:pt-14">
       <p className="section-kicker">The Shelvr Oracle</p>
       <h1 className="display mt-4 text-4xl leading-[1.08] text-ink sm:text-5xl">
-        Show me three things you saved and I’ll tell you who you are.
+        Show me what you saved and I’ll tell you who you are.
       </h1>
-
-      {state.phase === "picking" && (
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-          {(Object.keys(MODES) as OracleMode[]).map((mode) => (
-            <li key={mode}>
-              <button
-                type="button"
-                onClick={() => setState({ phase: "asking", mode })}
-                className="soft-card flex h-full min-h-28 w-full flex-col items-start rounded-2xl p-5 text-left transition hover:-translate-y-0.5 hover:border-ember focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-deep"
-              >
-                <span className="text-lg font-bold text-ink">
-                  {MODES[mode].name}
-                </span>
-                <span className="mt-1 text-[15px] leading-6 text-muted">
-                  {MODES[mode].hook}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
 
       {(state.phase === "asking" || state.phase === "consulting") && (
         <ModePanel
           state={state}
-          onBack={() => setState({ phase: "picking" })}
+          onPick={(mode) => setState({ phase: "asking", mode })}
           onSubmit={consult}
         />
       )}
@@ -154,17 +149,31 @@ export default function OracleApp() {
               state.input.kind === "library" ? state.input.stats : undefined
             }
           />
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <ShareRow mode={state.mode} verdict={state.verdict} />
+          <LockedSpaces
+            names={state.verdict.moreSpaces ?? []}
+            unlocked={state.unlocked}
+          />
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <ShareRow
+              mode={state.mode}
+              verdict={state.verdict}
+              onShared={() =>
+                setState((current) =>
+                  current.phase === "answered"
+                    ? { ...current, unlocked: true }
+                    : current,
+                )
+              }
+            />
             <button
               type="button"
-              onClick={() => setState({ phase: "picking" })}
+              onClick={() => setState({ phase: "asking", mode: state.mode })}
               className="min-h-12 rounded-xl px-5 text-base font-semibold text-muted underline decoration-line-strong underline-offset-4 transition hover:text-ember-deep"
             >
               Ask the oracle again
             </button>
           </div>
-          <StoreCta />
+          <StoreCta note="7-day trial on the annual plan." />
         </section>
       )}
     </div>
@@ -173,35 +182,47 @@ export default function OracleApp() {
 
 function ModePanel({
   state,
-  onBack,
+  onPick,
   onSubmit,
 }: {
   state: Extract<OracleState, { phase: "asking" | "consulting" }>;
-  onBack: () => void;
+  onPick: (mode: OracleMode) => void;
   onSubmit: (input: OracleInput) => void;
 }) {
   const { name, hook, Input } = MODES[state.mode];
   const busy = state.phase === "consulting";
+  const others = (Object.keys(MODES) as OracleMode[]).filter(
+    (mode) => mode !== state.mode,
+  );
   return (
-    <section className="soft-card mt-8 rounded-3xl p-5 sm:p-8">
-      <button
-        type="button"
-        onClick={onBack}
-        disabled={busy}
-        className="-ml-1 inline-flex min-h-11 items-center px-1 text-sm font-semibold text-muted transition hover:text-ink disabled:opacity-50"
-      >
-        ← Pick another
-      </button>
-      <h2 className="mt-2 text-2xl font-bold text-ink">{name}</h2>
-      <p className="mt-1 text-base text-muted">{hook}</p>
-      <div className="mt-5">
-        <Input busy={busy} onSubmit={onSubmit} />
+    <>
+      <section className="soft-card mt-8 rounded-3xl p-5 sm:p-8">
+        <h2 className="text-2xl font-bold text-ink">{name}</h2>
+        <p className="mt-1 text-base text-muted">{hook}</p>
+        <div className="mt-5">
+          {/* Keyed so switching modes starts the new input empty. */}
+          <Input key={state.mode} busy={busy} onSubmit={onSubmit} />
+        </div>
+        {state.phase === "asking" && state.error && (
+          <p role="alert" className="mt-4 text-sm font-medium text-ember-deep">
+            {state.error}
+          </p>
+        )}
+      </section>
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-muted">Or show me</span>
+        {others.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onPick(mode)}
+            disabled={busy}
+            className="min-h-11 rounded-full border border-line-strong bg-white px-4 text-sm font-semibold text-ink transition hover:border-ember-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-deep disabled:opacity-50"
+          >
+            {MODES[mode].short}
+          </button>
+        ))}
       </div>
-      {state.phase === "asking" && state.error && (
-        <p role="alert" className="mt-4 text-sm font-medium text-ember-deep">
-          {state.error}
-        </p>
-      )}
-    </section>
+    </>
   );
 }

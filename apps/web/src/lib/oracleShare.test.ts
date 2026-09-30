@@ -16,6 +16,7 @@ const VERDICT: SharedVerdict = {
     { name: "Lisbon", reason: "Cafés for the trip you keep planning." },
     { name: "Kitchen Kit", reason: "The pan you’ve priced four times." },
   ],
+  score: 87,
 };
 
 function wire(value: unknown): string {
@@ -49,6 +50,13 @@ describe("shared verdict codes", () => {
     expect(decoded?.spaces).toHaveLength(3);
   });
 
+  it("decodes a link made before the score existed", () => {
+    const { score: _score, ...withoutScore } = VERDICT;
+    const code = encodeSharedVerdict(withoutScore);
+
+    expect(decodeSharedVerdict(code)).toEqual(withoutScore);
+  });
+
   it("builds a path under /oracle/s", () => {
     expect(sharedVerdictPath(VERDICT)).toBe(
       `/oracle/s?c=${encodeSharedVerdict(VERDICT)}`,
@@ -70,6 +78,8 @@ describe("shared verdict codes", () => {
       wire({ m: "links", p: "A", t: "B", s: Array(4).fill(["x", "y"]) }),
     ],
     ["a code over 4 KB", "A".repeat(4097)],
+    ["a score over 100", wire({ m: "links", p: "A", t: "B", s: [], n: 101 })],
+    ["a fractional score", wire({ m: "links", p: "A", t: "B", s: [], n: 4.5 })],
   ])("decodes %s to undefined", (_, code) => {
     expect(decodeSharedVerdict(decodeURIComponent(code))).toBeUndefined();
   });

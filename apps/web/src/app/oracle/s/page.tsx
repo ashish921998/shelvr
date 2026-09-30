@@ -5,7 +5,7 @@ import Logo from "@/components/common/Logo";
 import SharedVerdictView from "@/components/oracle/SharedVerdictView";
 import StoreCta from "@/components/oracle/StoreCta";
 import VerdictCard from "@/components/oracle/VerdictCard";
-import { decodeSharedVerdict } from "@/lib/oracleShare";
+import { decodeSharedVerdict, sharedVerdictImagePath } from "@/lib/oracleShare";
 
 type PageProps = { searchParams: Promise<{ c?: string | string[] }> };
 
@@ -22,8 +22,8 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     : "The Shelvr Oracle";
   const description = verdict
     ? `${verdict.tagline} What are you?`
-    : "Show me three things you saved and I’ll tell you who you are.";
-  const image = verdict ? `/oracle/og?c=${code}` : undefined;
+    : "Show me what you saved and I’ll tell you who you are.";
+  const image = verdict ? sharedVerdictImagePath(code) : undefined;
   return {
     title,
     description,
