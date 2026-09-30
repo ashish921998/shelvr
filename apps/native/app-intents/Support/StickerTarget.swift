@@ -30,7 +30,10 @@ struct StickerTarget {
     let objectPart = tokens.prefix { !Self.boundaries.contains($0) }
     let nouns = objectPart
       .filter { $0.count > 2 && !Self.ignored.contains($0) }
-      .map { Self.synonyms[$0] ?? Self.singular($0) }
+      .map { token -> String in
+        let singular = Self.singular(token)
+        return Self.synonyms[token] ?? Self.synonyms[singular] ?? singular
+      }
     guard explicit || !nouns.isEmpty else { return nil }
     self.nouns = nouns
     self.explicit = explicit
@@ -158,7 +161,8 @@ struct StickerTarget {
   /// Crude English singular, enough to line spoken words up with Vision's labels ("shoes").
   static func singular(_ word: String) -> String {
     if word.hasSuffix("ies"), word.count > 4 { return String(word.dropLast(3)) + "y" }
-    if ["ses", "xes", "ches", "shes"].contains(where: word.hasSuffix) { return String(word.dropLast(2)) }
+    // "glasses", "boxes", "benches", "dishes"; plain "-ses" ("horses", "houses") keeps its "e".
+    if ["sses", "xes", "ches", "shes"].contains(where: word.hasSuffix) { return String(word.dropLast(2)) }
     if word.hasSuffix("s"), !word.hasSuffix("ss"), word.count > 3 { return String(word.dropLast()) }
     return word
   }

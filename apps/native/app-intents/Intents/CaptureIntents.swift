@@ -239,6 +239,15 @@ enum CaptureFallback {
     }
   }
 
+  /// Whether a refusal covers every save on the account (no Pro, a full photo limit) rather
+  /// than just this one.
+  static func refusesAccount(_ error: Error) -> Bool {
+    switch error as? ShelvrCapture.Failure {
+    case .proRequired?, .refused("photo_limit")?: return true
+    default: return false
+    }
+  }
+
   /// Queues the capture for the app when a retry there can succeed. Returns the invocation id (or
   /// a fresh id when nothing was queued) and, for a refusal, what Siri should say instead.
   static func queue(_ error: Error, name: String, params: [String: AppIntentValue]) async

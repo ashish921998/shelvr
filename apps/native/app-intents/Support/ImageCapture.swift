@@ -35,7 +35,10 @@ enum ImageCapture {
     // Each image keeps one operation id from here to the app's retry, so an upload the server
     // saved before its reply was lost is not saved twice.
     var unsaved: [(image: CaptureRouter.Attachment, operationId: String)] = []
+    // A refusal that covers the whole account (no Pro, photo limit) stops the batch; one that
+    // covers a single image (too large, empty) skips that image only.
     var refusal: IntentDialog?
+    var skipped: IntentDialog?
     for image in images {
       let operationId = ShelvrCapture.newOperationId()
       do {
@@ -55,19 +58,18 @@ enum ImageCapture {
       } catch {
         ShelvrIntentLog.record("\(intent) image capture failed: \(error)")
         if let dialog = CaptureFallback.refusalDialog(for: error) {
-          // The server refused (no Pro, photo limit): the rest would be refused too.
-          refusal = dialog
-          break
+          if CaptureFallback.refusesAccount(error) {
+            refusal = dialog
+            break
+          }
+          skipped = dialog
+          continue
         }
         unsaved.append((image, operationId))
       }
     }
 
-    if let refusal, savedIds.isEmpty {
-      return (nil, refusal)
-    }
-
-    if !unsaved.isEmpty && refusal == nil {
+    if !unsaved.isEmpty {
       do {
         let paths = try stage(unsaved.map(\.image))
         await AppIntentDispatcher.shared.dispatch(
@@ -82,8 +84,9 @@ enum ImageCapture {
         // Nowhere to keep them for the app (disk full): say what was saved rather than failing
         // the whole intent.
         ShelvrIntentLog.record("\(intent) could not stage images: \(error)")
+        unsaved = []
         if savedIds.isEmpty {
-          return (nil, "Shelvr couldn't save that. Try again from the share sheet.")
+          return (nil, refusal ?? skipped ?? "Shelvr couldn't save that. Try again from the share sheet.")
         }
         return (
           savedIds.first,
@@ -102,12 +105,18 @@ enum ImageCapture {
     if let refusal {
       return (savedIds.first, refusal)
     }
-    if savedIds.isEmpty {
+    if savedIds.isEmpty && unsaved.isEmpty {
+      return (nil, skipped ?? "Shelvr couldn't save that.")
+    }
+    if savedIds.isEmpty && skipped == nil {
       return (nil, "Your images will be saved\(whereSuffix) when you open Shelvr.")
+    }
+    if unsaved.isEmpty {
+      return (savedIds.first, "Saved \(savedIds.count) of \(images.count) images. Shelvr couldn't save the rest.")
     }
     return (
       savedIds.first,
-      "Saved \(savedIds.count) of \(images.count) images. Shelvr will save the rest when you open it."
+      "Saved \(savedIds.count) of \(images.count) images. Shelvr will try the rest when you open it."
     )
   }
 

@@ -134,6 +134,10 @@ extension ItemEntity: Transferable {
   func downloadImage() async throws -> URL {
     guard let imageUrl else { throw CocoaError(.fileNoSuchFile) }
     let (temporary, response) = try await URLSession.shared.download(from: imageUrl)
+    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+      try? FileManager.default.removeItem(at: temporary)
+      throw URLError(.badServerResponse)
+    }
     let ext = response.mimeType.flatMap { UTType(mimeType: $0) }?.preferredFilenameExtension ?? "jpg"
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
       UUID().uuidString, isDirectory: true)
