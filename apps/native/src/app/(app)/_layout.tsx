@@ -85,6 +85,8 @@ export default function AppLayout() {
           <Stack.Screen
             name="space/[id]"
             options={{
+              // iOS 26 native soft scroll edge: the feed fades out under the header.
+              scrollEdgeEffects: { top: "soft" },
               title: "",
               headerBackButtonDisplayMode: "minimal",
             }}

@@ -43,7 +43,8 @@ export default function HomeStackLayout() {
                   />
                 ),
               }
-            : undefined
+            : // iOS 26 native soft scroll edge: the feed fades out under the header.
+              { scrollEdgeEffects: { top: "soft" } }
         }
       >
         <Stack.Title asChild>

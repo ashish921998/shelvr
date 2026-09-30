@@ -33,7 +33,8 @@ export default function SpacesStackLayout() {
                   />
                 ),
               }
-            : undefined
+            : // iOS 26 native soft scroll edge: content fades out under the header.
+              { scrollEdgeEffects: { top: "soft" } }
         }
       >
         {Platform.OS === "ios" ? (

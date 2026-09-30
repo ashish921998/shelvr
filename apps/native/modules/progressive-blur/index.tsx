@@ -20,6 +20,9 @@ const NativeBlur =
     ? requireNativeView<NativeBlurProps>("ProgressiveBlur")
     : null;
 
+const hasNativeSoftScrollEdge =
+  Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) >= 26;
+
 /**
  * A blurred band pinned to the top of the screen, sized to the
  * navigation header. Sits behind the (transparent) native header so scrolling
@@ -78,4 +81,13 @@ function IOSProgressiveBlurHeader({
       ]}
     />
   );
+}
+
+/**
+ * For screens whose stack sets `scrollEdgeEffects: { top: "soft" }`. iOS 26
+ * fades content under the header natively there, so this renders the blur band
+ * only on older iOS, where that option does nothing.
+ */
+export function ScrollEdgeBlurFallback() {
+  return hasNativeSoftScrollEdge ? null : <ProgressiveBlurHeader />;
 }
