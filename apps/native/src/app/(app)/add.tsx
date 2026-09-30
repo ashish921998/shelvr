@@ -158,6 +158,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<TextInput>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -184,15 +185,25 @@ function AddContent({ close, openCamera }: AddContentProps) {
   // keyboard opened mid-resize can land behind it, so focus once it settles.
   useEffect(() => {
     if (Platform.OS !== "android" || mode === "menu") return;
-    const timer = setTimeout(() => inputRef.current?.focus(), 350);
-    return () => clearTimeout(timer);
+    focusTimer.current = setTimeout(() => inputRef.current?.focus(), 350);
+    return () => {
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+    };
   }, [mode]);
+
+  // The sheet keeps this content mounted through its hide animation, so a
+  // pending focus must be dropped when dismissal starts, or the keyboard
+  // would come back up mid-close.
+  const dismiss = () => {
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    close();
+  };
 
   const success = () => {
     if (process.env.EXPO_OS === "ios") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    close();
+    dismiss();
   };
 
   const openComposer = (next: Mode) => {
@@ -268,7 +279,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
       }
       success();
     },
-    onDismiss: close,
+    onDismiss: dismiss,
     onUnexpectedError: (error) => {
       analytics.captureError("image_upload_failed", error);
       Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
