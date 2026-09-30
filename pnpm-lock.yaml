@@ -21,6 +21,9 @@ patchedDependencies:
   expo-dev-launcher@58.0.9:
     hash: 850b017fc29e958842926cc60edb897d51faf32c7b49cfcc8d71267d45572b44
     path: patches/expo-dev-launcher@58.0.9.patch
+  expo-widgets@58.0.9:
+    hash: 04296f4ffe7ba4c615b6284705b05c67838af6aa01ca419ba73da9ea74216895
+    path: patches/expo-widgets@58.0.9.patch
 
 importers:
 
@@ -199,7 +202,7 @@ importers:
         version: 58.0.3(expo@58.0.0)(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))
       expo-widgets:
         specifier: ~58.0.9
-        version: 58.0.9(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+        version: 58.0.9(patch_hash=04296f4ffe7ba4c615b6284705b05c67838af6aa01ca419ba73da9ea74216895)(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       i18n-js:
         specifier: ^4.5.3
         version: 4.5.3
@@ -9198,7 +9201,7 @@ snapshots:
     optionalDependencies:
       '@babel/runtime': 7.29.2
       expo: 58.0.0(a22d3de4b18f1743d2bbdf6ea01336e8)
-      expo-widgets: 58.0.9(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+      expo-widgets: 58.0.9(patch_hash=04296f4ffe7ba4c615b6284705b05c67838af6aa01ca419ba73da9ea74216895)(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
     transitivePeerDependencies:
       - '@babel/core'
       - supports-color
@@ -10401,7 +10404,7 @@ snapshots:
       expo: 58.0.0(a22d3de4b18f1743d2bbdf6ea01336e8)
       react-native: 0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
 
-  expo-widgets@58.0.9(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
+  expo-widgets@58.0.9(patch_hash=04296f4ffe7ba4c615b6284705b05c67838af6aa01ca419ba73da9ea74216895)(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       '@expo/plist': 0.10.1
       '@expo/ui': 58.0.9(@babel/core@7.29.0)(expo@58.0.0)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0-rc.3(@babel/core@7.29.0)(@react-native/metro-config@0.88.0-rc.3(@babel/core@7.29.0)(bufferutil@4.1.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
