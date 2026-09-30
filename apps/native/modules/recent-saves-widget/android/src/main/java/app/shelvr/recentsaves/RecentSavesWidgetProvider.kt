@@ -40,14 +40,24 @@ class RecentSavesWidgetProvider : AppWidgetProvider() {
       if (ids.isEmpty()) return
       val renderer = RecentSavesRenderer(context, snapshot, now)
       for (id in ids) {
-        manager.updateAppWidget(id, renderer.views(manager.getAppWidgetOptions(id)))
+        val options = manager.getAppWidgetOptions(id)
+        try {
+          manager.updateAppWidget(id, renderer.views(options))
+        } catch (error: IllegalArgumentException) {
+          // Over the launcher's bitmap budget despite the shrink: show the
+          // saves as text tiles rather than leave the widget stale.
+          manager.updateAppWidget(id, RecentSavesRenderer(context, snapshot, now, withImages = false).views(options))
+        }
       }
     }
 
     // A snapshot outlives the app, so a Pro entitlement that lapses while the
     // app stays closed must still lock the widget. Redraw at the expiry; the
-    // redraw reads the clock and shows the locked state. The alarm is inexact,
-    // and the six-hourly update in the provider info backs it up.
+    // redraw reads the clock and shows the locked state. Android has no exact
+    // alarm without a special permission, so this one wakes the device but may
+    // land some minutes late, and the six-hourly update backs it up. The app
+    // locks at the stored period end plus a week's grace, so minutes matter
+    // little.
     private fun scheduleLock(context: Context, at: Long?) {
       val alarms = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
       val intent = Intent(context, RecentSavesWidgetProvider::class.java)
@@ -66,7 +76,7 @@ class RecentSavesWidgetProvider : AppWidgetProvider() {
       if (at == null) {
         alarms.cancel(pending)
       } else {
-        alarms.set(AlarmManager.RTC, at, pending)
+        alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
       }
     }
   }

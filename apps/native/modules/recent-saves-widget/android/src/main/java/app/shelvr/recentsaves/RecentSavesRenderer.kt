@@ -22,12 +22,39 @@ internal class RecentSavesRenderer(
   private val context: Context,
   private val snapshot: RecentSavesSnapshot,
   private val now: Long,
+  // False draws every save as its text tile, the fallback when a launcher
+  // still rejects an update for its bitmap size.
+  withImages: Boolean = true,
 ) {
   private val locked = snapshot.isLocked(now)
   // A locked widget never shows saved content, even if items came through.
   private val items = if (locked) emptyList() else snapshot.items
-  private val thumbnails: Map<String, Bitmap?> = items.associate { item ->
-    item.id to item.imagePath?.let { loadThumbnail(it) }
+  private val thumbnails: Map<String, Bitmap?> =
+    if (withImages) fitBudget(items.associate { item -> item.id to item.imagePath?.let { loadThumbnail(it) } })
+    else emptyMap()
+
+  // Android rejects a widget update whose bitmaps exceed 1.5 x the screen's
+  // pixel count x 4 bytes, and that budget covers the whole update, not each
+  // image. On a small screen five full thumbnails can pass it, so shrink them
+  // all together until they fit. Android 12+ sends the grid and the list in
+  // one update, so the images are counted twice there.
+  private fun fitBudget(bitmaps: Map<String, Bitmap?>): Map<String, Bitmap?> {
+    val metrics = context.resources.displayMetrics
+    val copies = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 2 else 1
+    val budget = metrics.widthPixels.toLong() * metrics.heightPixels * 4 * 3 / 2 * BUDGET_SHARE_PERCENT / 100 / copies
+    val total = bitmaps.values.filterNotNull().sumOf { it.allocationByteCount.toLong() }
+    if (total <= budget || total == 0L) return bitmaps
+    val scale = kotlin.math.sqrt(budget.toDouble() / total)
+    return bitmaps.mapValues { (_, bitmap) ->
+      bitmap?.let {
+        Bitmap.createScaledBitmap(
+          it,
+          maxOf(1, (it.width * scale).toInt()),
+          maxOf(1, (it.height * scale).toInt()),
+          true,
+        )
+      }
+    }
   }
 
   fun views(options: Bundle): RemoteViews {
@@ -194,6 +221,8 @@ internal class RecentSavesRenderer(
     // The app writes thumbnails up to 512px. Launchers cap the bitmap memory
     // one widget update may carry, so each is drawn at most this size.
     private const val MAX_THUMBNAIL_PX = 384
+    // Leaves headroom in the update's bitmap budget for anything else it carries.
+    private const val BUDGET_SHARE_PERCENT = 80L
     // Extreme shapes are trimmed to these bounds, the same as the feed.
     private const val MIN_RATIO = 0.5f
     private const val MAX_RATIO = 2f
