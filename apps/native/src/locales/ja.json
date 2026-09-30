@@ -541,5 +541,9 @@
   "exitOffer.reminderConsent": "このオファーについて、終了の1時間前に通知を1回お送りします。いつでも取り消せます。",
   "exitOffer.reminderSet": "オファー終了の1時間前にリマインドします。",
   "exitOffer.reminderCancel": "リマインドを取り消す",
-  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。"
+  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。",
+  "welcome.title": "準備完了。さっそく本当に残したいものを保存しましょう。",
+  "welcome.body": "本当に取っておきたいものを1つ保存してください。Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.trialBody": "無料トライアルは%{date}までです。本当に取っておきたいものを1つ保存すると、Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.cta": "保存する"
 }

@@ -6,13 +6,18 @@ import { SaveHowTo } from "@/components/home/save-how-to";
 import { SaveProgressCard } from "@/components/home/save-progress-card";
 import { SaveRecallCard } from "@/components/home/save-recall-card";
 import { WeeklyNudgeSheet } from "@/components/home/weekly-nudge-sheet";
+import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
-import { useEntitlement, useExitOfferEndsAt } from "@/lib/entitlement";
+import {
+  type Entitlement,
+  useEntitlement,
+  useExitOfferEndsAt,
+} from "@/lib/entitlement";
 import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
@@ -23,6 +28,7 @@ import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { useSaveProgress } from "@/lib/use-save-progress";
 import { useSaveRecall } from "@/lib/use-save-recall";
+import { welcomeSave } from "@/lib/welcome-save";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -47,6 +53,62 @@ function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
   );
 }
 
+/** The trial's real end date, only while the account is on a trial. */
+function trialEnd(entitlement: Entitlement): number | undefined {
+  return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
+}
+
+/**
+ * Inline prompts (and the one-shot claims behind them) wait while the cancel
+ * survey is up, while Pro is not yet known to be active, and while the
+ * post-purchase welcome is queued, so none is spent behind that modal.
+ */
+function usePromptsDeferred(
+  userId: string | undefined,
+  surveyVisible: boolean,
+  proPending: boolean,
+): boolean {
+  const welcomePending = welcomeSave.usePending(userId);
+  return surveyVisible || proPending || welcomePending;
+}
+
+/** Home's modal prompts. Pro just started: one real save comes first. */
+function HomeSheets({
+  userId,
+  entitled,
+  trialEndsAt,
+  surveyVisible,
+  previewTitle,
+  nudgeReady,
+}: {
+  userId: string;
+  entitled: boolean;
+  trialEndsAt?: number;
+  surveyVisible: boolean;
+  previewTitle?: string;
+  nudgeReady: boolean;
+}) {
+  const welcomePending = welcomeSave.usePending(userId);
+  // The welcome hands off to Add as it closes, so the weekly nudge sits out
+  // the rest of this visit instead of rising in the gap.
+  const [welcomeSeen, setWelcomeSeen] = useState(false);
+  if (welcomePending && !welcomeSeen) setWelcomeSeen(true);
+  return (
+    <>
+      <WelcomeSaveSheet
+        userId={userId}
+        ready={entitled && !surveyVisible}
+        trialEndsAt={trialEndsAt}
+      />
+      <WeeklyNudgeSheet
+        userId={userId}
+        previewTitle={previewTitle}
+        ready={nudgeReady && !welcomeSeen}
+      />
+    </>
+  );
+}
+
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
@@ -64,7 +126,7 @@ export default function HomeScreen() {
   // progress card, then the save recall card. Each later prompt defers its
   // one-shot claim so it is never consumed behind a card that holds the slot.
   const progress = useSaveProgress(user?._id, {
-    defer: cancelSurvey.visible || proPending,
+    defer: usePromptsDeferred(user?._id, cancelSurvey.visible, proPending),
   });
   // No rating prompt in an account's first session.
   useReviewPrompt(items, { defer: progress.firstSession });
@@ -103,10 +165,13 @@ export default function HomeScreen() {
     itemCount: items.length,
   });
   const nudge = user ? (
-    <WeeklyNudgeSheet
+    <HomeSheets
       userId={user._id}
+      entitled={entitlement.entitled}
+      trialEndsAt={trialEnd(entitlement)}
+      surveyVisible={cancelSurvey.visible}
       previewTitle={items[0]?.title}
-      ready={nudgeSheetReady(
+      nudgeReady={nudgeSheetReady(
         progress.nudgeReady,
         cancelSurvey.visible,
         recall.visible,
