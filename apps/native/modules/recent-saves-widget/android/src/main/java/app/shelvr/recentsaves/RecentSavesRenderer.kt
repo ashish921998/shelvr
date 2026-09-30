@@ -27,7 +27,7 @@ internal class RecentSavesRenderer(
   // A locked widget never shows saved content, even if items came through.
   private val items = if (locked) emptyList() else snapshot.items
   private val thumbnails: Map<String, Bitmap?> = items.associate { item ->
-    item.id to item.imagePath?.let(::loadThumbnail)
+    item.id to item.imagePath?.let { loadThumbnail(it) }
   }
 
   fun views(options: Bundle): RemoteViews {
@@ -219,16 +219,22 @@ internal class RecentSavesRenderer(
     )
 
     // A missing or undecodable file falls back to the text tile, like iOS.
-    private fun loadThumbnail(path: String): Bitmap? = runCatching {
-      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-      BitmapFactory.decodeFile(path, bounds)
-      if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-      var sample = 1
-      while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_THUMBNAIL_PX) sample *= 2
-      val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
-        ?: return null
-      clampRatio(scaleDown(decoded))
-    }.getOrNull()
+    private fun loadThumbnail(path: String): Bitmap? {
+      return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_THUMBNAIL_PX) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        val decoded = BitmapFactory.decodeFile(path, options) ?: return null
+        clampRatio(scaleDown(decoded))
+      } catch (error: Exception) {
+        null
+      } catch (error: OutOfMemoryError) {
+        null
+      }
+    }
 
     private fun scaleDown(bitmap: Bitmap): Bitmap {
       val longest = maxOf(bitmap.width, bitmap.height)
