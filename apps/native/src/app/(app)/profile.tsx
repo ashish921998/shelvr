@@ -1,6 +1,7 @@
 import { LegalConsentPreference } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { UpdateSetting } from "@/components/update-setting";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
@@ -445,6 +446,8 @@ export default function ProfileScreen() {
           thumbColor="#fff"
         />
       </View>
+
+      <UpdateSetting />
 
       <View style={styles.linkGroup}>
         <Pressable

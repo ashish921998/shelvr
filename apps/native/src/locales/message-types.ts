@@ -509,6 +509,18 @@ export type MessageParams = {
   "exitOffer.reminderSet": undefined;
   "exitOffer.reminderCancel": undefined;
   "exitOffer.reminderDenied": undefined;
+  "updates.title": undefined;
+  "updates.check": undefined;
+  "updates.checking": undefined;
+  "updates.downloading": undefined;
+  "updates.restart": undefined;
+  "updates.latest": undefined;
+  "updates.checkFailed": undefined;
+  "updates.restartFailed": undefined;
+  "updates.ready": undefined;
+  "updates.development": undefined;
+  "updates.embedded": undefined;
+  "updates.running": { date: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

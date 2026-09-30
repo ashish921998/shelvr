@@ -558,5 +558,17 @@
   "exitOffer.reminderConsent": "We'll send one notification about this offer, an hour before it ends. You can cancel anytime.",
   "exitOffer.reminderSet": "Reminder set for an hour before the offer ends.",
   "exitOffer.reminderCancel": "Cancel reminder",
-  "exitOffer.reminderDenied": "Notifications are off for Shelvr. Turn them on in Settings to get a reminder."
+  "exitOffer.reminderDenied": "Notifications are off for Shelvr. Turn them on in Settings to get a reminder.",
+  "updates.title": "App updates",
+  "updates.check": "Check for updates",
+  "updates.checking": "Checking…",
+  "updates.downloading": "Downloading…",
+  "updates.restart": "Restart to update",
+  "updates.latest": "You’re on the latest version.",
+  "updates.checkFailed": "Couldn’t check for updates. Check your connection and try again.",
+  "updates.restartFailed": "Couldn’t restart Shelvr. Close and reopen the app to finish updating.",
+  "updates.ready": "A new version is ready. Restart now, or it installs the next time you open Shelvr.",
+  "updates.development": "Updates are off in development builds.",
+  "updates.embedded": "Running the version this build shipped with.",
+  "updates.running": "Running the update from %{date}."
 }
