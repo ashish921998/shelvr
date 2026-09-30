@@ -1,4 +1,8 @@
-import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
 import { useState, type ReactNode } from "react";
 import { Pressable, View, type PressableProps } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -7,7 +11,9 @@ import { motion, motionCSS } from "@/lib/motion";
 import { ThemedText } from "@/components/ui/themed-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const glass = isLiquidGlassAvailable();
+// Expo recommends both checks: a build can report Liquid Glass while the
+// runtime glass API is missing, and then only the solid capsule is safe.
+const glass = isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
 
 type Variant = "primary" | "secondary" | "destructive";
 type Size = "md" | "lg";

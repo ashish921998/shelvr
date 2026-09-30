@@ -2,7 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { formatItemDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import * as Updates from "expo-updates";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -21,14 +21,21 @@ export function UpdateSetting() {
   const { currentlyRunning, isChecking, isDownloading, isUpdatePending } =
     Updates.useUpdates();
   const [message, setMessage] = useState<string | null>(null);
+  // useUpdates() flips its flags asynchronously, so a quick double tap could
+  // start a second check or reload before `busy` renders. The ref closes that.
+  const working = useRef(false);
   const busy = isChecking || isDownloading;
   const disabled = !updatesEnabled || busy;
 
   const check = async () => {
+    if (working.current) return;
+    working.current = true;
     setMessage(null);
     try {
       const result = await Updates.checkForUpdateAsync();
-      if (!result.isAvailable) {
+      // A rollback directive arrives as isAvailable: false with
+      // isRollBackToEmbedded: true, and still needs fetchUpdateAsync().
+      if (!result.isAvailable && !result.isRollBackToEmbedded) {
         setMessage(t("updates.latest"));
         return;
       }
@@ -39,10 +46,15 @@ export function UpdateSetting() {
     } catch (error) {
       analytics.captureError("update_check_failed", error);
       setMessage(t("updates.checkFailed"));
+    } finally {
+      working.current = false;
     }
   };
 
   const restart = async () => {
+    if (working.current) return;
+    // Stays locked on success: the app is about to reload.
+    working.current = true;
     try {
       await Updates.reloadAsync({
         reloadScreenOptions: {
@@ -51,6 +63,7 @@ export function UpdateSetting() {
         },
       });
     } catch (error) {
+      working.current = false;
       analytics.captureError("update_restart_failed", error);
       setMessage(t("updates.restartFailed"));
     }
