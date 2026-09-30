@@ -125,8 +125,16 @@ describe("useAnalyticsIdentity", () => {
     expect(mock.capture).not.toHaveBeenCalledWith("widget_cleared");
   });
 
-  it("does not start or retry widget cleanup on Android", async () => {
+  it("clears the widget at sign-out on Android too", async () => {
     mock.platform = "android";
+    mock.isAuthenticated = false;
+    renderHook(() => useAnalyticsIdentity());
+    await act(async () => {});
+    expect(mock.clearRecentSavesWidget).toHaveBeenCalledOnce();
+  });
+
+  it("does not start or retry widget cleanup without a widget platform", async () => {
+    mock.platform = "web";
     renderHook(() => useAnalyticsIdentity());
     await act(async () => {});
     expect(mock.clearRecentSavesWidget).not.toHaveBeenCalled();

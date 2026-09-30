@@ -44,10 +44,13 @@ internal data class RecentSavesSnapshot(
     fun write(context: Context, json: String) {
       // Parse before storing so a malformed snapshot never replaces a good one.
       parse(json)
-      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .edit()
         .putString(KEY, json)
         .commit()
+      // A sign-out clear that did not persist must fail so the app retries it;
+      // otherwise the previous account's snapshot returns after a restart.
+      check(saved) { "widget_snapshot_write_failed" }
     }
 
     // No snapshot yet reads as locked: the widget shows nothing until the app

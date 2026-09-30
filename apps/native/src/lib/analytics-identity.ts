@@ -12,7 +12,8 @@ import { AppState, Platform } from "react-native";
 
 function useWidgetCleanup(isAuthenticated: boolean, isLoading: boolean) {
   useEffect(() => {
-    if (isLoading || Platform.OS !== "ios") return;
+    if (isLoading || (Platform.OS !== "ios" && Platform.OS !== "android"))
+      return;
     let active = true;
     let pending = false;
     let completed = false;
