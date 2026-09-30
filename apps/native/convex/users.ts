@@ -116,6 +116,11 @@ async function deleteUserOwnedDataBatch(
 ): Promise<boolean> {
   const userKey = userId as string;
 
+  // Capture tokens first, so Siri stops saving into the account the moment
+  // deletion starts rather than after its saves have drained.
+  if (!(await deleteCaptureTokensBatch(ctx, userId as Id<"users">)))
+    return false;
+
   // Raw deletes on purpose: every spaceItems write normally goes through
   // model/memberships.ts to keep the space summary exact, but these spaces
   // are deleted in the same pass, so patching their counters would be waste.
@@ -268,6 +273,22 @@ async function deleteFeedbackBatch(
     await ctx.db.delete(submission._id);
   }
   return feedback.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's Siri capture tokens. Returns true
+ * when the table is fully drained for this user. */
+async function deleteCaptureTokensBatch(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const tokens = await ctx.db
+    .query("captureTokens")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const token of tokens) {
+    await ctx.db.delete(token._id);
+  }
+  return tokens.length !== DELETE_BATCH;
 }
 
 /** Deletes up to one batch of the user's branded share links. Returns true
