@@ -1,7 +1,8 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { openPaywall } from "@/lib/entitlement";
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
 
 type Props = {

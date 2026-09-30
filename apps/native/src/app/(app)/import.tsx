@@ -12,14 +12,8 @@ import {
   type ImportSummary,
 } from "@/lib/import-links";
 import { useCallback, useMemo, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Platform, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type ImportPhase = "idle" | "importing" | "done";

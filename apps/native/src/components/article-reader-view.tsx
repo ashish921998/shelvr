@@ -15,12 +15,13 @@ import type { Id } from "@convex/_generated/dataModel";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   Text,
   useWindowDimensions,
   View,
+  type ScrollViewInstance,
 } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -68,7 +69,7 @@ export function ArticleReaderView({
   }, [item.articleMedia, paragraphs.length]);
 
   // A recycled reader instance must open at the top of its article.
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrolledItemRef = useRef(item._id);
   useLayoutEffect(() => {
     if (scrolledItemRef.current === item._id) return;

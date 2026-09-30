@@ -4,13 +4,15 @@ import { displayHost } from "@/lib/url";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import * as WebBrowser from "expo-web-browser";
 import {
-  Pressable,
   Text,
-  type PressableStateCallbackType,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import {
+  Pressable,
+  type PressableStateCallbackType,
+} from "react-native-gesture-handler";
 
 type SourceItem = AnalyticsItem & {
   url?: string;

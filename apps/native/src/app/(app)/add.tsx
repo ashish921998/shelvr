@@ -22,12 +22,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
-  Pressable,
   Text,
   TextInput,
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 

@@ -28,6 +28,15 @@ vi.mock("expo-localization", () => ({
   getCalendars: () => [{ timeZone: "UTC" }],
 }));
 
+// Screens press through gesture-handler's Pressable, whose real module needs
+// the native runtime. Component suites already mock "react-native", so hand
+// them its Pressable, and a plain View for the root a Modal carries. Suites
+// that exercise gestures mock this module themselves.
+vi.mock("react-native-gesture-handler", async () => {
+  const { Pressable, View } = await import("react-native");
+  return { Pressable, GestureHandlerRootView: View };
+});
+
 afterEach(async () => {
   if (typeof document === "undefined") return;
   const { cleanup } = await import("@testing-library/react");

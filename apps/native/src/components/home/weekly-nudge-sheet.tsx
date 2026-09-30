@@ -9,7 +9,11 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
+import { Alert, Linking, Modal, Text, View } from "react-native";
+import {
+  GestureHandlerRootView,
+  Pressable,
+} from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
 
 /**
@@ -99,38 +103,42 @@ export function WeeklyNudgeSheet({
       animationType="slide"
       onRequestClose={close}
     >
-      <View style={styles.backdrop}>
-        <Pressable
-          style={styles.scrim}
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel={t("common.notNow")}
-        />
-        <View style={styles.sheet}>
-          <View style={styles.grabber} />
-          <Text style={styles.title}>{t("weekly.nudgeTitle")}</Text>
-          <Text style={styles.body}>{t("weekly.nudgeBody")}</Text>
-          <NotificationPreview
-            body={
-              previewTitle
-                ? t("weekly.previewBody", { title: previewTitle })
-                : t("weekly.previewFallback")
-            }
+      {/* Android renders a Modal in its own window, outside the app's gesture
+        root, so gesture-handler Pressables inside need a root of their own. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.backdrop}>
+          <Pressable
+            style={styles.scrim}
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.notNow")}
           />
-          <View style={styles.actions}>
-            <CtaButton
-              label={t("weekly.remindMe")}
-              onPress={() => void remind()}
-              busy={busy}
+          <View style={styles.sheet}>
+            <View style={styles.grabber} />
+            <Text style={styles.title}>{t("weekly.nudgeTitle")}</Text>
+            <Text style={styles.body}>{t("weekly.nudgeBody")}</Text>
+            <NotificationPreview
+              body={
+                previewTitle
+                  ? t("weekly.previewBody", { title: previewTitle })
+                  : t("weekly.previewFallback")
+              }
             />
-            <GhostButton
-              label={t("common.notNow")}
-              onPress={close}
-              disabled={busy}
-            />
+            <View style={styles.actions}>
+              <CtaButton
+                label={t("weekly.remindMe")}
+                onPress={() => void remind()}
+                busy={busy}
+              />
+              <GhostButton
+                label={t("common.notNow")}
+                onPress={close}
+                disabled={busy}
+              />
+            </View>
           </View>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

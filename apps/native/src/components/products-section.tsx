@@ -4,13 +4,8 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { useFindLinks } from "@/lib/use-find-links";
 import { Image } from "expo-image";
 import * as WebBrowser from "expo-web-browser";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Phase-3 "Find links": a user-triggered SerpAPI shopping search, launched

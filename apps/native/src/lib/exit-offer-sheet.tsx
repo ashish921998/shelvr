@@ -4,7 +4,11 @@ import type RevenueCatUI from "react-native-purchases-ui";
 import type { CustomVariables } from "react-native-purchases-ui";
 import type { PurchasesOffering } from "react-native-purchases";
 import { useEffect, useSyncExternalStore } from "react";
-import { AppState, Modal, Pressable, View } from "react-native";
+import { AppState, Modal } from "react-native";
+import {
+  GestureHandlerRootView,
+  Pressable,
+} from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -107,7 +111,9 @@ export function ExitOfferSheetHost() {
       presentationStyle="fullScreen"
       onRequestClose={() => finish("CANCELLED")}
     >
-      <View style={{ flex: 1 }}>
+      {/* Android renders a Modal in its own window, outside the app's gesture
+        root, so the gesture-handler Pressable below needs a root of its own. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <Paywall
           style={{ flex: 1 }}
           options={{
@@ -150,7 +156,7 @@ export function ExitOfferSheetHost() {
             tintColor="#fff"
           />
         </Pressable>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

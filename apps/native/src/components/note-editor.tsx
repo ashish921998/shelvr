@@ -12,7 +12,7 @@ import { saveErrorCode } from "@convex/model/saveErrors";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, TextInput, View } from "react-native";
+import { Alert, TextInput, View, type TextInputInstance } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** Idle time after the last keystroke before the note saves. */
@@ -64,7 +64,7 @@ export function NoteEditor({ item }: { item: DetailItem }) {
     title: state.edits.title?.value ?? title,
     text: state.edits.text?.value ?? text,
   };
-  const textInput = useRef<TextInput>(null);
+  const textInput = useRef<TextInputInstance>(null);
   const [queue] = useState(() => {
     // The component is keyed by note id: one queue and edit event per visit.
     let reportedEdit = false;

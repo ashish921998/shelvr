@@ -6,7 +6,8 @@ import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
 import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const KIND_IMAGES: Record<SaveKind, number> = {

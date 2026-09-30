@@ -1,7 +1,8 @@
-import { GlassView } from '@/components/glass';
-import { AppSymbolIcon } from '@/components/symbol';
-import { Pressable, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { GlassView } from "@/components/glass";
+import { AppSymbolIcon } from "@/components/symbol";
+import { View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const BADGE_SIZE = 26;
 
@@ -20,7 +21,10 @@ export function SuggestedBadge({
   const { theme } = useUnistyles();
   const circle = (
     <GlassView
-      style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }]}
+      style={[
+        styles.circle,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}
       glassEffectStyle="regular"
       isInteractive={onPress !== undefined}
     >
@@ -47,9 +51,9 @@ export function SuggestedBadge({
 
 const styles = StyleSheet.create(() => ({
   circle: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   pressed: {
     opacity: 0.7,

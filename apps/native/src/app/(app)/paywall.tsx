@@ -13,7 +13,8 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { openPaywall, waitForSheetTransition } from "@/lib/entitlement";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useRouter } from "expo-router";
-import { Linking, Pressable, Text } from "react-native";
+import { Linking, Text } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 

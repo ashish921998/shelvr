@@ -1,10 +1,6 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  View,
-  type PressableProps,
-} from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import { Pressable, type PressableProps } from "react-native-gesture-handler";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { motion, motionCSS } from "@/lib/motion";
