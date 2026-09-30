@@ -65,14 +65,27 @@ enum ImageCapture {
     }
 
     if !unsaved.isEmpty && refusal == nil {
-      let paths = try stage(unsaved)
-      await AppIntentDispatcher.shared.dispatch(
-        name: "saveImages",
-        params: [
-          "paths": .array(paths.map(AppIntentValue.string)),
-          "spaceId": spaceId.map { .string($0) } ?? .null,
-        ]
-      )
+      do {
+        let paths = try stage(unsaved)
+        await AppIntentDispatcher.shared.dispatch(
+          name: "saveImages",
+          params: [
+            "paths": .array(paths.map(AppIntentValue.string)),
+            "spaceId": spaceId.map { .string($0) } ?? .null,
+          ]
+        )
+      } catch {
+        // Nowhere to keep them for the app (disk full): say what was saved rather than failing
+        // the whole intent.
+        ShelvrIntentLog.record("\(intent) could not stage images: \(error)")
+        if savedIds.isEmpty {
+          return (nil, "Shelvr couldn't save that. Try again from the share sheet.")
+        }
+        return (
+          savedIds.first,
+          "Saved \(savedIds.count) of \(images.count) images. Share the rest to Shelvr to save them."
+        )
+      }
     }
 
     if savedIds.count == images.count {
