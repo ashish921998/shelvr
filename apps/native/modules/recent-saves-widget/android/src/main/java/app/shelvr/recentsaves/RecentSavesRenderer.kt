@@ -33,27 +33,17 @@ internal class RecentSavesRenderer(
     if (withImages) fitBudget(items.associate { item -> item.id to item.imagePath?.let { loadThumbnail(it) } })
     else emptyMap()
 
-  // Android rejects a widget update whose bitmaps exceed 1.5 x the screen's
-  // pixel count x 4 bytes, and that budget covers the whole update, not each
-  // image. On a small screen five full thumbnails can pass it, so shrink them
-  // all together until they fit. Android 12+ sends the grid and the list in
-  // one update, so the images are counted twice there.
+  // The budget covers the whole update, not each image, so on a small screen
+  // five full thumbnails can pass it. Shrink them all together until they fit.
   private fun fitBudget(bitmaps: Map<String, Bitmap?>): Map<String, Bitmap?> {
     val metrics = context.resources.displayMetrics
     val copies = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 2 else 1
-    val budget = metrics.widthPixels.toLong() * metrics.heightPixels * 4 * 3 / 2 * BUDGET_SHARE_PERCENT / 100 / copies
+    val budget = RecentSavesLayout.bitmapBudget(metrics.widthPixels, metrics.heightPixels, copies)
     val total = bitmaps.values.filterNotNull().sumOf { it.allocationByteCount.toLong() }
-    if (total <= budget || total == 0L) return bitmaps
-    val scale = kotlin.math.sqrt(budget.toDouble() / total)
+    val scale = RecentSavesLayout.budgetScale(total, budget)
+    if (scale >= 1.0) return bitmaps
     return bitmaps.mapValues { (_, bitmap) ->
-      bitmap?.let {
-        Bitmap.createScaledBitmap(
-          it,
-          maxOf(1, (it.width * scale).toInt()),
-          maxOf(1, (it.height * scale).toInt()),
-          true,
-        )
-      }
+      bitmap?.let { oom { scaled(it, scale) } }
     }
   }
 
@@ -91,12 +81,7 @@ internal class RecentSavesRenderer(
   private fun grid(): RemoteViews {
     val views = RemoteViews(context.packageName, R.layout.recent_saves_widget_grid)
     views.setOnClickPendingIntent(R.id.recent_saves_root, open("shelvr:///"))
-    // One or two saves get the full width instead of a half-empty grid.
-    val columns = if (items.size <= 2) {
-      listOf(items, emptyList())
-    } else {
-      listOf(items.filterIndexed { i, _ -> i % 2 == 0 }, items.filterIndexed { i, _ -> i % 2 == 1 })
-    }
+    val columns = RecentSavesLayout.gridColumns(items)
     views.setViewVisibility(R.id.grid_c1, if (columns[1].isEmpty()) View.GONE else View.VISIBLE)
     for ((c, column) in columns.withIndex()) {
       for (s in GRID_SLOTS[c].indices) {
@@ -135,7 +120,7 @@ internal class RecentSavesRenderer(
     views.setContentDescription(R.id.list_featured, featured.title)
     // Tall and square photos fill the card with the caption over a scrim.
     // Wide ones sit on top with the caption below, so neither is cropped much.
-    val cover = bitmap != null && bitmap.width.toFloat() / bitmap.height < COVER_MAX_RATIO
+    val cover = bitmap != null && RecentSavesLayout.isCover(bitmap.width, bitmap.height)
     views.setViewVisibility(R.id.list_featured_cover, if (cover) View.VISIBLE else View.GONE)
     views.setViewVisibility(R.id.list_featured_card, if (cover) View.GONE else View.VISIBLE)
     if (cover) {
@@ -217,15 +202,6 @@ internal class RecentSavesRenderer(
 
   companion object {
     private const val LIST_MIN_WIDTH_DP = 250f
-    private const val COVER_MAX_RATIO = 1.5f
-    // The app writes thumbnails up to 512px. Launchers cap the bitmap memory
-    // one widget update may carry, so each is drawn at most this size.
-    private const val MAX_THUMBNAIL_PX = 384
-    // Leaves headroom in the update's bitmap budget for anything else it carries.
-    private const val BUDGET_SHARE_PERCENT = 80L
-    // Extreme shapes are trimmed to these bounds, the same as the feed.
-    private const val MIN_RATIO = 0.5f
-    private const val MAX_RATIO = 2f
 
     private val GRID_SLOTS = listOf(
       listOf(
@@ -248,48 +224,49 @@ internal class RecentSavesRenderer(
     )
 
     // A missing or undecodable file falls back to the text tile, like iOS.
-    private fun loadThumbnail(path: String): Bitmap? {
-      return try {
+    private fun loadThumbnail(path: String): Bitmap? = oom {
+      try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_THUMBNAIL_PX) sample *= 2
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        val decoded = BitmapFactory.decodeFile(path, options) ?: return null
-        clampRatio(scaleDown(decoded))
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+          null
+        } else {
+          val options = BitmapFactory.Options().apply {
+            inSampleSize = RecentSavesLayout.sampleSize(bounds.outWidth, bounds.outHeight)
+          }
+          BitmapFactory.decodeFile(path, options)?.let { clampRatio(scaleDown(it)) }
+        }
       } catch (error: Exception) {
         null
+      }
+    }
+
+    // Every bitmap this renderer allocates goes through here, so memory
+    // pressure costs one image its thumbnail (a text tile) and never the update.
+    private inline fun oom(allocate: () -> Bitmap?): Bitmap? =
+      try {
+        allocate()
       } catch (error: OutOfMemoryError) {
         null
       }
-    }
+
+    private fun scaled(bitmap: Bitmap, scale: Double): Bitmap =
+      Bitmap.createScaledBitmap(
+        bitmap,
+        RecentSavesLayout.scaled(bitmap.width, scale),
+        RecentSavesLayout.scaled(bitmap.height, scale),
+        true,
+      )
 
     private fun scaleDown(bitmap: Bitmap): Bitmap {
       val longest = maxOf(bitmap.width, bitmap.height)
-      if (longest <= MAX_THUMBNAIL_PX) return bitmap
-      val scale = MAX_THUMBNAIL_PX.toFloat() / longest
-      return Bitmap.createScaledBitmap(
-        bitmap,
-        maxOf(1, (bitmap.width * scale).toInt()),
-        maxOf(1, (bitmap.height * scale).toInt()),
-        true,
-      )
+      if (longest <= RecentSavesLayout.MAX_THUMBNAIL_PX) return bitmap
+      return scaled(bitmap, RecentSavesLayout.MAX_THUMBNAIL_PX.toDouble() / longest)
     }
 
     private fun clampRatio(bitmap: Bitmap): Bitmap {
-      val ratio = bitmap.width.toFloat() / bitmap.height
-      return when {
-        ratio < MIN_RATIO -> {
-          val height = (bitmap.width / MIN_RATIO).toInt()
-          Bitmap.createBitmap(bitmap, 0, (bitmap.height - height) / 2, bitmap.width, height)
-        }
-        ratio > MAX_RATIO -> {
-          val width = (bitmap.height * MAX_RATIO).toInt()
-          Bitmap.createBitmap(bitmap, (bitmap.width - width) / 2, 0, width, bitmap.height)
-        }
-        else -> bitmap
-      }
+      val crop = RecentSavesLayout.ratioCrop(bitmap.width, bitmap.height) ?: return bitmap
+      return Bitmap.createBitmap(bitmap, crop.x, crop.y, crop.width, crop.height)
     }
   }
 }

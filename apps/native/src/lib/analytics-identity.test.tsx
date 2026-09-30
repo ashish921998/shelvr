@@ -57,6 +57,8 @@ vi.mock("@/lib/query-client", () => ({
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearRecentSavesWidget,
   retryPendingWidgetClear: mock.retryPendingWidgetClear,
+  hasRecentSavesWidget: () =>
+    mock.platform === "ios" || mock.platform === "android",
 }));
 
 describe("useAnalyticsIdentity", () => {

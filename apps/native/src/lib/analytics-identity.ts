@@ -5,15 +5,15 @@ import { useCurrentUser } from "@/lib/current-user";
 import { queryClient } from "@/lib/query-client";
 import {
   clearRecentSavesWidget,
+  hasRecentSavesWidget,
   retryPendingWidgetClear,
 } from "@/lib/widget-sync";
 import { widgetClearErrorEvent } from "@/lib/widget-clear-error";
-import { AppState, Platform } from "react-native";
+import { AppState } from "react-native";
 
 function useWidgetCleanup(isAuthenticated: boolean, isLoading: boolean) {
   useEffect(() => {
-    if (isLoading || (Platform.OS !== "ios" && Platform.OS !== "android"))
-      return;
+    if (isLoading || !hasRecentSavesWidget()) return;
     let active = true;
     let pending = false;
     let completed = false;

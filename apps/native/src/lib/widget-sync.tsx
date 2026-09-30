@@ -12,6 +12,11 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 import { Images } from "react-native-nitro-image";
 import { recentSavesWidget } from "recent-saves-widget";
+// Type-only, so erased at build time: the widget module itself still loads lazily below.
+import type {
+  RecentSavesWidgetProps,
+  WidgetSaveItem,
+} from "@/widgets/recent-saves-widget";
 
 const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
@@ -164,36 +169,21 @@ function deleteWidgetFiles(
   }
 }
 
-type WidgetSaveItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  kind: FeedItem["type"];
-  imageUri?: string;
-};
-
-type WidgetSnapshot = {
-  items: WidgetSaveItem[];
-  emptyTitle: string;
-  emptyHint: string;
-  locked: boolean;
-  validUntil?: number;
-};
-
 /** Where a platform's widget reads thumbnails from, and how it is published. */
 type WidgetHost = {
   directory: string;
   /**
-   * Publishes `current`. With `lock`, the widget must also switch to
-   * `lock.props` at `lock.at` without the app running.
+   * Publishes `current`. With `lockedProps`, the widget must also switch to
+   * them at `current.validUntil` without the app running.
    */
   publish(
-    current: WidgetSnapshot,
-    lock?: { at: number; props: WidgetSnapshot },
+    current: RecentSavesWidgetProps,
+    lockedProps?: RecentSavesWidgetProps,
   ): Promise<void> | void;
 };
 
-function widgetPlatform(): boolean {
+/** Whether this platform has the Recent Saves widget to publish and clear. */
+export function hasRecentSavesWidget(): boolean {
   return Platform.OS === "ios" || Platform.OS === "android";
 }
 
@@ -206,12 +196,12 @@ async function loadWidgetHost(): Promise<WidgetHost | null> {
       directory: widget.getDirectory(),
       // The Android widget reads `validUntil` on its own clock and redraws
       // itself at the expiry, so one snapshot carries both states.
-      publish: (current, lock) =>
+      publish: (current, lockedProps) =>
         widget.setSnapshot(
           JSON.stringify({
             ...current,
-            lockedTitle: lock?.props.emptyTitle,
-            lockedHint: lock?.props.emptyHint,
+            lockedTitle: lockedProps?.emptyTitle,
+            lockedHint: lockedProps?.emptyHint,
           }),
         ),
     };
@@ -228,11 +218,11 @@ async function loadWidgetHost(): Promise<WidgetHost | null> {
     ]);
   return {
     directory: widgetsDirectory,
-    publish: (current, lock) => {
-      if (lock) {
+    publish: (current, lockedProps) => {
+      if (lockedProps && current.validUntil !== undefined) {
         RecentSavesWidget.updateTimeline([
           { date: new Date(), props: current },
-          { date: new Date(lock.at), props: lock.props },
+          { date: new Date(current.validUntil), props: lockedProps },
         ]);
       } else {
         RecentSavesWidget.updateSnapshot(current);
@@ -300,7 +290,7 @@ async function syncWidget(
       emptyTitle: t("widget.proTitle"),
       emptyHint: t("widget.proBody"),
     };
-    const current: WidgetSnapshot = {
+    const current: RecentSavesWidgetProps = {
       items: widgetItems,
       ...(locked
         ? proEmpty
@@ -317,10 +307,7 @@ async function syncWidget(
       // Schedule a second, dated entry so the widget swaps to the locked Pro
       // state at the expiry with no app launch. The live entry also carries
       // `validUntil`, so it fails closed on the widget's own clock.
-      await host.publish(current, {
-        at: validUntil,
-        props: { items: [], ...proEmpty, locked: true },
-      });
+      await host.publish(current, { items: [], ...proEmpty, locked: true });
     } else {
       await host.publish(current);
     }
@@ -350,7 +337,7 @@ async function syncWidget(
  * module linked), so the caller can record the boundary.
  */
 export async function clearRecentSavesWidget(): Promise<boolean> {
-  if (!widgetPlatform()) return false;
+  if (!hasRecentSavesWidget()) return false;
   syncGeneration += 1;
   setPendingCleanup(syncGeneration);
   return startWidgetClear(syncGeneration);
@@ -499,7 +486,7 @@ export function RecentSavesWidgetSync() {
 
   useEffect(() => {
     if (
-      !widgetPlatform() ||
+      !hasRecentSavesWidget() ||
       entitlementLoading ||
       (entitled && recent === undefined)
     )

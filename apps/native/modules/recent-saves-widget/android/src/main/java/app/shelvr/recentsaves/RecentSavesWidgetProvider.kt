@@ -8,8 +8,23 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import java.util.concurrent.Executors
 
 class RecentSavesWidgetProvider : AppWidgetProvider() {
+  // Launcher broadcasts (boot, add, resize, the lock alarm, the periodic
+  // update) arrive on the main thread, and a render reads files and decodes
+  // thumbnails. Keep the broadcast alive and do that work off the main thread.
+  override fun onReceive(context: Context, intent: Intent) {
+    val result = goAsync()
+    receiver.execute {
+      try {
+        super.onReceive(context, intent)
+      } finally {
+        result.finish()
+      }
+    }
+  }
+
   override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
     render(context, manager, ids)
   }
@@ -32,10 +47,12 @@ class RecentSavesWidgetProvider : AppWidgetProvider() {
       render(context, manager, ids)
     }
 
+    // One thread, so launcher broadcasts render in the order they arrived.
+    private val receiver = Executors.newSingleThreadExecutor()
     private val renderLock = Any()
 
-    // The app publishes from the module thread and the launcher calls in on
-    // the main thread. Holding one lock from the snapshot read to the last
+    // The app publishes from the module thread and launcher broadcasts render
+    // on the receiver thread. Holding one lock from the snapshot read to the last
     // update keeps an older render, begun before a sign-out clear, from
     // publishing the previous account's saves after the locked widget.
     private fun render(context: Context, manager: AppWidgetManager, ids: IntArray) {
