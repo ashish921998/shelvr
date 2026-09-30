@@ -52,7 +52,9 @@ export function Button({
   const [pressed, setPressed] = useState(false);
   const inactive = disabled || loading;
   // Glass animates its own press natively; the solid fallback mimics it in JS.
-  const held = loading || (!glass && pressed && !inactive);
+  const touched = !glass && pressed && !inactive;
+  // Loading only dims; the scale belongs to a real press.
+  const held = loading || touched;
   const filled = variant === "primary";
   const labelColor = filled
     ? theme.colors.onTint
@@ -100,8 +102,7 @@ export function Button({
               : 1,
           transform: [
             {
-              scale:
-                held && !glass && !reducedMotion ? motion.scale.pressed : 1,
+              scale: touched && !reducedMotion ? motion.scale.pressed : 1,
             },
           ],
           transitionProperty: ["opacity", "transform"],
