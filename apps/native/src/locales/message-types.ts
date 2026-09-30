@@ -521,6 +521,10 @@ export type MessageParams = {
   "updates.development": undefined;
   "updates.embedded": undefined;
   "updates.running": { date: string };
+  "welcome.title": undefined;
+  "welcome.body": undefined;
+  "welcome.trialBody": { date: string };
+  "welcome.cta": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

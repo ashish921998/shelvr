@@ -553,5 +553,9 @@
   "updates.ready": "新しいバージョンの準備ができました。今すぐ再起動するか、次にShelvrを開いたときにインストールされます。",
   "updates.development": "開発ビルドではアップデートはオフです。",
   "updates.embedded": "このビルドに含まれるバージョンを使用中です。",
-  "updates.running": "%{date}のアップデートを使用中です。"
+  "updates.running": "%{date}のアップデートを使用中です。",
+  "welcome.title": "準備完了。さっそく本当に残したいものを保存しましょう。",
+  "welcome.body": "本当に取っておきたいものを1つ保存してください。Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.trialBody": "無料トライアルは%{date}までです。本当に取っておきたいものを1つ保存すると、Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.cta": "保存する"
 }

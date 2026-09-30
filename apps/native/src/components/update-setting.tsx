@@ -1,6 +1,6 @@
 import { SettingCard } from "@/components/ui/setting-card";
 import { useAppUpdate, type UpdateState } from "@/lib/app-update";
-import { formatItemDate } from "@/lib/date";
+import { formatShortDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { useUnistyles } from "react-native-unistyles";
@@ -57,7 +57,7 @@ export function UpdateSetting() {
       ? t("updates.development")
       : runningSince === null
         ? t("updates.embedded")
-        : t("updates.running", { date: formatItemDate(runningSince) });
+        : t("updates.running", { date: formatShortDate(runningSince) });
 
   return (
     <SettingCard

@@ -570,5 +570,9 @@
   "updates.ready": "Eine neue Version ist bereit. Starte jetzt neu, oder sie wird beim nächsten Öffnen von Shelvr installiert.",
   "updates.development": "Updates sind in Entwicklungs-Builds deaktiviert.",
   "updates.embedded": "Du nutzt die Version, mit der dieser Build ausgeliefert wurde.",
-  "updates.running": "Du nutzt das Update vom %{date}."
+  "updates.running": "Du nutzt das Update vom %{date}.",
+  "welcome.title": "Du bist dabei. Jetzt speichere etwas Echtes.",
+  "welcome.body": "Speichere etwas, das du wirklich behalten willst. Shelvr gibt ihm Titel und Tags und sortiert es für dich ein.",
+  "welcome.trialBody": "Deine kostenlose Testphase läuft bis %{date}. Speichere etwas, das du wirklich behalten willst, und Shelvr gibt ihm Titel und Tags und sortiert es für dich ein.",
+  "welcome.cta": "Etwas speichern"
 }

@@ -587,5 +587,9 @@
   "updates.ready": "Hay una nueva versión lista. Reinicia ahora o se instalará la próxima vez que abras Shelvr.",
   "updates.development": "Las actualizaciones están desactivadas en las compilaciones de desarrollo.",
   "updates.embedded": "Usas la versión incluida en esta compilación.",
-  "updates.running": "Usas la actualización del %{date}."
+  "updates.running": "Usas la actualización del %{date}.",
+  "welcome.title": "Ya estás dentro. Ahora guarda algo de verdad.",
+  "welcome.body": "Guarda algo que de verdad quieras conservar. Shelvr le pone título y etiquetas y lo archiva por ti.",
+  "welcome.trialBody": "Tu prueba gratuita dura hasta el %{date}. Guarda algo que de verdad quieras conservar y Shelvr le pondrá título y etiquetas y lo archivará por ti.",
+  "welcome.cta": "Guardar algo"
 }

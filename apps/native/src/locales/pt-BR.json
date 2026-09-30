@@ -587,5 +587,9 @@
   "updates.ready": "Uma nova versão está pronta. Reinicie agora ou ela será instalada na próxima vez que você abrir o Shelvr.",
   "updates.development": "As atualizações ficam desativadas em builds de desenvolvimento.",
   "updates.embedded": "Usando a versão que veio com esta build.",
-  "updates.running": "Usando a atualização de %{date}."
+  "updates.running": "Usando a atualização de %{date}.",
+  "welcome.title": "Tudo pronto. Agora salve algo de verdade.",
+  "welcome.body": "Salve uma coisa que você quer mesmo guardar. O Shelvr dá título, tags e organiza para você.",
+  "welcome.trialBody": "Seu teste grátis vai até %{date}. Salve uma coisa que você quer mesmo guardar, e o Shelvr dá título, tags e organiza para você.",
+  "welcome.cta": "Salvar algo"
 }

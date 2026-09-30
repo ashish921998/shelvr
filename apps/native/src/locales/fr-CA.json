@@ -587,5 +587,9 @@
   "updates.ready": "Une nouvelle version est prête. Redémarrez maintenant, ou elle s’installera à la prochaine ouverture de Shelvr.",
   "updates.development": "Les mises à jour sont désactivées dans les versions de développement.",
   "updates.embedded": "Vous utilisez la version fournie avec cette build.",
-  "updates.running": "Vous utilisez la mise à jour du %{date}."
+  "updates.running": "Vous utilisez la mise à jour du %{date}.",
+  "welcome.title": "C'est parti. Enregistrez maintenant quelque chose de vrai.",
+  "welcome.body": "Enregistrez une chose que vous voulez vraiment garder. Shelvr lui donne un titre et des étiquettes, puis la classe pour vous.",
+  "welcome.trialBody": "Votre essai gratuit dure jusqu'au %{date}. Enregistrez une chose que vous voulez vraiment garder : Shelvr lui donne un titre et des étiquettes, puis la classe pour vous.",
+  "welcome.cta": "Enregistrer quelque chose"
 }

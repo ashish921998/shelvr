@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { AnimatedText } from "@/components/animated-text";
 import type { DetailItem } from "@/components/item-detail";
-import { formatItemDate } from "@/lib/date";
+import { formatShortDate } from "@/lib/date";
 import { displayHost } from "@/lib/url";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -29,7 +29,7 @@ export function ItemHeader({ item }: { item: DetailItem | undefined }) {
       <AnimatedText text={title} truncate height={28} style={styles.title} />
       {when ? (
         <AnimatedText
-          text={formatItemDate(when)}
+          text={formatShortDate(when)}
           height={18}
           truncate
           style={styles.date}
