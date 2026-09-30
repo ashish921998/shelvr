@@ -132,13 +132,24 @@ into `ReduceMotion.Never` to keep state changes legible.
 
 ## Primitives
 
-`Button` is the primary action component: it exposes `accessibilityRole`,
-`accessibilityLabel`, and `accessibilityState` (disabled/busy), keeps its
-label rendered while loading beside the spinner, consumes the control and
-opacity tokens, and scales/opacity-shifts on press with a Reduce Motion
-branch. `ThemedText` maps the type ramp. Prefer both over raw `Pressable`/
-`Text` in new UI; raw components are for cases the primitives genuinely
-cannot express.
+`Button` is the capsule action for a screen's main step (Tidy's Continue).
+Where iOS supports Liquid Glass (`hasLiquidGlass` in
+`src/components/glass.tsx`) it is interactive glass and the system owns the
+press response; elsewhere it is a solid capsule that opacity-shifts and scales
+on press with a Reduce Motion branch. It has one look, the amber fill; add a
+variant when a screen needs one. Loading dims the button instead of adding a
+spinner, so the label stays put and nothing around it reflows. It exposes
+`accessibilityRole`, `accessibilityLabel`, and `accessibilityState`
+(disabled/busy), and consumes the control and opacity tokens.
+
+`SettingCard` (`src/components/ui/setting-card.tsx`) is the Profile settings
+row: a bordered card with a title, a muted description, and either an inline
+control such as a `Switch` or a text action with a status line below it. Use it
+for settings rather than the capsule.
+
+`ThemedText` maps the type ramp. Prefer these primitives over raw
+`Pressable`/`Text` in new UI; raw components are for cases the primitives
+genuinely cannot express.
 
 ## Adding tokens
 
