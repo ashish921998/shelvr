@@ -197,7 +197,24 @@ type Closed = {
   deliveryNextAttemptAt: undefined;
   deliveredAt: number | undefined;
   deliveryError: string;
+  deliverySentAt?: number;
 };
+
+/** The first-send time `notification_sent` telemetry reports and the row
+ * stamps: the row's recorded first-send time when it has one, else the first
+ * recipient that shows Expo accepted a push stamps `now` — the first moment
+ * this code can observe a send, not the later receipt check that runs a delay
+ * after the push went out. Without the stamp, a notification open can precede
+ * the notification's own "sent" event. Undefined when no recipient shows
+ * provider acceptance, so the event falls back to the terminal time — for a
+ * legacy row without a stamp, that observation is the only timestamp left. */
+function firstSendAt(
+  recorded: number | undefined,
+  recipients: Recipient[],
+  now: number,
+): number | undefined {
+  return recorded ?? (recipients.some(reachedDevice) ? now : undefined);
+}
 
 /**
  * Ends delivery before the next attempt: the user or the server turned it
@@ -218,21 +235,28 @@ async function closeBetweenAttempts(
     notificationId: string;
     kind: string;
     itemCount: number;
+    /** The row's recorded first-send time, when a send ever happened. */
+    sentAt?: number;
   },
 ) {
   const now = Date.now();
   const delivered = attempted?.some(reachedDevice) ?? false;
+  const sentAt = firstSendAt(event.sentAt, attempted ?? [], now);
   await close({
     deliveryStatus: delivered ? "complete" : "failed",
     deliveryNextAttemptAt: undefined,
     deliveredAt: delivered ? now : undefined,
     deliveryError,
+    ...(sentAt !== undefined && { deliverySentAt: sentAt }),
   });
   if (attempted !== undefined)
     await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
-      ...event,
+      userId: event.userId,
+      notificationId: event.notificationId,
+      kind: event.kind,
+      itemCount: event.itemCount,
       delivered,
-      sentAt: now,
+      sentAt: sentAt ?? now,
     });
 }
 
@@ -274,6 +298,7 @@ export const claim = internalMutation({
           notificationId: digestId,
           kind: NOTIFICATION_KIND,
           itemCount: digest.itemIds.length,
+          sentAt: digest.deliverySentAt,
         },
       );
     if (!preferences?.weeklyShelfEnabled) {
@@ -344,7 +369,11 @@ export const finish = internalMutation({
       MAX_AGE_MS,
       now,
     );
-    await ctx.db.patch(digest._id, fields);
+    const sentAt = firstSendAt(digest.deliverySentAt, args.recipients, now);
+    await ctx.db.patch(digest._id, {
+      ...fields,
+      ...(sentAt !== undefined && { deliverySentAt: sentAt }),
+    });
     // Exactly one event per digest: `finish` bails above unless it is the
     // attempt that owns the lease, and a non-pending status is terminal, so
     // this transition happens once however many times delivery is retried.
@@ -355,7 +384,7 @@ export const finish = internalMutation({
         kind: NOTIFICATION_KIND,
         itemCount: digest.itemIds.length,
         delivered: status === "complete",
-        sentAt: now,
+        sentAt: sentAt ?? now,
       });
     return null;
   },
@@ -541,6 +570,7 @@ export const claimReminder = internalMutation({
           notificationId: reminderId,
           kind: reminderNotificationKind(reminder.kind),
           itemCount: 1,
+          sentAt: reminder.deliverySentAt,
         },
       );
     if (
@@ -636,7 +666,11 @@ export const finishReminder = internalMutation({
       REMINDER_MAX_AGE_MS,
       now,
     );
-    await ctx.db.patch(reminder._id, fields);
+    const sentAt = firstSendAt(reminder.deliverySentAt, args.recipients, now);
+    await ctx.db.patch(reminder._id, {
+      ...fields,
+      ...(sentAt !== undefined && { deliverySentAt: sentAt }),
+    });
     // One event per reminder, for the same reason as the digest's.
     if (status !== "pending")
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
@@ -645,7 +679,7 @@ export const finishReminder = internalMutation({
         kind: reminderNotificationKind(reminder.kind),
         itemCount: 1,
         delivered: status === "complete",
-        sentAt: now,
+        sentAt: sentAt ?? now,
       });
     return null;
   },

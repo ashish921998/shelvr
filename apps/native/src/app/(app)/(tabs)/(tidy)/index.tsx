@@ -328,9 +328,14 @@ const PermissionGate: FC<{
 
 const Loading: FC = () => <ScreenLoader label={t("loading.tidy")} />;
 
-/** Pro gate shown to lapsed users on the Tidy tab. */
+/** Pro gate shown to lapsed users on the Tidy tab, with its own paywall
+ * placement so the funnel separates a Tidy gate from Map's. */
 const ProGate: FC = () => (
-  <ProGateView title={t("tidy.proTitle")} message={t("tidy.proBody")} />
+  <ProGateView
+    title={t("tidy.proTitle")}
+    message={t("tidy.proBody")}
+    placement="tidy"
+  />
 );
 
 const styles = StyleSheet.create((theme, rt) => ({

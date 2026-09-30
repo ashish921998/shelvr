@@ -468,6 +468,12 @@ export default defineSchema({
     deliveryAttempts: v.optional(v.number()),
     deliveryRecipients: v.optional(v.array(recipientValidator)),
     deliveryError: v.optional(v.string()),
+    // When Expo first accepted a push for this notification, stamped at the
+    // first finish that sees a ticket in hand. Separate from `deliveredAt`
+    // (the confirmation time) because `notification_sent` telemetry timestamps
+    // the send itself — otherwise a notification open can precede the
+    // notification's own "sent" event. Absent on rows that never sent.
+    deliverySentAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_week", ["userId", "weekStart"])
@@ -494,6 +500,9 @@ export default defineSchema({
     deliveryAttempts: v.optional(v.number()),
     deliveryRecipients: v.optional(v.array(recipientValidator)),
     deliveryError: v.optional(v.string()),
+    // See weeklyDigests: the first accepted send, kept apart from the
+    // delivery-confirmation time so `notification_sent` timestamps the send.
+    deliverySentAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_item", ["userId", "itemId"])
