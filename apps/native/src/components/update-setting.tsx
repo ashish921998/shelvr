@@ -1,155 +1,76 @@
-import { analytics } from "@/lib/analytics";
+import { SettingCard } from "@/components/ui/setting-card";
+import { useAppUpdate, type UpdateState } from "@/lib/app-update";
 import { formatItemDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
-import * as Updates from "expo-updates";
-import { useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import type { TextMessageKey } from "@/locales/message-types";
+import { useUnistyles } from "react-native-unistyles";
 
-// Dev clients load JS from Metro, so there is nothing for EAS Update to swap in.
-const updatesEnabled = Updates.isEnabled && !__DEV__;
+/** Button label and status line for each state; one table, no precedence. */
+function copyFor(state: UpdateState): {
+  label: TextMessageKey;
+  note: TextMessageKey | null;
+} {
+  switch (state.kind) {
+    case "unsupported":
+    case "idle":
+      return { label: "updates.check", note: null };
+    case "checking":
+      return { label: "updates.checking", note: null };
+    case "downloading":
+      return { label: "updates.downloading", note: null };
+    case "upToDate":
+      return { label: "updates.check", note: "updates.latest" };
+    case "ready":
+    case "restarting":
+      return { label: "updates.restart", note: "updates.ready" };
+    case "failed":
+      return state.at === "check"
+        ? { label: "updates.check", note: "updates.checkFailed" }
+        : { label: "updates.restart", note: "updates.restartFailed" };
+  }
+}
 
 /**
- * Manual EAS Update check. The native side already checks on launch; this lets
- * someone pull an update on their build's channel without cold-starting the
- * app. A found update downloads straight away, then the button offers the
- * restart. Ported from Amber (#16).
+ * Manual EAS Update check on Profile. The native side already checks on
+ * launch; this pulls an update on the build's channel without a cold start.
+ * A found update downloads straight away, then the action offers the restart.
+ * Ported from Amber (#16).
  */
 export function UpdateSetting() {
   useAppLocale();
   const { theme } = useUnistyles();
-  const { currentlyRunning, isChecking, isDownloading, isUpdatePending } =
-    Updates.useUpdates();
-  const [message, setMessage] = useState<string | null>(null);
-  // useUpdates() flips its flags asynchronously, so a quick double tap could
-  // start a second check or reload before `busy` renders. The ref closes that.
-  const working = useRef(false);
-  const busy = isChecking || isDownloading;
-  const disabled = !updatesEnabled || busy;
+  const { state, act, runningSince } = useAppUpdate(
+    theme.colors.background,
+    theme.colors.primary,
+  );
+  // A release build with updates off has nothing to offer; hide the card
+  // rather than call it a development build.
+  if (state.kind === "unsupported" && state.reason === "disabled") return null;
+  const { label, note } = copyFor(state);
+  const busy =
+    state.kind === "checking" ||
+    state.kind === "downloading" ||
+    state.kind === "restarting";
 
-  const check = async () => {
-    if (working.current) return;
-    working.current = true;
-    setMessage(null);
-    try {
-      const result = await Updates.checkForUpdateAsync();
-      // A rollback directive arrives as isAvailable: false with
-      // isRollBackToEmbedded: true, and still needs fetchUpdateAsync().
-      if (!result.isAvailable && !result.isRollBackToEmbedded) {
-        setMessage(t("updates.latest"));
-        return;
-      }
-      const fetched = await Updates.fetchUpdateAsync();
-      if (!fetched.isNew && !fetched.isRollBackToEmbedded) {
-        setMessage(t("updates.latest"));
-      }
-    } catch (error) {
-      analytics.captureError("update_check_failed", error);
-      setMessage(t("updates.checkFailed"));
-    } finally {
-      working.current = false;
-    }
-  };
-
-  const restart = async () => {
-    if (working.current) return;
-    // Stays locked on success: the app is about to reload.
-    working.current = true;
-    try {
-      await Updates.reloadAsync({
-        reloadScreenOptions: {
-          backgroundColor: theme.colors.background,
-          spinner: { color: theme.colors.primary },
-        },
-      });
-    } catch (error) {
-      working.current = false;
-      analytics.captureError("update_restart_failed", error);
-      setMessage(t("updates.restartFailed"));
-    }
-  };
-
-  const running = !updatesEnabled
-    ? t("updates.development")
-    : currentlyRunning.isEmbeddedLaunch || !currentlyRunning.createdAt
-      ? t("updates.embedded")
-      : t("updates.running", {
-          date: formatItemDate(currentlyRunning.createdAt.getTime()),
-        });
-
-  const label = isChecking
-    ? t("updates.checking")
-    : isDownloading
-      ? t("updates.downloading")
-      : isUpdatePending
-        ? t("updates.restart")
-        : t("updates.check");
+  const description =
+    state.kind === "unsupported"
+      ? t("updates.development")
+      : runningSince === null
+        ? t("updates.embedded")
+        : t("updates.running", { date: formatItemDate(runningSince) });
 
   return (
-    <View style={styles.card}>
-      <View style={styles.copy}>
-        <Text style={styles.title}>{t("updates.title")}</Text>
-        <Text style={styles.description}>{running}</Text>
-      </View>
-      <Pressable
-        testID="update-setting"
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled, busy }}
-        disabled={disabled}
-        onPress={() => void (isUpdatePending ? restart() : check())}
-        style={({ pressed }) => [
-          styles.button,
-          pressed && { opacity: 0.7 },
-          disabled && { opacity: 0.4 },
-        ]}
-      >
-        <Text style={styles.buttonText}>{label}</Text>
-      </Pressable>
-      {isUpdatePending && !busy ? (
-        <Text style={styles.description}>{t("updates.ready")}</Text>
-      ) : null}
-      {message ? (
-        <Text accessibilityRole="alert" style={styles.description}>
-          {message}
-        </Text>
-      ) : null}
-    </View>
+    <SettingCard
+      title={t("updates.title")}
+      description={description}
+      action={{
+        label: t(label),
+        onPress: () => void act(),
+        disabled: state.kind === "unsupported",
+        busy,
+        testID: "update-setting",
+      }}
+      note={note ? t(note) : null}
+    />
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  card: {
-    alignSelf: "stretch",
-    gap: theme.gap(1),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  copy: {
-    gap: theme.gap(0.25),
-  },
-  title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  description: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
-  },
-  button: {
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  buttonText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.primaryText,
-  },
-}));
