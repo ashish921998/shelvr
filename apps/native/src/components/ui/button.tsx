@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, View, type PressableProps } from "react-native";
+import { View } from "react-native";
+import { Pressable, type PressableProps } from "react-native-gesture-handler";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { GlassView, hasLiquidGlass } from "@/components/glass";

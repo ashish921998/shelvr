@@ -28,14 +28,18 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   Text,
   TextInput,
   View,
   useWindowDimensions,
   type GestureResponderEvent,
+  type TextInputInstance,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  Pressable,
+} from "react-native-gesture-handler";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -200,7 +204,7 @@ function FloatingTabBar({ restingBottom }: { restingBottom: number }) {
   const { width: windowWidth } = useWindowDimensions();
   const keyboardVisible = useKeyboardVisible();
   const query = useTabSearchQuery();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   // One call per route rather than a loop, so the hook order never changes.
   const home = useTabTrigger({ name: PILL_TABS[0].name });

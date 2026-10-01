@@ -3,7 +3,8 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
 
 // Sample saves for the collage. The photos are generated for the app, so they

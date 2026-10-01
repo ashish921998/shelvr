@@ -2,6 +2,8 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import type { ErrorBoundaryProps } from "expo-router";
 import { useEffect } from "react";
+// React Native's Pressable, not gesture-handler's: Expo Router renders this
+// boundary in place of the root layout, outside GestureHandlerRootView.
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 

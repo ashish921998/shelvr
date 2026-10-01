@@ -25,11 +25,14 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
-  Pressable,
   Text,
   TextInput,
   View,
 } from "react-native";
+import {
+  GestureHandlerRootView,
+  Pressable,
+} from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The first save is a pasted, typed or ready-made link; a link shared from
@@ -471,68 +474,72 @@ function DemoAuthSheet({
       animationType="slide"
       onRequestClose={busy ? undefined : onCancel}
     >
-      <Pressable
-        style={styles.scrim}
-        onPress={busy ? undefined : onCancel}
-        accessibilityRole="button"
-        accessibilityLabel={t("common.back")}
-      />
-      <View style={styles.authSheet}>
-        <View style={styles.grabber} />
-        <Text style={styles.sheetHeadline}>{t("demo.signInTitle")}</Text>
-        <Text style={styles.support}>{t("demo.signInHelp")}</Text>
+      {/* Android renders a Modal in its own window, outside the app's gesture
+        root, so gesture-handler Pressables inside need a root of their own. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Pressable
+          style={styles.scrim}
+          onPress={busy ? undefined : onCancel}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.back")}
+        />
+        <View style={styles.authSheet}>
+          <View style={styles.grabber} />
+          <Text style={styles.sheetHeadline}>{t("demo.signInTitle")}</Text>
+          <Text style={styles.support}>{t("demo.signInHelp")}</Text>
 
-        <DemoLinkRow title={pageHeading} url={url} />
+          <DemoLinkRow title={pageHeading} url={url} />
 
-        {!busy && (lastError !== null || interrupted) ? (
-          <Text style={styles.error}>{t("demo.signInFailed")}</Text>
-        ) : null}
+          {!busy && (lastError !== null || interrupted) ? (
+            <Text style={styles.error}>{t("demo.signInFailed")}</Text>
+          ) : null}
 
-        {Platform.OS === "ios" ? (
+          {Platform.OS === "ios" ? (
+            <Pressable
+              onPress={() => signIn("apple")}
+              disabled={busy}
+              style={({ pressed }) => [
+                styles.authBtn,
+                styles.authBtnApple,
+                busy && { opacity: 0.4 },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              {pendingProvider === "apple" ? (
+                <ActivityIndicator color={theme.colors.background} />
+              ) : (
+                <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
+                  {t("account.apple")}
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
           <Pressable
-            onPress={() => signIn("apple")}
+            onPress={() => signIn("google")}
             disabled={busy}
             style={({ pressed }) => [
               styles.authBtn,
-              styles.authBtnApple,
               busy && { opacity: 0.4 },
               pressed && { opacity: 0.85 },
             ]}
           >
-            {pendingProvider === "apple" ? (
-              <ActivityIndicator color={theme.colors.background} />
+            {pendingProvider === "google" ? (
+              <ActivityIndicator color={theme.colors.foreground} />
             ) : (
-              <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
-                {t("account.apple")}
-              </Text>
+              <Text style={styles.authBtnText}>{t("account.google")}</Text>
             )}
           </Pressable>
-        ) : null}
-        <Pressable
-          onPress={() => signIn("google")}
-          disabled={busy}
-          style={({ pressed }) => [
-            styles.authBtn,
-            busy && { opacity: 0.4 },
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          {pendingProvider === "google" ? (
-            <ActivityIndicator color={theme.colors.foreground} />
-          ) : (
-            <Text style={styles.authBtnText}>{t("account.google")}</Text>
-          )}
-        </Pressable>
-        {isAnonymousAuthEnabled() ? (
-          <GhostButton
-            label={t("account.anonymous")}
-            onPress={() => signIn("anonymous")}
-            disabled={busy}
-            testID="onboarding-dev-login"
-          />
-        ) : null}
-        <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
-      </View>
+          {isAnonymousAuthEnabled() ? (
+            <GhostButton
+              label={t("account.anonymous")}
+              onPress={() => signIn("anonymous")}
+              disabled={busy}
+              testID="onboarding-dev-login"
+            />
+          ) : null}
+          <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

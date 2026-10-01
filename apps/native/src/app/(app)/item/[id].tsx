@@ -31,11 +31,11 @@ import {
   Alert,
   type LayoutChangeEvent,
   Platform,
-  Pressable,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ProgressiveBlurHeader } from "progressive-blur";
 import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";

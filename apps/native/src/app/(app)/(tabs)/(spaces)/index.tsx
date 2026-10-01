@@ -15,7 +15,8 @@ import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Text, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 

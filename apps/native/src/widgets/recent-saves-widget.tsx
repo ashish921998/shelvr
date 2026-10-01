@@ -79,7 +79,7 @@ const RecentSavesWidget = (
   // runs: the app cannot republish, so the snapshot must expire on its own.
   const expired =
     props.validUntil !== undefined &&
-    environment.date.getTime() >= props.validUntil;
+    (environment.date ?? new Date()).getTime() >= props.validUntil;
   const locked = (props.locked ?? true) || expired;
   // A locked widget never shows saved content, even if items came through.
   const items = locked ? [] : (props.items ?? []);
@@ -270,7 +270,8 @@ const RecentSavesWidget = (
       <ZStack
         alignment="bottomLeading"
         modifiers={[
-          frame({ width: 112, maxHeight: Infinity }),
+          frame({ width: 112 }),
+          frame({ maxHeight: Infinity }),
           clipShape("roundedRectangle", 14),
         ]}
       >
@@ -280,7 +281,8 @@ const RecentSavesWidget = (
             modifiers={[
               resizable(),
               aspectRatio({ contentMode: "fill" }),
-              frame({ width: 112, maxHeight: Infinity }),
+              frame({ width: 112 }),
+              frame({ maxHeight: Infinity }),
             ]}
           />
         ) : (

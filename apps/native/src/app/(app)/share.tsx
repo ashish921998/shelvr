@@ -55,11 +55,11 @@ import {
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { shareStore } from "@/lib/share/share-store";
 import Animated, { Keyframe, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";

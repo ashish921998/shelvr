@@ -4,14 +4,8 @@ import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as AppleAuthentication from "expo-apple-authentication";
-import {
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  useColorScheme,
-  View,
-} from "react-native";
+import { Linking, Platform, Text, useColorScheme, View } from "react-native";
+import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /**
