@@ -1,13 +1,18 @@
 diff --git a/bundle/react-stub.ts b/bundle/react-stub.ts
-index dc78634f06d13b7272197056d0f829ab9e0f793f..242545b3c564a8ece98b9c2ed2a44843f607fe52 100644
+index dc78634..d37dfd7 100644
 --- a/bundle/react-stub.ts
 +++ b/bundle/react-stub.ts
-@@ -28,3 +28,8 @@ export const createContext = <T>(defaultValue: T): StubContext<T> => ({
+@@ -27,4 +27,12 @@ export const createContext = <T>(defaultValue: T): StubContext<T> => ({
+   _currentValue: defaultValue,
  });
  
- export const useContext = <T>(context: StubContext<T>): T => context._currentValue;
-+
+-export const useContext = <T>(context: StubContext<T>): T => context._currentValue;
++// The useContext line is rewritten, not just followed by an addition, on
++// purpose. EAS installs twice and pnpm's hoisted linker re-applied an
++// append-only patch each time, which declared `memo` twice and broke the
++// widget bundle.
 +// @expo/ui 58.0.9's recycled-row lists wrap a component in `memo` at module
 +// scope, so the whole widget bundle failed to load without it. Widgets render
 +// once per update, so there is nothing to memoize: return the component.
 +export const memo = <T>(component: T): T => component;
++export const useContext = <T>(c: StubContext<T>): T => c._currentValue;
