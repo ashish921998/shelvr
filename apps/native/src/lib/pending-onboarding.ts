@@ -15,7 +15,8 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 // Older flows stored `step` as an index into a different step list, under the
 // same key. Their step and answers are ignored so progress restarts at the
 // opener; the replay fields (operationId, spaces, demoUrl) still apply.
-const PROGRESS_VERSION = 2;
+// Version 3 inserted the acquisition source step after the opener.
+const PROGRESS_VERSION = 3;
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
@@ -233,8 +234,15 @@ export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
   }
 }
 
+// Version 2 had the same steps minus the source step at index 1, so its
+// answers still apply once a step past the opener is shifted by one.
+const SHIFTED_PROGRESS_VERSION = 2;
+
 function isCurrentProgress(record: PendingRecord | null): boolean {
-  return record?.progressVersion === PROGRESS_VERSION;
+  return (
+    record?.progressVersion === PROGRESS_VERSION ||
+    record?.progressVersion === SHIFTED_PROGRESS_VERSION
+  );
 }
 
 export function getOnboardingProgress(): OnboardingProgress {
@@ -242,10 +250,16 @@ export function getOnboardingProgress(): OnboardingProgress {
   if (record === null || !isCurrentProgress(record)) {
     return { saveKinds: [], spaces: [], step: null, demo: null };
   }
+  const step =
+    record.progressVersion === SHIFTED_PROGRESS_VERSION &&
+    record.step !== null &&
+    record.step >= 1
+      ? record.step + 1
+      : record.step;
   return {
     saveKinds: record.saveKinds,
     spaces: record.spaces,
-    step: record.step,
+    step,
     demo: record.demo,
   };
 }

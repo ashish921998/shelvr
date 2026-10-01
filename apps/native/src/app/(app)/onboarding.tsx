@@ -30,6 +30,7 @@ import {
 import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
+import { SourceStep } from "@/components/onboarding/source";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
@@ -40,6 +41,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
+  source: 0.125,
   setup: 0.25,
   demo: 0.5,
   reveal: 1,
@@ -206,6 +208,8 @@ export default function OnboardingScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
+          {step === "source" && <SourceStep onAdvance={advance} />}
+
           {step === "setup" && (
             <SetupStep
               kinds={kinds}

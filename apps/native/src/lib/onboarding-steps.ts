@@ -1,10 +1,17 @@
-export const ONBOARDING_STEPS = ["opener", "setup", "demo", "reveal"] as const;
+export const ONBOARDING_STEPS = [
+  "opener",
+  "source",
+  "setup",
+  "demo",
+  "reveal",
+] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 // Analytics step ids predate this flow; "live_demo" keeps the demo funnel
 // comparable with earlier onboarding versions.
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
+  source: "acquisition_source",
   setup: "setup",
   demo: "live_demo",
   reveal: "reveal",

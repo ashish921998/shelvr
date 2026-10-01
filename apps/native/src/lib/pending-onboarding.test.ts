@@ -172,7 +172,7 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual(fresh);
   });
 
-  it("restores a record written by the current flow", () => {
+  it("restores a version 2 record one step later", () => {
     storage.set(
       "shelvr.pending.onboarding",
       JSON.stringify({
@@ -180,6 +180,26 @@ describe("progress written by an older onboarding flow", () => {
         spaces: ["Travel"],
         demoUrl: null,
         progressVersion: 2,
+        saveKinds: ["Travel"],
+        step: 2,
+        demo: null,
+        spaceNames: {},
+      }),
+    );
+    expect(getOnboardingProgress()).toMatchObject({
+      saveKinds: ["Travel"],
+      step: 3,
+    });
+  });
+
+  it("restores a record written by the current flow", () => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: ["Travel"],
+        demoUrl: null,
+        progressVersion: 3,
         saveKinds: ["Travel"],
         step: 2,
         demo: { url: "https://example.com/trip", destination: null },
