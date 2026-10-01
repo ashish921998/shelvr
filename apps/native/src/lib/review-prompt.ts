@@ -31,7 +31,6 @@ export function useReviewPrompt(
   items: FeedbackFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
 ) {
-  const triggered = useRef(false);
   const home = isHomeRootRoute(useSegments());
   const homeRef = useRef(home);
   useEffect(() => {
@@ -43,16 +42,17 @@ export function useReviewPrompt(
     const subscription = AppState.addEventListener("change", setAppState);
     return () => subscription.remove();
   }, []);
-  // Bumped when a change cancels an attempt mid-check, so it runs again.
-  const [retry, setRetry] = useState(0);
 
+  // Every change to these deps cancels the pending attempt in cleanup and, if
+  // the guards still pass, schedules a fresh one with a full settle window.
+  // That includes any new `items` array, so a burst of saves finishing keeps
+  // pushing the prompt back until the feed is quiet: Home must hold still.
   useEffect(() => {
     if (
       !home ||
       defer ||
       keyboardVisible ||
       !items ||
-      triggered.current ||
       isPaywallPending() ||
       appState !== "active"
     )
@@ -61,38 +61,27 @@ export function useReviewPrompt(
 
     const readyCount = countEligibleSaves(items);
     if (readyCount < READY_ITEM_THRESHOLD) return;
-
-    const alreadyPrompted = SecureStore.getItem(PROMPTED_KEY) === "true";
-    if (alreadyPrompted) {
-      triggered.current = true;
-      return;
-    }
+    if (SecureStore.getItem(PROMPTED_KEY) === "true") return;
 
     // Hold the moment from the feedback invitation while Home settles, so the
-    // two prompts never appear together. Released below if the wait is cut.
+    // two prompts never appear together.
     setNativeReviewAttemptInFlight(true);
-    let started = false;
-    // Any change to what this attempt was scheduled under (Home left and
-    // re-entered, keyboard shown, a sheet or the feedback form opened)
-    // cancels it, even after hasAction() has started.
     let cancelled = false;
-    const timer = setTimeout(() => {
-      // Claim the attempt so overlapping feed updates cannot start a second
-      // one while hasAction() is pending. Nothing is persisted until the
-      // prompt is actually about to fire.
-      started = true;
-      triggered.current = true;
-      void attempt(readyCount);
-    }, REVIEW_PROMPT_SETTLE_MS);
+    const timer = setTimeout(
+      () => void attempt(readyCount),
+      REVIEW_PROMPT_SETTLE_MS,
+    );
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      if (!started) setNativeReviewAttemptInFlight(false);
+      setNativeReviewAttemptInFlight(false);
     };
 
     async function attempt(count: number) {
-      let prompted = false;
       try {
+        // hasAction() can resolve before React commits a render that changed
+        // a guard above, so every guard needs a live re-read here or must
+        // cancel this attempt through a dep. Add new guards to both places.
         if (
           (await StoreReview.hasAction()) &&
           !cancelled &&
@@ -101,7 +90,8 @@ export function useReviewPrompt(
           !isPaywallPending() &&
           AppState.currentState === "active"
         ) {
-          prompted = true;
+          // Persisted synchronously after the last check, so a superseding
+          // run always sees it and can never prompt a second time.
           SecureStore.setItem(PROMPTED_KEY, "true");
           // The in-app feedback invitation shares this threshold; tell it the
           // native review flow claimed this moment so the two never fire together.
@@ -112,17 +102,11 @@ export function useReviewPrompt(
       } catch {
         // Best-effort — Apple rate-limits internally and returns no signal.
       } finally {
-        setNativeReviewAttemptInFlight(false);
-        // A suppressed attempt (left Home, keyboard up, paywall opened,
-        // backgrounded, or no review action) recorded nothing, so a later
-        // feed change may retry.
-        if (!prompted) {
-          triggered.current = false;
-          // The change that cancelled it found this attempt still claimed,
-          // so schedule a fresh one with a full settle window.
-          if (cancelled) setRetry((n) => n + 1);
-        }
+        // A cancelled attempt's cleanup already released the hold, and a
+        // newer attempt may own it now. A suppressed one (no review action,
+        // keyboard up, paywall) recorded nothing, so a later change retries.
+        if (!cancelled) setNativeReviewAttemptInFlight(false);
       }
     }
-  }, [items, home, defer, keyboardVisible, appState, retry]);
+  }, [items, home, defer, keyboardVisible, appState]);
 }

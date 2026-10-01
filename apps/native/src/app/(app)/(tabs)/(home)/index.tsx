@@ -47,22 +47,38 @@ function nudgeSheetReady(
   return nudgeReady && !inlinePromptsVisible.some(Boolean);
 }
 
-/** No rating prompt in an account's first session, over the feedback form
- * (whose keyboard the review sheet would strand), or while Home's welcome or
- * weekly sheet may be up. Lifting the hold restarts the settle window, which
- * covers the sheet's dismissal. */
-function useReviewDeferred(
-  user: { _id: string } | null | undefined,
-  progress: { firstSession: boolean; nudgeReady: boolean },
-  feedbackOpen: boolean,
+/** Prompts after the recall card wait while it, or anything before it, holds
+ * or may claim the Home moment. */
+function laterPromptsDeferred(
+  progress: { deferLater: boolean },
+  recall: { visible: boolean; pending: boolean },
 ): boolean {
-  const welcomePending = welcomeSave.usePending(user?._id);
-  const nudgePending = weeklyNudge.usePending(user?._id);
+  return progress.deferLater || recall.visible || recall.pending;
+}
+
+/**
+ * The rating prompt joins Home's moment chain last: it waits while anything
+ * earlier holds or may claim the slot (cancel survey, Pro card, welcome,
+ * save progress, recall, feedback invitation or form). It also sits out an
+ * account's first session and a weekly sheet that may rise. Lifting a hold
+ * restarts the prompt's settle window, which covers the sheet's dismissal.
+ */
+function useReviewDeferred(
+  userId: string | undefined,
+  laterDeferred: boolean,
+  progress: { firstSession: boolean; nudgeReady: boolean },
+  feedback: { invitationVisible: boolean; modalOpen: boolean },
+  welcomeSeen: boolean,
+): boolean {
+  const nudgePending = weeklyNudge.usePending(userId);
   return (
+    laterDeferred ||
     progress.firstSession ||
-    feedbackOpen ||
-    welcomePending ||
-    (nudgePending && progress.nudgeReady)
+    feedback.invitationVisible ||
+    feedback.modalOpen ||
+    // Mirrors when HomeSheets can raise the nudge, so a nudge held back
+    // for the rest of the visit does not hold the prompt back with it.
+    (nudgePending && progress.nudgeReady && !welcomeSeen)
   );
 }
 
@@ -95,6 +111,15 @@ function usePromptsDeferred(
   return surveyVisible || proPending || welcomePending;
 }
 
+/** The welcome hands off to Add as it closes, so the weekly nudge sits out
+ * the rest of this visit instead of rising in the gap. */
+function useWelcomeSeen(userId: string | undefined): boolean {
+  const welcomePending = welcomeSave.usePending(userId);
+  const [welcomeSeen, setWelcomeSeen] = useState(false);
+  if (welcomePending && !welcomeSeen) setWelcomeSeen(true);
+  return welcomeSeen;
+}
+
 /** Home's modal prompts. Pro just started: one real save comes first. */
 function HomeSheets({
   userId,
@@ -103,6 +128,7 @@ function HomeSheets({
   surveyVisible,
   previewTitle,
   nudgeReady,
+  welcomeSeen,
 }: {
   userId: string;
   entitled: boolean;
@@ -110,12 +136,8 @@ function HomeSheets({
   surveyVisible: boolean;
   previewTitle?: string;
   nudgeReady: boolean;
+  welcomeSeen: boolean;
 }) {
-  const welcomePending = welcomeSave.usePending(userId);
-  // The welcome hands off to Add as it closes, so the weekly nudge sits out
-  // the rest of this visit instead of rising in the gap.
-  const [welcomeSeen, setWelcomeSeen] = useState(false);
-  if (welcomePending && !welcomeSeen) setWelcomeSeen(true);
   return (
     <>
       <WelcomeSaveSheet
@@ -152,11 +174,17 @@ export default function HomeScreen() {
     defer: usePromptsDeferred(user?._id, cancelSurvey.visible, proPending),
   });
   const recall = useSaveRecall(items, { defer: progress.deferLater });
-  const feedback = useFeedbackInvitation(items, {
-    defer: progress.deferLater || recall.visible || recall.pending,
-  });
+  const laterDeferred = laterPromptsDeferred(progress, recall);
+  const welcomeSeen = useWelcomeSeen(user?._id);
+  const feedback = useFeedbackInvitation(items, { defer: laterDeferred });
   useReviewPrompt(items, {
-    defer: useReviewDeferred(user, progress, feedback.modalOpen),
+    defer: useReviewDeferred(
+      user?._id,
+      laterDeferred,
+      progress,
+      feedback,
+      welcomeSeen,
+    ),
   });
   const busySaving = useBusySaving(items);
   // The share screen records the first save while Home stays mounted below
@@ -201,6 +229,7 @@ export default function HomeScreen() {
         recall.visible,
         feedback.invitationVisible,
       )}
+      welcomeSeen={welcomeSeen}
     />
   ) : null;
 
