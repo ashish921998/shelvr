@@ -117,9 +117,11 @@ function usePromptsDeferred(
  * the rest of this visit instead of rising in the gap. */
 function useWelcomeSeen(userId: string | undefined): boolean {
   const welcomePending = welcomeSave.usePending(userId);
-  const [welcomeSeen, setWelcomeSeen] = useState(false);
-  if (welcomePending && !welcomeSeen) setWelcomeSeen(true);
-  return welcomeSeen;
+  // Keyed to the account: Home stays mounted across a sign-out, and the next
+  // account's nudge must not inherit this one's welcome.
+  const [seenFor, setSeenFor] = useState<string | null>(null);
+  if (welcomePending && userId && seenFor !== userId) setSeenFor(userId);
+  return userId !== undefined && seenFor === userId;
 }
 
 /** Home's modal prompts. Pro just started: one real save comes first. */
