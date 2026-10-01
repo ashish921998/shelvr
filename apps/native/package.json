@@ -33,6 +33,7 @@
     "ai": "7.0.51",
     "convex": "1.43.0",
     "expo": "~57.0.12",
+    "expo-app-intents": "~0.4.7",
     "expo-apple-authentication": "~57.0.1",
     "expo-auth-session": "~57.0.1",
     "expo-build-properties": "~57.0.10",

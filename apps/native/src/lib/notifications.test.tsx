@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   otherMutation: vi.fn(),
   signOut: vi.fn(),
   clearWidget: vi.fn(async () => true),
+  revokeSiri: vi.fn(async () => {}),
   captureError: vi.fn(),
   capture: vi.fn(),
   push: vi.fn(),
@@ -38,6 +39,9 @@ vi.mock("@/lib/exit-offer-reminder", () => ({
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearWidget,
 }));
+vi.mock("@/lib/app-intents", () => ({
+  revokeSiriCapture: mock.revokeSiri,
+}));
 vi.mock("@convex/_generated/api", () => ({
   api: {
     notifications: {
@@ -46,6 +50,7 @@ vi.mock("@convex/_generated/api", () => ({
       setPreferences: "preferences",
     },
     users: { deleteCurrentUserAccount: "delete" },
+    appIntents: { revokeCaptureToken: "revokeCapture" },
   },
 }));
 vi.mock("convex/react", () => ({
@@ -125,6 +130,23 @@ describe("notification session lifecycle", () => {
       "widget_thumbnail_cleanup_failed",
       new Error("widget_thumbnail_cleanup_failed"),
     );
+  });
+  it("revokes the Siri capture token before signing out", async () => {
+    const order: string[] = [];
+    mock.revokeSiri.mockImplementationOnce(async () => {
+      order.push("revoke");
+    });
+    mock.signOut.mockImplementationOnce(async () => {
+      order.push("signOut");
+    });
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    await act(async () => {
+      await result.current.session.signOut();
+    });
+    expect(order).toEqual(["revoke", "signOut"]);
   });
   it("clears the widget after successful server account deletion", async () => {
     const { result } = renderSession();

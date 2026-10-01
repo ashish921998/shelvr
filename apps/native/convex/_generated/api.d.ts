@@ -11,6 +11,7 @@
 import type * as accountTelemetry from "../accountTelemetry.js";
 import type * as ai from "../ai.js";
 import type * as analytics from "../analytics.js";
+import type * as appIntents from "../appIntents.js";
 import type * as appleProfile from "../appleProfile.js";
 import type * as auth from "../auth.js";
 import type * as cancelSurvey from "../cancelSurvey.js";
@@ -26,6 +27,8 @@ import type * as legalConsentSync from "../legalConsentSync.js";
 import type * as model_accountCreated from "../model/accountCreated.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
+import type * as model_captureRequest from "../model/captureRequest.js";
+import type * as model_captureTokens from "../model/captureTokens.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
 import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
@@ -78,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   accountTelemetry: typeof accountTelemetry;
   ai: typeof ai;
   analytics: typeof analytics;
+  appIntents: typeof appIntents;
   appleProfile: typeof appleProfile;
   auth: typeof auth;
   cancelSurvey: typeof cancelSurvey;
@@ -93,6 +97,8 @@ declare const fullApi: ApiFromModules<{
   "model/accountCreated": typeof model_accountCreated;
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
+  "model/captureRequest": typeof model_captureRequest;
+  "model/captureTokens": typeof model_captureTokens;
   "model/demoErrors": typeof model_demoErrors;
   "model/embedding": typeof model_embedding;
   "model/entitlement": typeof model_entitlement;

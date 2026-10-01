@@ -134,6 +134,11 @@ module.exports = ({ config }) => ({
     infoPlist: {
       ...appConfig.expo.ios?.infoPlist,
       ...config?.ios?.infoPlist,
+      // Dev and preview builds are named "Shelvr (Dev)" / "Shelvr (Preview)";
+      // this lets Siri and App Shortcut phrases still answer to "Shelvr".
+      INAlternativeAppNames: [
+        { INAlternativeAppName: appConfig.expo.name ?? "Shelvr" },
+      ],
       ...(isProduction
         ? {
             NSAppTransportSecurity: {
@@ -166,6 +171,7 @@ module.exports = ({ config }) => ({
   plugins: [
     "./plugins/with-google-services",
     "./plugins/with-android-share-new-intent",
+    "./plugins/with-android-accent",
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
     ["expo-localization", { supportedLocales, supportsRTL }],

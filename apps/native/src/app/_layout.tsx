@@ -19,6 +19,7 @@ import {
 import { SplashGate, useSplashGate } from "@/components/splash/splash-gate";
 import { NavThemeProvider } from "@/lib/nav-theme";
 import { useAnalyticsIdentity } from "@/lib/analytics-identity";
+import { useAppIntentsSignOutReset } from "@/lib/app-intents";
 import { useConvexQueryHealing } from "@/lib/convex-query-healing";
 import { posthog } from "@/lib/posthog";
 
@@ -44,6 +45,13 @@ function NotificationSetup() {
  * edge. See useAnalyticsIdentity — the one session boundary. */
 function AnalyticsIdentity() {
   useAnalyticsIdentity();
+  return null;
+}
+
+/** Clears Siri's capture token, queued captures, and Spotlight catalogs when
+ * Convex Auth reports signed out. */
+function AppIntentsSignOutReset() {
+  useAppIntentsSignOutReset();
   return null;
 }
 
@@ -115,6 +123,7 @@ export default function RootLayout() {
           }}
         >
           <AnalyticsIdentity />
+          <AppIntentsSignOutReset />
           <PostHogScreenTracking />
           <NotificationSetup />
           <ConvexQueryHealer />
