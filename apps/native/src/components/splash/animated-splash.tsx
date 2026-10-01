@@ -43,6 +43,9 @@ const WORDMARK_SIZE = 50;
  * than a badge floating beside it.
  */
 const ASCENDER = 694 / 1024;
+// The wordmark opts out of system font scaling (see `allowFontScaling` below):
+// the S is a fixed size, so a scaled wordmark would outgrow it. It is a logo,
+// not reading text.
 const MARK_SIZE = Math.round(WORDMARK_SIZE * ASCENDER);
 const LOCKUP_GAP = 11;
 /** Slack past the measured wordmark, so the last glyph is never clipped. */
@@ -194,6 +197,7 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
           natural width, which the clipped copy below can then be given. */}
       <Text
         style={[styles.wordmark, styles.measure]}
+        allowFontScaling={false}
         onLayout={(event) => setWordmarkWidth(event.nativeEvent.layout.width)}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -201,7 +205,17 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
         shelvr
       </Text>
 
-      <View style={styles.lockupLayer} pointerEvents="none">
+      {/* Held invisible until the wordmark is measured: the row's baseline
+          comes from the wordmark, so the S only takes its final place once
+          the wordmark is mounted. Revealing it earlier could show the S jump
+          — visible with reduced motion, where it is drawn from frame one. */}
+      <View
+        style={[
+          styles.lockupLayer,
+          { opacity: wordmarkWidth === null ? 0 : 1 },
+        ]}
+        pointerEvents="none"
+      >
         <Animated.View
           style={[styles.lockup, rowStyle]}
           accessible
@@ -217,7 +231,10 @@ export function AnimatedSplash({ onFinish }: { onFinish?: () => void }) {
           {wordmarkWidth === null ? null : (
             <Animated.View style={[styles.wordmarkClip, wordmarkStyle]}>
               <View style={styles.wordmarkInset}>
-                <Text style={[styles.wordmark, { width: wordmarkWidth }]}>
+                <Text
+                  style={[styles.wordmark, { width: wordmarkWidth }]}
+                  allowFontScaling={false}
+                >
                   shelvr
                 </Text>
               </View>
