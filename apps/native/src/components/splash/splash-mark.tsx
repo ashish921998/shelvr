@@ -1,5 +1,6 @@
 import { Canvas, Group, Path, Skia } from "@shopify/react-native-skia";
 import { useMemo } from "react";
+import { View } from "react-native";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
 import { cubicBezierEase, span } from "@/lib/splash/composition";
@@ -17,7 +18,21 @@ import { TIMELINE } from "./timeline";
 const MARK_PATH =
   "M320 224h400c44.2 0 80 35.8 80 80v176c0 44.2-35.8 80-80 80H416v80h288c44.2 0 80 35.8 80 80s-35.8 80-80 80H304c-44.2 0-80-35.8-80-80V544c0-44.2 35.8-80 80-80h304v-80H320c-44.2 0-80-35.8-80-80s35.8-80 80-80Z";
 
-const MARK_VIEWBOX = 1024;
+/**
+ * The S's own bounds inside that viewBox. The canvas is cropped to them, so
+ * `size` is the height of the glyph itself rather than of a padded square, and
+ * the canvas's bottom edge is the S's bottom edge: the lockup sits it on the
+ * wordmark's baseline.
+ */
+const GLYPH_ORIGIN = 224;
+const GLYPH_SIZE = 576;
+
+/**
+ * Room around the glyph for the pop's overshoot and tilt, which would
+ * otherwise be clipped at the canvas edge. The canvas overflows its slot by
+ * this much on every side; the slot itself stays glyph-sized for layout.
+ */
+const BLEED = 0.2;
 
 // A pop with a touch of hand to it: the S arrives small and tilted back,
 // overshoots past full size, then settles square.
@@ -34,6 +49,7 @@ export function SplashMark({
   color,
   still = false,
 }: {
+  /** Height of the S itself, which the lockup matches to the wordmark. */
   size: number;
   /** Seconds elapsed since the animation started. */
   clock: SharedValue<number>;
@@ -52,7 +68,8 @@ export function SplashMark({
     return parsed ?? Skia.Path.Make();
   }, []);
 
-  const scaleToFit = size / MARK_VIEWBOX;
+  const bleed = Math.ceil(size * BLEED);
+  const canvasSize = size + bleed * 2;
 
   const transform = useDerivedValue(() => {
     const progress = still
@@ -80,13 +97,15 @@ export function SplashMark({
       (0 - PEAK_ROTATION) * settling;
 
     return [
-      { translateX: size / 2 },
-      { translateY: size / 2 },
+      { translateX: canvasSize / 2 },
+      { translateY: canvasSize / 2 },
       { rotate },
       { scale },
       { translateX: -size / 2 },
       { translateY: -size / 2 },
-      { scale: scaleToFit },
+      { scale: size / GLYPH_SIZE },
+      { translateX: -GLYPH_ORIGIN },
+      { translateY: -GLYPH_ORIGIN },
     ];
   });
 
@@ -102,11 +121,24 @@ export function SplashMark({
         ),
   );
 
+  // The slot has no in-flow children, so a baseline-aligned row reads its
+  // bottom edge as its baseline — which is where the S stands.
   return (
-    <Canvas style={{ width: size, height: size }} pointerEvents="none">
-      <Group transform={transform} opacity={opacity}>
-        <Path path={path} color={color} />
-      </Group>
-    </Canvas>
+    <View style={{ width: size, height: size }} pointerEvents="none">
+      <Canvas
+        style={{
+          position: "absolute",
+          left: -bleed,
+          top: -bleed,
+          width: canvasSize,
+          height: canvasSize,
+        }}
+        pointerEvents="none"
+      >
+        <Group transform={transform} opacity={opacity}>
+          <Path path={path} color={color} />
+        </Group>
+      </Canvas>
+    </View>
   );
 }
