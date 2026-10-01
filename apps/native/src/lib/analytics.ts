@@ -79,10 +79,15 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 type SaveKind = "link" | "note" | "image";
 
 type AnalyticsEventProperties = {
-  onboarding_step_viewed: { step_id: string; step_index: number };
+  onboarding_step_viewed: {
+    step_id: string;
+    step_index: number;
+    flow_version: number;
+  };
   onboarding_step_completed: {
     step_id: string;
     step_index: number;
+    flow_version: number;
     duration_ms: number;
   };
   // The four OAuth flow events share one `auth_attempt_id` per

@@ -172,24 +172,61 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual(fresh);
   });
 
-  it("restores a version 2 record one step later", () => {
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        operationId: "op",
-        spaces: ["Travel"],
-        demoUrl: null,
-        progressVersion: 2,
-        saveKinds: ["Travel"],
-        step: 2,
-        demo: null,
-        spaceNames: {},
-      }),
-    );
+  const v2Record = (step: number, demo: unknown = null) =>
+    JSON.stringify({
+      operationId: "op",
+      spaces: ["Travel"],
+      demoUrl: null,
+      progressVersion: 2,
+      saveKinds: ["Travel"],
+      step,
+      demo,
+      spaceNames: {},
+    });
+
+  // Version 2 steps: opener, setup, demo, reveal. Version 3 adds the source
+  // step at index 1, so only the opener keeps its index.
+  it.each([
+    [0, 0],
+    [1, 2],
+    [2, 3],
+    [3, 4],
+  ])("restores version 2 step %i as step %i", (stored, expected) => {
+    storage.set("shelvr.pending.onboarding", v2Record(stored));
     expect(getOnboardingProgress()).toMatchObject({
       saveKinds: ["Travel"],
-      step: 3,
+      spaces: ["Travel"],
+      step: expected,
     });
+  });
+
+  it("keeps a version 2 in-flight demo across the first version 3 write", () => {
+    const demo = {
+      url: "https://example.com/trip",
+      destination: "Travel",
+      source: "share",
+    };
+    storage.set("shelvr.pending.onboarding", v2Record(2, demo));
+    const restored = getOnboardingProgress();
+    expect(restored).toMatchObject({ step: 3, demo });
+
+    // onboarding.tsx writes the restored step straight back on mount.
+    setOnboardingProgress({
+      saveKinds: restored.saveKinds,
+      spaces: restored.spaces,
+      step: restored.step ?? 0,
+    });
+    const stored = JSON.parse(
+      storage.get("shelvr.pending.onboarding") ?? "{}",
+    ) as Record<string, unknown>;
+    expect(stored).toMatchObject({
+      progressVersion: 3,
+      step: 3,
+      operationId: "op",
+      demo,
+    });
+    // A second read does not shift the step again.
+    expect(getOnboardingProgress()).toMatchObject({ step: 3, demo });
   });
 
   it("restores a record written by the current flow", () => {

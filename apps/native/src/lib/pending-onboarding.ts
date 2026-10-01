@@ -235,7 +235,9 @@ export function clearLegacyDemoUrlIfSaved(savedUrl: string) {
 }
 
 // Version 2 had the same steps minus the source step at index 1, so its
-// answers still apply once a step past the opener is shifted by one.
+// answers still apply once a step past the opener is shifted by one. An OTA
+// rollback to a version 2 bundle ignores version 3 records, so onboarding that
+// was in progress restarts at the opener rather than resuming a wrong step.
 const SHIFTED_PROGRESS_VERSION = 2;
 
 function isCurrentProgress(record: PendingRecord | null): boolean {

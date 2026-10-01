@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
 import {
+  ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   restoreOnboardingStep,
@@ -94,6 +95,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
+      flow_version: ONBOARDING_FLOW_VERSION,
     });
   }, [step, stepIndex]);
 
@@ -102,6 +104,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_step_completed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
+      flow_version: ONBOARDING_FLOW_VERSION,
       duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
     });
     trackedStepsRef.current.add(step);
