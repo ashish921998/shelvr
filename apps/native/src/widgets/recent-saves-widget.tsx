@@ -22,7 +22,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { createWidget, type WidgetEnvironment } from "expo-widgets";
 
-type WidgetSaveItem = {
+export type WidgetSaveItem = {
   id: string;
   title: string;
   subtitle: string;
@@ -31,7 +31,7 @@ type WidgetSaveItem = {
   imageUri?: string;
 };
 
-type RecentSavesWidgetProps = {
+export type RecentSavesWidgetProps = {
   items: WidgetSaveItem[];
   emptyTitle?: string;
   emptyHint?: string;
