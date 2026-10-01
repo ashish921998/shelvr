@@ -7,9 +7,17 @@ const isIos = process.env.EXPO_OS === "ios";
 
 type Options = {
   headerTransparent?: boolean;
+  // For stacks that also render HeaderScrim. The native soft scroll edge is
+  // iOS 26 only, and a no-op on earlier versions and on Android.
+  softScrollEdge?: boolean;
 };
 
-export function useTabStackChrome({ headerTransparent = isIos }: Options = {}) {
+const SOFT_SCROLL_EDGE = { top: "soft" } as const;
+
+export function useTabStackChrome({
+  headerTransparent = isIos,
+  softScrollEdge = false,
+}: Options = {}) {
   const router = useRouter();
   const { theme } = useUnistyles();
   const labelColor = isIos ? PlatformColor("label") : theme.colors.foreground;
@@ -35,6 +43,7 @@ export function useTabStackChrome({ headerTransparent = isIos }: Options = {}) {
         : undefined,
     headerShadowVisible: false,
     headerTitleAlign: "center" as const,
+    scrollEdgeEffects: softScrollEdge ? SOFT_SCROLL_EDGE : undefined,
   };
 
   return { haptic, labelColor, screenOptions, tap };

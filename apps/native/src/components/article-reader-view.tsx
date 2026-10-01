@@ -253,7 +253,9 @@ export function ArticleReaderView({
           </View>
         )}
 
-        {item.status === "ready" ? <ProductsSection item={item} /> : null}
+        {item.status === "ready" ? (
+          <ProductsSection item={item} inset={theme.gap(2.5)} />
+        ) : null}
 
         {similar && similar.length > 0 ? (
           <View style={styles.similarSection}>

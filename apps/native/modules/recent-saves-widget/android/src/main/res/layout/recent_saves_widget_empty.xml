@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nothing saved yet, or locked (signed out, no Pro, snapshot expired). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/recent_saves_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/recent_saves_widget_background"
+  android:clipToOutline="true"
+  android:gravity="center"
+  android:orientation="vertical"
+  android:padding="16dp">
+
+  <ImageView
+    android:id="@+id/recent_saves_empty_icon"
+    android:layout_width="28dp"
+    android:layout_height="28dp"
+    android:importantForAccessibility="no"
+    android:src="@drawable/recent_saves_widget_inbox"
+    android:tint="@color/recent_saves_widget_muted" />
+
+  <TextView
+    android:id="@+id/recent_saves_empty_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:textSize="14sp"
+    android:textColor="@color/recent_saves_widget_foreground"
+    android:maxLines="2"
+    android:ellipsize="end"
+    android:includeFontPadding="false"
+    android:fontFamily="sans-serif-medium"
+    android:layout_marginTop="8dp"
+    android:gravity="center" />
+
+  <TextView
+    android:id="@+id/recent_saves_empty_hint"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:textSize="12sp"
+    android:textColor="@color/recent_saves_widget_muted"
+    android:maxLines="2"
+    android:ellipsize="end"
+    android:includeFontPadding="false"
+    android:layout_marginTop="2dp"
+    android:gravity="center" />
+</LinearLayout>

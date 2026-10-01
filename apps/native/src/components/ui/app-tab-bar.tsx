@@ -2,13 +2,12 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { AppSymbolIcon } from "@/components/symbol";
 import {
   RUBBER_BAND_LIMIT,
-  isDarkColor,
   overflowPast,
   rubberBand,
   tabIndexAt,
   tabSlotX,
-  withAlpha,
 } from "@/lib/tab-bar-motion";
+import { isDarkColor, withAlpha } from "@/lib/color";
 import { setTabSearchQuery, useTabSearchQuery } from "@/lib/tab-search-query";
 import {
   reconcileTabSelection,

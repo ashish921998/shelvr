@@ -1,29 +1,24 @@
+import { oncePerAccount } from "@/lib/once-per-account";
 import * as SecureStore from "expo-secure-store";
 
 // Keyed per account so a second account on the same phone still gets the
 // how-to card and the weekly nudge.
 const firstShareKey = (userId: string) => `shelvr.firstShareSaved.${userId}`;
-const weeklyNudgeKey = (userId: string) => `shelvr.weeklyNudge.${userId}`;
+
+/** The weekly shelf opt-in sheet, queued by the first share-sheet save. */
+export const weeklyNudge = oncePerAccount("weeklyNudge");
 
 export function recordShareSaved(userId: string): void {
   SecureStore.setItem(firstShareKey(userId), "1");
-  const nudge = SecureStore.getItem(weeklyNudgeKey(userId));
-  if (nudge === null || nudge === "") {
-    SecureStore.setItem(weeklyNudgeKey(userId), "pending");
-  }
+  weeklyNudge.mark(userId);
 }
 
 export function hasSavedFirstShare(userId: string): boolean {
   return SecureStore.getItem(firstShareKey(userId)) === "1";
 }
 
-export function isWeeklyNudgePending(userId: string): boolean {
-  return SecureStore.getItem(weeklyNudgeKey(userId)) === "pending";
-}
-
-export function finishWeeklyNudge(userId: string): void {
-  SecureStore.setItem(weeklyNudgeKey(userId), "done");
-}
+export const isWeeklyNudgePending = weeklyNudge.isPending;
+export const finishWeeklyNudge = weeklyNudge.finish;
 
 // One id per JS launch. The launch that first sees an account is its first
 // session, and the weekly nudge never interrupts that one.

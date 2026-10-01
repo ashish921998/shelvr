@@ -431,7 +431,9 @@ function ItemDetailBody({
 
       <TagsRow tags={item.tags} />
 
-      {item.status === "ready" ? <ProductsSection item={detail} /> : null}
+      {item.status === "ready" ? (
+        <ProductsSection item={detail} inset={theme.gap(2)} />
+      ) : null}
 
       {/* A recipe replaces the article paragraphs: the pipeline already lifted
           the ingredients and steps out of the story around them. A social post

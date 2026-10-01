@@ -38,6 +38,8 @@ const fsx = vi.hoisted(() => ({
   cacheListed: [] as unknown[],
   snapshots: [] as unknown[],
   timelines: [] as { date: Date; props: unknown }[][],
+  androidSnapshots: [] as unknown[],
+  androidModulePresent: true,
   downloads: [] as string[],
   deletes: [] as string[],
   moves: [] as [string, string][],
@@ -91,7 +93,12 @@ vi.mock("expo-file-system", () => {
     uri: string;
     exists: boolean;
     constructor(path: string | { uri: string }) {
-      this.uri = typeof path === "string" ? `file://${path}` : path.uri;
+      this.uri =
+        typeof path !== "string"
+          ? path.uri
+          : path.startsWith("file://")
+            ? path
+            : `file://${path}`;
       this.exists = fsx.files.get(this.uri) ?? true;
     }
     create() {
@@ -109,6 +116,19 @@ vi.mock("expo-modules-core", () => ({
     fsx.nativeModulePresent ? { registry: true } : null,
 }));
 vi.mock("expo-widgets", () => ({ widgetsDirectory: "/widgets" }));
+vi.mock("recent-saves-widget", () => ({
+  get recentSavesWidget() {
+    if (!fsx.androidModulePresent) return null;
+    return {
+      getDirectory: () => "file:///android-widgets",
+      setSnapshot: async (json: string) => {
+        fsx.snapshotAttempts += 1;
+        if (fsx.failSnapshot) throw new Error("widget unavailable");
+        fsx.androidSnapshots.push(JSON.parse(json));
+      },
+    };
+  },
+}));
 vi.mock("@/widgets/recent-saves-widget", () => ({
   default: {
     updateSnapshot: (snapshot: unknown) => {
@@ -228,6 +248,8 @@ beforeEach(async () => {
   fsx.cacheListed = [];
   fsx.snapshots = [];
   fsx.timelines = [];
+  fsx.androidSnapshots = [];
+  fsx.androidModulePresent = true;
   fsx.downloads = [];
   fsx.deletes = [];
   fsx.moves = [];
@@ -286,13 +308,60 @@ describe("RecentSavesWidgetSync", () => {
     expect(fsx.snapshots[0]).not.toHaveProperty("validUntil", 0);
   });
 
-  it("stays idle without data or off iOS", async () => {
+  it("stays idle without data or off iOS and Android", async () => {
     renderSync(undefined);
-    fsx.platformOs = "android";
+    fsx.platformOs = "web";
     renderSync([link]);
     // Let any (incorrectly scheduled) sync settle.
     await act(async () => {});
     expect(fsx.snapshots).toHaveLength(0);
+    expect(fsx.androidSnapshots).toHaveLength(0);
+    expect(fsx.downloads).toHaveLength(0);
+  });
+
+  it("publishes the Android widget into its own folder", async () => {
+    fsx.platformOs = "android";
+    renderSync([link, note]);
+    await waitFor(() => expect(fsx.androidSnapshots).toHaveLength(1));
+    expect(fsx.snapshots).toHaveLength(0);
+    expect(fsx.androidSnapshots[0]).toMatchObject({
+      locked: false,
+      emptyTitle: "Nothing saved yet",
+      items: [
+        {
+          id: "i1",
+          title: "A save",
+          subtitle: "Example",
+          kind: "link",
+          imageUri: "file:///android-widgets/recent-saves-i1.jpg",
+        },
+        { id: "i2", title: "First line", subtitle: "Note", kind: "note" },
+      ],
+    });
+  });
+
+  // Android has no timeline: the widget locks itself at `validUntil` and
+  // needs the Pro copy for that state up front.
+  it("sends the Android widget its expiry and the Pro copy for it", async () => {
+    fsx.platformOs = "android";
+    fsx.expiresAt = Date.now() + 86_400_000;
+    renderSync([note]);
+    await waitFor(() => expect(fsx.androidSnapshots).toHaveLength(1));
+    expect(fsx.timelines).toHaveLength(0);
+    expect(fsx.androidSnapshots[0]).toMatchObject({
+      locked: false,
+      validUntil: fsx.expiresAt + 7 * 86_400_000,
+      lockedTitle: "Recent saves are a Pro feature",
+      lockedHint: "Subscribe to Shelvr Pro to see your saves here",
+    });
+  });
+
+  it("stays idle on Android builds without the widget", async () => {
+    fsx.platformOs = "android";
+    fsx.androidModulePresent = false;
+    renderSync([link]);
+    await act(async () => {});
+    expect(fsx.androidSnapshots).toHaveLength(0);
     expect(fsx.downloads).toHaveLength(0);
   });
 
@@ -822,10 +891,25 @@ describe("clearRecentSavesWidget", () => {
     ]);
   });
 
-  it("does nothing off iOS", async () => {
-    fsx.platformOs = "android";
+  it("does nothing off iOS and Android", async () => {
+    fsx.platformOs = "web";
     expect(await clearRecentSavesWidget()).toBe(false);
     expect(fsx.snapshots).toHaveLength(0);
+  });
+
+  it("publishes the locked snapshot and drops every thumbnail on Android", async () => {
+    fsx.platformOs = "android";
+    const thumbs = ["recent-saves-i1.jpg", "other.txt"].map(
+      (name) => new File("file:///android-widgets", name),
+    );
+    fsx.listed = thumbs;
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(fsx.androidSnapshots).toEqual([
+      expect.objectContaining({ items: [], locked: true }),
+    ]);
+    expect(fsx.deletes).toEqual([
+      "file:///android-widgets/recent-saves-i1.jpg",
+    ]);
   });
 
   it("does nothing when the widget native module is missing", async () => {

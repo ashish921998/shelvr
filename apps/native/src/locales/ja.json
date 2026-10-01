@@ -541,5 +541,21 @@
   "exitOffer.reminderConsent": "このオファーについて、終了の1時間前に通知を1回お送りします。いつでも取り消せます。",
   "exitOffer.reminderSet": "オファー終了の1時間前にリマインドします。",
   "exitOffer.reminderCancel": "リマインドを取り消す",
-  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。"
+  "exitOffer.reminderDenied": "Shelvrの通知がオフになっています。リマインドを受け取るには設定で通知をオンにしてください。",
+  "updates.title": "アプリのアップデート",
+  "updates.check": "アップデートを確認",
+  "updates.checking": "確認中…",
+  "updates.downloading": "ダウンロード中…",
+  "updates.restart": "再起動してアップデート",
+  "updates.latest": "最新バージョンです。",
+  "updates.checkFailed": "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",
+  "updates.restartFailed": "Shelvrを再起動できませんでした。アプリを閉じて開き直すと、アップデートが完了します。",
+  "updates.ready": "新しいバージョンの準備ができました。今すぐ再起動するか、次にShelvrを開いたときにインストールされます。",
+  "updates.development": "開発ビルドではアップデートはオフです。",
+  "updates.embedded": "このビルドに含まれるバージョンを使用中です。",
+  "updates.running": "%{date}のアップデートを使用中です。",
+  "welcome.title": "準備完了。さっそく本当に残したいものを保存しましょう。",
+  "welcome.body": "本当に取っておきたいものを1つ保存してください。Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.trialBody": "無料トライアルは%{date}までです。本当に取っておきたいものを1つ保存すると、Shelvrがタイトルとタグを付けて整理します。",
+  "welcome.cta": "保存する"
 }

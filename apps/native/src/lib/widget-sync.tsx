@@ -11,6 +11,12 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 import { Images } from "react-native-nitro-image";
+import { recentSavesWidget } from "recent-saves-widget";
+// Type-only, so erased at build time: the widget module itself still loads lazily below.
+import type {
+  RecentSavesWidgetProps,
+  WidgetSaveItem,
+} from "@/widgets/recent-saves-widget";
 
 const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
@@ -163,6 +169,68 @@ function deleteWidgetFiles(
   }
 }
 
+/** Where a platform's widget reads thumbnails from, and how it is published. */
+type WidgetHost = {
+  directory: string;
+  /**
+   * Publishes `current`. With `lockedProps`, the widget must also switch to
+   * them at `current.validUntil` without the app running.
+   */
+  publish(
+    current: RecentSavesWidgetProps,
+    lockedProps?: RecentSavesWidgetProps,
+  ): Promise<void> | void;
+};
+
+/** Whether this platform has the Recent Saves widget to publish and clear. */
+export function hasRecentSavesWidget(): boolean {
+  return Platform.OS === "ios" || Platform.OS === "android";
+}
+
+// Resolves to null where the widget is not linked into the native build.
+async function loadWidgetHost(): Promise<WidgetHost | null> {
+  if (Platform.OS === "android") {
+    const widget = recentSavesWidget;
+    if (!widget) return null;
+    return {
+      directory: widget.getDirectory(),
+      // The Android widget reads `validUntil` on its own clock and redraws
+      // itself at the expiry, so one snapshot carries both states.
+      publish: (current, lockedProps) =>
+        widget.setSnapshot(
+          JSON.stringify({
+            ...current,
+            lockedTitle: lockedProps?.emptyTitle,
+            lockedHint: lockedProps?.emptyHint,
+          }),
+        ),
+    };
+  }
+  if (Platform.OS !== "ios") return null;
+  // Metro can evaluate a dynamic import eagerly. Check the native registry
+  // before touching expo-widgets so older development clients degrade safely
+  // instead of crashing in ExpoWidgets.ios.js at startup.
+  if (!requireOptionalNativeModule("ExpoWidgets")) return null;
+  const [{ widgetsDirectory }, { default: RecentSavesWidget }] =
+    await Promise.all([
+      import("expo-widgets"),
+      import("@/widgets/recent-saves-widget"),
+    ]);
+  return {
+    directory: widgetsDirectory,
+    publish: (current, lockedProps) => {
+      if (lockedProps && current.validUntil !== undefined) {
+        RecentSavesWidget.updateTimeline([
+          { date: new Date(), props: current },
+          { date: new Date(current.validUntil), props: lockedProps },
+        ]);
+      } else {
+        RecentSavesWidget.updateSnapshot(current);
+      }
+    },
+  };
+}
+
 // Publishes the widget for `items` (empty + `locked` clears it) and prunes
 // thumbnails the snapshot no longer references. With a `validUntil` it schedules
 // a timeline that locks itself at the expiry instead of a single snapshot.
@@ -178,22 +246,14 @@ async function syncWidget(
   // A sign-out between this sync being queued and running owns the widget now;
   // don't rebuild the previous account's snapshot over the cleared one.
   if (generation !== syncGeneration) return false;
-  // Metro can evaluate a dynamic import eagerly. Check the native registry
-  // before touching expo-widgets so older development clients degrade safely
-  // instead of crashing in ExpoWidgets.ios.js at startup.
-  if (!requireOptionalNativeModule("ExpoWidgets")) return false;
+  const host = await loadWidgetHost();
+  if (!host) return false;
 
-  const [{ widgetsDirectory }, { default: RecentSavesWidget }] =
-    await Promise.all([
-      import("expo-widgets"),
-      import("@/widgets/recent-saves-widget"),
-    ]);
-
-  const dir = new Directory(widgetsDirectory);
+  const dir = new Directory(host.directory);
   if (!dir.exists) dir.create({ intermediates: true });
 
   const widgetItems = await Promise.all(
-    items.map(async (item) => {
+    items.map(async (item): Promise<WidgetSaveItem> => {
       let imageUri: string | undefined;
       try {
         imageUri = await ensureThumbnail(dir, item);
@@ -230,7 +290,7 @@ async function syncWidget(
       emptyTitle: t("widget.proTitle"),
       emptyHint: t("widget.proBody"),
     };
-    const current = {
+    const current: RecentSavesWidgetProps = {
       items: widgetItems,
       ...(locked
         ? proEmpty
@@ -244,18 +304,12 @@ async function syncWidget(
     if (!locked && validUntil !== undefined) {
       // A snapshot outlives the app, so a Pro entitlement that lapses while
       // the app stays closed would keep the last saves on the Home Screen.
-      // Schedule a second, dated entry so WidgetKit swaps to the locked Pro
+      // Schedule a second, dated entry so the widget swaps to the locked Pro
       // state at the expiry with no app launch. The live entry also carries
       // `validUntil`, so it fails closed on the widget's own clock.
-      RecentSavesWidget.updateTimeline([
-        { date: new Date(), props: current },
-        {
-          date: new Date(validUntil),
-          props: { items: [], ...proEmpty, locked: true },
-        },
-      ]);
+      await host.publish(current, { items: [], ...proEmpty, locked: true });
     } else {
-      RecentSavesWidget.updateSnapshot(current);
+      await host.publish(current);
     }
   } finally {
     // Clearing private files must not depend on publishing the locked snapshot.
@@ -279,11 +333,11 @@ async function syncWidget(
  * generation first so a `syncWidget` queued or in flight before this boundary
  * cannot republish the cleared snapshot, then publishes the empty locked
  * snapshot (which also drops every thumbnail). Resolves to `true` once the
- * snapshot is published and thumbnail cleanup succeeds (iOS with the widget
+ * snapshot is published and thumbnail cleanup succeeds (iOS or Android with the widget
  * module linked), so the caller can record the boundary.
  */
 export async function clearRecentSavesWidget(): Promise<boolean> {
-  if (Platform.OS !== "ios") return false;
+  if (!hasRecentSavesWidget()) return false;
   syncGeneration += 1;
   setPendingCleanup(syncGeneration);
   return startWidgetClear(syncGeneration);
@@ -330,14 +384,10 @@ async function clearWidgetAndPendingThumbnails(
 }
 
 async function clearWidgetFiles(generation: number): Promise<void> {
-  if (
-    generation !== syncGeneration ||
-    !requireOptionalNativeModule("ExpoWidgets")
-  )
-    return;
-  const { widgetsDirectory } = await import("expo-widgets");
   if (generation !== syncGeneration) return;
-  const dir = new Directory(widgetsDirectory);
+  const host = await loadWidgetHost();
+  if (!host || generation !== syncGeneration) return;
+  const dir = new Directory(host.directory);
   const cache = new Directory(Paths.cache);
   // Try both locations even if one fails. Never delete unrelated app cache.
   const failures: unknown[] = [];
@@ -436,7 +486,7 @@ export function RecentSavesWidgetSync() {
 
   useEffect(() => {
     if (
-      Platform.OS !== "ios" ||
+      !hasRecentSavesWidget() ||
       entitlementLoading ||
       (entitled && recent === undefined)
     )
