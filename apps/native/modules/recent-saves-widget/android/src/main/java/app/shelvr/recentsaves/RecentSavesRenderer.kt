@@ -118,25 +118,16 @@ internal class RecentSavesRenderer(
     val bitmap = thumbnails[featured.id]
     views.setOnClickPendingIntent(R.id.list_featured, open(itemUrl(featured)))
     views.setContentDescription(R.id.list_featured, featured.title)
-    // Tall and square photos fill the card with the caption over a scrim.
-    // Wide ones sit on top with the caption below, so neither is cropped much.
-    val cover = bitmap != null && RecentSavesLayout.isCover(bitmap.width, bitmap.height)
-    views.setViewVisibility(R.id.list_featured_cover, if (cover) View.VISIBLE else View.GONE)
-    views.setViewVisibility(R.id.list_featured_card, if (cover) View.GONE else View.VISIBLE)
-    if (cover) {
-      views.setImageViewBitmap(R.id.list_featured_cover_image, bitmap!!)
+    // A photo fills the card with the caption over a scrim; a save without
+    // one shows its type icon.
+    views.setViewVisibility(R.id.list_featured_cover, if (bitmap != null) View.VISIBLE else View.GONE)
+    views.setViewVisibility(R.id.list_featured_card, if (bitmap != null) View.GONE else View.VISIBLE)
+    if (bitmap != null) {
+      views.setImageViewBitmap(R.id.list_featured_cover_image, bitmap)
       views.setTextViewText(R.id.list_featured_cover_title, featured.title)
       views.setTextViewText(R.id.list_featured_cover_subtitle, featured.subtitle)
     } else {
-      if (bitmap != null) {
-        views.setImageViewBitmap(R.id.list_featured_image, bitmap)
-        views.setViewVisibility(R.id.list_featured_image, View.VISIBLE)
-        views.setViewVisibility(R.id.list_featured_icon, View.GONE)
-      } else {
-        views.setViewVisibility(R.id.list_featured_image, View.GONE)
-        views.setViewVisibility(R.id.list_featured_icon, View.VISIBLE)
-        views.setImageViewResource(R.id.list_featured_icon, kindIcon(featured.kind))
-      }
+      views.setImageViewResource(R.id.list_featured_icon, kindIcon(featured.kind))
       views.setTextViewText(R.id.list_featured_title, featured.title)
       views.setTextViewText(R.id.list_featured_subtitle, featured.subtitle)
     }

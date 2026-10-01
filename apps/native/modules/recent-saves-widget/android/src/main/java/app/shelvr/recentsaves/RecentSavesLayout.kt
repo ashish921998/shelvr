@@ -13,8 +13,6 @@ internal object RecentSavesLayout {
   // Extreme shapes are trimmed to these bounds, the same as the feed.
   const val MIN_RATIO = 0.5f
   const val MAX_RATIO = 2f
-  // Tall and square photos fill the featured card; wider ones sit above the caption.
-  private const val COVER_MAX_RATIO = 1.5f
 
   /**
    * Bytes of bitmap each layout of one update may carry. Android rejects an
@@ -58,8 +56,6 @@ internal object RecentSavesLayout {
       else -> null
     }
   }
-
-  fun isCover(width: Int, height: Int): Boolean = width.toFloat() / height < COVER_MAX_RATIO
 
   /**
    * Splits saves into the grid's two columns, alternating so the newest sit

@@ -17,7 +17,7 @@
     android:background="@drawable/recent_saves_widget_tile"
     android:clipToOutline="true">
 
-    <!-- Tall and square photos fill the card with the caption over a scrim. -->
+    <!-- A photo fills the card, center cropped, with the caption over a scrim. -->
     <FrameLayout
       android:id="@+id/list_featured_cover"
       android:layout_width="match_parent"
@@ -69,21 +69,12 @@
       </LinearLayout>
     </FrameLayout>
 
-    <!-- Wide photos sit on top at full width with the caption below, and
-         saves without a photo show their type icon. Neither is cropped. -->
+    <!-- Saves without a photo show their type icon above the caption. -->
     <LinearLayout
       android:id="@+id/list_featured_card"
       android:layout_width="match_parent"
       android:layout_height="match_parent"
       android:orientation="vertical">
-
-      <ImageView
-        android:id="@+id/list_featured_image"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:adjustViewBounds="true"
-        android:importantForAccessibility="no"
-        android:scaleType="fitCenter" />
 
       <LinearLayout
         android:layout_width="match_parent"
@@ -141,27 +132,22 @@
       android:visibility="invisible">
 
       <FrameLayout
-        android:layout_width="42dp"
-        android:layout_height="32dp">
+        android:layout_width="36dp"
+        android:layout_height="36dp">
 
         <ImageView
           android:id="@+id/list_row0_image"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"
-          android:adjustViewBounds="true"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb"
           android:clipToOutline="true"
           android:importantForAccessibility="no"
-          android:maxHeight="32dp"
-          android:maxWidth="42dp"
-          android:scaleType="fitCenter" />
+          android:scaleType="centerCrop" />
 
         <FrameLayout
           android:id="@+id/list_row0_tile"
-          android:layout_width="32dp"
-          android:layout_height="32dp"
-          android:layout_gravity="center"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb">
 
           <ImageView
@@ -215,27 +201,22 @@
       android:visibility="invisible">
 
       <FrameLayout
-        android:layout_width="42dp"
-        android:layout_height="32dp">
+        android:layout_width="36dp"
+        android:layout_height="36dp">
 
         <ImageView
           android:id="@+id/list_row1_image"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"
-          android:adjustViewBounds="true"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb"
           android:clipToOutline="true"
           android:importantForAccessibility="no"
-          android:maxHeight="32dp"
-          android:maxWidth="42dp"
-          android:scaleType="fitCenter" />
+          android:scaleType="centerCrop" />
 
         <FrameLayout
           android:id="@+id/list_row1_tile"
-          android:layout_width="32dp"
-          android:layout_height="32dp"
-          android:layout_gravity="center"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb">
 
           <ImageView
@@ -289,27 +270,22 @@
       android:visibility="invisible">
 
       <FrameLayout
-        android:layout_width="42dp"
-        android:layout_height="32dp">
+        android:layout_width="36dp"
+        android:layout_height="36dp">
 
         <ImageView
           android:id="@+id/list_row2_image"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"
-          android:adjustViewBounds="true"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb"
           android:clipToOutline="true"
           android:importantForAccessibility="no"
-          android:maxHeight="32dp"
-          android:maxWidth="42dp"
-          android:scaleType="fitCenter" />
+          android:scaleType="centerCrop" />
 
         <FrameLayout
           android:id="@+id/list_row2_tile"
-          android:layout_width="32dp"
-          android:layout_height="32dp"
-          android:layout_gravity="center"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb">
 
           <ImageView
@@ -363,27 +339,22 @@
       android:visibility="invisible">
 
       <FrameLayout
-        android:layout_width="42dp"
-        android:layout_height="32dp">
+        android:layout_width="36dp"
+        android:layout_height="36dp">
 
         <ImageView
           android:id="@+id/list_row3_image"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_gravity="center"
-          android:adjustViewBounds="true"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb"
           android:clipToOutline="true"
           android:importantForAccessibility="no"
-          android:maxHeight="32dp"
-          android:maxWidth="42dp"
-          android:scaleType="fitCenter" />
+          android:scaleType="centerCrop" />
 
         <FrameLayout
           android:id="@+id/list_row3_tile"
-          android:layout_width="32dp"
-          android:layout_height="32dp"
-          android:layout_gravity="center"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
           android:background="@drawable/recent_saves_widget_thumb">
 
           <ImageView
