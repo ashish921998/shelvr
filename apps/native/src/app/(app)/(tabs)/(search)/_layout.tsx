@@ -6,7 +6,10 @@ import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 
 export default function SearchStackLayout() {
   useAppLocale();
-  const { screenOptions } = useTabStackChrome({ headerTransparent: true });
+  const { screenOptions } = useTabStackChrome({
+    headerTransparent: true,
+    softScrollEdge: true,
+  });
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index">

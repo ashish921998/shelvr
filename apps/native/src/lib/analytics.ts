@@ -270,6 +270,9 @@ type AnalyticsEventProperties = {
   save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
+  // Post-purchase save handoff on Home (lib/welcome-save.ts).
+  welcome_save_shown: { trial: boolean };
+  welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
   exit_offer_reminder_opt_in: { granted: boolean };
   exit_offer_reminder_opt_out: Record<string, never>;
   exit_offer_expired_open: Record<string, never>;
