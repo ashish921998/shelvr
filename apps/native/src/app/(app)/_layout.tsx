@@ -1,3 +1,4 @@
+import { AppIntentsBridge } from "@/lib/app-intents";
 import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -48,6 +49,7 @@ export default function AppLayout() {
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
+      <AppIntentsBridge />
       <ExitOfferSheetHost />
       <Stack
         screenOptions={{

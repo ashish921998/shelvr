@@ -640,10 +640,25 @@ async function analyzeLinkItem(
   return { result, page, linkRead: read };
 }
 
+/** Upper bound on the Siri context a classification prompt carries. */
+const MAX_CAPTURE_CONTEXT_CHARS = 4000;
+
+/** The prompt line for what a Siri capture knew beyond the saved content
+ * itself, or nothing for a save made in the app. */
+function captureContextBlock(captureContext: string | undefined): string[] {
+  const context = captureContext?.trim() ?? "";
+  if (context === "") return [];
+  return [
+    "The user saved this with Siri. What Siri passed along, and any text read from the image on the device, follows. Use it to understand the item; describe the content itself (the recipe, article, product, or place), not the fact that it was a screenshot, and ignore phone chrome such as the status bar and browser toolbars.",
+    `Siri context:\n${context.slice(0, MAX_CAPTURE_CONTEXT_CHARS)}`,
+  ];
+}
+
 async function analyzeImageItem(
   ctx: ActionCtx,
   item: Doc<"items">,
   spacesBlock: string,
+  captureContext?: string,
 ): Promise<Classification> {
   if (!item.storageId) {
     throw new StoredImageError("not_found");
@@ -663,6 +678,7 @@ async function analyzeImageItem(
             text: [
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
               "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
+              ...captureContextBlock(captureContext),
               spacesBlock,
               intentsPromptBlock(5),
             ].join("\n\n"),
@@ -682,6 +698,7 @@ async function analyzeImageItem(
 async function analyzeNoteItem(
   item: Doc<"items">,
   spacesBlock: string,
+  captureContext?: string,
 ): Promise<Classification> {
   if (!item.note) {
     throw new Error("Note item has no text");
@@ -695,6 +712,7 @@ async function analyzeNoteItem(
     schema: itemAnalysisSchema,
     prompt: [
       "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+      ...captureContextBlock(captureContext),
       spacesBlock,
       ...(item.titleSource === "user" && item.title
         ? [`The user titled this note: ${item.title}`]
@@ -900,6 +918,10 @@ export const processItem = internalAction({
     // must still own the item and win the refresh bucket, and a failure leaves
     // the ready note untouched.
     refresh: v.optional(v.boolean()),
+    // What a Siri capture knew beyond the saved content (the user's words,
+    // text read from an image on the device). Only steers this run's
+    // classification; a later retry classifies without it.
+    captureContext: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -935,9 +957,14 @@ export const processItem = internalAction({
           startedAt,
         );
       } else if (item.type === "image") {
-        outcome = await analyzeImageItem(ctx, item, spacesBlock);
+        outcome = await analyzeImageItem(
+          ctx,
+          item,
+          spacesBlock,
+          args.captureContext,
+        );
       } else {
-        outcome = await analyzeNoteItem(item, spacesBlock);
+        outcome = await analyzeNoteItem(item, spacesBlock, args.captureContext);
       }
       if ("terminal" in outcome) {
         return null;

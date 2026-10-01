@@ -134,6 +134,11 @@ module.exports = ({ config }) => ({
     infoPlist: {
       ...appConfig.expo.ios?.infoPlist,
       ...config?.ios?.infoPlist,
+      // Dev and preview builds are named "Shelvr (Dev)" / "Shelvr (Preview)";
+      // this lets Siri and App Shortcut phrases still answer to "Shelvr".
+      INAlternativeAppNames: [
+        { INAlternativeAppName: appConfig.expo.name ?? "Shelvr" },
+      ],
       ...(isProduction
         ? {
             NSAppTransportSecurity: {
