@@ -1,0 +1,7 @@
+{
+  "name": "recent-saves-widget",
+  "version": "1.0.0",
+  "description": "Android Recent Saves home screen widget. iOS uses expo-widgets.",
+  "main": "index.ts",
+  "private": true
+}
