@@ -55,8 +55,12 @@ The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
 the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
 same steps, so the pre-commit hook and the remote gate cannot drift. Knip's
 Convex entries are the top-level `convex/*.ts` modules and their co-located
-tests, so a Convex-registered function living in `convex/model/` is reported as
-an unused export. Advisories
+tests; every other file under `convex/` is a project file whose exports are
+reported as unused unless another module imports them. The Convex CLI registers
+every file under `convex/` though, so a `query` / `mutation` / `action` /
+`internal*` function stays live through the router with no importer at all.
+Keep registered functions in top-level modules, and confirm a reported export
+against `_generated/api.d.ts` before removing it. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
