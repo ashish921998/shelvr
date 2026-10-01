@@ -441,6 +441,19 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
 
+  // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
+  // intents save without launching the JavaScript app, so they have no Convex
+  // Auth JWT. Only the SHA-256 hex hash is stored; the raw token lives in the
+  // device keychain. See appIntents.ts.
+  captureTokens: defineTable({
+    userId: v.id("users"),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_user", ["userId"]),
+
   // A public share link for one item. The random token, never the item id, is
   // the capability: item ids travel through analytics, tokens do not.
   shareLinks: defineTable({

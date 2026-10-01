@@ -19,6 +19,8 @@ export const SAVE_SOURCES = [
   "note",
   "camera",
   "photo_import",
+  // Siri, Shortcuts, and the other iOS App Intents (appIntents.ts).
+  "siri",
 ] as const;
 
 export type SaveSource = (typeof SAVE_SOURCES)[number];

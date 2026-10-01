@@ -3,7 +3,7 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -231,11 +231,15 @@
           }
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-app-intents"
     ],
     "experiments": {
       "typedRoutes": true,
-      "tsconfigPaths": true
+      "tsconfigPaths": true,
+      "inlineModules": {
+        "watchedDirectories": ["app-intents"]
+      }
     },
     "extra": {
       "router": {},

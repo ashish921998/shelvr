@@ -13,9 +13,17 @@ import {
   reconcileRevenueCatCustomers,
   reconcileRevenueCatTransfer,
 } from "./model/revenuecatTransfer";
+import { bearerToken, sha256Hex } from "./model/captureTokens";
+import {
+  parseImageBegin,
+  parseImageFinish,
+  parseLinkOrNote,
+} from "./model/captureRequest";
+import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
+import { saveErrorCode } from "./model/saveErrors";
 import { secureCompare } from "./model/secureCompare";
 import {
   WaitlistInputError,
@@ -300,6 +308,162 @@ http.route({
     });
     if (!preview) return json({ message: "Not found." }, 404);
     return json(preview, 200);
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// iOS App Intents (Siri, Shortcuts)
+// ---------------------------------------------------------------------------
+//
+// The Swift intents in `apps/native/app-intents/` save without launching the
+// JavaScript app, authenticated by a per-device capture token rather than a
+// Convex Auth JWT (see appIntents.ts). Every route answers JSON with an `error`
+// code the Swift side maps to what Siri says: `unauthorized` (sign in again),
+// `pro_required` (open Shelvr to subscribe), `rate_limited`, a save refusal
+// code (`photo_limit`, `image_too_large`, `image_empty`), `bad_request`, or
+// `failed`.
+
+type CaptureRoute = "image_begin" | "image_finish" | "link" | "note";
+
+function captureUnauthorized(): Response {
+  return json({ error: "unauthorized" }, 401);
+}
+
+/** Maps a refused capture to its response. Never logs content or URLs. */
+function isSavableUrl(url: string): boolean {
+  try {
+    normalizeExternalUrl(url);
+    return true;
+  } catch (error) {
+    if (isUrlPolicyError(error)) return false;
+    throw error;
+  }
+}
+
+function captureFailure(route: CaptureRoute, error: unknown): Response {
+  const code = saveErrorCode(error);
+  if (code === "pro_required") return json({ error: code }, 402);
+  if (code !== null) return json({ error: code }, 422);
+  if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+  logEvent("error", "app_intent_capture_failed", {
+    route,
+    error_name: errorName(error),
+  });
+  return json({ error: "failed" }, 500);
+}
+
+/** The caller's token hash and JSON body, or the response that ends it. */
+async function readCapture(
+  req: Request,
+): Promise<{ tokenHash: string; body: unknown } | Response> {
+  const token = bearerToken(req.headers.get("authorization"));
+  if (token === undefined) return captureUnauthorized();
+  try {
+    return { tokenHash: await sha256Hex(token), body: await req.json() };
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+}
+
+http.route({
+  path: "/app-intents/image/begin",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(req);
+    if (read instanceof Response) return read;
+    const request = parseImageBegin(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    try {
+      const result = await ctx.runMutation(
+        internal.appIntents.beginImageCapture,
+        { tokenHash: read.tokenHash, operationId: request.operationId },
+      );
+      if (result.kind === "unauthorized") return captureUnauthorized();
+      return json(
+        result.kind === "upload"
+          ? { uploadUrl: result.uploadUrl }
+          : { itemId: result.itemId },
+        200,
+      );
+    } catch (error) {
+      return captureFailure("image_begin", error);
+    }
+  }),
+});
+
+http.route({
+  path: "/app-intents/image/finish",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(req);
+    if (read instanceof Response) return read;
+    const request = parseImageFinish(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    try {
+      const attached = await ctx.runMutation(
+        internal.appIntents.attachImageCapture,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          storageId: request.storageId,
+        },
+      );
+      if (attached.kind === "unauthorized") return captureUnauthorized();
+      if (attached.kind === "rejected") {
+        return json(
+          { error: attached.error },
+          attached.error === "bad_request" ? 400 : 422,
+        );
+      }
+      const saved = await ctx.runMutation(
+        internal.appIntents.finalizeImageCapture,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          aspectRatio: request.aspectRatio,
+          isSticker: request.isSticker,
+          spaceId: request.spaceId,
+          captureContext: request.context,
+        },
+      );
+      if (saved.kind === "unauthorized") return captureUnauthorized();
+      return json({ itemId: saved.itemId }, 200);
+    } catch (error) {
+      return captureFailure("image_finish", error);
+    }
+  }),
+});
+
+http.route({
+  path: "/app-intents/capture",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(req);
+    if (read instanceof Response) return read;
+    const request = parseLinkOrNote(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    // A link the URL policy refuses is the caller's to report, not a server
+    // failure the app would queue and retry forever.
+    if (request.kind === "link" && !isSavableUrl(request.url)) {
+      return json({ error: "invalid_url" }, 422);
+    }
+    try {
+      const saved = await ctx.runMutation(
+        internal.appIntents.captureLinkOrNote,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          kind: request.kind,
+          url: request.kind === "link" ? request.url : undefined,
+          text: request.kind === "note" ? request.text : undefined,
+          spaceId: request.spaceId,
+        },
+      );
+      if (saved.kind === "unauthorized") return captureUnauthorized();
+      return json({ itemId: saved.itemId }, 200);
+    } catch (error) {
+      return captureFailure(request.kind, error);
+    }
   }),
 });
 

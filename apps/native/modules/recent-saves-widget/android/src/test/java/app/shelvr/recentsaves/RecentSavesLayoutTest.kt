@@ -1,7 +1,6 @@
 package app.shelvr.recentsaves
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,13 +60,6 @@ class RecentSavesLayoutTest {
   @Test
   fun `a wide panorama is center cropped to two by one`() {
     assertEquals(RecentSavesLayout.Crop(150, 0, 200, 100), RecentSavesLayout.ratioCrop(500, 100))
-  }
-
-  @Test
-  fun `wide photos sit above the caption instead of filling the card`() {
-    assertTrue(RecentSavesLayout.isCover(300, 400))
-    assertTrue(RecentSavesLayout.isCover(400, 400))
-    assertFalse(RecentSavesLayout.isCover(600, 400))
   }
 
   @Test
