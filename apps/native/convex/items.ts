@@ -945,84 +945,95 @@ export const beginImageImport = mutation({
   ),
   handler: async (ctx, args): Promise<BeginImageImportResult> => {
     const userId = await requireUserId(ctx);
-    requireOperationId(args.operationId);
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-    const now = Date.now();
+    return await beginImageImportForUser(ctx, userId, args.operationId);
+  },
+});
 
-    // Idempotent read path: a complete operation whose item still exists
-    // returns the itemId WITHOUT a Pro check — a lapsed user must still
-    // retrieve an already-completed save. Hoisted before the gate so every
-    // path below is new or recycled work and can be gated uniformly.
-    if (op?.status === "complete" && op.itemId !== undefined) {
-      const item = await ctx.db.get(op.itemId);
-      if (item !== null) {
-        return { kind: "complete", itemId: op.itemId };
-      }
+/** `beginImageImport` for an already authenticated `userId`. Shared with the
+ * Siri capture endpoint (appIntents.ts), which authenticates by capture token
+ * instead of a Convex Auth session, so both paths gate on Pro the same way. */
+export async function beginImageImportForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  operationId: string,
+): Promise<BeginImageImportResult> {
+  requireOperationId(operationId);
+  const op = await loadItemOperation(ctx, userId, operationId);
+  const now = Date.now();
+
+  // Idempotent read path: a complete operation whose item still exists
+  // returns the itemId WITHOUT a Pro check — a lapsed user must still
+  // retrieve an already-completed save. Hoisted before the gate so every
+  // path below is new or recycled work and can be gated uniformly.
+  if (op?.status === "complete" && op.itemId !== undefined) {
+    const item = await ctx.db.get(op.itemId);
+    if (item !== null) {
+      return { kind: "complete", itemId: op.itemId };
     }
+  }
 
-    // Every remaining path creates, recycles, or refreshes work — gate once.
-    // Quota here saves the client an upload it could never finalize.
-    await requireProEntitlement(ctx, userId);
-    await requirePhotoQuota(ctx, userId);
+  // Every remaining path creates, recycles, or refreshes work — gate once.
+  // Quota here saves the client an upload it could never finalize.
+  await requireProEntitlement(ctx, userId);
+  await requirePhotoQuota(ctx, userId);
 
-    if (op === null) {
-      // (userId, operationId) uniqueness is enforced by Convex's serializable
-      // transactions: if two begins race on an empty index range, only one
-      // insert commits; the other's transaction is retried and will observe
-      // the row above as a pending op. No application-level unique index exists
-      // because Convex has no unique secondary indexes — this OCC + retry is
-      // the supported idiom.
-      await ctx.db.insert("itemOperations", {
-        userId,
-        operationId: args.operationId,
-        kind: "image",
-        status: "pending",
-        updatedAt: now,
-      });
-      return {
-        kind: "upload",
-        uploadUrl: await ctx.storage.generateUploadUrl(),
-      };
-    }
-
-    if (op.status === "complete") {
-      // Recycle: the item was deleted ( itemId set but gone) or the row is
-      // inconsistent (no itemId). Release the orphaned storage object before
-      // resetting, otherwise the blob leaks (the cleanup cron only sweeps
-      // pending rows, and this row is currently complete). Guarded so a blob
-      // some other item/operation still depends on — or one already deleted —
-      // can't corrupt them or wedge this recycle path. Clearing itemId is
-      // redundant for the no-itemId case but harmless.
-      if (
-        op.storageId !== undefined &&
-        (await isStorageUnreferenced(ctx, op.storageId, op._id))
-      ) {
-        await safeDeleteStorage(ctx, op.storageId);
-      }
-      await ctx.db.patch(op._id, {
-        status: "pending",
-        itemId: undefined,
-        storageId: undefined,
-        updatedAt: now,
-      });
-      return {
-        kind: "upload",
-        uploadUrl: await ctx.storage.generateUploadUrl(),
-      };
-    }
-
-    // Pending: refresh updatedAt (a begin is active interest) and hand back a
-    // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
-    // the first storageId and discards the redundant blob. A lapsed user
-    // retrying a pending op must not mint a fresh upload URL or refresh
-    // updatedAt (which would keep the row alive past the cleanup cron).
-    await ctx.db.patch(op._id, { updatedAt: now });
+  if (op === null) {
+    // (userId, operationId) uniqueness is enforced by Convex's serializable
+    // transactions: if two begins race on an empty index range, only one
+    // insert commits; the other's transaction is retried and will observe
+    // the row above as a pending op. No application-level unique index exists
+    // because Convex has no unique secondary indexes — this OCC + retry is
+    // the supported idiom.
+    await ctx.db.insert("itemOperations", {
+      userId,
+      operationId: operationId,
+      kind: "image",
+      status: "pending",
+      updatedAt: now,
+    });
     return {
       kind: "upload",
       uploadUrl: await ctx.storage.generateUploadUrl(),
     };
-  },
-});
+  }
+
+  if (op.status === "complete") {
+    // Recycle: the item was deleted ( itemId set but gone) or the row is
+    // inconsistent (no itemId). Release the orphaned storage object before
+    // resetting, otherwise the blob leaks (the cleanup cron only sweeps
+    // pending rows, and this row is currently complete). Guarded so a blob
+    // some other item/operation still depends on — or one already deleted —
+    // can't corrupt them or wedge this recycle path. Clearing itemId is
+    // redundant for the no-itemId case but harmless.
+    if (
+      op.storageId !== undefined &&
+      (await isStorageUnreferenced(ctx, op.storageId, op._id))
+    ) {
+      await safeDeleteStorage(ctx, op.storageId);
+    }
+    await ctx.db.patch(op._id, {
+      status: "pending",
+      itemId: undefined,
+      storageId: undefined,
+      updatedAt: now,
+    });
+    return {
+      kind: "upload",
+      uploadUrl: await ctx.storage.generateUploadUrl(),
+    };
+  }
+
+  // Pending: refresh updatedAt (a begin is active interest) and hand back a
+  // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
+  // the first storageId and discards the redundant blob. A lapsed user
+  // retrying a pending op must not mint a fresh upload URL or refresh
+  // updatedAt (which would keep the row alive past the cleanup cron).
+  await ctx.db.patch(op._id, { updatedAt: now });
+  return {
+    kind: "upload",
+    uploadUrl: await ctx.storage.generateUploadUrl(),
+  };
+}
 
 export const attachImageUpload = mutation({
   args: {
@@ -1035,196 +1046,225 @@ export const attachImageUpload = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
-    requireOperationId(args.operationId);
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-    const now = Date.now();
-
-    // Skip the size check for completed ops and for a different already-attached
-    // file; those paths return idempotently below.
-    const validatesNewUpload =
-      op?.status !== "complete" &&
-      (!op?.storageId || op.storageId === args.storageId);
-    const metadata = validatesNewUpload
-      ? await ctx.db.system.get("_storage", args.storageId)
-      : null;
-    if (validatesNewUpload) {
-      const error = metadata ? imageSizeError(metadata.size) : undefined;
-      if (error) {
-        if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
-          throw new Error(STORAGE_IN_USE);
-        }
-        await safeDeleteStorage(ctx, args.storageId);
-        if (op) {
-          await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
-        }
-        // Return, don't throw: throwing would roll back storage cleanup.
-        return { storageId: args.storageId, error };
-      }
-    }
-
-    if (op === null) {
-      // No begin happened (or the row was swept). Adopt the caller's storage id
-      // only if the blob actually exists (a swept id must not become an item
-      // with a permanently dead image) and isn't referenced by an item or
-      // another operation. NOTE: existence + unreferenced is NOT proof the
-      // caller owns this blob during the un-attached window — see the residual
-      // documented on isStorageUnreferenced.
-      if (metadata === null) {
-        throw new Error("Storage object not found");
-      }
-      if (!(await isStorageUnreferenced(ctx, args.storageId))) {
-        throw new Error(STORAGE_IN_USE);
-      }
-      await ctx.db.insert("itemOperations", {
-        userId,
-        operationId: args.operationId,
-        kind: "image",
-        status: "pending",
-        storageId: args.storageId,
-        updatedAt: now,
-      });
-      return { storageId: args.storageId };
-    }
-
-    if (op.status === "complete") {
-      // Already finalized (a racing retry lost to the original's finalize).
-      // Return the canonical id, and delete the retry's redundant re-upload —
-      // otherwise it is referenced by nothing (no item, no ledger row) and the
-      // pending-only cleanup cron would never reclaim it. The unreferenced
-      // guard keeps a blob some other item/operation owns safe.
-      if (
-        args.storageId !== op.storageId &&
-        (await isStorageUnreferenced(ctx, args.storageId))
-      ) {
-        await safeDeleteStorage(ctx, args.storageId);
-      }
-      return { storageId: op.storageId ?? args.storageId };
-    }
-
-    // First attachment wins. A racing retry that supplies a different storageId
-    // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob — but
-    // only if it is unreferenced, so a client can never delete storage it
-    // doesn't own (e.g. another user's blob or another operation's pending
-    // upload).
-    if (op.storageId !== undefined && op.storageId !== args.storageId) {
-      if (await isStorageUnreferenced(ctx, args.storageId)) {
-        await safeDeleteStorage(ctx, args.storageId);
-      }
-      await ctx.db.patch(op._id, { updatedAt: now });
-      return { storageId: op.storageId };
-    }
-    // No canonical id yet, or the caller re-sent the same id: adopt it, with
-    // the same existence and unreferenced defenses as the no-begin path.
-    if (op.storageId === undefined) {
-      if (metadata === null) {
-        throw new Error("Storage object not found");
-      }
-      if (!(await isStorageUnreferenced(ctx, args.storageId))) {
-        throw new Error(STORAGE_IN_USE);
-      }
-    }
-    await ctx.db.patch(op._id, { storageId: args.storageId, updatedAt: now });
-    return { storageId: args.storageId };
+    return await attachImageUploadForUser(ctx, userId, args);
   },
 });
 
+/** `attachImageUpload` for an already authenticated `userId` (see
+ * beginImageImportForUser). */
+export async function attachImageUploadForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: { operationId: string; storageId: Id<"_storage"> },
+): Promise<{ storageId: Id<"_storage">; error?: string }> {
+  await requireProEntitlement(ctx, userId);
+  requireOperationId(args.operationId);
+  const op = await loadItemOperation(ctx, userId, args.operationId);
+  const now = Date.now();
+
+  // Skip the size check for completed ops and for a different already-attached
+  // file; those paths return idempotently below.
+  const validatesNewUpload =
+    op?.status !== "complete" &&
+    (!op?.storageId || op.storageId === args.storageId);
+  const metadata = validatesNewUpload
+    ? await ctx.db.system.get("_storage", args.storageId)
+    : null;
+  if (validatesNewUpload) {
+    const error = metadata ? imageSizeError(metadata.size) : undefined;
+    if (error) {
+      if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
+        throw new Error(STORAGE_IN_USE);
+      }
+      await safeDeleteStorage(ctx, args.storageId);
+      if (op) {
+        await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
+      }
+      // Return, don't throw: throwing would roll back storage cleanup.
+      return { storageId: args.storageId, error };
+    }
+  }
+
+  if (op === null) {
+    // No begin happened (or the row was swept). Adopt the caller's storage id
+    // only if the blob actually exists (a swept id must not become an item
+    // with a permanently dead image) and isn't referenced by an item or
+    // another operation. NOTE: existence + unreferenced is NOT proof the
+    // caller owns this blob during the un-attached window — see the residual
+    // documented on isStorageUnreferenced.
+    if (metadata === null) {
+      throw new Error("Storage object not found");
+    }
+    if (!(await isStorageUnreferenced(ctx, args.storageId))) {
+      throw new Error(STORAGE_IN_USE);
+    }
+    await ctx.db.insert("itemOperations", {
+      userId,
+      operationId: args.operationId,
+      kind: "image",
+      status: "pending",
+      storageId: args.storageId,
+      updatedAt: now,
+    });
+    return { storageId: args.storageId };
+  }
+
+  if (op.status === "complete") {
+    // Already finalized (a racing retry lost to the original's finalize).
+    // Return the canonical id, and delete the retry's redundant re-upload —
+    // otherwise it is referenced by nothing (no item, no ledger row) and the
+    // pending-only cleanup cron would never reclaim it. The unreferenced
+    // guard keeps a blob some other item/operation owns safe.
+    if (
+      args.storageId !== op.storageId &&
+      (await isStorageUnreferenced(ctx, args.storageId))
+    ) {
+      await safeDeleteStorage(ctx, args.storageId);
+    }
+    return { storageId: op.storageId ?? args.storageId };
+  }
+
+  // First attachment wins. A racing retry that supplies a different storageId
+  // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob — but
+  // only if it is unreferenced, so a client can never delete storage it
+  // doesn't own (e.g. another user's blob or another operation's pending
+  // upload).
+  if (op.storageId !== undefined && op.storageId !== args.storageId) {
+    if (await isStorageUnreferenced(ctx, args.storageId)) {
+      await safeDeleteStorage(ctx, args.storageId);
+    }
+    await ctx.db.patch(op._id, { updatedAt: now });
+    return { storageId: op.storageId };
+  }
+  // No canonical id yet, or the caller re-sent the same id: adopt it, with
+  // the same existence and unreferenced defenses as the no-begin path.
+  if (op.storageId === undefined) {
+    if (metadata === null) {
+      throw new Error("Storage object not found");
+    }
+    if (!(await isStorageUnreferenced(ctx, args.storageId))) {
+      throw new Error(STORAGE_IN_USE);
+    }
+  }
+  await ctx.db.patch(op._id, { storageId: args.storageId, updatedAt: now });
+  return { storageId: args.storageId };
+}
+
+const finalizeImageImportArgs = v.object({
+  operationId: v.string(),
+  analyticsSessionId: v.optional(v.string()),
+  saveSource: v.optional(saveSourceValidator),
+  aspectRatio: v.optional(v.number()),
+  isSticker: v.optional(v.boolean()),
+  capturedAt: v.optional(v.number()),
+  latitude: v.optional(v.number()),
+  longitude: v.optional(v.number()),
+  spaceId: v.optional(v.id("spaces")),
+});
+
+type FinalizeImageImportArgs = Infer<typeof finalizeImageImportArgs> & {
+  captureContext?: string;
+};
+
 export const finalizeImageImport = mutation({
-  args: {
-    operationId: v.string(),
-    analyticsSessionId: v.optional(v.string()),
-    saveSource: v.optional(saveSourceValidator),
-    aspectRatio: v.optional(v.number()),
-    isSticker: v.optional(v.boolean()),
-    capturedAt: v.optional(v.number()),
-    latitude: v.optional(v.number()),
-    longitude: v.optional(v.number()),
-    spaceId: v.optional(v.id("spaces")),
-  },
+  args: finalizeImageImportArgs.fields,
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    requireOperationId(args.operationId);
-
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-
-    // Already complete — return the original live item id WITHOUT validating
-    // the resubmitted metadata. The idempotent read path must not be gated on
-    // the caller resending identical valid fields; a completed import is final.
-    // (A complete row pointing at a deleted item should have been recycled by
-    // begin; if we reach here, treat it as complete with the recorded id.)
-    // Entitlement is NOT checked here — a lapsed user must still retrieve an
-    // already-completed itemId.
-    if (op !== null && op.status === "complete" && op.itemId !== undefined) {
-      return op.itemId;
-    }
-
-    // Gate only new work (creating an item from a pending operation). Rate limit
-    // sits here too — after the idempotent completed-return above, so a retry of
-    // an already-finished import is never charged against the bucket.
-    await requireProEntitlement(ctx, userId);
-    const photoCount = await requirePhotoQuota(ctx, userId);
-    let storedBytes: number | undefined;
-    if (op?.storageId) {
-      const metadata = await ctx.db.system.get("_storage", op.storageId);
-      if (!metadata) throw new Error("Storage object not found");
-      const sizeCode = imageSizeErrorCode(metadata.size);
-      if (sizeCode) throw saveError(sizeCode);
-      storedBytes = metadata.size;
-    }
-    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-
-    // Validate BEFORE touching the ledger: invalid metadata must not mark the
-    // operation complete, so the caller can retry with corrected input.
-    validateImageMetadata(args);
-
-    if (op === null) {
-      // The caller skipped begin (or the row was swept). We have no storageId
-      // to attach, so this is an invalid import attempt.
-      throw new Error("Operation has no attached upload");
-    }
-    if (op.storageId === undefined) {
-      // begin succeeded but attach never ran (process died between upload and
-      // attach). The narrow unreferenced-blob window the plan documents.
-      throw new Error("Operation has no attached upload");
-    }
-
-    const run = beginProcessingRun();
-    const itemId = await ctx.db.insert("items", {
-      userId,
-      type: "image",
-      ...run,
-      storageId: op.storageId,
-      aspectRatio: args.aspectRatio,
-      isSticker: args.isSticker,
-      capturedAt: args.capturedAt,
-      latitude: args.latitude,
-      longitude: args.longitude,
-      tags: [],
-      searchText: "",
-    });
-    if (args.spaceId !== undefined) {
-      await saveIntoSpace(ctx, userId, itemId, args.spaceId);
-    }
-    await ctx.db.patch(op._id, {
-      status: "complete",
-      itemId,
-      updatedAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.ai.processItem, {
-      itemId,
-      runId: run.processingRunId,
-    });
-    await scheduleSaveTelemetry(ctx, itemId, {
-      sessionId: args.analyticsSessionId,
-      saveSource: args.saveSource,
-      operationId: args.operationId,
-      photoCount: photoCount + 1,
-      storedBytes,
-    });
-    return itemId;
+    return await finalizeImageImportForUser(ctx, userId, args);
   },
 });
+
+/** `finalizeImageImport` for an already authenticated `userId` (see
+ * beginImageImportForUser). `captureContext` is what a Siri capture knew
+ * about the image (the user's words, text read on the device); it only
+ * steers this run's classification and is never stored. */
+export async function finalizeImageImportForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: FinalizeImageImportArgs,
+): Promise<Id<"items">> {
+  requireOperationId(args.operationId);
+
+  const op = await loadItemOperation(ctx, userId, args.operationId);
+
+  // Already complete — return the original live item id WITHOUT validating
+  // the resubmitted metadata. The idempotent read path must not be gated on
+  // the caller resending identical valid fields; a completed import is final.
+  // (A complete row pointing at a deleted item should have been recycled by
+  // begin; if we reach here, treat it as complete with the recorded id.)
+  // Entitlement is NOT checked here — a lapsed user must still retrieve an
+  // already-completed itemId.
+  if (op !== null && op.status === "complete" && op.itemId !== undefined) {
+    return op.itemId;
+  }
+
+  // Gate only new work (creating an item from a pending operation). Rate limit
+  // sits here too — after the idempotent completed-return above, so a retry of
+  // an already-finished import is never charged against the bucket.
+  await requireProEntitlement(ctx, userId);
+  const photoCount = await requirePhotoQuota(ctx, userId);
+  let storedBytes: number | undefined;
+  if (op?.storageId) {
+    const metadata = await ctx.db.system.get("_storage", op.storageId);
+    if (!metadata) throw new Error("Storage object not found");
+    const sizeCode = imageSizeErrorCode(metadata.size);
+    if (sizeCode) throw saveError(sizeCode);
+    storedBytes = metadata.size;
+  }
+  await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+
+  // Validate BEFORE touching the ledger: invalid metadata must not mark the
+  // operation complete, so the caller can retry with corrected input.
+  validateImageMetadata(args);
+
+  if (op === null) {
+    // The caller skipped begin (or the row was swept). We have no storageId
+    // to attach, so this is an invalid import attempt.
+    throw new Error("Operation has no attached upload");
+  }
+  if (op.storageId === undefined) {
+    // begin succeeded but attach never ran (process died between upload and
+    // attach). The narrow unreferenced-blob window the plan documents.
+    throw new Error("Operation has no attached upload");
+  }
+
+  const run = beginProcessingRun();
+  const itemId = await ctx.db.insert("items", {
+    userId,
+    type: "image",
+    ...run,
+    storageId: op.storageId,
+    aspectRatio: args.aspectRatio,
+    isSticker: args.isSticker,
+    capturedAt: args.capturedAt,
+    latitude: args.latitude,
+    longitude: args.longitude,
+    tags: [],
+    searchText: "",
+  });
+  if (args.spaceId !== undefined) {
+    await saveIntoSpace(ctx, userId, itemId, args.spaceId);
+  }
+  await ctx.db.patch(op._id, {
+    status: "complete",
+    itemId,
+    updatedAt: Date.now(),
+  });
+  await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+    itemId,
+    runId: run.processingRunId,
+    captureContext: args.captureContext,
+  });
+  await scheduleSaveTelemetry(ctx, itemId, {
+    sessionId: args.analyticsSessionId,
+    saveSource: args.saveSource,
+    operationId: args.operationId,
+    photoCount: photoCount + 1,
+    storedBytes,
+  });
+  return itemId;
+}
 
 /** Read-only probe of an operation's server-side state. Used by client recovery
  * (e.g. plan 005's Tidy undo) to learn whether an operation completed. It MUST
@@ -1324,7 +1364,7 @@ export const cleanupStaleImageImports = internalMutation({
  * composer now supplies an operation id too, so its save attempt can join the
  * client and server telemetry; share retries use the same idempotency record.
  */
-async function createItemWithOperation(
+export async function createItemWithOperation(
   ctx: MutationCtx,
   userId: string,
   kind: Extract<OperationKind, "link" | "note">,
@@ -1334,6 +1374,9 @@ async function createItemWithOperation(
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
     saveSource?: SaveSource;
+    // What a Siri capture knew beyond the payload. Steers this run's
+    // classification only; never stored on the item.
+    captureContext?: string;
   },
 ): Promise<Id<"items">> {
   const now = Date.now();
@@ -1436,6 +1479,7 @@ async function insertLinkOrNote(
     analyticsSessionId?: string;
     saveSource?: SaveSource;
     operationId?: string;
+    captureContext?: string;
   },
 ): Promise<Id<"items">> {
   const run = beginProcessingRun();
@@ -1454,6 +1498,7 @@ async function insertLinkOrNote(
   await ctx.scheduler.runAfter(0, internal.ai.processItem, {
     itemId,
     runId: run.processingRunId,
+    captureContext: options.captureContext,
   });
   await scheduleSaveTelemetry(ctx, itemId, {
     sessionId: options.analyticsSessionId,

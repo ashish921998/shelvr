@@ -231,11 +231,15 @@
           }
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      "expo-app-intents"
     ],
     "experiments": {
       "typedRoutes": true,
-      "tsconfigPaths": true
+      "tsconfigPaths": true,
+      "inlineModules": {
+        "watchedDirectories": ["app-intents"]
+      }
     },
     "extra": {
       "router": {},

@@ -1,5 +1,6 @@
 import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
+import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -76,6 +77,7 @@ export function NotificationSessionProvider({
   const setPreferences = useMutation(api.notifications.setPreferences);
   const setSaveReminders = useMutation(api.notifications.setSaveReminders);
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
+  const revokeCaptureToken = useMutation(api.appIntents.revokeCaptureToken);
   const session = useMemo(
     () =>
       new NotificationDeviceSession(tokenStore, {
@@ -97,6 +99,8 @@ export function NotificationSessionProvider({
         setSaveReminders: (enabled) =>
           setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
         signOut: async () => {
+          // Before signOut, while the session can still authenticate it.
+          await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearExitOfferReminder();
         },
@@ -124,6 +128,7 @@ export function NotificationSessionProvider({
       setSaveReminders,
       signOut,
       deleteAccount,
+      revokeCaptureToken,
     ],
   );
   useEffect(() => {
