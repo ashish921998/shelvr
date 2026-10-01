@@ -43,6 +43,12 @@ function nudgeSheetReady(
   return nudgeReady && !inlinePromptsVisible.some(Boolean);
 }
 
+/** No rating prompt in an account's first session, or over the feedback
+ * form, whose keyboard the review sheet would strand. */
+function reviewDeferred(firstSession: boolean, feedbackOpen: boolean) {
+  return firstSession || feedbackOpen;
+}
+
 /** While the exit offer's window is open, its countdown takes the Pro slot. */
 function ProSlot({ userId, lapsed }: { userId?: string; lapsed: boolean }) {
   const exitOfferEndsAt = useExitOfferEndsAt(userId);
@@ -128,11 +134,12 @@ export default function HomeScreen() {
   const progress = useSaveProgress(user?._id, {
     defer: usePromptsDeferred(user?._id, cancelSurvey.visible, proPending),
   });
-  // No rating prompt in an account's first session.
-  useReviewPrompt(items, { defer: progress.firstSession });
   const recall = useSaveRecall(items, { defer: progress.deferLater });
   const feedback = useFeedbackInvitation(items, {
     defer: progress.deferLater || recall.visible || recall.pending,
+  });
+  useReviewPrompt(items, {
+    defer: reviewDeferred(progress.firstSession, feedback.modalOpen),
   });
   const busySaving = useBusySaving(items);
   // The share screen records the first save while Home stays mounted below
