@@ -35,9 +35,16 @@ import {
 // (Reanimated views over real text). Both read one clock, defined in
 // `timeline.ts`.
 
-const MARK_SIZE = 40;
-const LOCKUP_GAP = 13;
-const WORDMARK_SIZE = 46;
+const WORDMARK_SIZE = 50;
+/**
+ * Crimson Pro's ascender height (the top of the h and l), as a share of the
+ * font size: 694 units of 1024. The S is drawn exactly this tall and stood on
+ * the wordmark's baseline, so it reads as a letter of the same line rather
+ * than a badge floating beside it.
+ */
+const ASCENDER = 694 / 1024;
+const MARK_SIZE = Math.round(WORDMARK_SIZE * ASCENDER);
+const LOCKUP_GAP = 11;
 /** Slack past the measured wordmark, so the last glyph is never clipped. */
 const UNFURL_OVERSHOOT = 4;
 
@@ -246,11 +253,14 @@ const styles = StyleSheet.create((theme, rt) => {
       top: `${SPLASH_ANCHOR_Y * 100}%`,
       alignItems: "center",
       // Centre the lockup on the anchor rather than hanging it below the line.
-      transform: [{ translateY: -MARK_SIZE / 2 }],
+      transform: [{ translateY: -WORDMARK_SIZE / 2 }],
     },
     lockup: {
       flexDirection: "row",
-      alignItems: "center",
+      // The S's bottom edge meets the wordmark's baseline. Centring the two
+      // boxes instead left the mark floating above the letters, because a
+      // text box carries its descender space below the baseline.
+      alignItems: "baseline",
     },
     wordmarkClip: {
       overflow: "hidden",
