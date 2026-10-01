@@ -11,7 +11,7 @@ import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useSegments } from "expo-router";
 import { AppState, Keyboard } from "react-native";
 import * as StoreReview from "expo-store-review";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 
 const PROMPTED_KEY = "shelvr.review.prompted";
@@ -38,6 +38,13 @@ export function useReviewPrompt(
     homeRef.current = home;
   }, [home]);
   const keyboardVisible = useKeyboardVisible();
+  const [appState, setAppState] = useState(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", setAppState);
+    return () => subscription.remove();
+  }, []);
+  // Bumped when a change cancels an attempt mid-check, so it runs again.
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (
@@ -47,7 +54,7 @@ export function useReviewPrompt(
       !items ||
       triggered.current ||
       isPaywallPending() ||
-      AppState.currentState !== "active"
+      appState !== "active"
     )
       return;
     if (items.some((item) => item.status === "processing")) return;
@@ -65,6 +72,10 @@ export function useReviewPrompt(
     // two prompts never appear together. Released below if the wait is cut.
     setNativeReviewAttemptInFlight(true);
     let started = false;
+    // Any change to what this attempt was scheduled under (Home left and
+    // re-entered, keyboard shown, a sheet or the feedback form opened)
+    // cancels it, even after hasAction() has started.
+    let cancelled = false;
     const timer = setTimeout(() => {
       // Claim the attempt so overlapping feed updates cannot start a second
       // one while hasAction() is pending. Nothing is persisted until the
@@ -74,6 +85,7 @@ export function useReviewPrompt(
       void attempt(readyCount);
     }, REVIEW_PROMPT_SETTLE_MS);
     return () => {
+      cancelled = true;
       clearTimeout(timer);
       if (!started) setNativeReviewAttemptInFlight(false);
     };
@@ -83,6 +95,7 @@ export function useReviewPrompt(
       try {
         if (
           (await StoreReview.hasAction()) &&
+          !cancelled &&
           homeRef.current &&
           !Keyboard.isVisible() &&
           !isPaywallPending() &&
@@ -103,8 +116,13 @@ export function useReviewPrompt(
         // A suppressed attempt (left Home, keyboard up, paywall opened,
         // backgrounded, or no review action) recorded nothing, so a later
         // feed change may retry.
-        if (!prompted) triggered.current = false;
+        if (!prompted) {
+          triggered.current = false;
+          // The change that cancelled it found this attempt still claimed,
+          // so schedule a fresh one with a full settle window.
+          if (cancelled) setRetry((n) => n + 1);
+        }
       }
     }
-  }, [items, home, defer, keyboardVisible]);
+  }, [items, home, defer, keyboardVisible, appState, retry]);
 }

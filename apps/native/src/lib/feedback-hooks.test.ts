@@ -235,7 +235,7 @@ describe("useReviewPrompt", () => {
   it("records the prompt only once the guards pass, right before requesting the review", async () => {
     const items = threeReady();
     react.mount(() => useReviewPrompt(items));
-    // hasAction() is still pending: nothing may be claimed yet.
+    // Home has not settled yet: nothing may be claimed.
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
 
@@ -313,16 +313,71 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).toHaveBeenCalledOnce();
   });
 
-  it("records nothing when the keyboard comes up while hasAction() is pending", async () => {
+  /** Holds hasAction() open until the test resolves it. */
+  const pendingHasAction = () => {
+    let resolve!: (value: boolean) => void;
+    mock.hasAction.mockImplementationOnce(
+      () => new Promise<boolean>((r) => (resolve = r)),
+    );
+    return (value = true) => resolve(value);
+  };
+
+  it("cancels an attempt when the keyboard shows while hasAction() is pending", async () => {
     const items = threeReady();
-    mock.hasAction.mockImplementationOnce(async () => {
-      mock.keyboard.visible = true;
-      return true;
-    });
+    const resolveHasAction = pendingHasAction();
     react.mount(() => useReviewPrompt(items));
     await flush();
+    expect(mock.hasAction).toHaveBeenCalledOnce();
+
+    // The keyboard shows and hides again before hasAction() answers.
+    setKeyboard(true);
+    setKeyboard(false);
+    resolveHasAction();
+    await vi.advanceTimersByTimeAsync(0);
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
+
+    // A fresh attempt waits out a full settle window of its own.
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("cancels an attempt when a hold starts while hasAction() is pending", async () => {
+    const items = threeReady();
+    let defer = false;
+    const resolveHasAction = pendingHasAction();
+    react.mount(() => useReviewPrompt(items, { defer }));
+    await flush();
+
+    // The feedback form opens during the check.
+    defer = true;
+    react.rerender();
+    resolveHasAction();
+    await flush();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    defer = false;
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("cancels an attempt when Home is left and re-entered while hasAction() is pending", async () => {
+    const items = threeReady();
+    const resolveHasAction = pendingHasAction();
+    react.mount(() => useReviewPrompt(items));
+    await flush();
+
+    mock.segments = ["(app)", "item", "[id]"];
+    react.rerender();
+    mock.segments = ["(app)", "(tabs)", "(home)"];
+    react.rerender();
+    resolveHasAction();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
   });
 
   it("holds the feedback invitation through the settle window and releases it when Home is left", async () => {

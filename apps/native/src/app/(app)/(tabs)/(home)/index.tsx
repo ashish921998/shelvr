@@ -18,7 +18,11 @@ import {
   useEntitlement,
   useExitOfferEndsAt,
 } from "@/lib/entitlement";
-import { hasSavedFirstShare, shouldShowHowTo } from "@/lib/first-share";
+import {
+  hasSavedFirstShare,
+  shouldShowHowTo,
+  weeklyNudge,
+} from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import {
   useBusySaving,
@@ -43,10 +47,23 @@ function nudgeSheetReady(
   return nudgeReady && !inlinePromptsVisible.some(Boolean);
 }
 
-/** No rating prompt in an account's first session, or over the feedback
- * form, whose keyboard the review sheet would strand. */
-function reviewDeferred(firstSession: boolean, feedbackOpen: boolean) {
-  return firstSession || feedbackOpen;
+/** No rating prompt in an account's first session, over the feedback form
+ * (whose keyboard the review sheet would strand), or while Home's welcome or
+ * weekly sheet may be up. Lifting the hold restarts the settle window, which
+ * covers the sheet's dismissal. */
+function useReviewDeferred(
+  user: { _id: string } | null | undefined,
+  progress: { firstSession: boolean; nudgeReady: boolean },
+  feedbackOpen: boolean,
+): boolean {
+  const welcomePending = welcomeSave.usePending(user?._id);
+  const nudgePending = weeklyNudge.usePending(user?._id);
+  return (
+    progress.firstSession ||
+    feedbackOpen ||
+    welcomePending ||
+    (nudgePending && progress.nudgeReady)
+  );
 }
 
 /** While the exit offer's window is open, its countdown takes the Pro slot. */
@@ -139,7 +156,7 @@ export default function HomeScreen() {
     defer: progress.deferLater || recall.visible || recall.pending,
   });
   useReviewPrompt(items, {
-    defer: reviewDeferred(progress.firstSession, feedback.modalOpen),
+    defer: useReviewDeferred(user, progress, feedback.modalOpen),
   });
   const busySaving = useBusySaving(items);
   // The share screen records the first save while Home stays mounted below
