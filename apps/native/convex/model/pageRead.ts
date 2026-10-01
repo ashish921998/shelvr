@@ -1549,7 +1549,7 @@ async function fetchPage(url: string): Promise<PageData> {
  * is gone for good (no classification, no retry), or it could not be read this
  * time (classify from the URL alone, retry later). Keeps the branching out of
  * processItem's body; failed outcomes carry the error for sanitized logging. */
-export type PageRead =
+type PageRead =
   | PageReadOk
   | { status: "gone"; error: PageFetchError }
   | { status: "unreadable"; error: PageFetchError };

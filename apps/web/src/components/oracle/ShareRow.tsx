@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import type { OracleMode, OracleVerdict } from "@/lib/oracle";
-import { encodeSharedVerdict, sharedVerdictImagePath } from "@/lib/oracleShare";
+import {
+  encodeSharedVerdict,
+  sharedVerdictImagePath,
+  sharedVerdictPath,
+} from "@/lib/oracleShare";
 
 const IMAGE_NAME = "shelvr-oracle.png";
 
@@ -25,17 +29,19 @@ export default function ShareRow({
 }) {
   const [copied, setCopied] = useState(false);
   const [image, setImage] = useState<File>();
-  const code = useMemo(
-    () =>
-      encodeSharedVerdict({
-        mode,
-        persona: verdict.persona,
-        tagline: verdict.tagline,
-        spaces: verdict.spaces,
-        score: verdict.score,
-      }),
-    [mode, verdict],
-  );
+  const { code, url } = useMemo(() => {
+    const sharedVerdict = {
+      mode,
+      persona: verdict.persona,
+      tagline: verdict.tagline,
+      spaces: verdict.spaces,
+      score: verdict.score,
+    };
+    return {
+      code: encodeSharedVerdict(sharedVerdict),
+      url: `${window.location.origin}${sharedVerdictPath(sharedVerdict)}`,
+    };
+  }, [mode, verdict]);
   const imagePath = sharedVerdictImagePath(code, "story");
 
   // Safari only shares inside the tap's user activation, so the card is
@@ -58,8 +64,6 @@ export default function ShareRow({
 
   async function share() {
     const text = `The Shelvr Oracle says I'm ${verdict.persona}. What are you?`;
-    // The link opens this verdict's own page, whose preview card shows it.
-    const url = `${window.location.origin}/oracle/s?c=${code}`;
     if (typeof navigator.share === "function") {
       const files = image ? [image] : undefined;
       const withImage = files !== undefined && navigator.canShare?.({ files });

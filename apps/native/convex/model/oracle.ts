@@ -1,12 +1,12 @@
 import { v, type Infer } from "convex/values";
 import { z } from "zod";
 
-export const ORACLE_MAX_URLS = 3;
-export const ORACLE_MAX_TITLES = 5;
-export const ORACLE_MAX_ROWS = 40;
+const ORACLE_MAX_URLS = 3;
+const ORACLE_MAX_TITLES = 5;
+const ORACLE_MAX_ROWS = 40;
 // Node actions take at most 5 MiB of arguments, so a screenshot is capped at
 // 3 MiB of image, which is 4 MiB once base64 encoded.
-export const ORACLE_MAX_IMAGE_BASE64_CHARS = 4 * 1024 * 1024;
+const ORACLE_MAX_IMAGE_BASE64_CHARS = 4 * 1024 * 1024;
 const MAX_TEXT_CHARS = 300;
 const MAX_URL_CHARS = 2048;
 const MAX_TAB_COUNT = 100_000;
@@ -61,7 +61,7 @@ export type OracleInputOf<K extends OracleKind> = Extract<
   OracleInput,
   { kind: K }
 >;
-export type OracleVerdict = Infer<typeof oracleVerdictValidator>;
+type OracleVerdict = Infer<typeof oracleVerdictValidator>;
 
 export const oracleVerdictSchema = z.object({
   persona: z
@@ -128,8 +128,8 @@ function boundedString(value: unknown, max = MAX_TEXT_CHARS) {
 
 // Epoch milliseconds between 1990 and 2100. Anything outside is a malformed
 // export, and a date outside JavaScript's range would make formatting throw.
-export const ORACLE_MIN_SAVED_AT = Date.UTC(1990, 0, 1);
-export const ORACLE_MAX_SAVED_AT = Date.UTC(2100, 0, 1);
+const ORACLE_MIN_SAVED_AT = Date.UTC(1990, 0, 1);
+const ORACLE_MAX_SAVED_AT = Date.UTC(2100, 0, 1);
 
 function optionalTimestamp(value: unknown): number | undefined | null {
   if (value === undefined) return undefined;

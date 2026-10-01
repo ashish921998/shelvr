@@ -11,7 +11,7 @@ import { v } from "convex/values";
  * `item_saved` event, which PostHog dashboards group on. Adding one is additive;
  * renaming one splits an existing funnel in two without saying so.
  */
-export const SAVE_SOURCES = [
+const SAVE_SOURCES = [
   "onboarding_demo",
   "share_extension",
   "paste",

@@ -17,7 +17,7 @@ const CAPTURE_TIMEOUT_MS = 3000;
  * 100s, ... — long enough for a provider incident to clear between tries. */
 const RETRY_BASE_MS = 1000;
 
-export type PostHogDelivery =
+type PostHogDelivery =
   /** PostHog accepted the event. */
   | { status: "delivered" }
   /** No project token on the deployment, so nothing was sent. */
@@ -28,7 +28,7 @@ export type PostHogDelivery =
   /** Rate limiting, a server error, a timeout, or a transport failure. */
   | { status: "retryable"; httpStatus?: number; error?: unknown };
 
-export type PostHogEvent = {
+type PostHogEvent = {
   event: string;
   distinctId: string;
   /** Retry-stable dedupe id. PostHog drops a repeat of the same `uuid`, so

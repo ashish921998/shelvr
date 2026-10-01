@@ -28,7 +28,7 @@ const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
  * Generous for real links, bounded to deny pathological input. */
 export const MAX_URL_LENGTH = 2048;
 
-export class UrlPolicyErrorClass extends Error {
+class UrlPolicyErrorClass extends Error {
   constructor(
     public readonly code: UrlPolicyError,
     message: string,

@@ -24,9 +24,8 @@ import {
 
 /** Each kind rides in the payload and in telemetry, so an open is attributed
  * to what was sent. */
-export const NOTIFICATION_KIND = "weekly_shelf";
-export const reminderNotificationKind = (kind: "read" | "cook") =>
-  `${kind}_reminder`;
+const NOTIFICATION_KIND = "weekly_shelf";
+const reminderNotificationKind = (kind: "read" | "cook") => `${kind}_reminder`;
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
