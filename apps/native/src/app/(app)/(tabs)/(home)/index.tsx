@@ -60,8 +60,10 @@ function laterPromptsDeferred(
  * The rating prompt joins Home's moment chain last: it waits while anything
  * earlier holds or may claim the slot (cancel survey, Pro card, welcome,
  * save progress, recall, feedback invitation or form). It also sits out an
- * account's first session and a weekly sheet that may rise. Lifting a hold
- * restarts the prompt's settle window, which covers the sheet's dismissal.
+ * account's first session and a weekly sheet that may rise. Through the Pro
+ * card it also skips locked and lapsed accounts on purpose: someone who
+ * can't save right now is the wrong person to ask for a rating. Lifting a
+ * hold restarts the prompt's settle window, which covers a sheet's dismissal.
  */
 function useReviewDeferred(
   userId: string | undefined,
