@@ -34,7 +34,7 @@ const TRAILING_SOURCES = [
   "other",
 ] as const satisfies readonly AcquisitionSource[];
 
-export type SourceLabel =
+type SourceLabel =
   | { kind: "brand"; text: string }
   | { kind: "message"; key: TextMessageKey };
 
