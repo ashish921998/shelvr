@@ -1,6 +1,6 @@
 /**
  * Image dimensions read from a file's header bytes. Runtime-agnostic: it only
- * touches a Uint8Array, so both the page reader and the image backfill use it.
+ * touches a Uint8Array, so the page reader can use it in any runtime.
  */
 
 type ImageSize = { width: number; height: number };

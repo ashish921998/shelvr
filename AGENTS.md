@@ -53,7 +53,10 @@ use `expo lint`, which silently skips the `convex/` backend.
 
 The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
 the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
-same steps, so the pre-commit hook and the remote gate cannot drift. Advisories
+same steps, so the pre-commit hook and the remote gate cannot drift. Knip's
+Convex entries are the top-level `convex/*.ts` modules and their co-located
+tests, so a Convex-registered function living in `convex/model/` is reported as
+an unused export. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located

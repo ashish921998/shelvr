@@ -105,7 +105,7 @@ export const productValidator = v.object({
   thumbnailUrl: v.optional(v.string()),
 });
 
-export const productsStatusValidator = v.union(
+const productsStatusValidator = v.union(
   v.literal("searching"),
   v.literal("ready"),
   v.literal("failed"),
@@ -249,7 +249,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   return { ...stripEmbedding(item), imageUrl };
 }
 
-export async function toItemCard(
+async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
 ): Promise<ItemCard> {
@@ -309,8 +309,7 @@ function buildSearchText(parts: {
  * every item, full rows, newest first. Public function signatures are
  * contracts with every app build in the wild, so this keeps its exact shape
  * until the production update channel shows no bundle still calling it, then
- * remove it (`LIST_CAP` stays: the image backfill uses it too). New code uses
- * `listItemsPage`. */
+ * remove it (and `LIST_CAP` with it). New code uses `listItemsPage`. */
 export const listItems = query({
   args: {},
   returns: v.array(enrichedItemValidator),
@@ -327,7 +326,7 @@ export const listItems = query({
 
 /** Ready saves a new account needs before its shelf counts as started. The
  * Home "save your next two" card and the weekly shelf nudge both wait on it. */
-export const SAVE_PROGRESS_GOAL = 3;
+const SAVE_PROGRESS_GOAL = 3;
 const SAVE_PROGRESS_MAX_READ = 20;
 
 /** How many real saves the user has, counted up to `SAVE_PROGRESS_GOAL`. The
@@ -2627,40 +2626,6 @@ export const setEmbeddingsInternal = internalMutation({
       }
     }
     return { written, stamped, deferred };
-  },
-});
-
-export const listImagesNeedingRatioInternal = internalQuery({
-  args: {},
-  returns: v.array(
-    v.object({ _id: v.id("items"), storageId: v.id("_storage") }),
-  ),
-  handler: async (ctx) => {
-    const items = await ctx.db.query("items").take(LIST_CAP);
-    const out: { _id: Id<"items">; storageId: Id<"_storage"> }[] = [];
-    for (const item of items) {
-      if (
-        item.type === "image" &&
-        item.storageId !== undefined &&
-        item.aspectRatio === undefined
-      ) {
-        out.push({ _id: item._id, storageId: item.storageId });
-      }
-    }
-    return out;
-  },
-});
-
-export const setAspectRatioInternal = internalMutation({
-  args: { itemId: v.id("items"), aspectRatio: v.number() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const item = await ctx.db.get(args.itemId);
-    if (item === null) {
-      return null;
-    }
-    await ctx.db.patch(args.itemId, { aspectRatio: args.aspectRatio });
-    return null;
   },
 });
 
