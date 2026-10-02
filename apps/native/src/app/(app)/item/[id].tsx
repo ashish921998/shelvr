@@ -130,6 +130,7 @@ function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
       type: "beforeRemove" | "transitionStart" | "gestureCancel",
       callback: (e: { data?: { closing?: boolean } }) => void,
     ) => () => void;
+    isFocused: () => boolean;
   };
   const [focused, setFocused] = useState(true);
   useFocusEffect(
@@ -146,8 +147,10 @@ function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   // gestureCancel does.
   useEffect(() => {
     const drop = () => setFocused(false);
+    // A back tap landing mid-swipe cancels the gesture as the pop starts;
+    // the screen is no longer focused then, and the bar stays dropped.
     const offCancel = navigation.addListener("gestureCancel", () =>
-      setFocused(true),
+      setFocused(navigation.isFocused()),
     );
     const offRemove = navigation.addListener("beforeRemove", drop);
     const offTransition = navigation.addListener(
