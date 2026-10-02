@@ -164,9 +164,11 @@ describe("readPage for Pinterest pins", () => {
     });
     const read = await readPage(shortUrl);
     expect(read.status === "ok" && read.page.siteName).toBe("Pinterest");
+    // The page cap, not a smaller one: draining a pin page past a 64 KiB cap
+    // stalled to the deadline on live Pinterest.
     expect(safeFetch).toHaveBeenCalledWith(
       shortUrl,
-      expect.objectContaining({ maxRedirects: 5 }),
+      expect.objectContaining({ maxRedirects: 5, maxBytes: 1024 * 1024 }),
     );
   });
 
@@ -213,6 +215,17 @@ describe("readPage for Pinterest pins", () => {
         ? json(url, { data: [] })
         : { ok: false, code: "http_error", status: 404 },
     );
+    expect((await readPage(PIN_URL)).status).toBe("gone");
+  });
+
+  it("fails a deleted pin as gone when its page redirects to Pinterest's home page", async () => {
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [] }),
+      [PIN_URL]: html(
+        "https://www.pinterest.com/?show_error=true",
+        '<html><head><meta property="og:title" content="Pinterest"></head></html>',
+      ),
+    });
     expect((await readPage(PIN_URL)).status).toBe("gone");
   });
 
