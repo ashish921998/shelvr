@@ -14,7 +14,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -24,6 +24,7 @@ import {
   ScrollView,
   Switch,
   Text,
+  View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -201,22 +202,23 @@ export default function SettingsScreen() {
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
+      // Lets the Android form sheet hand drags to this list once it is full
+      // height, instead of only dragging the sheet.
+      nestedScrollEnabled
       contentContainerStyle={styles.content}
     >
-      <Stack.Screen
-        options={{
-          title: t("profile.settings"),
-          headerBackButtonDisplayMode: "minimal",
-          headerLeft: () =>
-            Platform.OS === "android" ? (
-              <HeaderIconButton
-                icon="xmark"
-                label={t("common.close")}
-                onPress={close}
-              />
-            ) : undefined,
-        }}
-      />
+      <View style={styles.sheetHeader}>
+        <Text accessibilityRole="header" style={styles.title}>
+          {t("profile.settings")}
+        </Text>
+        {Platform.OS === "android" ? (
+          <HeaderIconButton
+            icon="xmark"
+            label={t("common.close")}
+            onPress={close}
+          />
+        ) : null}
+      </View>
 
       <SettingCard
         title={t("notifications.weeklyShelf")}
@@ -328,9 +330,20 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create((theme) => ({
   content: {
     padding: theme.gap(3),
-    paddingTop: theme.gap(2),
+    paddingTop: theme.gap(4),
     paddingBottom: theme.gap(4),
     gap: theme.gap(1.5),
+  },
+  sheetHeader: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  title: {
+    fontFamily: theme.fonts.display,
+    fontSize: 24,
+    color: theme.colors.foreground,
   },
   fixtureReset: {
     alignSelf: "stretch",

@@ -1,5 +1,5 @@
-import { MenuView } from "@expo/ui/community/menu";
-import type { ReactNode } from "react";
+import { MenuView, type MenuComponentRef } from "@expo/ui/community/menu";
+import { useRef, type ReactNode } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 
 export type ActionMenuItem = {
@@ -32,8 +32,11 @@ export function ActionMenu({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const menu = useRef<MenuComponentRef>(null);
+  const isAndroid = process.env.EXPO_OS === "android";
   return (
     <MenuView
+      ref={menu}
       title={title}
       actions={actions.map((action) => ({
         id: action.id ?? action.label,
@@ -56,7 +59,23 @@ export function ActionMenu({
           ?.onPress();
       }}
     >
-      <View accessibilityRole="button" accessibilityLabel={label} style={style}>
+      <View
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        // Android's trigger Pressable opts out of accessibility, so TalkBack's
+        // double tap would land on this View with nothing to run. Route the
+        // activate action to the menu. iOS's SwiftUI menu handles VoiceOver.
+        accessible={isAndroid ? true : undefined}
+        accessibilityActions={isAndroid ? [{ name: "activate" }] : undefined}
+        onAccessibilityAction={
+          isAndroid
+            ? ({ nativeEvent }) => {
+                if (nativeEvent.actionName === "activate") menu.current?.show();
+              }
+            : undefined
+        }
+        style={style}
+      >
         {children}
       </View>
     </MenuView>

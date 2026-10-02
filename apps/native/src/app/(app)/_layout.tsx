@@ -171,10 +171,9 @@ export default function AppLayout() {
             name="settings"
             options={{
               presentation: "formSheet",
-              headerShown: true,
-              headerTransparent: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              headerBackButtonDisplayMode: "minimal",
+              // Android form sheets have no native header, so the screen
+              // draws its own title and close button, as Profile does.
+              headerShown: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },
