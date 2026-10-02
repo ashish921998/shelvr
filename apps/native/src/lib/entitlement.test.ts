@@ -14,6 +14,8 @@ const mock = vi.hoisted(() => ({
   presentExitSheet: vi.fn(),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
+  syncSuperwallUser: vi.fn(async () => {}),
+  resetSuperwallUser: vi.fn(async () => {}),
   captureError: vi.fn(),
   capture: vi.fn(),
   getOfferings: vi.fn(),
@@ -70,6 +72,10 @@ seedRequire("react-native-purchases-ui", {
 });
 vi.mock("./exit-offer-sheet", () => ({
   presentExitSheet: mock.presentExitSheet,
+}));
+vi.mock("./superwall", () => ({
+  syncSuperwallUser: mock.syncSuperwallUser,
+  resetSuperwallUser: mock.resetSuperwallUser,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("expo-secure-store", () => ({
@@ -135,6 +141,8 @@ beforeEach(() => {
   mock.presentPaywall.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
+  mock.syncSuperwallUser.mockClear();
+  mock.resetSuperwallUser.mockClear();
   mock.captureError.mockReset();
   mock.capture.mockReset();
   mock.getOfferings.mockReset().mockResolvedValue({ all: {} });
@@ -161,6 +169,7 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/(app)/paywall");
+    expect(mock.syncSuperwallUser).not.toHaveBeenCalled();
   });
 
   it("still reports a missing key the build did not choose", async () => {
@@ -176,6 +185,14 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("Superwall identity", () => {
+  it("follows the user RevenueCat is logged in as", async () => {
+    await loadReady();
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
+    expect(mock.syncSuperwallUser).toHaveBeenCalledWith("user_1");
+  });
 });
 
 describe("presentPaywall concurrency", () => {

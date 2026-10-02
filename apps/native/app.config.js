@@ -172,6 +172,7 @@ module.exports = ({ config }) => ({
     "./plugins/with-google-services",
     "./plugins/with-android-share-new-intent",
     "./plugins/with-android-accent",
+    "./plugins/with-android-billing-pin",
     // Xcode mods run in reverse registration order; attach strings after Widgets creates its target.
     "./plugins/with-widget-localization",
     ["expo-localization", { supportedLocales, supportsRTL }],

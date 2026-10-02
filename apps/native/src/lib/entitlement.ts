@@ -44,6 +44,7 @@ import {
   REVENUECAT_DISABLED_BY_BUILD,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
+import { resetSuperwallUser, syncSuperwallUser } from "./superwall";
 import { presentExitSheet } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
@@ -208,6 +209,7 @@ export function useEntitlementSync(): void {
       // The funnel memory belongs to the account that earned it, so a
       // sign-out or account change drops it (see `forgetPaywallFunnel`).
       forgetPaywallFunnel();
+      void resetSuperwallUser();
       return;
     }
     // A build that deliberately has no key would only burn the retry budget
@@ -230,7 +232,11 @@ export function useEntitlementSync(): void {
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
-      onReady: () => markRcUserSynced(sub),
+      onReady: () => {
+        markRcUserSynced(sub);
+        // Superwall buys through RevenueCat, so it follows RevenueCat's user.
+        void syncSuperwallUser(sub);
+      },
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
