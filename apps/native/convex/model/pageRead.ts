@@ -922,6 +922,8 @@ export function parseInstagramEmbed(html: string): {
   caption?: string;
   username?: string;
   posterUrl?: string;
+  /** Instagram's "this post may have been removed" placeholder. */
+  broken?: true;
 } {
   const block = html.match(
     /<div class="Caption">([\s\S]*?)<div class="CaptionComments">/i,
@@ -948,6 +950,9 @@ export function parseInstagramEmbed(html: string): {
     caption: caption || undefined,
     username: username ? decodeEntities(username) : undefined,
     posterUrl: src ? decodeEntities(src) : undefined,
+    ...(!block && !src && /BrokenMedia/.test(html)
+      ? { broken: true as const }
+      : {}),
   };
 }
 
@@ -1003,12 +1008,65 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     : { status: "missing" };
 }
 
+/** The link-preview card Instagram serves the crawler. The login shell titles
+ * itself just "Instagram", which names no post, so that is no title. A `/p/`
+ * link can be a video, and only the card ("• Instagram video") says so. */
+function instagramCard(
+  html: string,
+  kind: string | undefined,
+): { title?: string; image?: string; video?: true } {
+  const title = [
+    extractMetaContent(html, "twitter:title"),
+    extractMetaContent(html, "og:title"),
+  ].find((candidate) => candidate !== undefined && candidate !== "Instagram");
+  return {
+    title,
+    image:
+      extractMetaContent(html, "og:image") ??
+      extractMetaContent(html, "twitter:image"),
+    video:
+      kind === "p" && /•\s*Instagram (?:video|reel)\b/i.test(title ?? "")
+        ? true
+        : undefined,
+  };
+}
+
+/** Instagram answers 200 for a deleted or made-up post: the page is the bare
+ * shell and the embed shows its broken-media placeholder. That pair is the
+ * only "gone" signal it gives. */
+function isRemovedInstagramPost(
+  embedded: ReturnType<typeof parseInstagramEmbed>,
+  cardTitle: string | undefined,
+  cardImage: string | undefined,
+): boolean {
+  return (
+    embedded.broken === true &&
+    cardTitle === undefined &&
+    cardImage === undefined
+  );
+}
+
+/** A direct link's plain `/{kind}/{shortcode}/` address: the `/reels/` alias
+ * sends the crawler to the login page, which has no card. */
+function instagramPageUrl(
+  url: string,
+  linked: ReturnType<typeof instagramMedia>,
+): string {
+  return linked?.shortcode
+    ? `https://www.instagram.com/${linked.kind}/${linked.shortcode}/`
+    : url;
+}
+
 /**
  * Read an Instagram post or reel. The page fetch decides gone/unreadable like
  * any link; the embed is best-effort. Shell markup is never article content:
  * the only content is the caption. When Instagram shares nothing, the result
  * is a bare "Instagram" page and the item still classifies from its URL. A
  * transiently failed embed marks the read incomplete so the save can retry.
+ *
+ * Instagram answers 200 for a deleted or made-up post: the page is the bare
+ * shell and the embed says the media is broken. That pair is the only "gone"
+ * signal it gives, so it fails the save instead of saving a blank item.
  */
 export async function fetchInstagram(url: string): Promise<PageData> {
   const linked = instagramMedia(url);
@@ -1022,7 +1080,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
   // page. A share link only names it after the page fetch follows the
   // redirect, so its embed waits for the page.
   const [page, directEmbed] = await Promise.all([
-    fetchInstagramHtml(url),
+    fetchInstagramHtml(instagramPageUrl(url, linked)),
     linked?.shortcode ? embedFor(linked) : Promise.resolve(undefined),
   ]);
   if (!page.ok) {
@@ -1045,15 +1103,17 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     });
   }
   const embedded = embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
-  const cardTitle =
-    extractMetaContent(html, "twitter:title") ??
-    extractMetaContent(html, "og:title");
+  const {
+    title: cardTitle,
+    image: cardImage,
+    video,
+  } = instagramCard(html, media?.kind);
+  if (isRemovedInstagramPost(embedded, cardTitle, cardImage)) {
+    throw new PageFetchError("http_error", 404);
+  }
   const handle =
     embedded.username ?? cardTitle?.match(/\(@([A-Za-z0-9._]+)\)/)?.[1];
-  const heroImageUrl =
-    embedded.posterUrl ??
-    extractMetaContent(html, "og:image") ??
-    extractMetaContent(html, "twitter:image");
+  const heroImageUrl = embedded.posterUrl ?? cardImage;
   const caption = embedded.caption?.slice(0, MAX_STORED_CONTENT_CHARS);
   const heroAspectRatio = heroImageUrl
     ? ((await fetchImageAspectRatio(heroImageUrl)) ??
@@ -1074,6 +1134,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroImageUrl,
     heroAspectRatio,
     content: caption,
+    video,
     ...(page.truncated || (embed.status === "ok" && embed.truncated)
       ? { truncated: true as const }
       : {}),
