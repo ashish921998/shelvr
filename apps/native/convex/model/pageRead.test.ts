@@ -66,6 +66,11 @@ function html(url: string, body: string) {
 const PIN_PAGE =
   '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
 
+/** A pin page with no image or text, as Pinterest serves for a pin id it has
+ * no pin for. */
+const EMPTY_PIN_PAGE =
+  '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>';
+
 /** Serves `routes` by exact URL; every other fetch fails. */
 function serve(routes: Record<string, unknown>) {
   safeFetch.mockImplementation(
@@ -189,7 +194,8 @@ describe("readPage for Pinterest pins", () => {
   it("marks the page read incomplete when the widget fails transiently", async () => {
     serve({
       [WIDGET_URL]: { ok: false, code: "http_error", status: 503 },
-      [PIN_URL]: html(PIN_URL, PIN_PAGE),
+      // Even an empty page is kept: the widget may answer on a retry.
+      [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
     });
     const read = await readPage(PIN_URL);
     expect(read.status === "ok" && read.page.incomplete).toBe(true);
@@ -202,7 +208,7 @@ describe("readPage for Pinterest pins", () => {
     safeFetch.mockImplementation(async (url: string) => {
       if (url === WIDGET_URL) throw new Error("socket hang up");
       return url === PIN_URL
-        ? html(PIN_URL, PIN_PAGE)
+        ? html(PIN_URL, EMPTY_PIN_PAGE)
         : { ok: false, code: "http_error", status: 599 };
     });
     const read = await readPage(PIN_URL);
@@ -232,10 +238,7 @@ describe("readPage for Pinterest pins", () => {
   it("fails a pin id that never existed as gone when Pinterest serves an empty shell", async () => {
     serve({
       [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
-      [PIN_URL]: html(
-        PIN_URL,
-        '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>',
-      ),
+      [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
     });
     expect((await readPage(PIN_URL)).status).toBe("gone");
   });
