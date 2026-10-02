@@ -159,11 +159,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 28,
     color: theme.colors.foreground,
   },
-  heading: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.foreground,
-  },
   body: {
     fontFamily: theme.fonts.regular,
     fontSize: 15,

@@ -4,18 +4,8 @@ import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** A bordered card that stacks settings rows with hairline dividers. */
-export function SettingsGroup({
-  children,
-  accessibilityLabel,
-}: {
-  children: ReactNode;
-  accessibilityLabel?: string;
-}) {
-  return (
-    <View style={styles.group} accessibilityLabel={accessibilityLabel}>
-      {children}
-    </View>
-  );
+export function SettingsGroup({ children }: { children: ReactNode }) {
+  return <View style={styles.group}>{children}</View>;
 }
 
 /**
