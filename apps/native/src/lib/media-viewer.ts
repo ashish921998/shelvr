@@ -74,7 +74,7 @@ export function sheetUnderHeader(
 }
 
 /** A media page's caption state, for the save it currently shows. */
-export type CaptionState = {
+type CaptionState = {
   id: string;
   hidden: boolean;
   expanded: boolean;
