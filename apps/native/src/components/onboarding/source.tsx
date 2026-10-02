@@ -30,8 +30,13 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
     [],
   );
 
+  // A ref, not `picked`: two taps can land before the re-render that would
+  // disable the rows, and each must not record its own answer.
+  const done = useRef(false);
+
   const pick = (source: AcquisitionSource, position: number) => {
-    if (picked !== null) return;
+    if (done.current) return;
+    done.current = true;
     setPicked(source);
     if (process.env.EXPO_OS === "ios") Haptics.selectionAsync();
     acquisitionSourceAnalytics.answered(source, position);
@@ -39,7 +44,8 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
   };
 
   const skip = () => {
-    if (picked !== null) return;
+    if (done.current) return;
+    done.current = true;
     acquisitionSourceAnalytics.skipped();
     onAdvance();
   };
