@@ -152,9 +152,15 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const { theme } = useUnistyles();
   const router = useRouter();
   // Opened from inside a space: everything saved here is pre-pinned to it.
-  const { spaceId } = useLocalSearchParams<{ spaceId?: string }>();
+  // `mode=note` opens straight into the note composer (Home's save card).
+  const { spaceId, mode: startMode } = useLocalSearchParams<{
+    spaceId?: string;
+    mode?: string;
+  }>();
   const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
-  const [mode, setMode] = useState<Mode>("menu");
+  const [mode, setMode] = useState<Mode>(
+    startMode === "note" ? "note" : "menu",
+  );
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<TextInput>(null);

@@ -1,13 +1,18 @@
+import { analytics } from "@/lib/analytics";
 import {
   dismissSaveProgressCard,
   isFirstSession,
   isSaveProgressCardDismissed,
   shouldOfferWeeklyNudge,
 } from "@/lib/first-share";
+import { trackSaveGoal } from "@/lib/save-goal";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+// Accounts whose card was already reported shown in this launch.
+const shownThisLaunch = new Set<string>();
 
 /**
  * A new shelf's first three real saves (the onboarding demo does not count):
@@ -40,12 +45,41 @@ export function useSaveProgress(
     if (userId === undefined) return;
     dismissSaveProgressCard(userId);
     setDismissedFor(userId);
-  }, [userId]);
+    analytics.capture("save_progress_card_action", {
+      action: "dismiss",
+      saved: progress?.saved ?? 0,
+    });
+  }, [userId, progress?.saved]);
+
+  const saved = progress?.saved;
+  const goal = progress?.goal;
+  useEffect(() => {
+    if (userId === undefined || saved === undefined || goal === undefined) {
+      return;
+    }
+    trackSaveGoal(
+      userId,
+      { saved, goal },
+      { cardDismissed: isSaveProgressCardDismissed(userId) },
+    );
+  }, [userId, saved, goal]);
+
+  useEffect(() => {
+    if (!visible || userId === undefined || shownThisLaunch.has(userId)) {
+      return;
+    }
+    shownThisLaunch.add(userId);
+    analytics.capture("save_progress_card_shown", { saved: saved ?? 0 });
+  }, [visible, userId, saved]);
+
   // A failed read settles as "no card", so it never holds other cards back.
   const pending = progress === undefined && !query.isError;
   return {
     /** What the card shows, or null when it is not on Home. */
     card: visible ? progress : null,
+    /** A signed-in account's count has not loaded yet, so the card may
+     * still come. */
+    pending: pending && userId !== undefined,
     /** Later Home prompts wait while an earlier card holds the slot, and
      * while this one is up or may still come. */
     deferLater: defer || visible || pending,
