@@ -5,7 +5,7 @@
  * it is set. Only one request is open at a time: a new one resolves the
  * pending one with `superseded` first, so no caller is left waiting forever.
  */
-export type SheetRequestStore<T, R> = {
+type SheetRequestStore<T, R> = {
   subscribe(listener: () => void): () => void;
   /** The open request's value, or null when no sheet is open. */
   current(): T | null;
