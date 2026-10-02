@@ -126,15 +126,33 @@ export const REEL_PLAYER_SCRIPT = `(function () {
     if (data.type === "onPlayerReady") send("ready");
     else if (data.type === "onError") send("error");
   });
-  function ready() {
-    send("ready");
-    // The user already tapped play in the app; start a video the page left
-    // paused (Instagram's embed waits for a second tap otherwise).
+  // The user already tapped play in the app, so start a video the page
+  // left paused: play its <video> once there is one, else press the page's
+  // own play button (Instagram's embed builds the video on that press).
+  // Tried for a few seconds, then left to the user.
+  function autoplay(triesLeft) {
     var video = document.querySelector("video");
-    if (video && video.paused && video.play) {
+    if (video && !video.paused) return;
+    if (video && video.play) {
       var started = video.play();
       if (started && started.catch) started.catch(function () {});
+    } else {
+      var button = document.querySelector(
+        '[aria-label="Play"], [aria-label="play"], [class*="PlayButton"], [class*="playButton"], [class*="Play"]'
+      );
+      if (button && !(button.closest && button.closest("a[href]"))) {
+        button.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true })
+        );
+      }
     }
+    if (triesLeft > 0) {
+      setTimeout(function () { autoplay(triesLeft - 1); }, 500);
+    }
+  }
+  function ready() {
+    send("ready");
+    autoplay(6);
   }
   if (document.readyState === "complete") ready();
   else window.addEventListener("load", ready);
