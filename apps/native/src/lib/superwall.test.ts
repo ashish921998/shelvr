@@ -291,8 +291,10 @@ describe("Superwall identity", () => {
       expect.any(Error),
       { provider: "superwall" },
     );
+    const failed = mock.shared.setSubscriptionStatus.mock.calls.length;
     await mod.resetSuperwallUser();
     expect(mock.shared.reset).toHaveBeenCalledTimes(1);
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenCalledTimes(failed + 1);
     expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
       status: "INACTIVE",
     });
@@ -303,6 +305,7 @@ describe("Superwall identity", () => {
 
   it("sets inactive on sign-out after an account switch failed at identify", async () => {
     const mod = await load();
+    mock.rc.getCustomerInfo.mockResolvedValue(active);
     await mod.syncSuperwallUser("user_1");
     mock.shared.identify.mockRejectedValueOnce(new Error("offline"));
     await mod.syncSuperwallUser("user_2");
