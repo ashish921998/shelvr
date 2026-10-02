@@ -176,8 +176,8 @@ export function subscriptionStatusFor(
 
 let configured: Promise<Superwall | null> | null = null;
 let identifiedUserId: string | null = null;
-// A sign-out has reset Superwall but not yet set the inactive status.
-let signOutStatusPending = false;
+// Superwall has been reset but has not yet had a status set since.
+let inactiveStatusPending = false;
 // Identity changes run one at a time, in call order, like RevenueCat's.
 let queue = Promise.resolve();
 
@@ -247,6 +247,7 @@ export function syncSuperwallUser(userId: string): Promise<void> {
         // Reset is done: a failed identify below must retry without
         // resetting again, and must not leave the old id looking current.
         identifiedUserId = null;
+        inactiveStatusPending = true;
       }
       await shared.identify({ userId });
       identifiedUserId = userId;
@@ -254,7 +255,7 @@ export function syncSuperwallUser(userId: string): Promise<void> {
     await shared.setSubscriptionStatus(
       subscriptionStatusFor(sw, await rc.getCustomerInfo()),
     );
-    signOutStatusPending = false;
+    inactiveStatusPending = false;
   }, "superwall_identity_sync_failed");
 }
 
@@ -265,18 +266,17 @@ export function syncSuperwallUser(userId: string): Promise<void> {
 export function resetSuperwallUser(): Promise<void> {
   return enqueue(async () => {
     if (!configured) return;
-    if (identifiedUserId === null && !signOutStatusPending) return;
+    if (identifiedUserId === null && !inactiveStatusPending) return;
     const sw = await configured;
     if (!sw) return;
     if (identifiedUserId !== null) {
       await sw.default.shared.reset();
       identifiedUserId = null;
-      // Kept until the status lands, so a failed call below is retried.
-      signOutStatusPending = true;
+      inactiveStatusPending = true;
     }
     await sw.default.shared.setSubscriptionStatus(
       sw.SubscriptionStatus.Inactive(),
     );
-    signOutStatusPending = false;
+    inactiveStatusPending = false;
   }, "superwall_reset_failed");
 }

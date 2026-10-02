@@ -301,6 +301,18 @@ describe("Superwall identity", () => {
     expect(mock.shared.setSubscriptionStatus).toHaveBeenCalledTimes(calls);
   });
 
+  it("sets inactive on sign-out after an account switch failed at identify", async () => {
+    const mod = await load();
+    await mod.syncSuperwallUser("user_1");
+    mock.shared.identify.mockRejectedValueOnce(new Error("offline"));
+    await mod.syncSuperwallUser("user_2");
+    await mod.resetSuperwallUser();
+    expect(mock.shared.reset).toHaveBeenCalledTimes(1);
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
+      status: "INACTIVE",
+    });
+  });
+
   it("ignores RevenueCat updates while the two SDKs name different users", async () => {
     const mod = await load();
     await mod.syncSuperwallUser("user_1");
