@@ -22,6 +22,7 @@ const mock = vi.hoisted(() => ({
   schedule: vi.fn(),
   cancel: vi.fn(),
   remindersEnabled: true,
+  transition: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
@@ -41,7 +42,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
-  waitForSheetTransition: () => Promise.resolve(),
+  waitForSheetTransition: () => mock.transition(),
   whenSheetSettled: () => Promise.resolve(),
 }));
 vi.mock("expo-secure-store", () => ({ getItem: () => null, setItem: vi.fn() }));
@@ -149,6 +150,27 @@ describe("useTrialReminder primer", () => {
     await vi.waitFor(() => expect(mock.cancel).toHaveBeenCalled());
     expect(trialReminderPrimer.isOpen()).toBe(false);
     expect(mock.request).not.toHaveBeenCalled();
+  });
+
+  it("holds a late caller until the declined primer has slid away", async () => {
+    let slid: () => void = () => {};
+    mock.transition.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        slid = resolve;
+      }),
+    );
+    startTrial();
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    act(() => trialReminderPrimer.answer(false));
+    await vi.waitFor(() => expect(mock.transition).toHaveBeenCalled());
+    let done = false;
+    void whenTrialPrimerDone().then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    expect(done).toBe(false);
+    await act(async () => slid());
+    await vi.waitFor(() => expect(done).toBe(true));
   });
 
   it("closes the primer without prompting when the trial ends", async () => {
