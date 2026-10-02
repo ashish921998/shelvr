@@ -314,7 +314,7 @@ export default function SettingsScreen() {
         style={({ pressed }) => [
           styles.deleteAccount,
           pressed && { opacity: 0.7 },
-          deleting && { opacity: 0.4 },
+          busy && { opacity: 0.4 },
         ]}
         disabled={busy}
         onPress={confirmDeleteAccount}
