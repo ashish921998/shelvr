@@ -1,12 +1,14 @@
-import { MenuView } from '@expo/ui/community/menu';
-import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { MenuView } from "@expo/ui/community/menu";
+import type { ReactNode } from "react";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 
 export type ActionMenuItem = {
   id?: string;
   label: string;
   destructive?: boolean;
   disabled?: boolean;
+  /** Shows the platform checkmark, for a menu that picks one value. */
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -36,12 +38,22 @@ export function ActionMenu({
       actions={actions.map((action) => ({
         id: action.id ?? action.label,
         title: action.label,
-        attributes: { destructive: action.destructive, disabled: action.disabled },
+        attributes: {
+          destructive: action.destructive,
+          disabled: action.disabled,
+        },
+        ...(action.selected === undefined
+          ? {}
+          : { state: action.selected ? ("on" as const) : ("off" as const) }),
       }))}
       onPressAction={({ nativeEvent }) => {
-        actions.find(
-          (action) => !action.disabled && (action.id ?? action.label) === nativeEvent.event,
-        )?.onPress();
+        actions
+          .find(
+            (action) =>
+              !action.disabled &&
+              (action.id ?? action.label) === nativeEvent.event,
+          )
+          ?.onPress();
       }}
     >
       <View accessibilityRole="button" accessibilityLabel={label} style={style}>
