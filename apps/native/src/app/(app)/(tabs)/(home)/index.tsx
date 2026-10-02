@@ -305,17 +305,16 @@ export default function HomeScreen() {
 }
 
 /** The save progress card covers sharing too, so it replaces the share
- * how-to while it is up. The how-to waits for the count, so it never
- * flashes before the card. */
+ * how-to while it is up. The how-to also waits while the card may still
+ * come (count loading, or held behind another prompt), so it never shows
+ * first and then gets swapped out. */
 function howToVisible(
   progress: ReturnType<typeof useSaveProgress>,
   firstShareSaved: boolean,
   itemCount: number,
 ): boolean {
   return (
-    progress.card === null &&
-    !progress.pending &&
-    shouldShowHowTo({ firstShareSaved, itemCount })
+    !progress.deferLater && shouldShowHowTo({ firstShareSaved, itemCount })
   );
 }
 

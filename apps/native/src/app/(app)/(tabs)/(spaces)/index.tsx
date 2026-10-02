@@ -179,12 +179,16 @@ function emptySpaceIcon(name: string) {
 /**
  * Spaces that hold nothing yet, as one line of name chips instead of grid
  * cards. Each joins the grid once a save lands in it, and a tap still opens
- * it. Plain Pressables with router.push: no Link asChild style trap (#197).
+ * it, and a long press deletes it. Plain Pressables with router.push: no
+ * Link asChild style trap (#197).
  */
 function EmptySpaces({
   spaces,
+  onDelete,
 }: {
   spaces: { _id: Id<"spaces">; name: string }[];
+  /** Long-press deletes, like the grid cards' menu. */
+  onDelete: (id: Id<"spaces">) => void;
 }) {
   useAppLocale();
   const router = useRouter();
@@ -198,6 +202,15 @@ function EmptySpaces({
             key={space._id}
             accessibilityRole="button"
             onPress={() => router.push(`/space/${space._id}`)}
+            onLongPress={() => onDelete(space._id)}
+            accessibilityActions={[
+              { name: "delete", label: t("common.delete") },
+            ]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === "delete") {
+                onDelete(space._id);
+              }
+            }}
             style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
           >
             <Text style={styles.chipText} numberOfLines={1}>
@@ -256,7 +269,10 @@ export default function SpacesScreen() {
   // a bare label under the header, so they wait in a chip row below it.
   const filled = spaces.filter((space) => !isEmptySpace(space));
   const empty = spaces.filter(isEmptySpace);
-  const emptySpaces = empty.length > 0 ? <EmptySpaces spaces={empty} /> : null;
+  const emptySpaces =
+    empty.length > 0 ? (
+      <EmptySpaces spaces={empty} onDelete={confirmDelete} />
+    ) : null;
 
   if (filled.length === 0) {
     return (

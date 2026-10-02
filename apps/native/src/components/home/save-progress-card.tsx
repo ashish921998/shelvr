@@ -109,6 +109,9 @@ export function SaveProgressCard({
       if (results.length > 0) {
         analytics.capture("images_saved", { image_count: results.length });
       }
+      // The batch leaves busy set on success (Add closes instead), and this
+      // card stays up until the goal, so release it here.
+      setBusy(false);
     },
     onDismiss: () => {},
     onUnexpectedError: (error) => {
