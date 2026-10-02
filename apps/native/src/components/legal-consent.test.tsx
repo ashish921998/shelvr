@@ -38,6 +38,13 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mocks.captureError },
 }));
+// The preference renders through SettingCard; its ThemedText reads variant
+// styles that the empty StyleSheet mock below cannot supply.
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -110,8 +117,9 @@ it("offers withdrawal and displays pending remote propagation", async () => {
     syncPending: true,
   };
   rerender(<LegalConsentPreference />);
-  expect(screen.getByText("refundConsent.disabled")).toBeDefined();
-  expect(screen.getByText("refundConsent.syncPending")).toBeDefined();
+  // Both lines share the card's one description.
+  expect(screen.getByText(/refundConsent\.disabled/)).toBeDefined();
+  expect(screen.getByText(/refundConsent\.syncPending/)).toBeDefined();
 });
 it("allows an existing user to review and opt in later", async () => {
   mocks.consent = {
