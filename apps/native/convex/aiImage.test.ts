@@ -72,6 +72,32 @@ async function photo(
   });
 }
 
+describe("Siri capture context", () => {
+  it("steers the image prompt with what Siri passed along", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.action(internal.ai.processItem, {
+      itemId,
+      captureContext: "Siri: save this\n\nText in the image:\nMiso ramen",
+    });
+    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+      (part: { type: string }) => part.type === "text",
+    ).text as string;
+    expect(text).toContain("saved this with Siri");
+    expect(text).toContain("Miso ramen");
+  });
+
+  it("leaves an in-app save's prompt without it", async () => {
+    const t = newConvexTest();
+    const { itemId } = await photo(t);
+    await t.action(internal.ai.processItem, { itemId });
+    const text = generateObject.mock.calls[0][0].messages[0].content.find(
+      (part: { type: string }) => part.type === "text",
+    ).text as string;
+    expect(text).not.toContain("Siri");
+  });
+});
+
 describe("stored photo processing", () => {
   it("passes original bytes to vision and retains the uploaded file and chosen space", async () => {
     const t = newConvexTest();

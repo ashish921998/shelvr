@@ -11,7 +11,7 @@ import { v } from "convex/values";
  * `item_saved` event, which PostHog dashboards group on. Adding one is additive;
  * renaming one splits an existing funnel in two without saying so.
  */
-export const SAVE_SOURCES = [
+const SAVE_SOURCES = [
   "onboarding_demo",
   "share_extension",
   "paste",
@@ -19,6 +19,8 @@ export const SAVE_SOURCES = [
   "note",
   "camera",
   "photo_import",
+  // Siri, Shortcuts, and the other iOS App Intents (appIntents.ts).
+  "siri",
 ] as const;
 
 export type SaveSource = (typeof SAVE_SOURCES)[number];

@@ -15,6 +15,7 @@ import {
 } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import { AppEntityView } from "expo-app-intents";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
 import * as Haptics from "expo-haptics";
@@ -299,9 +300,10 @@ function ItemScreenContent() {
   const keyExtractor = useCallback((item: DetailItem) => item._id, []);
   const renderItem = useCallback(
     ({ item }: { item: DetailItem }) => (
-      <View style={pageStyle}>
+      // AppEntityView tells Siri which save is on screen ("send this to Sam").
+      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
         <ItemDetail item={item} isZoomTarget={item._id === pushedId} />
-      </View>
+      </AppEntityView>
     ),
     [pageStyle, pushedId],
   );

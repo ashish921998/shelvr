@@ -199,7 +199,7 @@ so the sweep hands it a whole page and does no chunking itself.
 
 ### Backfill
 
-`internalAction` mirroring `backfillImageAspectRatios` (`ai.ts:1422`), paged by
+`internalAction` (`sweepItemEmbeddings` in `ai.ts`), paged by
 the new index, batching through `embedMany`:
 
 - a page of `ready` rows with `embeddingVersion < CURRENT_EMBEDDING_VERSION`

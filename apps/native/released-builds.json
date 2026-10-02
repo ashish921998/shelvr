@@ -6,9 +6,9 @@
       "release": "1.0.6 (38), App Store, released 2026-09-30"
     },
     "android": {
-      "buildId": "e6678886-b624-4189-874a-b63bda40eca4",
-      "fingerprint": "6efc30930bfb26cde4d40cb7aea33730d72f8b0c",
-      "release": "1.0.6 (21), Google Play closed testing (Alpha), released 2026-09-30"
+      "buildId": "0423e2d6-f787-4aa9-93ff-8d857d42b70e",
+      "fingerprint": "f8ca4aa556d4e90733a40fa4ad04cb40419ffd27",
+      "release": "1.0.7 (25), Google Play closed testing (Alpha), released 2026-10-01"
     }
   },
   "internal-test": { "ios": null, "android": null },

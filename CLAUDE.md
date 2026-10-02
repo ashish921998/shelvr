@@ -144,7 +144,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
   existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
-  `SERPAPI_KEY`), and the one-off `backfillImageAspectRatios`.
+  `SERPAPI_KEY`).
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
