@@ -359,6 +359,8 @@
   "item.noteTitlePlaceholder": "Title",
   "item.noteTitleLabel": "Note title",
   "item.noteTextLabel": "Note text",
+  "item.userNotePlaceholder": "Add a note",
+  "item.userNoteLabel": "Your note",
   "item.details": "Details",
   "item.toggleCaption": "Shows or hides the caption",
   "capture.partialFailure": "%{saved} of %{total} saved.\n%{reason}\nRetry the failed images?",

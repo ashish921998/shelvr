@@ -360,6 +360,8 @@
   "item.noteTitlePlaceholder": "제목",
   "item.noteTitleLabel": "메모 제목",
   "item.noteTextLabel": "메모 내용",
+  "item.userNotePlaceholder": "메모 추가",
+  "item.userNoteLabel": "내 메모",
   "item.details": "세부 정보",
   "item.toggleCaption": "캡션을 표시하거나 숨깁니다",
   "capture.partialFailure": "%{total}개 중 %{saved}개 저장했어요.\n%{reason}\n저장하지 못한 이미지를 다시 시도할까요?",

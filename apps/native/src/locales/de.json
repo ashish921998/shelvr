@@ -359,6 +359,8 @@
   "item.noteTitlePlaceholder": "Titel",
   "item.noteTitleLabel": "Notiztitel",
   "item.noteTextLabel": "Notiztext",
+  "item.userNotePlaceholder": "Notiz hinzufügen",
+  "item.userNoteLabel": "Deine Notiz",
   "item.details": "Details",
   "item.toggleCaption": "Blendet die Beschriftung ein oder aus",
   "capture.partialFailure": "%{saved} von %{total} gespeichert.\n%{reason}\nFehlgeschlagene Bilder erneut speichern?",

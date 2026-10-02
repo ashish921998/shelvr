@@ -8,6 +8,7 @@ import { ItemSpaces } from "@/components/item-spaces";
 import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
+import { UserNoteField } from "@/components/user-note-field";
 import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
 import { SimilarGrid } from "@/components/similar-grid";
@@ -64,7 +65,12 @@ export type DetailItem = CardRow &
   Partial<
     Pick<
       FullRow,
-      "content" | "articleMedia" | "recipe" | "products" | "productsStatus"
+      | "content"
+      | "articleMedia"
+      | "recipe"
+      | "products"
+      | "productsStatus"
+      | "userNote"
     >
   > & {
     spaceIntents?: CardRow["intents"];
@@ -552,7 +558,8 @@ function ItemSheetBody({
 }
 
 /** What a save's page and a media save's sheet both show after their heads:
- * the post caption, tags, products, recipe or article, and similar saves. */
+ * the owner's note, the post caption, tags, products, recipe or article, and
+ * similar saves. */
 function DetailSections({
   item,
   detail,
@@ -563,6 +570,8 @@ function DetailSections({
   const { theme } = useUnistyles();
   return (
     <>
+      <UserNoteField key={item._id} item={detail} />
+
       {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}

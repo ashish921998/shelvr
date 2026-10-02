@@ -95,6 +95,9 @@ export default defineSchema({
     // a save as a social post.
     articleMedia: v.optional(v.array(articleMediaValidator)),
     note: v.optional(v.string()),
+    // The owner's own words about a save: why they kept it. Never written by
+    // the classifier.
+    userNote: v.optional(v.string()),
     // AI-proposed pressable actions. Optional so pre-existing rows validate
     // without a backfill. `kind` is the closed union from model/itemFields.
     intents: v.optional(v.array(intentValidator)),

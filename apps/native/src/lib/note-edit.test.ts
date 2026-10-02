@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createNoteSaveQueue } from "@/lib/note-edit";
+import { createLatestSaveQueue, createNoteSaveQueue } from "@/lib/note-edit";
 
 describe("note save queue", () => {
   it("does not write on an empty flush or repeat acknowledged edits", async () => {
@@ -65,5 +65,37 @@ describe("note save queue", () => {
     queue.change({ text: "Valid replacement" });
     await queue.flush();
     expect(write).toHaveBeenLastCalledWith({ text: "Valid replacement" });
+  });
+});
+
+describe("latest save queue", () => {
+  it("writes the newest value once, blank included", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const queue = createLatestSaveQueue(write, vi.fn());
+    await queue.flush();
+    expect(write).not.toHaveBeenCalled();
+    queue.change("for Mar");
+    queue.change("for March");
+    await queue.flush();
+    await queue.flush();
+    expect(write).toHaveBeenCalledExactlyOnceWith("for March");
+    queue.change("");
+    await queue.flush();
+    expect(write).toHaveBeenLastCalledWith("");
+  });
+
+  it("retries a failed value unless a newer one was typed", async () => {
+    const write = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("failed"))
+      .mockResolvedValue(undefined);
+    const onError = vi.fn().mockResolvedValue(undefined);
+    const queue = createLatestSaveQueue(write, onError);
+    queue.change("first");
+    await queue.flush();
+    expect(onError).toHaveBeenCalledOnce();
+    await queue.flush();
+    expect(write).toHaveBeenLastCalledWith("first");
+    expect(write).toHaveBeenCalledTimes(2);
   });
 });
