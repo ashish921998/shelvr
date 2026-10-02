@@ -240,7 +240,11 @@ export function useEntitlementSync(): void {
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") observer.retry();
+      if (state !== "active") return;
+      observer.retry();
+      // RevenueCat marks ready once; a Superwall sync that failed after that
+      // gets its retry here. Repeats are cheap: identify runs only on change.
+      if (_rcSyncedUserId === sub) void syncSuperwallUser(sub);
     });
 
     return () => {

@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   presentCustomerCenter: vi.fn(),
   syncSuperwallUser: vi.fn(async () => {}),
   resetSuperwallUser: vi.fn(async () => {}),
+  appStateListeners: new Set<(state: string) => void>(),
   captureError: vi.fn(),
   capture: vi.fn(),
   getOfferings: vi.fn(),
@@ -31,7 +32,12 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
-  AppState: { addEventListener: () => ({ remove: () => {} }) },
+  AppState: {
+    addEventListener: (_: string, listener: (state: string) => void) => {
+      mock.appStateListeners.add(listener);
+      return { remove: () => mock.appStateListeners.delete(listener) };
+    },
+  },
   NativeModules: { RNPaywalls: {}, RNPurchases: {} },
   Platform: { OS: "ios" },
 }));
@@ -153,6 +159,7 @@ beforeEach(() => {
   mock.useQuery.mockReset().mockReturnValue({});
   mock.isEntitled.mockReset().mockReturnValue(false);
   mock.store.clear();
+  mock.appStateListeners.clear();
   mock.apiKey.REVENUECAT_API_KEY = "appl_test";
   mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
   push.mockClear();
@@ -192,6 +199,16 @@ describe("Superwall identity", () => {
     await loadReady();
     expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
     expect(mock.syncSuperwallUser).toHaveBeenCalledWith("user_1");
+  });
+
+  it("retries the Superwall sync on every foreground", async () => {
+    const { hook } = await loadReady();
+    mock.appStateListeners.forEach((listener) => listener("background"));
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
+    mock.appStateListeners.forEach((listener) => listener("active"));
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(2);
+    expect(mock.syncSuperwallUser).toHaveBeenLastCalledWith("user_1");
+    hook.unmount();
   });
 });
 
