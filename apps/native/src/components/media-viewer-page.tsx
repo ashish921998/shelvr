@@ -183,6 +183,12 @@ export function MediaViewerPage({
       contentInsetAdjustmentBehavior="never"
       showsVerticalScrollIndicator={false}
       directionalLockEnabled
+      // The page rests either on the photo or with the sheet fully up, never
+      // with the caption half under the header; past the sheet's top it
+      // scrolls freely.
+      snapToOffsets={[0, pageHeight]}
+      snapToEnd={false}
+      decelerationRate="fast"
       onScroll={onScroll}
       scrollEventThrottle={32}
     >
@@ -291,7 +297,7 @@ export function MediaViewerPage({
               hitSlop={8}
               onPress={() =>
                 scrollRef.current?.scrollTo({
-                  y: pageHeight - headerInset,
+                  y: pageHeight,
                   animated: true,
                 })
               }
@@ -311,9 +317,11 @@ export function MediaViewerPage({
         style={[
           styles.sheet,
           {
-            // At least tall enough to scroll up to the header, so the
-            // caption leaves the screen instead of parking under it.
-            minHeight: pageHeight - headerInset,
+            // Fully up, the sheet fills the page and runs under the header,
+            // so the header sits on the sheet's own color (no black stage
+            // or corner wedges behind it) and the content starts below it.
+            minHeight: pageHeight,
+            paddingTop: headerInset + theme.gap(1.5),
             paddingBottom: insets.bottom + theme.gap(4),
           },
         ]}
@@ -342,7 +350,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: MEDIA_CANVAS,
   },
   media: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   stage: {
     flex: 1,
@@ -421,7 +429,6 @@ const styles = StyleSheet.create((theme) => ({
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     borderCurve: "continuous",
-    paddingTop: theme.gap(1.5),
   },
   grabber: {
     alignSelf: "center",

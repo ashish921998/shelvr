@@ -121,7 +121,14 @@ function pagerHeaderColors(
  */
 function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   const { theme } = useUnistyles();
-  const navigation = useNavigation();
+  // Typed to the two events used here: the native stack's transitionStart
+  // isn't in expo-router's generic navigation type.
+  const navigation = useNavigation() as {
+    addListener: (
+      type: "beforeRemove" | "transitionStart",
+      callback: (e: { data?: { closing?: boolean } }) => void,
+    ) => () => void;
+  };
   const [focused, setFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
@@ -131,10 +138,22 @@ function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   );
   // Blur only lands once the pop animation ends, leaving a white clock over
   // the feed while it plays; drop the light bar as the pop starts instead.
-  useEffect(
-    () => navigation.addListener("beforeRemove", () => setFocused(false)),
-    [navigation],
-  );
+  // A native back (button or swipe) skips beforeRemove, so the closing
+  // transition's start is what catches it.
+  useEffect(() => {
+    const drop = () => setFocused(false);
+    const offRemove = navigation.addListener("beforeRemove", drop);
+    const offTransition = navigation.addListener(
+      "transitionStart",
+      (e: { data?: { closing?: boolean } }) => {
+        if (e.data?.closing) drop();
+      },
+    );
+    return () => {
+      offRemove();
+      offTransition();
+    };
+  }, [navigation]);
   if (!onMedia) {
     return <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />;
   }
