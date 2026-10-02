@@ -79,6 +79,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
   - `saveReminders` — one push naming one save (an unread article or a recipe),
     with its delivery state; also the reminder budget's memory
+  - `xConnections`, `xImportedPosts`, `xOAuthStates` — automatic X bookmark import: the
+    connected account and its tokens, the post ids already handled, and pending OAuth
+    handshakes (see [automatic imports](docs/architecture/automatic-imports.md))
   - `waitlistSignups` — waitlist source of truth, projected to Resend
   - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
@@ -112,6 +115,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `notificationDelivery.ts` holds the claim/finish/recover delivery machine for both, and
   `model/saveReminders.ts` the reminder rules. See
   [contextual notifications](docs/architecture/contextual-notifications.md).
+- **`xImport.ts`** — "Connect X": `getXConnection`, `startXConnect`, `syncXNow`,
+  `disconnectX`, the `/x/oauth/callback` HTTP action, and the bookmark sync a cron runs
+  twice a day per account. Inert until `X_CLIENT_ID` and `X_CLIENT_SECRET` are set. See
+  [automatic imports](docs/architecture/automatic-imports.md).
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
 - **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
@@ -123,7 +130,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
-  recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
+  recovery, hourly feedback inbox delivery retry, embedding sweep, X bookmark sync, and daily payment-receipt
   retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
@@ -264,6 +271,9 @@ needed at runtime by the features that use them:
   ones included, without a deploy. See
   [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
+- `X_CLIENT_ID` / `X_CLIENT_SECRET` — X OAuth 2.0 confidential-client credentials for
+  automatic bookmark import. Without both, the Connect X card is hidden and no X API call
+  is made. X bills the app per bookmark read
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
 - `RESEND_SEGMENT_ID` — Resend segment for `shelvr` waitlist signups

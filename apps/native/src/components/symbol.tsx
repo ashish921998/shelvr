@@ -44,6 +44,7 @@ const SF_TO_MATERIAL = {
   "rectangle.stack": "collections_bookmark",
   "rectangle.stack.fill": "collections_bookmark",
   link: "link",
+  bookmark: "bookmark",
   safari: "language",
   map: "map",
   magnifyingglass: "search",

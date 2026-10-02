@@ -7,6 +7,7 @@ import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
+import { removeXConnection } from "./xImport";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -212,6 +213,8 @@ async function deleteUserOwnedDataBatch(
   // (see docs/architecture/feedback.md); it only removes the Convex copy.
   if (!(await deleteFeedbackBatch(ctx, userKey))) return false;
 
+  if (!(await deleteXImportBatch(ctx, userId as Id<"users">))) return false;
+
   // Does not cancel the App Store subscription — only the local entitlement row.
   const sub = await ctx.db
     .query("subscriptions")
@@ -230,6 +233,23 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(survey._id);
   }
   return true;
+}
+
+/** Drops the X connection (revoking its token at X), then up to one batch of
+ * the record of handled X posts. Returns true when both are gone. */
+async function deleteXImportBatch(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  await removeXConnection(ctx, userId);
+  const posts = await ctx.db
+    .query("xImportedPosts")
+    .withIndex("by_user_and_postId", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const post of posts) {
+    await ctx.db.delete(post._id);
+  }
+  return posts.length !== DELETE_BATCH;
 }
 
 /** Deletes up to one batch each of the user's weekly digests and save

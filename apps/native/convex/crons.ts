@@ -100,4 +100,14 @@ crons.interval(
   {},
 );
 
+// Sync connected X accounts whose next bookmark sync is due. Each account is
+// due twice a day; the worker schedules a bounded batch per run and is a no-op
+// while the X credentials are unset.
+crons.interval(
+  "sync x bookmarks",
+  { minutes: 30 },
+  internal.xImport.syncDueConnections,
+  {},
+);
+
 export default crons;

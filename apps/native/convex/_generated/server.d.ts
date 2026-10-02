@@ -42,6 +42,8 @@ type Env = {
   readonly SAVE_REMINDERS_ENABLED: string | undefined;
   readonly SERPAPI_KEY: string | undefined;
   readonly WAITLIST_SHARED_SECRET: string | undefined;
+  readonly X_CLIENT_ID: string | undefined;
+  readonly X_CLIENT_SECRET: string | undefined;
 };
 
 /**

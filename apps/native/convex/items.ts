@@ -1682,6 +1682,70 @@ async function hasSavedLink(
 }
 
 /**
+ * Splits raw import candidates into new, normalized links and counts the rest:
+ * already saved or repeated (`skipped`), or not a URL the save policy accepts
+ * (`invalid`). Blank entries are dropped without being counted.
+ */
+export async function partitionImportUrls(
+  ctx: QueryCtx,
+  userId: string,
+  urls: readonly string[],
+): Promise<{ fresh: string[]; skipped: number; invalid: number }> {
+  let skipped = 0;
+  let invalid = 0;
+  const fresh: string[] = [];
+  for (const raw of urls) {
+    const trimmed = raw.trim();
+    if (trimmed === "") continue;
+    let url: string;
+    try {
+      url = normalizeExternalUrl(trimmed);
+    } catch {
+      invalid++;
+      continue;
+    }
+    if (fresh.includes(url) || (await hasSavedLink(ctx, userId, url))) {
+      skipped++;
+      continue;
+    }
+    fresh.push(url);
+  }
+  return { fresh, skipped, invalid };
+}
+
+/**
+ * Inserts already-partitioned links as processing items, each through the
+ * same pipeline as a single save, with processing staggered from `offset`.
+ * The caller has drawn the `bulkImport` tokens.
+ */
+export async function insertImportedLinks(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  urls: readonly string[],
+  offset: number,
+): Promise<void> {
+  for (const [index, url] of urls.entries()) {
+    const run = beginProcessingRun();
+    const itemId = await ctx.db.insert("items", {
+      userId,
+      type: "link",
+      ...run,
+      url,
+      tags: [],
+      searchText: "",
+    });
+    await ctx.scheduler.runAfter(
+      (offset + index) * IMPORT_STAGGER_MS,
+      internal.ai.processItem,
+      { itemId, runId: run.processingRunId },
+    );
+    // No saveSource: the closed union has no literal for a bulk import, and
+    // a wrong one would pollute the funnel worse than an absent one does.
+    await scheduleSaveTelemetry(ctx, itemId);
+  }
+}
+
+/**
  * Bulk-import link URLs, such as X bookmarks. Each new link goes through the
  * same pipeline as a single save. Links already saved and repeats within the
  * batch are skipped for free, so pasting the same list again resumes an
@@ -1708,25 +1772,11 @@ export const importLinks = mutation({
       );
     }
 
-    let skipped = 0;
-    let invalid = 0;
-    const fresh: string[] = [];
-    for (const raw of args.urls) {
-      const trimmed = raw.trim();
-      if (trimmed === "") continue;
-      let url: string;
-      try {
-        url = normalizeExternalUrl(trimmed);
-      } catch {
-        invalid++;
-        continue;
-      }
-      if (fresh.includes(url) || (await hasSavedLink(ctx, userId, url))) {
-        skipped++;
-        continue;
-      }
-      fresh.push(url);
-    }
+    const { fresh, skipped, invalid } = await partitionImportUrls(
+      ctx,
+      userId,
+      args.urls,
+    );
     if (fresh.length === 0) {
       return {
         created: 0,
@@ -1757,25 +1807,7 @@ export const importLinks = mutation({
           MAX_IMPORT_STAGGER_OFFSET,
         )
       : 0;
-    for (const [index, url] of fresh.entries()) {
-      const run = beginProcessingRun();
-      const itemId = await ctx.db.insert("items", {
-        userId,
-        type: "link",
-        ...run,
-        url,
-        tags: [],
-        searchText: "",
-      });
-      await ctx.scheduler.runAfter(
-        (offset + index) * IMPORT_STAGGER_MS,
-        internal.ai.processItem,
-        { itemId, runId: run.processingRunId },
-      );
-      // No saveSource: the closed union has no literal for a bulk import, and
-      // a wrong one would pollute the funnel worse than an absent one does.
-      await scheduleSaveTelemetry(ctx, itemId);
-    }
+    await insertImportedLinks(ctx, userId, fresh, offset);
     return {
       created: fresh.length,
       skipped,

@@ -206,6 +206,10 @@ type AnalyticsEventProperties = {
     invalid: number;
     not_processed: number;
   };
+  // How a "Connect X" auth session ended. `failed` means X or the token
+  // exchange refused it; `cancelled` covers a closed browser.
+  x_connect_finished: { outcome: "connected" | "failed" | "cancelled" };
+  x_disconnected: Record<string, never>;
   // Photo saves fail as data, never as thrown errors, so error tracking never
   // sees them. `reason` is one of three fixed words, never the message text.
   images_save_failed: { reason: ImageSaveFailureReason; image_count: number };

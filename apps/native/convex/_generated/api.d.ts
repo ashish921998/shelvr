@@ -61,6 +61,7 @@ import type * as model_secureCompare from "../model/secureCompare.js";
 import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
+import type * as model_xApi from "../model/xApi.js";
 import type * as notificationDelivery from "../notificationDelivery.js";
 import type * as notifications from "../notifications.js";
 import type * as oracle from "../oracle.js";
@@ -70,6 +71,7 @@ import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
 import type * as waitlist from "../waitlist.js";
+import type * as xImport from "../xImport.js";
 
 import type {
   ApiFromModules,
@@ -131,6 +133,7 @@ declare const fullApi: ApiFromModules<{
   "model/spaceName": typeof model_spaceName;
   "model/storage": typeof model_storage;
   "model/storedImage": typeof model_storedImage;
+  "model/xApi": typeof model_xApi;
   notificationDelivery: typeof notificationDelivery;
   notifications: typeof notifications;
   oracle: typeof oracle;
@@ -140,6 +143,7 @@ declare const fullApi: ApiFromModules<{
   subscriptions: typeof subscriptions;
   users: typeof users;
   waitlist: typeof waitlist;
+  xImport: typeof xImport;
 }>;
 
 /**
