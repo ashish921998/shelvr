@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => ({
   request: vi.fn(),
   schedule: vi.fn(),
   cancel: vi.fn(),
+  remindersEnabled: true,
 }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
@@ -34,7 +35,7 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn(() => ({})) }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
-    data: { remindersEnabled: true, timezone: "UTC" },
+    data: { remindersEnabled: mock.remindersEnabled, timezone: "UTC" },
     isError: false,
   }),
 }));
@@ -86,6 +87,7 @@ function startTrial() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.remindersEnabled = true;
   trialReminderPrimer.dismiss();
   mock.permission.mockResolvedValue(undetermined);
   mock.request.mockResolvedValue(granted);
@@ -104,6 +106,17 @@ describe("useTrialReminder primer", () => {
   it("prompts and schedules the reminder after the primer is accepted", async () => {
     startTrial();
     await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    act(() => trialReminderPrimer.answer(true));
+    await vi.waitFor(() => expect(mock.schedule).toHaveBeenCalled());
+    expect(mock.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the primer answer when reminder preferences change", async () => {
+    const hook = startTrial();
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    mock.remindersEnabled = false;
+    hook.rerender();
+    expect(trialReminderPrimer.isOpen()).toBe(true);
     act(() => trialReminderPrimer.answer(true));
     await vi.waitFor(() => expect(mock.schedule).toHaveBeenCalled());
     expect(mock.request).toHaveBeenCalledTimes(1);

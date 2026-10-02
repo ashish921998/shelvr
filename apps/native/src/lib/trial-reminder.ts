@@ -361,12 +361,20 @@ export function useTrialReminder(): void {
   // Bumped whenever the reminder should no longer exist, so scheduling work
   // still in flight from an earlier trial knows it is stale.
   const generation = useRef(0);
+  // The primer answer for this trial, shared with any flow that replaces the
+  // one that asked (say the nudges switch flips while the primer is open), so
+  // the answer is not lost with it. The flow that uses it clears it.
+  const primerDecision = useRef<{
+    expiresAt: number;
+    ask: Promise<boolean>;
+  } | null>(null);
 
   useEffect(() => {
     if (loading) return;
     if (status !== "trialing" || expiresAt === undefined) {
       scheduledFor.current = null;
       generation.current += 1;
+      primerDecision.current = null;
       trialReminderPrimer.dismiss();
       serial(cancelTrialReminder).catch((error) =>
         analytics.captureError("trial_reminder_cancel_failed", error),
@@ -403,30 +411,44 @@ export function useTrialReminder(): void {
     generation.current += 1;
     const mine = generation.current;
     const isCurrent = () => generation.current === mine;
-    // Taken now, in the same commit as the purchase, so the welcome sheet
-    // sees it before its own wait ends.
-    const releasePrimer = mayAsk ? holdPrimer() : null;
-    void (async () => {
-      let ask = mayAsk;
-      if (ask) {
+    let decision: Promise<boolean> = Promise.resolve(false);
+    let pending: typeof primerDecision.current = null;
+    if (mayAsk) {
+      // Taken now, in the same commit as the purchase, so the welcome sheet
+      // sees it before its own wait ends.
+      const releasePrimer = holdPrimer();
+      const entry = { expiresAt, ask: decision };
+      const live = () => primerDecision.current === entry;
+      entry.ask = (async () => {
         let primed = false;
         try {
           // Nothing can present while a RevenueCat sheet is up or closing.
           await whenSheetSettled();
-          if (!isCurrent()) return;
+          if (!live()) return false;
           const confirmed = await confirmTrialReminderAsk();
-          ask = confirmed.ask;
           primed = confirmed.primed;
-          if (!isCurrent()) return;
+          if (!confirmed.ask || !live()) return false;
           // Nor over the closing primer, when one was shown.
-          if (ask && primed) await waitForSheetTransition();
-          if (!isCurrent()) return;
+          if (primed) await waitForSheetTransition();
+          return live();
         } finally {
           // The OS prompt that follows is a system alert, not a modal, so
           // the welcome sheet need not wait for it.
-          releasePrimer?.(primed);
+          releasePrimer(primed);
         }
-      }
+      })();
+      primerDecision.current = entry;
+      pending = entry;
+    } else if (primerDecision.current?.expiresAt === expiresAt) {
+      pending = primerDecision.current;
+    }
+    if (pending !== null) decision = pending.ask;
+    void (async () => {
+      const ask = await decision;
+      if (!isCurrent()) return;
+      // Used once, so a later preference change cannot ask again.
+      if (pending !== null && primerDecision.current === pending)
+        primerDecision.current = null;
       const scheduled = await serial(() =>
         scheduleTrialReminder(expiresAt, Date.now(), ask, isCurrent, nudges),
       );
