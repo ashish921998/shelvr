@@ -102,7 +102,7 @@ export default function AndroidWaitlist() {
       {/* Always mounted, so screen readers announce the success. */}
       <div role="status">
         {status === "success" ? (
-          <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light">
+          <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light transition-[opacity,transform] duration-250 ease-[cubic-bezier(.2,.8,.2,1)] starting:[transform:translateY(4px)_scale(.97)] starting:opacity-0 motion-reduce:transition-none">
             <CheckCircleIcon aria-hidden className="size-[18px]" />
             You’re on the list.
           </p>

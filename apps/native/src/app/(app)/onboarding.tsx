@@ -35,8 +35,15 @@ import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
+import Animated, {
+  Keyframe,
+  useAnimatedStyle,
+  useReducedMotion,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { motion, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
@@ -45,6 +52,27 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   reveal: 1,
 };
 const READING_PROGRESS = 0.625;
+
+// Step-to-step transitions: a short rise in, a shorter drift out. The
+// Reanimated drivers fire on mount/unmount, so a step change only animates if
+// React remounts the wrapper — each step passes its own `key`.
+const STEP_ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 12 }] },
+  100: {
+    opacity: 1,
+    transform: [{ translateY: 0 }],
+    easing: motion.easing.out,
+  },
+}).duration(motion.duration.enter);
+
+const STEP_EXIT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }] },
+  100: {
+    opacity: 0,
+    transform: [{ translateY: -6 }],
+    easing: motion.easing.out,
+  },
+}).duration(motion.duration.exit);
 
 // A share that arrived mid-onboarding and was not the demo save is still held
 // by expo-sharing. Flagging it lets the share screen pick it up in the app.
@@ -80,6 +108,16 @@ export default function OnboardingScreen() {
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+
+  const reducedMotion = useReducedMotion();
+  const progress =
+    step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
+  // The bar animates between step widths; onLayout supplies the pixel track
+  // width so the UI thread never animates a percentage string.
+  const [barWidth, setBarWidth] = useState(0);
+  const barStyle = useAnimatedStyle(() => ({
+    width: withTiming(barWidth * (progress ?? 0), motion.timing.enter),
+  }));
 
   useEffect(() => {
     setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
@@ -170,22 +208,21 @@ export default function OnboardingScreen() {
     );
   }
 
-  const progress =
-    step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={[styles.barWrap, progress === null && styles.barHidden]}>
-        <View
-          style={[
-            styles.bar,
-            { width: `${Math.round((progress ?? 0) * 100)}%` },
-          ]}
-        />
+      <View
+        style={[styles.barWrap, progress === null && styles.barHidden]}
+        onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
+      >
+        <Animated.View style={[styles.bar, barStyle]} />
       </View>
 
       {step === "opener" ? (
-        <View
+        <Animated.View
+          key="opener"
+          entering={reducedMotion ? REDUCED_FADE_IN : STEP_ENTER}
+          exiting={reducedMotion ? REDUCED_FADE_OUT : STEP_EXIT}
+          collapsable={false}
           style={[
             styles.content,
             styles.scroll,
@@ -193,7 +230,7 @@ export default function OnboardingScreen() {
           ]}
         >
           <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
-        </View>
+        </Animated.View>
       ) : (
         <ScrollView
           style={styles.scroll}
@@ -207,38 +244,59 @@ export default function OnboardingScreen() {
           showsVerticalScrollIndicator={false}
         >
           {step === "setup" && (
-            <SetupStep
-              kinds={kinds}
-              spaces={spaces}
-              onToggleKind={toggleKind}
-              onToggleSpace={toggleSpace}
-              onAddSpace={addSpace}
-              onAdvance={advance}
-            />
+            <Animated.View
+              key="setup"
+              entering={reducedMotion ? REDUCED_FADE_IN : STEP_ENTER}
+              exiting={reducedMotion ? REDUCED_FADE_OUT : STEP_EXIT}
+              collapsable={false}
+            >
+              <SetupStep
+                kinds={kinds}
+                spaces={spaces}
+                onToggleKind={toggleKind}
+                onToggleSpace={toggleSpace}
+                onAddSpace={addSpace}
+                onAdvance={advance}
+              />
+            </Animated.View>
           )}
 
           {step === "demo" && (
-            <LiveDemoStep
-              samples={
-                Platform.OS === "ios"
-                  ? orderShareDemoSamples(kinds)
-                  : orderDemoSamples(kinds)
-              }
-              spaces={spaces}
-              resume={initialStep === "demo" ? initialProgress.demo : null}
-              onSaved={setSaved}
-              onReadingChange={setReading}
-              onAdvance={advance}
-            />
+            <Animated.View
+              key="demo"
+              entering={reducedMotion ? REDUCED_FADE_IN : STEP_ENTER}
+              exiting={reducedMotion ? REDUCED_FADE_OUT : STEP_EXIT}
+              collapsable={false}
+            >
+              <LiveDemoStep
+                samples={
+                  Platform.OS === "ios"
+                    ? orderShareDemoSamples(kinds)
+                    : orderDemoSamples(kinds)
+                }
+                spaces={spaces}
+                resume={initialStep === "demo" ? initialProgress.demo : null}
+                onSaved={setSaved}
+                onReadingChange={setReading}
+                onAdvance={advance}
+              />
+            </Animated.View>
           )}
 
           {step === "reveal" && (
-            <RevealStep
-              saved={saved}
-              restored={initialStep === "reveal"}
-              onSaved={setSaved}
-              onFinish={finish}
-            />
+            <Animated.View
+              key="reveal"
+              entering={reducedMotion ? REDUCED_FADE_IN : STEP_ENTER}
+              exiting={reducedMotion ? REDUCED_FADE_OUT : STEP_EXIT}
+              collapsable={false}
+            >
+              <RevealStep
+                saved={saved}
+                restored={initialStep === "reveal"}
+                onSaved={setSaved}
+                onFinish={finish}
+              />
+            </Animated.View>
           )}
         </ScrollView>
       )}

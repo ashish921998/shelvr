@@ -1,7 +1,10 @@
 import AndroidWaitlist from "./AndroidWaitlist";
 import StoreButton from "./StoreButton";
 
-const spine = "block rounded-[4px_4px_1px_1px] origin-bottom";
+// The leaning books straighten and lift on hover, mirroring the Spaces
+// shelf. Tailwind's hover: variant only applies on devices that can hover.
+const spine =
+  "block rounded-[4px_4px_1px_1px] origin-bottom [transform:rotate(var(--lean,0deg))] transition-transform duration-250 hover:[transform:translateY(-10px)_rotate(0deg)] motion-reduce:transition-none";
 
 export default function ClosingPanel() {
   return (
@@ -18,7 +21,8 @@ export default function ClosingPanel() {
           <span className={`${spine} h-[70px] w-[22px] bg-ember`} />
           <span className={`${spine} h-[58px] w-[18px] bg-terracotta`} />
           <span
-            className={`${spine} h-[78px] w-[26px] -rotate-6 bg-ember-soft`}
+            className={`${spine} h-[78px] w-[26px] bg-ember-soft`}
+            style={{ ["--lean" as string]: "-6deg" }}
           />
         </div>
         <div
@@ -27,7 +31,10 @@ export default function ClosingPanel() {
         >
           <span className={`${spine} h-16 w-5 bg-[#8d8271]`} />
           <span className={`${spine} h-20 w-6 bg-ember`} />
-          <span className={`${spine} h-[52px] w-4 rotate-5 bg-dark-text`} />
+          <span
+            className={`${spine} h-[52px] w-4 bg-dark-text`}
+            style={{ ["--lean" as string]: "5deg" }}
+          />
         </div>
 
         <h2 className="font-display relative max-w-[16ch] text-[clamp(40px,6vw,88px)] leading-[.95] text-balance">
