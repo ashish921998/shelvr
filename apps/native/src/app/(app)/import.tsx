@@ -1,7 +1,9 @@
 import { api } from "@convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import * as WebBrowser from "expo-web-browser";
 import { Stack, useRouter } from "expo-router";
+import { FallbackOnError } from "@/components/fallback-on-error";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { usePaywallGuard } from "@/lib/entitlement";
@@ -27,11 +29,42 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type ImportPhase = "idle" | "importing" | "done";
 
+type XConnectionState = FunctionReturnType<typeof api.xImport.getXConnection>;
+
+/** The archive steps: the way in while connecting X is not offered. */
+function XArchiveHint() {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.hintBox}>
+      <View style={styles.hintHeader}>
+        <AppSymbolIcon name="link" size={16} tintColor={theme.colors.muted} />
+        <Text style={styles.hintTitle}>{t("import.xHintTitle")}</Text>
+      </View>
+      <Text style={styles.hintText}>{t("import.xHintBody")}</Text>
+    </View>
+  );
+}
+
+/** Connect X when the backend offers it, otherwise the archive steps. The
+ * screen wraps this in FallbackOnError, so a backend that predates
+ * `xImport` (the query throws) shows the archive steps instead of crashing
+ * the import screen. */
+function XImportOptions() {
+  const state = useQuery(api.xImport.getXConnection);
+  if (state === undefined) return null;
+  if (!state.available) return <XArchiveHint />;
+  return (
+    <>
+      <XConnectCard state={state} />
+      <Text style={styles.hintTitle}>{t("import.pasteTitle")}</Text>
+    </>
+  );
+}
+
 /** Connect X once and its bookmarks come in on their own. Hidden until the
  * backend reports the X app credentials are set. */
-function XConnectCard() {
+function XConnectCard({ state }: { state: XConnectionState }) {
   const { theme } = useUnistyles();
-  const state = useQuery(api.xImport.getXConnection);
   const startXConnect = useMutation(api.xImport.startXConnect);
   const syncXNow = useMutation(api.xImport.syncXNow);
   const disconnectX = useMutation(api.xImport.disconnectX);
@@ -78,7 +111,6 @@ function XConnectCard() {
     }
   }, [disconnectX]);
 
-  if (state === undefined || !state.available) return null;
   const connection = state.connection;
   const active = connection?.status === "active";
 
@@ -172,8 +204,6 @@ export default function ImportScreen() {
 
   const importLinks = useMutation(api.items.importLinks);
   const { guard } = usePaywallGuard("add");
-  const xState = useQuery(api.xImport.getXConnection);
-  const xAvailable = xState?.available === true;
 
   const urls = useMemo(() => parseImportText(text), [text]);
 
@@ -244,27 +274,14 @@ export default function ImportScreen() {
         }}
       />
 
-      <XConnectCard />
+      <FallbackOnError
+        event="x_import_render_failed"
+        fallback={<XArchiveHint />}
+      >
+        <XImportOptions />
+      </FallbackOnError>
 
-      {xAvailable ? (
-        <Text style={styles.hintTitle}>{t("import.pasteTitle")}</Text>
-      ) : null}
       <Text style={styles.description}>{t("import.description")}</Text>
-
-      {/* The archive route is the fallback while connecting X is not offered. */}
-      {!xAvailable ? (
-        <View style={styles.hintBox}>
-          <View style={styles.hintHeader}>
-            <AppSymbolIcon
-              name="link"
-              size={16}
-              tintColor={theme.colors.muted}
-            />
-            <Text style={styles.hintTitle}>{t("import.xHintTitle")}</Text>
-          </View>
-          <Text style={styles.hintText}>{t("import.xHintBody")}</Text>
-        </View>
-      ) : null}
 
       {phase !== "done" ? (
         <TextInput
