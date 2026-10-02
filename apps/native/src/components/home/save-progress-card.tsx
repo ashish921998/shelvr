@@ -5,8 +5,8 @@ import { progressTitleKey } from "@/lib/save-goal";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import { InlineCard } from "@/components/ui/inline-card";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -86,13 +86,17 @@ export function SaveProgressCard({
   saved,
   goal,
   onDismiss,
+  onShown,
 }: {
   saved: number;
   goal: number;
   onDismiss: () => void;
+  /** Fires each time Home is focused with the card on screen. */
+  onShown: () => void;
 }) {
   useAppLocale();
   const router = useRouter();
+  useFocusEffect(useCallback(() => onShown(), [onShown]));
   const [busy, setBusy] = useState(false);
   const count = t("home.progressCount", { saved, total: goal });
 

@@ -64,13 +64,13 @@ export function useSaveProgress(
     );
   }, [userId, saved, goal]);
 
-  useEffect(() => {
-    if (!visible || userId === undefined || shownThisLaunch.has(userId)) {
-      return;
-    }
+  // Called by the card itself once Home shows it focused, so a card that
+  // never reached the screen is not counted.
+  const markShown = useCallback(() => {
+    if (userId === undefined || shownThisLaunch.has(userId)) return;
     shownThisLaunch.add(userId);
     analytics.capture("save_progress_card_shown", { saved: saved ?? 0 });
-  }, [visible, userId, saved]);
+  }, [userId, saved]);
 
   // A failed read settles as "no card", so it never holds other cards back.
   const pending = progress === undefined && !query.isError;
@@ -86,5 +86,6 @@ export function useSaveProgress(
     firstSession,
     nudgeReady: shouldOfferWeeklyNudge({ firstSession, progress }),
     dismiss,
+    markShown,
   };
 }

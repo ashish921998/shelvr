@@ -347,6 +347,7 @@ function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
       saved={progress.card.saved}
       goal={progress.card.goal}
       onDismiss={progress.dismiss}
+      onShown={progress.markShown}
     />
   ) : null;
 }
