@@ -31,6 +31,7 @@ vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn() }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
   waitForSheetTransition: vi.fn(),
+  whenSheetSettled: vi.fn(),
 }));
 vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 vi.mock("expo-notifications", () => ({
@@ -265,11 +266,23 @@ describe("trial reminder primer", () => {
     });
   });
 
-  it("declines an earlier primer when a new one opens", async () => {
+  it("closes an earlier primer without a choice when a new one opens", async () => {
     const first = trialReminderPrimer.request();
     const second = trialReminderPrimer.request();
-    expect(await first).toBe(false);
+    expect(await first).toBeNull();
     trialReminderPrimer.answer(false);
     expect(await second).toBe(false);
+  });
+
+  it("records no choice when the app closes the primer", async () => {
+    mock.permission.mockResolvedValue(undetermined);
+    const answer = confirmTrialReminderAsk();
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    trialReminderPrimer.dismiss();
+    expect(await answer).toEqual({ ask: false, primed: true });
+    expect(mock.capture).not.toHaveBeenCalledWith(
+      "trial_reminder_primer",
+      expect.anything(),
+    );
   });
 });

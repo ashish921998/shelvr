@@ -1,6 +1,10 @@
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import { useEntitlement, waitForSheetTransition } from "@/lib/entitlement";
+import {
+  useEntitlement,
+  waitForSheetTransition,
+  whenSheetSettled,
+} from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
@@ -225,9 +229,18 @@ export async function scheduleTrialReminder(
 // The primer: one in-app screen that says what the reminder is for before the
 // OS asks. A bare system prompt gives no reason, and a reason is what gets a
 // yes. The hook awaits the answer; `TrialReminderPrimerSheet` renders it.
-let primerAnswer: ((allow: boolean) => void) | null = null;
+// Resolves true or false for the user's choice, null when the app closed it.
+let primerAnswer: ((allow: boolean | null) => void) | null = null;
 const primerListeners = new Set<() => void>();
 const emitPrimer = () => primerListeners.forEach((listener) => listener());
+
+function closePrimer(result: boolean | null) {
+  const resolve = primerAnswer;
+  if (!resolve) return;
+  primerAnswer = null;
+  emitPrimer();
+  resolve(result);
+}
 
 export const trialReminderPrimer = {
   subscribe(listener: () => void) {
@@ -236,21 +249,54 @@ export const trialReminderPrimer = {
   },
   isOpen: () => primerAnswer !== null,
   /** Opens the primer and resolves with the choice. */
-  request(): Promise<boolean> {
-    primerAnswer?.(false);
+  request(): Promise<boolean | null> {
+    closePrimer(null);
     return new Promise((resolve) => {
       primerAnswer = resolve;
       emitPrimer();
     });
   },
-  answer(allow: boolean) {
-    const resolve = primerAnswer;
-    if (!resolve) return;
-    primerAnswer = null;
-    emitPrimer();
-    resolve(allow);
-  },
+  /** The user's choice. */
+  answer: (allow: boolean) => closePrimer(allow),
+  /** Closes it without a choice: the trial it was for has ended. */
+  dismiss: () => closePrimer(null),
 };
+
+// From a trial starting until its primer is answered or skipped. The welcome
+// sheet waits on this: two modals at once can't present on iOS.
+let primerHolds = 0;
+let primerShown = false;
+const primerDoneWaiters = new Set<() => void>();
+
+function holdPrimer(): (shown: boolean) => void {
+  primerHolds += 1;
+  let released = false;
+  return (shown) => {
+    if (released) return;
+    released = true;
+    primerHolds -= 1;
+    primerShown ||= shown;
+    if (primerHolds > 0) return;
+    const waiters = [...primerDoneWaiters];
+    primerDoneWaiters.clear();
+    for (const waiter of waiters) waiter();
+  };
+}
+
+/**
+ * Resolves once no trial reminder primer is pending, after its sheet has slid
+ * away when one was on screen.
+ */
+export function whenTrialPrimerDone(): Promise<void> {
+  if (primerHolds === 0) return Promise.resolve();
+  return new Promise<void>((resolve) => primerDoneWaiters.add(resolve)).then(
+    () => {
+      const shown = primerShown;
+      primerShown = false;
+      return shown ? waitForSheetTransition() : undefined;
+    },
+  );
+}
 
 export function useTrialReminderPrimerOpen(): boolean {
   return useSyncExternalStore(
@@ -274,6 +320,7 @@ export async function confirmTrialReminderAsk(): Promise<{
   if (canNotify(permission)) return { ask: true, primed: false };
   if (!permission.canAskAgain) return { ask: false, primed: false };
   const allow = await trialReminderPrimer.request();
+  if (allow === null) return { ask: false, primed: true };
   analytics.capture("trial_reminder_primer", {
     outcome: allow ? "accepted" : "declined",
   });
@@ -320,7 +367,7 @@ export function useTrialReminder(): void {
     if (status !== "trialing" || expiresAt === undefined) {
       scheduledFor.current = null;
       generation.current += 1;
-      trialReminderPrimer.answer(false);
+      trialReminderPrimer.dismiss();
       serial(cancelTrialReminder).catch((error) =>
         analytics.captureError("trial_reminder_cancel_failed", error),
       );
@@ -356,18 +403,29 @@ export function useTrialReminder(): void {
     generation.current += 1;
     const mine = generation.current;
     const isCurrent = () => generation.current === mine;
+    // Taken now, in the same commit as the purchase, so the welcome sheet
+    // sees it before its own wait ends.
+    const releasePrimer = mayAsk ? holdPrimer() : null;
     void (async () => {
       let ask = mayAsk;
       if (ask) {
-        // Nothing can present over a closing RevenueCat sheet.
-        await waitForSheetTransition();
-        if (!isCurrent()) return;
-        const confirmed = await confirmTrialReminderAsk();
-        ask = confirmed.ask;
-        if (!isCurrent()) return;
-        // Nor over the closing primer, when one was shown.
-        if (ask && confirmed.primed) await waitForSheetTransition();
-        if (!isCurrent()) return;
+        let primed = false;
+        try {
+          // Nothing can present while a RevenueCat sheet is up or closing.
+          await whenSheetSettled();
+          if (!isCurrent()) return;
+          const confirmed = await confirmTrialReminderAsk();
+          ask = confirmed.ask;
+          primed = confirmed.primed;
+          if (!isCurrent()) return;
+          // Nor over the closing primer, when one was shown.
+          if (ask && primed) await waitForSheetTransition();
+          if (!isCurrent()) return;
+        } finally {
+          // The OS prompt that follows is a system alert, not a modal, so
+          // the welcome sheet need not wait for it.
+          releasePrimer?.(primed);
+        }
       }
       const scheduled = await serial(() =>
         scheduleTrialReminder(expiresAt, Date.now(), ask, isCurrent, nudges),

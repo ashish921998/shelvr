@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
-import { trialReminderPrimer, useTrialReminder } from "./trial-reminder";
+import {
+  trialReminderPrimer,
+  useTrialReminder,
+  whenTrialPrimerDone,
+} from "./trial-reminder";
 
 /**
  * The hook under a DOM, for what the primer adds between a trial starting and
@@ -37,6 +41,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
   waitForSheetTransition: () => Promise.resolve(),
+  whenSheetSettled: () => Promise.resolve(),
 }));
 vi.mock("expo-secure-store", () => ({ getItem: () => null, setItem: vi.fn() }));
 vi.mock("expo-notifications", () => ({
@@ -81,7 +86,7 @@ function startTrial() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  trialReminderPrimer.answer(false);
+  trialReminderPrimer.dismiss();
   mock.permission.mockResolvedValue(undetermined);
   mock.request.mockResolvedValue(granted);
 });
@@ -102,6 +107,18 @@ describe("useTrialReminder primer", () => {
     act(() => trialReminderPrimer.answer(true));
     await vi.waitFor(() => expect(mock.schedule).toHaveBeenCalled());
     expect(mock.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds the welcome sheet until the primer is answered", async () => {
+    startTrial();
+    let done = false;
+    void whenTrialPrimerDone().then(() => {
+      done = true;
+    });
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    expect(done).toBe(false);
+    act(() => trialReminderPrimer.answer(false));
+    await vi.waitFor(() => expect(done).toBe(true));
   });
 
   it("closes the primer without prompting when the trial ends", async () => {
