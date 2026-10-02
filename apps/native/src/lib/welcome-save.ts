@@ -6,6 +6,7 @@ import {
   whenSheetSettled,
 } from "@/lib/entitlement";
 import { oncePerAccount } from "@/lib/once-per-account";
+import { whenTrialPrimerDone } from "@/lib/trial-reminder";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -66,7 +67,8 @@ export function useWelcomeSaveTracker(): void {
 /**
  * Whether the sheet may present now: queued, Home says `ready`, Home is the
  * focused screen (a purchase behind an item or the share screen waits), and
- * no RevenueCat sheet is up or still sliding away. Re-checked every time
+ * no RevenueCat sheet or trial reminder primer is up or still sliding away.
+ * Re-checked every time
  * Home regains focus, so a sheet opened elsewhere in between is waited out.
  */
 export function useWelcomeSheetVisible(
@@ -89,9 +91,12 @@ export function useWelcomeSheetVisible(
   useEffect(() => {
     if (!pending || focus === null) return;
     let live = true;
-    void whenSheetSettled().then(() => {
-      if (live) setSettledFor(focus);
-    });
+    // After the trial reminder primer too: it opens on the same purchase.
+    void whenSheetSettled()
+      .then(whenTrialPrimerDone)
+      .then(() => {
+        if (live) setSettledFor(focus);
+      });
     return () => {
       live = false;
     };
