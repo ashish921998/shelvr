@@ -13,6 +13,7 @@ import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 import {
   DemoLinkRow,
+  DemoPreviewView,
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
@@ -83,7 +84,7 @@ export function LiveDemoStep({
   const { view, setError } = demo;
 
   useEffect(() => {
-    onReadingChange(view === "reading");
+    onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
 
   // A paste saves at once when it holds a link and shows just that link.
@@ -106,6 +107,20 @@ export function LiveDemoStep({
       setError("demo.clipboardNoLink");
     }
   };
+
+  if (view === "preview") {
+    const url = demo.savingUrl ?? "";
+    return (
+      <DemoPreviewView
+        title={
+          DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
+          displayHost(url)
+        }
+        url={url}
+        onDone={demo.advance}
+      />
+    );
+  }
 
   if (view === "reading" || view === "failed") {
     const failed = view === "failed";
@@ -307,7 +322,8 @@ export function ShareHint() {
 }
 
 /** A large sample card. "save" saves it in one tap; "share" opens the real
- * share sheet over it, so the save goes through the Shelvr tile. */
+ * share sheet over it, so the save goes through the Shelvr tile; "preview"
+ * only shows it. */
 export function SampleCard({
   sample,
   action,
@@ -315,16 +331,21 @@ export function SampleCard({
   onPress,
 }: {
   sample: DemoSample;
-  action: "save" | "share";
+  action: "save" | "share" | "preview";
   disabled: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const { theme } = useUnistyles();
   const share = action === "share";
+  const preview = action === "preview";
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`}
+      accessibilityRole={preview ? undefined : "button"}
+      accessibilityLabel={
+        preview
+          ? `${sample.pageHeading}, ${sample.domain}`
+          : `${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`
+      }
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -346,13 +367,15 @@ export function SampleCard({
             {sample.domain}
           </Text>
         </View>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name={share ? "square.and.arrow.up" : "plus"}
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
+        {preview ? null : (
+          <View style={styles.hintShare}>
+            <AppSymbolIcon
+              name={share ? "square.and.arrow.up" : "plus"}
+              size={18}
+              tintColor={theme.colors.primaryForeground}
+            />
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -409,10 +432,24 @@ function DemoAuthSheet({
   onCancel: () => void;
 }) {
   useAppLocale();
-  const { theme } = useUnistyles();
-  const { signInWith, pendingProvider, lastError, interrupted } =
-    useOAuthSignIn("demo_sheet");
-  const busy = pendingProvider !== null;
+  const oauth = useOAuthSignIn("demo_sheet");
+  const busy = oauth.pendingProvider !== null;
+
+  useEffect(() => {
+    if (!visible) return;
+    analytics.capture("onboarding_signin_prompt", {
+      surface: "demo_sheet",
+      action: "shown",
+    });
+  }, [visible]);
+
+  const dismiss = () => {
+    analytics.capture("onboarding_signin_prompt", {
+      surface: "demo_sheet",
+      action: "dismissed",
+    });
+    onCancel();
+  };
   const pageHeading =
     DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
     displayHost(url);
@@ -420,20 +457,16 @@ function DemoAuthSheet({
   // A cancel keeps the sheet open: the auth session reports its own failures
   // as cancels, and closing on them reads as a button that does nothing.
   // Back and the scrim still close it.
-  const signIn = (provider: OAuthProvider) => {
-    void signInWith(provider);
-  };
-
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={busy ? undefined : onCancel}
+      onRequestClose={busy ? undefined : dismiss}
     >
       <Pressable
         style={styles.scrim}
-        onPress={busy ? undefined : onCancel}
+        onPress={busy ? undefined : dismiss}
         accessibilityRole="button"
         accessibilityLabel={t("common.back")}
       />
@@ -444,56 +477,79 @@ function DemoAuthSheet({
 
         <DemoLinkRow title={pageHeading} url={url} />
 
-        {!busy && (lastError !== null || interrupted) ? (
-          <Text style={styles.error}>{t("demo.signInFailed")}</Text>
-        ) : null}
+        <SignInButtons oauth={oauth} />
+      </View>
+    </Modal>
+  );
+}
 
-        {Platform.OS === "ios" ? (
-          <Pressable
-            onPress={() => signIn("apple")}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.authBtn,
-              styles.authBtnApple,
-              busy && { opacity: 0.4 },
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            {pendingProvider === "apple" ? (
-              <ActivityIndicator color={theme.colors.background} />
-            ) : (
-              <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
-                {t("account.apple")}
-              </Text>
-            )}
-          </Pressable>
-        ) : null}
+/** Apple (iOS), Google and the dev login, with the failure line and the
+ * privacy note. The caller owns the OAuth state, so a sheet can stay open
+ * while a sign-in is in flight. */
+export function SignInButtons({
+  oauth,
+}: {
+  oauth: ReturnType<typeof useOAuthSignIn>;
+}) {
+  useAppLocale();
+  const { theme } = useUnistyles();
+  const { signInWith, pendingProvider, lastError, interrupted } = oauth;
+  const busy = pendingProvider !== null;
+  const signIn = (provider: OAuthProvider) => {
+    void signInWith(provider);
+  };
+
+  return (
+    <>
+      {!busy && (lastError !== null || interrupted) ? (
+        <Text style={styles.error}>{t("demo.signInFailed")}</Text>
+      ) : null}
+
+      {Platform.OS === "ios" ? (
         <Pressable
-          onPress={() => signIn("google")}
+          onPress={() => signIn("apple")}
           disabled={busy}
           style={({ pressed }) => [
             styles.authBtn,
+            styles.authBtnApple,
             busy && { opacity: 0.4 },
             pressed && { opacity: 0.85 },
           ]}
         >
-          {pendingProvider === "google" ? (
-            <ActivityIndicator color={theme.colors.foreground} />
+          {pendingProvider === "apple" ? (
+            <ActivityIndicator color={theme.colors.background} />
           ) : (
-            <Text style={styles.authBtnText}>{t("account.google")}</Text>
+            <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
+              {t("account.apple")}
+            </Text>
           )}
         </Pressable>
-        {isAnonymousAuthEnabled() ? (
-          <GhostButton
-            label={t("account.anonymous")}
-            onPress={() => signIn("anonymous")}
-            disabled={busy}
-            testID="onboarding-dev-login"
-          />
-        ) : null}
-        <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
-      </View>
-    </Modal>
+      ) : null}
+      <Pressable
+        onPress={() => signIn("google")}
+        disabled={busy}
+        style={({ pressed }) => [
+          styles.authBtn,
+          busy && { opacity: 0.4 },
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        {pendingProvider === "google" ? (
+          <ActivityIndicator color={theme.colors.foreground} />
+        ) : (
+          <Text style={styles.authBtnText}>{t("account.google")}</Text>
+        )}
+      </Pressable>
+      {isAnonymousAuthEnabled() ? (
+        <GhostButton
+          label={t("account.anonymous")}
+          onPress={() => signIn("anonymous")}
+          disabled={busy}
+          testID="onboarding-dev-login"
+        />
+      ) : null}
+      <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
+    </>
   );
 }
 

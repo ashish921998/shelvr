@@ -69,6 +69,11 @@ export function practiceShareSample(
   ].find((sample) => sample.url !== savedUrl);
 }
 
+/** A ready-made sample, which the demo can preview before sign-in. */
+export function isDemoSample(url: string): boolean {
+  return DEMO_SAMPLES.some((sample) => sample.url === url);
+}
+
 /** A sample files into its kind's first preset space when the user kept that
  * space. Any other link is left to the classifier. */
 export function demoDestination(

@@ -453,6 +453,9 @@ export type MessageParams = {
   "demo.eitherWay": undefined;
   "reveal.title": undefined;
   "reveal.subtitle": undefined;
+  "reveal.previewTitle": undefined;
+  "reveal.previewSubtitle": undefined;
+  "reveal.saveShelf": undefined;
   "reveal.filedIn": { space: string };
   "reveal.explainer": undefined;
   "reveal.emptyTitle": undefined;
