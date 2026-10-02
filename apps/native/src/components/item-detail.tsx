@@ -501,7 +501,7 @@ function ItemDetailBody({
 
       {sheet ? null : <IntentsRow item={item} intents={intents} />}
 
-      {item.description && !sheet ? (
+      {item.description ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 

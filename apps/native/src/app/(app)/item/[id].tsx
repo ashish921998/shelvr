@@ -97,10 +97,11 @@ function pagerEndReached(
 // details sheet has scrolled up under the header.
 function pagerHeaderColors(
   activeItem: DetailItem | undefined,
-  sheetUnderId: string | null,
+  sheetsUnder: ReadonlySet<string>,
   theme: ReturnType<typeof useUnistyles>["theme"],
 ): { onMedia: boolean; tint: string; background: string } {
-  const onMedia = isMediaSave(activeItem) && activeItem?._id !== sheetUnderId;
+  const onMedia =
+    isMediaSave(activeItem) && !sheetsUnder.has(activeItem?._id ?? "");
   return onMedia
     ? { onMedia, tint: "white", background: MEDIA_CANVAS }
     : {
@@ -273,14 +274,21 @@ function usePagerPages({
 }) {
   const acceptedId = accepted?.itemId;
   const { pageStyle, onListLayout } = usePageStyle(width, windowHeight);
-  // The media save whose details sheet has scrolled up under the header, if
-  // any: the header goes back to the light page's colors over it.
-  const [sheetUnderId, setSheetUnderId] = useState<string | null>(null);
+  // The media saves whose details sheet is up under the header: the header
+  // goes back to the light page's colors over them. Tracked per save, since
+  // a swipe leaves each page's sheet where it was.
+  const [sheetsUnder, setSheetsUnder] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const onSheetUnderHeader = useCallback(
     (itemId: string, under: boolean) =>
-      setSheetUnderId((current) =>
-        under ? itemId : current === itemId ? null : current,
-      ),
+      setSheetsUnder((current) => {
+        if (current.has(itemId) === under) return current;
+        const next = new Set(current);
+        if (under) next.add(itemId);
+        else next.delete(itemId);
+        return next;
+      }),
     [],
   );
   const renderItem = useCallback(
@@ -298,7 +306,7 @@ function usePagerPages({
     ),
     [pageStyle, pushedId, suggestedIds, acceptedId, onSheetUnderHeader],
   );
-  return { renderItem, onListLayout, sheetUnderId };
+  return { renderItem, onListLayout, sheetsUnder };
 }
 
 function ItemScreenContent() {
@@ -422,7 +430,7 @@ function ItemScreenContent() {
     [],
   );
 
-  const { renderItem, onListLayout, sheetUnderId } = usePagerPages({
+  const { renderItem, onListLayout, sheetsUnder } = usePagerPages({
     width,
     windowHeight: height,
     pushedId,
@@ -434,7 +442,7 @@ function ItemScreenContent() {
 
   // A photo or social post opens in the black media viewer, so the chrome
   // over it (header, status bar) turns light while it is the page in view.
-  const media = pagerHeaderColors(activeItem, sheetUnderId, theme);
+  const media = pagerHeaderColors(activeItem, sheetsUnder, theme);
 
   // List rows are card-shaped (no article body, no shopping status), so the
   // toolbar reads those from getItem. `single` follows the debounced `id`

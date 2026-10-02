@@ -120,6 +120,16 @@ export function MediaViewerPage({
     };
   }, []);
 
+  // The pager's light status bar would sit white-on-white over the in-app
+  // browser; hand it back once the browser closes, unless the page has gone
+  // since.
+  const openSource = () => {
+    setStatusBarStyle("dark");
+    openItemSource(item, () => {
+      if (mounted.current) setStatusBarStyle("light");
+    });
+  };
+
   const sheetUnder = useRef(false);
   useEffect(() => {
     sheetUnder.current = false;
@@ -165,14 +175,7 @@ export function MediaViewerPage({
       playable
       onPressIn={stillTap.onPressIn}
       onPress={(e) => {
-        if (!stillTap.isStill(e)) return;
-        // The pager's light status bar would sit white-on-white over the
-        // in-app browser; hand it back once the browser closes, unless the
-        // page has gone since.
-        setStatusBarStyle("dark");
-        openItemSource(item, () => {
-          if (mounted.current) setStatusBarStyle("light");
-        });
+        if (stillTap.isStill(e)) openSource();
       }}
     >
       {image}
@@ -257,6 +260,7 @@ export function MediaViewerPage({
           {item.url ? (
             <ItemSourceLink
               item={item}
+              onPress={openSource}
               icon={social?.playable ? "play.rectangle" : "safari"}
               iconSize={14}
               arrowSize={10}

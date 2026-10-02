@@ -38,6 +38,8 @@ type Props = {
     | StyleProp<ViewStyle>
     | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
   textStyle?: StyleProp<TextStyle>;
+  // Replaces the default open, for a caller that wraps it.
+  onPress?: () => void;
 };
 
 export function ItemSourceLink({
@@ -50,6 +52,7 @@ export function ItemSourceLink({
   label,
   style,
   textStyle,
+  onPress,
 }: Props) {
   if (!item.url) return null;
   const site = label ?? item.siteName ?? displayHost(item.url);
@@ -60,7 +63,7 @@ export function ItemSourceLink({
       accessibilityLabel={t("item.openSite", { site })}
       hitSlop={6}
       style={style}
-      onPress={() => openItemSource(item)}
+      onPress={onPress ?? (() => openItemSource(item))}
     >
       <AppSymbolIcon name={icon} size={iconSize} tintColor={iconTintColor} />
       <Text numberOfLines={1} style={textStyle}>
