@@ -200,7 +200,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     padding: theme.gap(1),
   },
-  preference: { padding: theme.gap(2), gap: theme.gap(1) },
+  // Matches SettingCard so it sits in the Settings list as one more card.
+  preference: {
+    alignSelf: "stretch",
+    padding: theme.gap(1.5),
+    gap: theme.gap(1),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
   error: {
     fontFamily: theme.fonts.regular,
     fontSize: 14,

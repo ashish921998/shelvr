@@ -327,11 +327,12 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   content: {
     padding: theme.gap(3),
     paddingTop: theme.gap(4),
-    paddingBottom: theme.gap(4),
+    // Keeps Delete account clear of the home indicator at full height.
+    paddingBottom: rt.insets.bottom + theme.gap(4),
     gap: theme.gap(1.5),
   },
   sheetHeader: {
