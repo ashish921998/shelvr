@@ -27,6 +27,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  AppState,
   type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -401,7 +402,8 @@ function playableVideo(
 
 /**
  * The reel playing on a media page: keyed by save, like the caption, and
- * stopped once the user swipes to another save or leaves the screen. A reel
+ * stopped once the user swipes to another save, leaves the screen or leaves
+ * the app. A reel
  * with no embed player, or one that never loads, opens its post instead.
  */
 function useReelPlayback(
@@ -415,8 +417,11 @@ function useReelPlayback(
   } | null>(null);
   const shownSave = useContext(ShownSaveContext);
   const focused = useIsFocused();
+  const foreground = useForeground();
   const canPlay =
-    focused && (shownSave === undefined || shownSave === item._id);
+    focused &&
+    foreground &&
+    (shownSave === undefined || shownSave === item._id);
   if (playing && (playing.id !== item._id || !canPlay)) setPlaying(null);
   const player = playing?.id === item._id && canPlay ? playing : null;
 
@@ -442,6 +447,16 @@ function useReelPlayback(
     });
   };
   return { player, play, fail, stop: () => setPlaying(null) };
+}
+
+/** Whether the app is in the foreground; a reel stops when it leaves. */
+function useForeground() {
+  const [state, setState] = useState(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", setState);
+    return () => subscription.remove();
+  }, []);
+  return state === "active";
 }
 
 // Keeps white caption type readable where a light photo shows through the

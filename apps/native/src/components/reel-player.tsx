@@ -109,10 +109,13 @@ function ReelPlayer({ uri, style, onOpen, onFail }: Props) {
           style={[styles.web, { opacity: loaded ? 1 : 0 }]}
           containerStyle={styles.web}
           injectedJavaScript={REEL_PLAYER_SCRIPT}
+          // The page is a third party's: it never gets the native modules.
+          useExpoModulesBridge={false}
           onMessage={(e) => {
             const message = readReelPlayerMessage(e.nativeEvent.data);
             if (message === "ready") setReady(uri);
             else if (message === "open") onOpen();
+            else if (message === "error") failRef.current();
           }}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}

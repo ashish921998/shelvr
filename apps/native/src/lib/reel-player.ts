@@ -78,8 +78,10 @@ export async function resolveReelEmbedUrl(
 }
 
 /**
- * Runs inside the embed player. Tells the app once the page has loaded, and
- * sends any link tap (the creator, "watch on Instagram") to the app, which
+ * Runs inside the embed player. Tells the app once the page has loaded, or
+ * fails when TikTok's player reports an error (its player API posts
+ * onPlayerReady / onError messages to its parent, which is the page itself
+ * when it is loaded on its own). Also sends any link tap (the creator, "watch on Instagram") to the app, which
  * opens the post in its browser: the player is too small to browse in, and an
  * iOS web view drops links that ask for a new window.
  */
@@ -101,12 +103,21 @@ export const REEL_PLAYER_SCRIPT = `(function () {
     },
     true
   );
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (e) { return; }
+    }
+    if (!data || data["x-tiktok-player"] !== true) return;
+    if (data.type === "onPlayerReady") send("ready");
+    else if (data.type === "onError") send("error");
+  });
   if (document.readyState === "complete") send("ready");
   else window.addEventListener("load", function () { send("ready"); });
 })();
 true;`;
 
-type ReelPlayerMessage = "ready" | "open";
+type ReelPlayerMessage = "ready" | "open" | "error";
 
 /** The player's message, or undefined for anything else the page posts. */
 export function readReelPlayerMessage(
@@ -114,7 +125,9 @@ export function readReelPlayerMessage(
 ): ReelPlayerMessage | undefined {
   try {
     const type = (JSON.parse(data) as { type?: unknown }).type;
-    return type === "ready" || type === "open" ? type : undefined;
+    return type === "ready" || type === "open" || type === "error"
+      ? type
+      : undefined;
   } catch {
     return undefined;
   }

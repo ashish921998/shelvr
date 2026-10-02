@@ -118,6 +118,7 @@ describe("readReelPlayerMessage", () => {
   it("reads the player's own messages and ignores the rest", () => {
     expect(readReelPlayerMessage('{"type":"ready"}')).toBe("ready");
     expect(readReelPlayerMessage('{"type":"open"}')).toBe("open");
+    expect(readReelPlayerMessage('{"type":"error"}')).toBe("error");
     expect(readReelPlayerMessage('{"type":"other"}')).toBeUndefined();
     expect(readReelPlayerMessage("not json")).toBeUndefined();
   });
