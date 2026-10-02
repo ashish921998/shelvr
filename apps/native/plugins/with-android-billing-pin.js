@@ -16,8 +16,16 @@ configurations.all {
 }
 `;
 
+// The marked block, as any version of this plugin wrote it.
+const BLOCK_PATTERN = new RegExp(
+  `\\n// ${MARKER}:[^\\n]*\\nconfigurations\\.all \\{\\n[^}]*\\}\\n`,
+);
+
 function addBillingPin(contents) {
-  if (contents.includes(MARKER)) return contents;
+  // Replace rather than skip, so a non-clean prebuild picks up a new version.
+  if (BLOCK_PATTERN.test(contents)) {
+    return contents.replace(BLOCK_PATTERN, BLOCK);
+  }
   return contents.trimEnd() + "\n" + BLOCK;
 }
 

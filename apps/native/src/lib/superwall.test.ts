@@ -232,12 +232,16 @@ describe("Superwall identity", () => {
       entitlements: ["Shelvr Pro"],
     });
 
-    // Later RevenueCat updates keep the status current.
+    // Later RevenueCat updates keep the status current, read for the
+    // current user rather than taken from the (possibly stale) payload.
     const [listener] = mock.rc.addCustomerInfoUpdateListener.mock.calls[0];
-    listener(inactive);
-    expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
-      status: "INACTIVE",
-    });
+    mock.rc.getCustomerInfo.mockResolvedValue(inactive);
+    listener(active);
+    await vi.waitFor(() =>
+      expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
+        status: "INACTIVE",
+      }),
+    );
   });
 
   it("resets before identifying a different account", async () => {
@@ -246,6 +250,28 @@ describe("Superwall identity", () => {
     await mod.syncSuperwallUser("user_2");
     expect(mock.shared.reset).toHaveBeenCalledTimes(1);
     expect(mock.shared.identify).toHaveBeenLastCalledWith({ userId: "user_2" });
+  });
+
+  it("retries a failed identify at an account switch without a second reset", async () => {
+    const mod = await load();
+    await mod.syncSuperwallUser("user_1");
+    mock.shared.identify.mockRejectedValueOnce(new Error("offline"));
+    await mod.syncSuperwallUser("user_2");
+    expect(mock.captureError).toHaveBeenCalledTimes(1);
+    await mod.syncSuperwallUser("user_2");
+    expect(mock.shared.reset).toHaveBeenCalledTimes(1);
+    expect(mock.shared.identify).toHaveBeenLastCalledWith({ userId: "user_2" });
+  });
+
+  it("ignores RevenueCat updates once signed out", async () => {
+    const mod = await load();
+    await mod.syncSuperwallUser("user_1");
+    await mod.resetSuperwallUser();
+    const calls = mock.shared.setSubscriptionStatus.mock.calls.length;
+    const [listener] = mock.rc.addCustomerInfoUpdateListener.mock.calls[0];
+    listener(active);
+    await mod.resetSuperwallUser();
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenCalledTimes(calls);
   });
 
   it("resets on sign-out only after a user was identified", async () => {

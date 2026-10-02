@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => ({
   presentCustomerCenter: vi.fn(),
   syncSuperwallUser: vi.fn(async () => {}),
   resetSuperwallUser: vi.fn(async () => {}),
+  authenticated: true,
   appStateListeners: new Set<(state: string) => void>(),
   captureError: vi.fn(),
   capture: vi.fn(),
@@ -116,7 +117,10 @@ vi.mock("@convex/model/entitlement", () => ({
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useConvexAuth: () => ({
+    isAuthenticated: mock.authenticated,
+    isLoading: false,
+  }),
 }));
 vi.mock("@tanstack/react-query", () => ({ useQuery: mock.useQuery }));
 
@@ -160,6 +164,7 @@ beforeEach(() => {
   mock.isEntitled.mockReset().mockReturnValue(false);
   mock.store.clear();
   mock.appStateListeners.clear();
+  mock.authenticated = true;
   mock.apiKey.REVENUECAT_API_KEY = "appl_test";
   mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
   push.mockClear();
@@ -199,6 +204,15 @@ describe("Superwall identity", () => {
     await loadReady();
     expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
     expect(mock.syncSuperwallUser).toHaveBeenCalledWith("user_1");
+  });
+
+  it("resets Superwall when the user signs out", async () => {
+    const { hook } = await loadReady();
+    expect(mock.resetSuperwallUser).not.toHaveBeenCalled();
+    mock.authenticated = false;
+    hook.rerender();
+    expect(mock.resetSuperwallUser).toHaveBeenCalledTimes(1);
+    hook.unmount();
   });
 
   it("retries the Superwall sync on every foreground", async () => {

@@ -193,12 +193,16 @@ function configureSuperwall(apiKey: string, rc: Purchases) {
       // No placement opens a Superwall paywall yet, so don't download any.
       options: { paywalls: { shouldPreload: false } },
     });
-    rc.addCustomerInfoUpdateListener((info) => {
-      void sw.default.shared
-        .setSubscriptionStatus(subscriptionStatusFor(sw, info))
-        .catch((error) =>
-          reportSuperwallError("superwall_status_failed", error),
+    // An update can still arrive for the previous account after a switch, so
+    // the payload is only a signal: the status is re-read for the current
+    // RevenueCat user on the identity queue, after any reset and identify.
+    rc.addCustomerInfoUpdateListener(() => {
+      void enqueue(async () => {
+        if (identifiedUserId === null) return;
+        await sw.default.shared.setSubscriptionStatus(
+          subscriptionStatusFor(sw, await rc.getCustomerInfo()),
         );
+      }, "superwall_status_failed");
     });
     return sw;
   })().catch((error) => {
@@ -233,7 +237,12 @@ export function syncSuperwallUser(userId: string): Promise<void> {
     const shared = sw.default.shared;
     if (identifiedUserId !== userId) {
       // A different account must not inherit the last one's assignments.
-      if (identifiedUserId !== null) await shared.reset();
+      if (identifiedUserId !== null) {
+        await shared.reset();
+        // Reset is done: a failed identify below must retry without
+        // resetting again, and must not leave the old id looking current.
+        identifiedUserId = null;
+      }
       await shared.identify({ userId });
       identifiedUserId = userId;
     }
@@ -250,9 +259,9 @@ export function resetSuperwallUser(): Promise<void> {
     const sw = await configured;
     if (!sw) return;
     await sw.default.shared.reset();
+    identifiedUserId = null;
     await sw.default.shared.setSubscriptionStatus(
       sw.SubscriptionStatus.Inactive(),
     );
-    identifiedUserId = null;
   }, "superwall_reset_failed");
 }
