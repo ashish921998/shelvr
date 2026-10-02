@@ -36,8 +36,9 @@ export function nextSaveGoalStep(
   if (start === null || !Number.isFinite(start)) return { kind: "skip" };
   return {
     kind: "reached",
-    // One decimal is enough for a "within 48 hours" filter.
-    hoursSinceStart: Math.round(((now - start) / HOUR_MS) * 10) / 10,
+    // Rounded up to the hundredth, so anything past 48 hours can never
+    // read as 48 in a "within 48 hours" filter.
+    hoursSinceStart: Math.ceil(((now - start) / HOUR_MS) * 100) / 100,
   };
 }
 

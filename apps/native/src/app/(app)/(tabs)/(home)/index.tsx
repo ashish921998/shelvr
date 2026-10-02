@@ -335,7 +335,10 @@ function emptyFeedStarter(
   }
   if (!progressCard) return null;
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic">
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.progressOnly}
+    >
       {progressCard}
     </ScrollView>
   );
@@ -358,6 +361,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   howToOnly: {
     padding: theme.gap(2),
+  },
+  // The card brings its own side margins; this matches the how-to's
+  // vertical rhythm.
+  progressOnly: {
+    paddingVertical: theme.gap(1),
   },
   howToHeader: {
     gap: theme.gap(2.5),

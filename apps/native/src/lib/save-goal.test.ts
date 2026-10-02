@@ -32,7 +32,16 @@ describe("nextSaveGoalStep", () => {
   it("reports the hours from that first sighting to the goal", () => {
     expect(
       nextSaveGoalStep("0", { saved: 3, goal }, 30 * HOUR + HOUR / 4),
-    ).toEqual({ kind: "reached", hoursSinceStart: 30.3 });
+    ).toEqual({ kind: "reached", hoursSinceStart: 30.25 });
+  });
+
+  it("never rounds a save past 48 hours down to 48", () => {
+    const step = nextSaveGoalStep(
+      "0",
+      { saved: 3, goal },
+      48 * HOUR + 2 * 60 * 1000,
+    );
+    expect(step).toEqual({ kind: "reached", hoursSinceStart: 48.04 });
   });
 
   it("skips a shelf that was already full when first seen", () => {
