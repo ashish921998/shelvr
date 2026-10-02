@@ -3,7 +3,7 @@
  * when the browser reaches it. */
 export const X_CONNECT_RETURN_URL = "shelvr://import";
 
-export type XConnectOutcome = "connected" | "failed" | "cancelled";
+type XConnectOutcome = "connected" | "failed" | "cancelled";
 
 /** How an X connect attempt ended, from the auth session's result. A closed
  * browser is a cancel; a return without a recognized `x=` value is a failure,
