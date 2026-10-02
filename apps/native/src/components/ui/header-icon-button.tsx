@@ -1,7 +1,6 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
-import { Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export function HeaderIconButton({

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ThemedText } from "@/components/ui/themed-text";
 

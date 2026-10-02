@@ -10,12 +10,12 @@ import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 

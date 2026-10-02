@@ -6,15 +6,12 @@ import {
   Linking,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import {
-  GestureHandlerRootView,
-  Pressable,
-} from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -159,121 +156,117 @@ export function FeedbackModal({
       statusBarTranslucent
       accessibilityViewIsModal
     >
-      {/* Android renders a Modal in its own window, outside the app's gesture
-        root, so gesture-handler Pressables inside need a root of their own. */}
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.backdrop}
-        >
-          <Pressable
-            style={styles.backdropPress}
-            onPress={onClose}
-            accessibilityLabel={t("feedback.close")}
-          />
-          <View style={styles.sheet}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              contentContainerStyle={styles.scrollContent}
-            >
-              <Text style={styles.title} accessibilityRole="header">
-                {t("feedback.open")}
-              </Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.backdrop}
+      >
+        <Pressable
+          style={styles.backdropPress}
+          onPress={onClose}
+          accessibilityLabel={t("feedback.close")}
+        />
+        <View style={styles.sheet}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Text style={styles.title} accessibilityRole="header">
+              {t("feedback.open")}
+            </Text>
 
-              {flow === "sent" ? (
-                <>
-                  <Text style={styles.body}>{t("feedback.thanks")}</Text>
-                  <View style={styles.buttonRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("common.done")}
-                      style={({ pressed }) => [
-                        styles.primaryButton,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={onClose}
-                    >
-                      <Text style={styles.primaryButtonText}>
-                        {t("common.done")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : !available ? (
-                <>
-                  <Text style={styles.body}>
-                    {t("feedback.unavailableContact")}
-                  </Text>
-                  <SupportLink />
-                </>
-              ) : (
-                <>
-                  {flow === "failed" ? (
-                    <>
-                      <Text style={styles.body}>
-                        {t("feedback.sendFailedContact")}
-                      </Text>
-                      <SupportLink />
-                    </>
-                  ) : null}
-                  <Text style={styles.body}>{t("feedback.prompt")}</Text>
-                  <Text style={styles.notice}>{t("feedback.replyNotice")}</Text>
-                  <TextInput
-                    accessibilityLabel={t("feedback.messageLabel")}
-                    style={styles.input}
-                    value={message}
-                    onChangeText={setMessage}
-                    placeholder={t("feedback.placeholder")}
-                    placeholderTextColor={theme.colors.faint}
-                    multiline
-                    maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
-                    autoCapitalize="sentences"
-                    autoCorrect
-                  />
-                  <Text style={styles.counter}>
-                    {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
-                  </Text>
-                  <View style={styles.buttonRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("feedback.cancel")}
-                      style={({ pressed }) => [
-                        styles.secondaryButton,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      disabled={flow === "sending"}
-                      onPress={onClose}
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {t("common.cancel")}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("feedback.open")}
-                      accessibilityState={{ disabled: !canSend }}
-                      style={({ pressed }) => [
-                        styles.primaryButton,
-                        pressed && { opacity: 0.7 },
-                        !canSend && { opacity: 0.4 },
-                      ]}
-                      disabled={!canSend}
-                      onPress={() => void send()}
-                    >
-                      <Text style={styles.primaryButtonText}>
-                        {flow === "sending"
-                          ? t("feedback.sending")
-                          : t("feedback.send")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </GestureHandlerRootView>
+            {flow === "sent" ? (
+              <>
+                <Text style={styles.body}>{t("feedback.thanks")}</Text>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("common.done")}
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    onPress={onClose}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {t("common.done")}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : !available ? (
+              <>
+                <Text style={styles.body}>
+                  {t("feedback.unavailableContact")}
+                </Text>
+                <SupportLink />
+              </>
+            ) : (
+              <>
+                {flow === "failed" ? (
+                  <>
+                    <Text style={styles.body}>
+                      {t("feedback.sendFailedContact")}
+                    </Text>
+                    <SupportLink />
+                  </>
+                ) : null}
+                <Text style={styles.body}>{t("feedback.prompt")}</Text>
+                <Text style={styles.notice}>{t("feedback.replyNotice")}</Text>
+                <TextInput
+                  accessibilityLabel={t("feedback.messageLabel")}
+                  style={styles.input}
+                  value={message}
+                  onChangeText={setMessage}
+                  placeholder={t("feedback.placeholder")}
+                  placeholderTextColor={theme.colors.faint}
+                  multiline
+                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
+                  autoCapitalize="sentences"
+                  autoCorrect
+                />
+                <Text style={styles.counter}>
+                  {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+                </Text>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("feedback.cancel")}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    disabled={flow === "sending"}
+                    onPress={onClose}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      {t("common.cancel")}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("feedback.open")}
+                    accessibilityState={{ disabled: !canSend }}
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      pressed && { opacity: 0.7 },
+                      !canSend && { opacity: 0.4 },
+                    ]}
+                    disabled={!canSend}
+                    onPress={() => void send()}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {flow === "sending"
+                        ? t("feedback.sending")
+                        : t("feedback.send")}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

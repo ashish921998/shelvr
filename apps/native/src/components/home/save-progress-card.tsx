@@ -2,8 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { InlineCard } from "@/components/ui/inline-card";
 import { CtaButton } from "@/components/onboarding/parts";
 import { useRouter } from "expo-router";
-import { Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /**

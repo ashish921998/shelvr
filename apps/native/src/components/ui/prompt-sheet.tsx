@@ -1,10 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { Modal, Text, View } from "react-native";
-import {
-  GestureHandlerRootView,
-  Pressable,
-} from "react-native-gesture-handler";
+import { Modal, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /**
@@ -37,25 +33,21 @@ export function PromptSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      {/* Android renders a Modal in its own window, outside the app's gesture
-        root, so gesture-handler Pressables inside need a root of their own. */}
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.backdrop}>
-          <Pressable
-            style={styles.scrim}
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t("common.notNow")}
-          />
-          <View style={styles.sheet} testID={testID}>
-            <View style={styles.grabber} />
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.body}>{body}</Text>
-            {children}
-            <View style={styles.actions}>{actions}</View>
-          </View>
+      <View style={styles.backdrop}>
+        <Pressable
+          style={styles.scrim}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.notNow")}
+        />
+        <View style={styles.sheet} testID={testID}>
+          <View style={styles.grabber} />
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.body}>{body}</Text>
+          {children}
+          <View style={styles.actions}>{actions}</View>
         </View>
-      </GestureHandlerRootView>
+      </View>
     </Modal>
   );
 }

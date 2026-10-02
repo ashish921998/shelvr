@@ -4,8 +4,7 @@ import * as Linking from "expo-linking";
 import { usePermissions } from "expo-media-library";
 import { Stack, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState, type FC } from "react";
-import { Platform, Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Platform, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { EmptyState } from "@/components/empty-state";

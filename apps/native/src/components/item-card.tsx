@@ -22,8 +22,14 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import { Alert, ActivityIndicator, Share, Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import {
+  Alert,
+  ActivityIndicator,
+  Pressable,
+  Share,
+  Text,
+  View,
+} from "react-native";
 import Animated, {
   FadeIn,
   useReducedMotion,

@@ -1,6 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Text, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { InlineCard } from "@/components/ui/inline-card";
 

@@ -28,6 +28,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   Text,
   TextInput,
   View,
@@ -35,11 +36,7 @@ import {
   type GestureResponderEvent,
   type TextInputInstance,
 } from "react-native";
-import {
-  Gesture,
-  GestureDetector,
-  Pressable,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolate,
   useAnimatedStyle,

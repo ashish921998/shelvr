@@ -6,8 +6,7 @@ import type { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 type RecallItem = FunctionReturnType<typeof api.items.similarItems>[number];

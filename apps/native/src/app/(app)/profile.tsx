@@ -30,12 +30,12 @@ import {
   Alert,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function ProfileScreen() {

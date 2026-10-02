@@ -1,7 +1,6 @@
 import type { IntentKind } from "@/lib/intents";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { Text } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The app owns the kind → icon mapping so the model can never emit an invalid

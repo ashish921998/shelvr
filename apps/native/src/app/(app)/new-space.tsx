@@ -15,12 +15,12 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
 import Animated, {
   FadeOut,
   Keyframe,

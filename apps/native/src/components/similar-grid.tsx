@@ -3,8 +3,7 @@ import type { DetailItem } from "@/components/item-detail";
 import { displayHost } from "@/lib/url";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 // A static two-column masonry for the similar-items strip. The parent page

@@ -1,7 +1,6 @@
 import { GlassView } from "@/components/glass";
 import { AppSymbolIcon } from "@/components/symbol";
-import { View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const BADGE_SIZE = 26;

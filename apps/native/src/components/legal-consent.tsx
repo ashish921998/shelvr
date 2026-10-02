@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Linking, Platform, ScrollView, Text, View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import {
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";

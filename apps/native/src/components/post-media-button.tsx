@@ -1,8 +1,7 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { t } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { View } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
+import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** A post's image or video poster that opens the post on its site. Videos

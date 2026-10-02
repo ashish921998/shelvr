@@ -15,13 +15,13 @@ import type { Id } from "@convex/_generated/dataModel";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   Text,
   useWindowDimensions,
   View,
   type ScrollViewInstance,
 } from "react-native";
-import { Pressable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 

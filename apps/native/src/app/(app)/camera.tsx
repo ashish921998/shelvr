@@ -13,12 +13,8 @@ import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Text, View } from "react-native";
-import {
-  Gesture,
-  GestureDetector,
-  Pressable,
-} from "react-native-gesture-handler";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
