@@ -63,7 +63,11 @@ vi.mock("@/lib/pending-onboarding", () => ({
 }));
 vi.mock("@/lib/onboarding-demo", () => ({
   demoDestination: (url: string) =>
-    url === "https://sample.test/recipe" ? "recipes" : null,
+    url === "https://sample.test/recipe" ||
+    url === "https://sample.test/ready-made"
+      ? "recipes"
+      : null,
+  isDemoSample: (url: string) => url === "https://sample.test/ready-made",
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
@@ -402,6 +406,53 @@ describe("useDemoSave", () => {
     });
   });
 
+  it("previews a ready-made sample when signed out, without saving", () => {
+    mock.authenticated = false;
+    const { result, rerender, onAdvance } = renderDemo();
+
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    expect(result.current.view).toBe("preview");
+    expect(result.current.savingUrl).toBe("https://sample.test/ready-made");
+    expect(mock.setPendingDemo).toHaveBeenCalledWith({
+      url: "https://sample.test/ready-made",
+      destination: "name:recipes",
+      source: "direct",
+    });
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: true, signed_in: false }],
+    ]);
+
+    // The reveal saves it after its own sign-in, not this step.
+    mock.authenticated = true;
+    rerender();
+    expect(mock.create).not.toHaveBeenCalled();
+
+    act(() => result.current.advance());
+    expect(onAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves a ready-made sample at once when already signed in", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo();
+    await flush(() =>
+      result.current.submitUrl("https://sample.test/ready-made"),
+    );
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: true, signed_in: true }],
+    ]);
+  });
+
+  it("still asks for sign-in first for a pasted link", () => {
+    mock.authenticated = false;
+    const { result } = renderDemo();
+    act(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(captured("onboarding_demo_picked")).toEqual([
+      ["onboarding_demo_picked", { sample: false, signed_in: false }],
+    ]);
+  });
+
   it("returns to picking when sign-in is cancelled", () => {
     mock.authenticated = false;
     const { result } = renderDemo();
@@ -490,6 +541,7 @@ describe("demoSaveReducer", () => {
           source: "direct",
         },
         authenticated: true,
+        preview: false,
         lost: true,
       }),
     ).toMatchObject({
