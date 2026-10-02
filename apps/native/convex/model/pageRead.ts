@@ -1301,10 +1301,17 @@ async function fetchPinterestPin(url: string): Promise<PageData> {
     };
   }
   // The widget has no such pin. Pinterest still serves a 200 shell page for a
-  // pin id that never existed, so a fallback read with neither an image nor
-  // any text is no pin at all: fail it as gone rather than save "Pinterest".
+  // pin id that never existed, so a whole page with no image, description or
+  // text is no pin at all: fail it as gone rather than save "Pinterest". A
+  // real pin page runs past the read cap, which can cut its tags off, so a
+  // truncated page is kept.
   const page = await fetchPage(resolved.url, isPinterestHomePage);
-  if (page.heroImageUrl === undefined && !page.content?.trim()) {
+  if (
+    page.truncated !== true &&
+    page.heroImageUrl === undefined &&
+    !page.description?.trim() &&
+    !page.content?.trim()
+  ) {
     throw new PageFetchError("http_error", 404);
   }
   return page;

@@ -243,6 +243,25 @@ describe("readPage for Pinterest pins", () => {
     expect((await readPage(PIN_URL)).status).toBe("gone");
   });
 
+  it("keeps a widget-less pin page that was cut off before its tags", async () => {
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
+      [PIN_URL]: { ...html(PIN_URL, EMPTY_PIN_PAGE), truncated: true },
+    });
+    expect((await readPage(PIN_URL)).status).toBe("ok");
+  });
+
+  it("keeps a widget-less pin page that has only a description", async () => {
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
+      [PIN_URL]: html(
+        PIN_URL,
+        '<html><head><meta property="og:description" content="Honey garlic chicken"></head><body></body></html>',
+      ),
+    });
+    expect((await readPage(PIN_URL)).status).toBe("ok");
+  });
+
   it("fails a deleted pin.it pin as gone, reading the resolved pin page", async () => {
     const shortUrl = "https://pin.it/4Vw0y6Zab";
     const pinUrl = "https://www.pinterest.com/pin/643944446743403202/";
