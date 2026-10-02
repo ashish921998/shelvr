@@ -8,7 +8,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 /**
@@ -222,6 +222,59 @@ export async function scheduleTrialReminder(
   return true;
 }
 
+// The primer: one in-app screen that says what the reminder is for before the
+// OS asks. A bare system prompt gives no reason, and a reason is what gets a
+// yes. The hook awaits the answer; `TrialReminderPrimerSheet` renders it.
+let primerAnswer: ((allow: boolean) => void) | null = null;
+const primerListeners = new Set<() => void>();
+const emitPrimer = () => primerListeners.forEach((listener) => listener());
+
+export const trialReminderPrimer = {
+  subscribe(listener: () => void) {
+    primerListeners.add(listener);
+    return () => primerListeners.delete(listener);
+  },
+  isOpen: () => primerAnswer !== null,
+  /** Opens the primer and resolves with the choice. */
+  request(): Promise<boolean> {
+    primerAnswer?.(false);
+    return new Promise((resolve) => {
+      primerAnswer = resolve;
+      emitPrimer();
+    });
+  },
+  answer(allow: boolean) {
+    const resolve = primerAnswer;
+    if (!resolve) return;
+    primerAnswer = null;
+    emitPrimer();
+    resolve(allow);
+  },
+};
+
+export function useTrialReminderPrimerOpen(): boolean {
+  return useSyncExternalStore(
+    trialReminderPrimer.subscribe,
+    trialReminderPrimer.isOpen,
+    trialReminderPrimer.isOpen,
+  );
+}
+
+/**
+ * Whether the OS prompt should follow. No primer when permission is already
+ * granted (nothing to ask) or refused for good (the OS would show nothing).
+ */
+export async function confirmTrialReminderAsk(): Promise<boolean> {
+  const permission = await Notifications.getPermissionsAsync();
+  if (canNotify(permission)) return true;
+  if (!permission.canAskAgain) return false;
+  const allow = await trialReminderPrimer.request();
+  analytics.capture("trial_reminder_primer", {
+    outcome: allow ? "accepted" : "declined",
+  });
+  return allow;
+}
+
 async function cancelTrialReminder(): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
   await cancelTrialNudges();
@@ -232,7 +285,7 @@ async function cancelTrialReminder(): Promise<void> {
 /**
  * Keeps the reminder in step with the entitlement. A trial that starts while
  * the app is open (the paywall just closed on a purchase) asks for
- * notification permission once per account. Trials already running only get
+ * notification permission once per account, after the primer says why. Trials already running only get
  * a reminder when permission was granted some other way, so nobody is asked
  * cold on launch. Anything other than a trial clears the reminder.
  */
@@ -261,6 +314,7 @@ export function useTrialReminder(): void {
     if (status !== "trialing" || expiresAt === undefined) {
       scheduledFor.current = null;
       generation.current += 1;
+      trialReminderPrimer.answer(false);
       serial(cancelTrialReminder).catch((error) =>
         analytics.captureError("trial_reminder_cancel_failed", error),
       );
@@ -297,11 +351,19 @@ export function useTrialReminder(): void {
     const mine = generation.current;
     const isCurrent = () => generation.current === mine;
     void (async () => {
-      // The OS prompt cannot present over a closing RevenueCat sheet.
-      if (mayAsk) await waitForSheetTransition();
-      if (!isCurrent()) return;
+      let ask = mayAsk;
+      if (ask) {
+        // Nothing can present over a closing RevenueCat sheet.
+        await waitForSheetTransition();
+        if (!isCurrent()) return;
+        ask = await confirmTrialReminderAsk();
+        if (!isCurrent()) return;
+        // Nor over the closing primer.
+        if (ask) await waitForSheetTransition();
+        if (!isCurrent()) return;
+      }
       const scheduled = await serial(() =>
-        scheduleTrialReminder(expiresAt, Date.now(), mayAsk, isCurrent, nudges),
+        scheduleTrialReminder(expiresAt, Date.now(), ask, isCurrent, nudges),
       );
       if (!scheduled && isCurrent()) scheduledFor.current = null;
     })().catch((error) => {

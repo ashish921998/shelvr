@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  confirmTrialReminderAsk,
   scheduleTrialReminder,
   TRIAL_NUDGES,
   TRIAL_REMINDER_ID,
   trialNudgeAt,
   trialNudgesAllowed,
   trialReminderAt,
+  trialReminderPrimer,
 } from "./trial-reminder";
 
 const mock = vi.hoisted(() => ({
@@ -229,5 +231,39 @@ describe("trial nudges", () => {
     mock.permission.mockResolvedValue(undetermined);
     await scheduleTrialReminder(noon + 7 * DAY, noon, false);
     for (const id of nudgeIds) expect(mock.cancel).toHaveBeenCalledWith(id);
+  });
+});
+
+describe("trial reminder primer", () => {
+  it("skips the primer when permission is already granted", async () => {
+    expect(await confirmTrialReminderAsk()).toBe(true);
+    expect(trialReminderPrimer.isOpen()).toBe(false);
+  });
+
+  it("skips the primer when the OS would show nothing", async () => {
+    mock.permission.mockResolvedValue({ ...undetermined, canAskAgain: false });
+    expect(await confirmTrialReminderAsk()).toBe(false);
+    expect(trialReminderPrimer.isOpen()).toBe(false);
+  });
+
+  it("says why before the OS asks, and follows the answer", async () => {
+    mock.permission.mockResolvedValue(undetermined);
+    const answer = confirmTrialReminderAsk();
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    trialReminderPrimer.answer(true);
+    expect(await answer).toBe(true);
+    expect(trialReminderPrimer.isOpen()).toBe(false);
+    expect(mock.request).not.toHaveBeenCalled();
+    expect(mock.capture).toHaveBeenCalledWith("trial_reminder_primer", {
+      outcome: "accepted",
+    });
+  });
+
+  it("declines an earlier primer when a new one opens", async () => {
+    const first = trialReminderPrimer.request();
+    const second = trialReminderPrimer.request();
+    expect(await first).toBe(false);
+    trialReminderPrimer.answer(false);
+    expect(await second).toBe(false);
   });
 });
