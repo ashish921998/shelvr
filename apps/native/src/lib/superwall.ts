@@ -198,7 +198,10 @@ function configureSuperwall(apiKey: string, rc: Purchases) {
     // RevenueCat user on the identity queue, after any reset and identify.
     rc.addCustomerInfoUpdateListener(() => {
       void enqueue(async () => {
+        // Between RevenueCat's logIn and Superwall's identify, the two SDKs
+        // name different users; the identity sync sets status after identify.
         if (identifiedUserId === null) return;
+        if ((await rc.getAppUserID()) !== identifiedUserId) return;
         await sw.default.shared.setSubscriptionStatus(
           subscriptionStatusFor(sw, await rc.getCustomerInfo()),
         );

@@ -34,6 +34,7 @@ const mock = vi.hoisted(() => {
       purchaseSubscriptionOption: vi.fn(),
       restorePurchases: vi.fn(),
       getCustomerInfo: vi.fn(),
+      getAppUserID: vi.fn(),
       addCustomerInfoUpdateListener: vi.fn(),
     },
     sdk: {
@@ -125,6 +126,7 @@ beforeEach(() => {
     if (typeof fn === "function") (fn as ReturnType<typeof vi.fn>).mockReset();
   }
   mock.rc.getCustomerInfo.mockResolvedValue(inactive);
+  mock.rc.getAppUserID.mockResolvedValue("user_1");
 });
 
 function controller(mod: Module) {
@@ -270,6 +272,21 @@ describe("Superwall identity", () => {
     await mod.syncSuperwallUser("user_2");
     expect(mock.shared.reset).toHaveBeenCalledTimes(1);
     expect(mock.shared.identify).toHaveBeenLastCalledWith({ userId: "user_2" });
+  });
+
+  it("ignores RevenueCat updates while the two SDKs name different users", async () => {
+    const mod = await load();
+    await mod.syncSuperwallUser("user_1");
+    const calls = mock.shared.setSubscriptionStatus.mock.calls.length;
+    // RevenueCat has logged in user_2; Superwall still has user_1.
+    mock.rc.getAppUserID.mockResolvedValue("user_2");
+    const [listener] = mock.rc.addCustomerInfoUpdateListener.mock.calls[0];
+    listener(active);
+    await mod.resetSuperwallUser();
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenCalledTimes(calls + 1);
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
+      status: "INACTIVE",
+    });
   });
 
   it("ignores RevenueCat updates once signed out", async () => {
