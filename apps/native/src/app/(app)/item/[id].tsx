@@ -122,11 +122,11 @@ function pagerHeaderColors(
  */
 function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   const { theme } = useUnistyles();
-  // Typed to the two events used here: the native stack's transitionStart
-  // isn't in expo-router's generic navigation type.
+  // Typed to the events used here: the native stack's transitionStart and
+  // gestureCancel aren't in expo-router's generic navigation type.
   const navigation = useNavigation() as {
     addListener: (
-      type: "beforeRemove" | "transitionStart",
+      type: "beforeRemove" | "transitionStart" | "gestureCancel",
       callback: (e: { data?: { closing?: boolean } }) => void,
     ) => () => void;
   };
@@ -140,9 +140,14 @@ function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   // Blur only lands once the pop animation ends, leaving a white clock over
   // the feed while it plays; drop the light bar as the pop starts instead.
   // A native back (button or swipe) skips beforeRemove, so the closing
-  // transition's start is what catches it.
+  // transition's start is what catches it. A swipe back the user lets go of
+  // keeps the screen focused, so no focus event brings the light bar back;
+  // gestureCancel does.
   useEffect(() => {
     const drop = () => setFocused(false);
+    const offCancel = navigation.addListener("gestureCancel", () =>
+      setFocused(true),
+    );
     const offRemove = navigation.addListener("beforeRemove", drop);
     const offTransition = navigation.addListener(
       "transitionStart",
@@ -153,6 +158,7 @@ function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
     return () => {
       offRemove();
       offTransition();
+      offCancel();
     };
   }, [navigation]);
   if (!onMedia) {
