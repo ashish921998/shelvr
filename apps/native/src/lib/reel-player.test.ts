@@ -56,6 +56,8 @@ describe("redirectsToReel", () => {
       false,
     );
     expect(redirectsToReel("https://example.com/video")).toBe(false);
+    expect(redirectsToReel("https://www.tiktok.com/@nasa")).toBe(false);
+    expect(redirectsToReel("https://www.tiktok.com/login")).toBe(false);
   });
 });
 

@@ -239,7 +239,7 @@ export function MediaViewerPage({
             uri={player.uri}
             top={headerInset}
             bottom={footInset}
-            onOpen={openSource}
+            onOpen={reel.openPost}
             onFail={reel.fail}
             onDone={reel.stop}
           />
@@ -446,7 +446,9 @@ function useReelPlayback(
       else fail();
     });
   };
-  return { player, play, fail, stop: () => setPlaying(null) };
+  // The player leaves the stage before the browser opens over it, so its
+  // sound never carries on under the browser.
+  return { player, play, fail, openPost: fail, stop: () => setPlaying(null) };
 }
 
 /** Whether the app is in the foreground; a reel stops when it leaves. */

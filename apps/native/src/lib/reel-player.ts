@@ -45,8 +45,21 @@ function tiktokVideoId(url: string | undefined): string | undefined {
  */
 export function redirectsToReel(url: string | undefined): boolean {
   if (!url || reelEmbedUrl(url)) return false;
-  if (isTikTokUrl(url)) return true;
+  if (isTikTokUrl(url)) return isTikTokShortLink(url);
   return instagramMedia(url) !== undefined;
+}
+
+/** vm.tiktok.com/…, vt.tiktok.com/… and tiktok.com/t/…: links that only
+ * redirect, unlike a profile or any other TikTok page. */
+function isTikTokShortLink(url: string): boolean {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const host = hostname.toLowerCase();
+    if (host === "vm.tiktok.com" || host === "vt.tiktok.com") return true;
+    return /^\/t\/[A-Za-z0-9_-]+\/?$/.test(pathname);
+  } catch {
+    return false;
+  }
 }
 
 /**
