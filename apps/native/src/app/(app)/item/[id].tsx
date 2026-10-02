@@ -6,6 +6,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
 import { ItemHeader } from "@/components/item-header";
+import { ShownSaveContext } from "@/components/media-viewer-page";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -728,22 +729,26 @@ function ItemScreenContent() {
         </Stack.Toolbar>
       ) : null}
 
-      <FlashList
-        ref={listRef}
-        style={styles.container}
-        onLayout={onListLayout}
-        data={items}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={pagerKey}
-        initialScrollIndex={startIndex >= 0 ? startIndex : 0}
-        renderItem={renderItem}
-        onViewableItemsChanged={onViewable}
-        viewabilityConfig={viewabilityConfig}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={2}
-      />
+      {/* Tells each media page which save is shown, so a reel stops playing
+          once the user swipes away from it. */}
+      <ShownSaveContext value={activeId}>
+        <FlashList
+          ref={listRef}
+          style={styles.container}
+          onLayout={onListLayout}
+          data={items}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={pagerKey}
+          initialScrollIndex={startIndex >= 0 ? startIndex : 0}
+          renderItem={renderItem}
+          onViewableItemsChanged={onViewable}
+          viewabilityConfig={viewabilityConfig}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={2}
+        />
+      </ShownSaveContext>
 
       {/* A pinned blur band behind the transparent iOS header: without it,
           scrolled article text and photos pass right through the header's

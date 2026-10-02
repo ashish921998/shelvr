@@ -352,6 +352,7 @@
   "item.link": "リンク",
   "item.photo": "写真",
   "item.openSite": "%{site}を開く",
+  "item.playVideo": "動画を再生",
   "item.hideTags": "タグを非表示：%{tags}",
   "item.showTags": "タグを表示：%{tags}",
   "item.inSpaces": "%{spaces}内",

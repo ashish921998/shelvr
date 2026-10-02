@@ -351,6 +351,7 @@
   "item.link": "Link",
   "item.photo": "Photo",
   "item.openSite": "Open %{site}",
+  "item.playVideo": "Play video",
   "item.hideTags": "Hide tags: %{tags}",
   "item.showTags": "Show tags: %{tags}",
   "item.inSpaces": "In %{spaces}",

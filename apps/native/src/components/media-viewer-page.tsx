@@ -1,6 +1,7 @@
 import type { DetailItem } from "@/components/item-detail";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { PostMediaButton } from "@/components/post-media-button";
+import { ReelStage } from "@/components/reel-player";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -11,11 +12,14 @@ import {
   sheetUnderHeader,
   toggleCaption,
 } from "@/lib/media-viewer";
+import { resolveReelEmbedUrl } from "@/lib/reel-player";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
 import { setStatusBarStyle } from "expo-status-bar";
-import { Link } from "expo-router";
+import { Link, useIsFocused } from "expo-router";
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -48,6 +52,13 @@ const CAPTION_SCRIM = `linear-gradient(180deg, ${[
   "rgba(0, 0, 0, 0.85) 100%",
 ].join(", ")})`;
 
+/**
+ * The save the item pager shows right now, so a reel playing on a page the
+ * user swiped away from stops. Undefined outside a pager: every page counts
+ * as shown.
+ */
+export const ShownSaveContext = createContext<string | undefined>(undefined);
+
 // Clearance for the Add / Dismiss bar and the "added to" notice the pager
 // pins over the bottom of the page.
 const FOOTER_CLEARANCE = 72;
@@ -79,8 +90,9 @@ type Props = {
 /**
  * A photo or social post shown the way a camera roll or reel shows it: the
  * picture fills a black stage the height of the page, with its caption over a
- * scrim at the bottom. Tapping the picture hides the caption; a video poster
- * opens the post instead, because the app cannot play it. Scrolling up brings
+ * scrim at the bottom. Tapping the picture hides the caption; tapping a video
+ * poster plays the reel in its site's embed player (or opens the post when
+ * there is no player for it). Scrolling up brings
  * the rest of the save (spaces, tags, caption, products, similar) in on a
  * sheet.
  */
@@ -110,7 +122,6 @@ export function MediaViewerPage({
   const [stored, setCaption] = useState(() => captionFor(null, item._id));
   const caption = captionFor(stored, item._id);
   if (caption !== stored) setCaption(caption);
-  const captionHidden = caption.hidden;
   const expanded = caption.expanded;
 
   // Reports only when the sheet crosses the header, with some slack, so a
@@ -134,6 +145,10 @@ export function MediaViewerPage({
       if (mounted.current) setStatusBarStyle("light");
     });
   };
+
+  const reel = useReelPlayback(item, openSource, mounted);
+  const player = reel.player;
+  const captionHidden = caption.hidden || player !== null;
 
   const sheetUnder = useRef(false);
   useEffect(() => {
@@ -171,14 +186,18 @@ export function MediaViewerPage({
       style={[mediaSize, styles.media]}
     />
   );
-  const video = social?.playable && item.url ? social : undefined;
+  // What sits under the caption: the page's foot, plus the pager's Add /
+  // Dismiss bar when it covers this page.
+  const footInset = insets.bottom + (reserveFooter ? FOOTER_CLEARANCE : 0);
+  const video = playableVideo(social, item.url);
   const hero = video ? (
     <PostMediaButton
       site={video.site}
+      label={t("item.playVideo")}
       playable
       onPressIn={stillTap.onPressIn}
       onPress={(e) => {
-        if (stillTap.isStill(e)) openSource();
+        if (stillTap.isStill(e)) reel.play();
       }}
     >
       {image}
@@ -214,8 +233,17 @@ export function MediaViewerPage({
       scrollEventThrottle={32}
     >
       <View style={{ height: pageHeight }}>
-        {video ? (
-          // A video poster is itself the button that opens the post, so the
+        {player ? (
+          <ReelStage
+            uri={player.uri}
+            top={headerInset}
+            bottom={footInset}
+            onOpen={openSource}
+            onFail={reel.fail}
+            onDone={reel.stop}
+          />
+        ) : video ? (
+          // A video poster is itself the button that plays the reel, so the
           // stage around it stays plain: wrapping it in the caption toggle
           // would hide that button from VoiceOver.
           <View style={styles.stage}>{stageMedia}</View>
@@ -249,10 +277,7 @@ export function MediaViewerPage({
             styles.caption,
             captionStyle,
             {
-              paddingBottom:
-                insets.bottom +
-                theme.gap(1.5) +
-                (reserveFooter ? FOOTER_CLEARANCE : 0),
+              paddingBottom: footInset + theme.gap(1.5),
               // Built here, not in the stylesheet: Unistyles drops a
               // stylesheet's experimental_backgroundImage on theme change
               // (jpudysz/react-native-unistyles#1030).
@@ -364,6 +389,59 @@ export function MediaViewerPage({
       </View>
     </ScrollView>
   );
+}
+
+/** The post when it is a video with a link to play or open. */
+function playableVideo(
+  social: SocialPost | undefined,
+  url: string | undefined,
+): SocialPost | undefined {
+  return social?.playable && url ? social : undefined;
+}
+
+/**
+ * The reel playing on a media page: keyed by save, like the caption, and
+ * stopped once the user swipes to another save or leaves the screen. A reel
+ * with no embed player, or one that never loads, opens its post instead.
+ */
+function useReelPlayback(
+  item: DetailItem,
+  openSource: () => void,
+  mounted: RefObject<boolean>,
+) {
+  const [playing, setPlaying] = useState<{
+    id: string;
+    uri: string | undefined;
+  } | null>(null);
+  const shownSave = useContext(ShownSaveContext);
+  const focused = useIsFocused();
+  const canPlay =
+    focused && (shownSave === undefined || shownSave === item._id);
+  if (playing && (playing.id !== item._id || !canPlay)) setPlaying(null);
+  const player = playing?.id === item._id && canPlay ? playing : null;
+
+  // The save a reel was last asked to play for; cleared when it stops, so a
+  // short link that resolves after the user moved on does nothing.
+  const pendingPlay = useRef<string | null>(null);
+  useEffect(() => {
+    if (!player) pendingPlay.current = null;
+  }, [player]);
+
+  const fail = () => {
+    setPlaying(null);
+    openSource();
+  };
+  const play = () => {
+    const id = item._id;
+    pendingPlay.current = id;
+    setPlaying({ id, uri: undefined });
+    void resolveReelEmbedUrl(item.url).then((uri) => {
+      if (!mounted.current || pendingPlay.current !== id) return;
+      if (uri) setPlaying({ id, uri });
+      else fail();
+    });
+  };
+  return { player, play, fail, stop: () => setPlaying(null) };
 }
 
 // Keeps white caption type readable where a light photo shows through the
