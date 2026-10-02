@@ -16,6 +16,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -110,6 +111,15 @@ export function MediaViewerPage({
   // Reports only when the sheet crosses the header, with some slack, so a
   // scroll doesn't push header options every frame. A recycled page starts
   // at the top, so it reports its new item as clear of the header.
+  const stillTap = useStillTap();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const sheetUnder = useRef(false);
   useEffect(() => {
     sheetUnder.current = false;
@@ -153,11 +163,16 @@ export function MediaViewerPage({
     <PostMediaButton
       site={video.site}
       playable
-      onPress={() => {
+      onPressIn={stillTap.onPressIn}
+      onPress={(e) => {
+        if (!stillTap.isStill(e)) return;
         // The pager's light status bar would sit white-on-white over the
-        // in-app browser; hand it back once the browser closes.
+        // in-app browser; hand it back once the browser closes, unless the
+        // page has gone since.
         setStatusBarStyle("dark");
-        openItemSource(item, () => setStatusBarStyle("light"));
+        openItemSource(item, () => {
+          if (mounted.current) setStatusBarStyle("light");
+        });
       }}
     >
       {image}
@@ -204,7 +219,12 @@ export function MediaViewerPage({
             accessibilityRole="button"
             accessibilityLabel={title || t("item.photo")}
             accessibilityHint={t("item.toggleCaption")}
-            onPress={() => setHiddenFor(captionHidden ? null : item._id)}
+            onPressIn={stillTap.onPressIn}
+            onPress={(e) => {
+              if (stillTap.isStill(e)) {
+                setHiddenFor(captionHidden ? null : item._id);
+              }
+            }}
           >
             {stageMedia}
           </Pressable>
@@ -340,6 +360,31 @@ const CAPTION_SHADOW = {
   textShadowOffset: { width: 0, height: 1 },
   textShadowRadius: 6,
 };
+
+/**
+ * Tells a tap from a swipe-back that began on the picture. An edge swipe
+ * carries the whole screen with the finger, so the touch never leaves the
+ * Pressable and it would still fire; the finger's travel across the screen
+ * gives the swipe away.
+ */
+function useStillTap() {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  return {
+    onPressIn: (e: GestureResponderEvent) => {
+      start.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+    },
+    isStill: (e: GestureResponderEvent) => {
+      const from = start.current;
+      if (!from) return true;
+      const dx = e.nativeEvent.pageX - from.x;
+      const dy = e.nativeEvent.pageY - from.y;
+      return dx * dx + dy * dy < TAP_SLOP * TAP_SLOP;
+    },
+  };
+}
+
+// How far (in points) a finger may travel and still count as a tap.
+const TAP_SLOP = 12;
 
 const WHITE_SOFT = "rgba(255, 255, 255, 0.86)";
 const WHITE_FAINT = "rgba(255, 255, 255, 0.6)";
