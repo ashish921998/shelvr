@@ -158,9 +158,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     mode?: string;
   }>();
   const pinnedSpaceId = spaceId as Id<"spaces"> | undefined;
-  const [mode, setMode] = useState<Mode>(
-    startMode === "note" ? "note" : "menu",
-  );
+  const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<TextInput>(null);
@@ -172,8 +170,8 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
-  // A composer opened straight from a link still passes the Pro guard,
-  // falling back to the menu when the paywall is closed.
+  // A composer opened straight from a link opens only once the Pro guard
+  // passes, so nothing is typed into a composer the paywall then closes.
   const startChecked = useRef(false);
   useEffect(() => {
     if (startMode !== "note" || entitlementLoading || startChecked.current) {
@@ -181,7 +179,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
     }
     startChecked.current = true;
     void guard().then((entitled) => {
-      if (!entitled) setMode("menu");
+      if (entitled) setMode("note");
     });
   }, [startMode, entitlementLoading, guard]);
 

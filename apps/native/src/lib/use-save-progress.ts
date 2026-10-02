@@ -28,6 +28,8 @@ export function useSaveProgress(
   });
   const progress = query.data;
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  // The account whose card Home has actually put on screen this launch.
+  const [shownFor, setShownFor] = useState<string | null>(null);
   // Read once per account per launch; the first read of a new account marks
   // this launch as its first session.
   const firstSession = useMemo(
@@ -62,15 +64,19 @@ export function useSaveProgress(
       { saved, goal },
       {
         cardDismissed: isSaveProgressCardDismissed(userId),
-        cardVisible: visible,
+        // The clock starts when the card is on screen, not merely eligible
+        // behind a loader or another screen.
+        cardVisible: visible && shownFor === userId,
       },
     );
-  }, [userId, saved, goal, visible]);
+  }, [userId, saved, goal, visible, shownFor]);
 
   // Called by the card itself once Home shows it focused, so a card that
   // never reached the screen is not counted.
   const markShown = useCallback(() => {
-    if (userId === undefined || shownThisLaunch.has(userId)) return;
+    if (userId === undefined) return;
+    setShownFor(userId);
+    if (shownThisLaunch.has(userId)) return;
     shownThisLaunch.add(userId);
     analytics.capture("save_progress_card_shown", { saved: saved ?? 0 });
   }, [userId, saved]);
