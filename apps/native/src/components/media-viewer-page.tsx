@@ -163,6 +163,8 @@ export function MediaViewerPage({
     if (under === sheetUnder.current) return;
     sheetUnder.current = under;
     onSheetUnderHeader?.(item._id, under);
+    // The details sheet covers the stage, so a playing reel stops.
+    if (under) reel.stop();
   };
 
   const captionStyle = useAnimatedStyle(

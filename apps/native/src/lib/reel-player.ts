@@ -91,7 +91,8 @@ export async function resolveReelEmbedUrl(
 }
 
 /**
- * Runs inside the embed player. Tells the app once the page has loaded, or
+ * Runs inside the embed player. Tells the app once the page has loaded (and
+ * starts its video if it sits paused), or
  * fails when TikTok's player reports an error (its player API posts
  * onPlayerReady / onError messages to its parent, which is the page itself
  * when it is loaded on its own). Also sends any link tap (the creator, "watch on Instagram") to the app, which
@@ -125,8 +126,18 @@ export const REEL_PLAYER_SCRIPT = `(function () {
     if (data.type === "onPlayerReady") send("ready");
     else if (data.type === "onError") send("error");
   });
-  if (document.readyState === "complete") send("ready");
-  else window.addEventListener("load", function () { send("ready"); });
+  function ready() {
+    send("ready");
+    // The user already tapped play in the app; start a video the page left
+    // paused (Instagram's embed waits for a second tap otherwise).
+    var video = document.querySelector("video");
+    if (video && video.paused && video.play) {
+      var started = video.play();
+      if (started && started.catch) started.catch(function () {});
+    }
+  }
+  if (document.readyState === "complete") ready();
+  else window.addEventListener("load", ready);
 })();
 true;`;
 
