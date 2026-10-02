@@ -64,7 +64,7 @@ function html(url: string, body: string) {
 }
 
 const PIN_PAGE =
-  '<html><head><meta property="og:title" content="Chicken | recipes"></head><body></body></html>';
+  '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
 
 /** Serves `routes` by exact URL; every other fetch fails. */
 function serve(routes: Record<string, unknown>) {
@@ -224,6 +224,17 @@ describe("readPage for Pinterest pins", () => {
       [PIN_URL]: html(
         "https://www.pinterest.com/?show_error=true",
         '<html><head><meta property="og:title" content="Pinterest"></head></html>',
+      ),
+    });
+    expect((await readPage(PIN_URL)).status).toBe("gone");
+  });
+
+  it("fails a pin id that never existed as gone when Pinterest serves an empty shell", async () => {
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
+      [PIN_URL]: html(
+        PIN_URL,
+        '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>',
       ),
     });
     expect((await readPage(PIN_URL)).status).toBe("gone");
