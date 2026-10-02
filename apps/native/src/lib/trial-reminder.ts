@@ -266,7 +266,7 @@ export const trialReminderPrimer = {
 // sheet waits on this: two modals at once can't present on iOS.
 let primerHolds = 0;
 let primerShown = false;
-const primerDoneWaiters = new Set<() => void>();
+const primerDoneWaiters = new Set<(shown: boolean) => void>();
 
 function holdPrimer(): (shown: boolean) => void {
   primerHolds += 1;
@@ -277,9 +277,12 @@ function holdPrimer(): (shown: boolean) => void {
     primerHolds -= 1;
     primerShown ||= shown;
     if (primerHolds > 0) return;
+    // Handed to whoever is waiting now, never left for a later caller.
+    const wasShown = primerShown;
+    primerShown = false;
     const waiters = [...primerDoneWaiters];
     primerDoneWaiters.clear();
-    for (const waiter of waiters) waiter();
+    for (const waiter of waiters) waiter(wasShown);
   };
 }
 
@@ -289,12 +292,8 @@ function holdPrimer(): (shown: boolean) => void {
  */
 export function whenTrialPrimerDone(): Promise<void> {
   if (primerHolds === 0) return Promise.resolve();
-  return new Promise<void>((resolve) => primerDoneWaiters.add(resolve)).then(
-    () => {
-      const shown = primerShown;
-      primerShown = false;
-      return shown ? waitForSheetTransition() : undefined;
-    },
+  return new Promise<boolean>((resolve) => primerDoneWaiters.add(resolve)).then(
+    (shown) => (shown ? waitForSheetTransition() : undefined),
   );
 }
 
