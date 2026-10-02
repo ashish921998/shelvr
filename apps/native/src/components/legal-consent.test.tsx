@@ -117,9 +117,8 @@ it("offers withdrawal and displays pending remote propagation", async () => {
     syncPending: true,
   };
   rerender(<LegalConsentPreference />);
-  // Both lines share the card's one description.
-  expect(screen.getByText(/refundConsent\.disabled/)).toBeDefined();
-  expect(screen.getByText(/refundConsent\.syncPending/)).toBeDefined();
+  expect(screen.getByText("refundConsent.disabled")).toBeDefined();
+  expect(screen.getByText("refundConsent.syncPending")).toBeDefined();
 });
 it("allows an existing user to review and opt in later", async () => {
   mocks.consent = {

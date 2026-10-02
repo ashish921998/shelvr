@@ -116,14 +116,11 @@ export function LegalConsentPreference() {
   return (
     <SettingCard
       title={t("refundConsent.setting")}
-      description={[
-        t(
-          consent?.refundSharing
-            ? "refundConsent.enabled"
-            : "refundConsent.disabled",
-        ),
-        ...(consent?.syncPending ? [t("refundConsent.syncPending")] : []),
-      ].join(" ")}
+      description={t(
+        consent?.refundSharing
+          ? "refundConsent.enabled"
+          : "refundConsent.disabled",
+      )}
       action={{
         label: t(
           consent?.refundSharing
@@ -135,7 +132,14 @@ export function LegalConsentPreference() {
         onPress: () =>
           consent?.refundSharing ? void turnOff() : setReviewing(true),
       }}
-      note={failed ? t("refundConsent.error") : null}
+      // Each message stays its own translated sentence on its own line.
+      note={
+        failed
+          ? t("refundConsent.error")
+          : consent?.syncPending
+            ? t("refundConsent.syncPending")
+            : null
+      }
     />
   );
 }
