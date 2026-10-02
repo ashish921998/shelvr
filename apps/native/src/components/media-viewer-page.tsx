@@ -7,8 +7,16 @@ import { fitMedia, MEDIA_CANVAS } from "@/lib/media-viewer";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { useState, type ReactNode, type RefObject } from "react";
 import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   Text,
@@ -35,6 +43,10 @@ const CAPTION_SCRIM = `linear-gradient(180deg, ${[
 // pins over the bottom of the page.
 const FOOTER_CLEARANCE = 72;
 
+// How close the sheet's top comes to the header's bottom edge before the
+// header switches to the light page's colors (and twice that to switch back).
+const HEADER_SLACK = 16;
+
 type Props = {
   item: DetailItem;
   social: SocialPost | undefined;
@@ -47,6 +59,9 @@ type Props = {
   // Leave room for the pager's bottom bar on this page.
   reserveFooter: boolean;
   scrollRef: RefObject<ScrollView | null>;
+  // Told when the details sheet reaches (true) or leaves (false) the header,
+  // so the pager can hand the header back its light-page colors.
+  onSheetUnderHeader?: (itemId: string, under: boolean) => void;
   testID?: string;
   // Save status (processing, failed, retry) shown in the caption.
   notice: ReactNode;
@@ -73,6 +88,7 @@ export function MediaViewerPage({
   headerInset,
   reserveFooter,
   scrollRef,
+  onSheetUnderHeader,
   testID,
   notice,
   actions,
@@ -89,6 +105,25 @@ export function MediaViewerPage({
   const [expandedFor, setExpandedFor] = useState<string | null>(null);
   const captionHidden = hiddenFor === item._id;
   const expanded = expandedFor === item._id;
+
+  // Reports only when the sheet crosses the header, with some slack, so a
+  // scroll doesn't push header options every frame. A recycled page starts
+  // at the top, so it reports its new item as clear of the header.
+  const sheetUnder = useRef(false);
+  useEffect(() => {
+    sheetUnder.current = false;
+    onSheetUnderHeader?.(item._id, false);
+  }, [item._id, onSheetUnderHeader]);
+  const sheetTop = pageHeight - headerInset;
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const under = sheetUnder.current
+      ? y > sheetTop - HEADER_SLACK * 2
+      : y > sheetTop - HEADER_SLACK;
+    if (under === sheetUnder.current) return;
+    sheetUnder.current = under;
+    onSheetUnderHeader?.(item._id, under);
+  };
 
   const captionStyle = useAnimatedStyle(
     () => ({
@@ -139,6 +174,9 @@ export function MediaViewerPage({
       style={styles.scroll}
       contentInsetAdjustmentBehavior="never"
       showsVerticalScrollIndicator={false}
+      directionalLockEnabled
+      onScroll={onScroll}
+      scrollEventThrottle={32}
     >
       <View style={{ height: pageHeight }}>
         {video ? (
@@ -160,6 +198,11 @@ export function MediaViewerPage({
 
         <Animated.View
           pointerEvents={captionHidden ? "none" : "box-none"}
+          // A hidden caption leaves the accessibility tree too.
+          accessibilityElementsHidden={captionHidden}
+          importantForAccessibility={
+            captionHidden ? "no-hide-descendants" : "auto"
+          }
           style={[
             styles.caption,
             captionStyle,

@@ -81,6 +81,7 @@ type Props = {
   // The pager pins a bar over this page's bottom (a suggestion decision, or
   // its undo), so a media caption must sit above it.
   reserveFooter: boolean;
+  onSheetUnderHeader?: (itemId: string, under: boolean) => void;
 };
 
 // Shared data for both render paths: the full document (list rows carry
@@ -152,6 +153,7 @@ export const ItemDetail = memo(function ItemDetail({
   isZoomTarget,
   pageHeight,
   reserveFooter,
+  onSheetUnderHeader,
 }: Props) {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
@@ -224,6 +226,7 @@ export const ItemDetail = memo(function ItemDetail({
         pageHeight={pageHeight}
         headerInset={headerInset}
         reserveFooter={reserveFooter}
+        onSheetUnderHeader={onSheetUnderHeader}
         scrollRef={scrollRef}
         testID={
           item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
