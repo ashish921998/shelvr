@@ -143,6 +143,7 @@ export type MessageParams = {
   "profile.ofFragment": undefined;
   "profile.photosFragment": undefined;
   "profile.appearance": undefined;
+  "profile.settings": undefined;
   "notifications.weeklyHelp": undefined;
   "notifications.toggleLabel": undefined;
   "notifications.remindersLabel": undefined;

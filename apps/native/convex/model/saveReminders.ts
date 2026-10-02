@@ -13,7 +13,7 @@ import { env } from "../_generated/server";
  * article or a recipe gets none, because a vague "remember this?" is the
  * notification people turn off.
  */
-export type ReminderKind = "read" | "cook";
+type ReminderKind = "read" | "cook";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -25,7 +25,7 @@ export const READ_MAX_AGE_MS = 90 * DAY_MS;
 /** A recipe resurfaces once it has had time to slip the user's mind. */
 export const COOK_MIN_AGE_MS = 3 * DAY_MS;
 /** A recipe opened this recently is already on the user's mind. */
-export const COOK_RECENTLY_OPENED_MS = 7 * DAY_MS;
+const COOK_RECENTLY_OPENED_MS = 7 * DAY_MS;
 
 /**
  * Less than a day, so an hourly cron that runs a little earlier tomorrow than
@@ -38,7 +38,7 @@ export const WEEK_MS = 7 * DAY_MS;
 /** This many reminders in a row with the save left unopened... */
 export const IGNORED_STREAK = 3;
 /** ...slows reminders to one a week until the user opens one again. */
-export const IGNORED_PAUSE_MS = WEEK_MS;
+const IGNORED_PAUSE_MS = WEEK_MS;
 
 /**
  * A pass this late is not sent: it books the user's next slot instead. The
@@ -106,7 +106,7 @@ export function reminderSubject(
   return subject || undefined;
 }
 
-export type ReminderCandidate = {
+type ReminderCandidate = {
   item: Doc<"items">;
   kind: ReminderKind;
   subject: string;
@@ -154,7 +154,7 @@ export function openedTooRecently(
   return kind === "read" || now - lastOpenedAt < COOK_RECENTLY_OPENED_MS;
 }
 
-export type BudgetBlock = "too_soon" | "weekly_limit" | "ignored";
+type BudgetBlock = "too_soon" | "weekly_limit" | "ignored";
 
 /**
  * Why no reminder may go out now, or `undefined` when one may.

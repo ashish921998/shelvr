@@ -51,7 +51,7 @@ const MAX_USER_ITEMS = 1000;
 /** Due users scheduled per transaction. A full page chains a follow-up run so a
  * backlog drains at scheduler speed instead of one page per hourly tick. */
 export const DUE_DIGEST_BATCH_SIZE = 50;
-export const DUE_REMINDER_BATCH_SIZE = 50;
+const DUE_REMINDER_BATCH_SIZE = 50;
 /** The newest ready saves a reminder pass reads, bounded by count and bytes:
  * article bodies make item rows large, and the pass runs daily per user. */
 const REMINDER_SCAN_ROWS = 500;

@@ -168,6 +168,18 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="settings"
+            options={{
+              presentation: "formSheet",
+              // Android form sheets have no native header, so the screen
+              // draws its own title and close button, as Profile does.
+              headerShown: false,
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
             name="camera"
             options={{
               presentation: "fullScreenModal",

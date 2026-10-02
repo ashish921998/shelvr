@@ -1,4 +1,4 @@
-export type NoteDraft = { title: string; text: string };
+type NoteDraft = { title: string; text: string };
 export type NoteEdit = Partial<NoteDraft>;
 
 /** Serializes edits and retains failed fields until another flush. A newer

@@ -57,7 +57,7 @@ export const TRAVEL_LIFT = 26;
 /** Half-length of the stitch a mark becomes once it lands. */
 export const STITCH_HALF_WIDTH = 3.4;
 
-export type SaveType = "note" | "recipe" | "article" | "photo" | "product";
+type SaveType = "note" | "recipe" | "article" | "photo" | "product";
 
 const SAVE_TYPES: SaveType[] = [
   "note",
@@ -71,7 +71,7 @@ const SAVE_TYPES: SaveType[] = [
  * Which palette entry a mark is drawn in. Resolved to hex by the renderer so
  * the composition stays independent of the ground it is drawn on.
  */
-export type InkTone = "ink" | "accent" | "cool";
+type InkTone = "ink" | "accent" | "cool";
 
 export type Mark = {
   /** Scatter position in design space. */

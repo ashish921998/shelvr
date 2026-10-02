@@ -1,11 +1,11 @@
 import { env } from "../_generated/server";
 
-export type LogLevel = "info" | "warn" | "error";
+type LogLevel = "info" | "warn" | "error";
 
 /** Only scalars: a field is a category, code, id, count, or flag. Never a
  * message, URL, or user content — those stay out of the log stream. */
-export type LogFieldValue = string | number | boolean | null | undefined;
-export type LogFields = Record<string, LogFieldValue>;
+type LogFieldValue = string | number | boolean | null | undefined;
+type LogFields = Record<string, LogFieldValue>;
 
 export function logEvent(
   level: LogLevel,

@@ -28,7 +28,7 @@ export const SAVE_ERROR_CODES = [
 
 export type SaveErrorCode = (typeof SAVE_ERROR_CODES)[number];
 
-export type SaveErrorData = { code: SaveErrorCode; message: string };
+type SaveErrorData = { code: SaveErrorCode; message: string };
 
 /** Byte-identical to the sentences the server throws. `localizeError` keys its
  * translations off them, so user-visible copy must not move. */

@@ -142,6 +142,7 @@
   "profile.ofFragment": "of",
   "profile.photosFragment": "photos",
   "profile.appearance": "Appearance",
+  "profile.settings": "Settings",
   "notifications.weeklyHelp": "A few unopened saves every Sunday",
   "notifications.toggleLabel": "Weekly shelf notifications",
   "notifications.remindersLabel": "Save reminders",

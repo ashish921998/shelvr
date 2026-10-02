@@ -17,7 +17,7 @@ export const resendErrorCategoryValidator = v.union(
   v.literal("timeout"),
   v.literal("network_error"),
 );
-export type ResendErrorCategory = Infer<typeof resendErrorCategoryValidator>;
+type ResendErrorCategory = Infer<typeof resendErrorCategoryValidator>;
 
 /**
  * A Resend call that returned a non-success HTTP status. Carries only the
