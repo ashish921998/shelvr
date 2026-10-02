@@ -176,6 +176,8 @@ export function subscriptionStatusFor(
 
 let configured: Promise<Superwall | null> | null = null;
 let identifiedUserId: string | null = null;
+// A sign-out has reset Superwall but not yet set the inactive status.
+let signOutStatusPending = false;
 // Identity changes run one at a time, in call order, like RevenueCat's.
 let queue = Promise.resolve();
 
@@ -252,19 +254,29 @@ export function syncSuperwallUser(userId: string): Promise<void> {
     await shared.setSubscriptionStatus(
       subscriptionStatusFor(sw, await rc.getCustomerInfo()),
     );
+    signOutStatusPending = false;
   }, "superwall_identity_sync_failed");
 }
 
-/** Forget the signed-out user. A no-op until Superwall has been configured. */
+/**
+ * Forget the signed-out user. A no-op until Superwall has been configured.
+ * Safe to repeat: a call after a partial failure finishes the sign-out.
+ */
 export function resetSuperwallUser(): Promise<void> {
   return enqueue(async () => {
-    if (identifiedUserId === null || !configured) return;
+    if (!configured) return;
+    if (identifiedUserId === null && !signOutStatusPending) return;
     const sw = await configured;
     if (!sw) return;
-    await sw.default.shared.reset();
-    identifiedUserId = null;
+    if (identifiedUserId !== null) {
+      await sw.default.shared.reset();
+      identifiedUserId = null;
+      // Kept until the status lands, so a failed call below is retried.
+      signOutStatusPending = true;
+    }
     await sw.default.shared.setSubscriptionStatus(
       sw.SubscriptionStatus.Inactive(),
     );
+    signOutStatusPending = false;
   }, "superwall_reset_failed");
 }

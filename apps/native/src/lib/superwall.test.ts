@@ -269,9 +269,36 @@ describe("Superwall identity", () => {
     mock.shared.identify.mockRejectedValueOnce(new Error("offline"));
     await mod.syncSuperwallUser("user_2");
     expect(mock.captureError).toHaveBeenCalledTimes(1);
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "superwall_identity_sync_failed",
+      expect.any(Error),
+      { provider: "superwall" },
+    );
     await mod.syncSuperwallUser("user_2");
     expect(mock.shared.reset).toHaveBeenCalledTimes(1);
     expect(mock.shared.identify).toHaveBeenLastCalledWith({ userId: "user_2" });
+  });
+
+  it("finishes a sign-out whose inactive status failed, without a second reset", async () => {
+    const mod = await load();
+    await mod.syncSuperwallUser("user_1");
+    mock.shared.setSubscriptionStatus.mockRejectedValueOnce(
+      new Error("offline"),
+    );
+    await mod.resetSuperwallUser();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "superwall_reset_failed",
+      expect.any(Error),
+      { provider: "superwall" },
+    );
+    await mod.resetSuperwallUser();
+    expect(mock.shared.reset).toHaveBeenCalledTimes(1);
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenLastCalledWith({
+      status: "INACTIVE",
+    });
+    const calls = mock.shared.setSubscriptionStatus.mock.calls.length;
+    await mod.resetSuperwallUser();
+    expect(mock.shared.setSubscriptionStatus).toHaveBeenCalledTimes(calls);
   });
 
   it("ignores RevenueCat updates while the two SDKs name different users", async () => {

@@ -210,7 +210,11 @@ export function useEntitlementSync(): void {
       // sign-out or account change drops it (see `forgetPaywallFunnel`).
       forgetPaywallFunnel();
       void resetSuperwallUser();
-      return;
+      // A sign-out that failed partway finishes on the next foreground.
+      const signedOut = AppState.addEventListener("change", (state) => {
+        if (state === "active") void resetSuperwallUser();
+      });
+      return () => signedOut.remove();
     }
     // A build that deliberately has no key would only burn the retry budget
     // and report the absence as a sync failure on every foreground. Readiness

@@ -212,6 +212,9 @@ describe("Superwall identity", () => {
     mock.authenticated = false;
     hook.rerender();
     expect(mock.resetSuperwallUser).toHaveBeenCalledTimes(1);
+    mock.appStateListeners.forEach((listener) => listener("active"));
+    expect(mock.resetSuperwallUser).toHaveBeenCalledTimes(2);
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
     hook.unmount();
   });
 
