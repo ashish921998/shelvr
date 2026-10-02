@@ -355,6 +355,8 @@
   "item.noteTitlePlaceholder": "Título",
   "item.noteTitleLabel": "Título de la nota",
   "item.noteTextLabel": "Texto de la nota",
+  "item.details": "Detalles",
+  "item.toggleCaption": "Muestra u oculta el texto",
   "capture.partialFailure": "%{saved} de %{total} imágenes guardadas.\n%{reason}\n¿Volver a intentar guardar las imágenes que fallaron?",
   "pro.restoredBody": "Se ha encontrado tu compra de %{store}. Shelvr Pro puede tardar un momento en actualizarse.",
   "pro.notFoundBody": "No se ha encontrado ninguna compra activa de Shelvr Pro para esta cuenta de %{store}.",
@@ -371,6 +373,11 @@
     "one": "%{formattedCount} contenido guardado",
     "many": "%{formattedCount} contenidos guardados",
     "other": "%{formattedCount} contenidos guardados"
+  },
+  "item.moreMedia": {
+    "one": "%{formattedCount} foto más en esta publicación",
+    "many": "%{formattedCount} fotos más en esta publicación",
+    "other": "%{formattedCount} fotos más en esta publicación"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} sugerencia",

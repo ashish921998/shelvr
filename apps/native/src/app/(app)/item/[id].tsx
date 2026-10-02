@@ -3,6 +3,7 @@ import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ItemDetail, type DetailItem } from "@/components/item-detail";
 import { ItemHeader } from "@/components/item-header";
 import { convexQuery } from "@convex-dev/react-query";
@@ -18,6 +19,7 @@ import { useMutation } from "convex/react";
 import { AppEntityView } from "expo-app-intents";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
+import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import {
   Stack,
@@ -46,6 +48,7 @@ import { useFindLinks } from "@/lib/use-find-links";
 import { useHomeFeed } from "@/lib/home-feed";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
+import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
 // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
 // React Query still subscribes through the Convex adapter, and an invalid
@@ -87,6 +90,50 @@ function pagerEndReached(
   return items === homeFeed.items && homeFeed.canLoadMore
     ? homeFeed.loadMore
     : undefined;
+}
+
+// The pager header's colors for the page in view: white over a media save's
+// black stage, the app's own otherwise.
+function pagerHeaderColors(
+  onMedia: boolean,
+  theme: ReturnType<typeof useUnistyles>["theme"],
+): { onMedia: boolean; tint: string; background: string } {
+  return onMedia
+    ? { onMedia, tint: "white", background: MEDIA_CANVAS }
+    : {
+        onMedia,
+        tint: theme.colors.primary,
+        background: theme.colors.background,
+      };
+}
+
+/**
+ * What sits behind the transparent iOS header, plus the status bar style.
+ *
+ * Over a media save's black stage the blur band would read as a grey bar; a
+ * black fade keeps the white header legible over bright photos and over the
+ * details sheet as it scrolls up beneath. The light status bar holds only
+ * while this screen is focused: on blur or unmount expo-status-bar falls back
+ * to the root layout's theme-driven bar.
+ */
+function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
+  const { theme } = useUnistyles();
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+  if (!onMedia) {
+    return <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />;
+  }
+  return (
+    <>
+      <HeaderScrim color={MEDIA_CANVAS} />
+      {focused ? <StatusBar style="light" /> : null}
+    </>
+  );
 }
 
 export default function ItemScreen() {
@@ -173,6 +220,45 @@ function usePageStyle(width: number, windowHeight: number) {
   const height = listHeight ?? windowHeight;
   const pageStyle = useMemo(() => ({ width, height }), [width, height]);
   return { pageStyle, onListLayout };
+}
+
+const pagerKey = (item: DetailItem) => item._id;
+
+/**
+ * The pager's page renderer. Stable across swipes for the same reason as
+ * usePageStyle. A page whose bottom the pager covers with the suggestion bar
+ * or its undo notice is told so, so a media caption can sit above it.
+ */
+function usePagerPages({
+  width,
+  windowHeight,
+  pushedId,
+  suggestedIds,
+  accepted,
+}: {
+  width: number;
+  windowHeight: number;
+  pushedId: string;
+  suggestedIds: Set<string>;
+  accepted: { itemId: string } | null;
+}) {
+  const acceptedId = accepted?.itemId;
+  const { pageStyle, onListLayout } = usePageStyle(width, windowHeight);
+  const renderItem = useCallback(
+    ({ item }: { item: DetailItem }) => (
+      // AppEntityView tells Siri which save is on screen ("send this to Sam").
+      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
+        <ItemDetail
+          item={item}
+          isZoomTarget={item._id === pushedId}
+          pageHeight={pageStyle.height}
+          reserveFooter={suggestedIds.has(item._id) || item._id === acceptedId}
+        />
+      </AppEntityView>
+    ),
+    [pageStyle, pushedId, suggestedIds, acceptedId],
+  );
+  return { renderItem, onListLayout };
 }
 
 function ItemScreenContent() {
@@ -296,19 +382,19 @@ function ItemScreenContent() {
     [],
   );
 
-  const { pageStyle, onListLayout } = usePageStyle(width, height);
-  const keyExtractor = useCallback((item: DetailItem) => item._id, []);
-  const renderItem = useCallback(
-    ({ item }: { item: DetailItem }) => (
-      // AppEntityView tells Siri which save is on screen ("send this to Sam").
-      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
-        <ItemDetail item={item} isZoomTarget={item._id === pushedId} />
-      </AppEntityView>
-    ),
-    [pageStyle, pushedId],
-  );
+  const { renderItem, onListLayout } = usePagerPages({
+    width,
+    windowHeight: height,
+    pushedId,
+    suggestedIds,
+    accepted,
+  });
 
   const activeItem = items?.find((i) => i._id === activeId) ?? items?.[0];
+
+  // A photo or social post opens in the black media viewer, so the chrome
+  // over it (header, status bar) turns light while it is the page in view.
+  const media = pagerHeaderColors(isMediaSave(activeItem), theme);
 
   // List rows are card-shaped (no article body, no shopping status), so the
   // toolbar reads those from getItem. `single` follows the debounced `id`
@@ -494,6 +580,9 @@ function ItemScreenContent() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
+          // Always set: Stack.Screen merges options, so leaving the key out
+          // would keep a media page's white tint on the next article.
+          headerTintColor: media.tint,
           ...(Platform.OS === "android"
             ? {
                 // Android has no progressive-blur band, so a transparent
@@ -501,7 +590,7 @@ function ItemScreenContent() {
                 // text. Give the toolbar the opaque treatment the space
                 // screen uses; content then starts below it natively.
                 headerTransparent: false,
-                headerStyle: { backgroundColor: theme.colors.background },
+                headerStyle: { backgroundColor: media.background },
                 headerTitleAlign: "center",
                 headerRight: () => (
                   <HeaderActionMenu
@@ -541,7 +630,7 @@ function ItemScreenContent() {
         }}
       />
       <Stack.Title asChild>
-        <ItemHeader item={activeItem} />
+        <ItemHeader item={activeItem} onMedia={media.onMedia} />
       </Stack.Title>
       {Platform.OS === "ios" ? (
         <Stack.Toolbar placement="right">
@@ -593,7 +682,7 @@ function ItemScreenContent() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={keyExtractor}
+        keyExtractor={pagerKey}
         initialScrollIndex={startIndex >= 0 ? startIndex : 0}
         renderItem={renderItem}
         onViewableItemsChanged={onViewable}
@@ -613,7 +702,7 @@ function ItemScreenContent() {
           blur across the whole band and land the fade where the reader
           layout's content begins — the same gap(1.5) — so nothing at rest is
           hazed. */}
-      <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />
+      <PagerHeaderBackdrop onMedia={media.onMedia} />
 
       {activeIsSuggested ? (
         // SlideInDown (not a fade) so the bar never mounts at opacity 0 — a

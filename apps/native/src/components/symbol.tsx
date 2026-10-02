@@ -60,6 +60,7 @@ const SF_TO_MATERIAL = {
   // Navigation
   "chevron.left": "arrow_back",
   "chevron.right": "arrow_forward",
+  "chevron.up": "expand_less",
   "arrow.uturn.backward": "undo",
   // Tabs / system
   "house.fill": "home",

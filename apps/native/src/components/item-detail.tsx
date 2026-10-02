@@ -5,6 +5,7 @@ import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
@@ -15,6 +16,7 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
@@ -26,6 +28,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
   memo,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -73,6 +76,11 @@ type Props = {
   // Only the page matching the pushed id owns the Apple-zoom transition target;
   // pairing more than one target with a single push confuses the animation.
   isZoomTarget: boolean;
+  // The pager's page height, which a media save's stage fills.
+  pageHeight: number;
+  // The pager pins a bar over this page's bottom (a suggestion decision, or
+  // its undo), so a media caption must sit above it.
+  reserveFooter: boolean;
 };
 
 // Shared data for both render paths: the full document (list rows carry
@@ -142,6 +150,8 @@ function useItemDetailData(item: DetailItem) {
 export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
+  pageHeight,
+  reserveFooter,
 }: Props) {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
@@ -203,6 +213,50 @@ export const ItemDetail = memo(function ItemDetail({
       ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
     ];
   })();
+
+  if (heroUri && isMediaSave(item)) {
+    return (
+      <MediaViewerPage
+        item={item}
+        social={social}
+        heroUri={heroUri}
+        isZoomTarget={isZoomTarget}
+        pageHeight={pageHeight}
+        headerInset={headerInset}
+        reserveFooter={reserveFooter}
+        scrollRef={scrollRef}
+        testID={
+          item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
+        }
+        notice={<SaveStatusNotice item={detail} onMedia />}
+        actions={<IntentsRow item={item} intents={intents} />}
+        details={
+          bodyPending ? (
+            <View style={styles.bodyPending}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : (
+            <ItemDetailBody
+              variant="sheet"
+              item={item}
+              detail={detail}
+              spaces={spaces}
+              similar={similar}
+              paragraphs={paragraphs}
+              social={social}
+              intents={intents}
+              heroUri={heroUri}
+              leading={
+                social && item.url ? (
+                  <MoreMedia item={item} site={social.site} />
+                ) : null
+              }
+            />
+          )
+        }
+      />
+    );
+  }
 
   // Cap the hero so a tall portrait image can't fill the whole screen and hide
   // the title, description, and actions below it.
@@ -337,7 +391,41 @@ export const ItemDetail = memo(function ItemDetail({
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
+/** A carousel post's photos after the first, at the top of the media
+ * viewer's details sheet. Each opens the post, as the first one does. */
+function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
+  const { theme } = useUnistyles();
+  const { width, height } = useWindowDimensions();
+  const rest = (item.media ?? []).slice(1);
+  if (rest.length === 0) return null;
+  const inset = theme.gap(2) * 2 + theme.gap(1) * 2;
+  return (
+    <View style={styles.moreMediaList}>
+      {rest.map((media, index) => (
+        <View key={index} style={styles.heroContainer}>
+          <PostMediaButton
+            site={site}
+            playable={media.kind !== "photo"}
+            onPress={() => openItemSource(item)}
+          >
+            <Image
+              source={{ uri: media.imageUrl }}
+              recyclingKey={`${item._id}-media-${index}`}
+              contentFit="contain"
+              style={[
+                styles.heroImage,
+                fitMedia(media.aspectRatio, width - inset, height * 0.55),
+              ]}
+            />
+          </PostMediaButton>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ItemDetailBody({
+  variant = "page",
   item,
   detail,
   spaces,
@@ -346,7 +434,12 @@ function ItemDetailBody({
   social,
   intents,
   heroUri,
+  leading,
 }: {
+  // "sheet" is the details sheet under a media save, whose caption already
+  // carries the status, source, actions and description.
+  variant?: "page" | "sheet";
+  leading?: ReactNode;
   item: DetailItem;
   detail: ReturnType<typeof useItemDetailData>["detail"];
   spaces: ReturnType<typeof useItemDetailData>["spaces"];
@@ -358,6 +451,7 @@ function ItemDetailBody({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const sheet = variant === "sheet";
   if (item.type === "note") {
     return (
       <View style={styles.body}>
@@ -373,14 +467,16 @@ function ItemDetailBody({
       style={[
         styles.body,
         // The ScrollView already clears the header; only a hero needs a gap.
-        heroUri ? { paddingTop: theme.gap(5) } : null,
+        heroUri && !sheet ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
-      <SaveStatusNotice item={item} />
+      {leading}
+
+      {sheet ? null : <SaveStatusNotice item={item} />}
 
       {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
-      {item.url ? (
+      {item.url && !sheet ? (
         <View style={styles.titleContainer}>
           <ItemSourceLink
             item={item}
@@ -400,13 +496,13 @@ function ItemDetailBody({
         </View>
       ) : null}
 
-      <IntentsRow item={item} intents={intents} />
+      {sheet ? null : <IntentsRow item={item} intents={intents} />}
 
-      {item.description ? (
+      {item.description && !sheet ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
-      {item.url && !detail.content ? (
+      {item.url && !detail.content && !sheet ? (
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"
@@ -566,7 +662,14 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  *
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
-function SaveStatusNotice({ item }: { item: DetailItem }) {
+function SaveStatusNotice({
+  item,
+  onMedia = false,
+}: {
+  item: DetailItem;
+  // Over a media save's dark caption scrim rather than the page.
+  onMedia?: boolean;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
@@ -592,8 +695,13 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   if (processing && state === null) {
     return (
       <View style={styles.processingRow}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={styles.processingText}>{t("item.reading")}</Text>
+        <ActivityIndicator
+          size="small"
+          color={onMedia ? "white" : theme.colors.primary}
+        />
+        <Text style={[styles.processingText, onMedia && styles.onMediaText]}>
+          {t("item.reading")}
+        </Text>
       </View>
     );
   }
@@ -619,7 +727,9 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
               : theme.colors.danger
         }
       />
-      <Text style={styles.noticeText}>{noticeFor(state, item.type)}</Text>
+      <Text style={[styles.noticeText, onMedia && styles.onMediaText]}>
+        {noticeFor(state, item.type)}
+      </Text>
       {isTerminalFailure(item.failureReason) ||
       state === "no_article" ? null : (
         <Pressable
@@ -685,6 +795,11 @@ const styles = StyleSheet.create((theme) => ({
   moreMedia: {
     marginTop: theme.gap(2),
   },
+  moreMediaList: {
+    gap: theme.gap(2),
+    // The sheet body is already inset; the frames bring their own margin.
+    marginHorizontal: -theme.gap(2),
+  },
   heroImage: {
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
@@ -702,6 +817,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
+  },
+  onMediaText: {
+    color: "rgba(255, 255, 255, 0.86)",
   },
   processingText: {
     fontFamily: theme.fonts.medium,
