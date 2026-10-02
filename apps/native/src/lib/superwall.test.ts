@@ -212,6 +212,11 @@ describe("RevenueCat purchase controller", () => {
     await expect(controller(mod).restorePurchases()).resolves.toEqual({
       result: "failed",
     });
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "superwall_restore_failed",
+      expect.any(Error),
+      { provider: "superwall" },
+    );
   });
 });
 
@@ -223,7 +228,11 @@ describe("Superwall identity", () => {
     await mod.syncSuperwallUser("user_1");
     expect(mock.configure).toHaveBeenCalledTimes(1);
     expect(mock.configure).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: "pk_Z4XtXjUCvy8Xw6tyjeGpM" }),
+      expect.objectContaining({
+        apiKey: "pk_Z4XtXjUCvy8Xw6tyjeGpM",
+        options: { paywalls: { shouldPreload: false } },
+        purchaseController: expect.anything(),
+      }),
     );
     expect(mock.shared.identify).toHaveBeenCalledTimes(1);
     expect(mock.shared.identify).toHaveBeenCalledWith({ userId: "user_1" });
