@@ -132,13 +132,15 @@ export function LegalConsentPreference() {
         onPress: () =>
           consent?.refundSharing ? void turnOff() : setReviewing(true),
       }}
-      // Each message stays its own translated sentence on its own line.
+      // Each message stays its own translated sentence on its own line, and
+      // a failed withdrawal still shows a sync the server reports as pending.
       note={
-        failed
-          ? t("refundConsent.error")
-          : consent?.syncPending
-            ? t("refundConsent.syncPending")
-            : null
+        [
+          failed ? t("refundConsent.error") : null,
+          consent?.syncPending ? t("refundConsent.syncPending") : null,
+        ]
+          .filter(Boolean)
+          .join("\n") || null
       }
     />
   );

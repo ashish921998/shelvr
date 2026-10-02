@@ -130,6 +130,7 @@ function lastAlert() {
   if (!call) throw new Error("no alert shown");
   return {
     title: call[0] as string,
+    message: call[1] as string | undefined,
     buttons: (call[2] ?? []) as AlertButton[],
   };
 }
@@ -174,6 +175,7 @@ it("reports a failed deletion and points to support", async () => {
     expect.any(Error),
   );
   expect(lastAlert().title).toBe("account.deleteFailed");
+  expect(lastAlert().message).toBe("errors.contactSupport");
 });
 
 it.each([
