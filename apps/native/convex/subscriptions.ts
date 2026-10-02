@@ -11,7 +11,7 @@ import {
 } from "./model/entitlement";
 import { saveError } from "./model/saveErrors";
 
-export const subscriptionStatusValidator = v.union(
+const subscriptionStatusValidator = v.union(
   v.literal("trialing"),
   v.literal("pro"),
   v.literal("lapsed"),

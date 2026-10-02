@@ -106,7 +106,7 @@ function readStringArray(value: unknown): string[] | undefined {
   return [...new Set(value)];
 }
 
-export type RevenueCatSnapshot = {
+type RevenueCatSnapshot = {
   status: "trialing" | "pro" | "lapsed" | "lifetime";
   expiresAt: number;
   productId?: string;

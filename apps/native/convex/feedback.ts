@@ -89,7 +89,7 @@ export function isFeedbackInboxConfigured(): boolean {
 /** Server-side twin of the client's sanitizeFeedbackMessage: the row is the
  * record of what the user said, so over-long input is rejected rather than
  * silently truncated, and whitespace-only input never creates a row. */
-export function normalizeFeedbackMessage(raw: string): string {
+function normalizeFeedbackMessage(raw: string): string {
   const message = raw.trim();
   if (message.length === 0) {
     throw new ConvexError("Feedback message is empty.");

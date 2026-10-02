@@ -395,14 +395,14 @@ export class WaitlistInputError extends Error {
   }
 }
 
-export type JoinWaitlistArgs = {
+type JoinWaitlistArgs = {
   email: string;
   product?: WaitlistProduct;
   source: WaitlistSource;
   ip?: string;
 };
 
-export type JoinWaitlistResult = {
+type JoinWaitlistResult = {
   saved: boolean;
   emailProviderSynced: boolean;
 };

@@ -20,7 +20,6 @@ import {
   type ShortFormSource,
 } from "./model/pageRead";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
-import { readImageSize } from "./model/imageSize";
 import { INTENT_KINDS, type Recipe } from "./model/itemFields";
 import { logEvent, errorName } from "./model/log";
 import { sanitizeRecipe, type RecipeDraft } from "./model/recipeMarkup";
@@ -134,7 +133,7 @@ const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
  * provider must be down") gets it wrong in exactly the case that wedges the
  * sweep: a completed call whose every vector is malformed.
  */
-export type EmbedBatchResult = {
+type EmbedBatchResult = {
   vectors: (number[] | undefined)[];
   callFailed: boolean;
 };
@@ -1169,33 +1168,6 @@ export const sweepItemEmbeddings = internalAction({
       await ctx.scheduler.runAfter(0, internal.ai.sweepItemEmbeddings, {});
     }
     return { scanned: pending.length, written };
-  },
-});
-
-export const backfillImageAspectRatios = internalAction({
-  args: {},
-  returns: v.object({ scanned: v.number(), updated: v.number() }),
-  handler: async (ctx): Promise<{ scanned: number; updated: number }> => {
-    const targets = await ctx.runQuery(
-      internal.items.listImagesNeedingRatioInternal,
-      {},
-    );
-    let updated = 0;
-    for (const target of targets) {
-      const blob = await ctx.storage.get(target.storageId);
-      if (blob === null) {
-        continue;
-      }
-      const size = readImageSize(new Uint8Array(await blob.arrayBuffer()));
-      if (size && size.width > 0 && size.height > 0) {
-        await ctx.runMutation(internal.items.setAspectRatioInternal, {
-          itemId: target._id,
-          aspectRatio: size.width / size.height,
-        });
-        updated++;
-      }
-    }
-    return { scanned: targets.length, updated };
   },
 });
 

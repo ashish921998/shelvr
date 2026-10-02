@@ -18,7 +18,7 @@ export type UpdateState =
   | { kind: "failed"; at: "check" | "restart" };
 
 /** What the last user action ended in. Cleared when the next one starts. */
-export type UpdateOutcome = "upToDate" | "checkFailed" | "restartFailed" | null;
+type UpdateOutcome = "upToDate" | "checkFailed" | "restartFailed" | null;
 
 export type UpdateSignals = {
   /** Why manual updates can't run here, or null when they can. */

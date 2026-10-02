@@ -5,8 +5,19 @@ import { StyleSheet } from "react-native-unistyles";
 
 const APP_ICON = require("../../assets/icon.png");
 
-/** A lock-screen style mock of the Sunday weekly shelf notification. */
-export function NotificationPreview({ body }: { body: string }) {
+/**
+ * A lock-screen style mock of a Shelvr notification. Defaults to the Sunday
+ * weekly shelf.
+ */
+export function NotificationPreview({
+  body,
+  title,
+  when,
+}: {
+  body: string;
+  title?: string;
+  when?: string;
+}) {
   useAppLocale();
   return (
     <View style={styles.push} accessible>
@@ -14,9 +25,9 @@ export function NotificationPreview({ body }: { body: string }) {
       <View style={styles.text}>
         <View style={styles.top}>
           <Text style={styles.app}>Shelvr</Text>
-          <Text style={styles.when}>{t("weekly.previewTime")}</Text>
+          <Text style={styles.when}>{when ?? t("weekly.previewTime")}</Text>
         </View>
-        <Text style={styles.title}>{t("weekly.previewTitle")}</Text>
+        <Text style={styles.title}>{title ?? t("weekly.previewTitle")}</Text>
         <Text style={styles.body} numberOfLines={2}>
           {body}
         </Text>

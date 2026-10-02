@@ -45,12 +45,7 @@ export type ImageSaveRequest = {
   operationId?: string;
 };
 
-export type ImageSaveStage =
-  | "begin"
-  | "normalize"
-  | "upload"
-  | "attach"
-  | "finalize";
+type ImageSaveStage = "begin" | "normalize" | "upload" | "attach" | "finalize";
 
 /** A settled per-image outcome. A failure is data, not a rejected promise, so
  * one image failing can never erase its siblings' success information. A caller
