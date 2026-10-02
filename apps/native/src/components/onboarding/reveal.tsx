@@ -28,12 +28,16 @@ export function RevealStep({
   saved,
   restored,
   onSaved,
+  onContinue,
   onFinish,
 }: {
   saved: DemoSaved | null;
   /** The app relaunched onto this step, so the paywall opens once by itself. */
   restored: boolean;
   onSaved: (saved: DemoSaved) => void;
+  /** Pro is active: on to the share-sheet practice. */
+  onContinue: () => void;
+  /** Declined the paywall: straight to the app. */
   onFinish: () => void;
 }) {
   useAppLocale();
@@ -84,14 +88,14 @@ export function RevealStep({
 
   const keepSaving = async () => {
     if (entitled) {
-      onFinish();
+      onContinue();
       return;
     }
     setPaywallOpen(true);
     try {
       if (await openPaywall(router, "onboarding")) {
         notePurchasedDuringOnboarding();
-        onFinish();
+        onContinue();
       }
     } finally {
       setPaywallOpen(false);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   demoDestination,
   orderDemoSamples,
-  orderShareDemoSamples,
+  practiceShareSample,
 } from "./onboarding-demo";
 
 describe("orderDemoSamples", () => {
@@ -21,17 +21,25 @@ describe("orderDemoSamples", () => {
   });
 });
 
-describe("orderShareDemoSamples", () => {
-  it("leads with the reading article, then the picked kinds", () => {
+describe("practiceShareSample", () => {
+  it("uses the reading article when the demo saved something else", () => {
     expect(
-      orderShareDemoSamples(["Recipes", "Travel"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "bbcgoodfood.com", "lonelyplanet.com"]);
+      practiceShareSample(
+        ["Recipes"],
+        "https://www.bbcgoodfood.com/recipes/classic-lasagne",
+      )?.domain,
+    ).toBe("fs.blog");
   });
 
-  it("does not repeat the article when Articles was picked", () => {
+  it("uses the reading article when nothing was saved", () => {
+    expect(practiceShareSample(["Travel"], null)?.domain).toBe("fs.blog");
+  });
+
+  it("falls back to a picked kind when the article was the demo save", () => {
     expect(
-      orderShareDemoSamples(["Articles", "Products"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "apple.com", "bbcgoodfood.com"]);
+      practiceShareSample(["Travel", "Recipes"], "https://fs.blog/reading/")
+        ?.domain,
+    ).toBe("lonelyplanet.com");
   });
 });
 

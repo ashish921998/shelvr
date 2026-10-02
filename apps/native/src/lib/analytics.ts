@@ -271,6 +271,11 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
+  // The share-sheet practice after the paywall (onboarding/share-practice.tsx).
+  // "other_app" can repeat; the other outcomes fire once per mount.
+  onboarding_share_practice: {
+    outcome: "saved" | "other_app" | "skipped" | "sheet_failed";
+  };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };

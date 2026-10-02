@@ -72,7 +72,7 @@ export function LiveDemoStep({
     onSaved,
     onAdvance,
   });
-  const { shareSheetOpen, shareSample } = useIncomingShareUrl({
+  const { shareSheetOpen } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
@@ -197,23 +197,13 @@ export function LiveDemoStep({
 
   return (
     <View style={styles.wrap}>
-      {Platform.OS === "ios" ? (
-        <SharePicker
-          samples={samples}
-          disabled={demo.submitting}
-          error={errorLine}
-          pasteRow={pasteRow}
-          onShare={(url) => void shareSample(url)}
-        />
-      ) : (
-        <PastePicker
-          samples={samples}
-          disabled={demo.submitting}
-          error={errorLine}
-          pasteRow={pasteRow}
-          onPick={demo.submitUrl}
-        />
-      )}
+      <SamplePicker
+        samples={samples}
+        disabled={demo.submitting}
+        error={errorLine}
+        pasteRow={pasteRow}
+        onPick={demo.submitUrl}
+      />
 
       {footer === null ? null : <View style={styles.foot}>{footer}</View>}
 
@@ -233,28 +223,31 @@ type PickerProps = {
   pasteRow: ReactNode;
 };
 
-/** iOS: the first save goes through the real share sheet, Matter-style. */
-function SharePicker({
+/** The first save is one tap on a sample matched to the kinds picked in
+ * setup. The share sheet is taught after it, once the first save has landed
+ * (see share-practice.tsx). */
+function SamplePicker({
   samples,
   disabled,
   error,
   pasteRow,
-  onShare,
-}: PickerProps & { onShare: (url: string) => void }) {
+  onPick,
+}: PickerProps & { onPick: (url: string) => void }) {
   useAppLocale();
   const [featured, ...others] = samples;
   return (
     <>
       <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.shareTitle")}</Text>
-        <Text style={styles.support}>{t("demo.shareSupport")}</Text>
+        <Text style={styles.headline}>{t("demo.title")}</Text>
+        <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 
       {featured === undefined ? null : (
-        <SharePost
+        <SampleCard
           sample={featured}
+          action="save"
           disabled={disabled}
-          onShare={() => onShare(featured.url)}
+          onPress={() => onPick(featured.url)}
         />
       )}
 
@@ -262,14 +255,14 @@ function SharePicker({
 
       {others.length === 0 ? null : (
         <View style={styles.samples}>
-          <Text style={styles.samplesLabel}>{t("demo.shareOthers")}</Text>
+          <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
           {others.map((candidate) => (
             <SampleRow
               key={candidate.url}
               sample={candidate}
-              icon="square.and.arrow.up"
+              icon="plus"
               disabled={disabled}
-              onPress={() => onShare(candidate.url)}
+              onPress={() => onPick(candidate.url)}
             />
           ))}
         </View>
@@ -283,45 +276,8 @@ function SharePicker({
   );
 }
 
-function PastePicker({
-  samples,
-  disabled,
-  error,
-  pasteRow,
-  onPick,
-}: PickerProps & { onPick: (url: string) => void }) {
-  useAppLocale();
-  return (
-    <>
-      <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.title")}</Text>
-        <Text style={styles.support}>{t("demo.pickHelp")}</Text>
-      </View>
-
-      <ShareHint />
-
-      {pasteRow}
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
-        {samples.map((candidate) => (
-          <SampleRow
-            key={candidate.url}
-            sample={candidate}
-            icon="plus"
-            disabled={disabled}
-            onPress={() => onPick(candidate.url)}
-          />
-        ))}
-      </View>
-
-      {error}
-    </>
-  );
-}
-
 /** An illustration of the share gesture, not a control. */
-function ShareHint() {
+export function ShareHint() {
   useAppLocale();
   const { theme } = useUnistyles();
   return (
@@ -350,23 +306,27 @@ function ShareHint() {
   );
 }
 
-/** The sample post the share sheet opens over, with its own Share button. */
-function SharePost({
+/** A large sample card. "save" saves it in one tap; "share" opens the real
+ * share sheet over it, so the save goes through the Shelvr tile. */
+export function SampleCard({
   sample,
+  action,
   disabled,
-  onShare,
+  onPress,
 }: {
   sample: DemoSample;
+  action: "save" | "share";
   disabled: boolean;
-  onShare: () => void;
+  onPress: () => void;
 }) {
   const { theme } = useUnistyles();
+  const share = action === "share";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
+      accessibilityLabel={`${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`}
       disabled={disabled}
-      onPress={onShare}
+      onPress={onPress}
       style={({ pressed }) => [
         styles.post,
         disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
@@ -388,7 +348,7 @@ function SharePost({
         </View>
         <View style={styles.hintShare}>
           <AppSymbolIcon
-            name="square.and.arrow.up"
+            name={share ? "square.and.arrow.up" : "plus"}
             size={18}
             tintColor={theme.colors.primaryForeground}
           />

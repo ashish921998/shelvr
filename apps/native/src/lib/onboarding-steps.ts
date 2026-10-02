@@ -4,10 +4,12 @@ export const ONBOARDING_STEPS = [
   "setup",
   "demo",
   "reveal",
+  "share",
 ] as const;
 // Sent with every step event. step_index means different steps in different
 // flows, so funnels split by this or filter on step_id. 3 added the source step.
-export const ONBOARDING_FLOW_VERSION = 3;
+// 4 made the first save one tap on every platform and added the share step.
+export const ONBOARDING_FLOW_VERSION = 4;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -19,6 +21,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   setup: "setup",
   demo: "live_demo",
   reveal: "reveal",
+  share: "share_practice",
 };
 
 // Takes an index written by this flow. getOnboardingProgress already returns

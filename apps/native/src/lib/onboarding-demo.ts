@@ -55,16 +55,18 @@ export function orderDemoSamples(kinds: readonly SaveKind[]): DemoSample[] {
     .slice(0, SAMPLE_COUNT);
 }
 
-/** The iOS share demo always features the reading article, then the picked
- * kinds' other samples. */
-export function orderShareDemoSamples(
+/** The share-sheet practice after the first save: the reading article
+ * (it previews reliably), else the picked kinds' first sample, never the link
+ * the demo already saved. */
+export function practiceShareSample(
   kinds: readonly SaveKind[],
-): DemoSample[] {
+  savedUrl: string | null,
+): DemoSample | undefined {
   const featured = DEMO_SAMPLES.find((sample) => sample.kind === "Articles");
-  const rest = orderDemoSamples(kinds).filter((sample) => sample !== featured);
-  return featured === undefined
-    ? rest
-    : [featured, ...rest.slice(0, SAMPLE_COUNT - 1)];
+  return [
+    ...(featured === undefined ? [] : [featured]),
+    ...orderDemoSamples(kinds),
+  ].find((sample) => sample.url !== savedUrl);
 }
 
 /** A sample files into its kind's first preset space when the user kept that
