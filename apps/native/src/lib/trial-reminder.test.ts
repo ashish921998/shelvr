@@ -236,13 +236,19 @@ describe("trial nudges", () => {
 
 describe("trial reminder primer", () => {
   it("skips the primer when permission is already granted", async () => {
-    expect(await confirmTrialReminderAsk()).toBe(true);
+    expect(await confirmTrialReminderAsk()).toEqual({
+      ask: true,
+      primed: false,
+    });
     expect(trialReminderPrimer.isOpen()).toBe(false);
   });
 
   it("skips the primer when the OS would show nothing", async () => {
     mock.permission.mockResolvedValue({ ...undetermined, canAskAgain: false });
-    expect(await confirmTrialReminderAsk()).toBe(false);
+    expect(await confirmTrialReminderAsk()).toEqual({
+      ask: false,
+      primed: false,
+    });
     expect(trialReminderPrimer.isOpen()).toBe(false);
   });
 
@@ -251,7 +257,7 @@ describe("trial reminder primer", () => {
     const answer = confirmTrialReminderAsk();
     await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
     trialReminderPrimer.answer(true);
-    expect(await answer).toBe(true);
+    expect(await answer).toEqual({ ask: true, primed: true });
     expect(trialReminderPrimer.isOpen()).toBe(false);
     expect(mock.request).not.toHaveBeenCalled();
     expect(mock.capture).toHaveBeenCalledWith("trial_reminder_primer", {

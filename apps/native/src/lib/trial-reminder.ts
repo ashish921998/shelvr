@@ -261,18 +261,23 @@ export function useTrialReminderPrimerOpen(): boolean {
 }
 
 /**
- * Whether the OS prompt should follow. No primer when permission is already
- * granted (nothing to ask) or refused for good (the OS would show nothing).
+ * Whether the OS prompt should follow, and whether the primer was on screen
+ * (only then is there a closing sheet to wait out). No primer when permission
+ * is already granted (nothing to ask) or refused for good (the OS would show
+ * nothing).
  */
-export async function confirmTrialReminderAsk(): Promise<boolean> {
+export async function confirmTrialReminderAsk(): Promise<{
+  ask: boolean;
+  primed: boolean;
+}> {
   const permission = await Notifications.getPermissionsAsync();
-  if (canNotify(permission)) return true;
-  if (!permission.canAskAgain) return false;
+  if (canNotify(permission)) return { ask: true, primed: false };
+  if (!permission.canAskAgain) return { ask: false, primed: false };
   const allow = await trialReminderPrimer.request();
   analytics.capture("trial_reminder_primer", {
     outcome: allow ? "accepted" : "declined",
   });
-  return allow;
+  return { ask: allow, primed: true };
 }
 
 async function cancelTrialReminder(): Promise<void> {
@@ -285,9 +290,10 @@ async function cancelTrialReminder(): Promise<void> {
 /**
  * Keeps the reminder in step with the entitlement. A trial that starts while
  * the app is open (the paywall just closed on a purchase) asks for
- * notification permission once per account, after the primer says why. Trials already running only get
- * a reminder when permission was granted some other way, so nobody is asked
- * cold on launch. Anything other than a trial clears the reminder.
+ * notification permission once per account, after the primer says why.
+ * Trials already running only get a reminder when permission was granted some
+ * other way, so nobody is asked cold on launch. Anything other than a trial
+ * clears the reminder.
  */
 export function useTrialReminder(): void {
   const { status, expiresAt, loading } = useEntitlement();
@@ -356,10 +362,11 @@ export function useTrialReminder(): void {
         // Nothing can present over a closing RevenueCat sheet.
         await waitForSheetTransition();
         if (!isCurrent()) return;
-        ask = await confirmTrialReminderAsk();
+        const confirmed = await confirmTrialReminderAsk();
+        ask = confirmed.ask;
         if (!isCurrent()) return;
-        // Nor over the closing primer.
-        if (ask) await waitForSheetTransition();
+        // Nor over the closing primer, when one was shown.
+        if (ask && confirmed.primed) await waitForSheetTransition();
         if (!isCurrent()) return;
       }
       const scheduled = await serial(() =>
