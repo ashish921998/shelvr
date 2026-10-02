@@ -38,6 +38,13 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mocks.captureError },
 }));
+// The preference renders through SettingCard; its ThemedText reads variant
+// styles that the empty StyleSheet mock below cannot supply.
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));

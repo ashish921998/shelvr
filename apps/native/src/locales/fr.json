@@ -146,6 +146,7 @@
   "profile.ofFragment": "sur",
   "profile.photosFragment": "photos",
   "profile.appearance": "Apparence",
+  "profile.settings": "Réglages",
   "notifications.weeklyHelp": "Quelques contenus non ouverts chaque dimanche",
   "notifications.toggleLabel": "Notifications de l'étagère hebdomadaire",
   "notifications.remindersLabel": "Rappels de vos contenus",
