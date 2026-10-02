@@ -309,16 +309,18 @@ export function useTrialReminderPrimerOpen(): boolean {
 /**
  * Whether the OS prompt should follow, and whether the primer was on screen
  * (only then is there a closing sheet to wait out). No primer when permission
- * is already granted (nothing to ask) or refused for good (the OS would show
- * nothing).
+ * is already granted (nothing to ask), refused for good (the OS would show
+ * nothing), or `live` has turned false while permission was being read.
  */
-export async function confirmTrialReminderAsk(): Promise<{
+export async function confirmTrialReminderAsk(
+  live: () => boolean = () => true,
+): Promise<{
   ask: boolean;
   primed: boolean;
 }> {
   const permission = await Notifications.getPermissionsAsync();
-  if (canNotify(permission)) return { ask: true, primed: false };
-  if (!permission.canAskAgain) return { ask: false, primed: false };
+  if (canNotify(permission) || !permission.canAskAgain || !live())
+    return { ask: false, primed: false };
   const allow = await trialReminderPrimer.request();
   if (allow === null) return { ask: false, primed: true };
   analytics.capture("trial_reminder_primer", {
@@ -425,7 +427,7 @@ export function useTrialReminder(): void {
           // Nothing can present while a RevenueCat sheet is up or closing.
           await whenSheetSettled();
           if (!live()) return false;
-          const confirmed = await confirmTrialReminderAsk();
+          const confirmed = await confirmTrialReminderAsk(live);
           primed = confirmed.primed;
           if (!confirmed.ask || !live()) return false;
           // Nor over the closing primer, when one was shown.

@@ -65,7 +65,7 @@
   "capture.photos": "Fotos",
   "capture.camera": "Cámara",
   "capture.cameraAccessTitle": "Guarda lo que tienes delante",
-  "capture.cameraAccessBody": "Permite la cámara para fotografiar un menú, la portada de un libro o un producto. Shelvr le pone título y lo archiva por ti.",
+  "capture.cameraAccessBody": "Permite el acceso a la cámara para fotografiar un menú, la portada de un libro o un producto. Shelvr le pone título y lo archiva por ti.",
   "capture.noCameraTitle": "No hay cámara",
   "capture.noCameraBody": "Este dispositivo no tiene cámara (hola, simulador).",
   "errors.upload": "La subida ha fallado. Vuelve a intentarlo.",

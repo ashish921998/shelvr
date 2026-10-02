@@ -238,7 +238,7 @@ describe("trial nudges", () => {
 describe("trial reminder primer", () => {
   it("skips the primer when permission is already granted", async () => {
     expect(await confirmTrialReminderAsk()).toEqual({
-      ask: true,
+      ask: false,
       primed: false,
     });
     expect(trialReminderPrimer.isOpen()).toBe(false);

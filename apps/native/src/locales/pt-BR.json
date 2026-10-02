@@ -65,7 +65,7 @@
   "capture.photos": "Fotos",
   "capture.camera": "Câmera",
   "capture.cameraAccessTitle": "Salve o que está na sua frente",
-  "capture.cameraAccessBody": "Permita a câmera para fotografar um cardápio, a capa de um livro ou um produto. O Shelvr dá um título e organiza para você.",
+  "capture.cameraAccessBody": "Permita o acesso à câmera para fotografar um cardápio, a capa de um livro ou um produto. O Shelvr dá um título e organiza para você.",
   "capture.noCameraTitle": "Nenhuma câmera disponível",
   "capture.noCameraBody": "Este dispositivo não tem câmera (olá, simulador).",
   "errors.upload": "O envio falhou. Tente novamente.",

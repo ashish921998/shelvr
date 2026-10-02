@@ -134,6 +134,23 @@ describe("useTrialReminder primer", () => {
     await vi.waitFor(() => expect(done).toBe(true));
   });
 
+  it("never opens the primer when the trial ends while permission is read", async () => {
+    let resolvePermission: (value: typeof undetermined) => void = () => {};
+    mock.permission.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePermission = resolve;
+      }),
+    );
+    const hook = startTrial();
+    await vi.waitFor(() => expect(mock.permission).toHaveBeenCalled());
+    vi.mocked(useEntitlement).mockReturnValue(entitled("none"));
+    hook.rerender();
+    await act(async () => resolvePermission(undetermined));
+    await vi.waitFor(() => expect(mock.cancel).toHaveBeenCalled());
+    expect(trialReminderPrimer.isOpen()).toBe(false);
+    expect(mock.request).not.toHaveBeenCalled();
+  });
+
   it("closes the primer without prompting when the trial ends", async () => {
     const hook = startTrial();
     await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
