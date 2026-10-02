@@ -28,7 +28,7 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   type LayoutChangeEvent,
@@ -121,12 +121,19 @@ function pagerHeaderColors(
  */
 function PagerHeaderBackdrop({ onMedia }: { onMedia: boolean }) {
   const { theme } = useUnistyles();
+  const navigation = useNavigation();
   const [focused, setFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
       return () => setFocused(false);
     }, []),
+  );
+  // Blur only lands once the pop animation ends, leaving a white clock over
+  // the feed while it plays; drop the light bar as the pop starts instead.
+  useEffect(
+    () => navigation.addListener("beforeRemove", () => setFocused(false)),
+    [navigation],
   );
   if (!onMedia) {
     return <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />;

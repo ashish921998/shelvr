@@ -17,11 +17,13 @@ type SourceItem = AnalyticsItem & {
   siteName?: string;
 };
 
-export function openItemSource(item: SourceItem): void {
+// `onClosed` runs once the in-app browser is dismissed (or failed to open).
+export function openItemSource(item: SourceItem, onClosed?: () => void): void {
   if (!item.url) return;
   void WebBrowser.openBrowserAsync(item.url)
     .then(() => analytics.itemAction(item, "open_source"))
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => onClosed?.());
 }
 
 type Props = {

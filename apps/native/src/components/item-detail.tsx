@@ -232,7 +232,7 @@ export const ItemDetail = memo(function ItemDetail({
           item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
         }
         notice={<SaveStatusNotice item={detail} onMedia />}
-        actions={<IntentsRow item={item} intents={intents} />}
+        actions={<IntentsRow item={item} intents={intents} align="start" />}
         details={
           bodyPending ? (
             <View style={styles.bodyPending}>
@@ -563,13 +563,21 @@ function ItemDetailBody({
 function IntentsRow({
   item,
   intents,
+  align = "center",
 }: {
   item: DetailItem;
   intents: ItemIntent[];
+  // "start" lines the chips up with a media save's left-aligned caption.
+  align?: "center" | "start";
 }) {
   if (intents.length === 0) return null;
   return (
-    <View style={styles.intentsRow}>
+    <View
+      style={[
+        styles.intentsRow,
+        align === "start" && { justifyContent: "flex-start" },
+      ]}
+    >
       {intents.map((intent, index) => (
         <IntentChip
           key={`${intent.kind}-${index}`}

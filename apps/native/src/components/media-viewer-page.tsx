@@ -6,6 +6,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { fitMedia, MEDIA_CANVAS } from "@/lib/media-viewer";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
+import { setStatusBarStyle } from "expo-status-bar";
 import { Link } from "expo-router";
 import {
   useEffect,
@@ -34,9 +35,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // enough under the text for white type, eased so the fade has no edge.
 const CAPTION_SCRIM = `linear-gradient(180deg, ${[
   "rgba(0, 0, 0, 0) 0%",
-  "rgba(0, 0, 0, 0.28) 30%",
-  "rgba(0, 0, 0, 0.62) 65%",
-  "rgba(0, 0, 0, 0.8) 100%",
+  "rgba(0, 0, 0, 0.4) 25%",
+  "rgba(0, 0, 0, 0.72) 55%",
+  "rgba(0, 0, 0, 0.85) 100%",
 ].join(", ")})`;
 
 // Clearance for the Add / Dismiss bar and the "added to" notice the pager
@@ -142,7 +143,9 @@ export function MediaViewerPage({
       source={{ uri: heroUri }}
       recyclingKey={item._id}
       contentFit="contain"
-      style={mediaSize}
+      // The frame stays visible when the picture fails to load, so the
+      // stage never reads as empty.
+      style={[mediaSize, styles.media]}
     />
   );
   const video = social?.playable && item.url ? social : undefined;
@@ -150,7 +153,12 @@ export function MediaViewerPage({
     <PostMediaButton
       site={video.site}
       playable
-      onPress={() => openItemSource(item)}
+      onPress={() => {
+        // The pager's light status bar would sit white-on-white over the
+        // in-app browser; hand it back once the browser closes.
+        setStatusBarStyle("dark");
+        openItemSource(item, () => setStatusBarStyle("light"));
+      }}
     >
       {image}
     </PostMediaButton>
@@ -303,7 +311,9 @@ export function MediaViewerPage({
         style={[
           styles.sheet,
           {
-            minHeight: pageHeight * 0.6,
+            // At least tall enough to scroll up to the header, so the
+            // caption leaves the screen instead of parking under it.
+            minHeight: pageHeight - headerInset,
             paddingBottom: insets.bottom + theme.gap(4),
           },
         ]}
@@ -315,6 +325,14 @@ export function MediaViewerPage({
   );
 }
 
+// Keeps white caption type readable where a light photo shows through the
+// top of the scrim.
+const CAPTION_SHADOW = {
+  textShadowColor: "rgba(0, 0, 0, 0.45)",
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 6,
+};
+
 const WHITE_SOFT = "rgba(255, 255, 255, 0.86)";
 const WHITE_FAINT = "rgba(255, 255, 255, 0.6)";
 
@@ -322,6 +340,9 @@ const styles = StyleSheet.create((theme) => ({
   scroll: {
     flex: 1,
     backgroundColor: MEDIA_CANVAS,
+  },
+  media: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
   },
   stage: {
     flex: 1,
@@ -351,12 +372,14 @@ const styles = StyleSheet.create((theme) => ({
     color: WHITE_SOFT,
   },
   title: {
+    ...CAPTION_SHADOW,
     fontFamily: theme.fonts.display,
     fontSize: 26,
     lineHeight: 31,
     color: "white",
   },
   description: {
+    ...CAPTION_SHADOW,
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     lineHeight: 21,
