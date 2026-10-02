@@ -68,6 +68,13 @@ seedRequire("react-native-purchases-ui", {
     Paywall: mock.paywall,
   },
 });
+// The paywall is the app's own screen; the session that waits on it is the
+// boundary, standing in for the native sheet the suite was written against.
+vi.mock("./paywall-session", () => ({
+  presentPaywallScreen: () => mock.presentPaywall(),
+  isPaywallScreenOpen: () => false,
+  classifyPurchaseError: () => "failed",
+}));
 vi.mock("./exit-offer-sheet", () => ({
   presentExitSheet: mock.presentExitSheet,
 }));

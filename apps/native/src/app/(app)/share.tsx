@@ -37,7 +37,12 @@ import {
 import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { saveFailureStage } from "@convex/model/saveErrors";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import {
+  isPaywallPending,
+  openPaywall,
+  useEntitlement,
+  whenSheetSettled,
+} from "@/lib/entitlement";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -511,7 +516,11 @@ function runEffect(
       void openPaywall(deps.router, "share");
       return;
     case "navigateHome":
-      deps.router.replace("/");
+      // A purchase flips the entitlement while the paywall screen may still
+      // be on top; replacing then would replace the paywall, not this screen.
+      if (isPaywallPending())
+        void whenSheetSettled().then(() => deps.router.replace("/"));
+      else deps.router.replace("/");
       return;
   }
 }

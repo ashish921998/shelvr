@@ -45,9 +45,17 @@ import {
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { presentExitSheet } from "./exit-offer-sheet";
+import {
+  classifyPurchaseError,
+  isPaywallScreenOpen,
+  presentPaywallScreen,
+  type PurchaseOutcome,
+} from "./paywall-session";
+import { annualTrialOffered } from "./paywall-plans";
 import { useRouter } from "expo-router";
+import type { PurchasesPackage } from "react-native-purchases";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 
 /**
  * Shelvr Pro entitlement.
@@ -63,9 +71,10 @@ import { AppState } from "react-native";
  * (trial or subscription ended) is read-only: they can view and search existing
  * saves and spaces, but every save and Pro feature routes to the paywall.
  *
- * The paywall UI itself is rendered natively by RevenueCat's SDK (designed in
- * the RevenueCat dashboard Paywall Editor). We call `presentPaywall()` which
- * presents a native sheet — no custom paywall view code needed.
+ * The paywall is the app's own two-step screen at the `/paywall` route
+ * (`paywall-session.ts` connects it to `openPaywall`). It reads prices from
+ * the current RevenueCat offering and buys through `purchasePackage`.
+ * RevenueCat's paywall UI still renders the exit offer after a close.
  */
 
 // ---------------------------------------------------------------------------
@@ -336,7 +345,7 @@ export function useEntitlement(): Entitlement {
 // ---------------------------------------------------------------------------
 
 /**
- * Present the RevenueCat paywall natively (sheet on iOS). Returns a three-way
+ * Present the paywall screen. Returns a three-way
  * outcome so callers can distinguish purchase/restore, user cancellation, and
  * real unavailability (SDK missing, identity sync timeout, ERROR).
  *
@@ -346,6 +355,7 @@ export function useEntitlement(): Entitlement {
  */
 async function presentPaywallImpl(
   placement = "pro_gate",
+  navigate?: () => void,
 ): Promise<PaywallOutcome> {
   const properties = { placement, paywall_attempt_id: randomUUID() };
   const requestedAt = Date.now();
@@ -366,12 +376,14 @@ async function presentPaywallImpl(
     return "unavailable";
   }
 
-  const rcui = getRCUI();
-  if (!rcui) {
+  if (!getPurchases()) {
     failed("sdk_unavailable");
     return "unavailable";
   }
-  if (!(await syncRevenueCatUILocale(getPurchases()))) {
+  // The paywall itself is the app's own screen; RevenueCat's UI only renders
+  // the exit offer that may follow a close, so it is optional here.
+  const rcui = getRCUI();
+  if (rcui && !(await syncRevenueCatUILocale(getPurchases()))) {
     failed("locale_sync_failed");
     return "unavailable";
   }
@@ -379,7 +391,12 @@ async function presentPaywallImpl(
     const enriched = { ...properties, ...(await context) };
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall(),
+      () =>
+        presentPaywallScreen({
+          placement,
+          attemptId: properties.paywall_attempt_id,
+          navigate,
+        }),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -387,10 +404,71 @@ async function presentPaywallImpl(
     }
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
-    if (outcome !== "cancelled") return outcome;
+    if (outcome !== "cancelled" || !rcui) return outcome;
     return (await presentExitOffer(rcui, placement)) ?? outcome;
   } catch {
     return "unavailable";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Paywall screen: offering, purchase
+// ---------------------------------------------------------------------------
+
+export type PaywallOffer = {
+  annual: PurchasesPackage;
+  monthly: PurchasesPackage;
+  /** The annual plan really starts with a free trial for this user. */
+  trial: boolean;
+};
+
+/**
+ * The current offering's annual and monthly packages, with the user's trial
+ * eligibility. Null when RevenueCat isn't ready or the offering lacks either
+ * package, so the screen shows its retry state instead of guessed prices.
+ */
+export async function loadPaywallOffer(): Promise<PaywallOffer | null> {
+  if (!(await awaitRcSyncReady())) return null;
+  const rc = getPurchases();
+  if (!rc) return null;
+  const offering = (await rc.getOfferings()).current;
+  const annual = offering?.annual;
+  const monthly = offering?.monthly;
+  if (!annual || !monthly) return null;
+  let iosEligibility: number | undefined;
+  if (Platform.OS === "ios" && annual.product.introPrice) {
+    try {
+      const id = annual.product.identifier;
+      const eligibility = await rc.checkTrialOrIntroductoryPriceEligibility([
+        id,
+      ]);
+      iosEligibility = eligibility[id]?.status;
+    } catch {
+      // Left unknown, which shows the plain annual copy.
+    }
+  }
+  const trial = annualTrialOffered({
+    introPrice: annual.product.introPrice,
+    platform: Platform.OS,
+    iosEligibility,
+  });
+  return { annual, monthly, trial };
+}
+
+/** Buys a package for the signed-in RevenueCat identity. */
+export async function purchasePaywallPackage(
+  pkg: PurchasesPackage,
+): Promise<PurchaseOutcome> {
+  // Same gate as the paywall: a purchase before identity sync would belong
+  // to an anonymous RevenueCat user the webhook can't map.
+  if (!(await awaitRcSyncReady())) return "failed";
+  const rc = getPurchases();
+  if (!rc) return "failed";
+  try {
+    await rc.purchasePackage(pkg);
+    return "purchased";
+  } catch (error) {
+    return classifyPurchaseError(error);
   }
 }
 
@@ -599,7 +677,11 @@ type OpenSheet = {
 let openSheet: OpenSheet | null = null;
 
 function liveSheet(): OpenSheet | null {
-  if (openSheet && Date.now() - openSheet.startedAt < SHEET_STALE_MS) {
+  // The app's own paywall screen is still open however long it has been up.
+  if (
+    openSheet &&
+    (Date.now() - openSheet.startedAt < SHEET_STALE_MS || isPaywallScreenOpen())
+  ) {
     return openSheet;
   }
   openSheet = null;
@@ -678,8 +760,8 @@ async function presentPaywall(
 }
 
 /**
- * Present the RevenueCat paywall. On real unavailability (SDK not linked, sync
- * timed out, ERROR), fall back to the paywall route. On cancellation, return
+ * Present the paywall. On real unavailability (SDK not linked, sync timed
+ * out, screen never mounted), open the paywall route on its own. On cancellation, return
  * to the caller without routing — cancel must not look like an outage. Returns
  * `true` only on purchase/restore. Shared by every Pro-gated affordance.
  */
@@ -698,6 +780,18 @@ export async function openPaywall(
   // through can report the resume, and whether a purchase sits between.
   recordBlockedAction(placement, outcome === "success");
   return outcome === "success";
+}
+
+/**
+ * Starts a presentation for a paywall route that opened without one (the
+ * widget link, or `openPaywall`'s fallback), so it shares the sheet latch,
+ * analytics, and exit offer of any other paywall. The route is already on
+ * screen, so nothing navigates; an unavailable result leaves the screen to
+ * show its own retry state rather than pushing another copy.
+ */
+export function adoptPaywallRoute(placement: string): void {
+  if (liveSheet()) return;
+  void presentPaywall(placement, () => presentPaywallImpl(placement, () => {}));
 }
 
 /** `openPaywall` for the Home countdown: reopens the open exit offer. */
@@ -807,8 +901,8 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
 
 /**
  * Returns a guard that runs `action` only when the user is entitled, otherwise
- * presents the RevenueCat paywall (native sheet). If the RC UI SDK isn't linked
- * or the paywall is unavailable, falls back to routing to the paywall route.
+ * presents the paywall. If the RevenueCat SDK isn't linked or the paywall is
+ * unavailable, falls back to routing to the paywall route.
  * A user cancellation returns to the current screen. Use this at every
  * Pro-gated affordance (Save, dynamic spaces,
  * Find links, Tidy, Map) so the paywall appears at a moment of felt need rather
