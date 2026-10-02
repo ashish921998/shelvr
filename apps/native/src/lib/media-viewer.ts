@@ -37,3 +37,47 @@ export function fitMedia(
   const height = Math.min(maxWidth / ratio, maxHeight);
   return { width: height * ratio, height };
 }
+
+// How far (in points) a finger may travel and still count as a tap.
+const TAP_SLOP = 12;
+
+type Point = { x: number; y: number };
+
+/**
+ * Whether a press that began at `from` and ended at `to` (screen coordinates)
+ * was a tap. An edge swipe back carries the whole screen with the finger, so
+ * the touch never leaves the picture; only its travel gives the swipe away.
+ */
+export function isStillTap(from: Point | null, to: Point): boolean {
+  if (!from) return true;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return dx * dx + dy * dy < TAP_SLOP * TAP_SLOP;
+}
+
+// How close the sheet's top comes to the header's bottom edge before the
+// header switches to the light page's colors (and twice that to switch back).
+const HEADER_SLACK = 16;
+
+/**
+ * Whether the details sheet sits under the header at scroll offset `y`, given
+ * the offset where the sheet's top meets the header. The switch back needs
+ * twice the slack, so a scroll resting near the edge doesn't flip the header
+ * every frame.
+ */
+export function sheetUnderHeader(
+  y: number,
+  sheetTop: number,
+  wasUnder: boolean,
+): boolean {
+  return y > sheetTop - HEADER_SLACK * (wasUnder ? 2 : 1);
+}
+
+/**
+ * Flips a per-save flag (caption hidden, description expanded) stored as the
+ * id of the save it is on for. A recycled page still holds the last save's
+ * id, so the flag reads off for the new save, and flipping it turns it on.
+ */
+export function toggleFor(current: string | null, id: string): string | null {
+  return current === id ? null : id;
+}

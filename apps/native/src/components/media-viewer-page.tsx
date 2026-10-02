@@ -3,7 +3,13 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { PostMediaButton } from "@/components/post-media-button";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
-import { fitMedia, MEDIA_CANVAS } from "@/lib/media-viewer";
+import {
+  fitMedia,
+  isStillTap,
+  MEDIA_CANVAS,
+  sheetUnderHeader,
+  toggleFor,
+} from "@/lib/media-viewer";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
 import { setStatusBarStyle } from "expo-status-bar";
@@ -44,10 +50,6 @@ const CAPTION_SCRIM = `linear-gradient(180deg, ${[
 // Clearance for the Add / Dismiss bar and the "added to" notice the pager
 // pins over the bottom of the page.
 const FOOTER_CLEARANCE = 72;
-
-// How close the sheet's top comes to the header's bottom edge before the
-// header switches to the light page's colors (and twice that to switch back).
-const HEADER_SLACK = 16;
 
 type Props = {
   item: DetailItem;
@@ -138,9 +140,7 @@ export function MediaViewerPage({
   const sheetTop = pageHeight - headerInset;
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
-    const under = sheetUnder.current
-      ? y > sheetTop - HEADER_SLACK * 2
-      : y > sheetTop - HEADER_SLACK;
+    const under = sheetUnderHeader(y, sheetTop, sheetUnder.current);
     if (under === sheetUnder.current) return;
     sheetUnder.current = under;
     onSheetUnderHeader?.(item._id, under);
@@ -225,7 +225,7 @@ export function MediaViewerPage({
             onPressIn={stillTap.onPressIn}
             onPress={(e) => {
               if (stillTap.isStill(e)) {
-                setHiddenFor(captionHidden ? null : item._id);
+                setHiddenFor((current) => toggleFor(current, item._id));
               }
             }}
           >
@@ -286,7 +286,9 @@ export function MediaViewerPage({
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded }}
-              onPress={() => setExpandedFor(expanded ? null : item._id)}
+              onPress={() =>
+                setExpandedFor((current) => toggleFor(current, item._id))
+              }
               hitSlop={6}
             >
               <Text
@@ -365,30 +367,20 @@ const CAPTION_SHADOW = {
   textShadowRadius: 6,
 };
 
-/**
- * Tells a tap from a swipe-back that began on the picture. An edge swipe
- * carries the whole screen with the finger, so the touch never leaves the
- * Pressable and it would still fire; the finger's travel across the screen
- * gives the swipe away.
- */
+/** Tells a tap from a swipe back that began on the picture (see isStillTap). */
 function useStillTap() {
   const start = useRef<{ x: number; y: number } | null>(null);
   return {
     onPressIn: (e: GestureResponderEvent) => {
       start.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
     },
-    isStill: (e: GestureResponderEvent) => {
-      const from = start.current;
-      if (!from) return true;
-      const dx = e.nativeEvent.pageX - from.x;
-      const dy = e.nativeEvent.pageY - from.y;
-      return dx * dx + dy * dy < TAP_SLOP * TAP_SLOP;
-    },
+    isStill: (e: GestureResponderEvent) =>
+      isStillTap(start.current, {
+        x: e.nativeEvent.pageX,
+        y: e.nativeEvent.pageY,
+      }),
   };
 }
-
-// How far (in points) a finger may travel and still count as a tap.
-const TAP_SLOP = 12;
 
 const WHITE_SOFT = "rgba(255, 255, 255, 0.86)";
 const WHITE_FAINT = "rgba(255, 255, 255, 0.6)";

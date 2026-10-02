@@ -17,7 +17,7 @@ const FADE_TAIL = 24;
  * Render it as a sibling AFTER the scrolling content, so the scroll view stays
  * the screen's first descendant, which the native edge effect looks for.
  */
-export function HeaderScrim({ color }: { color?: string } = {}) {
+export function HeaderScrim({ color }: { color?: string }) {
   const headerHeight = useAppHeaderHeight();
   // Built in render from useUnistyles rather than in StyleSheet.create:
   // Unistyles has a reported bug (jpudysz/react-native-unistyles#1030) where

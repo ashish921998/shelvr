@@ -28,7 +28,6 @@ import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
   memo,
-  type ReactNode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -239,21 +238,13 @@ export const ItemDetail = memo(function ItemDetail({
               <ActivityIndicator size="small" color={theme.colors.primary} />
             </View>
           ) : (
-            <ItemDetailBody
-              variant="sheet"
+            <ItemSheetBody
               item={item}
               detail={detail}
               spaces={spaces}
               similar={similar}
               paragraphs={paragraphs}
               social={social}
-              intents={intents}
-              heroUri={heroUri}
-              leading={
-                social && item.url ? (
-                  <MoreMedia item={item} site={social.site} />
-                ) : null
-              }
             />
           )
         }
@@ -378,7 +369,7 @@ export const ItemDetail = memo(function ItemDetail({
     <ScrollView {...scrollProps}>
       {heroBlock}
 
-      <ItemDetailBody
+      <ItemPageBody
         item={item}
         detail={detail}
         spaces={spaces}
@@ -427,8 +418,17 @@ function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
   );
 }
 
-function ItemDetailBody({
-  variant = "page",
+type DetailBodyProps = {
+  item: DetailItem;
+  detail: ReturnType<typeof useItemDetailData>["detail"];
+  spaces: ReturnType<typeof useItemDetailData>["spaces"];
+  similar: ReturnType<typeof useItemDetailData>["similar"];
+  paragraphs: string[];
+  social: SocialPost | undefined;
+};
+
+/** The body of a save's own page, under its hero. */
+function ItemPageBody({
   item,
   detail,
   spaces,
@@ -437,24 +437,12 @@ function ItemDetailBody({
   social,
   intents,
   heroUri,
-  leading,
-}: {
-  // "sheet" is the details sheet under a media save, whose caption already
-  // carries the status, source, actions and description.
-  variant?: "page" | "sheet";
-  leading?: ReactNode;
-  item: DetailItem;
-  detail: ReturnType<typeof useItemDetailData>["detail"];
-  spaces: ReturnType<typeof useItemDetailData>["spaces"];
-  similar: ReturnType<typeof useItemDetailData>["similar"];
-  paragraphs: string[];
-  social: SocialPost | undefined;
+}: DetailBodyProps & {
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const sheet = variant === "sheet";
   if (item.type === "note") {
     return (
       <View style={styles.body}>
@@ -470,16 +458,14 @@ function ItemDetailBody({
       style={[
         styles.body,
         // The ScrollView already clears the header; only a hero needs a gap.
-        heroUri && !sheet ? { paddingTop: theme.gap(5) } : null,
+        heroUri ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
-      {leading}
-
-      {sheet ? null : <SaveStatusNotice item={item} />}
+      <SaveStatusNotice item={item} />
 
       {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
 
-      {item.url && !sheet ? (
+      {item.url ? (
         <View style={styles.titleContainer}>
           <ItemSourceLink
             item={item}
@@ -499,13 +485,13 @@ function ItemDetailBody({
         </View>
       ) : null}
 
-      {sheet ? null : <IntentsRow item={item} intents={intents} />}
+      <IntentsRow item={item} intents={intents} />
 
       {item.description ? (
         <Text style={styles.description}>{item.description}</Text>
       ) : null}
 
-      {item.url && !detail.content && !sheet ? (
+      {item.url && !detail.content ? (
         <Pressable
           style={styles.urlRow}
           accessibilityRole="link"
@@ -521,6 +507,62 @@ function ItemDetailBody({
         </Pressable>
       ) : null}
 
+      <DetailSections
+        item={item}
+        detail={detail}
+        similar={similar}
+        paragraphs={paragraphs}
+        social={social}
+      />
+    </View>
+  );
+}
+
+/** The details sheet under a media save. Its caption already carries the
+ * status, source and actions; the sheet adds a carousel's other photos and
+ * the full description. */
+function ItemSheetBody({
+  item,
+  detail,
+  spaces,
+  similar,
+  paragraphs,
+  social,
+}: DetailBodyProps) {
+  useAppLocale();
+  return (
+    <View style={styles.body}>
+      {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
+
+      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+
+      {item.description ? (
+        <Text style={styles.description}>{item.description}</Text>
+      ) : null}
+
+      <DetailSections
+        item={item}
+        detail={detail}
+        similar={similar}
+        paragraphs={paragraphs}
+        social={social}
+      />
+    </View>
+  );
+}
+
+/** What a save's page and a media save's sheet both show after their heads:
+ * the post caption, tags, products, recipe or article, and similar saves. */
+function DetailSections({
+  item,
+  detail,
+  similar,
+  paragraphs,
+  social,
+}: Omit<DetailBodyProps, "spaces">) {
+  const { theme } = useUnistyles();
+  return (
+    <>
       {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
@@ -555,7 +597,7 @@ function ItemDetailBody({
           <SimilarGrid items={similar} />
         </View>
       ) : null}
-    </View>
+    </>
   );
 }
 
