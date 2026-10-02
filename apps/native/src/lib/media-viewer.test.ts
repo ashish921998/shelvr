@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  captionFor,
   fitMedia,
   isMediaSave,
   isStillTap,
   sheetUnderHeader,
-  toggleFor,
+  toggleCaption,
 } from "./media-viewer";
 
 describe("isMediaSave", () => {
@@ -98,13 +99,48 @@ describe("sheetUnderHeader", () => {
   });
 });
 
-describe("toggleFor", () => {
-  it("turns a flag on for a save, then off again", () => {
-    expect(toggleFor(null, "a")).toBe("a");
-    expect(toggleFor("a", "a")).toBeNull();
+describe("caption state", () => {
+  it("starts with the caption showing and collapsed", () => {
+    expect(captionFor(null, "a")).toEqual({
+      id: "a",
+      hidden: false,
+      expanded: false,
+    });
   });
 
-  it("turns the flag on when a recycled page still holds another save", () => {
-    expect(toggleFor("a", "b")).toBe("b");
+  it("flips each flag for the current save", () => {
+    const hidden = toggleCaption(null, "a", "hidden");
+    expect(hidden).toMatchObject({ hidden: true, expanded: false });
+    const expanded = toggleCaption(hidden, "a", "expanded");
+    expect(expanded).toMatchObject({ hidden: true, expanded: true });
+    expect(toggleCaption(expanded, "a", "hidden").hidden).toBe(false);
+  });
+
+  it("keeps the same object while the save is unchanged", () => {
+    const state = toggleCaption(null, "a", "hidden");
+    expect(captionFor(state, "a")).toBe(state);
+  });
+
+  it("starts afresh when a recycled page goes A → B → A", () => {
+    const onA = toggleCaption(
+      toggleCaption(null, "a", "hidden"),
+      "a",
+      "expanded",
+    );
+    const onB = captionFor(onA, "b");
+    expect(onB).toMatchObject({ hidden: false, expanded: false });
+    expect(captionFor(onB, "a")).toMatchObject({
+      hidden: false,
+      expanded: false,
+    });
+  });
+
+  it("flips the new save's flag, not the old one's", () => {
+    const onA = toggleCaption(null, "a", "hidden");
+    expect(toggleCaption(onA, "b", "hidden")).toEqual({
+      id: "b",
+      hidden: true,
+      expanded: false,
+    });
   });
 });

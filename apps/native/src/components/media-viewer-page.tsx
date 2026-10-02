@@ -4,11 +4,12 @@ import { PostMediaButton } from "@/components/post-media-button";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
+  captionFor,
   fitMedia,
   isStillTap,
   MEDIA_CANVAS,
   sheetUnderHeader,
-  toggleFor,
+  toggleCaption,
 } from "@/lib/media-viewer";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
@@ -103,12 +104,14 @@ export function MediaViewerPage({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  // Keyed by item: FlashList recycles this page for other saves, which must
-  // open with their caption showing and collapsed.
-  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
-  const [expandedFor, setExpandedFor] = useState<string | null>(null);
-  const captionHidden = hiddenFor === item._id;
-  const expanded = expandedFor === item._id;
+  // FlashList recycles this page for other saves, which must open with their
+  // caption showing and collapsed. Moving to another save starts it afresh
+  // (during render, so the old save's state never paints on the new one).
+  const [stored, setCaption] = useState(() => captionFor(null, item._id));
+  const caption = captionFor(stored, item._id);
+  if (caption !== stored) setCaption(caption);
+  const captionHidden = caption.hidden;
+  const expanded = caption.expanded;
 
   // Reports only when the sheet crosses the header, with some slack, so a
   // scroll doesn't push header options every frame. A recycled page starts
@@ -225,7 +228,9 @@ export function MediaViewerPage({
             onPressIn={stillTap.onPressIn}
             onPress={(e) => {
               if (stillTap.isStill(e)) {
-                setHiddenFor((current) => toggleFor(current, item._id));
+                setCaption((current) =>
+                  toggleCaption(current, item._id, "hidden"),
+                );
               }
             }}
           >
@@ -287,7 +292,9 @@ export function MediaViewerPage({
               accessibilityRole="button"
               accessibilityState={{ expanded }}
               onPress={() =>
-                setExpandedFor((current) => toggleFor(current, item._id))
+                setCaption((current) =>
+                  toggleCaption(current, item._id, "expanded"),
+                )
               }
               hitSlop={6}
             >

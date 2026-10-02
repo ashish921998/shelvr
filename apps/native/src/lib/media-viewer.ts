@@ -73,11 +73,32 @@ export function sheetUnderHeader(
   return y > sheetTop - HEADER_SLACK * (wasUnder ? 2 : 1);
 }
 
+/** A media page's caption state, for the save it currently shows. */
+export type CaptionState = {
+  id: string;
+  hidden: boolean;
+  expanded: boolean;
+};
+
 /**
- * Flips a per-save flag (caption hidden, description expanded) stored as the
- * id of the save it is on for. A recycled page still holds the last save's
- * id, so the flag reads off for the new save, and flipping it turns it on.
+ * The caption state for save `id`: `state` itself while the page still shows
+ * that save, else a fresh one (caption showing, description collapsed). A
+ * recycled page moving A → B → A therefore never brings A's old state back.
  */
-export function toggleFor(current: string | null, id: string): string | null {
-  return current === id ? null : id;
+export function captionFor(
+  state: CaptionState | null,
+  id: string,
+): CaptionState {
+  if (state?.id === id) return state;
+  return { id, hidden: false, expanded: false };
+}
+
+/** Flips one caption flag for save `id`. */
+export function toggleCaption(
+  state: CaptionState | null,
+  id: string,
+  flag: "hidden" | "expanded",
+): CaptionState {
+  const current = captionFor(state, id);
+  return { ...current, [flag]: !current[flag] };
 }
