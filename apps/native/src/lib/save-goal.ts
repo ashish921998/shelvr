@@ -8,7 +8,7 @@ const saveGoalKey = (userId: string) => `shelvr.saveGoal.${userId}`;
 const DONE = "done";
 const HOUR_MS = 60 * 60 * 1000;
 
-export type SaveGoalStep =
+type SaveGoalStep =
   | { kind: "none" }
   | { kind: "start"; at: number }
   | { kind: "reached"; hoursSinceStart: number }
