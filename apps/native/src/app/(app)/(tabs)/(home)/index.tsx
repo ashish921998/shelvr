@@ -238,12 +238,15 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {emptyFeedStarter(proCard, showHowTo, progressCard) ?? (
-          <EmptyState
-            title={t("home.emptyTitle")}
-            message={t("home.emptyBody")}
-          />
-        )}
+        {emptyFeedStarter(proCard, showHowTo, progressCard) ??
+          // Nothing while the count loads, so the empty state never
+          // flashes before the progress card.
+          (progress.pending ? null : (
+            <EmptyState
+              title={t("home.emptyTitle")}
+              message={t("home.emptyBody")}
+            />
+          ))}
         {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
         {nudge}

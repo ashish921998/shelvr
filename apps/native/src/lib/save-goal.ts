@@ -25,11 +25,13 @@ export function nextSaveGoalStep(
   stored: string | null,
   progress: { saved: number; goal: number },
   now: number,
+  cardVisible = true,
 ): SaveGoalStep {
   if (stored === DONE) return { kind: "none" };
   const start = stored === null || stored === "" ? null : Number(stored);
   if (progress.saved < progress.goal) {
-    return start === null || !Number.isFinite(start)
+    // The clock waits for the card itself, not another Home prompt.
+    return (start === null || !Number.isFinite(start)) && cardVisible
       ? { kind: "start", at: now }
       : { kind: "none" };
   }
@@ -47,7 +49,10 @@ export function nextSaveGoalStep(
 export function trackSaveGoal(
   userId: string,
   progress: { saved: number; goal: number },
-  { cardDismissed }: { cardDismissed: boolean },
+  {
+    cardDismissed,
+    cardVisible,
+  }: { cardDismissed: boolean; cardVisible: boolean },
   now = Date.now(),
 ): void {
   try {
@@ -55,6 +60,7 @@ export function trackSaveGoal(
       SecureStore.getItem(saveGoalKey(userId)),
       progress,
       now,
+      cardVisible,
     );
     if (step.kind === "start") {
       SecureStore.setItem(saveGoalKey(userId), String(step.at));

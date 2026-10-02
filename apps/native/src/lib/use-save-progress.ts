@@ -60,9 +60,12 @@ export function useSaveProgress(
     trackSaveGoal(
       userId,
       { saved, goal },
-      { cardDismissed: isSaveProgressCardDismissed(userId) },
+      {
+        cardDismissed: isSaveProgressCardDismissed(userId),
+        cardVisible: visible,
+      },
     );
-  }, [userId, saved, goal]);
+  }, [userId, saved, goal, visible]);
 
   // Called by the card itself once Home shows it focused, so a card that
   // never reached the screen is not counted.

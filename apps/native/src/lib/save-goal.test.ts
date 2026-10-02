@@ -44,6 +44,12 @@ describe("nextSaveGoalStep", () => {
     expect(step).toEqual({ kind: "reached", hoursSinceStart: 48.04 });
   });
 
+  it("waits for the card itself before starting the clock", () => {
+    expect(nextSaveGoalStep(null, { saved: 0, goal }, 1000, false)).toEqual({
+      kind: "none",
+    });
+  });
+
   it("skips a shelf that was already full when first seen", () => {
     expect(nextSaveGoalStep(null, { saved: 3, goal }, 0)).toEqual({
       kind: "skip",
@@ -64,18 +70,28 @@ describe("trackSaveGoal", () => {
   });
 
   it("fires save_goal_reached once per account", () => {
-    trackSaveGoal("user_a", { saved: 0, goal }, { cardDismissed: false }, 0);
-    trackSaveGoal("user_a", { saved: 2, goal }, { cardDismissed: false }, HOUR);
+    trackSaveGoal(
+      "user_a",
+      { saved: 0, goal },
+      { cardDismissed: false, cardVisible: true },
+      0,
+    );
+    trackSaveGoal(
+      "user_a",
+      { saved: 2, goal },
+      { cardDismissed: false, cardVisible: true },
+      HOUR,
+    );
     trackSaveGoal(
       "user_a",
       { saved: 3, goal },
-      { cardDismissed: true },
+      { cardDismissed: true, cardVisible: true },
       20 * HOUR,
     );
     trackSaveGoal(
       "user_a",
       { saved: 3, goal },
-      { cardDismissed: true },
+      { cardDismissed: true, cardVisible: true },
       21 * HOUR,
     );
     expect(mock.capture).toHaveBeenCalledTimes(1);
@@ -87,9 +103,24 @@ describe("trackSaveGoal", () => {
   });
 
   it("never fires for an existing shelf or another account's clock", () => {
-    trackSaveGoal("user_a", { saved: 0, goal }, { cardDismissed: false }, 0);
-    trackSaveGoal("user_b", { saved: 3, goal }, { cardDismissed: false }, 0);
-    trackSaveGoal("user_b", { saved: 3, goal }, { cardDismissed: false }, 1);
+    trackSaveGoal(
+      "user_a",
+      { saved: 0, goal },
+      { cardDismissed: false, cardVisible: true },
+      0,
+    );
+    trackSaveGoal(
+      "user_b",
+      { saved: 3, goal },
+      { cardDismissed: false, cardVisible: true },
+      0,
+    );
+    trackSaveGoal(
+      "user_b",
+      { saved: 3, goal },
+      { cardDismissed: false, cardVisible: true },
+      1,
+    );
     expect(mock.capture).not.toHaveBeenCalled();
   });
 });

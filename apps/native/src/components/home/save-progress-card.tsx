@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import { progressTitleKey } from "@/lib/save-goal";
 import { useSaveImageBatch } from "@/lib/use-save-image-batch";
+import { usePaywallGuard } from "@/lib/entitlement";
 import { InlineCard } from "@/components/ui/inline-card";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -116,10 +117,16 @@ export function SaveProgressCard({
     },
   });
 
+  // The card only shows while Pro reads active, but Pro can lapse between
+  // render and tap, so the picker waits behind the same guard as Add.
+  const { guard } = usePaywallGuard(PAYWALL_PLACEMENT);
   const pickPhotos = () => {
     analytics.capture("save_progress_card_action", { action: "photos", saved });
-    void pickAndSaveImages(runImageRequests).catch((error: unknown) => {
-      analytics.captureError("image_pick_failed", error);
+    void guard(() => {
+      void pickAndSaveImages(runImageRequests).catch((error: unknown) => {
+        analytics.captureError("image_pick_failed", error);
+        Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
+      });
     });
   };
 

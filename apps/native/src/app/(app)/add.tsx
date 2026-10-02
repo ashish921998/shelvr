@@ -172,6 +172,19 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const { guard, loading: entitlementLoading } =
     usePaywallGuard(PAYWALL_PLACEMENT);
 
+  // A composer opened straight from a link still passes the Pro guard,
+  // falling back to the menu when the paywall is closed.
+  const startChecked = useRef(false);
+  useEffect(() => {
+    if (startMode !== "note" || entitlementLoading || startChecked.current) {
+      return;
+    }
+    startChecked.current = true;
+    void guard().then((entitled) => {
+      if (!entitled) setMode("menu");
+    });
+  }, [startMode, entitlementLoading, guard]);
+
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
 
