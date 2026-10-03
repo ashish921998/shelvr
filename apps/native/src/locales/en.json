@@ -469,7 +469,7 @@
   "import.rateLimited": "You’ve reached the import limit for now. Try again later with the same list to continue; links already saved are skipped.",
   "import.failed": "The import stopped before it finished. Try again later with the same list to continue; links already saved are skipped.",
   "import.more": "Import more",
-  "onboarding.openerTitle": "This is your shelf in a week.",
+  "onboarding.openerTitle": "Your shelf in a week.",
   "onboarding.openerBody": "Links, photos and notes, read, titled and filed for you the moment you save them.",
   "onboarding.proLine": "Saving is part of Shelvr Pro. Free trial.",
   "onboarding.startYours": "Start yours",
