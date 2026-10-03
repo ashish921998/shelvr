@@ -11,6 +11,10 @@ import { StyleSheet } from "react-native-unistyles";
 // screen, the step scrolls instead.
 const COLLAGE_MIN_HEIGHT = 220;
 
+// Below this much room above the footer, the pinned scroll area is too small
+// to read, so the footer joins the scrolling content instead.
+const SCROLL_MIN_HEIGHT = 160;
+
 // Sample saves for the collage. The photos are generated for the app, so they
 // carry no licensing or brand questions.
 type Tile =
@@ -95,18 +99,54 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
+  const [height, setHeight] = useState(0);
+  const [footHeight, setFootHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
   const [collageTop, setCollageTop] = useState(0);
+  // On a small phone at the largest sizes the footer alone can take most of
+  // the screen. Then everything scrolls together, footer last, so nothing
+  // ends up out of reach.
+  const footScrolls =
+    height > 0 && footHeight > 0 && height - footHeight < SCROLL_MIN_HEIGHT;
   // Only the largest text sizes overflow. Everywhere else the content is
   // pinned to the viewport, so the collage fills the gap and its fade shows,
   // exactly as before this step could scroll.
-  const overflows = viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport;
+  const overflows =
+    footScrolls || (viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport);
+
+  const foot = (
+    <View
+      style={styles.foot}
+      onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
+    >
+      <View style={styles.proLine}>
+        <View style={styles.proPill}>
+          <Text style={styles.proPillText}>Pro</Text>
+        </View>
+        <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
+      </View>
+      <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
+      <Pressable
+        accessibilityRole="button"
+        onPress={onSignIn}
+        style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.signInText}>
+          {t("onboarding.haveAccount")}{" "}
+          <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+    >
       {/* At the largest text sizes the headline alone can fill most of the
           screen, so the headline and collage scroll. "Start yours" stays
-          pinned below. */}
+          pinned below unless the footer itself is too tall to pin. */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.body, overflows && styles.bodyScrolls]}
@@ -152,27 +192,10 @@ export function OpenerStep({
           ))}
           <View pointerEvents="none" style={styles.fade} />
         </View>
+        {footScrolls ? foot : null}
       </ScrollView>
 
-      <View style={styles.foot}>
-        <View style={styles.proLine}>
-          <View style={styles.proPill}>
-            <Text style={styles.proPillText}>Pro</Text>
-          </View>
-          <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
-        </View>
-        <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={onSignIn}
-          style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.signInText}>
-            {t("onboarding.haveAccount")}{" "}
-            <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
-          </Text>
-        </Pressable>
-      </View>
+      {footScrolls ? null : foot}
     </View>
   );
 }
