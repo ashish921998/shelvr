@@ -13,11 +13,15 @@ import { UnistylesRuntime } from "react-native-unistyles";
 UnistylesRuntime.updateTheme("light", (theme) => theme);
 
 export { AppSymbolIcon } from "@/components/symbol";
+export { Button } from "@/components/ui/button";
 export { EmptyState } from "@/components/empty-state";
 export { HeaderIconButton } from "@/components/ui/header-icon-button";
 export { InlineCard } from "@/components/ui/inline-card";
 export { IntentChip } from "@/components/intent-chip";
 export { ScreenLoader } from "@/components/ui/screen-loader";
+export { SettingCard } from "@/components/ui/setting-card";
+export { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 export { SuggestedBadge } from "@/components/suggested-badge";
 export { TagChip } from "@/components/tag-chip";
+export { ThemedText } from "@/components/ui/themed-text";
 export { Wordmark } from "@/components/wordmark";
