@@ -268,6 +268,10 @@ export default function SettingsScreen() {
       <SettingsGroup>
         <SettingsRow
           divider={false}
+          label={t("extension.title")}
+          onPress={() => router.push("/browser-extension")}
+        />
+        <SettingsRow
           label={restoring ? t("pro.restoring") : t("pro.restore")}
           icon="arrow.clockwise"
           disabled={restoring}

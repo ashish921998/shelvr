@@ -170,6 +170,19 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="browser-extension"
+            options={{
+              presentation: "formSheet",
+              headerShown: true,
+              headerTransparent: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              headerBackButtonDisplayMode: "minimal",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
             name="settings"
             options={{
               presentation: "formSheet",

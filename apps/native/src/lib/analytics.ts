@@ -275,6 +275,11 @@ type AnalyticsEventProperties = {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
   shared_content_saved: { item_count: number };
+  // Browser-extension pairing, from the app's side only. The extension is not
+  // an analytics client, so these say a user reached for desktop capture and
+  // whether they later revoked it — never which browser, or what it saved.
+  extension_pairing_code_created: Record<string, never>;
+  extension_connection_revoked: Record<string, never>;
   // Android task-restore ghost: the share screen skipped a replayed batch
   // that was already handled (recordCompletedShare tombstone matched).
   share_ghost_skipped: Record<string, never>;
