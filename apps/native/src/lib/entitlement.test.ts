@@ -432,6 +432,36 @@ describe("exit offer after a paywall close", () => {
     });
   });
 
+  it("presents the offering it dated the trial timeline from", async () => {
+    const current = {
+      identifier: "default",
+      availablePackages: [
+        {
+          product: {
+            identifier: "annual",
+            introPrice: {
+              price: 0,
+              periodUnit: "WEEK",
+              periodNumberOfUnits: 2,
+            },
+          },
+        },
+      ],
+    };
+    mock.getOfferings.mockResolvedValue({ current, all: {} });
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "share");
+
+    expect(mock.presentPaywall).toHaveBeenCalledWith({
+      offering: current,
+      customVariables: expect.objectContaining({
+        trial_end_day: { type: "string", value: "14" },
+      }),
+    });
+  });
+
   it("does not follow a purchase", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("PURCHASED");
@@ -439,9 +469,10 @@ describe("exit offer after a paywall close", () => {
     await openPaywall(router, "share");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
-    // The paywall context read starts before presentation, even when the
-    // result is already PURCHASED. It must not open the exit offer afterward.
-    expect(mock.getOfferings).toHaveBeenCalledTimes(1);
+    // The paywall context read and the post-sync offering read both precede
+    // presentation, even when the result is already PURCHASED. Nothing reads
+    // offerings afterward, so the exit offer is never looked up.
+    expect(mock.getOfferings).toHaveBeenCalledTimes(2);
     expect(mock.presentExitSheet).not.toHaveBeenCalled();
   });
 });

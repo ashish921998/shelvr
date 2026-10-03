@@ -11,6 +11,7 @@ import {
   forgetPaywallFunnel,
   hasActiveEntitlement,
   readPaywallContext,
+  readPaywallOffering,
   recordAccess,
   recordBlockedAction,
   resumeBlockedAction,
@@ -377,14 +378,16 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const { context: read, trial } = await context;
-    const enriched = { ...properties, ...read };
-    // An unknown trial length dates nothing: the paywall falls back to its
-    // undated labels instead of claiming a length the offer may not have.
+    const enriched = { ...properties, ...(await context) };
+    // Read after identity sync, so the dates come from this account's
+    // offering, and presented from the same snapshot. An unknown trial length
+    // dates nothing: the paywall falls back to its undated labels instead of
+    // claiming a length the offer may not have.
+    const { offering, trial } = await readPaywallOffering();
     const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall({ customVariables }),
+      () => rcui.presentPaywall({ offering, customVariables }),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {

@@ -135,7 +135,7 @@ describe("activeProductId", () => {
   });
 });
 
-describe("readPaywallContext", () => {
+describe("paywall offering reads", () => {
   const trial = (periodUnit: string, periodNumberOfUnits: number) => ({
     price: 0,
     periodUnit,
@@ -160,7 +160,7 @@ describe("readPaywallContext", () => {
 
   afterEach(() => vi.doUnmock("@/lib/revenuecat-module"));
 
-  it("keeps the trial length when the eligibility read fails", async () => {
+  it("keeps the offering id when the eligibility read fails", async () => {
     const funnel = await load({
       getOfferings: async () => offering(trial("DAY", 7), null),
       checkTrialOrIntroductoryPriceEligibility: async () => {
@@ -168,28 +168,23 @@ describe("readPaywallContext", () => {
       },
     });
     await expect(funnel.readPaywallContext()).resolves.toEqual({
-      context: { offering_id: "default" },
-      trial: { unit: "DAY", count: 7 },
+      offering_id: "default",
     });
   });
 
-  it("keeps the trial length when the eligibility read stalls", async () => {
-    vi.useFakeTimers();
-    const funnel = await load({
-      getOfferings: async () => offering(trial("WEEK", 2)),
-      checkTrialOrIntroductoryPriceEligibility: () => new Promise(() => {}),
-    });
-    const read = funnel.readPaywallContext();
-    await vi.advanceTimersByTimeAsync(2_000);
-    await expect(read).resolves.toMatchObject({
+  it("returns the offering with the trial its packages share", async () => {
+    const current = offering(trial("WEEK", 2), null);
+    const funnel = await load({ getOfferings: async () => current });
+    await expect(funnel.readPaywallOffering()).resolves.toEqual({
+      offering: current.current,
       trial: { unit: "WEEK", count: 2 },
     });
   });
 
-  it("reports no trial length when the offerings read stalls", async () => {
+  it("returns no offering or trial when the offerings read stalls", async () => {
     vi.useFakeTimers();
     const funnel = await load({ getOfferings: () => new Promise(() => {}) });
-    const read = funnel.readPaywallContext();
+    const read = funnel.readPaywallOffering();
     await vi.advanceTimersByTimeAsync(2_000);
     await expect(read).resolves.toEqual({});
   });

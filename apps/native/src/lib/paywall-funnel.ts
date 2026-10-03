@@ -171,18 +171,13 @@ function foldTrialEligibility(
   return "unknown";
 }
 
-/** Reads the paywall context from RevenueCat's caches, and the free trial on
- * the offering so the timeline dates follow the offer. Both calls are cache
+/** Reads the paywall context from RevenueCat's caches. Both calls are cache
  * reads in practice, but one shared timeout caps the worst case so a cold SDK
  * can never hold the sheet open for them. Each part is empty when its read
- * fails — the events and the dates carry no guess — and the trial length
- * survives a failed eligibility read. */
+ * fails — the events carry no guess. */
 const PAYWALL_CONTEXT_TIMEOUT_MS = 2_000;
 
-export async function readPaywallContext(): Promise<{
-  context?: PaywallContext;
-  trial?: TrialPeriod;
-}> {
+export async function readPaywallContext(): Promise<PaywallContext> {
   const rc = getPurchases();
   if (!rc) return {};
   const startedAt = Date.now();
@@ -191,8 +186,7 @@ export async function readPaywallContext(): Promise<{
     PAYWALL_CONTEXT_TIMEOUT_MS,
   );
   if (!offering) return {};
-  const products = offering.availablePackages.map((pkg) => pkg.product);
-  const ids = products.map((product) => product.identifier);
+  const ids = offering.availablePackages.map((pkg) => pkg.product.identifier);
   const eligibility = await withTimeout(
     rc.checkTrialOrIntroductoryPriceEligibility(ids).then((answers) => ({
       trial_eligible: foldTrialEligibility(
@@ -202,13 +196,34 @@ export async function readPaywallContext(): Promise<{
     })),
     Math.max(0, PAYWALL_CONTEXT_TIMEOUT_MS - (Date.now() - startedAt)),
   );
-  return {
-    context: {
-      offering_id: offering.identifier,
-      ...eligibility,
-    },
-    trial: singleTrialPeriod(products),
-  };
+  return { offering_id: offering.identifier, ...eligibility };
+}
+
+/** The offering the paywall is about to show and the free trial on it, so the
+ * timeline dates describe the plan being sold. Call it once RevenueCat
+ * identity sync is ready — offerings can be targeted per account — and present
+ * the returned offering, so the sheet and its dates come from one snapshot.
+ * Empty when the read fails or stalls: the sheet then resolves its own
+ * offering and shows no dates. */
+export async function readPaywallOffering(): Promise<{
+  offering?: import("react-native-purchases").PurchasesOffering;
+  trial?: TrialPeriod;
+}> {
+  const rc = getPurchases();
+  if (!rc) return {};
+  return withTimeout(
+    rc.getOfferings().then(({ current }) =>
+      current
+        ? {
+            offering: current,
+            trial: singleTrialPeriod(
+              current.availablePackages.map((pkg) => pkg.product),
+            ),
+          }
+        : {},
+    ),
+    PAYWALL_CONTEXT_TIMEOUT_MS,
+  );
 }
 
 /** The free trial the offering's packages share. The paywall has one trial
