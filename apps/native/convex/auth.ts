@@ -24,5 +24,20 @@ if (env.AUTH_ENABLE_ANONYMOUS === "true") {
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers,
-  callbacks: { afterUserCreatedOrUpdated: recordAccountCreated },
+  callbacks: {
+    afterUserCreatedOrUpdated: recordAccountCreated,
+    redirect: async ({ redirectTo }) => {
+      const allowed =
+        env.AUTH_ENABLE_ANONYMOUS === "true"
+          ? [
+              "shelvr://auth/callback",
+              "shelvr-dev://auth/callback",
+              "shelvr-preview://auth/callback",
+            ]
+          : ["shelvr://auth/callback"];
+      if (!allowed.includes(redirectTo))
+        throw new Error("Invalid OAuth callback");
+      return redirectTo;
+    },
+  },
 });

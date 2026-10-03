@@ -54,6 +54,7 @@ function join(
 
 function setup(envOverrides: Record<string, string> = {}) {
   vi.stubEnv("RESEND_API_KEY", "");
+  vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", "Shelvr <test@example.com>");
   vi.stubEnv("WAITLIST_SHARED_SECRET", SECRET);
   for (const [key, value] of Object.entries(envOverrides)) {
     vi.stubEnv(key, value);
@@ -71,6 +72,7 @@ describe("POST /waitlist/join", () => {
         source: "hero",
         consentVersion: CONSENT_VERSION,
         consentText: CONSENT_TEXT,
+        confirmedAt: 1,
         consentedAt: 1,
         firstSubmittedAt: 1,
         lastSubmittedAt: 1,
@@ -579,6 +581,7 @@ describe("Resend failure persistence", () => {
         source: "hero",
         consentVersion: CONSENT_VERSION,
         consentText: CONSENT_TEXT,
+        confirmedAt: 1,
         consentedAt: 1,
         firstSubmittedAt: 1,
         lastSubmittedAt: 1,

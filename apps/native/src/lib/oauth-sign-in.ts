@@ -1,6 +1,7 @@
 import { analytics, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { makeRedirectUri } from "expo-auth-session";
+import Constants from "expo-constants";
 import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
@@ -14,9 +15,15 @@ import { useCallback, useState } from "react";
 // (expo-web-browser `openAuthSessionAsync`); after the user authenticates the
 // browser redirects back to the app with a `?code=` param. We extract that
 // code and call `signIn(provider, { code })` to complete the handshake.
+const oauthScheme =
+  Constants.expoConfig?.extra?.variant === "production"
+    ? "shelvr"
+    : Constants.expoConfig?.extra?.variant === "preview"
+      ? "shelvr-preview"
+      : "shelvr-dev";
 const oauthRedirectTo = makeRedirectUri({
-  native: "shelvr://auth/callback",
-  scheme: "shelvr",
+  native: `${oauthScheme}://auth/callback`,
+  scheme: oauthScheme,
   path: "auth/callback",
 });
 
@@ -134,7 +141,15 @@ export function useOAuthSignIn(surface: OAuthSurface) {
         }
         // Hand the callback URL's code back to the provider to finish the
         // sign-in.
-        const code = new URL(result.url).searchParams.get("code");
+        const callback = new URL(result.url);
+        const expected = new URL(oauthRedirectTo);
+        if (
+          callback.protocol !== expected.protocol ||
+          callback.host !== expected.host ||
+          callback.pathname !== expected.pathname
+        )
+          throw new Error("Unexpected OAuth callback");
+        const code = callback.searchParams.get("code");
         if (!code) {
           throw new Error("OAuth callback did not include a verification code");
         }

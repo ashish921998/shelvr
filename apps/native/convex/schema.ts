@@ -346,7 +346,9 @@ export default defineSchema({
     // backward compatibility with rows created before this field existed.
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
   // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
   // row is the durable, cross-install record: its existence is the ask, and
@@ -562,6 +564,9 @@ export default defineSchema({
     consentVersion: v.string(),
     consentText: v.string(),
     consentedAt: v.number(),
+    confirmedAt: v.optional(v.number()),
+    confirmationHash: v.optional(v.string()),
+    confirmationExpiresAt: v.optional(v.number()),
     firstSubmittedAt: v.number(),
     lastSubmittedAt: v.number(),
     resendStatus: v.union(
@@ -575,6 +580,7 @@ export default defineSchema({
     resendAttempts: v.optional(v.number()),
   })
     .index("by_email_and_product", ["email", "product"])
+    .index("by_confirmationHash", ["confirmationHash"])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below
     // the attempt cap without scanning the whole waitlist.
     .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),

@@ -104,7 +104,7 @@ export default function AndroidWaitlist() {
         {status === "success" ? (
           <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light">
             <CheckCircleIcon aria-hidden className="size-[18px]" />
-            You’re on the list.
+            Check your inbox to confirm.
           </p>
         ) : null}
       </div>

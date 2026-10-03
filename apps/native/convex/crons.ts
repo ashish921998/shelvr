@@ -107,4 +107,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "recover expired subscriptions",
+  { minutes: 1 },
+  internal.subscriptions.recoverExpiredSubscriptions,
+  {},
+);
+
 export default crons;

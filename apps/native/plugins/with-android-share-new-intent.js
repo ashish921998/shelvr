@@ -17,7 +17,23 @@ const IMPORTS = [
 
 const OVERRIDE = `
   // ${MARKER}: see plugins/with-android-share-new-intent.js
+  private fun shelvrBoundedShareIntent(candidate: Intent): Intent {
+    if (candidate.action != Intent.ACTION_SEND && candidate.action != Intent.ACTION_SEND_MULTIPLE) return candidate
+    val count = candidate.getParcelableArrayListExtra<android.os.Parcelable>(Intent.EXTRA_STREAM)?.size ?: 0
+    val text = candidate.getCharSequenceExtra(Intent.EXTRA_TEXT)
+    if (count > 20 || (candidate.clipData?.itemCount ?: 0) > 20 || (text?.length ?: 0) > 262144 || (text?.toString()?.toByteArray(Charsets.UTF_8)?.size ?: 0) > 262144) {
+      return Intent(this, MainActivity::class.java)
+    }
+    return candidate
+  }
+
   override fun onNewIntent(intent: Intent) {
+    val bounded = shelvrBoundedShareIntent(intent)
+    if (bounded !== intent) {
+      setIntent(bounded)
+      super.onNewIntent(bounded)
+      return
+    }
     val action = intent.action
     if (intent.type != null &&
         (action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE)) {
@@ -39,6 +55,10 @@ function addToMainActivity(contents) {
       contents = contents.replace(/^(package .+)$/m, `$1\nimport ${name}`);
     }
   }
+  contents = contents.replace(
+    /(super\.onCreate\([^)]*\))/,
+    "setIntent(shelvrBoundedShareIntent(intent))\n    $1",
+  );
   return contents.replace(
     /(class MainActivity\s*:\s*ReactActivity\(\)\s*\{)/,
     `$1\n${OVERRIDE}`,
