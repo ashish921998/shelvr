@@ -34,14 +34,19 @@ settings rows are at least 48px tall; `HeaderIconButton` is a 40px circle.
 ## Type and actions
 
 - Set text with `ThemedText` and a `variant` from the type ramp, not a `font-size`.
-  Titles use the Crimson Pro steps (`hero`, `largeTitle`, `sheetTitle`, `title`,
-  `header`, `displaySmall`); everything else is Satoshi (`body`, `subhead`,
-  `caption`, `label`, and their `Label` / `Strong` weights). It defaults to
-  `--colors-foreground`; pass `style={{ color: "var(--colors-muted)" }}` for
-  secondary copy.
+  The ramp is exactly these 23 names; there are no other suffixes to combine.
+  Crimson Pro, for titles: `hero`, `largeTitle`, `sheetTitle`, `title`, `header`,
+  `displaySmall`. Satoshi, for everything else: `reader`, `headline`, `body`,
+  `bodyLabel`, `button`, `subhead`, `subheadLabel`, `subheadStrong`, `footnote`,
+  `secondaryLabel`, `caption`, `label`, `labelStrong`, `captionLabel`,
+  `captionStrong`, `finePrint`, `badge`. It defaults to `--colors-foreground`; pass
+  `style={{ color: "var(--colors-muted)" }}` for secondary copy.
 - `Button` is the one main action on a screen: an amber capsule with a dark label.
-  It stretches to its parent's width. Use `loading` while its action runs; the label
-  stays put. Do not use it for settings or secondary actions.
+  It sets no width of its own. In a column parent it stretches to the parent's
+  width, which is how screens use it; in a row or a centered parent it shrinks to
+  its label, so give it `style={{ alignSelf: "stretch" }}` or a width there. Use
+  `loading` while its action runs; the label stays put. Do not use it for settings
+  or secondary actions.
 - Settings use `SettingCard` (a title, a description, and either an inline control
   as `accessory` or a text `action`) and `SettingsGroup` with `SettingsRow` children
   (a label, an optional `value`, a trailing icon). Pass `divider={false}` to the

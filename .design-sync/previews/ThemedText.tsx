@@ -29,17 +29,23 @@ export function Body() {
   return (
     <div style={column}>
       <ThemedText variant="headline">App updates</ThemedText>
+      <ThemedText variant="reader">
+        The article body, set a step larger for long reading.
+      </ThemedText>
       <ThemedText variant="body">
         Tap + to drop in a link, a photo, or a stray thought.
       </ThemedText>
       <ThemedText variant="bodyLabel">Appearance</ThemedText>
+      <ThemedText variant="button">Keep going</ThemedText>
       <ThemedText variant="subhead">
         A few unopened saves every Sunday
       </ThemedText>
+      <ThemedText variant="subheadLabel">Import from X</ThemedText>
       <ThemedText variant="subheadStrong">Weekly shelf</ThemedText>
       <ThemedText variant="footnote">
         Running the version this build shipped with.
       </ThemedText>
+      <ThemedText variant="secondaryLabel">Not now</ThemedText>
     </div>
   );
 }
@@ -52,6 +58,7 @@ export function Small() {
       <ThemedText variant="label">Check for updates</ThemedText>
       <ThemedText variant="labelStrong">Restore Purchases</ThemedText>
       <ThemedText variant="captionLabel">recipes</ThemedText>
+      <ThemedText variant="captionStrong">dinner</ThemedText>
       <ThemedText variant="finePrint">Terms of Service</ThemedText>
       <ThemedText variant="badge">SUGGESTED</ThemedText>
     </div>

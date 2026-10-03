@@ -18,7 +18,8 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
 - `Button` and `ThemedText` joined on 2026-10-03: they are the primitives
   `docs/architecture/design-system.md` tells new UI to use, and a design without
   them hand-rolls buttons and font sizes. `Button` renders its solid capsule on
-  web (`hasLiquidGlass` is false outside iOS 26).
+  web (`hasLiquidGlass` is true only on iOS 26 and later, when the runtime
+  glass API is present).
 - Not synced from `components/ui`: `PromptSheet` (a `Modal`, which portals out of a
   preview card, and it reads the i18n catalog), `HeaderScrim` (returns null off iOS),
   `AnimatedSwitch` (`@expo/ui` native `Switch`; the `SettingCard` preview draws a
