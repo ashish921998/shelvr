@@ -114,4 +114,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "confirm legacy unsynced waitlist requests",
+  { hours: 1 },
+  internal.waitlist.requestLegacyConfirmations,
+  {},
+);
+
 export default crons;

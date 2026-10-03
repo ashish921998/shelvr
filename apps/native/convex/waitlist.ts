@@ -151,6 +151,7 @@ export const upsertSignup = internalMutation({
         lastSubmittedAt: now,
         ...(existing.confirmedAt === undefined
           ? {
+              confirmed: false,
               confirmationHash: args.confirmationHash,
               confirmationExpiresAt: now + 24 * 60 * 60 * 1000,
             }
@@ -586,3 +587,48 @@ export async function confirmWaitlist(
   );
   return true;
 }
+
+export const listLegacySignups = internalQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      email: v.string(),
+      product: productValidator,
+      source: sourceValidator,
+    }),
+  ),
+  handler: async (ctx) => {
+    for (const status of ["pending", "failed", "unconfigured"] as const) {
+      const rows = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_confirmed_and_resendStatus_and_resendAttempts", (q) =>
+          q.eq("confirmed", undefined).eq("resendStatus", status),
+        )
+        .take(8);
+      if (rows.length > 0)
+        return rows.map((row) => ({
+          email: row.email,
+          product: row.product,
+          source: row.source,
+        }));
+    }
+    return [];
+  },
+});
+
+export const requestLegacyConfirmations = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    if (!env.RESEND_API_KEY || !env.RESEND_FEEDBACK_FROM_EMAIL) return null;
+    const rows = await ctx.runQuery(internal.waitlist.listLegacySignups, {});
+    for (const row of rows) {
+      try {
+        await joinWaitlist(ctx, row);
+      } catch {
+        logEvent("warn", "legacy_confirmation_deferred", {});
+      }
+    }
+    return null;
+  },
+});
