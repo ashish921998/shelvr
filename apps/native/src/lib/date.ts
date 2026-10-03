@@ -36,13 +36,11 @@ export type TrialPeriod = { unit: string; count: number };
  * length, so both follow it; the reminder is two days before the end, as in
  * `trial-reminder.ts`. The dashboard defaults are empty dates and the day
  * numbers of a seven-day trial, so a build that passes nothing shows the bare
- * labels. `trial_day5` and `trial_day7` keep the names the dashboard already
+ * labels; the caller does the same when the offer's length is unknown.
+ * `trial_day5` and `trial_day7` keep the names the dashboard already
  * references: they are the reminder and end dates.
  */
-export function trialTimelineVariables(
-  now: number = Date.now(),
-  trial: TrialPeriod = { unit: "DAY", count: 7 },
-) {
+export function trialTimelineVariables(now: number, trial: TrialPeriod) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);

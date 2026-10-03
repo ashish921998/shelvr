@@ -173,9 +173,10 @@ function foldTrialEligibility(
 
 /** Reads the paywall context from RevenueCat's caches, and the free trial on
  * the offering so the timeline dates follow the offer. Both calls are cache
- * reads in practice, but the timeout caps the worst case so a cold SDK can
- * never hold the sheet open for them. Empty when anything is unavailable —
- * the events carry no guess. */
+ * reads in practice, but one shared timeout caps the worst case so a cold SDK
+ * can never hold the sheet open for them. Each part is empty when its read
+ * fails — the events and the dates carry no guess — and the trial length
+ * survives a failed eligibility read. */
 const PAYWALL_CONTEXT_TIMEOUT_MS = 2_000;
 
 export async function readPaywallContext(): Promise<{
@@ -184,33 +185,54 @@ export async function readPaywallContext(): Promise<{
 }> {
   const rc = getPurchases();
   if (!rc) return {};
-  const read = async () => {
-    const offerings = await rc.getOfferings();
-    const offering = offerings.current;
-    if (!offering) return {};
-    const products = offering.availablePackages.map(
-      (pkg) => pkg.product.identifier,
-    );
-    const intro = offering.availablePackages
-      .map((pkg) => pkg.product.introPrice)
-      .find((price) => price?.price === 0);
-    const eligibility =
-      await rc.checkTrialOrIntroductoryPriceEligibility(products);
-    const statuses = products.map((id) => eligibility[id]?.status);
-    return {
-      context: {
-        offering_id: offering.identifier,
-        trial_eligible: foldTrialEligibility(
-          statuses,
-          rc.INTRO_ELIGIBILITY_STATUS,
-        ),
-      },
-      trial: intro
-        ? { unit: intro.periodUnit, count: intro.periodNumberOfUnits }
-        : undefined,
-    };
+  const startedAt = Date.now();
+  const { offering } = await withTimeout(
+    rc.getOfferings().then((offerings) => ({ offering: offerings.current })),
+    PAYWALL_CONTEXT_TIMEOUT_MS,
+  );
+  if (!offering) return {};
+  const products = offering.availablePackages.map((pkg) => pkg.product);
+  const ids = products.map((product) => product.identifier);
+  const eligibility = await withTimeout(
+    rc.checkTrialOrIntroductoryPriceEligibility(ids).then((answers) => ({
+      trial_eligible: foldTrialEligibility(
+        ids.map((id) => answers[id]?.status),
+        rc.INTRO_ELIGIBILITY_STATUS,
+      ),
+    })),
+    Math.max(0, PAYWALL_CONTEXT_TIMEOUT_MS - (Date.now() - startedAt)),
+  );
+  return {
+    context: {
+      offering_id: offering.identifier,
+      ...eligibility,
+    },
+    trial: singleTrialPeriod(products),
   };
-  return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
+}
+
+/** The free trial the offering's packages share. The paywall has one trial
+ * timeline, so packages that disagree on the length leave it undated rather
+ * than dating it from the wrong plan. */
+export function singleTrialPeriod(
+  products: {
+    introPrice: {
+      price: number;
+      periodUnit: string;
+      periodNumberOfUnits: number;
+    } | null;
+  }[],
+): TrialPeriod | undefined {
+  const trials = products.flatMap(({ introPrice }) =>
+    introPrice?.price === 0
+      ? [{ unit: introPrice.periodUnit, count: introPrice.periodNumberOfUnits }]
+      : [],
+  );
+  const [first] = trials;
+  return first &&
+    trials.every((t) => t.unit === first.unit && t.count === first.count)
+    ? first
+    : undefined;
 }
 
 /** Resolves to `{}` when `read` rejects or outlasts `ms`, so a stalled SDK

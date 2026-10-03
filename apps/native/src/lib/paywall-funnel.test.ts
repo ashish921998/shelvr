@@ -134,3 +134,92 @@ describe("activeProductId", () => {
     vi.doUnmock("@/lib/revenuecat-module");
   });
 });
+
+describe("readPaywallContext", () => {
+  const trial = (periodUnit: string, periodNumberOfUnits: number) => ({
+    price: 0,
+    periodUnit,
+    periodNumberOfUnits,
+  });
+  const offering = (
+    ...intros: (ReturnType<typeof trial> | { price: number } | null)[]
+  ) => ({
+    current: {
+      identifier: "default",
+      availablePackages: intros.map((introPrice, index) => ({
+        product: { identifier: `product_${index}`, introPrice },
+      })),
+    },
+  });
+  const load = async (rc: object) => {
+    vi.doMock("@/lib/revenuecat-module", () => ({
+      getPurchases: () => ({ INTRO_ELIGIBILITY_STATUS: {}, ...rc }),
+    }));
+    return await loadFunnel();
+  };
+
+  afterEach(() => vi.doUnmock("@/lib/revenuecat-module"));
+
+  it("keeps the trial length when the eligibility read fails", async () => {
+    const funnel = await load({
+      getOfferings: async () => offering(trial("DAY", 7), null),
+      checkTrialOrIntroductoryPriceEligibility: async () => {
+        throw new Error("offline");
+      },
+    });
+    await expect(funnel.readPaywallContext()).resolves.toEqual({
+      context: { offering_id: "default" },
+      trial: { unit: "DAY", count: 7 },
+    });
+  });
+
+  it("keeps the trial length when the eligibility read stalls", async () => {
+    vi.useFakeTimers();
+    const funnel = await load({
+      getOfferings: async () => offering(trial("WEEK", 2)),
+      checkTrialOrIntroductoryPriceEligibility: () => new Promise(() => {}),
+    });
+    const read = funnel.readPaywallContext();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(read).resolves.toMatchObject({
+      trial: { unit: "WEEK", count: 2 },
+    });
+  });
+
+  it("reports no trial length when the offerings read stalls", async () => {
+    vi.useFakeTimers();
+    const funnel = await load({ getOfferings: () => new Promise(() => {}) });
+    const read = funnel.readPaywallContext();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(read).resolves.toEqual({});
+  });
+
+  it("reports no trial length when packages disagree or none is free", async () => {
+    const funnel = await loadFunnel();
+    expect(
+      funnel.singleTrialPeriod([
+        { introPrice: trial("DAY", 7) },
+        { introPrice: trial("DAY", 3) },
+      ]),
+    ).toBeUndefined();
+    expect(
+      funnel.singleTrialPeriod([
+        {
+          introPrice: {
+            price: 0.99,
+            periodUnit: "WEEK",
+            periodNumberOfUnits: 1,
+          },
+        },
+        { introPrice: null },
+      ]),
+    ).toBeUndefined();
+    expect(
+      funnel.singleTrialPeriod([
+        { introPrice: trial("DAY", 7) },
+        { introPrice: trial("DAY", 7) },
+        { introPrice: null },
+      ]),
+    ).toEqual({ unit: "DAY", count: 7 });
+  });
+});

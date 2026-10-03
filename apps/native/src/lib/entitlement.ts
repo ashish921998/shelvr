@@ -379,7 +379,9 @@ async function presentPaywallImpl(
   try {
     const { context: read, trial } = await context;
     const enriched = { ...properties, ...read };
-    const customVariables = trialTimelineVariables(Date.now(), trial);
+    // An unknown trial length dates nothing: the paywall falls back to its
+    // undated labels instead of claiming a length the offer may not have.
+    const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
       () => rcui.presentPaywall({ customVariables }),

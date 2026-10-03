@@ -9,7 +9,9 @@ const text = (value: string) => ({ type: "string", value });
 
 describe("trialTimelineVariables", () => {
   it("dates a seven-day trial from today, across a month end", () => {
-    expect(trialTimelineVariables(at(2026, 10, 28))).toEqual({
+    expect(
+      trialTimelineVariables(at(2026, 10, 28), { unit: "DAY", count: 7 }),
+    ).toEqual({
       trial_today: text(" · Oct 28"),
       trial_day5: text(" · Nov 2"),
       trial_day7: text(" · Nov 4"),
