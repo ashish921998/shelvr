@@ -79,6 +79,10 @@ export function notificationLocale(
  * truncates for us, and it does so mid-word; trimming here keeps the ellipsis
  * on a word boundary whenever one sits close to the limit.
  */
+/** A weekly shelf's own week: saves made within this long of the shelf being
+ * prepared are "this week's"; anything older came back from the archive. */
+export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 const MAX_TITLE_LENGTH = 60;
 
 export function truncateTitle(title: string): string | undefined {
@@ -102,6 +106,8 @@ const catalogs: Record<
     body: Record<string, string>;
     named: Record<string, string>;
     namedSingle: string;
+    namedShelf: Record<string, string>;
+    namedShelfSingle: string;
     reminder: Record<"read" | "cook", { title: string; body: string }>;
   }
 > = translations;
@@ -109,7 +115,9 @@ const catalogs: Record<
 /**
  * `count` is how many saves the shelf holds and `featuredTitle` is the one the
  * body names. Naming a save is the whole point of this copy: a count tells the
- * user they have unread things, which they already knew.
+ * user they have unread things, which they already knew. `olderIncluded` says
+ * the shelf also carries saves from before this week, so the copy must not
+ * claim they were all saved this week.
  *
  * Without a usable title it falls back to counting, which is what every build
  * before this one sent. The title is user content, so it is substituted
@@ -120,6 +128,7 @@ export function digestCopy(
   locale: string | undefined,
   count: number,
   featuredTitle?: string,
+  { olderIncluded = false }: { olderIncluded?: boolean } = {},
 ) {
   const title =
     featuredTitle === undefined ? undefined : truncateTitle(featuredTitle);
@@ -147,14 +156,19 @@ export function digestCopy(
   if (count <= 1)
     return {
       title: copy.title,
-      body: copy.namedSingle.replace("%{title}", () => title),
+      body: (olderIncluded ? copy.namedShelfSingle : copy.namedSingle).replace(
+        "%{title}",
+        () => title,
+      ),
     };
   // The plural agrees with the *other* saves, not the shelf total: "and 1
   // more" alongside the named one, never "and 0 more".
   const others = count - 1;
   return {
     title: copy.title,
-    body: copy.named[pluralRules[selected](others)]
+    body: (olderIncluded ? copy.namedShelf : copy.named)[
+      pluralRules[selected](others)
+    ]
       .replace("%{formattedCount}", format(others))
       .replace("%{title}", () => title),
   };

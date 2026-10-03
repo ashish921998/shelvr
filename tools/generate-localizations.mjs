@@ -131,6 +131,8 @@ const notificationCopy = Object.fromEntries(
       body: messages["digest.waitingCount"],
       named: messages["digest.namedCount"],
       namedSingle: messages["digest.namedSingle"],
+      namedShelf: messages["digest.namedShelfCount"],
+      namedShelfSingle: messages["digest.namedShelfSingle"],
       reminder: {
         read: {
           title: messages["reminder.readTitle"],

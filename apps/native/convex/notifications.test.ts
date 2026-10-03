@@ -554,3 +554,125 @@ describe("weekly shelf notifications", () => {
     expect(await t.query(api.notifications.getDigest, {})).toBeNull();
   });
 });
+
+describe("weekly shelf archive saves", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const START = Date.UTC(2026, 0, 4, 12);
+
+  async function seedAt(
+    t: TestCtx,
+    at: number,
+    type: "image" | "link" | "note",
+  ) {
+    vi.setSystemTime(at);
+    return await seedItem(t, "user-a", type);
+  }
+
+  async function prepare(t: TestCtx, now: number) {
+    vi.setSystemTime(now);
+    await t.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: true,
+      nextDigestAt: now - 1,
+    });
+    await t.mutation(internal.notifications.prepareWeeklyDigest, {
+      userId: "user-a",
+      now,
+    });
+    return await t.query(api.notifications.getDigest, {});
+  }
+
+  it("sends a shelf of older unopened saves when nothing was saved this week", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const old = [
+        await seedAt(t, START, "link"),
+        await seedAt(t, START + DAY, "note"),
+        await seedAt(t, START + 2 * DAY, "image"),
+      ];
+      const opened = await seedAt(t, START + 3 * DAY, "link");
+      await t.mutation(api.notifications.markItemOpened, { itemId: opened });
+
+      const digest = await prepare(t, START + 90 * DAY);
+
+      expect(digest?.items.map((item) => item._id).sort()).toEqual(
+        [...old].sort(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps one slot for an older save beside this week's", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const old = await seedAt(t, START, "note");
+      const now = START + 60 * DAY;
+      const recent = [
+        await seedAt(t, now - 3 * DAY, "link"),
+        await seedAt(t, now - 2 * DAY, "image"),
+        await seedAt(t, now - DAY, "note"),
+      ];
+
+      const digest = await prepare(t, now);
+      const ids = digest?.items.map((item) => item._id) ?? [];
+
+      expect(ids).toHaveLength(3);
+      expect(ids).toContain(old);
+      // This week's saves lead, so the push names one of them.
+      expect(ids[2]).toBe(old);
+      expect(recent).toEqual(expect.arrayContaining(ids.slice(0, 2)));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not bring back an archive save shown on a recent shelf", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      for (let i = 0; i < 4; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(first?.items).toHaveLength(3);
+      // Only one unseen save is left, which is not enough for a shelf.
+      expect(second?._id).toBe(first?._id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tells delivery when the shelf holds older saves", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      for (let i = 0; i < 3; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+      const now = START + 60 * DAY;
+      const digest = await prepare(t, now);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("notificationDevices", {
+          userId: "user-a",
+          token: "live-a",
+          enabled: true,
+          platform: "ios",
+          lastSeenAt: now,
+        });
+      });
+
+      const claimed = await t.mutation(internal.notificationDelivery.claim, {
+        digestId: digest!._id,
+      });
+
+      expect(claimed?.olderIncluded).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

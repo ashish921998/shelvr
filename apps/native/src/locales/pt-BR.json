@@ -414,6 +414,12 @@
     "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
   },
   "digest.namedSingle": "“%{title}”, salvo esta semana",
+  "digest.namedShelfCount": {
+    "one": "“%{title}” e mais %{formattedCount} conteúdo esperando na sua estante",
+    "many": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante",
+    "other": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante"
+  },
+  "digest.namedShelfSingle": "“%{title}” está esperando na sua estante",
   "reminder.readTitle": "Salvo para depois",
   "reminder.readBody": "“%{title}” te espera quando você quiser.",
   "reminder.cookTitle": "Das suas receitas salvas",

@@ -1,4 +1,7 @@
-import { notificationLocale } from "./model/notificationFields";
+import {
+  DIGEST_WINDOW_MS,
+  notificationLocale,
+} from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -45,8 +48,21 @@ const preferencesValidator = v.object({
   remindersEnabled: v.boolean(),
 });
 
-const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_DIGEST_ITEMS = 3;
+/**
+ * Shelf slots kept for an unopened save from before this week, whenever one
+ * exists. Without it the shelf only ever showed the last seven days, so a save
+ * that went unopened for a week was never seen again; and a person who saved
+ * fewer than three things that week got no shelf at all. Older saves also
+ * fill any slots this week's saves leave empty.
+ */
+const ARCHIVE_SLOTS = 1;
+/**
+ * Older saves checked against read state per shelf. Each check is one index
+ * point read, and every opened save spends one, so this bounds the extra reads
+ * while leaving plenty of room to find an unopened one.
+ */
+const ARCHIVE_CHECKS = 50;
 const MAX_USER_ITEMS = 1000;
 /** Due users scheduled per transaction. A full page chains a follow-up run so a
  * backlog drains at scheduler speed instead of one page per hourly tick. */
@@ -85,6 +101,7 @@ function chooseDigestItems(
   previouslyIncluded: Set<string>,
   openedItemIds: Set<string>,
   now: number,
+  limit: number,
 ): Doc<"items">[] {
   const candidates = items.filter(
     (item) =>
@@ -99,19 +116,53 @@ function chooseDigestItems(
   const selected: Doc<"items">[] = [];
   const seenTypes = new Set<Doc<"items">["type"]>();
   for (const item of candidates) {
-    if (selected.length >= MAX_DIGEST_ITEMS) break;
+    if (selected.length >= limit) break;
     if (!seenTypes.has(item.type)) {
       seenTypes.add(item.type);
       selected.push(item);
     }
   }
   for (const item of candidates) {
-    if (selected.length >= MAX_DIGEST_ITEMS) break;
+    if (selected.length >= limit) break;
     if (!selected.some((selectedItem) => selectedItem._id === item._id)) {
       selected.push(item);
     }
   }
   return selected;
+}
+
+/** A 32-bit FNV-1a hash, to seed the archive shuffle. */
+function hashSeed(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * `items` in an order that is random across weeks but fixed within one, so a
+ * re-run of the same week's preparation picks the same archive saves. A
+ * shuffle rather than newest-first means a save from two years ago is as
+ * likely to come back as one from last month.
+ */
+function weeklyShuffle<T>(items: T[], seed: string): T[] {
+  let state = hashSeed(seed);
+  // mulberry32
+  const random = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 export const getPreferences = query({
@@ -553,12 +604,42 @@ export const prepareWeeklyDigest = internalMutation({
     const previouslyIncluded = new Set(
       recentDigests.flatMap((digest) => digest.itemIds.map((itemId) => itemId)),
     );
-    const selected = chooseDigestItems(
+    // Unopened saves from before this week, in this week's shuffled order.
+    // Only the first ARCHIVE_CHECKS are checked against read state.
+    const archive: Doc<"items">[] = [];
+    const archivePool = weeklyShuffle(
+      items.filter(
+        (item) =>
+          item.status === "ready" &&
+          item._creationTime < args.now - DIGEST_WINDOW_MS &&
+          !previouslyIncluded.has(item._id),
+      ),
+      `${args.userId}:${weekStart(args.now)}`,
+    ).slice(0, ARCHIVE_CHECKS);
+    for (const item of archivePool) {
+      if (archive.length >= MAX_DIGEST_ITEMS) break;
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", args.userId).eq("itemId", item._id),
+        )
+        .unique();
+      if (read === null) archive.push(item);
+    }
+
+    // This week's saves first, with ARCHIVE_SLOTS held back for an older one
+    // when there is one; older saves then fill whatever is left.
+    const recent = chooseDigestItems(
       items,
       previouslyIncluded,
       openedItemIds,
       args.now,
+      MAX_DIGEST_ITEMS - Math.min(ARCHIVE_SLOTS, archive.length),
     );
+    const selected = [
+      ...recent,
+      ...archive.slice(0, MAX_DIGEST_ITEMS - recent.length),
+    ];
 
     const nextDigestAt = nextWeeklyDigestAt(args.now, preferences.timezone);
     await ctx.db.patch(preferences._id, {

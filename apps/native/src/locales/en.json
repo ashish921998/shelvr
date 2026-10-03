@@ -404,6 +404,11 @@
     "other": "“%{title}” and %{formattedCount} more you saved this week"
   },
   "digest.namedSingle": "“%{title}”, saved this week",
+  "digest.namedShelfCount": {
+    "one": "“%{title}” and %{formattedCount} more save waiting on your shelf",
+    "other": "“%{title}” and %{formattedCount} more saves waiting on your shelf"
+  },
+  "digest.namedShelfSingle": "“%{title}” is waiting on your shelf",
   "reminder.readTitle": "Saved for later",
   "reminder.readBody": "“%{title}” is ready when you are.",
   "reminder.cookTitle": "From your saved recipes",
