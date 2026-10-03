@@ -21,9 +21,8 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   reveal: "reveal",
 };
 
-// Takes an index in this flow's step list. getOnboardingProgress returns null
-// for records from flows before version 2 and shifts version 2 indexes into
-// this list, so an index from another step list never reaches here.
+// Takes an index written by this flow. getOnboardingProgress already returns
+// null for records from older flows, whose indexes point at different steps.
 export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";

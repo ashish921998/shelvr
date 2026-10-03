@@ -52,13 +52,14 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>{t("onboarding.sourceTitle")}</Text>
-
+      {/* The headline scrolls with the answers: at the largest text sizes it
+          alone can fill most of a small screen. Skip stays pinned below. */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={styles.headline}>{t("onboarding.sourceTitle")}</Text>
         {order.map((source, position) => {
           const active = picked === source;
           const label = sourceLabel(source, process.env.EXPO_OS);
@@ -102,6 +103,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
   },
   headline: {
+    marginBottom: theme.gap(1),
     fontFamily: theme.fonts.bold,
     fontSize: 26,
     lineHeight: 32,
