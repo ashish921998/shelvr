@@ -31,13 +31,26 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Clear reserved review tooling path
+        run: rm -rf .secure-review-tooling
+      - name: Checkout immutable trusted review tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: 754266328766453337830533266339f30a368749
+          path: .secure-review-tooling
+          persist-credentials: false
+          sparse-checkout: |
+            .github/actions/secure-review
+            tools/harden-review-action.mjs
+            tools/main-module.mjs
       - name: Prepare pinned claude dependencies
-        uses: ./.github/actions/secure-review
+        uses: ./.secure-review-tooling/.github/actions/secure-review
         with:
           provider: claude
       - name: Run Claude Code
         id: claude
-        uses: ./.github/runtime/claude
+        uses: ./.secure-review-tooling/runtime/claude
         env:
           DISABLE_AUTOUPDATER: "1"
         with:

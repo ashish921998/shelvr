@@ -8,7 +8,7 @@ test("workflows execute immutable action revisions and an exact EAS version", ()
     for (const [, action] of source.matchAll(/uses:\s*(\S+)/g)) {
       assert.match(
         action,
-        /^(?:[\w.-]+\/[\w./-]+@[a-f0-9]{40}|\.\/\.github\/(?:actions\/secure-review|runtime\/(?:droid|claude)))$/,
+        /^(?:[\w.-]+\/[\w./-]+@[a-f0-9]{40}|\.\/\.secure-review-tooling\/(?:\.github\/actions\/secure-review|runtime\/(?:droid|claude)))$/,
         `${file}: ${action}`,
       );
     }
@@ -39,8 +39,11 @@ test("review preparations pin every upstream checkout and run before secrets are
     "claude-code-review",
   ]) {
     const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
-    const preparation = source.indexOf("uses: ./.github/actions/secure-review");
-    const runtime = source.indexOf("uses: ./.github/runtime/");
+    const preparation = source.indexOf("uses: ./.secure-review-tooling/.github/actions/secure-review");
+    const runtime = source.indexOf("uses: ./.secure-review-tooling/runtime/");
+    assert.match(source, /repository:.*github.repository.*
+\s+ref: [a-f0-9]{40}
+\s+path: \.secure-review-tooling/);
     assert.notEqual(preparation, -1);
     assert.notEqual(runtime, -1);
     assert.ok(preparation < runtime);
