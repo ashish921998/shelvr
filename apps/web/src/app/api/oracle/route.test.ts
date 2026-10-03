@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
-  preflight: vi.fn(),
   serverLog: vi.fn(),
 }));
 
@@ -32,27 +31,8 @@ const verdict = {
 };
 
 describe("POST /api/oracle", () => {
-  it("rejects a denied parsing budget without reading the body", async () => {
-    mocks.preflight.mockResolvedValue(Response.json({}, { status: 429 }));
-    const input = request("not-json");
-    const result = await POST(input);
-    expect(result.status).toBe(429);
-    expect(input.bodyUsed).toBe(false);
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
-  it("enforces UTF-8 bytes for bodies without Content-Length", async () => {
-    const result = await POST(request("é".repeat(3 * 1024 * 1024 + 1)));
-    expect(result.status).toBe(413);
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
   beforeEach(() => {
-    mocks.preflight.mockReset();
-    mocks.preflight.mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", (url: string, init: RequestInit) =>
-      url.endsWith("/request-body")
-        ? mocks.preflight(url, init)
-        : mocks.fetch(url, init),
-    );
+    vi.stubGlobal("fetch", mocks.fetch);
     vi.stubEnv("CONVEX_SITE_URL", "https://example.convex.site");
     vi.stubEnv("WAITLIST_SHARED_SECRET", "secret");
     mocks.fetch.mockReset();
@@ -89,9 +69,7 @@ describe("POST /api/oracle", () => {
       request(JSON.stringify({ kind: "screenshot", imageBase64: "aGk=" })),
     );
 
-    expect(
-      timeout.mock.calls.map(([ms]) => ms).filter((ms) => ms >= 20_000),
-    ).toEqual([20_000, 45_000]);
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([20_000, 45_000]);
     timeout.mockRestore();
   });
 

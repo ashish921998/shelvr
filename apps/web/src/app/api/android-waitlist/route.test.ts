@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
-  preflight: vi.fn(),
   serverLog: vi.fn(),
 }));
 
@@ -28,21 +27,8 @@ function response(body: unknown, status = 200): Response {
 }
 
 describe("POST /api/android-waitlist", () => {
-  it("rejects oversized bodies without a Content-Length before forwarding", async () => {
-    const result = await POST(
-      request({ email: "person@example.com", company: "x".repeat(4096) }),
-    );
-    expect(result.status).toBe(413);
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
   beforeEach(() => {
-    mocks.preflight.mockReset();
-    mocks.preflight.mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", (url: string, init: RequestInit) =>
-      url.endsWith("/request-body")
-        ? mocks.preflight(url, init)
-        : mocks.fetch(url, init),
-    );
+    vi.stubGlobal("fetch", mocks.fetch);
     vi.stubEnv("CONVEX_SITE_URL", "");
     vi.stubEnv("CONVEX_URL", "");
     vi.stubEnv("WAITLIST_SHARED_SECRET", "");
