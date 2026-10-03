@@ -209,7 +209,7 @@
     "namedShelf": {
       "other": "'%{title}' 외 %{formattedCount}개가 책장에서 기다리고 있어요"
     },
-    "namedShelfSingle": "'%{title}'이(가) 책장에서 기다리고 있어요",
+    "namedShelfSingle": "'%{title}', 책장에서 기다리고 있어요",
     "reminder": {
       "read": {
         "title": "나중에 볼 글",

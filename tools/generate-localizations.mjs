@@ -30,6 +30,8 @@ const notificationPlaceholders = {
   "digest.waitingCount": "%{formattedCount}",
   "digest.namedCount": "%{formattedCount}|%{title}",
   "digest.namedSingle": "%{title}",
+  "digest.namedShelfCount": "%{formattedCount}|%{title}",
+  "digest.namedShelfSingle": "%{title}",
   "reminder.readBody": "%{title}",
   "reminder.cookBody": "%{title}",
 };

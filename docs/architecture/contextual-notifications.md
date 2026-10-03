@@ -21,15 +21,17 @@ Every notification about saves names one of them, or it is not sent.
 
 ### Weekly shelf
 
-The shelf holds three unopened saves. Up to two come from the past seven days,
-picked for a mix of types. At least one slot goes to an unopened save from
-before that whenever there is one, and older saves fill any slots the week left
-empty, so someone who saved little that week still gets a shelf. Older saves
-are drawn in a shuffled order that changes weekly, from the newest 1,000 saves,
-with read state checked for at most 50 of them. A save on any of the last 12
-shelves is skipped. When the shelf holds an older save, the push drops "saved
-this week" and reads _"The 12-hour short rib" and 2 more saves waiting on your
-shelf_.
+The shelf holds three unopened saves. When an unopened save from before the
+past seven days turns up, it takes one slot and this week's saves take at most
+two, picked for a mix of types; otherwise all three can come from this week.
+Older saves also fill any slots the week left empty, so someone who saved
+little that week can still get a shelf. Older saves are drawn in a shuffled
+order that changes weekly, from the newest 1,000 saves, with read state checked
+for at most 50 of them, so an unopened older save beyond that sample is not
+found that week. A save on any of the last 12 shelves is skipped. No shelf is
+sent unless three eligible saves are found. When the shelf holds an older save,
+the push drops "saved this week" and reads _"The 12-hour short rib" and 2 more
+saves waiting on your shelf_.
 
 ### Save reminders
 

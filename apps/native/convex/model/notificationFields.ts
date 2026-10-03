@@ -74,15 +74,15 @@ export function notificationLocale(
   return Object.hasOwn(translations, locale) ? locale : "en";
 }
 
+/** A weekly shelf's own week: saves made within this long of the shelf being
+ * prepared are "this week's"; anything older came back from the archive. */
+export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * The longest item title a notification body carries. Past this the system
  * truncates for us, and it does so mid-word; trimming here keeps the ellipsis
  * on a word boundary whenever one sits close to the limit.
  */
-/** A weekly shelf's own week: saves made within this long of the shelf being
- * prepared are "this week's"; anything older came back from the archive. */
-export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
 const MAX_TITLE_LENGTH = 60;
 
 export function truncateTitle(title: string): string | undefined {
