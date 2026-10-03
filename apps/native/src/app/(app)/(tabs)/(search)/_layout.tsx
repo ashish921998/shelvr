@@ -1,28 +1,21 @@
-import { t, useAppLocale } from "@/lib/i18n";
+import { useAppLocale } from "@/lib/i18n";
 import { Stack } from "expo-router";
-import { Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { useTabStackChrome } from "@/lib/tab-stack-chrome";
+import { useUnistyles } from "react-native-unistyles";
 
+// Search draws its own header, like every other root tab. A native title here
+// was drawn on top of it.
 export default function SearchStackLayout() {
   useAppLocale();
-  const { screenOptions } = useTabStackChrome({ headerTransparent: true });
+  const { theme } = useUnistyles();
+
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="index">
-        <Stack.Title asChild>
-          <Text style={styles.title}>{t("navigation.searchHeader")}</Text>
-        </Stack.Title>
-      </Stack.Screen>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
+      <Stack.Screen name="index" />
     </Stack>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 31,
-    letterSpacing: 0.5,
-    color: theme.colors.foreground,
-  },
-}));

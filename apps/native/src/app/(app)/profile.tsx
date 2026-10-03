@@ -262,7 +262,10 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    // No wrapping view: a form sheet only lays a header out above its scroll
+    // view when the two are its sole children. The route's contentStyle paints
+    // the background.
+    <>
       <ScreenHeader
         clock={clock}
         center={<Wordmark size={26} />}
@@ -499,12 +502,11 @@ export default function ProfileScreen() {
           />
         ) : null}
       </ScrollView>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
   // Eyebrows label a group; they sit left against the content gutter.
   eyebrow: { alignSelf: "flex-start", paddingTop: theme.gap(1.5) },
   segmented: { alignSelf: "stretch" },

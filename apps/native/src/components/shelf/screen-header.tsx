@@ -31,7 +31,13 @@ export function ScreenHeader({
   const { width } = useWindowDimensions();
 
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top + 6 }]}>
+    // Not collapsable: a form sheet lays out a header beside its scroll view
+    // only when the header is one real native view. Flattened, its children
+    // became siblings of the scroll view and the sheet drew the list over them.
+    <View
+      collapsable={false}
+      style={[styles.wrap, { paddingTop: insets.top + 6 }]}
+    >
       <View style={styles.row}>
         <View style={styles.side}>{left}</View>
         <View style={styles.centre}>

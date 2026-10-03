@@ -40,7 +40,7 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t("navigation.search")} />
+      <ScreenHeader title={t("navigation.searchHeader")} />
       <View style={styles.field}>
         <InkIcon name="magnifyingglass" size={16} tint={theme.colors.muted} />
         <TextInput
@@ -97,6 +97,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   input: {
     flex: 1,
+    // Fill the field's height: left to size itself, the input was shorter
+    // than its own line and cut the placeholder off at the bottom.
+    alignSelf: "stretch",
+    paddingVertical: 0,
     fontFamily: theme.fonts.regular,
     fontSize: 15,
     color: theme.colors.foreground,
