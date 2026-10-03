@@ -193,16 +193,17 @@ export default function AppLayout() {
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
-        {/* The onboarding reveal opens the paywall fallback before onboarding
+        {/* The onboarding reveal opens the paywall before onboarding
             completes. Keep it last: the first available screen is the initial
-            route, so it must be (tabs) or onboarding. */}
+            route, so it must be (tabs) or onboarding. Full screen with no
+            swipe-to-dismiss, so a close always goes through the Close button
+            or Android back, and the screen settles its presentation. */}
         <Stack.Screen
           name="paywall"
           options={{
-            presentation: "formSheet",
+            presentation: "fullScreenModal",
             headerShown: false,
-            sheetGrabberVisible: true,
-            sheetAllowedDetents: "fitToContents",
+            gestureEnabled: false,
             contentStyle: { backgroundColor: theme.colors.background },
           }}
         />

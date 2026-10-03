@@ -29,6 +29,7 @@ const SF_TO_MATERIAL = {
   "person.fill": "person",
   envelope: "mail",
   message: "chat",
+  "bubble.left": "chat_bubble",
   phone: "call",
   // Content / media
   camera: "photo_camera",
@@ -66,6 +67,8 @@ const SF_TO_MATERIAL = {
   gearshape: "settings",
   "gearshape.fill": "settings",
   "arrow.2.circlepath": "refresh",
+  "arrow.triangle.2.circlepath": "autorenew",
+  "arrow.left.arrow.right": "swap_horiz",
   "arrow.clockwise": "refresh",
   speedometer: "speed",
   viewfinder: "center_focus_strong",

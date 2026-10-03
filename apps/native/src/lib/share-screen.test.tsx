@@ -73,6 +73,8 @@ vi.mock("@/lib/analytics", () => ({
   },
 }));
 vi.mock("@/lib/entitlement", () => ({
+  isPaywallPending: () => false,
+  whenSheetSettled: () => Promise.resolve(),
   openPaywall: mock.openPaywall,
   useEntitlement: () => ({
     entitled: mock.entitled,
