@@ -15,7 +15,9 @@ export const ACQUISITION_SOURCES = [
   "youtube",
   "x",
   "reddit",
+  "ai_assistant",
   "friend",
+  "shared_link",
   "store_search",
   "other",
 ] as const;
@@ -27,9 +29,11 @@ const SOCIAL_SOURCES = [
   "youtube",
   "x",
   "reddit",
+  "ai_assistant",
 ] as const satisfies readonly AcquisitionSource[];
 const TRAILING_SOURCES = [
   "friend",
+  "shared_link",
   "store_search",
   "other",
 ] as const satisfies readonly AcquisitionSource[];
@@ -53,8 +57,12 @@ export function sourceLabel(
       return { kind: "brand", text: "X (Twitter)" };
     case "reddit":
       return { kind: "brand", text: "Reddit" };
+    case "ai_assistant":
+      return { kind: "message", key: "onboarding.sourceAi" };
     case "friend":
       return { kind: "message", key: "onboarding.sourceFriend" };
+    case "shared_link":
+      return { kind: "message", key: "onboarding.sourceSharedLink" };
     case "store_search":
       return {
         kind: "message",
@@ -69,8 +77,9 @@ export function sourceLabel(
 }
 
 /**
- * Social networks are shuffled so the first row does not collect taps by
- * position; the friend, store and "somewhere else" rows stay last.
+ * Social networks and AI assistants are shuffled so the first row does not collect taps by
+ * position; the friend, shared link, store and "somewhere else" rows stay
+ * last.
  */
 export function orderAcquisitionSources(
   random: () => number = Math.random,

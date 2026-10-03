@@ -475,6 +475,8 @@
   "onboarding.newSpacePlaceholder": "スペース名",
   "onboarding.sourceTitle": "Shelvrを何で知りましたか？",
   "onboarding.sourceFriend": "友だちから聞いた",
+  "onboarding.sourceSharedLink": "誰かがShelvrのリンクを共有してくれた",
+  "onboarding.sourceAi": "ChatGPTなどのAI",
   "onboarding.sourceAppStore": "App Storeで検索",
   "onboarding.sourceGooglePlay": "Google Playで検索",
   "onboarding.sourceOther": "その他",

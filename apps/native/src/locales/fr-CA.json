@@ -507,6 +507,8 @@
   "onboarding.newSpacePlaceholder": "Nom de l'espace",
   "onboarding.sourceTitle": "Comment avez-vous découvert Shelvr ?",
   "onboarding.sourceFriend": "Par un ami ou une amie",
+  "onboarding.sourceSharedLink": "Quelqu'un a partagé un lien Shelvr",
+  "onboarding.sourceAi": "ChatGPT ou une autre IA",
   "onboarding.sourceAppStore": "En cherchant dans l'App Store",
   "onboarding.sourceGooglePlay": "En cherchant dans Google Play",
   "onboarding.sourceOther": "Ailleurs",

@@ -444,6 +444,8 @@ export type MessageParams = {
   "onboarding.newSpacePlaceholder": undefined;
   "onboarding.sourceTitle": undefined;
   "onboarding.sourceFriend": undefined;
+  "onboarding.sourceSharedLink": undefined;
+  "onboarding.sourceAi": undefined;
   "onboarding.sourceAppStore": undefined;
   "onboarding.sourceGooglePlay": undefined;
   "onboarding.sourceOther": undefined;

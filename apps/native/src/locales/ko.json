@@ -475,6 +475,8 @@
   "onboarding.newSpacePlaceholder": "스페이스 이름",
   "onboarding.sourceTitle": "Shelvr를 어떻게 알게 되셨나요?",
   "onboarding.sourceFriend": "친구가 알려줬어요",
+  "onboarding.sourceSharedLink": "누군가 Shelvr 링크를 공유해 줬어요",
+  "onboarding.sourceAi": "ChatGPT 등 AI",
   "onboarding.sourceAppStore": "App Store에서 검색",
   "onboarding.sourceGooglePlay": "Google Play에서 검색",
   "onboarding.sourceOther": "기타",

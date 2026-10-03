@@ -14,10 +14,15 @@ describe("orderAcquisitionSources", () => {
   });
 
   it.each([0, 0.5, 0.999])(
-    "keeps friend, store and other last (random %s)",
+    "keeps friend, shared link, store and other last (random %s)",
     (value) => {
       const order = orderAcquisitionSources(() => value);
-      expect(order.slice(-3)).toEqual(["friend", "store_search", "other"]);
+      expect(order.slice(-4)).toEqual([
+        "friend",
+        "shared_link",
+        "store_search",
+        "other",
+      ]);
     },
   );
 });
