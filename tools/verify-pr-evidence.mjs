@@ -16,8 +16,9 @@ import { isMainModule } from "./main-module.mjs";
  */
 const UI_PATTERNS = [
   /^apps\/native\/src\/.+\.(tsx|jsx)$/,
+  /^apps\/native\/src\/(components|widgets)\/.+\.ts$/,
   /^apps\/native\/src\/unistyles\.ts$/,
-  /^apps\/native\/src\/lib\/(header-layout|motion|tab-bar-motion)\.ts$/,
+  /^apps\/native\/src\/lib\/(appearance|appearance-runtime|color|header-layout|motion|tab-bar-motion)\.ts$/,
   /^apps\/native\/src\/locales\/.+\.json$/,
   /^apps\/native\/locales\//,
   /^apps\/native\/assets\//,
@@ -26,6 +27,7 @@ const UI_PATTERNS = [
   /^apps\/native\/app\.(json|config\.js)$/,
   /^apps\/native\/convex\/model\/notificationTranslations\.json$/,
   /^apps\/web\/src\/.+\.(tsx|jsx|css)$/,
+  /^apps\/web\/src\/lib\/motion\.ts$/,
   /^apps\/web\/public\//,
 ];
 
@@ -119,7 +121,8 @@ const IMAGE_URL = `(${MEDIA_URL}|${ATTACHMENT_URL})`;
  */
 export function hasVisualEvidence(text) {
   const clean = stripFences(stripComments(text));
-  const markdown = new RegExp(String.raw`!\[[^\]]*\]\(\s*${IMAGE_URL}\s*\)`);
+  // An embed, or a plain link to a recording: both open the media.
+  const markdown = new RegExp(String.raw`!?\[[^\]]*\]\(\s*${IMAGE_URL}\s*\)`);
   const tag = new RegExp(
     String.raw`<(img|video|source)\b[^>]*\bsrc=["']?${IMAGE_URL}(?=["'\s>/])`,
     "i",

@@ -136,6 +136,7 @@ test("malformed or non-image links are not visual evidence", () => {
 test("markdown images, video, and media links count as evidence", () => {
   assert.ok(hasVisualEvidence("![home](https://x.dev/a.jpg)"));
   assert.ok(hasVisualEvidence(`![home](${SHOT})`));
+  assert.ok(hasVisualEvidence("[recording](https://cdn.example.com/demo.mp4)"));
   assert.ok(hasVisualEvidence('<video src="https://x.dev/v.mp4"></video>'));
   assert.ok(
     hasVisualEvidence(
@@ -151,6 +152,9 @@ test("which files count as UI", () => {
     "apps/native/src/lib/motion.ts",
     "apps/native/src/lib/tab-bar-motion.ts",
     "apps/native/src/lib/header-layout.ts",
+    "apps/native/src/lib/appearance.ts",
+    "apps/native/src/components/splash/timeline.ts",
+    "apps/web/src/lib/motion.ts",
     "apps/native/src/locales/en.json",
     "apps/native/locales/en.json",
     "apps/native/assets/icon.png",
