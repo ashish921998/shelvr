@@ -19,6 +19,8 @@ import { isMainModule } from "./main-module.mjs";
 const DOC = "CLAUDE.md";
 const CONVEX_DIR = "apps/native/convex";
 const APP_ROUTES_DIR = "apps/native/src/app/(app)";
+const BACKEND_HEADING = "### Backend";
+const NATIVE_HEADING = "### Native";
 
 /** Table names declared in `schema.ts`. */
 export function schemaTables(source) {
@@ -37,36 +39,46 @@ export function convexModules(fileNames) {
 /**
  * Route names under `(app)` as `CLAUDE.md` writes them: `add` for `add.tsx`,
  * `item/[id]` for `item/[id].tsx`, `(home)` for the `(tabs)/(home)` group.
- * `entries` is a `readdirSync(..., { withFileTypes: true })` listing and
- * `list` reads a subdirectory the same way.
+ * `list(relDir)` reads a directory relative to `(app)` with file types; `""`
+ * is `(app)` itself. Directories are walked to any depth, except that a tab
+ * group counts as one route and its inner screens are not listed.
  */
-export function appRoutes(entries, list) {
+export function appRoutes(list, relDir = "") {
   const routes = [];
-  for (const entry of entries) {
+  for (const entry of list(relDir)) {
     if (entry.name.startsWith("_") || entry.name.startsWith("+")) continue;
-    if (!entry.isDirectory()) {
-      if (entry.name.endsWith(".tsx")) routes.push(entry.name.slice(0, -4));
-      continue;
-    }
-    for (const child of list(entry.name)) {
-      if (child.name.startsWith("_")) continue;
-      if (entry.name === "(tabs)") {
-        if (child.isDirectory()) routes.push(child.name);
-      } else if (child.name.endsWith(".tsx")) {
-        const leaf = child.name.slice(0, -4);
-        routes.push(leaf === "index" ? entry.name : `${entry.name}/${leaf}`);
-      }
+    const path = relDir ? `${relDir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      if (relDir === "(tabs)") routes.push(entry.name);
+      else routes.push(...appRoutes(list, path));
+    } else if (entry.name.endsWith(".tsx") && relDir !== "(tabs)") {
+      const route = path.slice(0, -4);
+      routes.push(route.endsWith("/index") ? route.slice(0, -6) : route);
     }
   }
   return routes;
 }
 
-/** Names the doc never writes in backticks, alone or as the end of a path
+/**
+ * The text under a markdown heading, up to the next heading of the same or a
+ * higher level. Empty when the heading is gone, so every name scoped to it is
+ * then reported and the rename cannot pass unnoticed.
+ */
+export function section(doc, heading) {
+  const start = doc.indexOf(`\n${heading}`);
+  if (start === -1) return "";
+  const level = heading.match(/^#+/)[0].length;
+  const rest = doc.slice(start + 1 + heading.length);
+  const end = rest.search(new RegExp(`^#{1,${level}} `, "m"));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** Names the text never writes in backticks, alone or as the end of a path
  * (`items.ts` and `convex/items.ts` both count). */
-export function undocumented(doc, names) {
+export function undocumented(text, names) {
   return names
     .filter(
-      (name) => !doc.includes(`\`${name}\``) && !doc.includes(`/${name}\``),
+      (name) => !text.includes(`\`${name}\``) && !text.includes(`/${name}\``),
     )
     .sort();
 }
@@ -74,25 +86,39 @@ export function undocumented(doc, names) {
 function main() {
   const doc = readFileSync(DOC, "utf8");
   const dirents = (dir) => readdirSync(dir, { withFileTypes: true });
-  const groups = {
-    "Schema tables": schemaTables(
-      readFileSync(join(CONVEX_DIR, "schema.ts"), "utf8"),
-    ),
-    "Convex modules": convexModules(readdirSync(CONVEX_DIR)),
-    "App routes": appRoutes(dirents(APP_ROUTES_DIR), (name) =>
-      dirents(join(APP_ROUTES_DIR, name)),
-    ),
-  };
+  // Tables and routes are common words (`items`, `import`), so each is looked
+  // for only in the section that lists it. Module filenames are specific
+  // enough to match anywhere in the doc.
+  const groups = [
+    {
+      label: "Schema tables",
+      where: BACKEND_HEADING,
+      text: section(doc, BACKEND_HEADING),
+      names: schemaTables(readFileSync(join(CONVEX_DIR, "schema.ts"), "utf8")),
+    },
+    {
+      label: "Convex modules",
+      where: DOC,
+      text: doc,
+      names: convexModules(readdirSync(CONVEX_DIR)),
+    },
+    {
+      label: "App routes",
+      where: NATIVE_HEADING,
+      text: section(doc, NATIVE_HEADING),
+      names: appRoutes((relDir) => dirents(join(APP_ROUTES_DIR, relDir))),
+    },
+  ];
 
   let total = 0;
   let failed = false;
-  for (const [label, names] of Object.entries(groups)) {
+  for (const { label, where, text, names } of groups) {
     total += names.length;
-    const missing = undocumented(doc, names);
+    const missing = undocumented(text, names);
     if (missing.length === 0) continue;
     if (!failed) console.error(`${DOC} is missing names from the tree.\n`);
     failed = true;
-    console.error(`${label}:`);
+    console.error(`${label} (looked in "${where}"):`);
     for (const name of missing) console.error(`  ${name}`);
   }
   if (failed) {

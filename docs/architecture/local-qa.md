@@ -67,9 +67,9 @@ only loads bundles whose native fingerprint matches. Rebuild with
 ## Signing in and seeding data
 
 - **Sign-in:** the anonymous "Continue without account" button. It shows only on
-  the development variant with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` set
-  (`src/lib/anonymous-auth.ts`), and the dev deployment must set
-  `AUTH_ENABLE_ANONYMOUS`.
+  the development variant with `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`
+  (`src/lib/anonymous-auth.ts`; any other value hides it), and the dev
+  deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
 - **Fixtures:** `devFixtures.resetCurrentUser` seeds items, spaces and a Pro
   subscription. Home cards carry `fixture-item-*` test ids.
 - **Saved flows:** `apps/native/.argent/flows`.
@@ -86,7 +86,8 @@ only loads bundles whose native fingerprint matches. Rebuild with
   `useEntitlement` return a lapsed, non-entitled state after its effects (so
   hook order is preserved) and revert the patch afterwards. Then Home, "Paste a
   link", "Article" reaches the Pro gate. "Paste a link" does nothing unless a
-  URL is on the device clipboard: `xcrun simctl pbcopy <udid>`.
+  URL is on the device clipboard. `pbcopy` reads standard input:
+  `printf '%s' '<url>' | xcrun simctl pbcopy <udid>`.
 - **Reduced motion.**
   `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true`,
   then relaunch the app. Set it back to `false` when done.
@@ -114,9 +115,9 @@ alias.
 
 - **Local emulator.** `adb reverse tcp:<port> tcp:<port>`, then open the dev
   client link with
-  `am start -a android.intent.action.VIEW -d '<dev client url>' app.shelvr.save.dev`.
+  `adb shell am start -a android.intent.action.VIEW -d '<dev client url>' app.shelvr.save.dev`.
 - **Share intents.**
-  `am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <url> -p app.shelvr.save.dev`.
+  `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <url> -p app.shelvr.save.dev`.
   The dev client cannot test a cold-launch share: from a stopped app the
   launcher's server picker swallows the intent. Only a warm share works. To
   replay one, send the same intent with `-f 0x00100000`.

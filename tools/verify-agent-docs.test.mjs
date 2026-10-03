@@ -5,6 +5,7 @@ import {
   appRoutes,
   convexModules,
   schemaTables,
+  section,
   undocumented,
 } from "./verify-agent-docs.mjs";
 
@@ -38,14 +39,9 @@ test("keeps config modules and drops tests and non-TypeScript files", () => {
   );
 });
 
-test("names routes the way the doc writes them", () => {
+test("names routes the way the doc writes them, at any depth", () => {
   const tree = {
-    "(tabs)": [file("_layout.tsx"), dir("(home)"), dir("(search)")],
-    item: [file("[id].tsx")],
-    space: [file("_layout.tsx"), file("index.tsx")],
-  };
-  const routes = appRoutes(
-    [
+    "": [
       file("_layout.tsx"),
       file("add.tsx"),
       file("notes.md"),
@@ -53,9 +49,43 @@ test("names routes the way the doc writes them", () => {
       dir("item"),
       dir("space"),
     ],
-    (name) => tree[name],
+    "(tabs)": [file("_layout.tsx"), dir("(home)"), dir("(search)")],
+    item: [file("[id].tsx"), dir("[id]")],
+    "item/[id]": [file("edit.tsx")],
+    space: [file("_layout.tsx"), file("index.tsx")],
+  };
+  assert.deepEqual(
+    appRoutes((relDir) => tree[relDir]),
+    ["add", "(home)", "(search)", "item/[id]", "item/[id]/edit", "space"],
   );
-  assert.deepEqual(routes, ["add", "(home)", "(search)", "item/[id]", "space"]);
+});
+
+test("a section ends at the next heading of its level or above", () => {
+  const doc = [
+    "# Doc",
+    "### Backend (`convex/`)",
+    "`items`",
+    "#### Detail",
+    "`spaces`",
+    "### Native",
+    "`import`",
+    "## Env",
+    "`other`",
+  ].join("\n");
+  assert.equal(
+    section(doc, "### Backend"),
+    " (`convex/`)\n`items`\n#### Detail\n`spaces`\n",
+  );
+  assert.equal(section(doc, "### Native"), "\n`import`\n");
+  assert.equal(section(doc, "### Gone"), "");
+});
+
+test("a route named like a keyword is not excused by another section", () => {
+  const doc = "\n### Backend\nuses `import` syntax\n### Native\n`add`\n";
+  assert.deepEqual(
+    undocumented(section(doc, "### Native"), ["add", "import"]),
+    ["import"],
+  );
 });
 
 test("a name counts only when the doc writes it in backticks", () => {
