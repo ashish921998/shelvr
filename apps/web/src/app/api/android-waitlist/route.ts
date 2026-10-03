@@ -18,7 +18,11 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type WaitlistSource = "hero" | "footer" | "unknown";
 
-type JoinWaitlistResult = { saved: boolean; emailProviderSynced: boolean };
+type JoinWaitlistResult = {
+  saved: boolean;
+  emailProviderSynced: boolean;
+  confirmationSent?: boolean;
+};
 
 function normalizeSource(value: unknown): WaitlistSource {
   return value === "hero" || value === "footer" ? value : "unknown";
@@ -111,9 +115,18 @@ export async function POST(request: Request) {
       throw new Error("Convex did not confirm the signup.");
     }
 
+    if (result.confirmationSent === false)
+      return NextResponse.json(
+        {
+          message:
+            "Confirmation email is temporarily unavailable. Please try again later.",
+        },
+        { status: 503 },
+      );
     return NextResponse.json({
       ok: true,
       emailProviderSynced: result.emailProviderSynced === true,
+      ...(result.confirmationSent === true ? { confirmationSent: true } : {}),
     });
   } catch (error) {
     serverLog("error", "android_waitlist_failed", {

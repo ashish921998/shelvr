@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
 
-import { decodeSharedVerdict, type SharedVerdict } from "@/lib/oracleShare";
+import { verifiedVerdict } from "@/lib/oracleProof";
+import { authorizeRequestBody } from "@/lib/requestBody";
+import { type SharedVerdict } from "@/lib/oracleShare";
 
 // The link preview is 1200×630. The story cut is 9:16, for saving to the
 // camera roll and posting to Stories.
@@ -237,7 +239,20 @@ function Card({
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const format: Format = params.get("format") === "story" ? "story" : "link";
-  const verdict = decodeSharedVerdict(params.get("c") ?? "");
+  if (
+    [...params.keys()].some((key) => key !== "c" && key !== "format") ||
+    params.getAll("c").length !== 1 ||
+    params.getAll("format").length > 1 ||
+    (params.has("format") &&
+      !["story", "link"].includes(params.get("format") ?? ""))
+  )
+    return new Response(null, { status: 400 });
+  if (!process.env.WAITLIST_SHARED_SECRET)
+    return new Response(null, { status: 503 });
+  const verdict = await verifiedVerdict(params.get("c") ?? "");
+  if (!verdict) return new Response(null, { status: 404 });
+  const refused = await authorizeRequestBody(request, "oracle-image");
+  if (refused) return refused;
   return new ImageResponse(
     <Card verdict={verdict} format={format} />,
     SIZES[format],
