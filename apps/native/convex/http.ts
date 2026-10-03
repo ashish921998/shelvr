@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
-import { env, httpAction } from "./_generated/server";
+import { env, httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import {
@@ -18,12 +18,19 @@ import {
   parseImageBegin,
   parseImageFinish,
   parseLinkOrNote,
+  readBoundedText,
+  readBoundedBlob,
+  BodyTooLargeError,
 } from "./model/captureRequest";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { saveErrorCode } from "./model/saveErrors";
+import {
+  MAX_STORED_IMAGE_BYTES,
+  imageSizeErrorCode,
+} from "./model/imagePolicy";
 import { secureCompare } from "./model/secureCompare";
 import {
   WaitlistInputError,
@@ -33,6 +40,84 @@ import {
 } from "./waitlist";
 
 const http = httpRouter();
+
+http.route({
+  path: "/image-upload",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const response = await receiveImageUpload(ctx, req);
+    response.headers.set("access-control-allow-origin", "*");
+    return response;
+  }),
+});
+
+http.route({
+  path: "/image-upload",
+  method: "OPTIONS",
+  handler: httpAction(
+    async () =>
+      new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "POST",
+          "access-control-allow-headers": "content-type",
+          "access-control-max-age": "600",
+        },
+      }),
+  ),
+});
+
+async function receiveImageUpload(
+  ctx: ActionCtx,
+  req: Request,
+): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token");
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) return captureUnauthorized();
+  let claim:
+    | {
+        kind: "accept";
+        operationId: import("./_generated/dataModel").Id<"itemOperations">;
+        claimTime: number;
+      }
+    | undefined;
+  try {
+    const result = await ctx.runMutation(internal.items.claimImageUpload, {
+      tokenHash: await sha256Hex(token),
+    });
+    if (result.kind === "reject") return captureUnauthorized();
+    if (result.kind === "stored") {
+      // Consume only a bounded retry body. Canceling a valid incoming stream
+      // before replying can reset HTTP/2 and hide the successful receipt.
+      await readBoundedBlob(req, MAX_STORED_IMAGE_BYTES);
+      return json({ storageId: result.storageId }, 200);
+    }
+    claim = result;
+    const blob = await readBoundedBlob(req, MAX_STORED_IMAGE_BYTES);
+    const sizeError = imageSizeErrorCode(blob.size);
+    if (sizeError) return json({ error: sizeError }, 422);
+    const storageId = await ctx.storage.store(blob);
+    const attached = await ctx.runMutation(internal.items.finishImageUpload, {
+      operationId: result.operationId,
+      claimTime: result.claimTime,
+      storageId,
+    });
+    claim = undefined;
+    return attached
+      ? json({ storageId }, 200)
+      : json({ error: "bad_request" }, 409);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError)
+      return json({ error: "image_too_large" }, 413);
+    return captureFailure("image_begin", error);
+  } finally {
+    if (claim)
+      await ctx.runMutation(internal.items.finishImageUpload, {
+        operationId: claim.operationId,
+        claimTime: claim.claimTime,
+      });
+  }
+}
 
 // Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
 auth.addHttpRoutes(http);
@@ -169,6 +254,37 @@ function json(body: unknown, status: number): Response {
   });
 }
 
+/** The marketing server claims a bounded parsing budget before reading the
+ * visitor's request. No visitor body is accepted by this endpoint. */
+http.route({
+  path: "/request-body",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (
+      !secret ||
+      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+    )
+      return json({ error: "unauthorized" }, 401);
+    const route = req.headers.get("x-shelvr-body-route");
+    if (route !== "oracle" && route !== "waitlist")
+      return json({ error: "bad_request" }, 400);
+    try {
+      await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
+        route,
+        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+      });
+      return json({ ok: true }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+      logEvent("error", "request_body_claim_failed", {
+        error_name: errorName(error),
+      });
+      return json({ error: "failed" }, 500);
+    }
+  }),
+});
+
 /**
  * Header the web server uses to pass the visitor's IP along. A dedicated name
  * (rather than `x-forwarded-for`) means the value cannot be confused with
@@ -200,7 +316,7 @@ http.route({
 
     let body: unknown;
     try {
-      body = await req.json();
+      body = JSON.parse(await readBoundedText(req, 4096));
     } catch {
       return json({ message: "Invalid request." }, 400);
     }
@@ -264,7 +380,7 @@ http.route({
 
     let body: unknown;
     try {
-      body = await req.json();
+      body = JSON.parse(await readBoundedText(req, 6 * 1024 * 1024));
     } catch {
       return json({ message: "Invalid request." }, 400);
     }
@@ -354,13 +470,28 @@ function captureFailure(route: CaptureRoute, error: unknown): Response {
 
 /** The caller's token hash and JSON body, or the response that ends it. */
 async function readCapture(
+  ctx: ActionCtx,
   req: Request,
 ): Promise<{ tokenHash: string; body: unknown } | Response> {
   const token = bearerToken(req.headers.get("authorization"));
   if (token === undefined) return captureUnauthorized();
   try {
-    return { tokenHash: await sha256Hex(token), body: await req.json() };
-  } catch {
+    const tokenHash = await sha256Hex(token);
+    if (
+      !(await ctx.runMutation(internal.appIntents.authorizeCaptureBody, {
+        tokenHash,
+      }))
+    ) {
+      return captureUnauthorized();
+    }
+    return {
+      tokenHash,
+      body: JSON.parse(await readBoundedText(req, 128 * 1024)),
+    };
+  } catch (error) {
+    if (error instanceof BodyTooLargeError)
+      return json({ error: "bad_request" }, 413);
+    if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
     return json({ error: "bad_request" }, 400);
   }
 }
@@ -369,7 +500,7 @@ http.route({
   path: "/app-intents/image/begin",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
-    const read = await readCapture(req);
+    const read = await readCapture(ctx, req);
     if (read instanceof Response) return read;
     const request = parseImageBegin(read.body);
     if (!request) return json({ error: "bad_request" }, 400);
@@ -395,7 +526,7 @@ http.route({
   path: "/app-intents/image/finish",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
-    const read = await readCapture(req);
+    const read = await readCapture(ctx, req);
     if (read instanceof Response) return read;
     const request = parseImageFinish(read.body);
     if (!request) return json({ error: "bad_request" }, 400);
@@ -438,7 +569,7 @@ http.route({
   path: "/app-intents/capture",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
-    const read = await readCapture(req);
+    const read = await readCapture(ctx, req);
     if (read instanceof Response) return read;
     const request = parseLinkOrNote(read.body);
     if (!request) return json({ error: "bad_request" }, 400);

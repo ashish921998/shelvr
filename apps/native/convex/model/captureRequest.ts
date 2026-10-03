@@ -1,6 +1,59 @@
 // Narrowing for the untrusted JSON bodies the iOS App Intents post to the
 // `/app-intents/*` routes (http.ts). Pure, so it is unit tested directly.
 
+export class BodyTooLargeError extends Error {}
+
+/** Bound bytes as they arrive, including requests with a missing or false
+ * Content-Length. Cancel rather than buffering the remainder. */
+export async function readBoundedText(
+  req: Request,
+  maxBytes: number,
+): Promise<string> {
+  const body = await readBoundedBlob(req, maxBytes);
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    await body.arrayBuffer(),
+  );
+}
+
+export async function readBoundedBlob(
+  req: Request,
+  maxBytes: number,
+): Promise<Blob> {
+  const length = req.headers.get("content-length");
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > maxBytes)) {
+    await req.body?.cancel();
+    throw new BodyTooLargeError();
+  }
+  if (
+    req.headers.get("content-encoding") &&
+    req.headers.get("content-encoding") !== "identity"
+  ) {
+    await req.body?.cancel();
+    throw new BodyTooLargeError();
+  }
+  if (!req.body) return new Blob([]);
+  const reader = req.body.getReader();
+  let bytes = 0;
+  const parts: BlobPart[] = [];
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > maxBytes) throw new BodyTooLargeError();
+      parts.push(new Uint8Array(chunk.value));
+    }
+    return new Blob(parts, {
+      type: req.headers.get("content-type") ?? "application/octet-stream",
+    });
+  } catch (error) {
+    await reader.cancel();
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /** Upper bound on a captured note, in characters. */
 export const MAX_CAPTURE_NOTE_LENGTH = 20_000;
 /** Upper bound on a captured URL before normalization. */

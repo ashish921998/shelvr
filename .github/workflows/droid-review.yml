@@ -13,19 +13,23 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
-      id-token: write
       actions: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 1
-      - name: Run Droid Auto Review
-        uses: Factory-AI/droid-action@main
+      - name: Prepare pinned droid dependencies
+        uses: ./.github/actions/secure-review
         with:
+          provider: droid
+      - name: Run Droid Auto Review
+        uses: ./.github/runtime/droid
+        with:
+          github_token: ${{ github.token }}
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}
           automatic_review: true
           automatic_security_review: true

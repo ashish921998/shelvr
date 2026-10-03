@@ -37,6 +37,9 @@ export default defineSchema({
     acceptedAt: v.optional(v.number()),
     refundSharing: v.boolean(),
     changedAt: v.number(),
+    // Historical deployments wrote this field. Preserve it while those rows
+    // exist; dropping it rejects the deployment instead of rolling it back.
+    revision: v.optional(v.number()),
     deleting: v.optional(v.boolean()),
     syncState: v.union(
       v.literal("pending"),
@@ -290,10 +293,16 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("complete")),
     storageId: v.optional(v.id("_storage")),
     itemId: v.optional(v.id("items")),
+    uploadUrl: v.optional(v.string()),
+    uploadUrlIssuedAt: v.optional(v.number()),
+    uploadTokenHash: v.optional(v.string()),
+    uploadClaimedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     // The logical unique key — every mutation loads the row through this index.
     .index("by_user_operation", ["userId", "operationId"])
+    .index("by_user_and_kind_and_status", ["userId", "kind", "status"])
+    .index("by_upload_token_hash", ["uploadTokenHash"])
     // deleteItem cleanup: releases ledger rows whose item was deleted so the
     // same durable operationId can be re-performed. Pending rows have no
     // itemId and so are never returned by this index lookup.

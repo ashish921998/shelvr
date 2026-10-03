@@ -4,6 +4,13 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 crons.interval(
+  "cleanup unattached storage",
+  { hours: 24 },
+  internal.items.cleanupOrphanStorage,
+  {},
+);
+
+crons.interval(
   "retry refund consent sync",
   { minutes: 1 },
   internal.legalConsent.retry,

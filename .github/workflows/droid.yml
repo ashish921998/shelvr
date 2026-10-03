@@ -25,14 +25,18 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-      id-token: write
+      id-token: write # Required for the existing GitHub App authentication flow.
       actions: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 1
+      - name: Prepare pinned droid dependencies
+        uses: ./.github/actions/secure-review
+        with:
+          provider: droid
       - name: Run Droid Exec
-        uses: Factory-AI/droid-action@main
+        uses: ./.github/runtime/droid
         with:
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}

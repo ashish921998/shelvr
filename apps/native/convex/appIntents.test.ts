@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestConvexForDataModel } from "convex-test";
 import { newConvexTest } from "./test.setup";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { MAX_CAPTURE_TOKENS_PER_USER } from "./appIntents";
 import { sha256Hex } from "./model/captureTokens";
@@ -24,6 +24,137 @@ afterEach(() => {
 
 const OP = "siri:11111111-1111-4111-8111-111111111111";
 const OP_2 = "siri:22222222-2222-4222-8222-222222222222";
+
+describe("bounded upload endpoint", () => {
+  it("supports the upload URL contract for browser clients", async () => {
+    const { t } = await setup();
+    const preflight = await t.fetch("/image-upload", { method: "OPTIONS" });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-methods")).toBe("POST");
+    const rejected = await t.fetch("/image-upload", { method: "POST" });
+    expect(rejected.headers.get("access-control-allow-origin")).toBe("*");
+  });
+  it("records a successful upload before returning, and retries reuse its storage id", async () => {
+    const { t } = await setup();
+    const began = await t.mutation(api.items.beginImageImport, {
+      operationId: OP,
+    });
+    if (began.kind !== "upload") throw new Error("Expected upload");
+    const path =
+      new URL(began.uploadUrl).pathname + new URL(began.uploadUrl).search;
+    const uploaded = await t.fetch(path, {
+      method: "POST",
+      body: new Uint8Array([1, 2, 3]),
+      headers: { "content-type": "image/jpeg" },
+    });
+    expect(uploaded.status).toBe(200);
+    const result = await uploaded.json();
+    const op = await t.query(api.items.getImportOperation, { operationId: OP });
+    expect(op?.storageId).toBe(result.storageId);
+    const retry = await t.fetch(path, {
+      method: "POST",
+      body: new Uint8Array([4]),
+    });
+    expect(await retry.json()).toEqual(result);
+    let canceled = false;
+    const streamedRetry = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([5]));
+        controller.close();
+      },
+      cancel() {
+        canceled = true;
+      },
+    });
+    const received = await t.fetch(path, {
+      method: "POST",
+      body: streamedRetry,
+      duplex: "half",
+    } as RequestInit);
+    expect(await received.json()).toEqual(result);
+    expect(canceled).toBe(false);
+  });
+
+  it("rejects invalid capabilities and oversized bodies before storing", async () => {
+    const { t } = await setup();
+    expect(
+      (
+        await t.fetch("/image-upload?token=invalid", {
+          method: "POST",
+          body: "abc",
+        })
+      ).status,
+    ).toBe(401);
+    const began = await t.mutation(api.items.beginImageImport, {
+      operationId: OP,
+    });
+    if (began.kind !== "upload") throw new Error("Expected upload");
+    const url = new URL(began.uploadUrl);
+    const path = url.pathname + url.search;
+    expect(
+      (
+        await t.fetch(path, {
+          method: "POST",
+          body: "abc",
+          headers: { "content-length": "20000000" },
+        })
+      ).status,
+    ).toBe(413);
+    expect((await t.fetch(path, { method: "POST", body: "" })).status).toBe(
+      422,
+    );
+    expect(
+      await t.run((ctx) => ctx.db.system.query("_storage").collect()),
+    ).toEqual([]);
+    expect((await t.fetch(path, { method: "POST", body: "abc" })).status).toBe(
+      200,
+    );
+  });
+
+  it("allows only one active receiver and reclaims a losing claim's blob", async () => {
+    const { t } = await setup();
+    const began = await t.mutation(api.items.beginImageImport, {
+      operationId: OP,
+    });
+    if (began.kind !== "upload") throw new Error("Expected upload");
+    const tokenHash = await sha256Hex(
+      new URL(began.uploadUrl).searchParams.get("token")!,
+    );
+    const claim = await t.mutation(internal.items.claimImageUpload, {
+      tokenHash,
+    });
+    expect(
+      await t.mutation(internal.items.claimImageUpload, { tokenHash }),
+    ).toEqual({ kind: "reject" });
+    if (claim.kind !== "accept") throw new Error("Expected claim");
+    const storageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["loser"])),
+    );
+    expect(
+      await t.mutation(internal.items.finishImageUpload, {
+        operationId: claim.operationId,
+        claimTime: claim.claimTime - 1,
+        storageId,
+      }),
+    ).toBe(false);
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", storageId)),
+    ).toBeNull();
+  });
+
+  it("rejects an invalid capture token before parsing malformed JSON", async () => {
+    const { t } = await setup();
+    expect(
+      (
+        await t.fetch("/app-intents/capture", {
+          method: "POST",
+          body: "not-json",
+          headers: { authorization: "Bearer invalid" },
+        })
+      ).status,
+    ).toBe(401);
+  });
+});
 
 /** A signed-in user with a real users row, Pro unless `pro` is false, and a
  * freshly issued capture token. */
