@@ -18,7 +18,7 @@ const UI_PATTERNS = [
   /^apps\/native\/src\/.+\.(tsx|jsx)$/,
   /^apps\/native\/src\/(components|widgets)\/.+\.ts$/,
   /^apps\/native\/src\/unistyles\.ts$/,
-  /^apps\/native\/src\/lib\/(appearance|appearance-runtime|color|header-layout|motion|tab-bar-motion)\.ts$/,
+  /^apps\/native\/src\/lib\/(appearance|appearance-runtime|color|header-layout|motion|tab-bar-motion|onboarding-labels|onboarding-demo)\.ts$/,
   /^apps\/native\/src\/locales\/.+\.json$/,
   /^apps\/native\/locales\//,
   /^apps\/native\/assets\//,
@@ -47,13 +47,42 @@ export const WAIVER_LABEL = "no-ui-change";
 // not evidence, so a body left as the bare template has to read as empty.
 const stripComments = (text) => text.replace(/<!--[\s\S]*?-->/g, "");
 
+// A line that opens a code fence: a run of three or more backticks or tildes.
+const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})/;
+
+/**
+ * Splits `text` into lines, each marked with whether it sits inside a code
+ * fence (fence lines included). As in CommonMark, a fence closes only on a run
+ * of the same character at least as long as the one that opened it, so a
+ * shorter fence quoted inside a longer one stays quoted.
+ */
+function fencedLines(text) {
+  let open = null;
+  return text.split(/\r?\n/).map((line) => {
+    const run = FENCE_OPEN.exec(line)?.[1];
+    if (open === null) {
+      if (run) open = run;
+      return { line, fenced: Boolean(run) };
+    }
+    if (
+      run &&
+      run[0] === open[0] &&
+      run.length >= open.length &&
+      line.trim() === run
+    ) {
+      open = null;
+    }
+    return { line, fenced: true };
+  });
+}
+
 // Pasted output in a code fence is evidence that something ran, but an image
 // tag quoted inside one shows nothing.
 const stripFences = (text) =>
-  text.replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1/gm, "");
-
-// A line opening or closing a code fence; a heading inside one is quoted text.
-const FENCE = /^[ \t]*(```|~~~)/;
+  fencedLines(text)
+    .filter((l) => !l.fenced)
+    .map((l) => l.line)
+    .join("\n");
 
 const normalizeTitle = (title) =>
   title
@@ -67,13 +96,10 @@ const normalizeTitle = (title) =>
  * level. Null when there is no such heading.
  */
 export function section(body, title) {
-  const lines = stripComments(body).split(/\r?\n/);
   const want = normalizeTitle(title);
   let level = 0;
   const out = [];
-  let fenced = false;
-  for (const line of lines) {
-    if (FENCE.test(line)) fenced = !fenced;
+  for (const { line, fenced } of fencedLines(stripComments(body))) {
     const heading = fenced ? null : /^(#{1,6})[ \t]+(.*)$/.exec(line);
     if (level === 0) {
       if (heading && normalizeTitle(heading[2]) === want) {
@@ -93,13 +119,8 @@ const PLACEHOLDER = /^((todo|tbd|tbc|wip)\b.*|pending|n\/?a|-+|\.+)$/i;
 
 export function hasContent(text) {
   if (text === null) return false;
-  let fenced = false;
-  return text.split(/\r?\n/).some((raw) => {
-    if (FENCE.test(raw)) {
-      fenced = !fenced;
-      return false;
-    }
-    if (fenced) return raw.trim().length > 0;
+  return fencedLines(text).some(({ line: raw, fenced }) => {
+    if (fenced) return !FENCE_OPEN.test(raw) && raw.trim().length > 0;
     if (/^[ \t]*#{1,6}[ \t]/.test(raw)) return false;
     const line = raw
       .replace(/^\s*([-*+>]|\d+\.)?\s*(\[[ xX]?\])?\s*/, "")
@@ -122,12 +143,18 @@ const IMAGE_URL = `(${MEDIA_URL}|${ATTACHMENT_URL})`;
 export function hasVisualEvidence(text) {
   const clean = stripFences(stripComments(text));
   // An embed, or a plain link to a recording: both open the media.
-  const markdown = new RegExp(String.raw`!?\[[^\]]*\]\(\s*${IMAGE_URL}\s*\)`);
+  const markdown = new RegExp(
+    String.raw`!?\[[^\]]*\]\(\s*${IMAGE_URL}(\s+("[^"]*"|'[^']*'))?\s*\)`,
+  );
   const tag = new RegExp(
     String.raw`<(img|video|source)\b[^>]*\bsrc=["']?${IMAGE_URL}(?=["'\s>/])`,
     "i",
   );
-  const bare = new RegExp(String.raw`(^|\s)${IMAGE_URL}(?=\s|$)`, "m");
+  // Sentence punctuation may follow a bare link; another extension may not.
+  const bare = new RegExp(
+    String.raw`(^|\s)${IMAGE_URL}(?=[,;:!?)]?(\s|$)|\.(\s|$))`,
+    "m",
+  );
   return markdown.test(clean) || tag.test(clean) || bare.test(clean);
 }
 

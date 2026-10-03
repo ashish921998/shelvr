@@ -55,10 +55,11 @@ jobs:
           node-version: 20.20.0
 
       # The head commits arrive as data for the diff; they are never checked out.
+      # The exact head this event names, so a later push cannot leave it unfetched.
       - name: Fetch the pull request's commits
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: git fetch --no-tags origin "+refs/pull/$PR_NUMBER/head:refs/remotes/pr/head"
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git fetch --no-tags origin "$HEAD_SHA"
 
       # The body and labels go through the environment, never into the script
       # text, so nothing a description says can run as shell.

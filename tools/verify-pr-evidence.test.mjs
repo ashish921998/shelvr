@@ -134,7 +134,19 @@ test("malformed or non-image links are not visual evidence", () => {
   assert.equal(hasVisualEvidence("see https://github.com/o/r/pull/1"), false);
 });
 
+test("a shorter fence inside a longer one stays quoted", () => {
+  const quoted = "````\n```\n![shot](https://x.dev/a.png)\n````";
+  assert.equal(hasVisualEvidence(quoted), false);
+  const body = filled({ evidence: quoted });
+  assert.equal(evidenceProblems(body, [SCREEN]).length, 1);
+  const fakeSections = `## Summary\n\n\`\`\`\`\n\`\`\`\n${filled()}\n\`\`\`\``;
+  assert.match(evidenceProblems(fakeSections, [])[0], /no "## Verification"/);
+});
+
 test("markdown images, video, and media links count as evidence", () => {
+  assert.ok(hasVisualEvidence('[recording](https://x.dev/a.mp4 "demo")'));
+  assert.ok(hasVisualEvidence("Home tab: https://x.dev/a.png."));
+  assert.ok(hasVisualEvidence("Before https://x.dev/a.png, after."));
   assert.ok(hasVisualEvidence("![home](https://x.dev/a.jpg)"));
   assert.ok(hasVisualEvidence(`![home](${SHOT})`));
   assert.ok(hasVisualEvidence("[recording](https://cdn.example.com/demo.mp4)"));
@@ -154,6 +166,8 @@ test("which files count as UI", () => {
     "apps/native/src/lib/tab-bar-motion.ts",
     "apps/native/src/lib/header-layout.ts",
     "apps/native/src/lib/appearance.ts",
+    "apps/native/src/lib/onboarding-labels.ts",
+    "apps/native/src/lib/onboarding-demo.ts",
     "apps/native/src/components/splash/timeline.ts",
     "apps/web/src/lib/motion.ts",
     "apps/native/src/locales/en.json",
