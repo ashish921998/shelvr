@@ -1,3 +1,6 @@
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { variant: "production" } } },
+}));
 // @vitest-environment jsdom
 // Tests for the Recent Saves widget sync. The file system, nitro image module,
 // widget runtime, and query layer are all stubbed, so the tests exercise the
