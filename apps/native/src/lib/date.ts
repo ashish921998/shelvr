@@ -25,3 +25,26 @@ export function formatShortDate(ms: number): string {
     year: "numeric",
   });
 }
+
+/**
+ * Dates for the paywall's trial timeline, filled into its `{{ custom.* }}`
+ * labels ("Today · Oct 2"). The dashboard defaults are empty, so a build that
+ * passes nothing shows the bare labels.
+ */
+export function trialTimelineVariables(now: number = Date.now()) {
+  const day = (offset: number) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + offset);
+    return date.toLocaleDateString(formattingLocale(), {
+      month: "short",
+      day: "numeric",
+    });
+  };
+  const string = (value: string) => ({ type: "string", value }) as const;
+  return {
+    trial_today: string(` · ${day(0)}`),
+    trial_day5: string(` · ${day(5)}`),
+    trial_day7: string(` · ${day(7)}`),
+    trial_remind_date: string(day(5)),
+  };
+}

@@ -426,7 +426,9 @@ describe("exit offer after a paywall close", () => {
 
     // The main paywall only: an expired offer does not return on close.
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
-    expect(mock.presentPaywall).toHaveBeenCalledWith();
+    expect(mock.presentPaywall).toHaveBeenCalledWith({
+      customVariables: expect.any(Object),
+    });
   });
 
   it("does not follow a purchase", async () => {

@@ -28,6 +28,7 @@ import {
   timeLeft,
 } from "@/lib/exit-offer";
 import { t } from "@/lib/i18n";
+import { trialTimelineVariables } from "@/lib/date";
 import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
@@ -379,7 +380,7 @@ async function presentPaywallImpl(
     const enriched = { ...properties, ...(await context) };
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall(),
+      () => rcui.presentPaywall({ customVariables: trialTimelineVariables() }),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
