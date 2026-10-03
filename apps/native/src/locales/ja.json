@@ -398,6 +398,10 @@
     "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
   },
   "digest.namedSingle": "「%{title}」を今週保存しました",
+  "digest.namedShelfCount": {
+    "other": "「%{title}」ほか%{formattedCount}件がシェルフで待っています"
+  },
+  "digest.namedShelfSingle": "「%{title}」がシェルフで待っています",
   "reminder.readTitle": "あとで読む",
   "reminder.readBody": "「%{title}」、時間のあるときにどうぞ。",
   "reminder.cookTitle": "保存したレシピから",

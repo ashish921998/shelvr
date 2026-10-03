@@ -398,6 +398,10 @@
     "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
   },
   "digest.namedSingle": "이번 주에 저장한 '%{title}'",
+  "digest.namedShelfCount": {
+    "other": "'%{title}' 외 %{formattedCount}개가 책장에서 기다리고 있어요"
+  },
+  "digest.namedShelfSingle": "'%{title}', 책장에서 기다리고 있어요",
   "reminder.readTitle": "나중에 볼 글",
   "reminder.readBody": "'%{title}', 여유 있을 때 읽어 보세요.",
   "reminder.cookTitle": "저장한 레시피에서",

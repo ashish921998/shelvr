@@ -416,6 +416,12 @@
     "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
   },
   "digest.namedSingle": "« %{title} », enregistré cette semaine",
+  "digest.namedShelfCount": {
+    "one": "« %{title} » et %{formattedCount} autre contenu vous attendent sur votre étagère",
+    "many": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère",
+    "other": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère"
+  },
+  "digest.namedShelfSingle": "« %{title} » vous attend sur votre étagère",
   "reminder.readTitle": "Enregistré pour plus tard",
   "reminder.readBody": "« %{title} » vous attend quand vous voulez.",
   "reminder.cookTitle": "Parmi vos recettes enregistrées",

@@ -377,6 +377,8 @@ export type MessageParams = {
   "digest.waitingCount": { count: number };
   "digest.namedCount": { title: string; count: number };
   "digest.namedSingle": { title: string };
+  "digest.namedShelfCount": { title: string; count: number };
+  "digest.namedShelfSingle": { title: string };
   "reminder.readTitle": undefined;
   "reminder.readBody": { title: string };
   "reminder.cookTitle": undefined;

@@ -406,6 +406,11 @@
     "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
   },
   "digest.namedSingle": "„%{title}“ – diese Woche gespeichert",
+  "digest.namedShelfCount": {
+    "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt warten in deinem Regal",
+    "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte warten in deinem Regal"
+  },
+  "digest.namedShelfSingle": "„%{title}“ wartet in deinem Regal",
   "reminder.readTitle": "Für später gespeichert",
   "reminder.readBody": "„%{title}“ wartet auf dich, wenn du Zeit hast.",
   "reminder.cookTitle": "Aus deinen gespeicherten Rezepten",
