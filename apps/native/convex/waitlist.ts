@@ -174,6 +174,7 @@ export const upsertSignup = internalMutation({
       consentText:
         args.product === "shelvr-android" ? ANDROID_CONSENT_TEXT : CONSENT_TEXT,
       consentedAt: 0,
+      confirmed: false,
       confirmationHash: args.confirmationHash,
       confirmationExpiresAt: now + 24 * 60 * 60 * 1000,
       firstSubmittedAt: now,
@@ -243,8 +244,9 @@ export const listSignupsNeedingResendSync = internalQuery({
       // fill the retry window and starve newer, still-retryable rows.
       const page = await ctx.db
         .query("waitlistSignups")
-        .withIndex("by_resendStatus_attempts", (q) =>
+        .withIndex("by_confirmed_and_resendStatus_and_resendAttempts", (q) =>
           q
+            .eq("confirmed", true)
             .eq("resendStatus", status)
             .lt("resendAttempts", RESEND_MAX_ATTEMPTS),
         )
@@ -448,7 +450,7 @@ export async function joinWaitlist(
   const row = await ctx.runQuery(internal.waitlist.getSignup, {
     id: signup.id,
   });
-  if (row?.confirmedAt !== undefined) {
+  if (row?.confirmedAt !== undefined || signup.resendStatus === "synced") {
     // Public resubmits never change existing provider preferences.
     return {
       saved: true,
@@ -550,6 +552,7 @@ export const confirmSignup = internalMutation({
       return null;
     await ctx.db.patch(row._id, {
       confirmedAt: Date.now(),
+      confirmed: true,
       consentedAt: Date.now(),
       confirmationHash: undefined,
       confirmationExpiresAt: undefined,

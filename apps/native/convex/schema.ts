@@ -565,6 +565,7 @@ export default defineSchema({
     consentText: v.string(),
     consentedAt: v.number(),
     confirmedAt: v.optional(v.number()),
+    confirmed: v.optional(v.boolean()),
     confirmationHash: v.optional(v.string()),
     confirmationExpiresAt: v.optional(v.number()),
     firstSubmittedAt: v.number(),
@@ -581,6 +582,11 @@ export default defineSchema({
   })
     .index("by_email_and_product", ["email", "product"])
     .index("by_confirmationHash", ["confirmationHash"])
+    .index("by_confirmed_and_resendStatus_and_resendAttempts", [
+      "confirmed",
+      "resendStatus",
+      "resendAttempts",
+    ])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below
     // the attempt cap without scanning the whole waitlist.
     .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),

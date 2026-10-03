@@ -28,7 +28,7 @@ export default function ShareRow({
   const { code, url } = useMemo(() => {
     const code = verdict.shareCode ?? "";
     return { code, url: `${window.location.origin}/oracle/s?c=${code}` };
-  }, [mode, verdict]);
+  }, [verdict]);
   const imagePath = sharedVerdictImagePath(code, "story");
 
   // Safari only shares inside the tap's user activation, so the card is
