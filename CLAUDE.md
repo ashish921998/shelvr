@@ -125,7 +125,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
-  the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
+  the waitlist receiver at `/waitlist/join`, Apple's Get Retention Message endpoint at
+  `/retention-messaging` (authenticated by the App Store's JWS signature, checked in
+  `model/appleJws.ts`), and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
@@ -249,6 +251,9 @@ needed at runtime by the features that use them:
 - `CONVEX_SITE_URL` — set by Convex; `auth.config.ts` uses it as the JWT issuer domain
 - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials
 - `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET` — Sign-in-with-Apple Service ID + signed JWT secret
+- `APPLE_RETENTION_MESSAGE_ID` — id of the Apple-approved retention message
+  `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
+  the default message configured for the product
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
