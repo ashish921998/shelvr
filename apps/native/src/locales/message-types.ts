@@ -288,6 +288,8 @@ export type MessageParams = {
   "search.noResultsTitle": undefined;
   "navigation.spacesHeader": undefined;
   "spaces.addFirst": undefined;
+  "spaces.waitingTitle": undefined;
+  "spaces.waitingBody": undefined;
   "loading.spaces": undefined;
   "spaces.listEmptyTitle": undefined;
   "spaces.listEmptyBody": undefined;
@@ -485,10 +487,16 @@ export type MessageParams = {
   "home.howToMoreHelp": undefined;
   "home.pasteLink": undefined;
   "home.onYourShelf": undefined;
-  "home.progressTitle": undefined;
+  "home.progressTitleFirst": undefined;
+  "home.progressTitleNext": undefined;
+  "home.progressTitleLast": undefined;
   "home.progressBody": undefined;
   "home.progressCount": { saved: number; total: number };
-  "home.progressAdd": undefined;
+  "home.progressShare": undefined;
+  "home.progressShareAndroid": undefined;
+  "home.progressShareHelp": undefined;
+  "home.progressPhotos": undefined;
+  "home.progressNote": undefined;
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
   "demo.pickHelp": undefined;
