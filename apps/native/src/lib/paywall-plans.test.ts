@@ -196,6 +196,8 @@ describe("planCopy", () => {
 
   it("monthly bills today and offers the annual trial when there is one", () => {
     const copy = planCopy("monthly", true, now);
+    // Monthly is charged today, so it never borrows the trial headline.
+    expect(copy.titleKey).toBe("paywall.planTitle");
     expect(copy.ctaKey).toBe("paywall.ctaMonthly");
     expect(copy.disclosureKey).toBe("paywall.disclosureMonthly");
     expect(copy.timeline[0].headlineKey).toBe("paywall.billedToday");

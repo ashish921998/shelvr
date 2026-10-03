@@ -313,7 +313,7 @@ export function planCopy(plan: Plan, trial: boolean, now: number): PlanCopy {
     };
   }
   return {
-    titleKey: trial ? "paywall.planTitleTrial" : "paywall.planTitle",
+    titleKey: "paywall.planTitle",
     ctaKey: "paywall.ctaMonthly",
     disclosureKey: "paywall.disclosureMonthly",
     timeline: [
