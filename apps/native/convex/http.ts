@@ -42,6 +42,7 @@ import {
   isWaitlistProduct,
   isWaitlistSource,
   joinWaitlist,
+  confirmWaitlist,
 } from "./waitlist";
 
 const http = httpRouter();
@@ -311,7 +312,7 @@ http.route({
     )
       return json({ error: "unauthorized" }, 401);
     const route = req.headers.get("x-shelvr-body-route");
-    if (route !== "oracle" && route !== "waitlist")
+    if (route !== "oracle" && route !== "waitlist" && route !== "oracle-image")
       return json({ error: "bad_request" }, 400);
     try {
       await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
@@ -652,3 +653,31 @@ function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
 }
 
 export default http;
+
+http.route({
+  path: "/waitlist/confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (
+      !secret ||
+      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+    )
+      return json({ error: "unauthorized" }, 401);
+    try {
+      await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
+        route: "waitlist",
+        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+      });
+      const { token } = JSON.parse(await readBoundedText(req, 1024)) as {
+        token?: unknown;
+      };
+      if (typeof token !== "string" || !(await confirmWaitlist(ctx, token)))
+        return json({ error: "invalid_token" }, 400);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+      return json({ error: "invalid_request" }, 400);
+    }
+  }),
+});

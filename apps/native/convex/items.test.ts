@@ -290,7 +290,7 @@ describe("listRecentItems", () => {
     expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
   });
 
-  it("keeps serving a pre-clock build through the expiry webhook window", async () => {
+  it("does not extend access through the expiry webhook window", async () => {
     // A period that ended before its webhook landed still says "pro", so
     // the status-only fallback keeps the installed build's widget fed
     // while a build that sends its clock is already cut off.
@@ -309,7 +309,7 @@ describe("listRecentItems", () => {
 
     await expect(
       t.query(api.items.listRecentItems, { limit: 5 }),
-    ).resolves.toHaveLength(1);
+    ).resolves.toEqual([]);
     await expect(
       t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
     ).resolves.toEqual([]);

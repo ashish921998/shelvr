@@ -1,3 +1,4 @@
+import { shareBatchAllowed } from "@/lib/share/storage";
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { recordShareSaved } from "@/lib/first-share";
 import {
@@ -182,7 +183,7 @@ export default function ShareScreen() {
    * processor payloads and the reconcile effect run against the same list. */
   const rawPayloads = useMemo<RawSharePayload[]>(
     () =>
-      sharedPayloads.map((p) => ({
+      (shareBatchAllowed(sharedPayloads) ? sharedPayloads : []).map((p) => ({
         value: p.value,
         shareType: p.shareType,
         mimeType: p.mimeType,
@@ -257,7 +258,7 @@ export default function ShareScreen() {
   // the raw payloads (see processorPayloads) and entries the fallback cannot
   // resolve surface as failed entries on the partial screen.
   const nothingResolved =
-    !isResolving && sharedPayloads.length === 0 && phase.kind === "idle";
+    !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
   // --- Phase render ---------------------------------------------------------
 
