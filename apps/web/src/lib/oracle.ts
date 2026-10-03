@@ -15,6 +15,7 @@ export type OracleInput =
 export type OracleMode = OracleInput["kind"];
 
 export type OracleVerdict = {
+  shareCode?: string;
   persona: string;
   tagline: string;
   spaces: { name: string; reason: string }[];
