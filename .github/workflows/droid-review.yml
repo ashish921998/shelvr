@@ -16,6 +16,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write # The pinned action's validator still exchanges an OIDC token.
       actions: read
     steps:
       - name: Checkout repository
