@@ -47,12 +47,15 @@ export async function readBoundedText(
 
 export async function authorizeRequestBody(
   request: Request,
-  route: "oracle" | "waitlist",
+  route: "oracle" | "waitlist" | "oracle-image",
 ): Promise<Response | undefined> {
   const site = convexSiteUrl();
   const secret = process.env.WAITLIST_SHARED_SECRET;
   // The route's existing unconfigured response remains responsible for this.
-  if (!site || !secret) return undefined;
+  if (!site || !secret)
+    return route === "oracle-image"
+      ? Response.json({ message: "Please try again later." }, { status: 503 })
+      : undefined;
   try {
     const ip = clientIp(request);
     const response = await fetch(`${site}/request-body`, {

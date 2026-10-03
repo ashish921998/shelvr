@@ -397,25 +397,17 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves for the Pro-only home-screen widget. The status
- * index reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view.
- *
- * Pro is checked without ever reading the wall clock (a query is not rerun
- * as time advances, so a Date.now() read could serve stale access). A
- * caller that sends its refreshed clock gets an exact expiry check; a
- * build that predates the `now` argument keeps its saves while the stored
- * subscription status is active, and the RevenueCat webhook lapses that
- * status when a subscription actually expires. */
+/** Pro widget access follows server-maintained subscription status. Client time
+ * may narrow access, but cannot extend it past server expiry. */
 export const listRecentItems = query({
   args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const entitled =
-      args.now === undefined
-        ? await hasProEntitlementStatus(ctx, userId)
-        : await hasProEntitlementAt(ctx, userId, args.now);
+      (await hasProEntitlementStatus(ctx, userId)) &&
+      (args.now === undefined ||
+        (await hasProEntitlementAt(ctx, userId, args.now)));
     if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
@@ -1604,6 +1596,9 @@ function validateLinkOrNotePayload(
   }
   if (!("note" in payload) || payload.note.trim() === "") {
     throw new Error("Note text is empty");
+  }
+  if (payload.note.length > MAX_NOTE_TEXT_CHARS) {
+    throw new Error("Note text is too long");
   }
 }
 

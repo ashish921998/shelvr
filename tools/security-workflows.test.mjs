@@ -39,12 +39,26 @@ test("review preparations pin every upstream checkout and run before secrets are
     "claude-code-review",
   ]) {
     const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
-    const preparation = source.indexOf("uses: ./.secure-review-tooling/.github/actions/secure-review");
+    const preparation = source.indexOf(
+      "uses: ./.secure-review-tooling/.github/actions/secure-review",
+    );
     const runtime = source.indexOf("uses: ./.secure-review-tooling/runtime/");
-    assert.match(source, /repository:.*github\.repository.*\s+ref: [a-f0-9]{40}\s+path: \.secure-review-tooling/);
+    assert.match(
+      source,
+      /repository:.*github\.repository.*\s+ref: [a-f0-9]{40}\s+path: \.secure-review-tooling/,
+    );
     assert.notEqual(preparation, -1);
     assert.notEqual(runtime, -1);
     assert.ok(preparation < runtime);
     assert.match(source, /fetch-depth: 1\s+persist-credentials: false/);
+  }
+});
+
+test("tag-triggered paid agents require an authorized author before job execution", () => {
+  for (const name of ["claude", "droid"]) {
+    const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
+    assert.match(source, /github\.actor == github\.repository_owner/);
+    assert.match(source, /OWNER.*MEMBER.*COLLABORATOR/);
+    assert.match(source, /author_association/);
   }
 });

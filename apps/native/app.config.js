@@ -131,6 +131,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: displayName(appConfig.expo.name ?? "Shelvr"),
   icon: isProduction ? appConfig.expo.icon : "./assets/icon-dev.png",
+  scheme: isProduction ? "shelvr" : `shelvr${idSuffix.replace(".", "-")}`,
   ios: {
     ...appConfig.expo.ios,
     ...config?.ios,
@@ -153,6 +154,12 @@ module.exports = ({ config }) => ({
         : {}),
     },
     bundleIdentifier: bundleId,
+    associatedDomains: isProduction
+      ? [
+          "applinks:shelvr-web.vercel.app",
+          "webcredentials:shelvr-web.vercel.app",
+        ]
+      : [],
   },
   android: {
     ...appConfig.expo.android,
@@ -208,7 +215,7 @@ module.exports = ({ config }) => ({
     [
       "expo-widgets",
       {
-        groupIdentifier: "group.app.shelvr.save",
+        groupIdentifier: `group.${bundleId}`,
         widgets: [
           {
             name: "RecentSaves",
@@ -250,6 +257,12 @@ module.exports = ({ config }) => ({
                 ? {
                     ...ext,
                     bundleIdentifier: `${bundleId}.expo-sharing-extension`,
+                    entitlements: {
+                      ...ext.entitlements,
+                      "com.apple.security.application-groups": [
+                        `group.${bundleId}`,
+                      ],
+                    },
                   }
                 : ext,
             ),

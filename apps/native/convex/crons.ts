@@ -107,4 +107,18 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "recover expired subscriptions",
+  { minutes: 1 },
+  internal.subscriptions.recoverExpiredSubscriptions,
+  {},
+);
+
+crons.interval(
+  "confirm legacy unsynced waitlist requests",
+  { hours: 1 },
+  internal.waitlist.requestLegacyConfirmations,
+  {},
+);
+
 export default crons;

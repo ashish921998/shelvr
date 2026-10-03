@@ -53,3 +53,25 @@ describe("Firebase build configuration", () => {
     },
   );
 });
+
+it("isolates the widget group and callback scheme for co-installed variants", () => {
+  for (const variant of ["development", "preview", "production"]) {
+    const config = validate(variant, "ios") as unknown as {
+      scheme: string;
+      plugins: (string | [string, { groupIdentifier?: string }])[];
+    };
+    const widget = config.plugins.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === "expo-widgets",
+    ) as [string, { groupIdentifier: string }];
+    const suffix =
+      variant === "production"
+        ? ""
+        : variant === "preview"
+          ? ".preview"
+          : ".dev";
+    expect(widget[1].groupIdentifier).toBe(`group.app.shelvr.save${suffix}`);
+    expect(config.scheme).toBe(
+      variant === "production" ? "shelvr" : `shelvr${suffix.replace(".", "-")}`,
+    );
+  }
+});

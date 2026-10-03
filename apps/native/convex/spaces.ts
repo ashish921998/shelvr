@@ -472,6 +472,7 @@ async function scheduleSteering(
   await ctx.scheduler.runAfter(0, internal.ai.steerItemForSpace, {
     itemId: item._id,
     spaceId,
+    budgetCharged: true,
   });
   return true;
 }
@@ -787,6 +788,33 @@ export const listSavedSpaceIdsForItemInternal = internalQuery({
  * Intents do not affect the space summary, so this is the one spaceItems
  * patch that bypasses model/memberships.ts on purpose.
  */
+export const claimSteeringInternal = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    spaceId: v.id("spaces"),
+    budgetCharged: v.optional(v.boolean()),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    const space = await ctx.db.get(args.spaceId);
+    const row = await getMembership(ctx, args.itemId, args.spaceId);
+    if (
+      !item ||
+      !space ||
+      item.status !== "ready" ||
+      item.userId !== space.userId ||
+      !row ||
+      effectiveStatus(row) !== "saved"
+    )
+      return false;
+    const userId = ctx.db.normalizeId("users", item.userId);
+    if (!userId || !(await hasProEntitlement(ctx, userId))) return false;
+    if (args.budgetCharged) return true;
+    return (await rateLimiter.limit(ctx, "steerItem", { key: userId })).ok;
+  },
+});
+
 export const setMembershipIntentsInternal = internalMutation({
   args: {
     itemId: v.id("items"),

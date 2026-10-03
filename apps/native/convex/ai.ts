@@ -1618,10 +1618,16 @@ const steerSchema = z.object({
  * shopping link in "apartment shopping list" and nothing extra elsewhere.
  */
 export const steerItemForSpace = internalAction({
-  args: { itemId: v.id("items"), spaceId: v.id("spaces") },
+  args: {
+    itemId: v.id("items"),
+    spaceId: v.id("spaces"),
+    budgetCharged: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
+      if (!(await ctx.runMutation(internal.spaces.claimSteeringInternal, args)))
+        return null;
       const [item, space] = await Promise.all([
         ctx.runQuery(internal.items.getItemInternal, { itemId: args.itemId }),
         ctx.runQuery(internal.spaces.getSpaceInternal, {

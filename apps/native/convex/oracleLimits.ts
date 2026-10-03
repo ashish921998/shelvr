@@ -6,7 +6,11 @@ import { UNKNOWN_IP_LIMITER_KEY, normalizeIp } from "./waitlist";
 export const claimRequestBody = internalMutation({
   args: {
     ip: v.optional(v.string()),
-    route: v.union(v.literal("oracle"), v.literal("waitlist")),
+    route: v.union(
+      v.literal("oracle"),
+      v.literal("waitlist"),
+      v.literal("oracle-image"),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
