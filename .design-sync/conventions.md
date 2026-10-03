@@ -27,9 +27,25 @@ object. For your own layout glue, use plain elements with the theme variables:
 | Type            | `--fonts-regular`, `--fonts-medium`, `--fonts-bold` (Satoshi), `--fonts-display` (Crimson Pro, for titles and the wordmark)                 |
 
 Spacing and radii are not variables. Use the app's literal values: spacing steps of
-8px (4, 8, 12, 16, 24, 32), radii 8 (images), 11 (cards and buttons), 16 (inline
-cards), 24, and 50 for pills. Text buttons are 44px tall; `HeaderIconButton` is a
-40px circle.
+8px (4, 8, 12, 16, 24, 32), radii 8 (images), 11 (cards and settings rows), 16
+(inline cards), 24 (sheets), and a full capsule for `Button` and pills. `Button` and
+settings rows are at least 48px tall; `HeaderIconButton` is a 40px circle.
+
+## Type and actions
+
+- Set text with `ThemedText` and a `variant` from the type ramp, not a `font-size`.
+  Titles use the Crimson Pro steps (`hero`, `largeTitle`, `sheetTitle`, `title`,
+  `header`, `displaySmall`); everything else is Satoshi (`body`, `subhead`,
+  `caption`, `label`, and their `Label` / `Strong` weights). It defaults to
+  `--colors-foreground`; pass `style={{ color: "var(--colors-muted)" }}` for
+  secondary copy.
+- `Button` is the one main action on a screen: an amber capsule with a dark label.
+  It stretches to its parent's width. Use `loading` while its action runs; the label
+  stays put. Do not use it for settings or secondary actions.
+- Settings use `SettingCard` (a title, a description, and either an inline control
+  as `accessory` or a text `action`) and `SettingsGroup` with `SettingsRow` children
+  (a label, an optional `value`, a trailing icon). Pass `divider={false}` to the
+  first row in a group.
 
 ## Composition rules
 
@@ -49,7 +65,7 @@ Read `components/general/<Name>/<Name>.d.ts` for each component's props and
 ## Example
 
 ```jsx
-const { HeaderIconButton, Wordmark, EmptyState } = window.ShelvrUI;
+const { HeaderIconButton, Wordmark, EmptyState, Button } = window.ShelvrUI;
 
 <div
   style={{
@@ -77,5 +93,8 @@ const { HeaderIconButton, Wordmark, EmptyState } = window.ShelvrUI;
       "Tap + to drop in a link, a photo, or a stray thought.\nShelvr keeps it warm until you need it."
     }
   />
+  <div style={{ padding: 16 }}>
+    <Button title="Add a save" onPress={() => {}} />
+  </div>
 </div>;
 ```
