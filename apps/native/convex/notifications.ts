@@ -3,9 +3,14 @@ import {
   notificationLocale,
 } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
 import { requireUserId } from "./model/auth";
 import {
@@ -17,6 +22,17 @@ import {
   resolveTimezone,
 } from "./model/notificationSchedule";
 import { takeWithinBytes } from "./model/readBudget";
+import {
+  SHELF_HISTORY,
+  SHELF_SCAN_ITEMS,
+  SHELF_SIZE,
+  archiveCheckOrder,
+  archiveLimit,
+  chooseRecent,
+  composeShelf,
+  shelfCandidates,
+  weekStart,
+} from "./model/weeklyShelf";
 import {
   DEFAULT_REMINDER_HOUR,
   HOUR_SAMPLE_WINDOW_MS,
@@ -48,22 +64,6 @@ const preferencesValidator = v.object({
   remindersEnabled: v.boolean(),
 });
 
-const MAX_DIGEST_ITEMS = 3;
-/**
- * Shelf slots kept for an unopened save from before this week, whenever one
- * exists. Without it the shelf only ever showed the last seven days, so a save
- * that went unopened for a week was never seen again; and a person who saved
- * fewer than three things that week got no shelf at all. Older saves also
- * fill any slots this week's saves leave empty.
- */
-const ARCHIVE_SLOTS = 1;
-/**
- * Older saves checked against read state per shelf. Each check is one index
- * point read, and every opened save spends one, so this bounds the extra reads
- * while leaving plenty of room to find an unopened one.
- */
-const ARCHIVE_CHECKS = 50;
-const MAX_USER_ITEMS = 1000;
 /** Due users scheduled per transaction. A full page chains a follow-up run so a
  * backlog drains at scheduler speed instead of one page per hourly tick. */
 export const DUE_DIGEST_BATCH_SIZE = 50;
@@ -88,82 +88,6 @@ const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
 const REMINDER_CHECKS_PER_KIND = 100;
 /** Failed attempts at one save before it is given up on. */
 const MAX_FAILED_REMINDERS = 2;
-
-function weekStart(now: number): number {
-  const date = new Date(now);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
-  return date.getTime();
-}
-
-function chooseDigestItems(
-  items: Doc<"items">[],
-  previouslyIncluded: Set<string>,
-  openedItemIds: Set<string>,
-  now: number,
-  limit: number,
-): Doc<"items">[] {
-  const candidates = items.filter(
-    (item) =>
-      item.status === "ready" &&
-      item._creationTime >= now - DIGEST_WINDOW_MS &&
-      !openedItemIds.has(item._id) &&
-      !previouslyIncluded.has(item._id),
-  );
-
-  // Prefer a varied shelf, then fill any remaining slots by recency. The input
-  // is already newest-first from the by_user index.
-  const selected: Doc<"items">[] = [];
-  const seenTypes = new Set<Doc<"items">["type"]>();
-  for (const item of candidates) {
-    if (selected.length >= limit) break;
-    if (!seenTypes.has(item.type)) {
-      seenTypes.add(item.type);
-      selected.push(item);
-    }
-  }
-  for (const item of candidates) {
-    if (selected.length >= limit) break;
-    if (!selected.some((selectedItem) => selectedItem._id === item._id)) {
-      selected.push(item);
-    }
-  }
-  return selected;
-}
-
-/** A 32-bit FNV-1a hash, to seed the archive shuffle. */
-function hashSeed(text: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
-/**
- * `items` in an order that is random across weeks but fixed within one, so a
- * re-run of the same week's preparation picks the same archive saves. A
- * shuffle rather than newest-first means a save from two years ago is as
- * likely to come back as one from last month.
- */
-function weeklyShuffle<T>(items: T[], seed: string): T[] {
-  let state = hashSeed(seed);
-  // mulberry32
-  const random = () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const shuffled = [...items];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
 
 export const getPreferences = query({
   args: {},
@@ -556,6 +480,21 @@ export const prepareDueWeeklyDigests = internalMutation({
   },
 });
 
+/** Whether `userId` has ever opened `itemId`. */
+async function wasOpened(
+  ctx: QueryCtx,
+  userId: string,
+  itemId: Id<"items">,
+): Promise<boolean> {
+  const read = await ctx.db
+    .query("itemReads")
+    .withIndex("by_user_and_item", (q) =>
+      q.eq("userId", userId).eq("itemId", itemId),
+    )
+    .unique();
+  return read !== null;
+}
+
 export const prepareWeeklyDigest = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
@@ -576,77 +515,43 @@ export const prepareWeeklyDigest = internalMutation({
       .query("items")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
-      .take(MAX_USER_ITEMS);
-    const reads = await Promise.all(
-      items
-        .filter(
-          (item) =>
-            item.status === "ready" &&
-            item._creationTime >= args.now - DIGEST_WINDOW_MS,
-        )
-        .map((item) =>
-          ctx.db
-            .query("itemReads")
-            .withIndex("by_user_and_item", (q) =>
-              q.eq("userId", args.userId).eq("itemId", item._id),
-            )
-            .unique(),
-        ),
-    );
-    const openedItemIds = new Set(
-      reads.flatMap((read) => (read === null ? [] : [read.itemId])),
-    );
+      .take(SHELF_SCAN_ITEMS);
     const recentDigests = await ctx.db
       .query("weeklyDigests")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
-      .take(12);
-    const previouslyIncluded = new Set(
-      recentDigests.flatMap((digest) => digest.itemIds.map((itemId) => itemId)),
+      .take(SHELF_HISTORY);
+    const previouslyIncluded = new Set<string>(
+      recentDigests.flatMap((digest) => digest.itemIds),
     );
-    // Unopened saves from before this week, in this week's shuffled order.
-    // Only the first ARCHIVE_CHECKS are checked against read state.
-    const archive: Doc<"items">[] = [];
-    const archivePool = weeklyShuffle(
-      items.filter(
-        (item) =>
-          item.status === "ready" &&
-          item._creationTime < args.now - DIGEST_WINDOW_MS &&
-          !previouslyIncluded.has(item._id),
-      ),
-      `${args.userId}:${weekStart(args.now)}`,
-    ).slice(0, ARCHIVE_CHECKS);
-    for (const item of archivePool) {
-      if (archive.length >= MAX_DIGEST_ITEMS) break;
-      const read = await ctx.db
-        .query("itemReads")
-        .withIndex("by_user_and_item", (q) =>
-          q.eq("userId", args.userId).eq("itemId", item._id),
-        )
-        .unique();
-      if (read === null) archive.push(item);
-    }
+    const candidates = shelfCandidates(items, previouslyIncluded, args.now);
 
-    // This week's saves first, with ARCHIVE_SLOTS held back for an older one
-    // when there is one; older saves then fill whatever is left.
-    const recent = chooseDigestItems(
-      items,
-      previouslyIncluded,
-      openedItemIds,
-      args.now,
-      MAX_DIGEST_ITEMS - Math.min(ARCHIVE_SLOTS, archive.length),
+    const recentOpened = await Promise.all(
+      candidates.recent.map((item) => wasOpened(ctx, args.userId, item._id)),
     );
-    const selected = [
-      ...recent,
-      ...archive.slice(0, MAX_DIGEST_ITEMS - recent.length),
-    ];
+    const recent = chooseRecent(
+      candidates.recent.filter((_, index) => !recentOpened[index]),
+    );
+
+    // Older saves are checked one at a time, and only until enough are found.
+    const archive: Doc<"items">[] = [];
+    const wanted = archiveLimit(recent.length);
+    for (const item of archiveCheckOrder(
+      candidates.archive,
+      args.userId,
+      args.now,
+    )) {
+      if (archive.length >= wanted) break;
+      if (!(await wasOpened(ctx, args.userId, item._id))) archive.push(item);
+    }
+    const selected = composeShelf(recent, archive);
 
     const nextDigestAt = nextWeeklyDigestAt(args.now, preferences.timezone);
     await ctx.db.patch(preferences._id, {
       nextDigestAt,
       updatedAt: args.now,
     });
-    if (selected.length < MAX_DIGEST_ITEMS) {
+    if (selected.length < SHELF_SIZE) {
       return null;
     }
 
