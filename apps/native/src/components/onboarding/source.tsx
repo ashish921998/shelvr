@@ -9,7 +9,7 @@ import { GhostButton } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Long enough to see the tick land, short enough to read as one tap.
@@ -54,7 +54,11 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
     <View style={styles.wrap}>
       <Text style={styles.headline}>{t("onboarding.sourceTitle")}</Text>
 
-      <View style={styles.list}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      >
         {order.map((source, position) => {
           const active = picked === source;
           const label = sourceLabel(source, process.env.EXPO_OS);
@@ -83,7 +87,7 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.foot}>
         <GhostButton label={t("onboarding.sourceSkip")} onPress={skip} />
@@ -104,6 +108,9 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: -0.4,
     color: theme.colors.foreground,
   },
+  scroll: {
+    flex: 1,
+  },
   list: {
     gap: theme.gap(1),
   },
@@ -112,7 +119,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
+    paddingVertical: theme.gap(1.5),
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 1,
@@ -124,6 +133,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primarySoft,
   },
   label: {
+    flexShrink: 1,
     fontFamily: theme.fonts.medium,
     fontSize: 16,
     color: theme.colors.foreground,
@@ -132,7 +142,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.primaryText,
   },
   foot: {
-    marginTop: "auto",
-    paddingTop: theme.gap(2),
+    paddingTop: theme.gap(1),
   },
 }));

@@ -199,6 +199,18 @@ export default function OnboardingScreen() {
         >
           <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
         </View>
+      ) : step === "source" ? (
+        // Its own frame, not the shared ScrollView: the list scrolls inside
+        // it so Skip stays on screen on small phones and at large text sizes.
+        <View
+          style={[
+            styles.content,
+            styles.scroll,
+            { paddingBottom: insets.bottom + theme.gap(1) },
+          ]}
+        >
+          <SourceStep onAdvance={advance} />
+        </View>
       ) : (
         <ScrollView
           style={styles.scroll}
@@ -211,8 +223,6 @@ export default function OnboardingScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          {step === "source" && <SourceStep onAdvance={advance} />}
-
           {step === "setup" && (
             <SetupStep
               kinds={kinds}
