@@ -26,14 +26,29 @@ export function formatShortDate(ms: number): string {
   });
 }
 
+/** A free trial's length as the store reports it: `unit` is DAY, WEEK, MONTH
+ * or YEAR. */
+export type TrialPeriod = { unit: string; count: number };
+
 /**
  * Dates for the paywall's trial timeline, filled into its `{{ custom.* }}`
  * labels ("Today · Oct 2"). The dashboard defaults are empty, so a build that
- * passes nothing shows the bare labels.
+ * passes nothing shows the bare labels. `trial` is the offer's own length, so
+ * the dates follow it; the reminder is two days before the end, as in
+ * `trial-reminder.ts`. The variable names keep the seven-day wording the
+ * dashboard already references.
  */
-export function trialTimelineVariables(now: number = Date.now()) {
-  const day = (offset: number) => {
-    const date = new Date(now);
+export function trialTimelineVariables(
+  now: number = Date.now(),
+  trial: TrialPeriod = { unit: "DAY", count: 7 },
+) {
+  const end = new Date(now);
+  if (trial.unit === "YEAR") end.setFullYear(end.getFullYear() + trial.count);
+  else if (trial.unit === "MONTH") end.setMonth(end.getMonth() + trial.count);
+  else
+    end.setDate(end.getDate() + trial.count * (trial.unit === "WEEK" ? 7 : 1));
+  const day = (from: Date, offset: number) => {
+    const date = new Date(from);
     date.setDate(date.getDate() + offset);
     return date.toLocaleDateString(formattingLocale(), {
       month: "short",
@@ -42,9 +57,9 @@ export function trialTimelineVariables(now: number = Date.now()) {
   };
   const string = (value: string) => ({ type: "string", value }) as const;
   return {
-    trial_today: string(` · ${day(0)}`),
-    trial_day5: string(` · ${day(5)}`),
-    trial_day7: string(` · ${day(7)}`),
-    trial_remind_date: string(day(5)),
+    trial_today: string(` · ${day(new Date(now), 0)}`),
+    trial_day5: string(` · ${day(end, -2)}`),
+    trial_day7: string(` · ${day(end, 0)}`),
+    trial_remind_date: string(day(end, -2)),
   };
 }

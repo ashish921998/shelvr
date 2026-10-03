@@ -4,6 +4,7 @@ import {
   type PaywallContext,
   type TrialEligibility,
 } from "@/lib/analytics";
+import type { TrialPeriod } from "@/lib/date";
 import { getPurchases } from "@/lib/revenuecat-module";
 
 /**
@@ -170,31 +171,43 @@ function foldTrialEligibility(
   return "unknown";
 }
 
-/** Reads the paywall context from RevenueCat's caches. Both calls are cache
+/** Reads the paywall context from RevenueCat's caches, and the free trial on
+ * the offering so the timeline dates follow the offer. Both calls are cache
  * reads in practice, but the timeout caps the worst case so a cold SDK can
  * never hold the sheet open for them. Empty when anything is unavailable —
  * the events carry no guess. */
 const PAYWALL_CONTEXT_TIMEOUT_MS = 2_000;
 
-export async function readPaywallContext(): Promise<PaywallContext> {
+export async function readPaywallContext(): Promise<{
+  context?: PaywallContext;
+  trial?: TrialPeriod;
+}> {
   const rc = getPurchases();
   if (!rc) return {};
-  const read = async (): Promise<PaywallContext> => {
+  const read = async () => {
     const offerings = await rc.getOfferings();
     const offering = offerings.current;
     if (!offering) return {};
     const products = offering.availablePackages.map(
       (pkg) => pkg.product.identifier,
     );
+    const intro = offering.availablePackages
+      .map((pkg) => pkg.product.introPrice)
+      .find((price) => price?.price === 0);
     const eligibility =
       await rc.checkTrialOrIntroductoryPriceEligibility(products);
     const statuses = products.map((id) => eligibility[id]?.status);
     return {
-      offering_id: offering.identifier,
-      trial_eligible: foldTrialEligibility(
-        statuses,
-        rc.INTRO_ELIGIBILITY_STATUS,
-      ),
+      context: {
+        offering_id: offering.identifier,
+        trial_eligible: foldTrialEligibility(
+          statuses,
+          rc.INTRO_ELIGIBILITY_STATUS,
+        ),
+      },
+      trial: intro
+        ? { unit: intro.periodUnit, count: intro.periodNumberOfUnits }
+        : undefined,
     };
   };
   return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);

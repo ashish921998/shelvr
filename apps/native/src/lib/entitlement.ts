@@ -377,10 +377,12 @@ async function presentPaywallImpl(
     return "unavailable";
   }
   try {
-    const enriched = { ...properties, ...(await context) };
+    const { context: read, trial } = await context;
+    const enriched = { ...properties, ...read };
+    const customVariables = trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall({ customVariables: trialTimelineVariables() }),
+      () => rcui.presentPaywall({ customVariables }),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
