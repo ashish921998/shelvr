@@ -4,7 +4,13 @@ import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 // The collage never shrinks below this. When the headline pushes it past the
@@ -91,13 +97,21 @@ const COLUMNS: Tile[][] = [
   ],
 ];
 
-export function OpenerStep({
-  onStart,
-  onSignIn,
-}: {
+type OpenerProps = {
   onStart: () => void;
   onSignIn: () => void;
-}) {
+};
+
+export function OpenerStep(props: OpenerProps) {
+  // Changing the system text size while this step is open keeps the old
+  // measurements: the footer stays pinned at its previous height and clips
+  // the bigger text until the app restarts. A new font scale remounts the
+  // layout, so every measurement and the footer placement start fresh.
+  const { fontScale } = useWindowDimensions();
+  return <OpenerLayout key={fontScale} {...props} />;
+}
+
+function OpenerLayout({ onStart, onSignIn }: OpenerProps) {
   useAppLocale();
   const [height, setHeight] = useState(0);
   const [footHeight, setFootHeight] = useState(0);
