@@ -469,7 +469,7 @@
   "import.rateLimited": "Du hast das Importlimit vorerst erreicht. Versuche es später mit derselben Liste erneut, um fortzufahren; bereits gespeicherte Links werden übersprungen.",
   "import.failed": "Der Import wurde vorzeitig beendet. Versuche es später mit derselben Liste erneut, um fortzufahren; bereits gespeicherte Links werden übersprungen.",
   "import.more": "Mehr importieren",
-  "onboarding.openerTitle": "So sieht dein Regal in einer Woche aus.",
+  "onboarding.openerTitle": "Dein Regal in einer Woche.",
   "onboarding.openerBody": "Links, Fotos und Notizen, gelesen, benannt und einsortiert, sobald du sie speicherst.",
   "onboarding.proLine": "Speichern ist Teil von Shelvr Pro. Kostenlos testen.",
   "onboarding.startYours": "Leg los",

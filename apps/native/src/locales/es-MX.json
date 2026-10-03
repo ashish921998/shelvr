@@ -485,7 +485,7 @@
   "import.rateLimited": "Alcanzaste el límite de importación por ahora. Vuelve a intentarlo más tarde con la misma lista para continuar; los enlaces ya guardados se omiten.",
   "import.failed": "La importación se detuvo antes de terminar. Vuelve a intentarlo más tarde con la misma lista para continuar; los enlaces ya guardados se omiten.",
   "import.more": "Importar más",
-  "onboarding.openerTitle": "Así será tu estantería en una semana.",
+  "onboarding.openerTitle": "Tu estantería en una semana.",
   "onboarding.openerBody": "Enlaces, fotos y notas, leídos, titulados y archivados en cuanto los guardas.",
   "onboarding.proLine": "Guardar es parte de Shelvr Pro. Prueba gratuita.",
   "onboarding.startYours": "Empieza la tuya",

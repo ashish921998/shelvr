@@ -485,7 +485,7 @@
   "import.rateLimited": "Você atingiu o limite de importação por enquanto. Tente novamente mais tarde com a mesma lista para continuar; links já salvos são ignorados.",
   "import.failed": "A importação parou antes de terminar. Tente novamente mais tarde com a mesma lista para continuar; links já salvos são ignorados.",
   "import.more": "Importar mais",
-  "onboarding.openerTitle": "Esta é a sua estante em uma semana.",
+  "onboarding.openerTitle": "Sua estante em uma semana.",
   "onboarding.openerBody": "Links, fotos e notas, lidos, com título e organizados no momento em que você salva.",
   "onboarding.proLine": "Salvar faz parte do Shelvr Pro. Teste grátis.",
   "onboarding.startYours": "Comece a sua",

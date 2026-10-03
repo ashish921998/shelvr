@@ -485,7 +485,7 @@
   "import.rateLimited": "Vous avez atteint la limite d’importation pour le moment. Réessayez plus tard avec la même liste pour continuer ; les liens déjà enregistrés sont ignorés.",
   "import.failed": "L’importation s’est arrêtée avant la fin. Réessayez plus tard avec la même liste pour continuer ; les liens déjà enregistrés sont ignorés.",
   "import.more": "Importer plus",
-  "onboarding.openerTitle": "Voici votre étagère dans une semaine.",
+  "onboarding.openerTitle": "Votre étagère dans une semaine.",
   "onboarding.openerBody": "Liens, photos et notes, lus, titrés et rangés dès que vous les enregistrez.",
   "onboarding.proLine": "L'enregistrement fait partie de Shelvr Pro. Essai gratuit.",
   "onboarding.startYours": "Créer la vôtre",
