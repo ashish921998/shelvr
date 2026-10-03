@@ -4,6 +4,13 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 crons.interval(
+  "cleanup unattached storage",
+  { hours: 24 },
+  internal.items.cleanupOrphanStorage,
+  {},
+);
+
+crons.interval(
   "retry refund consent sync",
   { minutes: 1 },
   internal.legalConsent.retry,
@@ -97,6 +104,20 @@ crons.interval(
   "purge expired payment receipts",
   { hours: 24 },
   internal.paymentTelemetry.purgeExpiredReceipts,
+  {},
+);
+
+crons.interval(
+  "recover expired subscriptions",
+  { minutes: 1 },
+  internal.subscriptions.recoverExpiredSubscriptions,
+  {},
+);
+
+crons.interval(
+  "confirm legacy unsynced waitlist requests",
+  { hours: 1 },
+  internal.waitlist.requestLegacyConfirmations,
   {},
 );
 

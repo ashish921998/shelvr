@@ -8,6 +8,11 @@ import {
 } from "@/lib/convexForward";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
+import {
+  BodyTooLargeError,
+  readBoundedText,
+  authorizeRequestBody,
+} from "@/lib/requestBody";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,11 +25,19 @@ function normalizeSource(value: unknown): WaitlistSource {
 }
 
 export async function POST(request: Request) {
+  const refused = await authorizeRequestBody(request, "waitlist");
+  if (refused) return refused;
   let body: { email?: unknown; company?: unknown; source?: unknown };
 
   try {
-    body = await request.json();
-  } catch {
+    body = JSON.parse(await readBoundedText(request, 4096));
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return NextResponse.json(
+        { message: "Invalid request." },
+        { status: 413 },
+      );
+    }
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 

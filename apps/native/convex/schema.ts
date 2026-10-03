@@ -37,6 +37,9 @@ export default defineSchema({
     acceptedAt: v.optional(v.number()),
     refundSharing: v.boolean(),
     changedAt: v.number(),
+    // Historical deployments wrote this field. Preserve it while those rows
+    // exist; dropping it rejects the deployment instead of rolling it back.
+    revision: v.optional(v.number()),
     deleting: v.optional(v.boolean()),
     syncState: v.union(
       v.literal("pending"),
@@ -290,10 +293,16 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("complete")),
     storageId: v.optional(v.id("_storage")),
     itemId: v.optional(v.id("items")),
+    uploadUrl: v.optional(v.string()),
+    uploadUrlIssuedAt: v.optional(v.number()),
+    uploadTokenHash: v.optional(v.string()),
+    uploadClaimedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     // The logical unique key — every mutation loads the row through this index.
     .index("by_user_operation", ["userId", "operationId"])
+    .index("by_user_and_kind_and_status", ["userId", "kind", "status"])
+    .index("by_upload_token_hash", ["uploadTokenHash"])
     // deleteItem cleanup: releases ledger rows whose item was deleted so the
     // same durable operationId can be re-performed. Pending rows have no
     // itemId and so are never returned by this index lookup.
@@ -337,7 +346,9 @@ export default defineSchema({
     // backward compatibility with rows created before this field existed.
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
   // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
   // row is the durable, cross-install record: its existence is the ask, and
@@ -553,6 +564,10 @@ export default defineSchema({
     consentVersion: v.string(),
     consentText: v.string(),
     consentedAt: v.number(),
+    confirmedAt: v.optional(v.number()),
+    confirmed: v.optional(v.boolean()),
+    confirmationHash: v.optional(v.string()),
+    confirmationExpiresAt: v.optional(v.number()),
     firstSubmittedAt: v.number(),
     lastSubmittedAt: v.number(),
     resendStatus: v.union(
@@ -566,6 +581,12 @@ export default defineSchema({
     resendAttempts: v.optional(v.number()),
   })
     .index("by_email_and_product", ["email", "product"])
+    .index("by_confirmationHash", ["confirmationHash"])
+    .index("by_confirmed_and_resendStatus_and_resendAttempts", [
+      "confirmed",
+      "resendStatus",
+      "resendAttempts",
+    ])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below
     // the attempt cap without scanning the whole waitlist.
     .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),

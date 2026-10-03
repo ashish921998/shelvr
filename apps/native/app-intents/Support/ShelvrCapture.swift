@@ -47,7 +47,21 @@ enum ShelvrCapture {
   private static let service = "shelvr.app-intents.capture"
   private static let account = "credentials"
 
+  private static func isAllowedOrigin(_ value: String, bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> Bool {
+    guard let url = URLComponents(string: value),
+      url.scheme == "https", url.user == nil, url.password == nil,
+      url.port == nil, url.query == nil, url.fragment == nil,
+      url.path.isEmpty || url.path == "/"
+    else { return false }
+    if bundleIdentifier == "app.shelvr.save" {
+      return url.host == "amiable-setter-120.convex.site"
+    }
+    guard bundleIdentifier == "app.shelvr.save.dev" || bundleIdentifier == "app.shelvr.save.preview" else { return false }
+    return url.host == "amicable-antelope-639.convex.site"
+  }
+
   static func store(_ credentials: Credentials) throws {
+    guard isAllowedOrigin(credentials.siteUrl) else { throw Failure.signedOut }
     let data = try JSONEncoder().encode(credentials)
     var query = baseQuery()
     SecItemDelete(query as CFDictionary)
@@ -134,7 +148,8 @@ enum ShelvrCapture {
 
   /// POSTs JSON to a capture endpoint with the device's token and returns the JSON reply.
   private static func post(path: String, body: [String: Any]) async throws -> [String: Any] {
-    guard let credentials = load(), let endpoint = URL(string: credentials.siteUrl + path) else {
+    guard let credentials = load(), isAllowedOrigin(credentials.siteUrl),
+      let endpoint = URL(string: credentials.siteUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path) else {
       throw Failure.signedOut
     }
 
