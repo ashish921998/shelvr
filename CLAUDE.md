@@ -333,6 +333,12 @@ needed at runtime by the features that use them:
   naming it. So reverting the commit that added the field fails the deploy instead
   of rolling it back. To back a field out, stop writing it and leave it declared
   `v.optional(...)`; drop the declaration only once no row still has it.
+- Every pull request fills in the template's Verification section: what was run and its result,
+  the evidence, and what was not verified. Never call work "done" or "verified" without evidence
+  a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
+  assets, `apps/web` UI) embeds a screenshot or recording, or says `No UI change: <reason>`.
+  The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`) fails the pull request otherwise
+  and re-runs when the description is edited.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 
