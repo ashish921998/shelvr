@@ -283,6 +283,21 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
+  // per account per launch. `saved` is the real-save count, demo excluded.
+  save_progress_card_shown: { saved: number };
+  save_progress_card_action: {
+    action: "photos" | "note" | "dismiss";
+    saved: number;
+  };
+  // Once per account, when a shelf this device watched below the goal
+  // reaches it (lib/save-goal.ts). `hours_since_start` counts from that
+  // first sighting, so "3+ saves in 48h" is `hours_since_start <= 48`.
+  save_goal_reached: {
+    goal: number;
+    hours_since_start: number;
+    card_dismissed: boolean;
+  };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
   trial_reminder_primer: { outcome: "accepted" | "declined" };
