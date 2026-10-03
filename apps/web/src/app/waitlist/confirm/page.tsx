@@ -44,12 +44,16 @@ export default async function ConfirmationPage({
     } catch {
       redirect("/waitlist/confirm?status=unavailable");
     }
-    if (!response.ok)
+    if (!response.ok) {
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
       redirect(
-        response.status === 400
+        response.status === 400 && result.error === "invalid_token"
           ? "/waitlist/confirm?status=expired"
           : "/waitlist/confirm?status=unavailable",
       );
+    }
     redirect("/waitlist/confirmed");
   }
   if (

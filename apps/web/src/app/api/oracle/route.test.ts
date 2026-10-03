@@ -1,3 +1,4 @@
+import { verifiedVerdict } from "@/lib/oracleProof";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -72,7 +73,12 @@ describe("POST /api/oracle", () => {
     expect(result.status).toBe(200);
     const resultBody = await result.json();
     expect(resultBody).toMatchObject(verdict);
-    expect(resultBody.shareCode).toEqual(expect.any(String));
+    expect(await verifiedVerdict(resultBody.shareCode)).toEqual({
+      mode: "tabs",
+      persona: verdict.persona,
+      tagline: verdict.tagline,
+      spaces: verdict.spaces,
+    });
     const [url, init] = mocks.fetch.mock.calls[0];
     expect(url).toBe("https://example.convex.site/oracle");
     expect(init.body).toBe(tabs);

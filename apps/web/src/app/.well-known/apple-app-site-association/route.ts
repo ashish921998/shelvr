@@ -1,6 +1,7 @@
 export function GET() {
   return Response.json(
     {
+      webcredentials: { apps: ["WJP847UZY2.app.shelvr.save"] },
       applinks: {
         apps: [],
         details: [

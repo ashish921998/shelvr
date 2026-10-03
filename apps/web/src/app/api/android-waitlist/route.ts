@@ -126,6 +126,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       emailProviderSynced: result.emailProviderSynced === true,
+      ...(result.confirmationSent === true ? { confirmationSent: true } : {}),
     });
   } catch (error) {
     serverLog("error", "android_waitlist_failed", {

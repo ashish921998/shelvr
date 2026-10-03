@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { GET } from "./route";
+import { encodeSharedVerdict } from "@/lib/oracleShare";
 import { signVerdict } from "@/lib/oracleProof";
 
 const { budget } = vi.hoisted(() => ({ budget: vi.fn() }));
@@ -10,7 +11,15 @@ afterEach(() => {
 });
 
 it("rejects invalid and unsigned cards before invoking the rendering budget", async () => {
+  vi.stubEnv("WAITLIST_SHARED_SECRET", "test-secret");
+  const unsigned = encodeSharedVerdict({
+    mode: "links",
+    persona: "Forged",
+    tagline: "Not generated",
+    spaces: [],
+  });
   for (const query of [
+    `?c=${unsigned}`,
     "",
     "?c=not-signed",
     "?c=not-signed&extra=cache-buster",

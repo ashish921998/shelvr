@@ -41,12 +41,20 @@ export default function AndroidWaitlist() {
           source,
         }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json()) as {
+        message?: string;
+        confirmationSent?: boolean;
+      };
 
       if (!response.ok) {
         throw new Error(result.message ?? "Could not join right now.");
       }
 
+      setMessage(
+        result.confirmationSent
+          ? "Check your inbox to confirm."
+          : "You’re on the list.",
+      );
       setStatus("success");
       captureWebAnalyticsEvent("android_waitlist_joined", { source });
     } catch (error) {
@@ -104,7 +112,7 @@ export default function AndroidWaitlist() {
         {status === "success" ? (
           <p className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-dark-plank-2 bg-dark-3 px-4 text-[15px] font-bold text-ember-light">
             <CheckCircleIcon aria-hidden className="size-[18px]" />
-            Check your inbox to confirm.
+            {message}
           </p>
         ) : null}
       </div>

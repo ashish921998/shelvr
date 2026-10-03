@@ -154,7 +154,12 @@ module.exports = ({ config }) => ({
         : {}),
     },
     bundleIdentifier: bundleId,
-    associatedDomains: isProduction ? ["applinks:shelvr-web.vercel.app"] : [],
+    associatedDomains: isProduction
+      ? [
+          "applinks:shelvr-web.vercel.app",
+          "webcredentials:shelvr-web.vercel.app",
+        ]
+      : [],
   },
   android: {
     ...appConfig.expo.android,

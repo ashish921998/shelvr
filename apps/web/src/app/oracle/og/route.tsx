@@ -243,9 +243,12 @@ export async function GET(request: Request) {
     [...params.keys()].some((key) => key !== "c" && key !== "format") ||
     params.getAll("c").length !== 1 ||
     params.getAll("format").length > 1 ||
-    (params.has("format") && params.get("format") !== "story")
+    (params.has("format") &&
+      !["story", "link"].includes(params.get("format") ?? ""))
   )
     return new Response(null, { status: 400 });
+  if (!process.env.WAITLIST_SHARED_SECRET)
+    return new Response(null, { status: 503 });
   const verdict = await verifiedVerdict(params.get("c") ?? "");
   if (!verdict) return new Response(null, { status: 404 });
   const refused = await authorizeRequestBody(request, "oracle-image");
