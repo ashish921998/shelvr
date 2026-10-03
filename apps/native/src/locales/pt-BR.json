@@ -354,6 +354,7 @@
   "item.link": "Link",
   "item.photo": "Foto",
   "item.openSite": "Abrir %{site}",
+  "item.playVideo": "Reproduzir vídeo",
   "item.hideTags": "Ocultar etiquetas: %{tags}",
   "item.showTags": "Mostrar etiquetas: %{tags}",
   "item.inSpaces": "Em %{spaces}",
@@ -362,6 +363,8 @@
   "item.noteTitlePlaceholder": "Título",
   "item.noteTitleLabel": "Título da nota",
   "item.noteTextLabel": "Texto da nota",
+  "item.details": "Detalhes",
+  "item.toggleCaption": "Mostra ou oculta a legenda",
   "capture.partialFailure": "%{saved} de %{total} salvos.\n%{reason}\nTentar novamente as imagens que falharam?",
   "pro.restoredBody": "Sua compra na %{store} foi encontrada. O Shelvr Pro pode levar um instante para atualizar.",
   "pro.notFoundBody": "Nenhuma compra ativa do Shelvr Pro foi encontrada para esta conta da %{store}.",
@@ -378,6 +381,11 @@
     "one": "%{formattedCount} conteúdo salvo",
     "many": "%{formattedCount} conteúdos salvos",
     "other": "%{formattedCount} conteúdos salvos"
+  },
+  "item.moreMedia": {
+    "one": "Mais %{formattedCount} foto nesta publicação",
+    "many": "Mais %{formattedCount} fotos nesta publicação",
+    "other": "Mais %{formattedCount} fotos nesta publicação"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} sugestão",

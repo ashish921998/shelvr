@@ -354,6 +354,7 @@
   "item.link": "링크",
   "item.photo": "사진",
   "item.openSite": "%{site} 열기",
+  "item.playVideo": "동영상 재생",
   "item.hideTags": "태그 숨기기: %{tags}",
   "item.showTags": "태그 보기: %{tags}",
   "item.inSpaces": "%{spaces}에 있음",
@@ -362,6 +363,8 @@
   "item.noteTitlePlaceholder": "제목",
   "item.noteTitleLabel": "메모 제목",
   "item.noteTextLabel": "메모 내용",
+  "item.details": "세부 정보",
+  "item.toggleCaption": "캡션을 표시하거나 숨깁니다",
   "capture.partialFailure": "%{total}개 중 %{saved}개 저장했어요.\n%{reason}\n저장하지 못한 이미지를 다시 시도할까요?",
   "pro.restoredBody": "%{store} 구매를 찾았어요. Shelvr Pro 업데이트에 잠시 걸릴 수 있어요.",
   "pro.notFoundBody": "이 %{store} 계정에서 유효한 Shelvr Pro 구매를 찾지 못했어요.",
@@ -374,6 +377,9 @@
   },
   "spaces.saveCount": {
     "other": "저장 항목 %{formattedCount}개"
+  },
+  "item.moreMedia": {
+    "other": "이 게시물에 사진 %{formattedCount}장이 더 있습니다"
   },
   "spaces.suggestionCount": {
     "other": "추천 %{formattedCount}개"

@@ -354,6 +354,7 @@
   "item.link": "リンク",
   "item.photo": "写真",
   "item.openSite": "%{site}を開く",
+  "item.playVideo": "動画を再生",
   "item.hideTags": "タグを非表示：%{tags}",
   "item.showTags": "タグを表示：%{tags}",
   "item.inSpaces": "%{spaces}内",
@@ -362,6 +363,8 @@
   "item.noteTitlePlaceholder": "タイトル",
   "item.noteTitleLabel": "メモのタイトル",
   "item.noteTextLabel": "メモの本文",
+  "item.details": "詳細",
+  "item.toggleCaption": "キャプションを表示または非表示にします",
   "capture.partialFailure": "%{total}件中%{saved}件を保存しました。\n%{reason}\n保存できなかった画像を再試行しますか？",
   "pro.restoredBody": "%{store}での購入が見つかりました。Shelvr Proの更新には少し時間がかかることがあります。",
   "pro.notFoundBody": "この%{store}アカウントで有効なShelvr Proの購入が見つかりません。",
@@ -374,6 +377,9 @@
   },
   "spaces.saveCount": {
     "other": "%{formattedCount}件の保存項目"
+  },
+  "item.moreMedia": {
+    "other": "この投稿にはあと%{formattedCount}枚の写真があります"
   },
   "spaces.suggestionCount": {
     "other": "%{formattedCount}件の提案"

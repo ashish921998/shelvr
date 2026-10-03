@@ -354,6 +354,7 @@
   "item.link": "Lien",
   "item.photo": "Photo",
   "item.openSite": "Ouvrir %{site}",
+  "item.playVideo": "Lire la vidéo",
   "item.hideTags": "Masquer les étiquettes : %{tags}",
   "item.showTags": "Afficher les étiquettes : %{tags}",
   "item.inSpaces": "Dans %{spaces}",
@@ -362,6 +363,8 @@
   "item.noteTitlePlaceholder": "Titre",
   "item.noteTitleLabel": "Titre de la note",
   "item.noteTextLabel": "Texte de la note",
+  "item.details": "Détails",
+  "item.toggleCaption": "Affiche ou masque la légende",
   "capture.partialFailure": "%{saved} sur %{total} enregistrés.\n%{reason}\nRéessayer les images en échec ?",
   "pro.restoredBody": "Votre achat %{store} a été trouvé. La mise à jour de Shelvr Pro peut prendre un instant.",
   "pro.notFoundBody": "Aucun achat Shelvr Pro actif n'a été trouvé pour ce compte %{store}.",
@@ -378,6 +381,11 @@
     "one": "%{formattedCount} contenu enregistré",
     "many": "%{formattedCount} contenus enregistrés",
     "other": "%{formattedCount} contenus enregistrés"
+  },
+  "item.moreMedia": {
+    "one": "%{formattedCount} autre photo dans cette publication",
+    "many": "%{formattedCount} autres photos dans cette publication",
+    "other": "%{formattedCount} autres photos dans cette publication"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} suggestion",
