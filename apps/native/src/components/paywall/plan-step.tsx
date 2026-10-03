@@ -19,7 +19,7 @@ export type PlanPrices = {
 const APP_ICON = require("../../../assets/icon.png");
 
 /** "Oct 7" in the user's locale. */
-export function shortDate(ms: number): string {
+function shortDate(ms: number): string {
   return new Date(ms).toLocaleDateString(formattingLocale(), {
     month: "short",
     day: "numeric",

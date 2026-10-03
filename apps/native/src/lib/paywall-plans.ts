@@ -29,7 +29,7 @@ export const initialPaywallState: PaywallState = {
   plan: "annual",
 };
 
-export type PaywallAction =
+type PaywallAction =
   | { type: "continue" }
   | { type: "back" }
   | { type: "selectPlan"; plan: Plan }
@@ -163,7 +163,7 @@ function isSevenDays(intro: {
   );
 }
 // lib/trial-reminder.ts schedules the reminder two days before renewal.
-export const REMINDER_DAY = TRIAL_DAYS - 2;
+const REMINDER_DAY = TRIAL_DAYS - 2;
 
 /** Calendar days later, so a DST change keeps the local time of day. */
 export function addDays(from: number, days: number): number {
@@ -228,7 +228,7 @@ export type TimelineRow = {
   annualChip?: boolean;
 };
 
-export type PlanCopy = {
+type PlanCopy = {
   titleKey: TextMessageKey;
   ctaKey: TextMessageKey;
   disclosureKey:
