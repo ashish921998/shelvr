@@ -60,34 +60,40 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.headline}>{t("onboarding.sourceTitle")}</Text>
-        {order.map((source, position) => {
-          const active = picked === source;
-          const label = sourceLabel(source, process.env.EXPO_OS);
-          return (
-            <Pressable
-              key={source}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: active }}
-              onPress={() => pick(source, position)}
-              style={({ pressed }) => [
-                styles.row,
-                active && styles.rowActive,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Text style={[styles.label, active && styles.labelActive]}>
-                {label.kind === "brand" ? label.text : t(label.key)}
-              </Text>
-              {active ? (
-                <AppSymbolIcon
-                  name="checkmark"
-                  size={14}
-                  tintColor={theme.colors.primary}
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t("onboarding.sourceTitle")}
+          style={styles.list}
+        >
+          {order.map((source, position) => {
+            const active = picked === source;
+            const label = sourceLabel(source, process.env.EXPO_OS);
+            return (
+              <Pressable
+                key={source}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                onPress={() => pick(source, position)}
+                style={({ pressed }) => [
+                  styles.row,
+                  active && styles.rowActive,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={[styles.label, active && styles.labelActive]}>
+                  {label.kind === "brand" ? label.text : t(label.key)}
+                </Text>
+                {active ? (
+                  <AppSymbolIcon
+                    name="checkmark"
+                    size={14}
+                    tintColor={theme.colors.primary}
+                  />
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
 
       <View style={styles.foot}>

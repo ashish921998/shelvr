@@ -189,7 +189,10 @@ export default function OnboardingScreen() {
         />
       </View>
 
-      {step === "opener" ? (
+      {step === "opener" || step === "source" ? (
+        // A static frame, not the shared ScrollView. The source list scrolls
+        // inside it so Skip stays on screen on small phones and at large text
+        // sizes.
         <View
           style={[
             styles.content,
@@ -197,19 +200,14 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + theme.gap(1) },
           ]}
         >
-          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
-        </View>
-      ) : step === "source" ? (
-        // Its own frame, not the shared ScrollView: the list scrolls inside
-        // it so Skip stays on screen on small phones and at large text sizes.
-        <View
-          style={[
-            styles.content,
-            styles.scroll,
-            { paddingBottom: insets.bottom + theme.gap(1) },
-          ]}
-        >
-          <SourceStep onAdvance={advance} />
+          {step === "opener" ? (
+            <OpenerStep
+              onStart={advance}
+              onSignIn={() => setShowSignIn(true)}
+            />
+          ) : (
+            <SourceStep onAdvance={advance} />
+          )}
         </View>
       ) : (
         <ScrollView

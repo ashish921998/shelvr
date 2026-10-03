@@ -1,11 +1,57 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACQUISITION_SOURCES,
+  acquisitionSourceAnalytics,
   orderAcquisitionSources,
   sourceLabel,
 } from "./acquisition-source";
 
-vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
+const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
+
+describe("acquisitionSourceAnalytics", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("emits answered with the source, its position and a set-once person property", () => {
+    acquisitionSourceAnalytics.answered("reddit", 2);
+
+    expect(analyticsMock.capture).toHaveBeenCalledWith(
+      "acquisition_source_answered",
+      {
+        source: "reddit",
+        position: 2,
+        $set_once: { acquisition_source: "reddit" },
+      },
+    );
+  });
+
+  it("emits skipped with no properties", () => {
+    acquisitionSourceAnalytics.skipped();
+
+    expect(analyticsMock.capture).toHaveBeenCalledWith(
+      "acquisition_source_skipped",
+    );
+  });
+
+  // The ids are an analytics contract: PostHog groups the event and the
+  // person property on them. The literal list catches a rename.
+  it("pins the source ids", () => {
+    expect(ACQUISITION_SOURCES).toEqual([
+      "tiktok",
+      "instagram",
+      "youtube",
+      "x",
+      "reddit",
+      "ai_assistant",
+      "friend",
+      "shared_link",
+      "store_search",
+      "other",
+    ]);
+  });
+});
 
 describe("orderAcquisitionSources", () => {
   it("returns every source once", () => {
