@@ -1,4 +1,3 @@
-import { confirmWaitlist } from "./waitlist";
 import { httpRouter } from "convex/server";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { env, httpAction, type ActionCtx } from "./_generated/server";
@@ -38,6 +37,7 @@ import {
   isWaitlistProduct,
   isWaitlistSource,
   joinWaitlist,
+  confirmWaitlist,
 } from "./waitlist";
 
 const http = httpRouter();

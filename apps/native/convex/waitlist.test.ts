@@ -109,6 +109,7 @@ describe("POST /waitlist/join", () => {
     expect(await response.json()).toEqual({
       saved: true,
       emailProviderSynced: false,
+      confirmationSent: false,
     });
     await t.run(async (ctx) => {
       const signup = await ctx.db
@@ -503,6 +504,7 @@ describe("Resend failure persistence", () => {
     expect(await response.json()).toEqual({
       saved: true,
       emailProviderSynced: false,
+      confirmationSent: false,
     });
 
     await t.run(async (ctx) => {

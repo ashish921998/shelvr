@@ -417,6 +417,7 @@ type JoinWaitlistArgs = {
 };
 
 type JoinWaitlistResult = {
+  confirmationSent?: boolean;
   saved: boolean;
   emailProviderSynced: boolean;
 };
@@ -466,8 +467,9 @@ export async function joinWaitlist(
       status: "unconfigured",
       preserveError: true,
     });
-    return { saved: true, emailProviderSynced: false };
+    return { saved: true, emailProviderSynced: false, confirmationSent: false };
   }
+  let confirmationSent = false;
   try {
     const response = await resendRequest(apiKey, RESEND_USER_AGENT, "/emails", {
       method: "POST",
@@ -480,6 +482,7 @@ export async function joinWaitlist(
     });
     if (!response.ok)
       throw new ResendResponseError("confirmation", response.status);
+    confirmationSent = true;
   } catch (error) {
     const { category, status } = classifyResendError(
       error,
@@ -494,7 +497,7 @@ export async function joinWaitlist(
       attempts: signup.resendAttempts + 1,
     });
   }
-  return { saved: true, emailProviderSynced: false };
+  return { saved: true, emailProviderSynced: false, confirmationSent };
 }
 
 export const retryFailedResendSyncs = internalAction({

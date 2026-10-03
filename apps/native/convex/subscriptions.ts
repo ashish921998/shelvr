@@ -219,16 +219,12 @@ export const upsertSubscription = internalMutation({
         ? existing.expiresAt
         : args.expiresAt;
 
-    const effectiveStatus = isEntitled(status, expiresAt, Date.now())
-      ? status
-      : ("lapsed" as const);
-    if (effectiveStatus === "pro" || effectiveStatus === "trialing") {
-      await ctx.scheduler.runAt(
-        expiresAt,
-        internal.subscriptions.expireSubscription,
-        { userId: args.userId, expiresAt },
-      );
-    }
+    const effectiveStatus = await scheduleSubscriptionExpiry(
+      ctx,
+      args.userId,
+      status,
+      expiresAt,
+    );
     const doc = {
       status: effectiveStatus,
       expiresAt,
@@ -337,3 +333,19 @@ export const recoverExpiredSubscriptions = internalMutation({
     return null;
   },
 });
+
+async function scheduleSubscriptionExpiry(
+  ctx: MutationCtx,
+  userId: string,
+  status: SubscriptionStatus,
+  expiresAt: number,
+): Promise<SubscriptionStatus> {
+  if (!isEntitled(status, expiresAt, Date.now())) return "lapsed";
+  if (status !== "lifetime")
+    await ctx.scheduler.runAt(
+      expiresAt,
+      internal.subscriptions.expireSubscription,
+      { userId, expiresAt },
+    );
+  return status;
+}
