@@ -2,7 +2,10 @@
 
 CI runs `pnpm audit --audit-level high`. An advisory with no compatible fix yet
 is baselined in `pnpm.auditConfig.ignoreGhsas` in the root `package.json`.
-`package.json` can't carry comments, so each entry is explained here. Remove an
+`package.json` can't carry comments, so entries are explained here. The five
+older entries (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq, GHSA-rv78-f8rc-xrxh,
+GHSA-wx67-qw84-cm4g, GHSA-w24r-5266-9c3c) predate this file and are not yet
+documented. Remove an
 entry as soon as a fixed version reaches the tree, and re-check every entry
 when bumping Expo, Next.js or the lint tooling.
 

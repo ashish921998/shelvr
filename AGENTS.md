@@ -62,8 +62,8 @@ every file under `convex/` though, so a `query` / `mutation` / `action` /
 Keep registered functions in top-level modules, and confirm a reported export
 against `_generated/api.d.ts` before removing it. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
-the root `package.json`, each explained in
-[`docs/security/audit-exceptions.md`](docs/security/audit-exceptions.md);
+the root `package.json`; explain each new entry in
+[`docs/security/audit-exceptions.md`](docs/security/audit-exceptions.md) and
 re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
 under `apps/native/convex/**`, `apps/native/src/**`, and `apps/web/src/**`.
