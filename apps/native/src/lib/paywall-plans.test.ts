@@ -46,7 +46,7 @@ describe("pricing math", () => {
 });
 
 describe("annualTrialOffered", () => {
-  const trial = { price: 0 };
+  const trial = { price: 0, periodUnit: "DAY", periodNumberOfUnits: 7 };
 
   it("needs a free introductory phase", () => {
     expect(annualTrialOffered({ introPrice: null, platform: "android" })).toBe(
@@ -58,6 +58,21 @@ describe("annualTrialOffered", () => {
     expect(annualTrialOffered({ introPrice: trial, platform: "android" })).toBe(
       true,
     );
+  });
+
+  it("needs the free phase to last exactly seven days", () => {
+    const android = (periodUnit: string, periodNumberOfUnits: number) =>
+      annualTrialOffered({
+        introPrice: { price: 0, periodUnit, periodNumberOfUnits },
+        platform: "android",
+      });
+    expect(android("WEEK", 1)).toBe(true);
+    expect(android("DAY", 3)).toBe(false);
+    expect(android("DAY", 14)).toBe(false);
+    expect(android("MONTH", 1)).toBe(false);
+    expect(
+      annualTrialOffered({ introPrice: { price: 0 }, platform: "android" }),
+    ).toBe(false);
   });
 
   it("needs RevenueCat to confirm eligibility on iOS", () => {

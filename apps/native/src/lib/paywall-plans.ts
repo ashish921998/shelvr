@@ -131,11 +131,17 @@ const INTRO_ELIGIBLE = 2;
  *   product's default option, so the free phase alone answers it.
  */
 export function annualTrialOffered(input: {
-  introPrice: { price: number } | null | undefined;
+  introPrice:
+    | { price: number; periodUnit?: string; periodNumberOfUnits?: number }
+    | null
+    | undefined;
   platform: string;
   iosEligibility?: number;
 }): boolean {
   if (!input.introPrice || input.introPrice.price !== 0) return false;
+  // The timeline and copy promise exactly seven days, so any other trial
+  // length falls back to the plain annual copy rather than a wrong date.
+  if (!isSevenDays(input.introPrice)) return false;
   if (input.platform === "ios") return input.iosEligibility === INTRO_ELIGIBLE;
   return true;
 }
@@ -145,6 +151,17 @@ export function annualTrialOffered(input: {
 // ---------------------------------------------------------------------------
 
 const TRIAL_DAYS = 7;
+
+function isSevenDays(intro: {
+  periodUnit?: string;
+  periodNumberOfUnits?: number;
+}): boolean {
+  const unit = intro.periodUnit?.toUpperCase();
+  const count = intro.periodNumberOfUnits;
+  return (
+    (unit === "DAY" && count === TRIAL_DAYS) || (unit === "WEEK" && count === 1)
+  );
+}
 // lib/trial-reminder.ts schedules the reminder two days before renewal.
 export const REMINDER_DAY = TRIAL_DAYS - 2;
 
