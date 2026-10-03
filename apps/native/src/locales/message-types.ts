@@ -36,6 +36,10 @@ export type MessageParams = {
   "notifications.trialChannel": undefined;
   "notifications.trialEndingTitle": undefined;
   "notifications.trialEndingBody": undefined;
+  "notifications.trialPrimerTitle": undefined;
+  "notifications.trialPrimerBody": undefined;
+  "notifications.trialPrimerAllow": undefined;
+  "notifications.trialPrimerWhen": undefined;
   "notifications.trialFirstDayTitle": undefined;
   "notifications.trialFirstDayBody": undefined;
   "notifications.trialThirdDayTitle": undefined;
@@ -143,6 +147,7 @@ export type MessageParams = {
   "profile.ofFragment": undefined;
   "profile.photosFragment": undefined;
   "profile.appearance": undefined;
+  "profile.settings": undefined;
   "notifications.weeklyHelp": undefined;
   "notifications.toggleLabel": undefined;
   "notifications.remindersLabel": undefined;
@@ -437,6 +442,14 @@ export type MessageParams = {
   "onboarding.spacesChangeable": undefined;
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
+  "onboarding.sourceTitle": undefined;
+  "onboarding.sourceFriend": undefined;
+  "onboarding.sourceSharedLink": undefined;
+  "onboarding.sourceAi": undefined;
+  "onboarding.sourceAppStore": undefined;
+  "onboarding.sourceGooglePlay": undefined;
+  "onboarding.sourceOther": undefined;
+  "onboarding.sourceSkip": undefined;
   "demo.shareHelp": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;

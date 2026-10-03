@@ -34,6 +34,8 @@
         "tools/main-module.test.mjs",
         "tools/measure-header-morph.mjs",
         "tools/release-guards.test.mjs",
+        "tools/verify-agent-docs.mjs",
+        "tools/verify-agent-docs.test.mjs",
         "tools/verify-ci.cjs",
         "tools/verify-convex-api.mjs",
         "tools/verify-convex-api.test.mjs",

@@ -148,7 +148,8 @@ describe("server-confirmed payments", () => {
       ctx.db.query("subscriptions").collect(),
     );
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].status).toBe("pro");
+    // The historical purchase is still recorded, but its expired period grants no access.
+    expect(subscriptions[0].status).toBe("lapsed");
     expect(
       await t.run((ctx) =>
         ctx.db.system.query("_scheduled_functions").collect(),

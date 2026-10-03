@@ -24,6 +24,7 @@ function validate(variant: string, platform: string) {
         EXPO_PUBLIC_REVENUECAT_IOS_KEY: "appl_store",
         // A production Android config refuses to build without the maps key.
         GOOGLE_MAPS_API_KEY: "maps_key",
+        EXPO_PUBLIC_CONVEX_SITE_URL: "https://amiable-setter-120.convex.site",
         EXPO_PUBLIC_CONVEX_URL:
           variant === "production"
             ? "https://amiable-setter-120.convex.cloud"
@@ -51,4 +52,26 @@ describe("Firebase build configuration", () => {
       expect(() => validate(variant, "ios")).not.toThrow();
     },
   );
+});
+
+it("isolates the widget group and callback scheme for co-installed variants", () => {
+  for (const variant of ["development", "preview", "production"]) {
+    const config = validate(variant, "ios") as unknown as {
+      scheme: string;
+      plugins: (string | [string, { groupIdentifier?: string }])[];
+    };
+    const widget = config.plugins.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === "expo-widgets",
+    ) as [string, { groupIdentifier: string }];
+    const suffix =
+      variant === "production"
+        ? ""
+        : variant === "preview"
+          ? ".preview"
+          : ".dev";
+    expect(widget[1].groupIdentifier).toBe(`group.app.shelvr.save${suffix}`);
+    expect(config.scheme).toBe(
+      variant === "production" ? "shelvr" : `shelvr${suffix.replace(".", "-")}`,
+    );
+  }
 });

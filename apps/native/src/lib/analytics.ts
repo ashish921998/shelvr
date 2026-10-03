@@ -3,6 +3,7 @@ import {
   posthog,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
+import type { AcquisitionSource } from "@/lib/acquisition-source";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
@@ -78,10 +79,15 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 type SaveKind = "link" | "note" | "image";
 
 type AnalyticsEventProperties = {
-  onboarding_step_viewed: { step_id: string; step_index: number };
+  onboarding_step_viewed: {
+    step_id: string;
+    step_index: number;
+    flow_version: number;
+  };
   onboarding_step_completed: {
     step_id: string;
     step_index: number;
+    flow_version: number;
     duration_ms: number;
   };
   // The four OAuth flow events share one `auth_attempt_id` per
@@ -241,6 +247,15 @@ type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
+  // Onboarding "How did you hear about Shelvr?" (lib/acquisition-source.ts).
+  // `source` is a fixed id; `position` is the row it sat in (0-based), since
+  // the social rows are shuffled. The person property keeps the first answer.
+  acquisition_source_answered: {
+    source: AcquisitionSource;
+    position: number;
+    $set_once: { acquisition_source: AcquisitionSource };
+  };
+  acquisition_source_skipped: Record<string, never>;
   // Feedback events never carry message text; see lib/feedback.ts. The
   // submission event fires only after Convex acknowledges persistence — the
   // message itself lives in Convex and the support inbox, never in PostHog.
@@ -270,6 +285,7 @@ type AnalyticsEventProperties = {
   save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
+  trial_reminder_primer: { outcome: "accepted" | "declined" };
   // Post-purchase save handoff on Home (lib/welcome-save.ts).
   welcome_save_shown: { trial: boolean };
   welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
