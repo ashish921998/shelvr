@@ -50,6 +50,9 @@ jobs:
       - name: Convex codegen drift
         run: pnpm run verify:codegen
 
+      - name: Agent docs drift
+        run: pnpm run verify:agent-docs
+
       - name: Tooling tests
         run: pnpm run test:tools
 
