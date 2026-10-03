@@ -24,5 +24,24 @@ if (env.AUTH_ENABLE_ANONYMOUS === "true") {
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers,
-  callbacks: { afterUserCreatedOrUpdated: recordAccountCreated },
+  callbacks: {
+    afterUserCreatedOrUpdated: recordAccountCreated,
+    redirect: async ({ redirectTo }) => {
+      const allowed =
+        process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
+        "https://amicable-antelope-639.convex.site"
+          ? [
+              "shelvr://auth/callback",
+              "shelvr-dev://auth/callback",
+              "shelvr-preview://auth/callback",
+            ]
+          : [
+              "shelvr://auth/callback",
+              "https://shelvr-web.vercel.app/auth/callback",
+            ];
+      if (!allowed.includes(redirectTo))
+        throw new Error("Invalid OAuth callback");
+      return redirectTo;
+    },
+  },
 });

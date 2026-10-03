@@ -1,3 +1,5 @@
+import { signVerdict } from "@/lib/oracleProof";
+import type { OracleMode, OracleVerdict } from "@/lib/oracle";
 import { NextResponse } from "next/server";
 
 import {
@@ -8,6 +10,11 @@ import {
 } from "@/lib/convexForward";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
+import {
+  BodyTooLargeError,
+  readBoundedText,
+  authorizeRequestBody,
+} from "@/lib/requestBody";
 
 // A screenshot verdict may take the full 45 s upstream deadline.
 export const maxDuration = 60;
@@ -33,12 +40,15 @@ function requestKind(text: string): string | undefined {
 
 /** Forwards the visitor's oracle input to Convex, which validates it. */
 export async function POST(request: Request) {
-  if (Number(request.headers.get("content-length")) > MAX_BODY_CHARS) {
-    return message("That is too big for the oracle.", 413);
-  }
-  const text = await request.text();
-  if (text.length > MAX_BODY_CHARS) {
-    return message("That is too big for the oracle.", 413);
+  const refused = await authorizeRequestBody(request, "oracle");
+  if (refused) return refused;
+  let text: string;
+  try {
+    text = await readBoundedText(request, MAX_BODY_CHARS);
+  } catch (error) {
+    return error instanceof BodyTooLargeError
+      ? message("That is too big for the oracle.", 413)
+      : message("Invalid request.", 400);
   }
   const kind = requestKind(text);
   if (!kind) return message("Invalid request.", 400);
@@ -78,7 +88,12 @@ export async function POST(request: Request) {
     if (!response.ok) {
       throw new Error(`Convex oracle endpoint returned ${response.status}.`);
     }
-    return NextResponse.json(await response.json());
+    const verdict = (await response.json()) as OracleVerdict;
+    const shareCode = await signVerdict({
+      ...verdict,
+      mode: kind as OracleMode,
+    });
+    return NextResponse.json({ ...verdict, shareCode });
   } catch (error) {
     serverLog("error", "oracle_request_failed", {
       kind,
