@@ -3,7 +3,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 // Sample saves for the collage. The photos are generated for the app, so they
@@ -93,43 +93,52 @@ export function OpenerStep({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.head}>
-        <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
-        <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
-      </View>
-
-      <View
-        style={styles.collage}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+      {/* The headline and collage scroll: at the largest text sizes the
+          headline alone can fill most of the screen. When everything fits,
+          the collage grows to fill the space. "Start yours" stays pinned. */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
       >
-        {COLUMNS.map((column, index) => (
-          <View key={index} style={styles.column}>
-            {column.map((tile) =>
-              tile.kind === "note" ? (
-                <View key={tile.titleKey} style={[styles.tile, styles.note]}>
-                  <Text style={styles.noteText}>{t(tile.titleKey)}</Text>
-                </View>
-              ) : (
-                <View key={tile.titleKey} style={styles.tile}>
-                  <Image
-                    source={tile.image}
-                    contentFit="cover"
-                    style={[styles.thumb, { height: tile.height }]}
-                  />
-                  <View style={styles.meta}>
-                    <Text style={styles.tileTitle} numberOfLines={2}>
-                      {t(tile.titleKey)}
-                    </Text>
-                    <Text style={styles.domain}>{tile.domain}</Text>
+        <View style={styles.head}>
+          <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
+          <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
+        </View>
+
+        <View
+          style={styles.collage}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {COLUMNS.map((column, index) => (
+            <View key={index} style={styles.column}>
+              {column.map((tile) =>
+                tile.kind === "note" ? (
+                  <View key={tile.titleKey} style={[styles.tile, styles.note]}>
+                    <Text style={styles.noteText}>{t(tile.titleKey)}</Text>
                   </View>
-                </View>
-              ),
-            )}
-          </View>
-        ))}
-        <View pointerEvents="none" style={styles.fade} />
-      </View>
+                ) : (
+                  <View key={tile.titleKey} style={styles.tile}>
+                    <Image
+                      source={tile.image}
+                      contentFit="cover"
+                      style={[styles.thumb, { height: tile.height }]}
+                    />
+                    <View style={styles.meta}>
+                      <Text style={styles.tileTitle} numberOfLines={2}>
+                        {t(tile.titleKey)}
+                      </Text>
+                      <Text style={styles.domain}>{tile.domain}</Text>
+                    </View>
+                  </View>
+                ),
+              )}
+            </View>
+          ))}
+          <View pointerEvents="none" style={styles.fade} />
+        </View>
+      </ScrollView>
 
       <View style={styles.foot}>
         <View style={styles.proLine}>
@@ -157,6 +166,13 @@ export function OpenerStep({
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
+    gap: theme.gap(2),
+  },
+  scroll: {
+    flex: 1,
+  },
+  body: {
+    flexGrow: 1,
     gap: theme.gap(2),
   },
   head: {
