@@ -977,12 +977,9 @@ export const processItem = internalAction({
       // Map returned space names back to ids (case-insensitive, trimmed).
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
-      posterStorageId =
-        linkRead?.status === "ok" &&
-        linkRead.shortForm !== undefined &&
-        page?.heroImageUrl
-          ? await storePoster(ctx, page.heroImageUrl)
-          : undefined;
+      posterStorageId = page?.heroImageUrl
+        ? await storePoster(ctx, page.heroImageUrl)
+        : undefined;
 
       const tags = result.tags
         .map((t) => t.trim().toLowerCase())

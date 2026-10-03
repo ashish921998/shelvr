@@ -78,6 +78,22 @@ async function seedFeed(
 }
 
 describe("listItems (installed builds)", () => {
+  it("does not expose existing page-controlled preview URLs", async () => {
+    const t = await as("preview-user");
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "preview-user",
+        type: "link",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        heroImageUrl: "http://127.0.0.1/private",
+      });
+    });
+    expect(
+      (await t.query(api.items.listItems, {}))[0].heroImageUrl,
+    ).toBeUndefined();
+  });
   it("still returns every item as a full row, newest first", async () => {
     const t = await as("feed-user");
     const ids = await seedFeed(t, "feed-user", 3);
@@ -757,6 +773,92 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
     );
   });
 }
+
+describe("upload abuse controls", () => {
+  it("reuses pending upload capabilities and limits fresh begins", async () => {
+    const t = await as("upload-limits");
+    const first = await t.mutation(api.items.beginImageImport, {
+      operationId: OP_ID,
+    });
+    for (let i = 0; i < 35; i++) {
+      expect(
+        await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+      ).toEqual(first);
+    }
+    for (let i = 0; i < 29; i++) {
+      await t.mutation(api.items.beginImageImport, {
+        operationId: `image:limit-${i}`,
+      });
+    }
+    await expect(
+      t.mutation(api.items.beginImageImport, {
+        operationId: "image:over-limit",
+      }),
+    ).rejects.toThrow();
+    expect(
+      await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).toEqual(first);
+  });
+
+  it("caps pending imports independently of the finalized photo quota", async () => {
+    const t = await as("pending-limits");
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 30; i++) {
+        await ctx.db.insert("itemOperations", {
+          userId: "pending-limits",
+          operationId: `pending:${i}`,
+          kind: "image",
+          status: "pending",
+          updatedAt: Date.now(),
+        });
+      }
+    });
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow("Too many pending image imports");
+  });
+
+  it("sweeps unattached storage while protecting young and referenced blobs", async () => {
+    const t = await as("storage-sweep");
+    const orphan = await storeBlob(t);
+    const owned = await storeBlob(t);
+    const pending = await storeBlob(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "storage-sweep",
+        type: "image",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        storageId: owned,
+      });
+      await ctx.db.insert("itemOperations", {
+        userId: "storage-sweep",
+        operationId: OP_ID,
+        kind: "image",
+        status: "pending",
+        storageId: pending,
+        updatedAt: Date.now(),
+      });
+    });
+    await t.mutation(internal.items.cleanupOrphanStorage, {});
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).not.toBeNull();
+    await t.mutation(internal.items.cleanupOrphanStorage, {
+      cutoff: Date.now() + 1000,
+    });
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", owned)),
+    ).not.toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", pending)),
+    ).not.toBeNull();
+  });
+});
 
 /** Asserts a refusal carries BOTH halves of the save-error contract: the code
  * the current client routes on, and the sentence an already-installed bundle
