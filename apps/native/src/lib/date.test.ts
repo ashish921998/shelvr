@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { trialTimelineVariables } from "./date";
 
+// A zone with daylight saving, so the tests cover a trial that crosses it.
+process.env.TZ = "America/New_York";
+
 vi.mock("./i18n", () => ({ formattingLocale: () => "en-US" }));
 
 const at = (year: number, month: number, day: number) =>
@@ -53,6 +56,20 @@ describe("trialTimelineVariables", () => {
     ).toMatchObject({
       trial_day7: text(" · Feb 28"),
       trial_end_day: text("365"),
+    });
+  });
+
+  it("matches the reminder across a daylight saving change", () => {
+    // Clocks go back on Nov 1, 2026: seven elapsed days from 00:30 end at
+    // 23:30 the day before, and the reminder fires 48 hours ahead of that.
+    const now = new Date(2026, 9, 28, 0, 30).getTime();
+    expect(
+      trialTimelineVariables(now, { unit: "DAY", count: 7 }),
+    ).toMatchObject({
+      trial_day5: text(" · Nov 1"),
+      trial_day7: text(" · Nov 3"),
+      trial_remind_day: text("5"),
+      trial_end_day: text("7"),
     });
   });
 });

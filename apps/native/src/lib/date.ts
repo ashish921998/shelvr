@@ -41,9 +41,12 @@ export type TrialPeriod = { unit: string; count: number };
  * references: they are the reminder and end dates.
  */
 export function trialTimelineVariables(now: number, trial: TrialPeriod) {
+  // Day and week trials run in elapsed time, as the store bills them and as
+  // the reminder is scheduled, so a daylight saving change inside the trial
+  // cannot move a date by a day.
+  const dayMs = 86_400_000;
   const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
+  let end = new Date(now);
   const months =
     trial.unit === "YEAR"
       ? trial.count * 12
@@ -61,18 +64,16 @@ export function trialTimelineVariables(now: number, trial: TrialPeriod) {
     ).getDate();
     end.setDate(Math.min(start.getDate(), lastDay));
   } else {
-    end.setDate(end.getDate() + trial.count * (trial.unit === "WEEK" ? 7 : 1));
+    end = new Date(now + trial.count * (trial.unit === "WEEK" ? 7 : 1) * dayMs);
   }
-  const remind = new Date(end);
-  remind.setDate(remind.getDate() - 2);
+  const remind = new Date(end.getTime() - 2 * dayMs);
   const label = (date: Date) =>
     date.toLocaleDateString(formattingLocale(), {
       month: "short",
       day: "numeric",
     });
-  // Rounded, so a daylight saving change inside the trial cannot shift a day.
   const dayNumber = (date: Date) =>
-    String(Math.round((date.getTime() - start.getTime()) / 86_400_000));
+    String(Math.round((date.getTime() - now) / dayMs));
   const string = (value: string) => ({ type: "string", value }) as const;
   return {
     trial_today: string(` · ${label(start)}`),
