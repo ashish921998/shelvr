@@ -358,6 +358,8 @@ export type MessageParams = {
   "item.noteTitlePlaceholder": undefined;
   "item.noteTitleLabel": undefined;
   "item.noteTextLabel": undefined;
+  "item.userNotePlaceholder": undefined;
+  "item.userNoteLabel": undefined;
   "item.details": undefined;
   "item.toggleCaption": undefined;
   "capture.partialFailure": { saved: number; total: number; reason: string };

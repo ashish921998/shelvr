@@ -131,3 +131,7 @@ export const MAX_ITEM_TITLE_CHARS = 200;
  * the UTF-8 bytes stay under 300 KB and the item document stays far below
  * Convex's 1 MiB limit alongside its other fields. */
 export const MAX_NOTE_TEXT_CHARS = 100_000;
+
+/** Longest personal note a user can attach to a save. A line or two of why
+ * they kept it, not a document; the client's field shares the cap. */
+export const MAX_USER_NOTE_CHARS = 2000;

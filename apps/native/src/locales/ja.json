@@ -361,6 +361,8 @@
   "item.noteTitlePlaceholder": "タイトル",
   "item.noteTitleLabel": "メモのタイトル",
   "item.noteTextLabel": "メモの本文",
+  "item.userNotePlaceholder": "メモを追加",
+  "item.userNoteLabel": "自分のメモ",
   "item.details": "詳細",
   "item.toggleCaption": "キャプションを表示または非表示にします",
   "capture.partialFailure": "%{total}件中%{saved}件を保存しました。\n%{reason}\n保存できなかった画像を再試行しますか？",

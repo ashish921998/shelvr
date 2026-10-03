@@ -361,6 +361,8 @@
   "item.noteTitlePlaceholder": "Titre",
   "item.noteTitleLabel": "Titre de la note",
   "item.noteTextLabel": "Texte de la note",
+  "item.userNotePlaceholder": "Ajouter une note",
+  "item.userNoteLabel": "Votre note",
   "item.details": "Détails",
   "item.toggleCaption": "Affiche ou masque la légende",
   "capture.partialFailure": "%{saved} sur %{total} enregistrés.\n%{reason}\nRéessayer les images en échec ?",

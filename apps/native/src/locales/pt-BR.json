@@ -361,6 +361,8 @@
   "item.noteTitlePlaceholder": "Título",
   "item.noteTitleLabel": "Título da nota",
   "item.noteTextLabel": "Texto da nota",
+  "item.userNotePlaceholder": "Adicionar uma nota",
+  "item.userNoteLabel": "Sua nota",
   "item.details": "Detalhes",
   "item.toggleCaption": "Mostra ou oculta a legenda",
   "capture.partialFailure": "%{saved} de %{total} salvos.\n%{reason}\nTentar novamente as imagens que falharam?",
