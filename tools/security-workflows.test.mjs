@@ -41,9 +41,7 @@ test("review preparations pin every upstream checkout and run before secrets are
     const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
     const preparation = source.indexOf("uses: ./.secure-review-tooling/.github/actions/secure-review");
     const runtime = source.indexOf("uses: ./.secure-review-tooling/runtime/");
-    assert.match(source, /repository:.*github.repository.*
-\s+ref: [a-f0-9]{40}
-\s+path: \.secure-review-tooling/);
+    assert.match(source, /repository:.*github\.repository.*\s+ref: [a-f0-9]{40}\s+path: \.secure-review-tooling/);
     assert.notEqual(preparation, -1);
     assert.notEqual(runtime, -1);
     assert.ok(preparation < runtime);
