@@ -12,6 +12,10 @@ const mock = vi.hoisted(() => ({
   captureError: vi.fn(),
   uuid: 0,
 }));
+vi.mock("react-native", () => ({ Platform: { OS: "android", Version: 35 } }));
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { variant: "development" } } },
+}));
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signIn: mock.signIn }),
 }));
