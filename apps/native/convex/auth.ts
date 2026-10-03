@@ -28,7 +28,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     afterUserCreatedOrUpdated: recordAccountCreated,
     redirect: async ({ redirectTo }) => {
       const allowed =
-        env.AUTH_ENABLE_ANONYMOUS === "true"
+        process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
+        "https://amicable-antelope-639.convex.site"
           ? [
               "shelvr://auth/callback",
               "shelvr-dev://auth/callback",

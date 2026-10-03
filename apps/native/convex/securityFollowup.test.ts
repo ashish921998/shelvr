@@ -142,3 +142,35 @@ it("server expiry fences stale timers and ignores a caller-supplied past clock",
   ).toEqual([]);
   expect(await auth.query(api.items.listRecentItems, { limit: 5 })).toEqual([]);
 });
+
+it("unconfirmed rows cannot fill the confirmed provider retry window", async () => {
+  const t = newConvexTest();
+  await t.run(async (ctx) => {
+    const base = {
+      product: "shelvr" as const,
+      source: "hero" as const,
+      consentVersion: "test",
+      consentText: "test",
+      consentedAt: 0,
+      firstSubmittedAt: 1,
+      lastSubmittedAt: 1,
+      resendStatus: "pending" as const,
+      resendAttempts: 0,
+    };
+    for (let index = 0; index < 101; index++)
+      await ctx.db.insert("waitlistSignups", {
+        ...base,
+        email: `pending-${index}@example.com`,
+        confirmed: false,
+      });
+    await ctx.db.insert("waitlistSignups", {
+      ...base,
+      email: "confirmed@example.com",
+      confirmed: true,
+      confirmedAt: 1,
+    });
+  });
+  expect(
+    await t.query(internal.waitlist.listSignupsNeedingResendSync, {}),
+  ).toEqual([expect.objectContaining({ email: "confirmed@example.com" })]);
+});
