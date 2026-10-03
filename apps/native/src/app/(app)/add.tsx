@@ -27,6 +27,7 @@ import {
   TextInput,
   View,
   type LayoutChangeEvent,
+  type TextInputInstance,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
@@ -157,7 +158,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
   const [mode, setMode] = useState<Mode>("menu");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);

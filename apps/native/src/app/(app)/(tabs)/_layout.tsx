@@ -1,6 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { AppTabs } from "@/components/ui/app-tab-bar";
-import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/native-tabs";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
