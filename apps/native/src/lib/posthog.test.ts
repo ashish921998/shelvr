@@ -92,6 +92,45 @@ describe("posthog before_send", () => {
     ]);
   });
 
+  it("keeps a generated Expo error code so the failing module is named", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "ERR_UNAVAILABLE",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "ERR_UNAVAILABLE",
+            stacktrace: "frame at app.js:1",
+          },
+        ],
+      }),
+    );
+    expect(sent.properties?.$exception_message).toBe("ERR_UNAVAILABLE");
+    const list = sent.properties?.$exception_list as ExceptionListEntry[];
+    expect(list[0].value).toBe("ERR_UNAVAILABLE");
+  });
+
+  it("redacts an all-caps message that is not a bare code token", () => {
+    const beforeSend = sentBeforeSend();
+    const sent = beforeSend(
+      exceptionEvent({
+        message: "FAILED saving https://private.example/note",
+        type: "Error",
+        list: [
+          {
+            type: "Error",
+            value: "FAILED saving https://private.example/note",
+          },
+        ],
+      }),
+    );
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain("private.example");
+    expect(sent.properties?.$exception_message).toBe("Error");
+  });
+
   it("replaces content-carrying messages with the error class", () => {
     const beforeSend = sentBeforeSend();
     const noteUrl = "https://private.example/saved/note-42";
@@ -197,6 +236,56 @@ describe("posthog exception autocapture gate", () => {
     };
     expect(options.errorTracking.autocapture.uncaughtExceptions).toBe(true);
     expect(options.errorTracking.autocapture.unhandledRejections).toBe(true);
+    vi.doUnmock("expo-constants");
+  });
+});
+
+describe("posthog session replay gate", () => {
+  it("records a production build with masking and sampling intact", async () => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+            variant: "production",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as {
+      enableSessionReplay: boolean;
+      sessionReplayConfig: Record<string, unknown>;
+    };
+    expect(options.enableSessionReplay).toBe(true);
+    expect(options.sessionReplayConfig).toMatchObject({
+      maskAllTextInputs: true,
+      maskAllImages: true,
+      maskAllSandboxedViews: true,
+      captureLog: false,
+      captureNetworkTelemetry: false,
+      sampleRate: 1,
+    });
+    vi.doUnmock("expo-constants");
+  });
+
+  it("stays off when the build declares no variant", async () => {
+    vi.resetModules();
+    vi.doMock("expo-constants", () => ({
+      default: {
+        expoConfig: {
+          extra: {
+            posthogProjectToken: "phc_test",
+            posthogHost: "https://test.i.posthog.com",
+          },
+        },
+      },
+    }));
+    await import("./posthog");
+    const options = posthogCtor.options as { enableSessionReplay: boolean };
+    expect(options.enableSessionReplay).toBe(false);
     vi.doUnmock("expo-constants");
   });
 });

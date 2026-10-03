@@ -2,6 +2,9 @@
 
 This file provides guidance when working with code in this repository.
 
+@AGENTS.md carries the "where things live" map for both apps. Check it before searching
+for a module.
+
 > Expo docs change quickly. Before writing native app code, read the versioned docs
 > for the SDK pinned in `apps/native/package.json` (currently Expo SDK 57):
 > https://docs.expo.dev/versions/v57.0.0/
@@ -74,12 +77,22 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `extensionPairings` — short-lived, single-use browser-extension pairing codes
   - `extensionConnections` — one paired browser each, holding only the token's hash
   - `notificationDevices` — one Expo push token per device, scoped to a user
-  - `notificationPreferences` — weekly shelf opt-in, timezone, and the next digest instant
+  - `notificationPreferences` — weekly shelf opt-in, save reminder opt-out, timezone, and the
+    next digest and reminder instants
   - `itemReads` — per-user read state, kept out of the item row
+  - `shareLinks` — one random public token per shared item, the capability behind the
+    branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests` — the persisted weekly shelf and its delivery state
+  - `saveReminders` — one push naming one save (an unread article or a recipe),
+    with its delivery state; also the reminder budget's memory
   - `waitlistSignups` — waitlist source of truth, projected to Resend
   - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
+  - `legalConsents` — versioned terms acceptance and the refund-data sharing choice
+    (see [refund consent](docs/architecture/refund-consent.md))
+  - `cancelSurveys` — one next-visit cancel-survey ask per user; the first recorded outcome wins
+  - `captureTokens` — hashed per-device tokens the iOS App Intents use in place of a JWT
+  - `onboardingDemos` — the one pre-payment demo save each user is allowed
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -87,7 +100,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`items.ts`** — public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
   `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
   `beginImageImport` → `attachImageUpload` → `finalizeImageImport`, all keyed on a
-  client-generated `operationId` in `itemOperations`. Other public mutations are
+  client-generated `operationId` in `itemOperations`.
+  The returned upload URL now targets `/image-upload`, which claims a single
+  receiver, caps the streamed body at the image limit, and records its storage ID
+  before replying. Begin and upload budgets, pending-operation reservations,
+  stale-operation cleanup, and a paginated orphan-storage sweep bound abandoned
+  work. Successful upload retries return the same storage ID.
+  Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
   `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
@@ -113,10 +132,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
-- **`notifications.ts`** — push and weekly shelf API: `getPreferences`, `setPreferences`,
-  `registerDevice`, `unregisterDevice`, `markItemOpened`, `getDigest`, and `markDigestOpened`,
-  plus internal digest preparation and send. `notificationDelivery.ts` holds the
-  claim/finish/recover delivery machine.
+- **`notifications.ts`** — push, weekly shelf and save reminder API: `getPreferences`,
+  `setPreferences`, `setSaveReminders`, `registerDevice`, `unregisterDevice`, `markItemOpened`,
+  `getDigest`, and `markDigestOpened`, plus internal digest and reminder preparation.
+  `notificationDelivery.ts` holds the claim/finish/recover delivery machine for both, and
+  `model/saveReminders.ts` the reminder rules. See
+  [contextual notifications](docs/architecture/contextual-notifications.md).
 - **`waitlist.ts`** — the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
 - **`feedback.ts`** — the public `submitFeedback` mutation (persist-first), plus the internal
@@ -124,16 +145,21 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
-  the waitlist receiver at `/waitlist/join`, the browser-extension routes
+  the waitlist receiver at `/waitlist/join`, the web Oracle at `/oracle`, the App Intents
+  capture routes under `/app-intents/`, the browser-extension routes
   (`POST /extension/pair`, `GET /extension/session`, `POST /extension/save`,
   `POST /extension/disconnect`, each with an `OPTIONS` preflight that echoes only
-  `chrome-extension://`-style origins and never allows credentials), and `GET /health`
-  (200/503 probe for uptime monitors, backed by the `health.ts` `ping` query).
-- **`crons.ts`** — stale image import cleanup, waitlist Resend retry, expired extension pairing
-  cleanup, weekly shelf preparation, weekly shelf delivery recovery, and hourly feedback inbox
-  delivery retry.
+  `chrome-extension://`-style origins and never allows credentials), Apple's Get Retention
+  Message endpoint at `/retention-messaging` (authenticated by the App Store's JWS signature,
+  checked in `model/appleJws.ts`), and `GET /health` (200/503 probe for uptime
+  monitors, backed by the `health.ts` `ping` query).
+- **`crons.ts`** — refund consent sync retry, stale image import cleanup, expired extension
+  pairing cleanup, stale processing-item failure, waitlist Resend retry, weekly shelf and save
+  reminder preparation, their delivery recovery, hourly feedback inbox delivery retry,
+  embedding sweep, and daily payment-receipt retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
-  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
+  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
+  `image: null` Apple's provider emits, which the users schema rejects.
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
   identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
@@ -142,16 +168,36 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   capture. Every one is a no-op when `POSTHOG_PROJECT_TOKEN` is unset.
 - **`ai.ts`** (`"use node"` action) — the processing pipeline. On create, a mutation inserts the
   item as `status: "processing"` and schedules `internal.ai.processItem`. That action: for links,
-  fetches the page and extracts the article body (Mozilla **Readability** via `linkedom`, with a
-  regex fallback) + OpenGraph metadata + hero image aspect ratio (read from raw header bytes);
-  for notes it feeds the content to the model; for images it sends the stored bytes as a file
-  part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
+  calls `readPage(url)` from `model/pageRead.ts`, which returns the article body, metadata and
+  hero image; for notes it feeds the content to the model; for images it sends the stored bytes
+  as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
   matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
   existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
-  `SERPAPI_KEY`), and the one-off `backfillImageAspectRatios`.
+  `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
+  [embeddings](docs/architecture/embeddings.md)).
+- **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
+  one entry point: it picks the reader for the host (TikTok oEmbed, X syndication, Instagram
+  embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
+  image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
+  schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
+- **`model/safeFetch.ts`**, **`model/externalUrl.ts`** — every backend fetch of an external URL
+  goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
+  `externalUrl.ts` is the runtime-agnostic URL policy and host detection (`linkSource`,
+  `isInstagramUrl`, `isPinterestHost`), usable from mutations as well as Node actions.
+- **`appIntents.ts`** — saves from the iOS App Intents (Siri, Shortcuts), which run without the
+  JavaScript app and so have no JWT. The app mints a per-device capture token
+  (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
+  user and run the same save helpers, gates and limits as the app's own mutations.
+- **`demo.ts`** — the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
+  per user, tracked in `onboardingDemos`.
+- **`cancelSurvey.ts`** — the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
+  client boundary is `src/lib/cancel-survey.ts`.
+- **`oracle.ts`**, **`oracleLimits.ts`** — the web Oracle. The internal `consult` action reads
+  pages and makes one model call inside the web route's deadline; `claim` is its rate limit.
+  Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
@@ -178,7 +224,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Saves the current page from the toolbar, a keyboard shortcut, or the context menu, through
   the `/extension` HTTP routes rather than the Convex client
 - Authenticates with a connection token traded for a pairing code the app shows under
-  **Profile → Browser extension**. The server stores only digests — the token's SHA-256, and
+  **Profile → Settings → Browser extension**. The server stores only digests — the token's SHA-256, and
   the pairing code's HMAC under `EXTENSION_PAIRING_SECRET`, since a 40-bit code would
   otherwise be recoverable offline from a database read — so the copy in
   the browser is the only one; revoking from either side is a row delete
@@ -189,15 +235,23 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 - UI localization uses `expo-localization` and i18n-js. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
-  update all catalogs and run `pnpm localization:generate` after translation changes.
+  update all catalogs and run `pnpm localization:generate` after translation changes. It is a
+  root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,
+  `src/locales/message-types.ts` and `convex/model/notificationTranslations.json`; never edit
+  those by hand.
+- Design tokens live in `src/unistyles.ts` (type, spacing, color, controls) and motion in
+  `src/lib/motion.ts`. Read [design system](docs/architecture/design-system.md) before adding
+  UI, and [display font](docs/architecture/display-font.md) before touching the title face.
+- To run a branch or worktree on a simulator (Metro port, dev client link, sign-in, fixtures,
+  forcing onboarding or the paywall), read [local QA](docs/architecture/local-qa.md) first.
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
-  `new-space`, `manage-spaces`, `browser-extension`, `item/[id]`, `space/[id]`, `digest/[id]`
+- Other `(app)` routes: `add`, `camera`, `share`, `import`, `onboarding`, `paywall`, `profile`,
+  `settings`, `new-space`, `manage-spaces`, `browser-extension`, `item/[id]`, `space/[id]`, `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides
@@ -217,21 +271,26 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST` — web analytics keys.
   Analytics is a no-op when either is unset
+- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN` — optional App Store Connect provider token. With
+  it, App Store links carry `ct=` campaign tokens; see
+  [growth funnel](docs/analytics/growth-funnel.md)
 - Native (`apps/native/.example.env` → `.env.local`):
   - `EXPO_PUBLIC_CONVEX_URL` — the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL` — the deployment's HTTP Actions origin
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the dev-only passwordless button
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by every
-    non-production variant. `app.config.js` pins it to one exact value
+    to show the passwordless dev-login button and fixture reset on development builds
+    (release-mode included); preview and production builds never show either
+  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
+    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
+    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
+    to one exact value
   - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — RevenueCat public
     SDK keys used only by production builds. The entitlement stays `none` until a key is set and
     a subscription row is written
-  - `ACTIVATION_PAL_IOS_KEY` — ActivationPal public app key. `app.config.js` writes it into the
-    iOS `infoPlist` and a production iOS build fails without an `ap_pk_` value
   - `GOOGLE_MAPS_API_KEY` — Google Maps key injected into the Android config, needed by
-    `expo-maps` on the map screen
+    `expo-maps` on the map screen. A production Android EAS build fails without it, so the map
+    screen never ships unconfigured
   - `GOOGLE_SERVICES_JSON` — EAS secret file variable containing Firebase's
     `google-services.json`; required by every Android EAS build, with a Firebase
     client matching that variant's package, so `expo-notifications` can obtain an
@@ -239,6 +298,14 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
     for credentials, rebuilding existing installs, and OTA fingerprint consistency
   - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST` — build-time PostHog config baked into
     `expoConfig.extra`. The client analytics module is undefined unless both resolve
+  - `POSTHOG_CLI_API_KEY` — PostHog personal API key (scopes: error tracking write, organization
+    read). `app.config.js` adds the `posthog-react-native/expo` source map upload plugin only when
+    this is set, so a build without it keeps working and uploads switch on the moment the EAS
+    secret is added. The upload runs inside the native build and needs `@posthog/cli` available
+    there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
+    variables rather than in `eas.json`, which the native fingerprint hashes. Turning the upload
+    on adds a config plugin, so it moves the fingerprint and needs a store build.
+    `metro.config.js` stamps the matching debug id into every bundle regardless
 
 **Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
 `apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and
@@ -251,6 +318,9 @@ needed at runtime by the features that use them:
 - `CONVEX_SITE_URL` — set by Convex; `auth.config.ts` uses it as the JWT issuer domain
 - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials
 - `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET` — Sign-in-with-Apple Service ID + signed JWT secret
+- `APPLE_RETENTION_MESSAGE_ID` — id of the Apple-approved retention message
+  `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
+  the default message configured for the product
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
@@ -267,6 +337,10 @@ needed at runtime by the features that use them:
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID` — entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
+- `SAVE_REMINDERS_ENABLED` — save reminders send only while this is `"true"`. Unset by
+  default, so a deploy never starts them; set it back to anything else to stop them, queued
+  ones included, without a deploy. See
+  [contextual notifications](docs/architecture/contextual-notifications.md)
 - `SERPAPI_KEY` — SerpAPI key for `findProductLinks`. The search fails without it
 - `RESEND_API_KEY` — Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
@@ -350,6 +424,9 @@ needed at runtime by the features that use them:
   `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
+- A new schema table, top-level Convex module or `(app)` route needs a line in this file.
+  `tools/verify-agent-docs.mjs` (`pnpm run verify:agent-docs`, part of `pnpm run check` and CI)
+  fails until the name appears here in backticks.
 
 <!-- convex-ai-start -->
 

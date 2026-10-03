@@ -1,6 +1,7 @@
-import { LegalConsentPreference } from "@/components/legal-consent";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { ActionMenu } from "@/components/ui/action-menu";
+import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
@@ -8,18 +9,15 @@ import { useAppearanceMode } from "@/lib/appearance-runtime";
 import {
   openPaywall,
   presentCustomerCenter,
-  restorePurchases,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import { LEGAL_URLS, SUPPORT_URL } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
@@ -29,7 +27,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -38,31 +35,16 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 export default function ProfileScreen() {
   useAppLocale();
   const { session, operation } = useNotificationSession();
-  const deleting = operation === "delete_account";
   const signingOut = operation === "sign_out";
   const busy = operation !== "idle";
   const { data: user } = useCurrentUser();
   const router = useRouter();
   const { theme } = useUnistyles();
   const { status, loading } = useEntitlement();
-  const { data: notificationPreferences } = useQuery(
-    convexQuery(api.notifications.getPreferences, {}),
-  );
   const { data: photoUsage } = useQuery(convexQuery(api.items.photoUsage, {}));
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [restoring, setRestoring] = useState(false);
-  const [resettingFixtures, setResettingFixtures] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
     useAppearanceMode();
-  const fixtureResetEnabled =
-    __DEV__ && process.env.EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS === "true";
-  const { data: canResetFlowFixtures } = useQuery(
-    convexQuery(
-      api.devFixtures.canResetCurrentUser,
-      fixtureResetEnabled && user ? {} : "skip",
-    ),
-  );
-  const resetFlowFixtures = useMutation(api.devFixtures.resetCurrentUser);
 
   const closeProfile = () => {
     if (router.canGoBack()) {
@@ -91,17 +73,20 @@ export default function ProfileScreen() {
   // — any non-`none` status. A `none` user has nothing to manage and should see
   // the "View Pro plans" paywall row instead.
   const hasSubscription = status !== "none" && !loading;
+  // A lapsed trial or subscription has nothing left to manage: the way back is
+  // a new purchase, so that row opens the paywall rather than Customer Center.
+  const opensPaywall = status === "none" || status === "lapsed";
 
   // RevenueCat UI (paywall / Customer Center) presents from the root view
   // controller, and UIKit refuses to present while this profile sheet is up
   // ("already presenting RNSScreen"). Dismiss the sheet first, let it settle,
-  // then route: an active/lapsed subscriber to Customer Center (cancel/refund/
-  // change-plan/restore), a `none` user to the paywall to start a trial.
+  // then route: an active subscriber to Customer Center (cancel/refund/
+  // change-plan/restore), a `none` or lapsed user to the paywall.
   const manageSubscription = async () => {
     if (loading) return;
     router.back();
     await waitForSheetTransition();
-    if (hasSubscription) {
+    if (!opensPaywall) {
       const presented = await presentCustomerCenter();
       // Customer Center isn't linked/configured, or identity sync timed out —
       // fall back to the platform's own subscription management page rather
@@ -121,59 +106,10 @@ export default function ProfileScreen() {
         ]);
       }
     } else {
-      void openPaywall(router, "profile");
-    }
-  };
-
-  const openExternal = (url: string) => {
-    void Linking.openURL(url);
-  };
-
-  const toggleWeeklyShelf = async (enabled: boolean) => {
-    try {
-      if ((await session.setWeeklyShelf(enabled)) === false) {
-        Alert.alert(
-          t("notifications.disabledTitle"),
-          t("notifications.disabledBody"),
-          [
-            { text: t("common.cancel"), style: "cancel" },
-            {
-              text: t("permissions.openSettings"),
-              onPress: () => void Linking.openSettings(),
-            },
-          ],
-        );
-      }
-    } catch (error) {
-      analytics.captureError("weekly_shelf_preference_failed", error);
-      Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
-    }
-  };
-
-  const handleRestorePurchases = async () => {
-    if (restoring) return;
-    const storeName = Platform.OS === "ios" ? "App Store" : "Google Play";
-    setRestoring(true);
-    try {
-      const outcome = await restorePurchases();
-      if (outcome === "restored") {
-        Alert.alert(
-          t("pro.restoredTitle"),
-          t("pro.restoredBody", { store: storeName }),
-        );
-      } else if (outcome === "none") {
-        Alert.alert(
-          t("pro.notFoundTitle"),
-          t("pro.notFoundBody", { store: storeName }),
-        );
-      } else {
-        Alert.alert(
-          t("pro.restoreFailed"),
-          t("pro.restoreFailedBody", { store: storeName }),
-        );
-      }
-    } finally {
-      setRestoring(false);
+      void openPaywall(
+        router,
+        status === "lapsed" ? "profile_lapsed" : "profile",
+      );
     }
   };
 
@@ -184,68 +120,6 @@ export default function ProfileScreen() {
       analytics.captureError("sign_out_failed", error);
       Alert.alert(t("account.signOutFailed"), t("errors.connection"));
     }
-  };
-
-  const confirmDeleteAccount = () => {
-    Alert.alert(
-      t("account.deleteTitle"),
-      [
-        t("account.deleteIntro"),
-        t("account.deleteItems"),
-        t("account.deleteSpaces"),
-        t("account.deleteUploads"),
-        "",
-        t("account.subscriptionWarning"),
-      ].join("\n"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("account.delete"),
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              try {
-                await session.deleteAccount();
-              } catch (err) {
-                analytics.captureError("account_deletion_failed", err);
-                Alert.alert(
-                  t("account.deleteFailed"),
-                  t("errors.contactSupport"),
-                );
-              }
-            })();
-          },
-        },
-      ],
-    );
-  };
-
-  const confirmResetFlowFixtures = () => {
-    Alert.alert(t("dev.resetTitle"), t("dev.resetBody"), [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("dev.reset"),
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            if (resettingFixtures) return;
-            setResettingFixtures(true);
-            try {
-              const result = await resetFlowFixtures({});
-              Alert.alert(
-                t("dev.resetSuccess"),
-                `${result.items} saves and ${result.spaces} spaces were created.`,
-              );
-            } catch (error) {
-              analytics.captureError("flow_fixture_reset_failed", error);
-              Alert.alert(t("dev.resetFailed"), t("dev.resetHelp"));
-            } finally {
-              setResettingFixtures(false);
-            }
-          })();
-        },
-      },
-    ]);
   };
 
   return (
@@ -269,243 +143,94 @@ export default function ProfileScreen() {
       <Text style={styles.slogan}>{t("brand.tagline")}</Text>
 
       <View style={styles.card}>
-        <View style={styles.avatar}>
+        <View style={styles.accountRow}>
+          <View style={styles.avatar}>
+            <AppSymbolIcon
+              name="person.fill"
+              size={20}
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+          <Text selectable style={styles.email} numberOfLines={1}>
+            {user?.email ?? t("account.signedIn")}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.proRow,
+            pressed && { opacity: 0.7 },
+            loading && { opacity: 0.4 },
+          ]}
+          disabled={loading}
+          onPress={manageSubscription}
+        >
           <AppSymbolIcon
-            name="person.fill"
-            size={20}
+            name="sparkles"
+            size={18}
             tintColor={theme.colors.primaryText}
           />
-        </View>
-        <Text selectable style={styles.email} numberOfLines={1}>
-          {user?.email ?? t("account.signedIn")}
-        </Text>
-      </View>
-
-      {fixtureResetEnabled && canResetFlowFixtures ? (
-        <Pressable
-          testID="reset-flow-fixtures"
-          accessibilityRole="button"
-          accessibilityLabel={t("dev.resetFixtures")}
-          style={({ pressed }) => [
-            styles.fixtureReset,
-            pressed && { opacity: 0.7 },
-            resettingFixtures && { opacity: 0.4 },
-          ]}
-          disabled={resettingFixtures}
-          onPress={confirmResetFlowFixtures}
-        >
-          <Text style={styles.fixtureResetText}>
-            {resettingFixtures ? t("dev.resetting") : t("dev.resetFixtures")}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.proRow,
-          pressed && { opacity: 0.7 },
-          loading && { opacity: 0.4 },
-        ]}
-        disabled={loading}
-        onPress={manageSubscription}
-      >
-        <AppSymbolIcon
-          name="sparkles"
-          size={18}
-          tintColor={theme.colors.primaryText}
-        />
-        <View style={styles.proCopy}>
-          <Text style={styles.proLabel}>{proLabel}</Text>
-          {photoUsage && hasSubscription && status !== "lapsed" ? (
-            <Text style={styles.preferenceDescription}>
-              {t("profile.photoUsage", {
-                count: photoUsage.count,
-                limit: photoUsage.limit,
-              })}
-            </Text>
-          ) : null}
-        </View>
-        <AppSymbolIcon
-          name="chevron.right"
-          size={16}
-          tintColor={theme.colors.muted}
-        />
-      </Pressable>
-
-      <LegalConsentPreference />
-
-      <View
-        style={styles.linkGroup}
-        accessibilityLabel={t("profile.appearance")}
-        accessibilityRole="radiogroup"
-      >
-        {APPEARANCE_MODES.map((mode) => {
-          const selected = mode === appearanceMode;
-          return (
-            <Pressable
-              key={mode}
-              accessibilityRole="radio"
-              accessibilityLabel={t("profile.appearanceLabel", {
-                appearance: t(APPEARANCE_LABELS[mode]),
-              })}
-              accessibilityState={{ selected }}
-              style={({ pressed }) => [
-                styles.appearanceRow,
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() => setAppearanceMode(mode)}
-            >
-              <Text style={styles.appearanceLabel}>
-                {t(APPEARANCE_LABELS[mode])}
+          <View style={styles.proCopy}>
+            <Text style={styles.proLabel}>{proLabel}</Text>
+            {photoUsage && hasSubscription && status !== "lapsed" ? (
+              <Text style={styles.preferenceDescription}>
+                {t("profile.photoUsage", {
+                  count: photoUsage.count,
+                  limit: photoUsage.limit,
+                })}
               </Text>
-              {selected ? (
-                <AppSymbolIcon
-                  name="checkmark"
-                  size={16}
-                  tintColor={theme.colors.primaryText}
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
+            ) : null}
+          </View>
+          <AppSymbolIcon
+            name="chevron.right"
+            size={16}
+            tintColor={theme.colors.muted}
+          />
+        </Pressable>
       </View>
 
-      <View style={styles.preferenceRow}>
-        <View style={styles.preferenceCopy}>
-          <Text style={styles.preferenceLabel}>
-            {t("notifications.weeklyShelf")}
-          </Text>
-          <Text style={styles.preferenceDescription}>
-            {t("notifications.weeklyHelp")}
-          </Text>
-        </View>
-        <Switch
-          accessibilityLabel={t("notifications.toggleLabel")}
-          value={notificationPreferences?.weeklyShelfEnabled ?? false}
-          disabled={notificationPreferences === undefined || busy}
-          onValueChange={(value) => void toggleWeeklyShelf(value)}
-          trackColor={{
-            false: theme.colors.border,
-            true: theme.colors.primary,
-          }}
-          thumbColor="#fff"
-        />
-      </View>
-
-      <View style={styles.linkGroup}>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t("import.fromX")}
+      <SettingsGroup>
+        <ActionMenu
+          label={t("profile.appearanceLabel", {
+            appearance: t(APPEARANCE_LABELS[appearanceMode]),
+          })}
+          title={t("profile.appearance")}
+          actions={APPEARANCE_MODES.map((mode) => ({
+            id: mode,
+            label: t(APPEARANCE_LABELS[mode]),
+            selected: mode === appearanceMode,
+            onPress: () => setAppearanceMode(mode),
+          }))}
+        >
+          <SettingsRow
+            divider={false}
+            label={t("profile.appearance")}
+            value={t(APPEARANCE_LABELS[appearanceMode])}
+          />
+        </ActionMenu>
+        <SettingsRow
+          label={t("import.fromX")}
           onPress={() => router.push("/import")}
-        >
-          <Text style={styles.linkLabel}>{t("import.fromX")}</Text>
-          <AppSymbolIcon
-            name="chevron.right"
-            size={16}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t("extension.title")}
-          onPress={() => router.push("/browser-extension")}
-        >
-          <Text style={styles.linkLabel}>{t("extension.title")}</Text>
-          <AppSymbolIcon
-            name="chevron.right"
-            size={16}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t("feedback.open")}
+        />
+        <SettingsRow
+          label={t("feedback.open")}
+          icon="arrow.up.right"
           onPress={() => setFeedbackOpen(true)}
-        >
-          <Text style={styles.linkLabel}>{t("feedback.open")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(SUPPORT_URL)}
-        >
-          <Text style={styles.linkLabel}>{t("support.contact")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.linkRow,
-            pressed && { opacity: 0.7 },
-            restoring && { opacity: 0.4 },
-          ]}
-          disabled={restoring}
-          onPress={() => void handleRestorePurchases()}
-        >
-          <Text style={styles.linkLabel}>
-            {restoring ? t("pro.restoring") : t("pro.restore")}
-          </Text>
-          <AppSymbolIcon
-            name="arrow.clockwise"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(LEGAL_URLS.terms)}
-        >
-          <Text style={styles.linkLabel}>{t("legal.terms")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
-          onPress={() => openExternal(LEGAL_URLS.privacy)}
-        >
-          <Text style={styles.linkLabel}>{t("legal.privacy")}</Text>
-          <AppSymbolIcon
-            name="arrow.up.right"
-            size={14}
-            tintColor={theme.colors.muted}
-          />
-        </Pressable>
-      </View>
+        />
+        <SettingsRow
+          label={t("profile.settings")}
+          onPress={() => router.push("/settings")}
+        />
+      </SettingsGroup>
 
       <Pressable
+        accessibilityRole="button"
         style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.7 }]}
         disabled={busy}
         onPress={() => void handleSignOut()}
       >
         <Text style={styles.signOutText}>
           {signingOut ? t("account.signingOut") : t("account.signOut")}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.deleteAccount,
-          pressed && { opacity: 0.7 },
-          deleting && { opacity: 0.4 },
-        ]}
-        disabled={busy}
-        onPress={confirmDeleteAccount}
-      >
-        <Text style={styles.deleteAccountText}>
-          {deleting ? t("account.deleting") : t("account.delete")}
         </Text>
       </Pressable>
       {feedbackOpen ? (
@@ -541,16 +266,19 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: theme.gap(1),
   },
   card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: theme.gap(1.5),
     alignSelf: "stretch",
+    overflow: "hidden",
+  },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    padding: theme.gap(1.5),
   },
   avatar: {
     width: 40,
@@ -570,34 +298,11 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.25),
-    alignSelf: "stretch",
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  preferenceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    alignSelf: "stretch",
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  preferenceCopy: {
-    flex: 1,
-    gap: theme.gap(0.25),
-  },
-  preferenceLabel: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
+    minHeight: 48,
+    paddingVertical: theme.gap(1.25),
+    paddingHorizontal: theme.gap(1.5),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   preferenceDescription: {
     fontFamily: theme.fonts.regular,
@@ -610,55 +315,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   proLabel: {
     fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  fixtureReset: {
-    alignSelf: "stretch",
-    alignItems: "center",
-    paddingVertical: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  fixtureResetText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 15,
-    color: theme.colors.primary,
-  },
-  linkGroup: {
-    alignSelf: "stretch",
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: "hidden",
-  },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: theme.gap(1.5),
-    paddingHorizontal: theme.gap(1.5),
-  },
-  appearanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 44,
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(1.5),
-  },
-  appearanceLabel: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 15,
-    color: theme.colors.foreground,
-  },
-  linkLabel: {
-    fontFamily: theme.fonts.medium,
     fontSize: 15,
     color: theme.colors.foreground,
   },
@@ -676,15 +332,5 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 15,
     color: theme.colors.danger,
-  },
-  deleteAccount: {
-    alignSelf: "stretch",
-    alignItems: "center",
-    paddingVertical: theme.gap(1.25),
-  },
-  deleteAccountText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 14,
-    color: theme.colors.muted,
   },
 }));

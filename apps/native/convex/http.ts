@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
-import { env, httpAction } from "./_generated/server";
+import { env, httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import {
@@ -13,9 +13,19 @@ import {
   reconcileRevenueCatCustomers,
   reconcileRevenueCatTransfer,
 } from "./model/revenuecatTransfer";
+import { bearerToken, sha256Hex } from "./model/captureTokens";
+import {
+  parseImageBegin,
+  parseImageFinish,
+  parseLinkOrNote,
+  readBoundedText,
+  readBoundedBlob,
+  BodyTooLargeError,
+} from "./model/captureRequest";
+import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import {
-  bearerToken,
+  bearerToken as extensionBearerToken,
   generateConnectionToken,
   hashPairingCode,
   hashSecret,
@@ -23,19 +33,112 @@ import {
   pairingCodeSecret,
   sanitizeConnectionLabel,
 } from "./model/extensionAuth";
-import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { OPERATION_ID_MAX, OPERATION_ID_MIN } from "./items";
+import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
+import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
+import {
+  RETENTION_MAX_BODY_BYTES,
+  answerRetentionRequest,
+} from "./model/retentionMessaging";
 import { saveErrorCode } from "./model/saveErrors";
+import {
+  MAX_STORED_IMAGE_BYTES,
+  imageSizeErrorCode,
+} from "./model/imagePolicy";
 import { secureCompare } from "./model/secureCompare";
 import {
   WaitlistInputError,
   isWaitlistProduct,
   isWaitlistSource,
   joinWaitlist,
+  confirmWaitlist,
 } from "./waitlist";
 
 const http = httpRouter();
+
+http.route({
+  path: "/image-upload",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const response = await receiveImageUpload(ctx, req);
+    response.headers.set("access-control-allow-origin", "*");
+    return response;
+  }),
+});
+
+http.route({
+  path: "/image-upload",
+  method: "OPTIONS",
+  handler: httpAction(
+    async () =>
+      new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "POST",
+          "access-control-allow-headers": "content-type",
+          "access-control-max-age": "600",
+        },
+      }),
+  ),
+});
+
+async function receiveImageUpload(
+  ctx: ActionCtx,
+  req: Request,
+): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token");
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) return captureUnauthorized();
+  let claim:
+    | {
+        kind: "accept";
+        operationId: import("./_generated/dataModel").Id<"itemOperations">;
+        claimTime: number;
+      }
+    | undefined;
+  try {
+    const result = await ctx.runMutation(internal.items.claimImageUpload, {
+      tokenHash: await sha256Hex(token),
+    });
+    if (result.kind === "reject") return captureUnauthorized();
+    if (result.kind === "busy") {
+      const response = json({ error: "rate_limited" }, 429);
+      response.headers.set("retry-after", "60");
+      return response;
+    }
+    if (result.kind === "stored") {
+      // This capability already has its immutable receipt. Do not parse or
+      // cancel the irrelevant retry body: cancellation resets HTTP/2, and
+      // revalidation could incorrectly refuse an upload already accepted.
+      return json({ storageId: result.storageId }, 200);
+    }
+    claim = result;
+    const blob = await readBoundedBlob(req, MAX_STORED_IMAGE_BYTES);
+    const sizeError = imageSizeErrorCode(blob.size);
+    if (sizeError) return json({ error: sizeError }, 422);
+    const storageId = await ctx.storage.store(blob);
+    const attached = await ctx.runMutation(internal.items.finishImageUpload, {
+      operationId: result.operationId,
+      claimTime: result.claimTime,
+      storageId,
+    });
+    claim = undefined;
+    return attached
+      ? json({ storageId }, 200)
+      : json({ error: "bad_request" }, 409);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError)
+      return json({ error: "image_too_large" }, 413);
+    return captureFailure("image_begin", error);
+  } finally {
+    if (claim)
+      await ctx.runMutation(internal.items.finishImageUpload, {
+        operationId: claim.operationId,
+        claimTime: claim.claimTime,
+      });
+  }
+}
 
 // Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
 auth.addHttpRoutes(http);
@@ -173,6 +276,71 @@ function json(body: unknown, status: number): Response {
 }
 
 /**
+ * Apple's Get Retention Message endpoint. The App Store posts a signed request
+ * while a subscriber views the page where they can cancel, and the reply picks
+ * the message shown on the cancel sheet. The request is authenticated by its
+ * signature alone, so there is no shared secret. Apple allows 700 ms, which is
+ * why this reads no database.
+ */
+http.route({
+  path: "/retention-messaging",
+  method: "POST",
+  handler: httpAction(async (_ctx, req) => {
+    let body: string;
+    try {
+      body = await readBoundedText(req, RETENTION_MAX_BODY_BYTES);
+    } catch (error) {
+      logEvent("warn", "retention_request_rejected", {
+        reason:
+          error instanceof BodyTooLargeError
+            ? "body_too_large"
+            : "body_unreadable",
+      });
+      return json({ error: "bad_request" }, 400);
+    }
+    const reply = await answerRetentionRequest(body, {
+      root: APPLE_ROOT_CA_G3,
+      now: Date.now(),
+      messageId: env.APPLE_RETENTION_MESSAGE_ID,
+    });
+    if (reply.reason)
+      logEvent("warn", "retention_request_rejected", { reason: reply.reason });
+    return json(reply.body, reply.status);
+  }),
+});
+
+/** The marketing server claims a bounded parsing budget before reading the
+ * visitor's request. No visitor body is accepted by this endpoint. */
+http.route({
+  path: "/request-body",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (
+      !secret ||
+      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+    )
+      return json({ error: "unauthorized" }, 401);
+    const route = req.headers.get("x-shelvr-body-route");
+    if (route !== "oracle" && route !== "waitlist" && route !== "oracle-image")
+      return json({ error: "bad_request" }, 400);
+    try {
+      await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
+        route,
+        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+      });
+      return json({ ok: true }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+      logEvent("error", "request_body_claim_failed", {
+        error_name: errorName(error),
+      });
+      return json({ error: "failed" }, 500);
+    }
+  }),
+});
+
+/**
  * Header the web server uses to pass the visitor's IP along. A dedicated name
  * (rather than `x-forwarded-for`) means the value cannot be confused with
  * hops Convex's own edge adds, and it is only honoured after the shared
@@ -203,7 +371,7 @@ http.route({
 
     let body: unknown;
     try {
-      body = await req.json();
+      body = JSON.parse(await readBoundedText(req, 4096));
     } catch {
       return json({ message: "Invalid request." }, 400);
     }
@@ -242,6 +410,245 @@ http.route({
         error_name: errorName(error),
       });
       return json({ message: "Could not join right now." }, 500);
+    }
+  }),
+});
+
+/**
+ * The marketing site's no-login oracle. Same caller and trust model as
+ * `/waitlist/join`: the Next.js route proves itself with the waitlist secret
+ * and forwards the visitor IP for the per-IP limiter. The body is narrowed
+ * before a token is spent, so a malformed request costs the visitor nothing.
+ */
+http.route({
+  path: "/oracle",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Oracle secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(await readBoundedText(req, 6 * 1024 * 1024));
+    } catch {
+      return json({ message: "Invalid request." }, 400);
+    }
+    const input = parseOracleInput(body);
+    if (!input) {
+      return json({ message: "Invalid request." }, 400);
+    }
+
+    try {
+      await ctx.runMutation(internal.oracleLimits.claim, {
+        ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+      });
+      const verdict = await ctx.runAction(internal.oracle.consult, { input });
+      return json(verdict, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "oracle_request_failed", {
+        kind: input.kind,
+        error_name: errorName(error),
+      });
+      return json({ message: "The oracle could not answer." }, 500);
+    }
+  }),
+});
+
+/**
+ * Public preview for a branded share link (`shelvr-web.vercel.app/i/:token`).
+ * The marketing site's `/i/[token]` route calls this to build the page's OG
+ * tags. No secret: the random share token is the capability, and the
+ * response is a narrow preview shape (see `getSharePreview`).
+ */
+http.route({
+  pathPrefix: "/share/links/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const preview = await ctx.runQuery(internal.items.getSharePreview, {
+      token,
+    });
+    if (!preview) return json({ message: "Not found." }, 404);
+    return json(preview, 200);
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// iOS App Intents (Siri, Shortcuts)
+// ---------------------------------------------------------------------------
+//
+// The Swift intents in `apps/native/app-intents/` save without launching the
+// JavaScript app, authenticated by a per-device capture token rather than a
+// Convex Auth JWT (see appIntents.ts). Every route answers JSON with an `error`
+// code the Swift side maps to what Siri says: `unauthorized` (sign in again),
+// `pro_required` (open Shelvr to subscribe), `rate_limited`, a save refusal
+// code (`photo_limit`, `image_too_large`, `image_empty`), `bad_request`, or
+// `failed`.
+
+type CaptureRoute = "image_begin" | "image_finish" | "link" | "note";
+
+function captureUnauthorized(): Response {
+  return json({ error: "unauthorized" }, 401);
+}
+
+/** Maps a refused capture to its response. Never logs content or URLs. */
+function isSavableUrl(url: string): boolean {
+  try {
+    normalizeExternalUrl(url);
+    return true;
+  } catch (error) {
+    if (isUrlPolicyError(error)) return false;
+    throw error;
+  }
+}
+
+function captureFailure(route: CaptureRoute, error: unknown): Response {
+  const code = saveErrorCode(error);
+  if (code === "pro_required") return json({ error: code }, 402);
+  if (code !== null) return json({ error: code }, 422);
+  if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+  logEvent("error", "app_intent_capture_failed", {
+    route,
+    error_name: errorName(error),
+  });
+  return json({ error: "failed" }, 500);
+}
+
+/** The caller's token hash and JSON body, or the response that ends it. */
+async function readCapture(
+  ctx: ActionCtx,
+  req: Request,
+): Promise<{ tokenHash: string; body: unknown } | Response> {
+  const token = bearerToken(req.headers.get("authorization"));
+  if (token === undefined) return captureUnauthorized();
+  try {
+    const tokenHash = await sha256Hex(token);
+    if (
+      !(await ctx.runMutation(internal.appIntents.authorizeCaptureBody, {
+        tokenHash,
+      }))
+    ) {
+      return captureUnauthorized();
+    }
+    return {
+      tokenHash,
+      body: JSON.parse(await readBoundedText(req, 128 * 1024)),
+    };
+  } catch (error) {
+    if (error instanceof BodyTooLargeError)
+      return json({ error: "bad_request" }, 413);
+    if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+    return json({ error: "bad_request" }, 400);
+  }
+}
+
+http.route({
+  path: "/app-intents/image/begin",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(ctx, req);
+    if (read instanceof Response) return read;
+    const request = parseImageBegin(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    try {
+      const result = await ctx.runMutation(
+        internal.appIntents.beginImageCapture,
+        { tokenHash: read.tokenHash, operationId: request.operationId },
+      );
+      if (result.kind === "unauthorized") return captureUnauthorized();
+      return json(
+        result.kind === "upload"
+          ? { uploadUrl: result.uploadUrl }
+          : { itemId: result.itemId },
+        200,
+      );
+    } catch (error) {
+      return captureFailure("image_begin", error);
+    }
+  }),
+});
+
+http.route({
+  path: "/app-intents/image/finish",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(ctx, req);
+    if (read instanceof Response) return read;
+    const request = parseImageFinish(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    try {
+      const attached = await ctx.runMutation(
+        internal.appIntents.attachImageCapture,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          storageId: request.storageId,
+        },
+      );
+      if (attached.kind === "unauthorized") return captureUnauthorized();
+      if (attached.kind === "rejected") {
+        return json(
+          { error: attached.error },
+          attached.error === "bad_request" ? 400 : 422,
+        );
+      }
+      const saved = await ctx.runMutation(
+        internal.appIntents.finalizeImageCapture,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          aspectRatio: request.aspectRatio,
+          isSticker: request.isSticker,
+          spaceId: request.spaceId,
+          captureContext: request.context,
+        },
+      );
+      if (saved.kind === "unauthorized") return captureUnauthorized();
+      return json({ itemId: saved.itemId }, 200);
+    } catch (error) {
+      return captureFailure("image_finish", error);
+    }
+  }),
+});
+
+http.route({
+  path: "/app-intents/capture",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const read = await readCapture(ctx, req);
+    if (read instanceof Response) return read;
+    const request = parseLinkOrNote(read.body);
+    if (!request) return json({ error: "bad_request" }, 400);
+    // A link the URL policy refuses is the caller's to report, not a server
+    // failure the app would queue and retry forever.
+    if (request.kind === "link" && !isSavableUrl(request.url)) {
+      return json({ error: "invalid_url" }, 422);
+    }
+    try {
+      const saved = await ctx.runMutation(
+        internal.appIntents.captureLinkOrNote,
+        {
+          tokenHash: read.tokenHash,
+          operationId: request.operationId,
+          kind: request.kind,
+          url: request.kind === "link" ? request.url : undefined,
+          text: request.kind === "note" ? request.text : undefined,
+          spaceId: request.spaceId,
+        },
+      );
+      if (saved.kind === "unauthorized") return captureUnauthorized();
+      return json({ itemId: saved.itemId }, 200);
+    } catch (error) {
+      return captureFailure(request.kind, error);
     }
   }),
 });
@@ -321,7 +728,7 @@ async function readJsonObject(
  * bearer credential. Hashing here means the plaintext token never reaches a
  * mutation, a log, or the database. */
 async function connectionTokenHash(req: Request): Promise<string | null> {
-  const token = bearerToken(req.headers.get("authorization"));
+  const token = extensionBearerToken(req.headers.get("authorization"));
   return token === null ? null : await hashSecret(token);
 }
 
@@ -519,3 +926,31 @@ function requiresRefundReconciliation(event: RevenueCatEvent): boolean {
 }
 
 export default http;
+
+http.route({
+  path: "/waitlist/confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (
+      !secret ||
+      !(await secureCompare(secret, req.headers.get("x-waitlist-secret") ?? ""))
+    )
+      return json({ error: "unauthorized" }, 401);
+    try {
+      await ctx.runMutation(internal.oracleLimits.claimRequestBody, {
+        route: "waitlist",
+        ip: req.headers.get("x-shelvr-client-ip") ?? undefined,
+      });
+      const { token } = JSON.parse(await readBoundedText(req, 1024)) as {
+        token?: unknown;
+      };
+      if (typeof token !== "string" || !(await confirmWaitlist(ctx, token)))
+        return json({ error: "invalid_token" }, 400);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) return json({ error: "rate_limited" }, 429);
+      return json({ error: "invalid_request" }, 400);
+    }
+  }),
+});

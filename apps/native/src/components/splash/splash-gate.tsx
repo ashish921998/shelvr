@@ -4,6 +4,7 @@ import { View } from "react-native";
 
 import { analytics } from "@/lib/analytics";
 import { getNotificationUrl } from "@/lib/notifications";
+import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 import {
   isDirectLaunch,
   subscribeDirectLaunch,
@@ -17,6 +18,9 @@ import { AnimatedSplash } from "./animated-splash";
 //
 // It stands down entirely when the launch is heading somewhere specific: a
 // Share Sheet intent, a deep link, or a notification that carries a route.
+// That includes a share whose launch URL was lost: on an Android cold start
+// the URL can lose Expo Router's initial-URL race, but the payloads it was
+// delivering are still sitting unread in the native share store.
 
 /**
  * Module scope, deliberately: the splash belongs to the process, not to a
@@ -67,7 +71,16 @@ export function useSplashGate() {
 
   const [wantsSplash] = useState(() => {
     const play =
-      !hasPlayed && !isDirectLaunch() && !launchedByNotificationRoute();
+      !hasPlayed &&
+      !isDirectLaunch() &&
+      !launchedByNotificationRoute() &&
+      // A share the OS just delivered — or one left over from a launch that
+      // died before the share screen consumed it — is a launch heading
+      // somewhere specific. The same resumable-batch read the resume path
+      // uses settles the question synchronously at gate init, and a batch
+      // the user explicitly discarded is not "heading somewhere": it stays
+      // home, with its splash.
+      !hasResumableSharedPayloads();
     // Either way this process has now had its one chance.
     hasPlayed = true;
     return play;

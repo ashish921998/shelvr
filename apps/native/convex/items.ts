@@ -19,6 +19,7 @@ import {
   requireProEntitlement,
 } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
+import { takeWithinBytes } from "./model/readBudget";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -27,6 +28,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
   enrichmentValidator,
@@ -41,6 +43,15 @@ import {
   PROCESSING_STALE_MS,
   recipeValidator,
 } from "./model/itemFields";
+import {
+  buildEmbeddingText,
+  CURRENT_EMBEDDING_VERSION,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+  MAX_HYDRATE_READ_BYTES,
+  MAX_EMBEDDING_ATTEMPTS,
+  MAX_SWEEP_READ_BYTES,
+} from "./model/embedding";
 import {
   imageSizeError,
   imageSizeErrorCode,
@@ -95,7 +106,7 @@ export const productValidator = v.object({
   thumbnailUrl: v.optional(v.string()),
 });
 
-export const productsStatusValidator = v.union(
+const productsStatusValidator = v.union(
   v.literal("searching"),
   v.literal("ready"),
   v.literal("failed"),
@@ -206,14 +217,44 @@ export const itemCardValidator = enrichedItemValidator.omit(
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
+/**
+ * Drops the retrieval vector before a row crosses any function boundary.
+ *
+ * `embedding` is ~6 KB of floats and `itemFields` is spread into
+ * `enrichedItemValidator` — the return shape of `listItems`, `getItem`,
+ * `searchItems`, the weekly digest, and `getSpace`. Left in, every one of
+ * those reads would ship the vector to the client (and Convex would reject
+ * the response outright, since the field is not in their validators).
+ *
+ * Nothing outside the backend has any use for it: vector search runs server
+ * side, in an action. So the vector is stripped at the boundary rather than
+ * added to the validators.
+ */
+function stripEmbedding(
+  item: Doc<"items">,
+): Omit<Doc<"items">, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
+  const {
+    embedding: _embedding,
+    embeddingVersion: _version,
+    embeddingAttempts: _attempts,
+    ...rest
+  } = item;
+  return rest;
+}
+
 export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
-  return { ...item, imageUrl };
+  // The single chokepoint every client-facing item read shares.
+  return {
+    ...stripEmbedding(item),
+    imageUrl,
+    heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
+  };
 }
 
-export async function toItemCard(
+async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
 ): Promise<ItemCard> {
@@ -236,12 +277,21 @@ export async function toItemCard(
  * the cap keeps a pasted essay from bloating the index. */
 const MAX_SEARCH_NOTE_CHARS = 8000;
 
+/** How much of an extracted article body the search index carries. Without
+ * this the index only ever held the classifier's ~40-word summary of a page,
+ * so a phrase the reader actually remembers from the article was unfindable.
+ * The cap mirrors the note cap rather than MAX_STORED_CONTENT_CHARS (100k):
+ * `searchText` rides along on every `enrichedItemValidator` read, so the index
+ * copy stays a lede, not a second copy of the body. */
+const MAX_SEARCH_CONTENT_CHARS = 8000;
+
 function buildSearchText(parts: {
   title?: string;
   description?: string;
   tags: string[];
   siteName?: string;
   note?: string;
+  content?: string;
 }): string {
   return [
     parts.title,
@@ -249,6 +299,7 @@ function buildSearchText(parts: {
     ...parts.tags,
     parts.siteName,
     parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+    parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
   ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .join(" ")
@@ -263,8 +314,7 @@ function buildSearchText(parts: {
  * every item, full rows, newest first. Public function signatures are
  * contracts with every app build in the wild, so this keeps its exact shape
  * until the production update channel shows no bundle still calling it, then
- * remove it (`LIST_CAP` stays: the image backfill uses it too). New code uses
- * `listItemsPage`. */
+ * remove it (and `LIST_CAP` with it). New code uses `listItemsPage`. */
 export const listItems = query({
   args: {},
   returns: v.array(enrichedItemValidator),
@@ -276,6 +326,44 @@ export const listItems = query({
       .order("desc")
       .take(LIST_CAP);
     return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+  },
+});
+
+/** Ready saves a new account needs before its shelf counts as started. The
+ * Home "save your next two" card and the weekly shelf nudge both wait on it. */
+const SAVE_PROGRESS_GOAL = 3;
+const SAVE_PROGRESS_MAX_READ = 20;
+
+/** How many real saves the user has, counted up to `SAVE_PROGRESS_GOAL`. The
+ * onboarding demo save is excluded (the app picked it for them), as are
+ * fixture seeds and saves not yet `ready`. Reads at most
+ * `SAVE_PROGRESS_MAX_READ` rows. */
+export const saveProgress = query({
+  args: {},
+  returns: v.object({ saved: v.number(), goal: v.number() }),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const demo = await ctx.db
+      .query("onboardingDemos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    // Walk ready saves until the goal is met, skipping excluded rows (the dev
+    // fixture reset seeds several), with a hard bound on rows read.
+    let saved = 0;
+    let read = 0;
+    for await (const item of ctx.db
+      .query("items")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", "ready"),
+      )) {
+      if (item._id !== demo?.itemId && item.fixtureKey === undefined) saved++;
+      read++;
+      if (saved >= SAVE_PROGRESS_GOAL || read >= SAVE_PROGRESS_MAX_READ) break;
+    }
+    return {
+      saved: Math.min(saved, SAVE_PROGRESS_GOAL),
+      goal: SAVE_PROGRESS_GOAL,
+    };
   },
 });
 
@@ -309,25 +397,17 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves for the Pro-only home-screen widget. The status
- * index reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view.
- *
- * Pro is checked without ever reading the wall clock (a query is not rerun
- * as time advances, so a Date.now() read could serve stale access). A
- * caller that sends its refreshed clock gets an exact expiry check; a
- * build that predates the `now` argument keeps its saves while the stored
- * subscription status is active, and the RevenueCat webhook lapses that
- * status when a subscription actually expires. */
+/** Pro widget access follows server-maintained subscription status. Client time
+ * may narrow access, but cannot extend it past server expiry. */
 export const listRecentItems = query({
   args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const entitled =
-      args.now === undefined
-        ? await hasProEntitlementStatus(ctx, userId)
-        : await hasProEntitlementAt(ctx, userId, args.now);
+      (await hasProEntitlementStatus(ctx, userId)) &&
+      (args.now === undefined ||
+        (await hasProEntitlementAt(ctx, userId, args.now)));
     if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
@@ -448,17 +528,118 @@ export const searchItems = query({
 // Similar-items v0: lexical overlap, no new infra. Tags carry most of the
 // signal (they're the classifier's own summary), searchText tokens catch the
 // rest. A vector index over real embeddings replaces this in v1.
+//
+// Candidates come from two reads: the newest saves, and a full-text search on
+// the item's own tags and title. The search reaches saves of any age, so an
+// item saved months ago can still come back when a related one arrives.
+// Both sets go through the same scoring below.
 const SIMILAR_CANDIDATES = 300;
+const SIMILAR_SEARCH_CANDIDATES = 100;
+// Candidate rows are full documents, and an article's stored content runs to
+// MAX_STORED_CONTENT_CHARS, so both reads also stop at a shared byte budget
+// that leaves headroom under Convex's 16 MiB per-query read limit. The search
+// runs first under its own smaller cap, so the recent read can't starve it,
+// and the recent read gets whatever the search left, never less than 10 MiB.
+// Each read can overshoot by the one document that crosses its cap, which
+// the headroom covers.
+const SIMILAR_READ_BYTES = 13 * 1024 * 1024;
+const SIMILAR_SEARCH_BYTES = 3 * 1024 * 1024;
+const SIMILAR_RECENT_MIN_BYTES = SIMILAR_READ_BYTES - SIMILAR_SEARCH_BYTES;
+// Convex caps a full-text query at 16 terms.
+const SIMILAR_SEARCH_TERMS = 16;
 const SIMILAR_LIMIT = 10;
 const SIMILAR_MIN_SCORE = 3;
+// Mirrors RECALL_MIN_AGE_MS in apps/native/src/lib/save-recall.ts: the age a
+// match needs to clear before the save recall card will show it. Reserving a
+// few slots for the best-scoring matches this old means a burst of newer,
+// higher-scoring saves can't crowd every old match out of SIMILAR_LIMIT
+// before the card ever sees them.
+const SIMILAR_OLD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const SIMILAR_RESERVED_OLD = 3;
+
+/** The words of `text` worth matching on. Splits on Unicode letters and
+ * digits, so Japanese or Korean text still yields words. Short Latin words
+ * are mostly noise; words in other scripts are often two characters. */
+function significantWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(
+      (word) =>
+        word.length >= (/^[\p{Script=Latin}\p{N}]*$/u.test(word) ? 4 : 2),
+    );
+}
+
+/**
+ * The text similar-items scores on: exactly what `searchText` held before the
+ * article body was indexed.
+ *
+ * `searchTokens` keeps every token longer than three characters and has no
+ * stopword list, so scoring over a body-bearing `searchText` would have every
+ * pair of English articles sharing "that", "with", "from", "have" and dozens
+ * more. With SIMILAR_MIN_SCORE at 3 effectively every candidate would qualify
+ * and ranking would track document length instead of topic. The full-text
+ * index still gets the body; this scorer deliberately does not.
+ */
+function summaryText(item: Doc<"items">): string {
+  return buildSearchText({
+    title: item.title,
+    description: item.description,
+    tags: item.tags,
+    siteName: item.siteName,
+    note: item.note,
+  });
+}
 
 function searchTokens(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((token) => token.length > 3),
-  );
+  return new Set(significantWords(text));
+}
+
+// Filler that multi-word tags like "how to" or "to do" would otherwise put in
+// the query. `searchText` holds article bodies, so each of these matches
+// nearly every save and spends search rows on candidates that score 0.
+const TAG_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "for",
+  "how",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+]);
+
+/** The words of a tag to search on. A shared tag scores in full however
+ * short it is, so tags like "art", "diy" or "ux" keep every word of two or
+ * more characters instead of going through the Latin length floor. */
+export function tagSearchWords(tag: string): string[] {
+  return tag
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 2 && !TAG_STOPWORDS.has(word));
+}
+
+/** The full-text query for an item's older relatives: its tags first, since
+ * they carry most of the scoring signal, then its title words. Deduplicated
+ * and capped at the search term limit. Title words are the same words scoring
+ * uses, so any candidate they find can score on them. */
+function similarSearchTerms(item: Doc<"items">): string[] {
+  const terms = new Set<string>();
+  const words = [
+    ...item.tags.flatMap(tagSearchWords),
+    ...significantWords(item.title ?? ""),
+  ];
+  for (const word of words) {
+    terms.add(word);
+    if (terms.size >= SIMILAR_SEARCH_TERMS) {
+      break;
+    }
+  }
+  return [...terms];
 }
 
 export const similarItems = query({
@@ -471,19 +652,48 @@ export const similarItems = query({
       return [];
     }
     const tags = new Set(item.tags);
-    const tokens = searchTokens(item.searchText);
+    const tokens = searchTokens(summaryText(item));
     if (tags.size === 0 && tokens.size === 0) {
       return [];
     }
 
-    const candidates = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(SIMILAR_CANDIDATES);
+    const terms = similarSearchTerms(item);
+    const searched =
+      terms.length === 0
+        ? { rows: [], bytes: 0 }
+        : await takeWithinBytes(
+            ctx.db
+              .query("items")
+              .withSearchIndex("search_text", (q) =>
+                q.search("searchText", terms.join(" ")).eq("userId", userId),
+              ),
+            {
+              maxRows: SIMILAR_SEARCH_CANDIDATES,
+              maxBytes: SIMILAR_SEARCH_BYTES,
+            },
+          );
+
+    const recent = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc"),
+      {
+        maxRows: SIMILAR_CANDIDATES,
+        maxBytes: Math.max(
+          SIMILAR_READ_BYTES - searched.bytes,
+          SIMILAR_RECENT_MIN_BYTES,
+        ),
+      },
+    );
+
+    const candidates = new Map<Id<"items">, Doc<"items">>();
+    for (const candidate of [...recent.rows, ...searched.rows]) {
+      candidates.set(candidate._id, candidate);
+    }
 
     const scored: { item: Doc<"items">; score: number }[] = [];
-    for (const candidate of candidates) {
+    for (const candidate of candidates.values()) {
       if (candidate._id === item._id || candidate.status !== "ready") {
         continue;
       }
@@ -493,7 +703,7 @@ export const similarItems = query({
           score += 3;
         }
       }
-      for (const token of searchTokens(candidate.searchText)) {
+      for (const token of searchTokens(summaryText(candidate))) {
         if (tokens.has(token)) {
           score += 1;
         }
@@ -503,10 +713,22 @@ export const similarItems = query({
       }
     }
     scored.sort((a, b) => b.score - a.score);
+
+    // Reserve a few slots for the best-scoring old-enough matches before the
+    // general top-score cut, so they survive even when newer saves outscore
+    // them. The final list stays score-ordered either way.
+    const oldCutoff = item._creationTime - SIMILAR_OLD_AGE_MS;
+    const reservedOld = scored
+      .filter((candidate) => candidate.item._creationTime <= oldCutoff)
+      .slice(0, SIMILAR_RESERVED_OLD);
+    const reservedIds = new Set(reservedOld.map((s) => s.item._id));
+    const rest = scored
+      .filter((candidate) => !reservedIds.has(candidate.item._id))
+      .slice(0, SIMILAR_LIMIT - reservedOld.length);
+    const final = [...reservedOld, ...rest].sort((a, b) => b.score - a.score);
+
     return await Promise.all(
-      scored
-        .slice(0, SIMILAR_LIMIT)
-        .map(({ item: match }) => toItemCard(ctx, match)),
+      final.map(({ item: match }) => toItemCard(ctx, match)),
     );
   },
 });
@@ -549,12 +771,10 @@ async function saveIntoSpace(
 //   attach -> records the storageId on the pending operation
 //   finalize -> validates metadata and atomically inserts the item + completes
 //
-// Correctness goal is idempotency + compensation, NOT upload+DB atomicity: a
-// process can crash after the upload succeeds but before `attach` records the
-// storageId. In that gap the blob's id was never written anywhere, so nothing
-// — including the stale-pending cleanup cron, which only sees storageIds
-// recorded on ledger rows — can ever reclaim it. That narrow window leaks the
-// blob permanently; it is documented and accepted, not eliminated.
+// The upload receiver records the storageId before acknowledging the upload.
+// A crash between storage.store and that transaction can still leave a blob;
+// the independent sweep reclaims it after a grace period, checking both item
+// and operation references atomically.
 
 /** Operation IDs are opaque client UUIDs (optionally prefixed for logs). This
  * bounds length so a stray empty/huge string can't pollute the index. Exported
@@ -722,84 +942,134 @@ export const beginImageImport = mutation({
   ),
   handler: async (ctx, args): Promise<BeginImageImportResult> => {
     const userId = await requireUserId(ctx);
-    requireOperationId(args.operationId);
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-    const now = Date.now();
-
-    // Idempotent read path: a complete operation whose item still exists
-    // returns the itemId WITHOUT a Pro check — a lapsed user must still
-    // retrieve an already-completed save. Hoisted before the gate so every
-    // path below is new or recycled work and can be gated uniformly.
-    if (op?.status === "complete" && op.itemId !== undefined) {
-      const item = await ctx.db.get(op.itemId);
-      if (item !== null) {
-        return { kind: "complete", itemId: op.itemId };
-      }
-    }
-
-    // Every remaining path creates, recycles, or refreshes work — gate once.
-    // Quota here saves the client an upload it could never finalize.
-    await requireProEntitlement(ctx, userId);
-    await requirePhotoQuota(ctx, userId);
-
-    if (op === null) {
-      // (userId, operationId) uniqueness is enforced by Convex's serializable
-      // transactions: if two begins race on an empty index range, only one
-      // insert commits; the other's transaction is retried and will observe
-      // the row above as a pending op. No application-level unique index exists
-      // because Convex has no unique secondary indexes — this OCC + retry is
-      // the supported idiom.
-      await ctx.db.insert("itemOperations", {
-        userId,
-        operationId: args.operationId,
-        kind: "image",
-        status: "pending",
-        updatedAt: now,
-      });
-      return {
-        kind: "upload",
-        uploadUrl: await ctx.storage.generateUploadUrl(),
-      };
-    }
-
-    if (op.status === "complete") {
-      // Recycle: the item was deleted ( itemId set but gone) or the row is
-      // inconsistent (no itemId). Release the orphaned storage object before
-      // resetting, otherwise the blob leaks (the cleanup cron only sweeps
-      // pending rows, and this row is currently complete). Guarded so a blob
-      // some other item/operation still depends on — or one already deleted —
-      // can't corrupt them or wedge this recycle path. Clearing itemId is
-      // redundant for the no-itemId case but harmless.
-      if (
-        op.storageId !== undefined &&
-        (await isStorageUnreferenced(ctx, op.storageId, op._id))
-      ) {
-        await safeDeleteStorage(ctx, op.storageId);
-      }
-      await ctx.db.patch(op._id, {
-        status: "pending",
-        itemId: undefined,
-        storageId: undefined,
-        updatedAt: now,
-      });
-      return {
-        kind: "upload",
-        uploadUrl: await ctx.storage.generateUploadUrl(),
-      };
-    }
-
-    // Pending: refresh updatedAt (a begin is active interest) and hand back a
-    // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
-    // the first storageId and discards the redundant blob. A lapsed user
-    // retrying a pending op must not mint a fresh upload URL or refresh
-    // updatedAt (which would keep the row alive past the cleanup cron).
-    await ctx.db.patch(op._id, { updatedAt: now });
-    return {
-      kind: "upload",
-      uploadUrl: await ctx.storage.generateUploadUrl(),
-    };
+    return await beginImageImportForUser(ctx, userId, args.operationId);
   },
 });
+
+/** `beginImageImport` for an already authenticated `userId`. Shared with the
+ * Siri capture endpoint (appIntents.ts), which authenticates by capture token
+ * instead of a Convex Auth session, so both paths gate on Pro the same way. */
+export async function beginImageImportForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  operationId: string,
+): Promise<BeginImageImportResult> {
+  requireOperationId(operationId);
+  const op = await loadItemOperation(ctx, userId, operationId);
+  const now = Date.now();
+
+  // Idempotent read path: a complete operation whose item still exists
+  // returns the itemId WITHOUT a Pro check — a lapsed user must still
+  // retrieve an already-completed save. Hoisted before the gate so every
+  // path below is new or recycled work and can be gated uniformly.
+  if (op?.status === "complete" && op.itemId !== undefined) {
+    const item = await ctx.db.get(op.itemId);
+    if (item !== null) {
+      return { kind: "complete", itemId: op.itemId };
+    }
+  }
+
+  // Every remaining path creates, recycles, or refreshes work — gate once.
+  // Quota here saves the client an upload it could never finalize.
+  await requireProEntitlement(ctx, userId);
+  const photoCount = await requirePhotoQuota(ctx, userId);
+  if (
+    op?.status === "pending" &&
+    op.uploadUrl &&
+    op.uploadUrlIssuedAt !== undefined &&
+    now - op.uploadUrlIssuedAt < 55 * 60 * 1000
+  ) {
+    return { kind: "upload", uploadUrl: op.uploadUrl };
+  }
+  await rateLimiter.limit(ctx, "imageBegin", { key: userId, throws: true });
+  if (op?.status !== "pending") {
+    const pending = await ctx.db
+      .query("itemOperations")
+      .withIndex("by_user_and_kind_and_status", (q) =>
+        q.eq("userId", userId).eq("kind", "image").eq("status", "pending"),
+      )
+      .take(30);
+    if (pending.length >= 30) throw new Error("Too many pending image imports");
+    if (photoCount + pending.length >= MAX_PHOTOS_PER_ACCOUNT)
+      throw saveError("photo_limit");
+  }
+
+  // Use an unexposed platform capability as unpredictable entropy; mutation
+  // Math.random is deterministic. Never hand the unbounded storage URL out.
+  const platformUrl = await ctx.storage.generateUploadUrl();
+  const uploadToken = await sha256Hex(platformUrl);
+  const uploadTokenHash = await sha256Hex(uploadToken);
+  const siteOrigin =
+    process.env.CONVEX_SITE_URL ??
+    new URL(platformUrl).origin.replace(".convex.cloud", ".convex.site");
+  const uploadUrl = `${siteOrigin.replace(/\/+$/, "")}/image-upload?token=${uploadToken}`;
+  if (op === null) {
+    // (userId, operationId) uniqueness is enforced by Convex's serializable
+    // transactions: if two begins race on an empty index range, only one
+    // insert commits; the other's transaction is retried and will observe
+    // the row above as a pending op. No application-level unique index exists
+    // because Convex has no unique secondary indexes — this OCC + retry is
+    // the supported idiom.
+    await ctx.db.insert("itemOperations", {
+      userId,
+      operationId: operationId,
+      kind: "image",
+      status: "pending",
+      updatedAt: now,
+      uploadUrl,
+      uploadUrlIssuedAt: now,
+      uploadTokenHash,
+    });
+    return {
+      kind: "upload",
+      uploadUrl,
+    };
+  }
+
+  if (op.status === "complete") {
+    // Recycle: the item was deleted ( itemId set but gone) or the row is
+    // inconsistent (no itemId). Release the orphaned storage object before
+    // resetting, otherwise the blob leaks (the cleanup cron only sweeps
+    // pending rows, and this row is currently complete). Guarded so a blob
+    // some other item/operation still depends on — or one already deleted —
+    // can't corrupt them or wedge this recycle path. Clearing itemId is
+    // redundant for the no-itemId case but harmless.
+    if (
+      op.storageId !== undefined &&
+      (await isStorageUnreferenced(ctx, op.storageId, op._id))
+    ) {
+      await safeDeleteStorage(ctx, op.storageId);
+    }
+    await ctx.db.patch(op._id, {
+      status: "pending",
+      itemId: undefined,
+      storageId: undefined,
+      updatedAt: now,
+      uploadUrl,
+      uploadUrlIssuedAt: now,
+      uploadTokenHash,
+      uploadClaimedAt: undefined,
+    });
+    return {
+      kind: "upload",
+      uploadUrl,
+    };
+  }
+
+  // Refresh an expired capability for a pending operation. The receiver
+  // reuses an already-recorded blob, so a retry cannot create extra uploads.
+  await ctx.db.patch(op._id, {
+    updatedAt: now,
+    uploadUrl,
+    uploadUrlIssuedAt: now,
+    uploadTokenHash,
+    uploadClaimedAt: undefined,
+  });
+  return {
+    kind: "upload",
+    uploadUrl,
+  };
+}
 
 export const attachImageUpload = mutation({
   args: {
@@ -812,195 +1082,299 @@ export const attachImageUpload = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
-    requireOperationId(args.operationId);
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-    const now = Date.now();
-
-    // Skip the size check for completed ops and for a different already-attached
-    // file; those paths return idempotently below.
-    const validatesNewUpload =
-      op?.status !== "complete" &&
-      (!op?.storageId || op.storageId === args.storageId);
-    const metadata = validatesNewUpload
-      ? await ctx.db.system.get("_storage", args.storageId)
-      : null;
-    if (validatesNewUpload) {
-      const error = metadata ? imageSizeError(metadata.size) : undefined;
-      if (error) {
-        if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
-          throw new Error(STORAGE_IN_USE);
-        }
-        await safeDeleteStorage(ctx, args.storageId);
-        if (op) {
-          await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
-        }
-        // Return, don't throw: throwing would roll back storage cleanup.
-        return { storageId: args.storageId, error };
-      }
-    }
-
-    if (op === null) {
-      // No begin happened (or the row was swept). Adopt the caller's storage id
-      // only if the blob actually exists (a swept id must not become an item
-      // with a permanently dead image) and isn't referenced by an item or
-      // another operation. NOTE: existence + unreferenced is NOT proof the
-      // caller owns this blob during the un-attached window — see the residual
-      // documented on isStorageUnreferenced.
-      if (metadata === null) {
-        throw new Error("Storage object not found");
-      }
-      if (!(await isStorageUnreferenced(ctx, args.storageId))) {
-        throw new Error(STORAGE_IN_USE);
-      }
-      await ctx.db.insert("itemOperations", {
-        userId,
-        operationId: args.operationId,
-        kind: "image",
-        status: "pending",
-        storageId: args.storageId,
-        updatedAt: now,
-      });
-      return { storageId: args.storageId };
-    }
-
-    if (op.status === "complete") {
-      // Already finalized (a racing retry lost to the original's finalize).
-      // Return the canonical id, and delete the retry's redundant re-upload —
-      // otherwise it is referenced by nothing (no item, no ledger row) and the
-      // pending-only cleanup cron would never reclaim it. The unreferenced
-      // guard keeps a blob some other item/operation owns safe.
-      if (
-        args.storageId !== op.storageId &&
-        (await isStorageUnreferenced(ctx, args.storageId))
-      ) {
-        await safeDeleteStorage(ctx, args.storageId);
-      }
-      return { storageId: op.storageId ?? args.storageId };
-    }
-
-    // First attachment wins. A racing retry that supplies a different storageId
-    // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob — but
-    // only if it is unreferenced, so a client can never delete storage it
-    // doesn't own (e.g. another user's blob or another operation's pending
-    // upload).
-    if (op.storageId !== undefined && op.storageId !== args.storageId) {
-      if (await isStorageUnreferenced(ctx, args.storageId)) {
-        await safeDeleteStorage(ctx, args.storageId);
-      }
-      await ctx.db.patch(op._id, { updatedAt: now });
-      return { storageId: op.storageId };
-    }
-    // No canonical id yet, or the caller re-sent the same id: adopt it, with
-    // the same existence and unreferenced defenses as the no-begin path.
-    if (op.storageId === undefined) {
-      if (metadata === null) {
-        throw new Error("Storage object not found");
-      }
-      if (!(await isStorageUnreferenced(ctx, args.storageId))) {
-        throw new Error(STORAGE_IN_USE);
-      }
-    }
-    await ctx.db.patch(op._id, { storageId: args.storageId, updatedAt: now });
-    return { storageId: args.storageId };
+    return await attachImageUploadForUser(ctx, userId, args);
   },
 });
 
-export const finalizeImageImport = mutation({
-  args: {
-    operationId: v.string(),
-    analyticsSessionId: v.optional(v.string()),
-    saveSource: v.optional(saveSourceValidator),
-    aspectRatio: v.optional(v.number()),
-    isSticker: v.optional(v.boolean()),
-    capturedAt: v.optional(v.number()),
-    latitude: v.optional(v.number()),
-    longitude: v.optional(v.number()),
-    spaceId: v.optional(v.id("spaces")),
+/** Single active receiver per capability, before reading any upload bytes. */
+export const claimImageUpload = internalMutation({
+  args: { tokenHash: v.string() },
+  returns: v.union(
+    v.object({
+      kind: v.literal("accept"),
+      operationId: v.id("itemOperations"),
+      claimTime: v.number(),
+    }),
+    v.object({ kind: v.literal("stored"), storageId: v.id("_storage") }),
+    v.object({ kind: v.literal("busy") }),
+    v.object({ kind: v.literal("reject") }),
+  ),
+  handler: async (ctx, { tokenHash }) => {
+    const op = await ctx.db
+      .query("itemOperations")
+      .withIndex("by_upload_token_hash", (q) =>
+        q.eq("uploadTokenHash", tokenHash),
+      )
+      .unique();
+    const now = Date.now();
+    if (
+      !op ||
+      op.kind !== "image" ||
+      now - (op.uploadUrlIssuedAt ?? 0) >= 60 * 60 * 1000
+    )
+      return { kind: "reject" as const };
+    const userId = ctx.db.normalizeId("users", op.userId);
+    if (!userId) return { kind: "reject" as const };
+    await requireProEntitlement(ctx, userId);
+    if (op.storageId)
+      return { kind: "stored" as const, storageId: op.storageId };
+    if (op.status !== "pending") return { kind: "reject" as const };
+    if (op.uploadClaimedAt !== undefined && now - op.uploadClaimedAt < 60_000)
+      return { kind: "busy" as const };
+    await rateLimiter.limit(ctx, "imageUpload", {
+      key: op.userId,
+      throws: true,
+    });
+    await ctx.db.patch(op._id, { uploadClaimedAt: now, updatedAt: now });
+    return { kind: "accept" as const, operationId: op._id, claimTime: now };
   },
+});
+
+/** Record the blob before acknowledging its receipt. Concurrent expired
+ * claims lose and delete their own blob; the storage sweep covers a crash. */
+export const finishImageUpload = internalMutation({
+  args: {
+    operationId: v.id("itemOperations"),
+    claimTime: v.number(),
+    storageId: v.optional(v.id("_storage")),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.operationId);
+    if (
+      !op ||
+      op.status !== "pending" ||
+      op.uploadClaimedAt !== args.claimTime ||
+      op.storageId
+    ) {
+      if (args.storageId && (await isStorageUnreferenced(ctx, args.storageId)))
+        await safeDeleteStorage(ctx, args.storageId);
+      return false;
+    }
+    await ctx.db.patch(op._id, {
+      storageId: args.storageId,
+      uploadClaimedAt: undefined,
+      updatedAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+/** `attachImageUpload` for an already authenticated `userId` (see
+ * beginImageImportForUser). */
+export async function attachImageUploadForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: { operationId: string; storageId: Id<"_storage"> },
+): Promise<{ storageId: Id<"_storage">; error?: string }> {
+  await requireProEntitlement(ctx, userId);
+  requireOperationId(args.operationId);
+  const op = await loadItemOperation(ctx, userId, args.operationId);
+  const now = Date.now();
+
+  // Skip the size check for completed ops and for a different already-attached
+  // file; those paths return idempotently below.
+  const validatesNewUpload =
+    op?.status !== "complete" &&
+    (!op?.storageId || op.storageId === args.storageId);
+  const metadata = validatesNewUpload
+    ? await ctx.db.system.get("_storage", args.storageId)
+    : null;
+  if (validatesNewUpload) {
+    const error = metadata ? imageSizeError(metadata.size) : undefined;
+    if (error) {
+      if (!(await isStorageUnreferenced(ctx, args.storageId, op?._id))) {
+        throw new Error(STORAGE_IN_USE);
+      }
+      await safeDeleteStorage(ctx, args.storageId);
+      if (op) {
+        await ctx.db.patch(op._id, { storageId: undefined, updatedAt: now });
+      }
+      // Return, don't throw: throwing would roll back storage cleanup.
+      return { storageId: args.storageId, error };
+    }
+  }
+
+  if (op === null) {
+    // No begin happened (or the row was swept). Adopt the caller's storage id
+    // only if the blob actually exists (a swept id must not become an item
+    // with a permanently dead image) and isn't referenced by an item or
+    // another operation. NOTE: existence + unreferenced is NOT proof the
+    // caller owns this blob during the un-attached window — see the residual
+    // documented on isStorageUnreferenced.
+    if (metadata === null) {
+      throw new Error("Storage object not found");
+    }
+    if (!(await isStorageUnreferenced(ctx, args.storageId))) {
+      throw new Error(STORAGE_IN_USE);
+    }
+    await ctx.db.insert("itemOperations", {
+      userId,
+      operationId: args.operationId,
+      kind: "image",
+      status: "pending",
+      storageId: args.storageId,
+      updatedAt: now,
+    });
+    return { storageId: args.storageId };
+  }
+
+  if (op.status === "complete") {
+    // Already finalized (a racing retry lost to the original's finalize).
+    // Return the canonical id, and delete the retry's redundant re-upload —
+    // otherwise it is referenced by nothing (no item, no ledger row) and the
+    // pending-only cleanup cron would never reclaim it. The unreferenced
+    // guard keeps a blob some other item/operation owns safe.
+    if (
+      args.storageId !== op.storageId &&
+      (await isStorageUnreferenced(ctx, args.storageId))
+    ) {
+      await safeDeleteStorage(ctx, args.storageId);
+    }
+    return { storageId: op.storageId ?? args.storageId };
+  }
+
+  // First attachment wins. A racing retry that supplies a different storageId
+  // has re-uploaded redundantly; delete the REDUNDANT (incoming) blob — but
+  // only if it is unreferenced, so a client can never delete storage it
+  // doesn't own (e.g. another user's blob or another operation's pending
+  // upload).
+  if (op.storageId !== undefined && op.storageId !== args.storageId) {
+    if (await isStorageUnreferenced(ctx, args.storageId)) {
+      await safeDeleteStorage(ctx, args.storageId);
+    }
+    await ctx.db.patch(op._id, { updatedAt: now });
+    return { storageId: op.storageId };
+  }
+  // No canonical id yet, or the caller re-sent the same id: adopt it, with
+  // the same existence and unreferenced defenses as the no-begin path.
+  if (op.storageId === undefined) {
+    if (metadata === null) {
+      throw new Error("Storage object not found");
+    }
+    if (!(await isStorageUnreferenced(ctx, args.storageId))) {
+      throw new Error(STORAGE_IN_USE);
+    }
+  }
+  await ctx.db.patch(op._id, { storageId: args.storageId, updatedAt: now });
+  return { storageId: args.storageId };
+}
+
+const finalizeImageImportArgs = v.object({
+  operationId: v.string(),
+  analyticsSessionId: v.optional(v.string()),
+  saveSource: v.optional(saveSourceValidator),
+  aspectRatio: v.optional(v.number()),
+  isSticker: v.optional(v.boolean()),
+  capturedAt: v.optional(v.number()),
+  latitude: v.optional(v.number()),
+  longitude: v.optional(v.number()),
+  spaceId: v.optional(v.id("spaces")),
+});
+
+type FinalizeImageImportArgs = Infer<typeof finalizeImageImportArgs> & {
+  captureContext?: string;
+};
+
+export const finalizeImageImport = mutation({
+  args: finalizeImageImportArgs.fields,
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    requireOperationId(args.operationId);
-
-    const op = await loadItemOperation(ctx, userId, args.operationId);
-
-    // Already complete — return the original live item id WITHOUT validating
-    // the resubmitted metadata. The idempotent read path must not be gated on
-    // the caller resending identical valid fields; a completed import is final.
-    // (A complete row pointing at a deleted item should have been recycled by
-    // begin; if we reach here, treat it as complete with the recorded id.)
-    // Entitlement is NOT checked here — a lapsed user must still retrieve an
-    // already-completed itemId.
-    if (op !== null && op.status === "complete" && op.itemId !== undefined) {
-      return op.itemId;
-    }
-
-    // Gate only new work (creating an item from a pending operation). Rate limit
-    // sits here too — after the idempotent completed-return above, so a retry of
-    // an already-finished import is never charged against the bucket.
-    await requireProEntitlement(ctx, userId);
-    const photoCount = await requirePhotoQuota(ctx, userId);
-    let storedBytes: number | undefined;
-    if (op?.storageId) {
-      const metadata = await ctx.db.system.get("_storage", op.storageId);
-      if (!metadata) throw new Error("Storage object not found");
-      const sizeCode = imageSizeErrorCode(metadata.size);
-      if (sizeCode) throw saveError(sizeCode);
-      storedBytes = metadata.size;
-    }
-    await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
-
-    // Validate BEFORE touching the ledger: invalid metadata must not mark the
-    // operation complete, so the caller can retry with corrected input.
-    validateImageMetadata(args);
-
-    if (op === null) {
-      // The caller skipped begin (or the row was swept). We have no storageId
-      // to attach, so this is an invalid import attempt.
-      throw new Error("Operation has no attached upload");
-    }
-    if (op.storageId === undefined) {
-      // begin succeeded but attach never ran (process died between upload and
-      // attach). The narrow unreferenced-blob window the plan documents.
-      throw new Error("Operation has no attached upload");
-    }
-
-    const run = beginProcessingRun();
-    const itemId = await ctx.db.insert("items", {
-      userId,
-      type: "image",
-      ...run,
-      storageId: op.storageId,
-      aspectRatio: args.aspectRatio,
-      isSticker: args.isSticker,
-      capturedAt: args.capturedAt,
-      latitude: args.latitude,
-      longitude: args.longitude,
-      tags: [],
-      searchText: "",
-    });
-    if (args.spaceId !== undefined) {
-      await saveIntoSpace(ctx, userId, itemId, args.spaceId);
-    }
-    await ctx.db.patch(op._id, {
-      status: "complete",
-      itemId,
-      updatedAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.ai.processItem, {
-      itemId,
-      runId: run.processingRunId,
-    });
-    await scheduleSaveTelemetry(ctx, itemId, {
-      sessionId: args.analyticsSessionId,
-      saveSource: args.saveSource,
-      photoCount: photoCount + 1,
-      storedBytes,
-    });
-    return itemId;
+    return await finalizeImageImportForUser(ctx, userId, args);
   },
 });
+
+/** `finalizeImageImport` for an already authenticated `userId` (see
+ * beginImageImportForUser). `captureContext` is what a Siri capture knew
+ * about the image (the user's words, text read on the device); it only
+ * steers this run's classification and is never stored. */
+export async function finalizeImageImportForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: FinalizeImageImportArgs,
+): Promise<Id<"items">> {
+  requireOperationId(args.operationId);
+
+  const op = await loadItemOperation(ctx, userId, args.operationId);
+
+  // Already complete — return the original live item id WITHOUT validating
+  // the resubmitted metadata. The idempotent read path must not be gated on
+  // the caller resending identical valid fields; a completed import is final.
+  // (A complete row pointing at a deleted item should have been recycled by
+  // begin; if we reach here, treat it as complete with the recorded id.)
+  // Entitlement is NOT checked here — a lapsed user must still retrieve an
+  // already-completed itemId.
+  if (op !== null && op.status === "complete" && op.itemId !== undefined) {
+    return op.itemId;
+  }
+
+  // Gate only new work (creating an item from a pending operation). Rate limit
+  // sits here too — after the idempotent completed-return above, so a retry of
+  // an already-finished import is never charged against the bucket.
+  await requireProEntitlement(ctx, userId);
+  const photoCount = await requirePhotoQuota(ctx, userId);
+  let storedBytes: number | undefined;
+  if (op?.storageId) {
+    const metadata = await ctx.db.system.get("_storage", op.storageId);
+    if (!metadata) throw new Error("Storage object not found");
+    const sizeCode = imageSizeErrorCode(metadata.size);
+    if (sizeCode) throw saveError(sizeCode);
+    storedBytes = metadata.size;
+  }
+  await rateLimiter.limit(ctx, "itemCreate", { key: userId, throws: true });
+
+  // Validate BEFORE touching the ledger: invalid metadata must not mark the
+  // operation complete, so the caller can retry with corrected input.
+  validateImageMetadata(args);
+
+  if (op === null) {
+    // The caller skipped begin (or the row was swept). We have no storageId
+    // to attach, so this is an invalid import attempt.
+    throw new Error("Operation has no attached upload");
+  }
+  if (op.storageId === undefined) {
+    // begin succeeded but attach never ran (process died between upload and
+    // attach). The narrow unreferenced-blob window the plan documents.
+    throw new Error("Operation has no attached upload");
+  }
+
+  const run = beginProcessingRun();
+  const itemId = await ctx.db.insert("items", {
+    userId,
+    type: "image",
+    ...run,
+    storageId: op.storageId,
+    aspectRatio: args.aspectRatio,
+    isSticker: args.isSticker,
+    capturedAt: args.capturedAt,
+    latitude: args.latitude,
+    longitude: args.longitude,
+    tags: [],
+    searchText: "",
+  });
+  if (args.spaceId !== undefined) {
+    await saveIntoSpace(ctx, userId, itemId, args.spaceId);
+  }
+  await ctx.db.patch(op._id, {
+    status: "complete",
+    itemId,
+    updatedAt: Date.now(),
+  });
+  await ctx.scheduler.runAfter(0, internal.ai.processItem, {
+    itemId,
+    runId: run.processingRunId,
+    captureContext: args.captureContext,
+  });
+  await scheduleSaveTelemetry(ctx, itemId, {
+    sessionId: args.analyticsSessionId,
+    saveSource: args.saveSource,
+    operationId: args.operationId,
+    photoCount: photoCount + 1,
+    storedBytes,
+  });
+  return itemId;
+}
 
 /** Read-only probe of an operation's server-side state. Used by client recovery
  * (e.g. plan 005's Tidy undo) to learn whether an operation completed. It MUST
@@ -1019,9 +1393,8 @@ export const getImportOperation = query({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    // Deliberately kind-agnostic: this probe serves every operation kind
-    // (plans 004/005 add link/note), so it must not throw a kind mismatch the
-    // way the image mutations do.
+    // Deliberately kind-agnostic: this probe serves every operation kind, so it
+    // must not throw a kind mismatch the way the image mutations do.
     const op = await ctx.db
       .query("itemOperations")
       .withIndex("by_user_operation", (q) =>
@@ -1043,15 +1416,15 @@ export const getImportOperation = query({
  * and eligible for the cleanup sweep. Tests derive staleness from this. */
 export const STALE_IMPORT_CUTOFF_MS = 24 * 60 * 60 * 1000;
 
-/** Sweep a bounded page of pending image operations older than the cutoff:
- * delete the unreferenced attached upload (the blob the process never
- * finalized), then the ledger row. Complete rows stay as the permanent
- * idempotency record. The index leads with kind so stale link/note rows
- * (plans 004/005) can never fill the page and starve image cleanup. */
 /** Rows swept per transaction. A full page chains a follow-up run, so backlog
  * drains at scheduler speed instead of one page per cron interval. */
 const CLEANUP_PAGE_SIZE = 100;
 
+/** Sweep a bounded page of pending image operations older than the cutoff:
+ * delete the unreferenced attached upload (the blob the process never
+ * finalized), then the ledger row. Complete rows stay as the permanent
+ * idempotency record. The index leads with kind so stale rows of other kinds
+ * can never fill the page and starve image cleanup. */
 export const cleanupStaleImageImports = internalMutation({
   args: {},
   returns: v.null(),
@@ -1090,6 +1463,32 @@ export const cleanupStaleImageImports = internalMutation({
   },
 });
 
+/** Includes uploads abandoned before attach. Storage has a creation-time
+ * index; paginate it in bounded transactions and preserve every live owner. */
+export const cleanupOrphanStorage = internalMutation({
+  args: { cursor: v.optional(v.string()), cutoff: v.optional(v.number()) },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const cutoff = args.cutoff ?? Date.now() - 2 * STALE_IMPORT_CUTOFF_MS;
+    const page = await ctx.db.system
+      .query("_storage")
+      .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
+      .paginate({ cursor: args.cursor ?? null, numItems: CLEANUP_PAGE_SIZE });
+    for (const blob of page.page) {
+      if (await isStorageUnreferenced(ctx, blob._id)) {
+        await safeDeleteStorage(ctx, blob._id);
+      }
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.cleanupOrphanStorage, {
+        cursor: page.continueCursor,
+        cutoff,
+      });
+    }
+    return null;
+  },
+});
+
 /**
  * Idempotent completion for a link/note operation. When a durable `operationId`
  * is supplied, (userId, operationId) is the unique key: a repeat with the same
@@ -1097,10 +1496,11 @@ export const cleanupStaleImageImports = internalMutation({
  * item insert, optional space membership, operation completion, and scheduler
  * job all land in this one transaction so a crash mid-mutation never leaves a
  * completed item without its ledger row (or vice versa). Calls without an
- * operationId skip the ledger entirely and always create a fresh item — the
- * ordinary Add UI path.
+ * operationId skip the ledger entirely and always create a fresh item. The
+ * composer now supplies an operation id too, so its save attempt can join the
+ * client and server telemetry; share retries use the same idempotency record.
  */
-async function createItemWithOperation(
+export async function createItemWithOperation(
   ctx: MutationCtx,
   userId: string,
   kind: Extract<OperationKind, "link" | "note">,
@@ -1110,6 +1510,9 @@ async function createItemWithOperation(
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
     saveSource?: SaveSource;
+    // What a Siri capture knew beyond the payload. Steers this run's
+    // classification only; never stored on the item.
+    captureContext?: string;
   },
 ): Promise<Id<"items">> {
   const now = Date.now();
@@ -1197,6 +1600,9 @@ function validateLinkOrNotePayload(
   if (!("note" in payload) || payload.note.trim() === "") {
     throw new Error("Note text is empty");
   }
+  if (payload.note.length > MAX_NOTE_TEXT_CHARS) {
+    throw new Error("Note text is too long");
+  }
 }
 
 /** Inserts a link or note item, files it into the optional space, and schedules
@@ -1211,6 +1617,8 @@ async function insertLinkOrNote(
     spaceId?: Id<"spaces">;
     analyticsSessionId?: string;
     saveSource?: SaveSource;
+    operationId?: string;
+    captureContext?: string;
   },
 ): Promise<Id<"items">> {
   const run = beginProcessingRun();
@@ -1229,10 +1637,12 @@ async function insertLinkOrNote(
   await ctx.scheduler.runAfter(0, internal.ai.processItem, {
     itemId,
     runId: run.processingRunId,
+    captureContext: options.captureContext,
   });
   await scheduleSaveTelemetry(ctx, itemId, {
     sessionId: options.analyticsSessionId,
     saveSource: options.saveSource,
+    operationId: options.operationId,
   });
   return itemId;
 }
@@ -1243,6 +1653,7 @@ async function scheduleSaveTelemetry(
   telemetry?: {
     sessionId?: string;
     saveSource?: SaveSource;
+    operationId?: string;
     photoCount?: number;
     storedBytes?: number;
   },
@@ -1256,6 +1667,45 @@ async function scheduleSaveTelemetry(
     savedAt: item._creationTime,
     ...telemetry,
     sessionId: telemetry?.sessionId?.slice(0, 128),
+  });
+}
+
+/**
+ * Schedules the one processing-outcome event per applied transition: the save
+ * funnel's last leg, `did the persisted item become usable`, joined to
+ * `item_saved` by `item_id`. Called only for processing -> terminal writes
+ * that own the row — `finalizeItem`, `failItem`, and the stale-processing
+ * sweeper — so note refreshes and superseded runs never land in the funnel.
+ * `processingMs` measures the run that just settled, from its own start rather
+ * than `_creationTime`, so a `reprocessItem` retry is timed on its own.
+ */
+async function scheduleProcessedTelemetry(
+  ctx: MutationCtx,
+  item: Pick<
+    Doc<"items">,
+    "_id" | "_creationTime" | "userId" | "type" | "processingStartedAt"
+  >,
+  outcome:
+    | { status: "ready"; enrichment?: Infer<typeof enrichmentValidator> }
+    | {
+        status: "failed";
+        failureReason: Infer<typeof failureReasonValidator>;
+      },
+): Promise<void> {
+  const now = Date.now();
+  await ctx.scheduler.runAfter(0, internal.analytics.captureItemProcessed, {
+    itemId: item._id,
+    userId: item.userId,
+    itemType: item.type,
+    outcome: outcome.status,
+    ...(outcome.status === "failed"
+      ? { failureReason: outcome.failureReason }
+      : { enrichment: outcome.enrichment }),
+    processingMs: Math.max(
+      0,
+      now - (item.processingStartedAt ?? item._creationTime),
+    ),
+    finishedAt: now,
   });
 }
 
@@ -1605,7 +2055,19 @@ export const updateNoteItem = mutation({
         description: item.description,
         tags: item.tags,
         note: text,
+        content: item.content,
       }),
+      // The note's own words are most of what it is embedded from, so an edit
+      // invalidates the vector. A text change also schedules a re-classify
+      // that re-embeds, but a title-only edit does not — clearing the stamp
+      // covers both by handing the row back to the sweep either way.
+      //
+      // The attempt count goes with it: it is a budget for embedding one
+      // particular text, and this is different text. Carried over, a row that
+      // had already failed four times would be stamped current after a single
+      // failure on the edited note, with no vector for what it now says.
+      embeddingVersion: undefined,
+      embeddingAttempts: undefined,
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
         ? { processingStartedAt: Date.now() }
@@ -1751,6 +2213,13 @@ export const deleteItem = mutation({
     for (const read of reads) {
       await ctx.db.delete(read._id);
     }
+    const shareLinks = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .collect();
+    for (const link of shareLinks) {
+      await ctx.db.delete(link._id);
+    }
     if (item.storageId) {
       // Existence-checked: if the blob is somehow already gone, the delete must
       // still remove the item rather than throw and leave it undeletable.
@@ -1761,6 +2230,40 @@ export const deleteItem = mutation({
   },
 });
 
+/** Token for an item's public preview page, minted the first time the owner
+ * shares it and reused after. Null when the item has no preview to show (not
+ * ready, or an image, which shares its file instead). */
+export const createShareLink = mutation({
+  args: { itemId: v.id("items") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    if (!isShareable(item)) return null;
+
+    const existing = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .first();
+    if (existing !== null) return existing.token;
+
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const token = Array.from(bytes, (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
+    await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
+    return token;
+  },
+});
+
+function isShareable(item: Doc<"items">): boolean {
+  return item.status === "ready" && item.type !== "image";
+}
+
 // ---------------------------------------------------------------------------
 // Internal — used by the AI actions
 // ---------------------------------------------------------------------------
@@ -1769,7 +2272,48 @@ export const getItemInternal = internalQuery({
   args: { itemId: v.id("items") },
   returns: v.union(v.object(itemFields), v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.itemId);
+    const item = await ctx.db.get(args.itemId);
+    // `itemFields` deliberately omits the vector, and Convex enforces
+    // `returns` exactly — the raw document would fail validation here.
+    return item === null ? null : stripEmbedding(item);
+  },
+});
+
+/** Bounded preview for the public branded share page, looked up by the token
+ * `createShareLink` minted. Deliberately narrow: no `userId`, no article
+ * body, no tags — just enough to render an OG card and a landing page for
+ * someone who doesn't have the app yet. */
+export const getSharePreview = internalQuery({
+  args: { token: v.string() },
+  returns: v.union(
+    v.object({
+      type: itemTypeValidator,
+      title: v.string(),
+      description: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      noteText: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { token }) => {
+    const link = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (link === null) return null;
+    const item = await ctx.db.get(link.itemId);
+    if (!item || item.userId !== link.userId || !isShareable(item)) return null;
+
+    const { imageUrl } = await enrichItem(ctx, item);
+    return {
+      type: item.type,
+      title: item.title ?? "A save from Shelvr",
+      description: item.description,
+      imageUrl: imageUrl ?? undefined,
+      sourceUrl: item.type === "link" ? item.url : undefined,
+      noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
+    };
   },
 });
 
@@ -1781,13 +2325,84 @@ export const listReadyItemsInternal = internalQuery({
     // Index-scoped to `ready` so a library full of failed or in-flight saves
     // still yields `limit` candidates; the old by_user read took 2x and
     // filtered in JS, which starved users with many failed items.
-    return await ctx.db
+    const rows = await ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
         q.eq("userId", args.userId).eq("status", "ready"),
       )
       .order("desc")
       .take(limit);
+    // Keeps `limit` vectors (~6 KB each) from crossing into the action on
+    // every recommendation pass, and keeps the rows inside `itemFields`.
+    return rows.map(stripEmbedding);
+  },
+});
+
+/**
+ * Hydrates vector-search hits back into item documents, preserving the order
+ * they were given in.
+ *
+ * `ctx.vectorSearch` returns `{_id, _score}` and nothing else, and it is
+ * action-only, so the ids have to come back through a query to become rows.
+ * Order is the caller's ranking and is load-bearing: the recommendation prompt
+ * numbers the list it is handed, so re-sorting here would quietly hand the
+ * model a worse shortlist.
+ *
+ * Rows that are not `ready` are dropped rather than returned: the vector index
+ * has no `status` filter field (Convex vector filters cannot AND across
+ * fields), so a stale vector belonging to an item that has since failed can
+ * still match. The `userId` re-check is defence in depth — the search is
+ * already filtered to one owner, and this is the one field whose failure would
+ * cross accounts.
+ *
+ * Rows stamped with an older generation are dropped for the same reason. A
+ * version bump means the vectors describe different text, a different model,
+ * or both, and the index keeps serving the old ones until the sweep replaces
+ * them. Scoring a current query against them is not a weaker ranking so much
+ * as a meaningless one, and the ranking is silent about it either way. The
+ * caller's recency half covers the gap while the sweep drains, so refusing to
+ * mix generations costs candidates only where they would have been misranked.
+ */
+export const listReadyItemsByIdInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    itemIds: v.array(v.id("items")),
+    limit: v.number(),
+  },
+  returns: v.array(v.object(itemFields)),
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
+    const rows: Doc<"items">[] = [];
+    let bytes = 0;
+    for (const itemId of args.itemIds) {
+      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
+        break;
+      }
+      const item = await ctx.db.get(itemId);
+      if (item === null) {
+        continue;
+      }
+      // Charged before the row is judged, not after: the read has already
+      // happened by this point, and it is reads the budget exists to bound.
+      // A dropped hit costs the transaction exactly what a kept one does, so
+      // a run of large non-`ready` rows would otherwise walk straight past
+      // the budget and into Convex's own limit.
+      //
+      // Approximate, like the sweep's budget: the body dominates, and this
+      // only has to keep the transaction clear of that limit.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (
+        item.userId !== args.userId ||
+        item.status !== "ready" ||
+        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
+      ) {
+        continue;
+      }
+      rows.push(item);
+    }
+    // Same reason as listReadyItemsInternal: vectors stay out of the action,
+    // and the rows stay inside `itemFields`.
+    return rows.map(stripEmbedding);
   },
 });
 
@@ -1855,6 +2470,12 @@ export const finalizeItem = internalMutation({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     intents: v.optional(v.array(intentValidator)),
+    // The retrieval vector for the text this run classified, already
+    // normalized and width-checked by the action. Optional because embedding
+    // is best-effort: a run whose embed call failed still finalizes the item,
+    // and the sweeper fills the vector in later. Never `null` — absent means
+    // "this run produced none".
+    embedding: v.optional(v.array(v.float64())),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
@@ -1888,6 +2509,7 @@ export const finalizeItem = internalMutation({
       tags: args.tags,
       siteName: args.siteName,
       note: item.note,
+      content: args.content,
     });
     await ctx.db.patch(args.itemId, {
       title,
@@ -1909,6 +2531,31 @@ export const finalizeItem = internalMutation({
       enrichment: args.enrichment,
       failureReason: undefined,
       searchText,
+      // Written in the same run-fenced transaction as the classification it
+      // describes, so a superseded run can never leave a vector that
+      // disagrees with the text beside it.
+      // Re-checked here even though the action already validated: Convex
+      // rejects a vector whose width differs from the index at write time, and
+      // that would fail this whole transaction — losing the classification
+      // over a field that is optional by design.
+      ...(args.embedding !== undefined && isValidEmbedding(args.embedding)
+        ? {
+            embedding: args.embedding,
+            embeddingVersion: CURRENT_EMBEDDING_VERSION,
+            embeddingAttempts: undefined,
+          }
+        : // This run could not embed. Keep whatever vector the row already
+          // carried — a slightly stale semantic match beats none — but drop
+          // the generation stamp so the sweeper re-embeds it against the text
+          // just written. Patching `embedding: undefined` instead would
+          // delete a good vector over a transient provider failure.
+          //
+          // The attempt count is cleared for the same reason it is on a
+          // success: the budget belongs to one particular text, and this
+          // classification just wrote new text. Carried over, a row with four
+          // prior attempts would be stamped current after one failure on the
+          // new text, keeping a vector that describes the old.
+          { embeddingVersion: undefined, embeddingAttempts: undefined }),
     });
     if (
       args.storageId !== undefined &&
@@ -1917,6 +2564,17 @@ export const finalizeItem = internalMutation({
       (await isStorageUnreferenced(ctx, item.storageId))
     ) {
       await safeDeleteStorage(ctx, item.storageId);
+    }
+    // The save funnel's last leg: the persisted item became usable (a
+    // `partial`/`no_article` enrichment is usable and retryable, not a
+    // failure). Only the run that owns the row reports; the fence above
+    // already returned for superseded runs. The `failed` transition is
+    // failItem's to write, and it reports its own event with the reason.
+    if (args.status === "ready" && item.status !== "ready") {
+      await scheduleProcessedTelemetry(ctx, item, {
+        status: "ready",
+        enrichment: args.enrichment,
+      });
     }
     return "applied";
   },
@@ -1940,37 +2598,234 @@ export const deleteStorageIfUnreferenced = internalMutation({
   },
 });
 
-export const listImagesNeedingRatioInternal = internalQuery({
-  args: {},
-  returns: v.array(
-    v.object({ _id: v.id("items"), storageId: v.id("_storage") }),
-  ),
-  handler: async (ctx) => {
-    const items = await ctx.db.query("items").take(LIST_CAP);
-    const out: { _id: Id<"items">; storageId: Id<"_storage"> }[] = [];
-    for (const item of items) {
-      if (
-        item.type === "image" &&
-        item.storageId !== undefined &&
-        item.aspectRatio === undefined
-      ) {
-        out.push({ _id: item._id, storageId: item.storageId });
+/**
+ * One page of items whose stored vector is missing or from an older
+ * generation, already reduced to the exact text each one should be embedded
+ * from.
+ *
+ * Composing the text here rather than in the action is what keeps the page
+ * small on the way out: the builder truncates to MAX_EMBED_CHARS, so the
+ * result is bounded even when the source article is not.
+ *
+ * The read side is bounded separately and explicitly. Rows are streamed rather
+ * than `take`n so the loop can stop on a byte budget as well as a row count —
+ * a `ready` link can carry 100k characters of `content`, and a page of those
+ * would blow the transaction read limit. That failure would not be a one-off:
+ * the same oversized rows sit at the front of the range on every run, so the
+ * sweep would wedge on them forever instead of making progress.
+ *
+ * Rows with nothing to embed are returned too, with an empty `text`. The
+ * caller needs to see them to mark them finished — otherwise an item that can
+ * never produce text would sit at the front of the range forever.
+ */
+export const listItemsNeedingEmbeddingInternal = internalQuery({
+  args: { limit: v.number() },
+  returns: v.array(v.object({ itemId: v.id("items"), text: v.string() })),
+  handler: async (ctx, args) => {
+    const limit = Math.min(
+      Math.max(1, Math.floor(args.limit)),
+      EMBEDDING_SWEEP_PAGE,
+    );
+    // `undefined` sorts before every number, so this one range covers rows
+    // that have never been embedded and rows left behind by a version bump.
+    const rows = ctx.db
+      .query("items")
+      .withIndex("by_status_and_embeddingVersion", (q) =>
+        q
+          .eq("status", "ready")
+          .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
+      );
+    const page: { itemId: Id<"items">; text: string }[] = [];
+    let bytes = 0;
+    for await (const item of rows) {
+      page.push({
+        itemId: item._id,
+        text: buildEmbeddingText({
+          title: item.title,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          note: item.note,
+          content: item.content,
+        }),
+      });
+      // Approximate: the body dominates, and the budget only has to keep the
+      // transaction well clear of its limit, not measure it exactly.
+      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
+      if (page.length >= limit || bytes >= MAX_SWEEP_READ_BYTES) {
+        break;
       }
     }
-    return out;
+    return page;
   },
 });
 
-export const setAspectRatioInternal = internalMutation({
-  args: { itemId: v.id("items"), aspectRatio: v.number() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const item = await ctx.db.get(args.itemId);
-    if (item === null) {
-      return null;
+/**
+ * What the sweep concluded about one item, decided in the action where the
+ * batch outcome is visible.
+ *
+ * The distinction between `failed` and `deferred` is the whole point. Stamping
+ * the current generation is what removes a row from the sweep range, so doing
+ * it for an item the provider merely could not reach right now would delete it
+ * from the vector index permanently. During an outage that is not one row: the
+ * sweep would march the entire table, stamping every item as done with no
+ * vector, and nothing would ever revisit them.
+ */
+const embeddingOutcomeValidator = v.union(
+  // A usable vector came back.
+  v.literal("embedded"),
+  // The item has no embeddable text at all, so it is finished either way.
+  v.literal("nothing_to_embed"),
+  // The provider answered for the rest of the batch but not usefully for this
+  // item: its own content is the problem, so it spends an attempt.
+  v.literal("failed"),
+  // The whole batch came back empty — the provider is down. Costs nothing and
+  // changes nothing; the row is retried on a later tick.
+  v.literal("deferred"),
+);
+
+/**
+ * Writes one sweep's results back.
+ *
+ * Guards, in order: the item may have been deleted while the action ran; a
+ * live pipeline run may have written a current-generation vector in the
+ * meantime, which describes newer text than the sweep read and must win; and a
+ * vector that is the wrong width, non-finite, or all zero is dropped rather
+ * than written, because Convex rejects the wrong width at write time and the
+ * other two poison every later comparison.
+ *
+ * It also rebuilds `searchText`, but only when the value actually changes.
+ * The rebuild is what makes the article body reach the full-text index for
+ * saves classified before it was indexed, without re-running the model — and
+ * skipping no-op writes keeps a drained sweep from invalidating every
+ * subscribed feed query on a timer.
+ */
+export const setEmbeddingsInternal = internalMutation({
+  args: {
+    entries: v.array(
+      v.object({
+        itemId: v.id("items"),
+        // The exact text the action embedded. Echoed back so the write can
+        // check it still describes the row — see the staleness fence below.
+        text: v.string(),
+        embedding: v.optional(v.array(v.float64())),
+        outcome: embeddingOutcomeValidator,
+      }),
+    ),
+  },
+  returns: v.object({
+    written: v.number(),
+    stamped: v.number(),
+    deferred: v.number(),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ written: number; stamped: number; deferred: number }> => {
+    let written = 0;
+    let stamped = 0;
+    let deferred = 0;
+    for (const entry of args.entries) {
+      const item = await ctx.db.get(entry.itemId);
+      if (item === null) {
+        continue;
+      }
+      if ((item.embeddingVersion ?? -1) >= CURRENT_EMBEDDING_VERSION) {
+        // A pipeline run beat the sweep to it.
+        continue;
+      }
+
+      const nextSearchText = buildSearchText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        content: item.content,
+      });
+      const reindex =
+        nextSearchText === item.searchText
+          ? {}
+          : { searchText: nextSearchText };
+
+      // Staleness fence. The version guard above catches a pipeline run that
+      // embedded successfully, but not one that re-classified this item and
+      // then failed to embed — that clears the stamp, so the row looks
+      // unembedded while its text is newer than what the action read. Writing
+      // then would pin a vector describing text the item no longer has, at the
+      // current generation, where nothing would revisit it. Comparing the
+      // composed text is the cheap equivalent of a run fence: the row is left
+      // for the next tick, which reads the new text.
+      const currentText = buildEmbeddingText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        content: item.content,
+      });
+      if (currentText !== entry.text) {
+        if (reindex.searchText !== undefined) {
+          await ctx.db.patch(entry.itemId, reindex);
+        }
+        deferred++;
+        continue;
+      }
+
+      const usable =
+        entry.outcome === "embedded" &&
+        entry.embedding !== undefined &&
+        isValidEmbedding(entry.embedding);
+
+      if (usable) {
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embedding: entry.embedding,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          embeddingAttempts: undefined,
+        });
+        written++;
+        stamped++;
+        continue;
+      }
+
+      if (entry.outcome === "nothing_to_embed") {
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+        });
+        stamped++;
+        continue;
+      }
+
+      if (entry.outcome === "deferred") {
+        // The provider was down. Reindexing is still worth doing; the row
+        // stays in the range so a later tick retries the vector.
+        if (reindex.searchText !== undefined) {
+          await ctx.db.patch(entry.itemId, reindex);
+        }
+        deferred++;
+        continue;
+      }
+
+      // "failed", or "embedded" with a vector that did not survive validation:
+      // this item's own content is the problem, so it spends an attempt.
+      const attempts = (item.embeddingAttempts ?? 0) + 1;
+      const givingUp = attempts >= MAX_EMBEDDING_ATTEMPTS;
+      await ctx.db.patch(entry.itemId, {
+        ...reindex,
+        embeddingAttempts: attempts,
+        // Giving up stamps the row so it stops blocking everything behind it.
+        // A later CURRENT_EMBEDDING_VERSION bump re-enlists it.
+        ...(givingUp ? { embeddingVersion: CURRENT_EMBEDDING_VERSION } : {}),
+      });
+      if (givingUp) {
+        stamped++;
+      } else {
+        deferred++;
+      }
     }
-    await ctx.db.patch(args.itemId, { aspectRatio: args.aspectRatio });
-    return null;
+    return { written, stamped, deferred };
   },
 });
 
@@ -2019,6 +2874,12 @@ export const failItem = internalMutation({
       status: "failed",
       failureReason: args.reason,
     });
+    // The save funnel's failure leg, with the bounded reason the client
+    // already renders. Only the run that owns the row reports.
+    await scheduleProcessedTelemetry(ctx, item, {
+      status: "failed",
+      failureReason: args.reason,
+    });
     return "applied";
   },
 });
@@ -2064,6 +2925,14 @@ export const failStaleProcessingItems = internalMutation({
         continue;
       }
       await ctx.db.patch(item._id, {
+        status: "failed",
+        failureReason: "error",
+      });
+      // The action died outside its try block, so this sweep is the only
+      // witness of the outcome — the funnel event fires here or never. The
+      // run id is deliberately left so a late finish can still repair the
+      // item, which its own finalize will then report.
+      await scheduleProcessedTelemetry(ctx, item, {
         status: "failed",
         failureReason: "error",
       });

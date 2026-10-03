@@ -8,7 +8,9 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./model/auth";
+import { logEvent } from "./model/log";
 import { TERMS_VERSION } from "./model/legalConsent";
+import { MAX_SYNC_ATTEMPTS, deliversGrant } from "./legalConsentSync";
 
 export const get = query({
   args: {},
@@ -20,6 +22,7 @@ export const get = query({
       acceptedAt: v.optional(v.number()),
       refundSharing: v.boolean(),
       syncPending: v.boolean(),
+      syncFailed: v.boolean(),
     }),
   ),
   handler: async (ctx) => {
@@ -35,6 +38,7 @@ export const get = query({
       acceptedAt: row.acceptedAt,
       refundSharing: row.refundSharing,
       syncPending: row.syncState !== "synced",
+      syncFailed: row.syncState === "failed",
     };
   },
 });
@@ -133,7 +137,35 @@ export const retry = internalMutation({
         )
         .take(50);
       for (const row of rows) {
-        await ctx.db.patch(row._id, { syncState: "pending", nextSyncAt: now });
+        // A syncing row past its lease means the action died before finish
+        // could spend the attempt — spend it here so crash-recovery loops
+        // cannot retry for free forever (mirrors feedback delivery).
+        const attempts = state === "syncing" ? row.attempts + 1 : row.attempts;
+        // Recovery must not outlive the cap either: a grant that keeps
+        // crashing before `finish` would otherwise burn attempts via this
+        // path and stay retryable indefinitely.
+        if (
+          state === "syncing" &&
+          deliversGrant(row) &&
+          attempts >= MAX_SYNC_ATTEMPTS
+        ) {
+          await ctx.db.patch(row._id, {
+            syncState: "failed",
+            attempts,
+            nextSyncAt: now,
+          });
+          logEvent("error", "refund_consent_sync_exhausted", {
+            consent_id: row._id,
+            attempts,
+            via: "recovery",
+          });
+          continue;
+        }
+        await ctx.db.patch(row._id, {
+          syncState: "pending",
+          nextSyncAt: now,
+          attempts,
+        });
         await ctx.scheduler.runAfter(0, internal.legalConsentSync.send, {
           id: row._id,
         });

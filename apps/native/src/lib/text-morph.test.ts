@@ -1,0 +1,374 @@
+import { describe, expect, it } from "vitest";
+import {
+  MAX_MORPH_GLYPHS,
+  advanceMorphTransition,
+  includeMorphExits,
+  layoutMorphText,
+  pruneMorphCells,
+  reconcileMorphCells,
+  resolveMorphRender,
+  type MorphCell,
+} from "./text-morph";
+
+// Every glyph advances 10px, so widths and centering are easy to predict.
+const advance10 = () => 10;
+
+describe("resolveMorphRender", () => {
+  it("holds an untouched slot blank while its font resolves", () => {
+    expect(resolveMorphRender(false, false, false)).toEqual({
+      mode: "hold",
+      animateOnMount: false,
+    });
+  });
+
+  it("staggers the first canvas in when nothing was painted before it", () => {
+    expect(resolveMorphRender(true, false, false)).toEqual({
+      mode: "morph",
+      animateOnMount: true,
+    });
+  });
+
+  it("shows native text once the hold has expired", () => {
+    expect(resolveMorphRender(false, false, true)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+  });
+
+  it("mounts opaque over a title the reader can already see", () => {
+    // The slow-font and native-shaping paths both land here: replacing
+    // readable text with a transparent entrance is the regression to avoid.
+    expect(resolveMorphRender(true, false, true)).toEqual({
+      mode: "morph",
+      animateOnMount: false,
+    });
+  });
+
+  it("keeps native shaping, Reduce Motion and Dynamic Type on native text", () => {
+    expect(resolveMorphRender(true, true, false)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+    expect(resolveMorphRender(false, true, false)).toEqual({
+      mode: "native",
+      animateOnMount: false,
+    });
+  });
+});
+
+describe("layoutMorphText", () => {
+  it("preserves the full glyph budget when no ellipsis is requested", () => {
+    expect(
+      layoutMorphText("a".repeat(49), 1000, 0, advance10, false),
+    ).toHaveLength(48);
+  });
+
+  it("preserves fitting text when the ellipsis cannot fit", () => {
+    const cells = layoutMorphText("abc", 20, 0, (char) =>
+      char === "…" ? 30 : 10,
+    );
+    expect(cells.map((cell) => cell.char).join("")).toBe("ab");
+  });
+  it("returns no cells for an unusable slot", () => {
+    expect(layoutMorphText("abc", 0, 0, advance10)).toEqual([]);
+    expect(layoutMorphText("abc", -5, 0, advance10)).toEqual([]);
+  });
+
+  it("lays glyphs out left to right, centered in the slot", () => {
+    const cells = layoutMorphText("abc", 240, 0, advance10);
+    expect(cells.map((cell) => cell.char).join("")).toBe("abc");
+    expect(cells.map((cell) => cell.x)).toEqual([105, 115, 125]);
+    expect(cells.every((cell) => cell.phase === "present")).toBe(true);
+    // A fresh scene never waits on an entrance: it renders opaque.
+    expect(cells.every((cell) => cell.animateIn === undefined)).toBe(true);
+  });
+
+  it("offsets the whole run by the canvas overscan", () => {
+    const cells = layoutMorphText("abc", 240, 32, advance10);
+    expect(cells[0]?.x).toBe(137);
+    expect(cells[2]?.x).toBe(157);
+  });
+
+  it("keys repeated characters by occurrence so identities stay stable", () => {
+    const cells = layoutMorphText("aaa", 240, 0, advance10);
+    expect(cells.map((cell) => cell.key)).toEqual(["a#0", "a#1", "a#2"]);
+  });
+
+  it("clamps a negative measured advance to zero", () => {
+    const cells = layoutMorphText("ab", 240, 0, (char) =>
+      char === "a" ? -3 : 10,
+    );
+    expect(cells[0]?.x).toBe(115);
+    expect(cells[1]?.x).toBe(115);
+  });
+
+  it("truncates with an ellipsis when the run exceeds the slot", () => {
+    // 5 glyphs x 10px = 50 > 45: drops the last glyph, appends "…" (10px).
+    const cells = layoutMorphText("abcde", 45, 0, advance10);
+    expect(cells.map((cell) => cell.char).join("")).toBe("abc…");
+    expect(cells).toHaveLength(4);
+    // The truncated run (40px) is centered in the 45px slot.
+    expect(cells[0]?.x).toBe(2.5);
+  });
+
+  it("bounds the run without an ellipsis when truncation is off", () => {
+    const cells = layoutMorphText("abcde", 45, 0, advance10, false);
+    expect(cells.map((cell) => cell.char).join("")).toBe("abcd");
+  });
+
+  it("caps the scene at the glyph budget, including zero-width glyphs", () => {
+    const cells = layoutMorphText("a".repeat(200), 1000, 0, advance10);
+    expect(cells).toHaveLength(MAX_MORPH_GLYPHS);
+    expect(cells.at(-1)?.char).toBe("…");
+
+    // Spaces measure 0px but still consume the budget, so a long note padded
+    // with whitespace cannot allocate an unbounded scene.
+    const spaces = layoutMorphText("a" + " ".repeat(100), 1000, 0, (char) =>
+      char === " " ? 0 : 10,
+    );
+    expect(spaces).toHaveLength(MAX_MORPH_GLYPHS);
+  });
+});
+
+describe("reconcileMorphCells", () => {
+  const cellA: MorphCell = {
+    key: "a#0",
+    char: "a",
+    x: 0,
+    width: 10,
+    index: 0,
+    phase: "present",
+  };
+  const cellB: MorphCell = {
+    key: "b#0",
+    char: "b",
+    x: 10,
+    width: 10,
+    index: 1,
+    phase: "present",
+  };
+  const previous: MorphCell[] = [
+    cellA,
+    cellB,
+    { key: "c#0", char: "c", x: 20, width: 10, index: 2, phase: "present" },
+  ];
+
+  it("keeps surviving glyphs, marks added ones entering, retires the rest", () => {
+    const present = layoutMorphText("bd", 240, 0, advance10);
+    const next = reconcileMorphCells(previous, present, 1000, 240, 25);
+    const byKey = new Map(next.map((cell) => [cell.key, cell]));
+
+    expect(byKey.get("b#0")?.animateIn).toBe(false); // persisted
+    expect(byKey.get("d#0")?.animateIn).toBe(true); // added
+    expect(byKey.get("a#0")?.phase).toBe("exit"); // retired
+    expect(byKey.get("c#0")?.phase).toBe("exit");
+    // Present cells come first so they win any budget contention.
+    expect(next[0]?.key).toBe("b#0");
+    expect(next[1]?.key).toBe("d#0");
+  });
+
+  it("staggers a whole first scene in against no previous scene", () => {
+    // How a slot that painted nothing yet mounts its entrance: every glyph
+    // counts as added, and nothing is left retiring behind it.
+    const present = layoutMorphText("abc", 240, 0, advance10);
+    const next = reconcileMorphCells([], present, 1000, 240, 25);
+
+    expect(next).toHaveLength(3);
+    expect(next.every((cell) => cell.animateIn === true)).toBe(true);
+    expect(next.every((cell) => cell.phase === "present")).toBe(true);
+  });
+
+  it("schedules each retirement after the exit duration plus its stagger", () => {
+    const present = layoutMorphText("d", 240, 0, advance10);
+    const next = reconcileMorphCells(previous, present, 1000, 240, 25);
+    const byKey = new Map(next.map((cell) => [cell.key, cell]));
+
+    expect(byKey.get("a#0")?.exitAt).toBe(1000 + 240 + 0 * 25);
+    expect(byKey.get("c#0")?.exitAt).toBe(1000 + 240 + 2 * 25);
+  });
+
+  it("keeps a returning letter out of the entrance stagger", () => {
+    // "a" left the scene and came back before its exit finished: it resumes
+    // in place instead of replaying the signature entrance.
+    const retiring: MorphCell[] = [
+      { ...cellA, phase: "exit", exitAt: 1500 },
+      { ...cellB, phase: "exit", exitAt: 1500 },
+    ];
+    const present = layoutMorphText("ab", 240, 0, advance10);
+    const next = reconcileMorphCells(retiring, present, 1000, 240, 25);
+    const byKey = new Map(next.map((cell) => [cell.key, cell]));
+
+    expect(byKey.get("a#0")?.animateIn).toBe(false);
+    expect(byKey.get("a#0")?.phase).toBe("present");
+  });
+
+  it("drops finished exits and keeps running ones on their deadline", () => {
+    const retiring: MorphCell[] = [
+      { ...cellA, phase: "exit", exitAt: 900 },
+      { ...cellB, phase: "exit", exitAt: 1200 },
+    ];
+    const present = layoutMorphText("z", 240, 0, advance10);
+    const next = reconcileMorphCells(retiring, present, 1000, 240, 25);
+    const byKey = new Map(next.map((cell) => [cell.key, cell]));
+
+    expect(byKey.has("a#0")).toBe(false); // deadline passed
+    expect(byKey.get("b#0")?.exitAt).toBe(1200); // deadline unchanged
+  });
+
+  it("returns only the present scene, fully opaque, when interrupted", () => {
+    const present = layoutMorphText("bd", 240, 0, advance10);
+    const next = reconcileMorphCells(previous, present, 1000, 240, 25, true);
+
+    expect(next.map((cell) => cell.phase)).toEqual(["present", "present"]);
+    expect(next.every((cell) => cell.animateIn === false)).toBe(true);
+    expect(next.every((cell) => cell.exitAt === undefined)).toBe(true);
+  });
+
+  it("bounds the retiring layer so a burst cannot flood the scene", () => {
+    const many: MorphCell[] = Array.from({ length: 60 }, (_, index) => ({
+      key: `g#${index}`,
+      char: "g",
+      x: index * 10,
+      width: 10,
+      index,
+      phase: "present" as const,
+    }));
+    const next = reconcileMorphCells(many, [], 1000, 240, 25);
+
+    expect(next).toHaveLength(MAX_MORPH_GLYPHS);
+    expect(next.every((cell) => cell.phase === "exit")).toBe(true);
+  });
+});
+
+describe("pruneMorphCells", () => {
+  it("keeps present glyphs and pending exits, drops completed exits", () => {
+    const cells: MorphCell[] = [
+      { key: "a#0", char: "a", x: 0, width: 10, index: 0, phase: "present" },
+      {
+        key: "b#0",
+        char: "b",
+        x: 10,
+        width: 10,
+        index: 1,
+        phase: "exit",
+        exitAt: 1200,
+      },
+      {
+        key: "c#0",
+        char: "c",
+        x: 20,
+        width: 10,
+        index: 2,
+        phase: "exit",
+        exitAt: 1000,
+      },
+    ];
+    const kept = pruneMorphCells(cells, 1000);
+    expect(kept.map((cell) => cell.key)).toEqual(["a#0", "b#0"]);
+    // An exit whose deadline is exactly now has finished.
+    expect(pruneMorphCells(cells, 1200).map((cell) => cell.key)).toEqual([
+      "a#0",
+    ]);
+  });
+});
+
+describe("advanceMorphTransition", () => {
+  // Mirrors the runtime choreography: a staggered entrance grows with the
+  // glyph count, while an interrupted transition lands on a flat short timing.
+  const durationFor = (glyphs: number, interrupted: boolean) =>
+    interrupted ? 120 : 120 + Math.max(0, glyphs - 1) * 25 + 550;
+
+  it("interrupts while a settled long title exits behind a short replacement", () => {
+    const previous = layoutMorphText("a".repeat(48), 1000, 0, advance10);
+    const present = layoutMorphText("b", 1000, 0, advance10);
+    const change = advanceMorphTransition(
+      { text: "a".repeat(48), deadline: null },
+      "b",
+      1,
+      0,
+      durationFor,
+    );
+    const cells = reconcileMorphCells(previous, present, 0, 240, 25);
+    const active = includeMorphExits(change.next, cells);
+    expect(active.deadline).toBe(1415);
+    const next = advanceMorphTransition(active, "c", 1, 800, durationFor);
+    expect(next.interrupted).toBe(true);
+    const interruptedCells = reconcileMorphCells(
+      cells,
+      layoutMorphText("c", 1000, 0, advance10),
+      800,
+      240,
+      25,
+      next.interrupted,
+    );
+    expect(includeMorphExits(next.next, interruptedCells).deadline).toBe(920);
+    expect(interruptedCells).toHaveLength(1);
+    expect(interruptedCells[0]?.animateIn).toBe(false);
+  });
+
+  it("treats unchanged text as no transition at all", () => {
+    const previous = { text: "abc", deadline: 900 };
+    const { interrupted, next } = advanceMorphTransition(
+      previous,
+      "abc",
+      3,
+      500,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+    expect(next).toBe(previous);
+  });
+
+  it("does not interrupt the very first change", () => {
+    const { interrupted, next } = advanceMorphTransition(
+      { text: "abc", deadline: null },
+      "xyz",
+      3,
+      500,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+    expect(next).toEqual({ text: "xyz", deadline: 500 + 720 });
+  });
+
+  it("does not interrupt a change after the running transition settles", () => {
+    const { interrupted } = advanceMorphTransition(
+      { text: "abc", deadline: 1000 },
+      "xyz",
+      3,
+      1000,
+      durationFor,
+    );
+    expect(interrupted).toBe(false);
+  });
+
+  it("interrupts a change inside the running transition", () => {
+    const { interrupted, next } = advanceMorphTransition(
+      { text: "abc", deadline: 1000 },
+      "xyz",
+      3,
+      800,
+      durationFor,
+    );
+    expect(interrupted).toBe(true);
+    // An interrupted transition settles on the short timing, not another
+    // stagger, so the deadline it records is correspondingly short.
+    expect(next).toEqual({ text: "xyz", deadline: 800 + 120 });
+  });
+
+  it("judges a short title against the long morph it lands on", () => {
+    // A 24-glyph entrance runs 1245ms; a 3-glyph one only 720ms. Recomputing
+    // the window from the incoming title would clear this change at 800ms and
+    // stack a second stagger on the unfinished morph.
+    const long = advanceMorphTransition(
+      { text: "", deadline: null },
+      "a".repeat(24),
+      24,
+      0,
+      durationFor,
+    );
+    expect(long.next.deadline).toBe(1245);
+    const short = advanceMorphTransition(long.next, "xyz", 3, 800, durationFor);
+    expect(short.interrupted).toBe(true);
+  });
+});

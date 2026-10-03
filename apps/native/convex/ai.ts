@@ -3,37 +3,33 @@
 import { v } from "convex/values";
 import { env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { GenericActionCtx } from "convex/server";
+import type { FunctionReturnType, GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
-import { generateObject, wrapLanguageModel } from "ai";
+import { embedMany, generateObject, wrapLanguageModel } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import { Readability } from "@mozilla/readability";
-import { parseHTML } from "linkedom";
+import { safeFetch, parseJson } from "./model/safeFetch";
 import {
-  safeFetch,
-  decodeWithContentType,
-  parseJson,
-  isSafeFetchError,
-  type SafeFetchError,
-} from "./model/safeFetch";
-import {
-  instagramMedia,
-  isInstagramUrl,
-  isTikTokUrl,
-  isXHost,
-  shortFormSource,
-  xStatusId,
-} from "./model/externalUrl";
+  fetchErrorCategory,
+  linkEnrichment,
+  PROMPT_CONTENT_CHARS,
+  readPage,
+  storePoster,
+  type LinkRead,
+  type PageData,
+  type ShortFormSource,
+} from "./model/pageRead";
 import { MAX_SPACE_PROMPT_BYTES } from "./model/imagePolicy";
+import { INTENT_KINDS, type Recipe } from "./model/itemFields";
+import { logEvent, errorName } from "./model/log";
+import { sanitizeRecipe, type RecipeDraft } from "./model/recipeMarkup";
 import {
-  INTENT_KINDS,
-  type ArticleMedia,
-  type PostMedia,
-  type Recipe,
-} from "./model/itemFields";
-import { logEvent } from "./model/log";
-import { extractRecipeMarkup, type RecipeDraft } from "./model/recipeMarkup";
+  buildEmbeddingText,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_SWEEP_PAGE,
+  isValidEmbedding,
+  normalizeEmbedding,
+} from "./model/embedding";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -46,7 +42,7 @@ import { readStoredImage, StoredImageError } from "./model/storedImage";
 const MODEL_NAME = "gemini-3.1-flash-lite";
 // Token usage lands in the Convex log stream of whichever action made the call,
 // so classification and product-search spend can be told apart per invocation.
-const MODEL = wrapLanguageModel({
+export const MODEL = wrapLanguageModel({
   model: google(MODEL_NAME),
   middleware: {
     wrapGenerate: async ({ doGenerate }) => {
@@ -79,7 +75,7 @@ const SMALL_TIMEOUT_MS = 30_000;
 // a flaky provider triple the wall-clock spend inside a single deadline.
 const MODEL_MAX_RETRIES = 1;
 
-function modelCallOptions(timeoutMs: number): {
+export function modelCallOptions(timeoutMs: number): {
   abortSignal: AbortSignal;
   maxRetries: number;
 } {
@@ -87,6 +83,142 @@ function modelCallOptions(timeoutMs: number): {
     abortSignal: AbortSignal.timeout(timeoutMs),
     maxRetries: MODEL_MAX_RETRIES,
   };
+}
+
+/**
+ * The embedding model, called through the same provider and API key as
+ * classification. Separate from MODEL_NAME because they are different models
+ * on different release cadences, and because token usage is logged per call
+ * site: embedding spend should be legible on its own.
+ */
+const EMBEDDING_MODEL_NAME = "gemini-embedding-2";
+
+/**
+ * Deadline for one embedding batch. Embedding is a single forward pass with no
+ * generated tokens, so it is far quicker than classification; the allowance is
+ * generous only so a cold provider does not cost an item its vector. It adds
+ * to processItem's budget above, which stays well under the action limit.
+ */
+const EMBED_TIMEOUT_MS = 20_000;
+
+/**
+ * The two sides of retrieval.
+ *
+ * Google documents these task types as an asymmetric pair: items are the
+ * corpus, so they are embedded as documents, and anything searching the index
+ * embeds its query text as a query. The pairing lives in one place and callers
+ * pick a side by choosing `embedTexts` or `embedQuery` rather than by passing
+ * a string.
+ *
+ * Measured 2026-09-25 against the dev deployment: `gemini-embedding-2` returns
+ * the same vector for a query under either task type, so with this model the
+ * pairing changes nothing and ranking is plain symmetric similarity. It is
+ * kept because the provider forwards it and a later model may honour it; do
+ * not read it as a ranking guarantee, and do not expect a mismatch to show up
+ * as worse results.
+ */
+const EMBEDDING_DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT";
+const EMBEDDING_QUERY_TASK_TYPE = "RETRIEVAL_QUERY";
+
+/**
+ * What one embedding batch produced.
+ *
+ * `callFailed` is reported separately from an empty `vectors` slot on purpose.
+ * A slot is `undefined` for two unrelated reasons — the call never completed,
+ * or the call completed and that particular vector was unusable — and the two
+ * demand opposite handling. The first is nobody's fault and must be retried
+ * for free; the second is that item's own problem and has to spend an
+ * attempt, or a row the provider can never embed leads the sweep range
+ * forever. Inferring one from the other ("the batch produced nothing, so the
+ * provider must be down") gets it wrong in exactly the case that wedges the
+ * sweep: a completed call whose every vector is malformed.
+ */
+type EmbedBatchResult = {
+  vectors: (number[] | undefined)[];
+  callFailed: boolean;
+};
+
+/**
+ * Embeds a batch of texts, in input order.
+ *
+ * Best effort by contract: it never throws and never rejects. Every failure
+ * mode — provider outage, timeout, a malformed vector, an empty input —
+ * collapses to `undefined` in that text's slot, because an item is worth
+ * saving whether or not it could be embedded. Callers write the vectors they
+ * got and leave the rest to the sweeper; `callFailed` tells them which kind
+ * of nothing they are looking at.
+ *
+ * Empty texts are never sent upstream; their slot is `undefined` from the
+ * start. Vectors are normalized and width-checked before being returned, so a
+ * caller can hand the result straight to a mutation: Convex rejects a vector
+ * whose width does not match the index, which would otherwise fail the whole
+ * classification transaction over an optional field.
+ *
+ * Batching is the SDK's: `embedMany` splits at the provider's documented
+ * 100-values ceiling on its own, so callers pass a whole page.
+ */
+async function embedBatch(
+  texts: string[],
+  taskType: string,
+): Promise<EmbedBatchResult> {
+  const vectors: (number[] | undefined)[] = texts.map(() => undefined);
+  const sendable = texts
+    .map((text, index) => ({ text, index }))
+    .filter((entry) => entry.text.length > 0);
+  if (sendable.length === 0) {
+    return { vectors, callFailed: false };
+  }
+  try {
+    const { embeddings } = await embedMany({
+      model: google.embedding(EMBEDDING_MODEL_NAME),
+      values: sendable.map((entry) => entry.text),
+      providerOptions: {
+        google: {
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+          taskType,
+        },
+      },
+      ...modelCallOptions(EMBED_TIMEOUT_MS),
+    });
+    embeddings.forEach((raw, position) => {
+      const vector = normalizeEmbedding(raw);
+      if (isValidEmbedding(vector)) {
+        vectors[sendable[position].index] = vector;
+      }
+    });
+  } catch (error) {
+    // Categories and counts only: an embedding error can echo the text.
+    logEvent("warn", "embedding_failed", {
+      model: EMBEDDING_MODEL_NAME,
+      task_type: taskType,
+      count: sendable.length,
+      timed_out: isModelTimeout(error),
+      error: errorName(error),
+    });
+    return { vectors, callFailed: true };
+  }
+  return { vectors, callFailed: false };
+}
+
+/** Embeds item texts for storage in the vector index. */
+export async function embedTexts(texts: string[]): Promise<EmbedBatchResult> {
+  return await embedBatch(texts, EMBEDDING_DOCUMENT_TASK_TYPE);
+}
+
+/**
+ * Embeds one search string for use as a `ctx.vectorSearch` vector.
+ *
+ * Same best-effort contract as `embedTexts`: `undefined` means the caller has
+ * no vector to search with and must fall back to whatever it did before, not
+ * that it should fail. Text bounding is the caller's, via
+ * `buildEmbeddingText`, so a query is composed exactly the way the stored
+ * summaries were.
+ */
+async function embedQuery(text: string): Promise<number[] | undefined> {
+  // A search has no sweep behind it to retry for it, so a failed call and an
+  // unusable vector mean the same thing here: no vector, take the fallback.
+  const { vectors } = await embedBatch([text], EMBEDDING_QUERY_TASK_TYPE);
+  return vectors[0];
 }
 
 /** True for the error a timed-out or aborted model call rejects with. The SDK
@@ -208,1258 +340,26 @@ const SYSTEM_PROMPT =
 // zod enum below and the DB shape cannot drift. Anything outside it is
 // dropped in sanitizeIntents before finalize.
 
-// Appended to every classification prompt. Describes the catalog and the rules
-// that keep intents genuinely useful (and, for social posts, honest).
-const INTENTS_PROMPT_BLOCK = [
-  "Also propose up to 5 useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:",
-  "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
-  "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
-  "- web_search: search the web. value is the query.",
-  "- open_maps: open a place in maps. value is a place name or address.",
-  "- call: call a phone number. value is the phone number.",
-  "- message: text a phone number. value is the phone number.",
-  "- email: email someone. value is the email address.",
-  "- add_event: add a calendar event. value is the event title.",
-  "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
-].join("\n");
+// Appended to every classification and steering prompt. Describes the catalog
+// and the rules that keep intents genuinely useful (and, for social posts,
+// honest). The cap matches the caller's schema and sanitize limit.
+const intentsPromptBlock = (maxIntents: number): string =>
+  [
+    `Also propose up to ${maxIntents} useful actions ('intents') the user could take on this item. Only include ones that clearly apply — an empty list is fine, and do not pad. Each intent has a kind, a short label (1-3 words, no trailing punctuation), and a value (the payload). Available kinds:`,
+    "- open_url: open a link, or deep-link into a native app (a social post, video, profile, product page). value must be a full https:// URL. For a social post in a screenshot, if you can clearly read the @handle, link to that profile (e.g. https://x.com/HANDLE) — NEVER invent a post/status id you cannot actually see. If the saved item already has a URL pointing at a specific post, use that exact URL.",
+    "- copy: copy a short, specific string to the clipboard (an address, code, wallet/handle, quoted line). Put the exact text in value.",
+    "- web_search: search the web. value is the query.",
+    "- open_maps: open a place in maps. value is a place name or address.",
+    "- call: call a phone number. value is the phone number.",
+    "- message: text a phone number. value is the phone number.",
+    "- email: email someone. value is the email address.",
+    "- add_event: add a calendar event. value is the event title.",
+    "Give each a concrete label like 'Open in X', 'Copy address', 'Call', or 'Add to calendar'.",
+  ].join("\n");
 
 // How much extracted text to feed the classifier. The model only needs enough
 // to understand the piece — it doesn't read the whole thing.
 const MAX_CONTENT_CHARS = 8000;
-// How much of the article body to store & render. Kept well under Convex's
-// 1MB document limit; long-form essays run tens of thousands of chars.
-const MAX_STORED_CONTENT_CHARS = 100000;
-// How much page text the classifier prompt actually carries. Anything longer
-// is cut, so the model never sees the tail.
-const PROMPT_CONTENT_CHARS = 6000;
-
-// ---------------------------------------------------------------------------
-// HTML extraction
-// ---------------------------------------------------------------------------
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&#(\d+);/g, (_, code) => {
-      const n = Number(code);
-      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
-        ? String.fromCodePoint(n)
-        : "";
-    })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
-      const n = parseInt(code, 16);
-      return Number.isFinite(n) && n >= 0 && n <= 0x10ffff
-        ? String.fromCodePoint(n)
-        : "";
-    })
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    .replace(/&hellip;/g, "…")
-    .replace(/&rsquo;/g, "’")
-    .replace(/&lsquo;/g, "‘")
-    .replace(/&rdquo;/g, "”")
-    .replace(/&ldquo;/g, "“");
-}
-
-/** The page's `<link rel="canonical">` href, tolerant of attribute order. */
-function extractCanonical(html: string): string | undefined {
-  const tag = html.match(/<link[^>]*rel\s*=\s*["']canonical["'][^>]*>/i)?.[0];
-  const href = tag?.match(/href\s*=\s*["']([^"']*)["']/i)?.[1]?.trim();
-  return href ? decodeEntities(href) : undefined;
-}
-
-/** Find the content of a meta tag by property/name, tolerant of attribute order. */
-function extractMetaContent(html: string, key: string): string | undefined {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(
-      `<meta[^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*["']([^"']*)["'][^>]*>`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]*content\\s*=\\s*["']([^"']*)["'][^>]*(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
-      "i",
-    ),
-  ];
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match && match[1].trim() !== "") {
-      return decodeEntities(match[1].trim());
-    }
-  }
-  return undefined;
-}
-
-type ImageSize = { width: number; height: number };
-
-function readUint32BE(buf: Uint8Array, offset: number): number {
-  return (
-    (buf[offset] << 24) |
-    (buf[offset + 1] << 16) |
-    (buf[offset + 2] << 8) |
-    buf[offset + 3]
-  );
-}
-
-function readUint16BE(buf: Uint8Array, offset: number): number {
-  return (buf[offset] << 8) | buf[offset + 1];
-}
-
-function readUint16LE(buf: Uint8Array, offset: number): number {
-  return buf[offset] | (buf[offset + 1] << 8);
-}
-
-function hasBytes(
-  buf: Uint8Array,
-  offset: number,
-  signature: number[],
-): boolean {
-  return signature.every((byte, i) => buf[offset + i] === byte);
-}
-
-// PNG — IHDR width/height are big-endian uint32 at offset 16/20.
-function pngSize(buf: Uint8Array): ImageSize | undefined {
-  if (buf.length < 24 || !hasBytes(buf, 0, [0x89, 0x50, 0x4e, 0x47])) {
-    return undefined;
-  }
-  return { width: readUint32BE(buf, 16), height: readUint32BE(buf, 20) };
-}
-
-// GIF — little-endian uint16 at offset 6/8.
-function gifSize(buf: Uint8Array): ImageSize | undefined {
-  if (buf.length < 10 || !hasBytes(buf, 0, [0x47, 0x49, 0x46])) {
-    return undefined;
-  }
-  return { width: readUint16LE(buf, 6), height: readUint16LE(buf, 8) };
-}
-
-// WebP — RIFF container tagged "WEBP", three sub-formats.
-function webpSize(buf: Uint8Array): ImageSize | undefined {
-  if (
-    buf.length < 30 ||
-    !hasBytes(buf, 0, [0x52, 0x49, 0x46, 0x46]) ||
-    !hasBytes(buf, 8, [0x57, 0x45, 0x42, 0x50])
-  ) {
-    return undefined;
-  }
-  const fourCC = String.fromCharCode(buf[12], buf[13], buf[14], buf[15]);
-  if (fourCC === "VP8 ") {
-    return {
-      width: readUint16LE(buf, 26) & 0x3fff,
-      height: readUint16LE(buf, 28) & 0x3fff,
-    };
-  }
-  if (fourCC === "VP8L") {
-    const b0 = buf[21];
-    const b1 = buf[22];
-    const b2 = buf[23];
-    const b3 = buf[24];
-    return {
-      width: 1 + (((b1 & 0x3f) << 8) | b0),
-      height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)),
-    };
-  }
-  if (fourCC === "VP8X") {
-    return {
-      width: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)),
-      height: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)),
-    };
-  }
-  return undefined;
-}
-
-// JPEG — walk segments to the start-of-frame marker.
-function jpegSize(buf: Uint8Array): ImageSize | undefined {
-  if (buf.length < 2 || !hasBytes(buf, 0, [0xff, 0xd8])) {
-    return undefined;
-  }
-  let offset = 2;
-  while (offset + 9 < buf.length) {
-    if (buf[offset] !== 0xff) {
-      offset++;
-      continue;
-    }
-    const marker = buf[offset + 1];
-    const isStartOfFrame =
-      (marker >= 0xc0 && marker <= 0xc3) ||
-      (marker >= 0xc5 && marker <= 0xc7) ||
-      (marker >= 0xc9 && marker <= 0xcb) ||
-      (marker >= 0xcd && marker <= 0xcf);
-    if (isStartOfFrame) {
-      return {
-        height: readUint16BE(buf, offset + 5),
-        width: readUint16BE(buf, offset + 7),
-      };
-    }
-    const segLen = readUint16BE(buf, offset + 2);
-    if (segLen <= 0) {
-      break;
-    }
-    offset += 2 + segLen;
-  }
-  return undefined;
-}
-
-/**
- * Read the pixel dimensions straight from an image file's header bytes.
- * Covers PNG, GIF, WebP (VP8/VP8L/VP8X) and JPEG — no dependencies. Returns
- * undefined for formats we don't recognize or truncated buffers.
- */
-function readImageSize(buf: Uint8Array): ImageSize | undefined {
-  return pngSize(buf) ?? gifSize(buf) ?? webpSize(buf) ?? jpegSize(buf);
-}
-
-/**
- * Fetch just enough of a metadata image to read its real width/height ratio.
- * Best-effort: any policy/transport failure returns no ratio and the caller
- * falls back to a sensible default. Routes through the safe fetcher so the
- * destination is policy-checked and the body is hard-capped at 128 KiB even if
- * the server ignores Range.
- */
-async function fetchImageAspectRatio(
-  imageUrl: string,
-): Promise<number | undefined> {
-  const result = await safeFetch(imageUrl, {
-    timeoutMs: 10000,
-    // Header bytes live at the front; 128 KiB covers large EXIF blocks. The
-    // safe fetcher enforces this cap on actual streamed bytes regardless of
-    // what the server sends, so a Range-ignoring server still cannot exhaust us.
-    maxBytes: 131072,
-    // Allow only the raster types readImageSize parses (PNG/GIF/WebP/JPEG).
-    // SVG is intentionally excluded: it is XML and can carry scripts/XXE, and
-    // readImageSize returns undefined for it anyway. ct is already lowercased
-    // by the safe fetcher.
-    allowContentType: (ct) =>
-      ct === "image/png" ||
-      ct === "image/gif" ||
-      ct === "image/webp" ||
-      ct === "image/jpeg" ||
-      ct.startsWith("image/png;") ||
-      ct.startsWith("image/gif;") ||
-      ct.startsWith("image/webp;") ||
-      ct.startsWith("image/jpeg;"),
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      Range: "bytes=0-131071",
-    },
-  });
-  if (!result.ok) {
-    // A blocked or oversized hero image is best-effort — no aspect ratio.
-    return undefined;
-  }
-  const size = readImageSize(result.bytes);
-  if (size && size.width > 0 && size.height > 0) {
-    return size.width / size.height;
-  }
-  return undefined;
-}
-
-function extractTitle(html: string): string | undefined {
-  const ogTitle = extractMetaContent(html, "og:title");
-  if (ogTitle) {
-    return ogTitle;
-  }
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (match) {
-    const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
-    if (title !== "") {
-      return title;
-    }
-  }
-  return undefined;
-}
-
-function htmlToText(html: string): string {
-  let text = html;
-  // Block-level boundaries become paragraph breaks.
-  text = text.replace(
-    /<\/(p|div|section|h[1-6]|li|blockquote|tr|figcaption|pre)>/gi,
-    "\n\n",
-  );
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<li[^>]*>/gi, "- ");
-  // Drop every remaining tag.
-  text = text.replace(/<[^>]+>/g, " ");
-  text = decodeEntities(text);
-  // Collapse intra-line whitespace, keep paragraph breaks.
-  text = text
-    .split(/\n{2,}/)
-    .map((para) =>
-      para
-        .replace(/[ \t]+/g, " ")
-        .replace(/\n/g, " ")
-        .trim(),
-    )
-    .filter((para) => para !== "")
-    .join("\n\n");
-  return text.slice(0, MAX_STORED_CONTENT_CHARS);
-}
-
-/**
- * Extract the readable article body. Mozilla Readability (the engine behind
- * Firefox Reader View) scores DOM blocks by text density and link ratio to
- * isolate the real article, discarding nav, ads, share widgets, comment
- * counts, captions, and other boilerplate — so it works across arbitrary
- * article pages rather than one site's markup. We feed its cleaned article
- * HTML through htmlToText to get the paragraph-separated plain text the client
- * renders. Pages without a readable article do not store a body.
- */
-// Shortest extraction worth calling an article body. Under this a bot-hostile
-// or JS-rendered page has yielded only chrome, and the classifier writing a
-// description of that chrome is worse than it knowing there was no body: it
-// still has the title, the site and the page's own meta description. The
-// shortest text the tests deliberately keep is a little under 200 characters.
-const MIN_ARTICLE_CHARS = 120;
-
-export function extractBodyText(html: string, url: string): string | undefined {
-  try {
-    const { document } = parseHTML(html);
-    // Remove explicit page chrome before parsing: the readerability preflight
-    // rejects short articles, while parse() can retain chrome on sparse pages.
-    for (const element of document.querySelectorAll(
-      'nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"], .cookie-banner, #cookie-banner, .cookie-consent, #cookie-consent, .skip-link, .skip-to-content, .skip-nav, .screen-reader-shortcut',
-    )) {
-      element.remove();
-    }
-    // A skip link is an in-page anchor, so it sits outside nav and banner and
-    // reads to Readability as ordinary body text.
-    for (const anchor of document.querySelectorAll('a[href^="#"]')) {
-      if (/^\s*skip\b/i.test(anchor.textContent ?? "")) {
-        anchor.remove();
-      }
-    }
-    for (const menu of document.querySelectorAll(".menu")) {
-      const links = Array.from(menu.querySelectorAll("a"));
-      const linkText = links
-        .map((link) => link.textContent ?? "")
-        .join("")
-        .replace(/\s/g, "");
-      const menuText = (menu.textContent ?? "").replace(/\s/g, "");
-      if (links.length > 0 && menuText === linkText) {
-        menu.remove();
-      }
-    }
-    // Give Readability a base URL so it can resolve/keep links correctly.
-    try {
-      const base = document.createElement("base");
-      base.setAttribute("href", url);
-      document.head?.appendChild(base);
-    } catch {
-      // Non-fatal — Readability still parses without a <base>.
-    }
-    const article = new Readability(document).parse();
-    if (article?.content) {
-      const text = htmlToText(article.content);
-      if (text.trim().length >= MIN_ARTICLE_CHARS) {
-        return text;
-      }
-    }
-  } catch {
-    // Malformed pages without a readable body remain bare links.
-  }
-  return undefined;
-}
-
-type PageData = {
-  title?: string;
-  description?: string;
-  heroImageUrl?: string;
-  heroAspectRatio?: number;
-  siteName?: string;
-  author?: string;
-  content?: string;
-  /** A best-effort part of the read failed transiently (e.g. the Instagram
-   * caption), so a retry can still add content. Internal only. */
-  incomplete?: true;
-  /** The source served a cut copy of its own text, so `content` ends early no
-   * matter how short it is. X does this for a long post (`note_tweet`) and for
-   * an Article preview. Internal only. */
-  truncated?: true;
-  media?: PostMedia[];
-  articleMedia?: ArticleMedia[];
-  /** The recipe the page declares in schema.org markup (or, for a caption
-   * source, the recipe page its caption links to). Already sanitized. */
-  recipe?: Recipe;
-  /** The caption's first outside link, when the reader saw the real href
-   * rather than the display text. Readers that don't set it fall back to
-   * scanning the caption in `withLinkedRecipe`. */
-  linkedUrl?: string;
-};
-
-/** Hosts whose pages are link hubs or the social network itself — never the
- * recipe write-up — so a caption pointing there is not worth a fetch. */
-const LINK_HUB_HOSTS = new Set([
-  "linktr.ee",
-  "linkin.bio",
-  "beacons.ai",
-  "bio.link",
-  "lnk.bio",
-  "tiktok.com",
-  "instagram.com",
-  "x.com",
-  "twitter.com",
-  "youtube.com",
-  "youtu.be",
-]);
-
-/** First http(s) URL in a caption worth following for a recipe, with trailing
- * punctuation trimmed and link hubs skipped. Exported pure for unit testing. */
-export function firstLinkedUrl(text: string | undefined): string | undefined {
-  if (!text) {
-    return undefined;
-  }
-  for (const match of text.matchAll(/https?:\/\/[^\s<>"'()]+/gi)) {
-    const candidate = match[0].replace(/[.,;:!?]+$/, "");
-    try {
-      const host = new URL(candidate).hostname.replace(/^www\./, "");
-      if (!LINK_HUB_HOSTS.has(host)) {
-        return candidate;
-      }
-    } catch {
-      // Not a URL after all; keep scanning.
-    }
-  }
-  return undefined;
-}
-
-const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-
-/**
- * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
- * the caption, creator, and a 9:16 poster — everything the card needs. TikTok
- * also returns 400 for unsupported URL shapes, so only true 404/410 responses
- * are treated as permanently gone by the shared page reader.
- */
-async function fetchTikTokOEmbed(url: string): Promise<PageData> {
-  const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-  const result = await safeFetch(endpoint, {
-    timeoutMs: 15000,
-    maxBytes: 64 * 1024,
-    allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
-  });
-  if (!result.ok) {
-    throw new PageFetchError(result.code, result.status);
-  }
-  const data = parseJson(result.bytes) as Record<string, unknown>;
-  const str = (key: string) => {
-    const value = data[key];
-    return typeof value === "string" && value !== "" ? value : undefined;
-  };
-  const width = Number(data.thumbnail_width);
-  const height = Number(data.thumbnail_height);
-  const handle = str("author_unique_id");
-  const caption = str("title");
-  return {
-    title: caption,
-    siteName: "TikTok",
-    author: handle ? `@${handle}` : str("author_name"),
-    heroImageUrl: str("thumbnail_url"),
-    heroAspectRatio: width > 0 && height > 0 ? width / height : 9 / 16,
-    content: caption,
-  };
-}
-
-/**
- * X serves posts behind JS rendering and a login wall, but its public oEmbed
- * endpoint answers with the post markup and author. The markup is
- * `<blockquote><p>post text</p>&mdash; Author (@handle) <a>date</a></blockquote>`,
- * so only the first paragraph becomes content; the attribution stays out. A
- * body that is not a JSON object is unreadable, like a page that fails to
- * parse, so the item keeps its URL-only fallback instead of crashing.
- */
-export async function fetchXoEmbed(url: string): Promise<PageData> {
-  const endpoint = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
-  const result = await safeFetch(endpoint, {
-    timeoutMs: 15000,
-    maxBytes: 64 * 1024,
-    allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
-  });
-  if (!result.ok) {
-    throw new PageFetchError(result.code, result.status);
-  }
-  let parsed: unknown;
-  try {
-    parsed = parseJson(result.bytes);
-  } catch {
-    throw new PageFetchError("http_error", result.status);
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new PageFetchError("http_error", result.status);
-  }
-  const data = parsed as Record<string, unknown>;
-  const str = (key: string) => {
-    const value = data[key];
-    return typeof value === "string" && value !== "" ? value : undefined;
-  };
-  const html = str("html") ?? "";
-  const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-  const body = paragraph ? paragraph[1] : html;
-  const content = decodeEntities(
-    body
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim(),
-  );
-  // Post links are t.co redirects whose anchor text is the display URL;
-  // attached media links display as pic.twitter.com and lead nowhere useful.
-  const hrefs = Array.from(
-    body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi),
-  )
-    .filter(([, , label]) => !/^\s*pic\.(twitter|x)\.com/i.test(label))
-    .map(([, href]) => decodeEntities(href));
-  // author_url carries the handle; author_name is the display name.
-  const handle = str("author_url")?.match(
-    /(?:twitter\.com|x\.com)\/([^/?#]+)/i,
-  )?.[1];
-  return {
-    title: content.slice(0, 100) || undefined,
-    siteName: "X",
-    author: handle ? `@${handle}` : str("author_name"),
-    content: content || undefined,
-    linkedUrl: firstLinkedUrl(hrefs.join(" ")),
-  };
-}
-
-const xDimensions = {
-  width: z.number().positive(),
-  height: z.number().positive(),
-};
-
-const xSyndicationSchema = z.object({
-  text: z.string().optional(),
-  user: z.object({ screen_name: z.string() }).optional(),
-  possibly_sensitive: z.boolean().optional(),
-  entities: z
-    .object({
-      urls: z
-        .array(z.object({ url: z.string(), expanded_url: z.string() }))
-        .optional(),
-      media: z.array(z.object({ url: z.string() })).optional(),
-    })
-    .optional(),
-  mediaDetails: z
-    .array(
-      z.object({
-        type: z.string(),
-        media_url_https: z.url(),
-        original_info: z.object(xDimensions),
-      }),
-    )
-    .optional(),
-  // Present when `text` is the first 280 characters of a longer post.
-  note_tweet: z.object({}).optional(),
-  article: z
-    .object({
-      title: z.string(),
-      preview_text: z.string().optional(),
-      cover_media: z
-        .object({
-          media_info: z.object({
-            original_img_url: z.url(),
-            original_img_width: xDimensions.width,
-            original_img_height: xDimensions.height,
-          }),
-        })
-        .optional(),
-    })
-    .optional(),
-});
-
-const X_MEDIA_KINDS: Partial<Record<string, PostMedia["kind"]>> = {
-  photo: "photo",
-  video: "video",
-  animated_gif: "gif",
-};
-
-/** pbs.twimg.com serves a small rendition by default (600 px for older
- * posts); `name=large` is the largest one, capped at 2048 px. */
-function xLargeImage(url: string): string {
-  const parsed = new URL(url);
-  parsed.searchParams.set("name", "large");
-  return parsed.toString();
-}
-
-/** A post's display text: X escapes `&`, `<`, and `>`, shortens links to
- * t.co, and appends a t.co link for its attached media. */
-function xPostText(
-  post: z.infer<typeof xSyndicationSchema>,
-): string | undefined {
-  let text = decodeEntities(post.text ?? "");
-  for (const link of post.entities?.urls ?? []) {
-    text = text.replaceAll(link.url, link.expanded_url);
-  }
-  for (const attachment of post.entities?.media ?? []) {
-    text = text.replaceAll(attachment.url, "");
-  }
-  text = text.trim();
-  if (text === "") {
-    return undefined;
-  }
-  return post.note_tweet ? `${text}…` : text;
-}
-
-type XSyndicationRead = {
-  page: PageData;
-  isArticle: boolean;
-  sensitive: boolean;
-};
-
-function parseXSyndication(body: unknown): XSyndicationRead | undefined {
-  const parsed = xSyndicationSchema.safeParse(body);
-  if (!parsed.success) {
-    return undefined;
-  }
-  const post = parsed.data;
-  const author = post.user ? `@${post.user.screen_name}` : undefined;
-  // X hides sensitive media behind a warning; the feed and widget have none.
-  const cover = post.possibly_sensitive
-    ? undefined
-    : post.article?.cover_media?.media_info;
-  if (post.article) {
-    // Syndication cuts the preview mid-sentence; X's web app loads the rest
-    // from its private API.
-    const preview = post.article.preview_text?.trim();
-    return {
-      isArticle: true,
-      sensitive: post.possibly_sensitive === true,
-      page: {
-        title: post.article.title,
-        siteName: "X",
-        author,
-        content: preview ? `${preview}…` : undefined,
-        // The preview is a cut copy; withXArticleBody swaps in the whole body
-        // when X's private API answers.
-        ...(preview ? { truncated: true as const } : {}),
-        heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
-        heroAspectRatio: cover
-          ? cover.original_img_width / cover.original_img_height
-          : undefined,
-      },
-    };
-  }
-  const content = xPostText(post);
-  const attachments = post.possibly_sensitive ? [] : (post.mediaDetails ?? []);
-  const media = attachments.flatMap((attachment) => {
-    const kind = X_MEDIA_KINDS[attachment.type];
-    return kind
-      ? [
-          {
-            kind,
-            imageUrl: xLargeImage(attachment.media_url_https),
-            aspectRatio:
-              attachment.original_info.width / attachment.original_info.height,
-          },
-        ]
-      : [];
-  });
-  if (content === undefined && media.length === 0) {
-    return undefined;
-  }
-  return {
-    isArticle: false,
-    sensitive: post.possibly_sensitive === true,
-    page: {
-      title: content ? Array.from(content).slice(0, 100).join("") : undefined,
-      siteName: "X",
-      author,
-      content,
-      ...(post.note_tweet ? { truncated: true as const } : {}),
-      ...(media.length > 0
-        ? {
-            heroImageUrl: media[0].imageUrl,
-            heroAspectRatio: media[0].aspectRatio,
-            media,
-          }
-        : {}),
-    },
-  };
-}
-
-// fxtwitter mirrors the Draft.js blocks X's web app renders an Article from.
-// Entity offsets count code points, not UTF-16 units.
-const fxArticleSchema = z.object({
-  status: z.object({
-    id: z.string(),
-    article: z.object({
-      content: z.object({
-        blocks: z.array(
-          z.object({
-            type: z.string(),
-            text: z.string(),
-            entityRanges: z
-              .array(
-                z.object({
-                  key: z.coerce.string(),
-                  offset: z.number().int().nonnegative(),
-                  length: z.number().int().positive(),
-                }),
-              )
-              .default([]),
-          }),
-        ),
-        entityMap: z.array(
-          z.object({
-            key: z.string(),
-            value: z.object({
-              type: z.string(),
-              data: z.object({
-                url: z.string().optional(),
-                // Parsed in blockMedia, so an odd shape skips the image
-                // rather than the whole body.
-                mediaItems: z.unknown().optional(),
-              }),
-            }),
-          }),
-        ),
-      }),
-      // Parsed one entry at a time (see articleMediaById), so a media type
-      // this schema does not know cannot cost the whole body.
-      media_entities: z.array(z.unknown()).default([]),
-    }),
-  }),
-});
-
-const fxMediaItemsSchema = z.array(
-  z.object({ mediaId: z.union([z.string(), z.number()]).transform(String) }),
-);
-
-const fxImageInfo = z.object({
-  original_img_url: z.url(),
-  original_img_width: xDimensions.width,
-  original_img_height: xDimensions.height,
-});
-
-const fxMediaEntitySchema = z.object({
-  media_id: z.coerce.string(),
-  media_info: z.discriminatedUnion("__typename", [
-    fxImageInfo.extend({ __typename: z.literal("ApiImage") }),
-    z.object({
-      __typename: z.enum(["ApiVideo", "ApiGif"]),
-      preview_image: fxImageInfo,
-    }),
-  ]),
-});
-
-type FxArticle = z.infer<typeof fxArticleSchema>["status"]["article"];
-type FxArticleContent = FxArticle["content"];
-
-const FXTWITTER_USER_AGENT = "Shelvr/1.0 (+https://shelvr.app)";
-
-/** An external link's URL, for the reader to see where "HERE" goes. Links to
- * X itself (mentions, cashtags, subscribe buttons) read fine as their text. */
-function externalLinkUrl(url: string | undefined): string | undefined {
-  if (url === undefined) {
-    return undefined;
-  }
-  try {
-    const parsed = new URL(url);
-    const web = parsed.protocol === "https:" || parsed.protocol === "http:";
-    return web && !isXHost(parsed.hostname) ? parsed.href : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function articleBlockText(
-  block: FxArticleContent["blocks"][number],
-  links: Map<string, string>,
-): string {
-  const chars = Array.from(block.text);
-  const ranges = [...block.entityRanges].sort((a, b) => b.offset - a.offset);
-  for (const range of ranges) {
-    const url = links.get(range.key);
-    const end = range.offset + range.length;
-    if (url === undefined || end > chars.length) {
-      continue;
-    }
-    const anchor = chars.slice(range.offset, end).join("");
-    if (!anchor.includes(url)) {
-      chars.splice(end, 0, ` (${url})`);
-    }
-  }
-  return chars
-    .join("")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
-}
-
-/** Where to show an Article's images and videos, keyed by media id. */
-function articleMediaById(
-  entities: unknown[],
-): Map<string, Omit<ArticleMedia, "paragraph">> {
-  const byId = new Map<string, Omit<ArticleMedia, "paragraph">>();
-  for (const entity of entities) {
-    const parsed = fxMediaEntitySchema.safeParse(entity);
-    if (!parsed.success) {
-      continue;
-    }
-    const info = parsed.data.media_info;
-    const image = info.__typename === "ApiImage" ? info : info.preview_image;
-    byId.set(parsed.data.media_id, {
-      kind:
-        info.__typename === "ApiImage"
-          ? "photo"
-          : info.__typename === "ApiVideo"
-            ? "video"
-            : "gif",
-      imageUrl: xLargeImage(image.original_img_url),
-      aspectRatio: image.original_img_width / image.original_img_height,
-    });
-  }
-  return byId;
-}
-
-/** The readable media an atomic block points at. */
-function blockMedia(
-  block: FxArticleContent["blocks"][number],
-  content: FxArticleContent,
-  mediaById: Map<string, Omit<ArticleMedia, "paragraph">>,
-): Omit<ArticleMedia, "paragraph">[] {
-  return block.entityRanges.flatMap((range) => {
-    const entity = content.entityMap.find((e) => e.key === range.key);
-    const items = fxMediaItemsSchema.safeParse(entity?.value.data.mediaItems);
-    return (items.success ? items.data : []).flatMap((item) => {
-      const found = mediaById.get(item.mediaId);
-      return found ? [found] : [];
-    });
-  });
-}
-
-const MAX_ARTICLE_MEDIA = 50;
-
-type ArticleBody = { text: string; media: ArticleMedia[] };
-
-/** The plain-text body the reader view renders, one paragraph per text
- * block, and the images and videos that sit between those paragraphs.
- * Embedded posts and dividers are atomic blocks the reader cannot show, so
- * they are left out rather than marked. */
-function articleBody(article: FxArticle): ArticleBody | undefined {
-  const { content } = article;
-  const mediaById = articleMediaById(article.media_entities);
-  const links = new Map<string, string>();
-  for (const entity of content.entityMap) {
-    const url =
-      entity.value.type === "LINK"
-        ? externalLinkUrl(entity.value.data.url)
-        : undefined;
-    if (url !== undefined) {
-      links.set(entity.key, url);
-    }
-  }
-  const paragraphs: string[] = [];
-  const media: ArticleMedia[] = [];
-  let listNumber = 0;
-  for (const block of content.blocks) {
-    if (block.type === "atomic") {
-      for (const found of blockMedia(block, content, mediaById)) {
-        media.push({ ...found, paragraph: paragraphs.length });
-      }
-    }
-    const text = block.type === "atomic" ? "" : articleBlockText(block, links);
-    if (text === "") {
-      continue;
-    }
-    listNumber = block.type === "ordered-list-item" ? listNumber + 1 : 0;
-    paragraphs.push(
-      block.type === "unordered-list-item"
-        ? `- ${text}`
-        : block.type === "ordered-list-item"
-          ? `${listNumber}. ${text}`
-          : text,
-    );
-  }
-  const joined = paragraphs.join("\n\n");
-  const text = joined.slice(0, MAX_STORED_CONTENT_CHARS);
-  if (text === "") {
-    return undefined;
-  }
-  // A cut body loses its last paragraphs, and the media after them.
-  const kept =
-    text.length === joined.length
-      ? paragraphs.length
-      : text.split("\n\n").length - 1;
-  return {
-    text,
-    media: media.filter((m) => m.paragraph <= kept).slice(0, MAX_ARTICLE_MEDIA),
-  };
-}
-
-type ArticleBodyRead =
-  | { ok: true; body: ArticleBody }
-  | { ok: false; category: string };
-
-async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
-  const result = await safeFetch(`https://api.fxtwitter.com/2/status/${id}`, {
-    timeoutMs: 5000,
-    maxBytes: 2 * 1024 * 1024,
-    maxRedirects: 0,
-    allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": FXTWITTER_USER_AGENT, Accept: "application/json" },
-  });
-  if (!result.ok) {
-    return {
-      ok: false,
-      category:
-        result.status === undefined
-          ? `fetch:${result.code}`
-          : `fetch:${result.code}:${result.status}`,
-    };
-  }
-  let json: unknown;
-  try {
-    json = parseJson(result.bytes);
-  } catch {
-    return { ok: false, category: "unreadable_json" };
-  }
-  const parsed = fxArticleSchema.safeParse(json);
-  if (!parsed.success) {
-    return { ok: false, category: "schema_mismatch" };
-  }
-  if (parsed.data.status.id !== id) {
-    return { ok: false, category: "id_mismatch" };
-  }
-  const body = articleBody(parsed.data.status.article);
-  return body === undefined
-    ? { ok: false, category: "empty_body" }
-    : { ok: true, body };
-}
-
-/** fxtwitter is an unofficial mirror of X's private web API, so the full body
- * is a bonus: any failure keeps the syndication preview. */
-async function withXArticleBody(
-  id: string,
-  page: PageData,
-  sensitive: boolean,
-): Promise<PageData> {
-  const read = await readXArticleBody(id);
-  if (read.ok) {
-    // Sensitive media stays hidden, as for posts. An Article that opens
-    // with its cover would show it twice.
-    const media = sensitive
-      ? []
-      : read.body.media.filter(
-          (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
-        );
-    // The whole body replaces the cut preview, so the read is no longer short
-    // of its source.
-    const { truncated: _preview, ...whole } = page;
-    return {
-      ...whole,
-      content: read.body.text,
-      ...(media.length > 0 ? { articleMedia: media } : {}),
-    };
-  }
-  logEvent("warn", "x_article_body_fallback", {
-    error_category: read.category,
-  });
-  return page;
-}
-
-/** react-tweet's token for the syndication endpoint, derived from the id. */
-function xSyndicationToken(id: string): string {
-  return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
-}
-
-/** X's public syndication endpoint (the one embedded posts render from)
- * carries Article titles and covers and the post's media, which oEmbed does
- * not. */
-export async function fetchXPost(url: string): Promise<PageData> {
-  const id = xStatusId(url);
-  if (id === undefined) {
-    return await fetchXoEmbed(url);
-  }
-  const result = await safeFetch(
-    `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${xSyndicationToken(id)}`,
-    {
-      timeoutMs: 10000,
-      maxBytes: 256 * 1024,
-      allowContentType: (ct) => ct.startsWith("application/json"),
-      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
-    },
-  );
-  let read: XSyndicationRead | undefined;
-  if (result.ok) {
-    try {
-      read = parseXSyndication(parseJson(result.bytes));
-    } catch {
-      read = undefined;
-    }
-  }
-  if (read) {
-    return read.isArticle
-      ? await withXArticleBody(id, read.page, read.sensitive)
-      : read.page;
-  }
-  logEvent("warn", "x_syndication_fallback", {
-    error_category: result.ok
-      ? "unreadable_post"
-      : `page_fetch_error:${result.code}`,
-  });
-  return await fetchXoEmbed(url);
-}
-
-/**
- * Instagram serves browsers a login shell with no metadata, but answers a link
- * preview crawler with `twitter:title` ("Name (@handle) • Instagram reel") and
- * a square-cropped `og:image`. Its captioned embed adds the caption and the
- * uncropped poster. Parsed apart from the fetch so it is testable.
- */
-export function parseInstagramEmbed(html: string): {
-  caption?: string;
-  username?: string;
-  posterUrl?: string;
-} {
-  const block = html.match(
-    /<div class="Caption">([\s\S]*?)<div class="CaptionComments">/i,
-  )?.[1];
-  const username = block
-    ?.match(/<a[^>]*class="CaptionUsername"[^>]*>([^<]*)<\/a>/i)?.[1]
-    ?.trim();
-  const caption = block
-    ? decodeEntities(
-        block
-          .replace(/<a[^>]*class="CaptionUsername"[^>]*>[^<]*<\/a>/i, "")
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<[^>]+>/g, ""),
-      )
-        .split("\n")
-        .map((line) => line.replace(/[ \t]+/g, " ").trim())
-        .join("\n")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim()
-    : undefined;
-  const img = html.match(/<img[^>]*class="EmbeddedMediaImage"[^>]*>/i)?.[0];
-  const src = img?.match(/\ssrc="([^"]+)"/i)?.[1];
-  return {
-    caption: caption || undefined,
-    username: username ? decodeEntities(username) : undefined,
-    posterUrl: src ? decodeEntities(src) : undefined,
-  };
-}
-
-const LINK_PREVIEW_USER_AGENT = "facebookexternalhit/1.1";
-
-async function fetchInstagramHtml(url: string) {
-  return await safeFetch(url, {
-    timeoutMs: 15000,
-    maxBytes: 1024 * 1024,
-    onOverflow: "truncate",
-    allowContentType: (ct) => ct.startsWith("text/html"),
-    headers: {
-      "User-Agent": LINK_PREVIEW_USER_AGENT,
-      Accept: "text/html",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
-}
-
-type InstagramEmbed =
-  | { status: "ok"; html: string; truncated?: true }
-  | { status: "missing" }
-  | { status: "transient"; errorCategory: string };
-
-/** True for a fetch failure a later retry may not repeat: a timeout, a network
- * error, rate limiting, or a server error. */
-function isTransientFetchFailure(code: SafeFetchError, status?: number) {
-  return (
-    code === "timeout" ||
-    code === "fetch_failed" ||
-    (code === "http_error" &&
-      status !== undefined &&
-      (status === 429 || status >= 500))
-  );
-}
-
-async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
-  let result: Awaited<ReturnType<typeof fetchInstagramHtml>>;
-  try {
-    result = await fetchInstagramHtml(url);
-  } catch (error) {
-    return { status: "transient", errorCategory: summarizeError(error) };
-  }
-  if (result.ok) {
-    return {
-      status: "ok",
-      html: decodeWithContentType(result.bytes, result.contentType),
-      ...(result.truncated ? { truncated: true as const } : {}),
-    };
-  }
-  return isTransientFetchFailure(result.code, result.status)
-    ? { status: "transient", errorCategory: `page_fetch_error:${result.code}` }
-    : { status: "missing" };
-}
-
-/**
- * Read an Instagram post or reel. The page fetch decides gone/unreadable like
- * any link; the embed is best-effort. Shell markup is never article content:
- * the only content is the caption. When Instagram shares nothing, the result
- * is a bare "Instagram" page and the item still classifies from its URL. A
- * transiently failed embed marks the read incomplete so the save can retry.
- */
-export async function fetchInstagram(url: string): Promise<PageData> {
-  const linked = instagramMedia(url);
-  const embedFor = (media: { kind: string; shortcode?: string } | undefined) =>
-    media?.shortcode
-      ? fetchInstagramEmbed(
-          `https://www.instagram.com/${media.kind}/${media.shortcode}/embed/captioned/`,
-        )
-      : Promise.resolve<InstagramEmbed>({ status: "missing" });
-  // A direct link names its shortcode, so the embed is read alongside the
-  // page. A share link only names it after the page fetch follows the
-  // redirect, so its embed waits for the page.
-  const [page, directEmbed] = await Promise.all([
-    fetchInstagramHtml(url),
-    linked?.shortcode ? embedFor(linked) : Promise.resolve(undefined),
-  ]);
-  if (!page.ok) {
-    throw new PageFetchError(page.code, page.status);
-  }
-  const html = decodeWithContentType(page.bytes, page.contentType);
-  const media = linked?.shortcode
-    ? linked
-    : ([
-        page.finalUrl,
-        extractMetaContent(html, "og:url"),
-        extractCanonical(html),
-      ]
-        .map((candidate) => instagramMedia(candidate, page.finalUrl))
-        .find((candidate) => candidate?.shortcode) ?? linked);
-  const embed = directEmbed ?? (await embedFor(media));
-  if (embed.status === "transient") {
-    logEvent("warn", "instagram_caption_fetch_failed", {
-      error_category: embed.errorCategory,
-    });
-  }
-  const embedded = embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
-  const cardTitle =
-    extractMetaContent(html, "twitter:title") ??
-    extractMetaContent(html, "og:title");
-  const handle =
-    embedded.username ?? cardTitle?.match(/\(@([A-Za-z0-9._]+)\)/)?.[1];
-  const heroImageUrl =
-    embedded.posterUrl ??
-    extractMetaContent(html, "og:image") ??
-    extractMetaContent(html, "twitter:image");
-  const caption = embedded.caption?.slice(0, MAX_STORED_CONTENT_CHARS);
-  const heroAspectRatio = heroImageUrl
-    ? ((await fetchImageAspectRatio(heroImageUrl)) ??
-      (media?.kind === "p" ? 1 : 9 / 16))
-    : undefined;
-  return {
-    title:
-      Array.from(caption?.split("\n")[0] ?? "")
-        .slice(0, 100)
-        .join("") || cardTitle,
-    // With a caption the card names the creator; without one the card is
-    // already the title, so the page's own description is the only new text.
-    description: caption
-      ? cardTitle
-      : extractMetaContent(html, "og:description"),
-    siteName: "Instagram",
-    author: handle ? `@${handle}` : undefined,
-    heroImageUrl,
-    heroAspectRatio,
-    content: caption,
-    ...(page.truncated || (embed.status === "ok" && embed.truncated)
-      ? { truncated: true as const }
-      : {}),
-    ...(embed.status === "transient" ? { incomplete: true as const } : {}),
-  };
-}
-
-/**
- * Copy a poster into Convex storage. TikTok and Instagram poster URLs are
- * signed and expire, so the card would go blank without this. Best-effort:
- * a blocked or oversized image leaves the (short-lived) URL as the fallback.
- */
-export async function storePoster(
-  ctx: { storage: { store: (blob: Blob) => Promise<Id<"_storage">> } },
-  imageUrl: string,
-): Promise<Id<"_storage"> | undefined> {
-  const result = await safeFetch(imageUrl, {
-    timeoutMs: 10000,
-    maxBytes: 3 * 1024 * 1024,
-    allowContentType: (ct) =>
-      ct.startsWith("image/jpeg") ||
-      ct.startsWith("image/png") ||
-      ct.startsWith("image/webp"),
-    headers: { "User-Agent": BROWSER_USER_AGENT },
-  });
-  if (!result.ok) {
-    return undefined;
-  }
-  try {
-    return await ctx.storage.store(
-      new Blob([new Uint8Array(result.bytes)], {
-        type: result.contentType.split(";")[0],
-      }),
-    );
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Thrown when the page could not be read through the safe-fetch policy: the
- * resource may be blocked by policy, refused, or simply gone. Carries only a
- * stable code (never the URL, addresses, or response body) so callers can log
- * a sanitized category. A failed primary page fetch is a CORE processing
- * problem, unlike a blocked best-effort hero image.
- */
-class PageFetchError extends Error {
-  constructor(
-    public readonly code: SafeFetchError,
-    /** HTTP status when `code` is `http_error`. Feeds `pageGone`. */
-    public readonly status?: number,
-  ) {
-    super(`page fetch failed: ${code}`);
-    this.name = "PageFetchError";
-  }
-}
-
-function isPageFetchError(e: unknown): e is PageFetchError {
-  return e instanceof PageFetchError;
-}
-
-/** True when the page will never be readable: the resource is gone (404/410).
- * Such an item must NOT be classified from its URL alone — the model would
- * invent content from the slug. Exported pure for unit testing. */
-export function pageGone(status: number | undefined): boolean {
-  return status === 404 || status === 410;
-}
-
-/**
- * Pure decision for the enrichment flag a finalized item earns from one
- * pipeline run, taken straight from the page-read outcome: "partial" when the
- * page could not be read at all (retryable — the classifier worked from the
- * URL alone), "no_article" when the page read fine but yielded no extractable
- * article body (the URL itself is the save; a retry cannot change the
- * outcome), undefined when fully enriched. A missing read (images/notes never
- * fetch a page) is fully enriched; "gone" never reaches finalize — a gone
- * page fails the item instead. Exported pure for unit testing.
- */
-export function linkEnrichment(
-  read: LinkRead | undefined,
-): "partial" | "no_article" | undefined {
-  if (read === undefined) {
-    return undefined;
-  }
-  if (read.status === "unreadable" || read.page.incomplete) {
-    return "partial";
-  }
-  return read.page.content || read.page.media?.length
-    ? undefined
-    : "no_article";
-}
 
 /**
  * Reduce a caught error to a safe log category. Fetch-policy errors expose only
@@ -1469,221 +369,13 @@ export function linkEnrichment(
  */
 function summarizeError(error: unknown): string {
   if (error instanceof StoredImageError) return `stored_image:${error.code}`;
-  if (isPageFetchError(error)) {
-    return `page_fetch_error:${error.code}`;
-  }
   // A model call that hit its AbortSignal.timeout deadline. Its own stable
   // category so provider slowness is visible in telemetry separately from
   // genuine bugs, and so callers can treat it as retryable.
   if (isModelTimeout(error)) {
     return "model_timeout";
   }
-  // Defensive: safeFetch returns error codes in its result type and never
-  // throws SafeFetchErrorClass itself, but if a future caller uses the
-  // throwing variant directly this branch ensures the error is summarized.
-  if (isSafeFetchError(error)) {
-    return `safe_fetch:${error.code}`;
-  }
-  // Include the constructor name so genuine bugs are diagnosable in logs; the
-  // name (TypeError, RangeError, ...) carries no user/request data.
-  if (error !== null && typeof error === "object" && "name" in error) {
-    return `unexpected_error:${String(error.name)}`;
-  }
-  return "unexpected_error";
-}
-
-/** Fetch policy for an HTML page read: the saved link itself, or the recipe
- * page a caption links to. */
-const PAGE_FETCH_OPTIONS = {
-  timeoutMs: 15000,
-  // Hard cap on the streamed page body. Generous for real articles; bounded
-  // to deny a malicious/buggy server from exhausting memory. Truncate instead
-  // of failing — a large page's first 1 MiB is still enough for extraction.
-  maxBytes: 1024 * 1024,
-  onOverflow: "truncate",
-  allowContentType: (ct: string) =>
-    ct.startsWith("text/html") ||
-    ct.startsWith("application/xhtml+xml") ||
-    ct.startsWith("application/xml"),
-  headers: {
-    "User-Agent": BROWSER_USER_AGENT,
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-  },
-} as const;
-
-/**
- * The recipe a page declares in its own schema.org markup, or undefined when
- * it declares none.
- *
- * A read cut off at `maxBytes` yields nothing, because a cut document still
- * parses. Microdata's ingredient and step lists simply stop early, and a recipe
- * whose method stops after step 1 reads exactly like a recipe with one step —
- * `sanitizeRecipe` checks that the lists are non-empty and within budget, which
- * a prefix satisfies. JSON-LD survives a cut only by accident, since
- * `JSON.parse` rejects a half-written object, so the guard belongs here where
- * both markup shapes pass through rather than inside the extractor.
- */
-function recipeFromMarkup(
-  html: string,
-  truncated: true | undefined,
-): Recipe | undefined {
-  return truncated ? undefined : sanitizeRecipe(extractRecipeMarkup(html));
-}
-
-/**
- * A caption source (TikTok, X) carries only a caption, and the caption often
- * links to the full recipe write-up. Follow that one link and read its
- * structured recipe markup. Best-effort: a blocked, slow, or markup-less page
- * leaves the post exactly as it was.
- */
-async function withLinkedRecipe(page: PageData): Promise<PageData> {
-  const caption = captionText(page);
-  if (caption === undefined) {
-    return page;
-  }
-  const linkedUrl = page.linkedUrl ?? firstLinkedUrl(caption);
-  if (linkedUrl === undefined) {
-    return page;
-  }
-  try {
-    const result = await safeFetch(linkedUrl, PAGE_FETCH_OPTIONS);
-    if (!result.ok) {
-      return page;
-    }
-    const recipe = recipeFromMarkup(
-      decodeWithContentType(result.bytes, result.contentType),
-      result.truncated,
-    );
-    return recipe === undefined ? page : { ...page, recipe };
-  } catch {
-    return page;
-  }
-}
-
-async function fetchPage(url: string): Promise<PageData> {
-  const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
-  if (!result.ok) {
-    // Surface only the policy code (+ status for http_error); readPage decides
-    // whether the item can still be saved.
-    throw new PageFetchError(result.code, result.status);
-  }
-  const finalUrl = result.finalUrl;
-  const html = decodeWithContentType(result.bytes, result.contentType);
-
-  const title = extractTitle(html);
-  const description =
-    extractMetaContent(html, "og:description") ??
-    extractMetaContent(html, "description");
-
-  let heroImageUrl =
-    extractMetaContent(html, "og:image") ??
-    extractMetaContent(html, "og:image:url") ??
-    extractMetaContent(html, "twitter:image");
-  if (heroImageUrl) {
-    try {
-      heroImageUrl = new URL(heroImageUrl, finalUrl).toString();
-    } catch {
-      heroImageUrl = undefined;
-    }
-  }
-
-  // Match the preview to the OG image's real shape. Prefer the dimensions the
-  // page declares; if absent, read them from the image file itself.
-  let heroAspectRatio: number | undefined;
-  if (heroImageUrl) {
-    const ogWidth = Number(extractMetaContent(html, "og:image:width"));
-    const ogHeight = Number(extractMetaContent(html, "og:image:height"));
-    if (
-      Number.isFinite(ogWidth) &&
-      Number.isFinite(ogHeight) &&
-      ogWidth > 0 &&
-      ogHeight > 0
-    ) {
-      heroAspectRatio = ogWidth / ogHeight;
-    } else {
-      heroAspectRatio = await fetchImageAspectRatio(heroImageUrl);
-    }
-  }
-
-  let siteName = extractMetaContent(html, "og:site_name");
-  if (!siteName) {
-    try {
-      siteName = new URL(finalUrl).hostname.replace(/^www\./, "");
-    } catch {
-      siteName = undefined;
-    }
-  }
-
-  const content = extractBodyText(html, finalUrl);
-  // The page's own schema.org Recipe markup is the recipe: exact lines, no
-  // prompt window, nothing invented. Absent for anything not a recipe.
-  const recipe = recipeFromMarkup(html, result.truncated);
-
-  return {
-    title,
-    description,
-    heroImageUrl,
-    heroAspectRatio,
-    siteName,
-    content,
-    // A page over the fetch cap gives us a prefix, so `content` ends early
-    // however long it looks.
-    ...(result.truncated ? { truncated: true as const } : {}),
-    ...(recipe ? { recipe } : {}),
-  };
-}
-
-/** The three outcomes that matter when reading a link's page: got it, the page
- * is gone for good (no classification, no retry), or it could not be read this
- * time (classify from the URL alone, retry later). Keeps the branching out of
- * processItem's body; failed outcomes carry the error for sanitized logging. */
-type PageRead =
-  | { status: "ok"; page: PageData }
-  | { status: "gone"; error: PageFetchError }
-  | { status: "unreadable"; error: PageFetchError };
-
-/** The read outcomes that reach finalizeItem: "gone" fails the item before
- * classification, and the fetch error is dropped — nothing downstream of the
- * sanitized log rereads it. */
-type LinkRead = { status: "ok"; page: PageData } | { status: "unreadable" };
-
-/** True for saves whose readable text is a post caption rather than a page
- * body. Only these let the model propose a recipe: a caption has no schema.org
- * markup to read. Real web pages use their markup instead. */
-function isCaptionSource(url: string): boolean {
-  return isTikTokUrl(url) || xStatusId(url) !== undefined;
-}
-
-/** The page's text when the model receives all of it, which is what makes it a
- * caption rather than a body. A longer read (an X Article, a blog post) is
- * neither text whose one outbound link is the recipe it describes, nor text a
- * model can transcribe a recipe from without inventing the part that was cut. */
-function captionText(page: PageData): string | undefined {
-  return page.content !== undefined &&
-    page.content.length <= PROMPT_CONTENT_CHARS
-    ? page.content
-    : undefined;
-}
-
-async function readPage(url: string): Promise<PageRead> {
-  try {
-    const page = isTikTokUrl(url)
-      ? await withLinkedRecipe(await fetchTikTokOEmbed(url))
-      : xStatusId(url)
-        ? await withLinkedRecipe(await fetchXPost(url))
-        : isInstagramUrl(url)
-          ? await withLinkedRecipe(await fetchInstagram(url))
-          : await fetchPage(url);
-    return { status: "ok", page };
-  } catch (error) {
-    if (!isPageFetchError(error)) {
-      throw error;
-    }
-    return pageGone(error.status)
-      ? { status: "gone", error }
-      : { status: "unreadable", error };
-  }
+  return fetchErrorCategory(error);
 }
 
 // ---------------------------------------------------------------------------
@@ -1805,68 +497,6 @@ function sanitizeIntents(raw: Intent[] | undefined): Intent[] {
     .slice(0, 5);
 }
 
-// Bounds for a proposed recipe. Both reject the whole recipe rather than
-// shorten it, so they sit well above what a real recipe reaches: an elaborate
-// multi-component bake runs to a few thousand characters, not twenty thousand.
-const MAX_RECIPE_LINES = 120;
-const MAX_RECIPE_CHARS = 20000;
-const MAX_RECIPE_NAME_CHARS = 120;
-const MAX_RECIPE_SERVINGS_CHARS = 60;
-
-/** Clean a proposed recipe (page markup or model) before it's persisted: trim
- * every line, drop the empty ones, and reject the whole recipe when a list
- * comes back empty (the markup is incomplete or the model is guessing) or when
- * it is too long to store.
- *
- * Nothing here shortens a recipe. The card replaces the article body, so a cut
- * instruction is a wrong recipe the reader cannot tell from a right one and
- * cannot read around; a recipe over budget is refused instead, which leaves the
- * article in place. Repeated lines are kept for the same reason: a recipe in
- * components lists the same quantity under each one, and a dough really does
- * rest twice. A rejected recipe is simply omitted — never fails the whole
- * finalize. */
-export function sanitizeRecipe(
-  raw: RecipeDraft | null | undefined,
-): Recipe | undefined {
-  if (!raw) {
-    return undefined;
-  }
-  const clean = (lines: string[] | undefined): string[] =>
-    (lines ?? []).map((line) => line.trim()).filter((line) => line !== "");
-  const ingredients = clean(raw.ingredients);
-  const steps = clean(raw.steps);
-  if (ingredients.length === 0 || steps.length === 0) {
-    return undefined;
-  }
-  if (
-    ingredients.length > MAX_RECIPE_LINES ||
-    steps.length > MAX_RECIPE_LINES
-  ) {
-    return undefined;
-  }
-  // Blank name/servings are left out entirely (not set to undefined) so the
-  // persisted document never carries an explicit undefined key. Both label the
-  // recipe rather than state it, so capping their length loses no instruction.
-  const name = raw.name?.trim().slice(0, MAX_RECIPE_NAME_CHARS);
-  const servings = raw.servings?.trim().slice(0, MAX_RECIPE_SERVINGS_CHARS);
-  const recipe = {
-    ...(name ? { name } : {}),
-    ...(servings ? { servings } : {}),
-    ingredients,
-    steps,
-  };
-  return recipeChars(recipe) > MAX_RECIPE_CHARS ? undefined : recipe;
-}
-
-function recipeChars(recipe: Recipe): number {
-  return [
-    recipe.name ?? "",
-    recipe.servings ?? "",
-    ...recipe.ingredients,
-    ...recipe.steps,
-  ].reduce((total, line) => total + line.length, 0);
-}
-
 function spacesPromptBlock(
   spaces: { name: string; description?: string }[],
 ): string {
@@ -1887,7 +517,7 @@ function spacesPromptBlock(
     candidates.push(line);
   }
   const lines = candidates.join("\n");
-  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, include only the exact names of spaces this item CLEARLY belongs to. Only include confident matches. If none clearly match, return an empty array.`;
+  return `The user organizes items into spaces. Candidate spaces:\n${lines}\n\nIn spaceNames, list the exact names of the spaces this item clearly belongs to, or an empty array if none do. Each name becomes a suggestion the user reviews, so leave out borderline matches.`;
 }
 
 /** The model's classification for one item, plus the link-read artifacts the
@@ -1908,8 +538,7 @@ type AnalysisOutcome = Classification | { terminal: true };
 
 /** How the prompt introduces a page's content: a short-form social link only
  * carries its caption. */
-function captionIntro(url: string | undefined): string {
-  const source = shortFormSource(url);
+function captionIntro(source: ShortFormSource | undefined): string {
   if (source === undefined) {
     return "Page content:";
   }
@@ -1939,13 +568,18 @@ function linkAnalysisPrompt(
     page?.siteName ? `Site: ${page.siteName}` : "",
     page?.author ? `Creator: ${page.author}` : "",
     page?.description ? `Meta description: ${page.description}` : "",
+    page?.board ? `Saved to the board: ${page.board}` : "",
+    page?.video ? "The post is a video." : "",
+    page?.linkedTitle && page.linkedUrl
+      ? `Links to: ${page.linkedTitle} (${page.linkedUrl})`
+      : "",
     page?.content
-      ? `${captionIntro(item.url)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
+      ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
       : "",
-    INTENTS_PROMPT_BLOCK,
+    intentsPromptBlock(5),
   ]
     .filter((line) => line !== "")
     .join("\n\n");
@@ -1991,17 +625,7 @@ async function analyzeLinkItem(
     });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
-  // The model proposes a recipe only from a caption it can read in full, and
-  // only when the caption's own link did not already yield the structured
-  // recipe. Web pages and URL-only reads never ask: nothing to read exactly.
-  const askForRecipe =
-    page !== undefined &&
-    page.recipe === undefined &&
-    // A cut caption reads as complete at any length, so the length check alone
-    // would let the model transcribe a recipe that stops mid-ingredient.
-    page.truncated !== true &&
-    isCaptionSource(item.url) &&
-    captionText(page) !== undefined;
+  const askForRecipe = read.status === "ok" && read.askForRecipe;
   const call = {
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
@@ -2015,10 +639,25 @@ async function analyzeLinkItem(
   return { result, page, linkRead: read };
 }
 
+/** Upper bound on the Siri context a classification prompt carries. */
+const MAX_CAPTURE_CONTEXT_CHARS = 4000;
+
+/** The prompt line for what a Siri capture knew beyond the saved content
+ * itself, or nothing for a save made in the app. */
+function captureContextBlock(captureContext: string | undefined): string[] {
+  const context = captureContext?.trim() ?? "";
+  if (context === "") return [];
+  return [
+    "The user saved this with Siri. What Siri passed along, and any text read from the image on the device, follows. Use it to understand the item; describe the content itself (the recipe, article, product, or place), not the fact that it was a screenshot, and ignore phone chrome such as the status bar and browser toolbars.",
+    `Siri context:\n${context.slice(0, MAX_CAPTURE_CONTEXT_CHARS)}`,
+  ];
+}
+
 async function analyzeImageItem(
   ctx: ActionCtx,
   item: Doc<"items">,
   spacesBlock: string,
+  captureContext?: string,
 ): Promise<Classification> {
   if (!item.storageId) {
     throw new StoredImageError("not_found");
@@ -2038,8 +677,9 @@ async function analyzeImageItem(
             text: [
               "You are helping organize a save-it-for-later app. Analyze this saved image and produce a short evocative title, a 1-2 sentence description of what it shows, 4-8 lowercase tags (one or two words each), and matching space names.",
               "If the image is a recipe (a screenshot or photo of a written recipe), also fill the recipe field with every ingredient and step exactly as written in the image (null otherwise). A photo of a dish with no written recipe is not a recipe.",
+              ...captureContextBlock(captureContext),
               spacesBlock,
-              INTENTS_PROMPT_BLOCK,
+              intentsPromptBlock(5),
             ].join("\n\n"),
           },
           {
@@ -2057,6 +697,7 @@ async function analyzeImageItem(
 async function analyzeNoteItem(
   item: Doc<"items">,
   spacesBlock: string,
+  captureContext?: string,
 ): Promise<Classification> {
   if (!item.note) {
     throw new Error("Note item has no text");
@@ -2070,12 +711,13 @@ async function analyzeNoteItem(
     schema: itemAnalysisSchema,
     prompt: [
       "You are helping organize a save-it-for-later app. Analyze this saved note and produce a short evocative title, a 1-2 sentence description, 4-8 lowercase tags (one or two words each), and matching space names.",
+      ...captureContextBlock(captureContext),
       spacesBlock,
       ...(item.titleSource === "user" && item.title
         ? [`The user titled this note: ${item.title}`]
         : []),
       `Note:\n${item.note.slice(0, MAX_CONTENT_CHARS)}`,
-      INTENTS_PROMPT_BLOCK,
+      intentsPromptBlock(5),
     ].join("\n\n"),
   });
   return { result: object };
@@ -2222,6 +864,47 @@ async function refreshClaimed(
   });
 }
 
+/**
+ * The vector for a classification about to be finalized.
+ *
+ * Best effort: a failure returns undefined, the item still finalizes, and the
+ * sweeper repairs it. Producing it here rather than in a later mutation is
+ * what lets it ride the same run-fenced write as the text it describes, so a
+ * superseded run can never leave a vector disagreeing with the row beside it.
+ *
+ * The title is resolved with finalizeItem's own rule — a title the owner typed
+ * (or one a note refresh keeps) outranks the classifier's — so the vector
+ * describes the title the row actually ends up with, not one this run proposed
+ * and the mutation then discarded.
+ */
+async function embedForRun(params: {
+  item: { title?: string; titleSource?: "user"; note?: string };
+  refresh: boolean;
+  title: string;
+  description: string;
+  tags: string[];
+  siteName?: string;
+  content?: string;
+}): Promise<number[] | undefined> {
+  const keepsExistingTitle =
+    params.item.titleSource === "user" || params.refresh;
+  const storedTitle =
+    keepsExistingTitle && params.item.title !== undefined
+      ? params.item.title
+      : params.title;
+  const { vectors } = await embedTexts([
+    buildEmbeddingText({
+      title: storedTitle,
+      description: params.description,
+      tags: params.tags,
+      siteName: params.siteName,
+      note: params.item.note,
+      content: params.content,
+    }),
+  ]);
+  return vectors[0];
+}
+
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -2234,6 +917,10 @@ export const processItem = internalAction({
     // must still own the item and win the refresh bucket, and a failure leaves
     // the ready note untouched.
     refresh: v.optional(v.boolean()),
+    // What a Siri capture knew beyond the saved content (the user's words,
+    // text read from an image on the device). Only steers this run's
+    // classification; a later retry classifies without it.
+    captureContext: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2269,9 +956,14 @@ export const processItem = internalAction({
           startedAt,
         );
       } else if (item.type === "image") {
-        outcome = await analyzeImageItem(ctx, item, spacesBlock);
+        outcome = await analyzeImageItem(
+          ctx,
+          item,
+          spacesBlock,
+          args.captureContext,
+        );
       } else {
-        outcome = await analyzeNoteItem(item, spacesBlock);
+        outcome = await analyzeNoteItem(item, spacesBlock, args.captureContext);
       }
       if ("terminal" in outcome) {
         return null;
@@ -2285,12 +977,26 @@ export const processItem = internalAction({
       // Map returned space names back to ids (case-insensitive, trimmed).
       const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
-      posterStorageId =
-        item.type === "link" &&
-        shortFormSource(item.url) !== undefined &&
-        page?.heroImageUrl
-          ? await storePoster(ctx, page.heroImageUrl)
-          : undefined;
+      posterStorageId = page?.heroImageUrl
+        ? await storePoster(ctx, page.heroImageUrl)
+        : undefined;
+
+      const tags = result.tags
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      // `page` is undefined for anything that is not a link, so these need no
+      // type guard. Hoisted so the embedded text is exactly the stored text.
+      const pageContent = page?.content;
+      const pageSiteName = page?.siteName;
+      const embedding = await embedForRun({
+        item,
+        refresh: args.refresh === true,
+        title: result.title,
+        description: result.description,
+        tags,
+        siteName: pageSiteName,
+        content: pageContent,
+      });
 
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
@@ -2298,9 +1004,10 @@ export const processItem = internalAction({
         title: result.title,
         keepTitle: args.refresh === true,
         description: result.description,
-        tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
-        content: page?.content,
-        siteName: page?.siteName,
+        tags,
+        content: pageContent,
+        siteName: pageSiteName,
+        embedding,
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
@@ -2383,34 +1090,81 @@ export const processItem = internalAction({
 });
 
 /**
- * One-off: fill in aspectRatio for existing image items that don't have one
- * (older saves whose ratio was dropped before it was persisted). Reads the
- * stored file's header bytes directly — no re-upload needed.
+ * Embeds one page of items whose vector is missing or from an older
+ * generation, then stamps the whole page.
+ *
+ * This is three jobs in one, which is why it runs on a schedule rather than
+ * once: it backfills saves made before embeddings existed, it repairs saves
+ * whose inline embed call failed during classification, and it is the
+ * migration path when CURRENT_EMBEDDING_VERSION is bumped. Once the range is
+ * empty it costs one indexed read per run and nothing else.
+ *
+ * A full page that actually embedded something chains itself immediately, the
+ * same way the stale-processing sweeper does, so a large existing shelf drains
+ * without waiting a cron interval per page. Nothing can sit at the front of
+ * the range forever: an item with no embeddable text is finished on sight, and
+ * one the provider keeps rejecting is stamped after MAX_EMBEDDING_ATTEMPTS.
+ * An item the provider merely could not reach is left exactly as it was.
  */
-export const backfillImageAspectRatios = internalAction({
+export const sweepItemEmbeddings = internalAction({
   args: {},
-  returns: v.object({ scanned: v.number(), updated: v.number() }),
-  handler: async (ctx): Promise<{ scanned: number; updated: number }> => {
-    const targets = await ctx.runQuery(
-      internal.items.listImagesNeedingRatioInternal,
-      {},
+  returns: v.object({ scanned: v.number(), written: v.number() }),
+  handler: async (ctx): Promise<{ scanned: number; written: number }> => {
+    const pending = await ctx.runQuery(
+      internal.items.listItemsNeedingEmbeddingInternal,
+      { limit: EMBEDDING_SWEEP_PAGE },
     );
-    let updated = 0;
-    for (const target of targets) {
-      const blob = await ctx.storage.get(target.storageId);
-      if (blob === null) {
-        continue;
-      }
-      const size = readImageSize(new Uint8Array(await blob.arrayBuffer()));
-      if (size && size.width > 0 && size.height > 0) {
-        await ctx.runMutation(internal.items.setAspectRatioInternal, {
-          itemId: target._id,
-          aspectRatio: size.width / size.height,
-        });
-        updated++;
-      }
+    if (pending.length === 0) {
+      return { scanned: 0, written: 0 };
     }
-    return { scanned: targets.length, updated };
+    const { vectors, callFailed } = await embedTexts(
+      pending.map((entry) => entry.text),
+    );
+
+    // Whether the provider answered at all, taken from the call itself rather
+    // than inferred from its output. Both directions matter. A real outage
+    // must not march the whole table stamping items as done with no vector —
+    // that is what the `deferred` outcome prevents. But a call that completes
+    // and returns nothing usable is not an outage, and deferring those rows
+    // would wedge the sweep: they lead the range every run, so the page would
+    // be re-read forever and every ready item behind it would never be
+    // reached. Those spend an attempt instead, and the cap eventually clears
+    // them.
+
+    const { written, stamped, deferred } = await ctx.runMutation(
+      internal.items.setEmbeddingsInternal,
+      {
+        entries: pending.map((entry, index) => ({
+          itemId: entry.itemId,
+          text: entry.text,
+          embedding: vectors[index],
+          outcome:
+            vectors[index] !== undefined
+              ? ("embedded" as const)
+              : entry.text.length === 0
+                ? ("nothing_to_embed" as const)
+                : callFailed
+                  ? ("deferred" as const)
+                  : ("failed" as const),
+        })),
+      },
+    );
+    logEvent("info", "embedding_sweep", {
+      scanned: pending.length,
+      written,
+      stamped,
+      deferred,
+      provider_down: callFailed,
+    });
+
+    // Chain only on real progress. Gating on `written` rather than on rows
+    // touched is what keeps a provider outage from accelerating: with nothing
+    // embedded there is nothing to chain for, and the next cron tick retries
+    // at its own pace.
+    if (pending.length === EMBEDDING_SWEEP_PAGE && written > 0) {
+      await ctx.scheduler.runAfter(0, internal.ai.sweepItemEmbeddings, {});
+    }
+    return { scanned: pending.length, written };
   },
 });
 
@@ -2426,9 +1180,149 @@ const recommendSchema = z.object({
 // sweep — the user can always add more by hand or ask again later.
 const MAX_RECOMMENDATIONS = 8;
 
+/** How many candidate items the recommendation prompt is handed. */
+const RECOMMEND_CANDIDATES = 100;
+
 /**
- * Recommend existing items for a space, off nothing but its title. Runs when
- * a space is created, and again whenever its dynamic toggle turns on. Writes
+ * How many hits the candidate vector search asks for.
+ *
+ * Wider than RECOMMEND_CANDIDATES because the hits are thinned afterwards:
+ * items already in the space drop out, and so do items whose stored vector
+ * outlived a change of status or belongs to an older generation. The headroom
+ * keeps a space whose strongest matches are already filed from arriving at the
+ * prompt short-handed.
+ *
+ * 256 is the most Convex will return from one `vectorSearch`, and a hit is an
+ * id and a score rather than a document, so the widest window the platform
+ * offers costs almost nothing here; the document reads are bounded separately,
+ * by `listReadyItemsByIdInternal`'s row and byte limits. Past 256 filed
+ * stronger matches the ranking cannot see further, and the recency half of
+ * `recommendationCandidates` is what fills the list instead.
+ */
+const RECOMMEND_VECTOR_LIMIT = 256;
+
+type RecommendationCandidate = FunctionReturnType<
+  typeof internal.items.listReadyItemsInternal
+>[number];
+
+/**
+ * The semantic half of `recommendationCandidates`.
+ *
+ * Returns an empty list rather than throwing on any failure. The outer action
+ * catches and logs, so an error escaping here would turn a transient search
+ * hiccup into no recommendations at all — strictly worse than the recency read
+ * this replaced. An empty list is the fallback signal.
+ */
+async function searchCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  vector: number[],
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  try {
+    const matches = await ctx.vectorSearch("items", "by_embedding", {
+      vector,
+      limit: RECOMMEND_VECTOR_LIMIT,
+      // The only filter the index carries, and deliberately so: Convex vector
+      // filters cannot AND across fields, and this is the one whose absence
+      // would leak another account's saves. Everything else the candidates
+      // have to satisfy is enforced when the ids are hydrated.
+      filter: (q) => q.eq("userId", space.userId),
+    });
+    const itemIds = matches
+      .map((match) => match._id)
+      .filter((itemId) => !memberIds.has(itemId));
+    if (itemIds.length === 0) {
+      return [];
+    }
+    return await ctx.runQuery(internal.items.listReadyItemsByIdInternal, {
+      userId: space.userId,
+      itemIds,
+      limit: RECOMMEND_CANDIDATES,
+    });
+  } catch (error) {
+    logEvent("warn", "recommend_vector_search_failed", {
+      space_id: space._id,
+      error: errorName(error),
+    });
+    return [];
+  }
+}
+
+/**
+ * Picks the items the recommendation prompt gets to choose from.
+ *
+ * Semantic first: the space's own name and description are embedded as a
+ * query and matched against the item vector index, so a user with a thousand
+ * saves is judged on the hundred most *relevant* rather than the hundred most
+ * *recent*. That difference is the whole point — the saves worth resurfacing
+ * when someone finally makes a "Recipes" space are the old ones they have
+ * forgotten, and those are exactly the ones a recency read cannot see.
+ *
+ * Recency is not an alternative to that, it is the floor underneath it, and
+ * it is not optional. A user whose backfill has not drained, whose items all
+ * failed to embed, or whose query text could not be embedded at all has no
+ * vectors — or too few — to match; unaided, the feature would hand such a
+ * user a shorter list than the "newest 100" read it replaced. So the two are
+ * combined rather than chosen between: ranked hits first, recency filling
+ * whatever is left of the candidate budget. Both halves return the same shape
+ * and feed the same prompt, and when the index covers the shelf the recency
+ * read is never reached.
+ */
+async function recommendationCandidates(
+  ctx: GenericActionCtx<DataModel>,
+  space: Doc<"spaces">,
+  memberIds: Set<Id<"items">>,
+): Promise<RecommendationCandidate[]> {
+  // Composed exactly the way an item's own summary is, so the query sits in
+  // the same region of the space as the corpus text it has to match.
+  const queryText = buildEmbeddingText({
+    title: space.name,
+    description: space.description,
+  });
+  const vector = queryText.length > 0 ? await embedQuery(queryText) : undefined;
+  const ranked =
+    vector === undefined
+      ? []
+      : await searchCandidates(ctx, space, vector, memberIds);
+
+  if (ranked.length >= RECOMMEND_CANDIDATES) {
+    logEvent("info", "recommend_candidates", {
+      space_id: space._id,
+      source: "vector",
+      count: ranked.length,
+    });
+    return ranked;
+  }
+
+  // A short ranked list does not mean the shelf is short. While the sweep is
+  // draining, a user can have a thousand saves and fifty vectors, and the
+  // index can only ever offer the fifty. Returning those alone would hand the
+  // prompt less than the newest-100 read this replaced, so partial coverage
+  // would be a regression for exactly the users the feature is for. The
+  // ranked hits lead — they are the relevant ones, and the prompt numbers
+  // what it is given — and recency fills the rest of the list behind them.
+  const seen = new Set(ranked.map((item) => item._id));
+  const recent = (
+    await ctx.runQuery(internal.items.listReadyItemsInternal, {
+      userId: space.userId,
+      limit: RECOMMEND_CANDIDATES,
+    })
+  ).filter((item) => !memberIds.has(item._id) && !seen.has(item._id));
+  const candidates = [...ranked, ...recent].slice(0, RECOMMEND_CANDIDATES);
+  logEvent("info", "recommend_candidates", {
+    space_id: space._id,
+    source: ranked.length === 0 ? "recent" : "mixed",
+    count: candidates.length,
+    ranked: ranked.length,
+  });
+  return candidates;
+}
+
+/**
+ * Recommend existing items for a space, off nothing but its name and
+ * description. Runs when a space is created, and again whenever its dynamic
+ * toggle turns on. Writes
  * `suggested` rows only — the user decides what actually enters the space —
  * and never re-suggests anything they already filed or dismissed.
  */
@@ -2448,12 +1342,7 @@ export const recommendForSpace = internalAction({
           spaceId: args.spaceId,
         }),
       );
-      const items = (
-        await ctx.runQuery(internal.items.listReadyItemsInternal, {
-          userId: space.userId,
-          limit: 100,
-        })
-      ).filter((item) => !memberIds.has(item._id));
+      const items = await recommendationCandidates(ctx, space, memberIds);
       if (items.length === 0) {
         return null;
       }
@@ -2476,7 +1365,7 @@ export const recommendForSpace = internalAction({
         prompt: [
           "You are helping organize a save-it-for-later app. The user just created a space (a themed collection) and Shelvr recommends a few existing saves for it — the user decides which to keep.",
           `Space name: "${space.name}"${space.description ? `\nSpace description: ${space.description}` : ""}`,
-          "Below is a numbered list of the user's saved items. Return the numbers of a handful of items that CLEARLY belong in this space — quality over quantity, high-confidence picks only, at most 8. If nothing clearly fits, return an empty array.",
+          `Below is a numbered list of the user's saved items. Return the numbers of the items that clearly belong in this space, at most ${MAX_RECOMMENDATIONS}, or an empty array if none do. The user reviews each pick, so leave out borderline ones.`,
           itemLines,
         ].join("\n\n"),
       });
@@ -2729,10 +1618,16 @@ const steerSchema = z.object({
  * shopping link in "apartment shopping list" and nothing extra elsewhere.
  */
 export const steerItemForSpace = internalAction({
-  args: { itemId: v.id("items"), spaceId: v.id("spaces") },
+  args: {
+    itemId: v.id("items"),
+    spaceId: v.id("spaces"),
+    budgetCharged: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
+      if (!(await ctx.runMutation(internal.spaces.claimSteeringInternal, args)))
+        return null;
       const [item, space] = await Promise.all([
         ctx.runQuery(internal.items.getItemInternal, { itemId: args.itemId }),
         ctx.runQuery(internal.spaces.getSpaceInternal, {
@@ -2757,7 +1652,7 @@ export const steerItemForSpace = internalAction({
           ]
             .filter((line) => line !== "")
             .join("\n"),
-          INTENTS_PROMPT_BLOCK,
+          intentsPromptBlock(3),
           "Steering by space purpose:",
           "- Shopping/wishlist space: identify the product and include an open_url intent to a Google Shopping search, https://www.google.com/search?tbm=shop&q=PRODUCT+QUERY, labeled like 'Shop this'.",
           "- Travel space: prefer open_maps for places and open_url for official/booking pages you can actually see.",

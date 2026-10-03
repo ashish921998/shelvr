@@ -6,6 +6,7 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
 
 - `onboarding_step_viewed`: emitted when entering each named step, including the first. `step_id` and `step_index` identify the step without answers or saved content.
 - `onboarding_step_completed`: emitted once per step per onboarding mount when advancing; `duration_ms` is wall-clock time since entry and can include background time.
+- `acquisition_source_answered`: the "How did you hear about Shelvr?" step, right after the opener. `source` is one of `tiktok`, `instagram`, `youtube`, `x`, `reddit`, `ai_assistant`, `friend`, `shared_link`, `store_search`, `other`; `position` is the 0-based row it sat in, since the six social and AI rows are shuffled per mount. It also sets the `acquisition_source` person property with `$set_once`. `acquisition_source_skipped` fires on Skip. Its step id is `acquisition_source`, and inserting it moved `step_index` up by one for setup, demo and reveal, so filter funnels on `step_id`. Both step events carry `flow_version` (3 from this flow on; absent before it).
 - `onboarding_completed`: existing completion event. Authenticated and deferred onboarding are both supported; do not require a universal signup-before-onboarding order.
 - `auth_started`, `auth_cancelled`, `auth_failed`, `auth_succeeded`: OAuth outcomes with provider, no error messages or callback URLs.
   - `auth_cancelled` carries `elapsed_ms` (since `auth_started`) and `browser_ms` (time the system sign-in sheet was open). expo-web-browser reports every auth-session error as a cancel, so a `browser_ms` well under a second is the sheet failing to present, not a person backing out. Apple's review devices produce these.
@@ -18,6 +19,30 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
 - `paywall_presentation_started`: before calling the native presentation API. This is an attempt, not a confirmed impression. It includes sessions interrupted before the promise settles.
 - `paywall_shown`: emitted after a cancel, purchase, or restore confirms the sheet was presented. The imperative API has no on-show callback. **Never use this event as the abandonment denominator.**
 - `paywall_cancelled`, `paywall_purchase_completed`, `paywall_restored`, `paywall_failed`: client outcomes. A completed checkout can start a free trial and is not evidence of payment. Attempts/outcomes share `paywall_attempt_id` and `placement`. Failures use bounded reasons and no raw error text.
+- The presentation, shown, cancelled, completed, restored, and failed events
+  carry `offering_id` and `trial_eligible` when RevenueCat can read the current
+  offering before the sheet opens. `trial_eligible` is one of `eligible`,
+  `ineligible`, `no_intro`, or `unknown`; missing SDK context is omitted rather
+  than guessed.
+- `paywall_purchase_started` records a purchase tap in the mounted exit-offer
+  component. RevenueCat's imperative `presentPaywall` API does not expose the
+  equivalent callback, so the event is intentionally not emitted for the main
+  paywall. Its `package_id` is the SDK package identifier.
+- `entitlement_activated` records the later client observation that the
+  Convex entitlement became active after a purchase or restore. It carries
+  `source`, the bounded entitlement `status`, and `delay_ms`. A Profile
+  restore reports nothing while an entitlement is already visible — restoring
+  an already-active entitlement made nothing new visible.
+- `paywall_blocked_action_resumed` records a gated action that later passed at
+  the same placement within 30 minutes of the block. `purchased_since_block`
+  distinguishes a post-purchase retry from a later independent visit. The
+  memory is one action deep (a new block replaces it), and a resume is only
+  reported where a `usePaywallGuard` backs the placement: a screen-level gate
+  (Tidy, Map) blocks through its Pro gate CTA, and no guard runs there after
+  the purchase, so those placements report requests and outcomes but never a
+  resume.
+- Purchase and restore outcomes add `product_id` when RevenueCat returns the
+  active store product. It is absent when the SDK cannot provide it.
 - `trial_started`: authenticated RevenueCat INITIAL_PURCHASE with TRIAL period.
 - `payment_succeeded`: authenticated RevenueCat INITIAL_PURCHASE, RENEWAL, or NON_RENEWING_PURCHASE with a finite positive USD `price`. Excludes trial/promotional periods, family sharing, zero-price transactions, restores, cancellations, and transfers. `payment_kind` distinguishes initial, trial_conversion, renewal, and one_time. This measures positive charges, not net revenue after refunds or fees.
 - `trial_cancelled`: authenticated RevenueCat CANCELLATION with a TRIAL period — auto-renew was turned off, or a refund hit the trial. `payment_kind` is `trial`.
@@ -79,9 +104,9 @@ Recorded 13 September 2026 from RevenueCat's cancellation-flow guidance, Apple t
 
 For failure recordings, open **Paywall attempt to actual payment**, click the dropped-off people at the payment step, then inspect their matching recordings. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
 
-For the 1.0.2 release, native replay is disabled for the production build variant
-until its visual masking check is complete. Production funnel events remain enabled.
-Development replay samples 20% of sessions, masks all text, images, and sandboxed
+Native replay was disabled for the production build variant from 1.0.2 until
+visual masking was verified on a signed preview build on 2026-09-28. Production,
+preview and development builds now all record. Replay samples 20% of sessions, masks all text, images, and sandboxed
 system views, disables logs/network telemetry, and captures at most one snapshot
 per second. Not every failed journey will have a recording. Native dead-tap
 detection is not promised. Replay requires a rebuilt native binary; an OTA

@@ -1,4 +1,7 @@
+import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
+import { revokeSiriCapture } from "@/lib/app-intents";
+import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -20,8 +23,9 @@ import {
 import { NotificationDeviceSession } from "./notification-device-session";
 import { getExpoPushToken } from "./notification-token";
 import { analytics } from "./analytics";
+import { readConvexUrl } from "@/lib/convex-url";
 
-const tokenStorageKey = `notification-tokens-${(process.env.EXPO_PUBLIC_CONVEX_URL ?? "default").replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const tokenStorageKey = `notification-tokens-${readConvexUrl().replace(/[^A-Za-z0-9._-]/g, "_")}`;
 const tokenStore = {
   read: async () => {
     const stored = await SecureStore.getItemAsync(tokenStorageKey);
@@ -52,15 +56,6 @@ export function useNotificationSession() {
   return { session, operation };
 }
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
 function getNotificationTimezone(): string | undefined {
   return (
     Localization.getCalendars()[0]?.timeZone ??
@@ -80,7 +75,9 @@ export function NotificationSessionProvider({
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const setPreferences = useMutation(api.notifications.setPreferences);
+  const setSaveReminders = useMutation(api.notifications.setSaveReminders);
   const deleteAccount = useMutation(api.users.deleteCurrentUserAccount);
+  const revokeCaptureToken = useMutation(api.appIntents.revokeCaptureToken);
   const session = useMemo(
     () =>
       new NotificationDeviceSession(tokenStore, {
@@ -99,13 +96,40 @@ export function NotificationSessionProvider({
             weeklyShelfEnabled: enabled,
             timezone: getNotificationTimezone(),
           }),
-        signOut,
-        deleteAccount: () => deleteAccount({}),
-        resetAnalytics: analytics.reset,
-        reportError: (error) =>
-          analytics.captureError("notification_session_cleanup_failed", error),
+        setSaveReminders: (enabled) =>
+          setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
+        signOut: async () => {
+          // Before signOut, while the session can still authenticate it.
+          await revokeSiriCapture(revokeCaptureToken);
+          await signOut();
+          await clearExitOfferReminder();
+        },
+        deleteAccount: async () => {
+          await deleteAccount({});
+          await clearExitOfferReminder();
+        },
+        clearWidget: clearRecentSavesWidget,
+        // Fallback for a failed post-deletion sign-out: no auth edge may fire
+        // promptly, so clear the identity here (idempotent with the hook's).
+        resetAnalytics: () => void analytics.resetIfIdentified(),
+        reportError: (error) => {
+          const event =
+            error instanceof Error &&
+            error.message === "widget_thumbnail_cleanup_failed"
+              ? "widget_thumbnail_cleanup_failed"
+              : "notification_session_cleanup_failed";
+          analytics.captureError(event, error);
+        },
       }),
-    [registerDevice, unregisterDevice, setPreferences, signOut, deleteAccount],
+    [
+      registerDevice,
+      unregisterDevice,
+      setPreferences,
+      setSaveReminders,
+      signOut,
+      deleteAccount,
+      revokeCaptureToken,
+    ],
   );
   useEffect(() => {
     if (!isAuthenticated) {
@@ -168,6 +192,17 @@ export function NotificationSessionProvider({
   );
 }
 
+function notificationField(
+  notification: Notifications.Notification,
+  field: string,
+): string | null {
+  const data = notification.request.content.data as
+    | Record<string, unknown>
+    | undefined;
+  const value = data?.[field];
+  return typeof value === "string" ? value : null;
+}
+
 /**
  * The route a notification carries, if any. Exported because the splash gate
  * decides whether to stand down from the same rule this navigates by — a push
@@ -176,33 +211,48 @@ export function NotificationSessionProvider({
 export function getNotificationUrl(
   notification: Notifications.Notification,
 ): string | null {
-  const data = notification.request.content.data as
-    | { url?: unknown }
-    | undefined;
-  return typeof data?.url === "string" ? data.url : null;
+  return notificationField(notification, "url");
 }
 
 export function useNotificationObserver(): void {
   const nav = useRouter();
 
   useEffect(() => {
-    let lastUrl: string | null = null;
+    // Keyed by the notification's own id, not its destination: at launch the
+    // same tap can arrive both as the last response and through the listener,
+    // but a later push to the same screen (two trial nudges to /add) is a new
+    // open and must navigate and be recorded again.
+    const handled = new Set<string>();
     const redirect = (notification: Notifications.Notification) => {
       const url = getNotificationUrl(notification);
-      if (!url || url === lastUrl) return;
-      lastUrl = url;
+      if (!url) return;
+      const id = notification.request.identifier;
+      if (id) {
+        if (handled.has(id)) return;
+        handled.add(id);
+      }
+      // Recorded before navigating: a push that throws must not lose the one
+      // signal V1 exists to collect.
+      analytics.capture("notification_opened", {
+        notification_kind: notificationField(notification, "kind") ?? "unknown",
+        notification_id:
+          notificationField(notification, "notificationId") ?? "",
+      });
       nav.push(url as never);
     };
 
-    const response = Notifications.getLastNotificationResponse();
-    if (response?.notification) {
+    // Expo keeps the last tap until it is cleared, so a remount of this
+    // observer would otherwise navigate and record the same open again.
+    // Cleared after handling, never before: the splash gate reads it once
+    // per process during the first render, ahead of this effect.
+    const handle = (response: Notifications.NotificationResponse) => {
       redirect(response.notification);
-    }
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        redirect(response.notification);
-      },
-    );
+      Notifications.clearLastNotificationResponse();
+    };
+    const response = Notifications.getLastNotificationResponse();
+    if (response?.notification) handle(response);
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(handle);
     return () => subscription.remove();
   }, [nav]);
 }

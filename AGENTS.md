@@ -18,6 +18,62 @@ workflow described there.
 - `apps/web` is the marketing site and its server-backed waitlist routes.
 - `apps/native/convex` is the backend source of truth.
 
+### Where things live
+
+Check here before searching. Paths that start with `src/` or `convex/` are
+under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
+`.github/` are relative to the repository root.
+
+- **No `hooks/` or `features/` directory.** Hooks and feature logic sit flat in
+  `src/lib` as kebab-case files. Standalone hooks are named `use-*.ts`; a hook
+  that belongs to one feature is exported from that feature's module
+  (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
+  so search for the hook name, not the filename. Subfolders exist only for
+  `src/lib/share`, `src/lib/splash` and `src/lib/tidy`.
+- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
+  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
+  `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
+- **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
+  `openPaywall`, `openExitOffer`, `usePaywallGuard` and `restorePurchases`.
+  Around it: `exit-offer*.ts`, `trial-reminder.ts`, `paywall-funnel.ts`,
+  `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
+  The server side is `convex/subscriptions.ts`.
+- **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
+  cards in `src/components/item-card.tsx` and `src/components/home`.
+- **Item detail:** route `src/app/(app)/item/[id].tsx`, body
+  `src/components/item-detail.tsx`.
+- **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
+  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`; pasted
+  link lists in `src/lib/import-links.ts`.
+- **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
+  `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
+  `onboarding-steps.ts` and `pending-onboarding.ts`.
+- **Copy:** `src/locales/en.json` is the source catalog; `t()` and
+  `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
+  `src/locales/message-types.ts` and
+  `convex/model/notificationTranslations.json` are written by
+  `pnpm localization:generate` (a root script). Do not edit them by hand.
+- **Analytics:** `src/lib/analytics.ts` holds the typed client event map
+  (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
+  those rather than grepping call sites.
+- **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
+  top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
+  `convex/ai.ts` only orchestrates the model call.
+- **Large files:** `convex/items.ts` (about 2,800 lines), `convex/ai.ts` and
+  `convex/model/pageRead.ts` (about 1,650 each). Search for the export name
+  first and read that range, not the whole file.
+- **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
+  subscription for the anonymous dev user.
+- **Tests:** co-located `*.test.ts(x)`; shared setup in `src/test.setup.ts` and
+  `convex/test.setup.ts`. Never put a test file under `src/app`: Expo Router
+  bundles that tree.
+- **Design handoffs, marketing assets and store media** are not in this repo.
+  They live in the separate `shelvr-notes` repo.
+- **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
+  setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
+  paywall.
+- **Pull requests:** fill in `.github/pull_request_template.md`.
+
 ## Naming conventions
 
 ESLint enforces file and identifier naming (`eslint-plugin-check-file` and
@@ -53,7 +109,14 @@ use `expo lint`, which silently skips the `convex/` backend.
 
 The root check runs lint, typecheck, coverage thresholds, Knip, Syncpack, and
 the dependency audit (`pnpm run audit`, blocks on high/critical). CI runs the
-same steps, so the pre-commit hook and the remote gate cannot drift. Advisories
+same steps, so the pre-commit hook and the remote gate cannot drift. Knip's
+Convex entries are the top-level `convex/*.ts` modules and their co-located
+tests; every other file under `convex/` is a project file whose exports are
+reported as unused unless another module imports them. The Convex CLI registers
+every file under `convex/` though, so a `query` / `mutation` / `action` /
+`internal*` function stays live through the router with no importer at all.
+Keep registered functions in top-level modules, and confirm a reported export
+against `_generated/api.d.ts` before removing it. Advisories
 with no compatible fix yet are baselined in `pnpm.auditConfig.ignoreGhsas` in
 the root `package.json`; re-evaluate that list when bumping dependencies.
 Use `pnpm run coverage` when iterating on test changes. Tests are co-located
@@ -99,9 +162,12 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
 - OTA updates reach installs by EAS fingerprint. Any change that alters the
-  fingerprint (a native dependency added or removed, a native config change)
-  makes new updates invisible to binaries built from the old fingerprint:
-  cut a fresh store build before resuming OTA publishes.
+  fingerprint (a native dependency added or removed, a native config change,
+  or `version` in `app.json`) makes new updates invisible to binaries built
+  from the old fingerprint: cut a fresh store build before resuming OTA
+  publishes. The version is the easy one to miss — a bump must land on
+  `main` before any OTA aimed at the build carrying it. The build number is
+  not an input.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract — an installed

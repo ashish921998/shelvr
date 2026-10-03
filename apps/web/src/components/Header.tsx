@@ -1,80 +1,49 @@
 "use client";
 
-import {
-  Disclosure,
-  DisclosureButton,
-  DisclosurePanel,
-} from "@headlessui/react";
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import AppStoreButton from "./AppStoreButton";
+import { useEffect, useState } from "react";
 import Logo from "./common/Logo";
+import StoreButton from "./home/StoreButton";
 
 const navigation = [
-  { name: "How it works", href: "#how" },
-  { name: "Spaces", href: "#spaces" },
-  { name: "Search", href: "#search" },
+  { name: "Spaces", href: "#shelves" },
+  { name: "Search", href: "#find" },
+  { name: "Photo tidy", href: "#tidy" },
+  { name: "FAQ", href: "#faq" },
 ];
 
 export default function Header() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <Disclosure
-      as="nav"
-      className="sticky top-0 z-50 border-b border-line bg-paper/90 backdrop-blur-xl"
+    <header
+      className={`sticky top-0 z-30 border-b border-ink/6 bg-paper/82 backdrop-blur-[14px] transition-shadow duration-300 ${
+        scrolled ? "shadow-[0_8px_24px_-12px_rgba(43,36,24,.18)]" : ""
+      }`}
     >
-      {({ open }) => (
-        <>
-          <div className="container flex h-16 items-center justify-between gap-4">
-            <Logo />
-
-            <ul className="hidden items-center gap-8 md:flex">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="text-sm font-medium text-muted transition-colors hover:text-ink"
-                  >
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            <div className="hidden shrink-0 items-center sm:flex">
-              <AppStoreButton source="header" compact />
-            </div>
-
-            <div className="md:hidden">
-              <DisclosureButton className="inline-flex items-center justify-center rounded-lg p-2 text-ink">
-                <span className="sr-only">Open main menu</span>
-                {open ? (
-                  <XMarkIcon className="h-6 w-6" aria-hidden="true" />
-                ) : (
-                  <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-                )}
-              </DisclosureButton>
-            </div>
-          </div>
-
-          <DisclosurePanel className="border-t border-line bg-cream md:hidden">
-            <div className="container flex flex-col gap-1 py-4">
-              {navigation.map((item) => (
-                <DisclosureButton
-                  key={item.name}
-                  as={Link}
+      <nav className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-3.5">
+        <Logo />
+        <div className="flex items-center gap-2">
+          <ul className="hidden items-center min-[760px]:flex">
+            {navigation.map((item) => (
+              <li key={item.name}>
+                <a
                   href={item.href}
-                  className="rounded-lg px-2 py-2.5 text-base font-medium text-ink hover:bg-paper-deep"
+                  className="flex h-10 items-center px-3.5 text-sm font-medium text-muted transition-colors hover:text-ember-deep"
                 >
                   {item.name}
-                </DisclosureButton>
-              ))}
-              <div className="mt-2 flex justify-center">
-                <AppStoreButton source="header" compact />
-              </div>
-            </div>
-          </DisclosurePanel>
-        </>
-      )}
-    </Disclosure>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <StoreButton source="header" />
+        </div>
+      </nav>
+    </header>
   );
 }

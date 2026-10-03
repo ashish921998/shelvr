@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import Logo from "@/components/common/Logo";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Support — Shelvr",
   description: "Get help with Shelvr, subscriptions, privacy, or your account.",
 };
-
-const SUPPORT_EMAIL = "support@shelvr.app";
 
 export default function SupportPage() {
   return (

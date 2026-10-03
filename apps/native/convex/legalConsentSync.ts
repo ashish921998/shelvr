@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { env, internalAction, internalMutation } from "./_generated/server";
 import {
@@ -8,6 +9,26 @@ import {
   TERMS_VERSION,
 } from "./model/legalConsent";
 import { errorName, logEvent } from "./model/log";
+
+/** Capped rows stop consuming the recovery crons and stay `failed` for
+ * manual inspection (logged as `refund_consent_sync_exhausted`). A later
+ * consent change revives the row via `queueSync`, which resets the attempt
+ * count. With `finish`'s backoff (doubling from 2s, capped at 1h) twenty
+ * attempts span roughly ten hours, so a RevenueCat outage shorter than a
+ * working day cannot park a grant. */
+export const MAX_SYNC_ATTEMPTS = 20;
+
+/** Whether delivering this row would report an allowed grant to RevenueCat.
+ * Only grants may cap out: a withdrawal (sharing off, obsolete terms
+ * acceptance, or account deletion) revokes remote data sharing and no user
+ * action may exist to revive it, so those retry until delivered. Same
+ * predicate as `claim`'s `allowed`, minus the owner check its owner-gone
+ * branch already handled. */
+export function deliversGrant(row: Doc<"legalConsents">): boolean {
+  return (
+    !row.deleting && row.refundSharing && row.acceptedVersion === TERMS_VERSION
+  );
+}
 
 const claimValidator = v.object({
   userId: v.id("users"),
@@ -78,6 +99,19 @@ export const finish = internalMutation({
       return null;
     }
     const attempts = row.changedAt === changedAt ? row.attempts + 1 : 0;
+    if (deliversGrant(row) && attempts >= MAX_SYNC_ATTEMPTS) {
+      await ctx.db.patch(id, {
+        syncState: "failed",
+        attempts,
+        nextSyncAt: Date.now(),
+      });
+      logEvent("error", "refund_consent_sync_exhausted", {
+        consent_id: id,
+        attempts,
+        via: "finish",
+      });
+      return null;
+    }
     const delay =
       attempts === 0
         ? 0

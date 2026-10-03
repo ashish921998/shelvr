@@ -2,6 +2,7 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { analytics } from "@/lib/analytics";
+import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { memo } from "react";
@@ -31,12 +32,12 @@ import {
 } from "react-native";
 import Animated, {
   FadeIn,
-  FadeOut,
   useReducedMotion,
   ZoomOut,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { EASE_OUT, REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { REDUCED_FADE_IN, REDUCED_FADE_OUT } from "@/lib/motion";
+import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
 
 export type FeedItem = {
   _id: Id<"items">;
@@ -89,18 +90,20 @@ function failureLabel(item: FeedItem): string | undefined {
 }
 
 // Describes which list a card belongs to, so the detail screen can rebuild the
-// same ordered sibling set for horizontal swipe-paging.
+// same ordered sibling set for horizontal swipe-paging. `digest` and `map` open
+// onto the home feed's pager (anything not `space`/`search` does), but the
+// `from` value still reaches `item_opened` so the open is attributed to the
+// screen it came from instead of collapsing into `direct`.
 export type ItemSource =
   | { from: "home" }
   | { from: "space"; spaceId: string }
-  | { from: "search"; q: string };
+  | { from: "search"; q: string }
+  | { from: "digest" }
+  | { from: "map" };
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
 // hero dimensions weren't captured.
 const OG_RATIO = 1.91;
-
-const PROCESSING_ENTER = FadeIn.duration(150).easing(EASE_OUT);
-const PROCESSING_EXIT = FadeOut.duration(150).easing(EASE_OUT);
 
 function cardMenuActions({
   isSuggested,
@@ -277,16 +280,14 @@ function CardCaption({
 function CardStatusCorner({
   item,
   theme,
-  reducedMotion,
 }: {
   item: FeedItem;
   theme: UnistylesTheme;
-  reducedMotion: boolean;
 }) {
   return (
     <Animated.View
-      entering={reducedMotion ? REDUCED_FADE_IN : PROCESSING_ENTER}
-      exiting={reducedMotion ? REDUCED_FADE_OUT : PROCESSING_EXIT}
+      entering={REDUCED_FADE_IN}
+      exiting={REDUCED_FADE_OUT}
       collapsable={false}
       style={styles.processing}
     >
@@ -326,10 +327,19 @@ export const ItemCard = memo(function ItemCard({
   const isSuggested = item.suggested === true && spaceId !== undefined;
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
+  const shareLink = useShareLink();
   const share = async () => {
     if (!item.url) return;
     try {
-      const result = await Share.share({ url: item.url });
+      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      const result = await shareUrl(link ?? item.url);
+      if (result.action === Share.sharedAction) {
+        const shareRef = await shareRefOf(link);
+        analytics.capture("item_shared", {
+          surface: "feed",
+          ...(shareRef ? { share_ref: shareRef } : {}),
+        });
+      }
       if (
         result.action === Share.sharedAction &&
         item._creationTime !== undefined
@@ -397,7 +407,10 @@ export const ItemCard = memo(function ItemCard({
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () => deleteItem({ id: item._id }),
+        onPress: () =>
+          deleteItem({ id: item._id }).then(() =>
+            forgetDeletedSharedItem(item._id),
+          ),
       },
     ]);
   };
@@ -422,7 +435,7 @@ export const ItemCard = memo(function ItemCard({
         href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
         asChild
       >
-        <Link.Trigger withAppleZoom>
+        <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable
             // `role`, not `accessibilityRole`: Link spreads its own role="link"
             // onto this trigger, and React Native reads `role` first on both
@@ -433,41 +446,49 @@ export const ItemCard = memo(function ItemCard({
             testID={
               item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
             }
-            style={({ pressed }) => [
-              styles.card,
-              item.isSticker && styles.cardSticker,
-              pressed && { opacity: 0.85 },
-            ]}
           >
-            <CardMedia item={item} failedLabel={failedLabel} theme={theme} />
-            <CardCaption
-              item={item}
-              captionTitle={captionTitle}
-              menuActions={menuActions}
-              theme={theme}
-            />
-
-            {isSuggested && (
-              // The badge pops off with a spring when the suggestion resolves
-              // (accepted here or anywhere else — the prop flip unmounts it).
-              <Animated.View
-                exiting={
-                  reducedMotion
-                    ? REDUCED_FADE_OUT
-                    : ZoomOut.springify().damping(14).stiffness(300)
-                }
-                style={styles.suggestedBadge}
+            {/* Link.Trigger's Slot drops a Pressable style function (it merges
+                style by object spread), so the card's look lives on this inner
+                View, driven by the Pressable's render-prop children. */}
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.card,
+                  item.isSticker && styles.cardSticker,
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                <SuggestedBadge onPress={accept} />
-              </Animated.View>
-            )}
+                <CardMedia
+                  item={item}
+                  failedLabel={failedLabel}
+                  theme={theme}
+                />
+                <CardCaption
+                  item={item}
+                  captionTitle={captionTitle}
+                  menuActions={menuActions}
+                  theme={theme}
+                />
 
-            {(item.status === "processing" || item.status === "failed") && (
-              <CardStatusCorner
-                item={item}
-                theme={theme}
-                reducedMotion={reducedMotion}
-              />
+                {isSuggested && (
+                  // The badge pops off with a spring when the suggestion resolves
+                  // (accepted here or anywhere else — the prop flip unmounts it).
+                  <Animated.View
+                    exiting={
+                      reducedMotion
+                        ? REDUCED_FADE_OUT
+                        : ZoomOut.springify().damping(14).stiffness(300)
+                    }
+                    style={styles.suggestedBadge}
+                  >
+                    <SuggestedBadge onPress={accept} />
+                  </Animated.View>
+                )}
+
+                {(item.status === "processing" || item.status === "failed") && (
+                  <CardStatusCorner item={item} theme={theme} />
+                )}
+              </View>
             )}
           </Pressable>
         </Link.Trigger>

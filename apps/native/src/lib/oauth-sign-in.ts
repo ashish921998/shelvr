@@ -1,8 +1,11 @@
-import { analytics } from "@/lib/analytics";
+import { analytics, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { makeRedirectUri } from "expo-auth-session";
+import Constants from "expo-constants";
+import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
+import { Platform } from "react-native";
 
 // Convex Auth OAuth sign-in (React Native), extracted from the sign-in screen
 // so the onboarding demo step can authenticate inline — without navigating
@@ -13,11 +16,24 @@ import { useCallback, useState } from "react";
 // (expo-web-browser `openAuthSessionAsync`); after the user authenticates the
 // browser redirects back to the app with a `?code=` param. We extract that
 // code and call `signIn(provider, { code })` to complete the handshake.
-const oauthRedirectTo = makeRedirectUri({
-  native: "shelvr://auth/callback",
-  scheme: "shelvr",
-  path: "auth/callback",
-});
+const oauthScheme =
+  Constants.expoConfig?.extra?.variant === "production"
+    ? "shelvr"
+    : Constants.expoConfig?.extra?.variant === "preview"
+      ? "shelvr-preview"
+      : "shelvr-dev";
+const iosVersion = String(Platform.Version).split(".").map(Number);
+const preferUniversalLinks =
+  Platform.OS === "ios" &&
+  Constants.expoConfig?.extra?.variant === "production" &&
+  (iosVersion[0] > 17 || (iosVersion[0] === 17 && (iosVersion[1] ?? 0) >= 4));
+const oauthRedirectTo = preferUniversalLinks
+  ? "https://shelvr-web.vercel.app/auth/callback"
+  : makeRedirectUri({
+      native: `${oauthScheme}://auth/callback`,
+      scheme: oauthScheme,
+      path: "auth/callback",
+    });
 
 export type OAuthProvider = "apple" | "google" | "anonymous";
 
@@ -25,7 +41,41 @@ type OAuthSignInOutcome = "completed" | "cancelled" | "failed";
 
 type SignInStage = "request" | "browser" | "exchange";
 
-export function useOAuthSignIn() {
+/**
+ * The native module resolves every failed auth session with the OS error in
+ * the result dictionary, but `WebBrowserAuthSessionResult` does not declare
+ * the field, so it is read through a widened type rather than a cast to `any`.
+ *
+ * Only the NSError domain and code are kept. They are what separate a person
+ * backing out (`canceledLogin`, 1) from a session that could not present
+ * (`presentationContextNotProvided`, 2 / `presentationContextInvalid`, 3), and
+ * unlike the description they carry no free-form text.
+ *
+ * What arrives is `localizedDescription`, which renders as
+ * "… (<domain> <label> <code>.)". The domain and the code are stable, but the
+ * label between them is Foundation's own and follows the device language, so
+ * matching the English word "error" would drop the diagnostic on exactly the
+ * devices hardest to get a second look at. Step over the label instead, and
+ * allow the full-width parentheses a CJK locale can render.
+ */
+const NATIVE_ERROR =
+  /[(（]([A-Za-z][A-Za-z0-9.]*[A-Za-z0-9])[^()（）]*?(-?\d+)[^()（）]*[)）]/;
+
+function nativeError(result: WebBrowser.WebBrowserAuthSessionResult) {
+  const description = (result as { error?: unknown }).error;
+  if (typeof description !== "string") return {};
+  const match = NATIVE_ERROR.exec(description);
+  // Anything that does not render as an NSError is dropped rather than
+  // guessed at. A missing field says "unparsed", which is honest; a wrong
+  // domain or code would send the next person chasing the wrong failure.
+  if (match === null) return {};
+  return {
+    native_error_domain: match[1],
+    native_error_code: Number(match[2]),
+  };
+}
+
+export function useOAuthSignIn(surface: OAuthSurface) {
   const { signIn } = useAuthActions();
   const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(
     null,
@@ -38,7 +88,14 @@ export function useOAuthSignIn() {
 
   const signInWith = useCallback(
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
-      analytics.capture("auth_started", { provider });
+      // One id per attempt, shared by the start, cancel, failure, and success
+      // events, so a funnel can pair each start with the outcome that ended it.
+      const attemptId = randomUUID();
+      analytics.capture("auth_started", {
+        provider,
+        surface,
+        auth_attempt_id: attemptId,
+      });
       setPendingProvider(provider);
       setLastError(null);
       setInterrupted(false);
@@ -58,23 +115,37 @@ export function useOAuthSignIn() {
         if (!redirect) {
           analytics.capture("auth_succeeded", {
             provider,
+            surface,
             elapsed_ms: elapsedMs(),
+            auth_attempt_id: attemptId,
           });
           return "completed";
         }
         stage = "browser";
         const browserStartedAt = Date.now();
-        const result = await WebBrowser.openAuthSessionAsync(
-          redirect.toString(),
-          oauthRedirectTo,
-        );
+        const result = preferUniversalLinks
+          ? await WebBrowser.openAuthSessionAsync(
+              redirect.toString(),
+              oauthRedirectTo,
+              { preferUniversalLinks: true },
+            )
+          : await WebBrowser.openAuthSessionAsync(
+              redirect.toString(),
+              oauthRedirectTo,
+            );
         if (result.type === "cancel" || result.type === "dismiss") {
           // A person needs seconds to back out; a sheet that ends in well under
-          // one is the system failing to present it. The timings tell them apart.
+          // one is the system failing to present it. Until the OS error below
+          // reaches enough sessions, the timings are the only thing telling
+          // those apart.
           analytics.capture("auth_cancelled", {
             provider,
+            surface,
+            result: result.type,
             elapsed_ms: elapsedMs(),
             browser_ms: Date.now() - browserStartedAt,
+            auth_attempt_id: attemptId,
+            ...nativeError(result),
           });
           setInterrupted(true);
           return "cancelled";
@@ -84,7 +155,15 @@ export function useOAuthSignIn() {
         }
         // Hand the callback URL's code back to the provider to finish the
         // sign-in.
-        const code = new URL(result.url).searchParams.get("code");
+        const callback = new URL(result.url);
+        const expected = new URL(oauthRedirectTo);
+        if (
+          callback.protocol !== expected.protocol ||
+          callback.host !== expected.host ||
+          callback.pathname !== expected.pathname
+        )
+          throw new Error("Unexpected OAuth callback");
+        const code = callback.searchParams.get("code");
         if (!code) {
           throw new Error("OAuth callback did not include a verification code");
         }
@@ -95,25 +174,33 @@ export function useOAuthSignIn() {
         }
         analytics.capture("auth_succeeded", {
           provider,
+          surface,
           elapsed_ms: elapsedMs(),
+          auth_attempt_id: attemptId,
         });
         return "completed";
       } catch (err) {
         analytics.capture("auth_failed", {
           provider,
+          surface,
           stage,
           elapsed_ms: elapsedMs(),
+          auth_attempt_id: attemptId,
         });
         const detail =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-        analytics.captureError("auth_failed", err, { provider, stage });
+        analytics.captureError("auth_failed", err, {
+          provider,
+          stage,
+          surface,
+        });
         setLastError(detail);
         return "failed";
       } finally {
         setPendingProvider(null);
       }
     },
-    [signIn],
+    [signIn, surface],
   );
 
   return { signInWith, pendingProvider, lastError, interrupted };

@@ -7,7 +7,7 @@ import { newConvexTest } from "./test.setup";
 
 import { api, internal } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { pageGone } from "./ai";
+import { pageGone } from "./model/pageRead";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   IMPORT_STAGGER_MS,
@@ -15,6 +15,7 @@ import {
   PROCESSING_STALE_MS,
   RECENT_ITEMS_MAX,
   STALE_IMPORT_CUTOFF_MS,
+  tagSearchWords,
 } from "./items";
 import {
   IMAGE_EMPTY_MESSAGE,
@@ -77,6 +78,22 @@ async function seedFeed(
 }
 
 describe("listItems (installed builds)", () => {
+  it("does not expose existing page-controlled preview URLs", async () => {
+    const t = await as("preview-user");
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "preview-user",
+        type: "link",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        heroImageUrl: "http://127.0.0.1/private",
+      });
+    });
+    expect(
+      (await t.query(api.items.listItems, {}))[0].heroImageUrl,
+    ).toBeUndefined();
+  });
   it("still returns every item as a full row, newest first", async () => {
     const t = await as("feed-user");
     const ids = await seedFeed(t, "feed-user", 3);
@@ -273,7 +290,7 @@ describe("listRecentItems", () => {
     expect(recent.map((item) => item._id)).toEqual([ids[1], ids[0]]);
   });
 
-  it("keeps serving a pre-clock build through the expiry webhook window", async () => {
+  it("does not extend access through the expiry webhook window", async () => {
     // A period that ended before its webhook landed still says "pro", so
     // the status-only fallback keeps the installed build's widget fed
     // while a build that sends its clock is already cut off.
@@ -292,7 +309,7 @@ describe("listRecentItems", () => {
 
     await expect(
       t.query(api.items.listRecentItems, { limit: 5 }),
-    ).resolves.toHaveLength(1);
+    ).resolves.toEqual([]);
     await expect(
       t.query(api.items.listRecentItems, { limit: 5, now: Date.now() }),
     ).resolves.toEqual([]);
@@ -434,6 +451,165 @@ describe("listLocatedItems", () => {
   });
 });
 
+describe("similarItems", () => {
+  async function insertItem(
+    t: TestCtx,
+    userId: string,
+    fields: { title: string; tags: string[]; status?: "ready" | "processing" },
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: fields.status ?? "ready",
+        title: fields.title,
+        url: `https://example.com/${encodeURIComponent(fields.title)}`,
+        tags: fields.tags,
+        searchText: [fields.title, ...fields.tags].join(" ").toLowerCase(),
+      }),
+    );
+  }
+
+  it("finds a related save older than the newest-items window", async () => {
+    const t = await as("similar-user");
+    const old = await insertItem(t, "similar-user", {
+      title: "Walnut floor lamp",
+      tags: ["lighting", "furniture"],
+    });
+    // Enough unrelated saves to push the old one out of the recent read.
+    await seedFeed(t, "similar-user", 320);
+    const fresh = await insertItem(t, "similar-user", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+    // Card shape only: the index copy never reaches the client.
+    expect(similar[0]).not.toHaveProperty("searchText");
+  });
+
+  it("searches on short tags like art and diy", async () => {
+    const t = await as("similar-short-tag-user");
+    const old = await insertItem(t, "similar-short-tag-user", {
+      title: "Linocut prints",
+      tags: ["art", "diy"],
+    });
+    await seedFeed(t, "similar-short-tag-user", 320);
+    const fresh = await insertItem(t, "similar-short-tag-user", {
+      title: "Watercolour washes",
+      tags: ["art", "diy"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("keeps short tag words but drops filler from multi-word tags", () => {
+    expect(tagSearchWords("art")).toEqual(["art"]);
+    expect(tagSearchWords("ux")).toEqual(["ux"]);
+    expect(tagSearchWords("how to")).toEqual([]);
+    expect(tagSearchWords("to do lists")).toEqual(["do", "lists"]);
+  });
+
+  it("searches for older saves with non-Latin tags and titles", async () => {
+    const t = await as("similar-ja-user");
+    const old = await insertItem(t, "similar-ja-user", {
+      title: "真鍮のフロアランプ",
+      tags: ["照明", "家具"],
+    });
+    await seedFeed(t, "similar-ja-user", 320);
+    const fresh = await insertItem(t, "similar-ja-user", {
+      title: "読書用ランプ",
+      tags: ["照明", "家具"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("scores shared non-Latin title words without a shared tag", async () => {
+    const t = await as("similar-ja-title-user");
+    const old = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 真鍮",
+      tags: ["インテリア"],
+    });
+    const fresh = await insertItem(t, "similar-ja-title-user", {
+      title: "北欧 照明 スタンド 木製",
+      tags: ["読書"],
+    });
+
+    const similar = await t.query(api.items.similarItems, { id: fresh });
+    expect(similar.map((item) => item._id)).toEqual([old]);
+  });
+
+  it("skips unready matches and never reads another user's saves", async () => {
+    const backend = newConvexTest();
+    const mine = backend.withIdentity({ subject: "similar-a|session-1" });
+    const theirs = backend.withIdentity({ subject: "similar-b|session-1" });
+    await insertItem(theirs, "similar-b", {
+      title: "Ceramic table lamp",
+      tags: ["lighting", "furniture"],
+    });
+    await insertItem(mine, "similar-a", {
+      title: "Paper pendant lamp",
+      tags: ["lighting", "furniture"],
+      status: "processing",
+    });
+    const fresh = await insertItem(mine, "similar-a", {
+      title: "Brass reading lamp",
+      tags: ["lighting", "furniture"],
+    });
+
+    expect(await mine.query(api.items.similarItems, { id: fresh })).toEqual([]);
+  });
+
+  describe("reserves old matches ahead of the score cut", () => {
+    // _creationTime is stamped from Date.now(), so backdating the old save
+    // needs the same faked-Date pattern as the "stale processing runs" tests.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
+    });
+
+    it("keeps a strong old match out of a burst of higher-scoring newer saves", async () => {
+      const start = Date.now();
+      const oldAgeMs = 8 * 24 * 60 * 60 * 1000; // past the 7-day reserve threshold
+
+      // convex-test's virtual clock anchors to the real Date.now() at the
+      // first write on a test context, then ticks forward from there — so
+      // the backdated write has to be the very first thing this context
+      // does. `as()` seeds a Pro row first, which similarItems doesn't need,
+      // so build the identity directly instead.
+      vi.setSystemTime(start - oldAgeMs);
+      const t = newConvexTest().withIdentity({
+        subject: "similar-old-user|session-1",
+      });
+      const old = await insertItem(t, "similar-old-user", {
+        title: "Walnut floor lamp",
+        tags: ["lighting", "furniture", "walnut"],
+      });
+
+      vi.setSystemTime(start);
+      // More than SIMILAR_LIMIT newer saves that fully match the fresh
+      // save's tags, so a plain top-score cut would push the old match out.
+      for (let i = 0; i < 12; i++) {
+        await insertItem(t, "similar-old-user", {
+          title: `Recent lamp ${i}`,
+          tags: ["lighting", "furniture", "brass", "reading"],
+        });
+      }
+      const fresh = await insertItem(t, "similar-old-user", {
+        title: "Brass reading lamp",
+        tags: ["lighting", "furniture", "brass", "reading"],
+      });
+
+      const similar = await t.query(api.items.similarItems, { id: fresh });
+      expect(similar.map((item) => item._id)).toContain(old);
+    });
+  });
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const t = await as("telemetry-user");
@@ -464,6 +640,7 @@ describe("canonical save telemetry", () => {
         savedAt: item?._creationTime,
         sessionId: "save-session",
         saveSource: "note",
+        operationId: "note:telemetry-1",
       },
     ]);
   });
@@ -596,6 +773,92 @@ async function storeBlob(t: TestCtx): Promise<Id<"_storage">> {
     );
   });
 }
+
+describe("upload abuse controls", () => {
+  it("reuses pending upload capabilities and limits fresh begins", async () => {
+    const t = await as("upload-limits");
+    const first = await t.mutation(api.items.beginImageImport, {
+      operationId: OP_ID,
+    });
+    for (let i = 0; i < 35; i++) {
+      expect(
+        await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+      ).toEqual(first);
+    }
+    for (let i = 0; i < 29; i++) {
+      await t.mutation(api.items.beginImageImport, {
+        operationId: `image:limit-${i}`,
+      });
+    }
+    await expect(
+      t.mutation(api.items.beginImageImport, {
+        operationId: "image:over-limit",
+      }),
+    ).rejects.toThrow();
+    expect(
+      await t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).toEqual(first);
+  });
+
+  it("caps pending imports independently of the finalized photo quota", async () => {
+    const t = await as("pending-limits");
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 30; i++) {
+        await ctx.db.insert("itemOperations", {
+          userId: "pending-limits",
+          operationId: `pending:${i}`,
+          kind: "image",
+          status: "pending",
+          updatedAt: Date.now(),
+        });
+      }
+    });
+    await expect(
+      t.mutation(api.items.beginImageImport, { operationId: OP_ID }),
+    ).rejects.toThrow("Too many pending image imports");
+  });
+
+  it("sweeps unattached storage while protecting young and referenced blobs", async () => {
+    const t = await as("storage-sweep");
+    const orphan = await storeBlob(t);
+    const owned = await storeBlob(t);
+    const pending = await storeBlob(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId: "storage-sweep",
+        type: "image",
+        tags: [],
+        searchText: "",
+        status: "ready",
+        storageId: owned,
+      });
+      await ctx.db.insert("itemOperations", {
+        userId: "storage-sweep",
+        operationId: OP_ID,
+        kind: "image",
+        status: "pending",
+        storageId: pending,
+        updatedAt: Date.now(),
+      });
+    });
+    await t.mutation(internal.items.cleanupOrphanStorage, {});
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).not.toBeNull();
+    await t.mutation(internal.items.cleanupOrphanStorage, {
+      cutoff: Date.now() + 1000,
+    });
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", orphan)),
+    ).toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", owned)),
+    ).not.toBeNull();
+    expect(
+      await t.run((ctx) => ctx.db.system.get("_storage", pending)),
+    ).not.toBeNull();
+  });
+});
 
 /** Asserts a refusal carries BOTH halves of the save-error contract: the code
  * the current client routes on, and the sentence an already-installed bundle
@@ -2751,6 +3014,88 @@ describe("stale processing runs", () => {
     });
   });
 
+  it("schedules one processed event for each applied terminal outcome", async () => {
+    const t = newConvexTest();
+    const readyId = await processingLink(t, "processed", FRESH_AGE);
+    const readyRun = (await t.run((ctx) => ctx.db.get(readyId)))!
+      .processingRunId;
+    await t.mutation(internal.items.finalizeItem, {
+      itemId: readyId,
+      runId: readyRun,
+      title: "Ready",
+      description: "Usable",
+      tags: [],
+      status: "ready",
+      enrichment: "partial",
+    });
+
+    const failedId = await processingLink(t, "processed", FRESH_AGE);
+    const failedRun = (await t.run((ctx) => ctx.db.get(failedId)))!
+      .processingRunId;
+    await t.mutation(internal.items.failItem, {
+      itemId: failedId,
+      reason: "not_found",
+      runId: failedRun,
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    const processed = jobs.filter(
+      (job) => job.name === "analytics:captureItemProcessed",
+    );
+    expect(processed).toHaveLength(2);
+    expect(processed.map((job) => job.args[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: readyId,
+          outcome: "ready",
+          enrichment: "partial",
+          processingMs: expect.any(Number),
+        }),
+        expect.objectContaining({
+          itemId: failedId,
+          outcome: "failed",
+          failureReason: "not_found",
+          processingMs: expect.any(Number),
+        }),
+      ]),
+    );
+  });
+
+  it("does not report a processed event for a ready note refresh", async () => {
+    const t = newConvexTest();
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: "refresh",
+        type: "note",
+        note: "Updated note",
+        status: "ready",
+        processingRunId: "refresh-run",
+        processingStartedAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
+        tags: [],
+        searchText: "updated note",
+      }),
+    );
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId: "refresh-run",
+      keepTitle: true,
+      title: "Updated note",
+      description: "The refreshed note",
+      tags: ["note"],
+      status: "ready",
+    });
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(
+      jobs.filter((job) => job.name === "analytics:captureItemProcessed"),
+    ).toHaveLength(0);
+  });
+
   it("finalizeItem reports a deleted item as missing", async () => {
     const t = newConvexTest();
     const itemId = await processingLink(t, "gone", FRESH_AGE);
@@ -2913,5 +3258,100 @@ describe("stale processing runs", () => {
         (item) => item.status === "ready" && item.userId === "ready-list",
       ),
     ).toBe(true);
+  });
+});
+
+describe("share links", () => {
+  async function seedItem(
+    t: TestCtx,
+    userId: string,
+    fields: Partial<{
+      type: "image" | "link" | "note";
+      status: "processing" | "ready" | "failed";
+    }> = {},
+  ): Promise<Id<"items">> {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: fields.type ?? "link",
+        status: fields.status ?? "ready",
+        title: "A great recipe",
+        description: "Weeknight pasta",
+        url: "https://example.com/recipe",
+        tags: ["food"],
+        searchText: "a great recipe",
+      }),
+    );
+  }
+
+  it("mints one token per item and serves a narrow preview for it", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+
+    const preview = await t.query(internal.items.getSharePreview, {
+      token: token!,
+    });
+    expect(preview).toEqual({
+      type: "link",
+      title: "A great recipe",
+      description: "Weeknight pasta",
+      imageUrl: undefined,
+      sourceUrl: "https://example.com/recipe",
+      noteText: undefined,
+    });
+  });
+
+  it("does not treat an item id as a token", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: itemId }),
+    ).toBeNull();
+  });
+
+  it("returns no token for an unfinished save or an image", async () => {
+    const t = await as("share-user");
+    const processing = await seedItem(t, "share-user", {
+      status: "processing",
+    });
+    const image = await seedItem(t, "share-user", { type: "image" });
+
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: processing }),
+    ).toBeNull();
+    expect(
+      await t.mutation(api.items.createShareLink, { itemId: image }),
+    ).toBeNull();
+  });
+
+  it("refuses another user's item", async () => {
+    const backend = newConvexTest();
+    const owner = backend.withIdentity({ subject: "share-owner|session-1" });
+    const other = backend.withIdentity({ subject: "share-other|session-1" });
+    const itemId = await seedItem(owner, "share-owner");
+
+    await expect(
+      other.mutation(api.items.createShareLink, { itemId }),
+    ).rejects.toThrow("Item not found");
+  });
+
+  it("stops serving the preview once the item is deleted", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.deleteItem, { id: itemId });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+    const links = await t.run((ctx) => ctx.db.query("shareLinks").collect());
+    expect(links).toEqual([]);
   });
 });

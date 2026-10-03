@@ -3,11 +3,12 @@
 // src/test/react-stand-in.ts) drives them without a renderer.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  isNativeReviewAttemptInFlight,
   readInvitationState,
   setNativeReviewAttemptInFlight,
 } from "./feedback";
 import { useFeedbackInvitation } from "./feedback-invitation";
-import { useReviewPrompt } from "./review-prompt";
+import { REVIEW_PROMPT_SETTLE_MS, useReviewPrompt } from "./review-prompt";
 import { reactStandIn as react } from "../test/react-stand-in";
 
 vi.mock("react", async () => {
@@ -17,9 +18,14 @@ vi.mock("react", async () => {
 
 const mock = vi.hoisted(() => ({
   appState: { currentState: "active" },
+  appStateListeners: new Set<(state: string) => void>(),
   segments: ["(app)", "(tabs)", "(home)"],
   user: { _id: "user-1" } as { _id: string } | null | undefined,
   paywallPending: false,
+  keyboard: {
+    visible: false,
+    listeners: new Map<string, () => void>(),
+  },
   hasAction: vi.fn(async () => true),
   requestReview: vi.fn(async () => undefined),
   capture: vi.fn(),
@@ -35,8 +41,18 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock("react-native", () => ({
   AppState: Object.assign(mock.appState, {
-    addEventListener: () => ({ remove: () => undefined }),
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      mock.appStateListeners.add(listener);
+      return { remove: () => void mock.appStateListeners.delete(listener) };
+    },
   }),
+  Keyboard: {
+    isVisible: () => mock.keyboard.visible,
+    addListener: (event: string, listener: () => void) => {
+      mock.keyboard.listeners.set(event, listener);
+      return { remove: () => void mock.keyboard.listeners.delete(event) };
+    },
+  },
 }));
 vi.mock("expo-router", () => ({ useSegments: () => mock.segments }));
 vi.mock("@/lib/current-user", () => ({
@@ -82,7 +98,16 @@ const item = (
   ...overrides,
 });
 const threeReady = () => [item(), item(), item()];
-const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+const setAppState = (state: string) => {
+  mock.appState.currentState = state;
+  for (const listener of mock.appStateListeners) listener(state);
+};
+const setKeyboard = (visible: boolean) => {
+  mock.keyboard.visible = visible;
+  mock.keyboard.listeners.get(
+    visible ? "keyboardDidShow" : "keyboardDidHide",
+  )?.();
+};
 const PROMPTED_KEY = "shelvr.review.prompted";
 
 beforeEach(() => {
@@ -90,6 +115,8 @@ beforeEach(() => {
   mock.appState.currentState = "active";
   mock.user = { _id: "user-1" };
   mock.paywallPending = false;
+  mock.keyboard.visible = false;
+  mock.segments = ["(app)", "(tabs)", "(home)"];
   mock.secure.clear();
   setNativeReviewAttemptInFlight(false);
   mock.kv.clear();
@@ -203,10 +230,20 @@ describe("useFeedbackInvitation", () => {
 });
 
 describe("useReviewPrompt", () => {
+  // Home must hold still for the settle window before the sheet may appear.
+  const flush = () => vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("records the prompt only once the guards pass, right before requesting the review", async () => {
     const items = threeReady();
     react.mount(() => useReviewPrompt(items));
-    // hasAction() is still pending: nothing may be claimed yet.
+    // Home has not settled yet: nothing may be claimed.
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
 
@@ -253,5 +290,146 @@ describe("useReviewPrompt", () => {
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
+  });
+
+  it("waits while deferred, as in an account's first session", async () => {
+    const items = threeReady();
+    let defer = true;
+    react.mount(() => useReviewPrompt(items, { defer }));
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    defer = false;
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the keyboard to go away, then for Home to settle", async () => {
+    const items = threeReady();
+    // Add was just closed with its keyboard still sliding away.
+    setKeyboard(true);
+    react.mount(() => useReviewPrompt(items));
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+
+    setKeyboard(false);
+    await vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS - 1);
+    expect(mock.hasAction).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  /** Holds hasAction() open until the test resolves it. */
+  const pendingHasAction = () => {
+    let resolve!: (value: boolean) => void;
+    mock.hasAction.mockImplementationOnce(
+      () => new Promise<boolean>((r) => (resolve = r)),
+    );
+    return (value = true) => resolve(value);
+  };
+
+  it("cancels an attempt when the keyboard shows while hasAction() is pending", async () => {
+    const items = threeReady();
+    const resolveHasAction = pendingHasAction();
+    react.mount(() => useReviewPrompt(items));
+    await flush();
+    expect(mock.hasAction).toHaveBeenCalledOnce();
+
+    // The keyboard shows and hides again before hasAction() answers.
+    setKeyboard(true);
+    setKeyboard(false);
+    resolveHasAction();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mock.requestReview).not.toHaveBeenCalled();
+    expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
+
+    // A fresh attempt waits out a full settle window of its own.
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("cancels an attempt when a hold starts while hasAction() is pending", async () => {
+    const items = threeReady();
+    let defer = false;
+    const resolveHasAction = pendingHasAction();
+    react.mount(() => useReviewPrompt(items, { defer }));
+    await flush();
+
+    // The feedback form opens during the check.
+    defer = true;
+    react.rerender();
+    resolveHasAction();
+    await flush();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    defer = false;
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("cancels an attempt when Home is left and re-entered while hasAction() is pending", async () => {
+    const items = threeReady();
+    const resolveHasAction = pendingHasAction();
+    react.mount(() => useReviewPrompt(items));
+    await flush();
+
+    mock.segments = ["(app)", "item", "[id]"];
+    react.rerender();
+    // The cancelled check gave the invitation its moment back.
+    expect(isNativeReviewAttemptInFlight()).toBe(false);
+    mock.segments = ["(app)", "(tabs)", "(home)"];
+    react.rerender();
+    resolveHasAction();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mock.requestReview).not.toHaveBeenCalled();
+    // The superseded check must not release the fresh attempt's hold.
+    expect(isNativeReviewAttemptInFlight()).toBe(true);
+
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+    expect(isNativeReviewAttemptInFlight()).toBe(false);
+  });
+
+  it("holds the feedback invitation through the settle window and releases it when Home is left", async () => {
+    const items = threeReady();
+    react.mount(() => useReviewPrompt(items));
+    expect(isNativeReviewAttemptInFlight()).toBe(true);
+
+    mock.segments = ["(app)", "item", "[id]"];
+    react.rerender();
+    expect(isNativeReviewAttemptInFlight()).toBe(false);
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+  });
+
+  it("records nothing when hasAction() resolves before the keyboard's render commits", async () => {
+    const items = threeReady();
+    // The keyboard is already up by the live read, though no show event has
+    // reached the hook yet: only the re-check after the await stops it.
+    mock.hasAction.mockImplementationOnce(async () => {
+      mock.keyboard.visible = true;
+      return true;
+    });
+    react.mount(() => useReviewPrompt(items));
+    await flush();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+    expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
+  });
+
+  it("waits out a trip to the background, then settles again on return", async () => {
+    const items = threeReady();
+    react.mount(() => useReviewPrompt(items));
+    setAppState("background");
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+
+    setAppState("active");
+    await vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS - 1);
+    expect(mock.hasAction).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mock.requestReview).toHaveBeenCalledOnce();
   });
 });

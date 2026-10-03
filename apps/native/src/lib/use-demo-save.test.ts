@@ -27,6 +27,7 @@ const mock = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
+  recordShareSaved: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -64,16 +65,27 @@ vi.mock("@/lib/onboarding-demo", () => ({
   demoDestination: (url: string) =>
     url === "https://sample.test/recipe" ? "recipes" : null,
 }));
+vi.mock("@/lib/first-share", () => ({
+  recordShareSaved: mock.recordShareSaved,
+}));
 
 const ITEM_ID = "item-1";
 const saved = (reused = false) => ({
   itemId: ITEM_ID,
+  userId: "user_1",
   url: "https://example.com/",
+  urlMatchesRequest: true,
   reused,
   savedSpaceNames: [],
 });
 
-function renderDemo(resume: { url: string; destination: null } | null = null) {
+function renderDemo(
+  resume: {
+    url: string;
+    destination: null;
+    source: "direct" | "share";
+  } | null = null,
+) {
   const onSaved = vi.fn();
   const onAdvance = vi.fn();
   const hook = renderHook(() =>
@@ -100,6 +112,7 @@ beforeEach(() => {
   mock.retry.mockReset();
   mock.capture.mockReset();
   mock.setPendingDemo.mockReset();
+  mock.recordShareSaved.mockReset();
   mock.query = { data: undefined, isError: false, isSuccess: false };
   mock.queryArgs = undefined;
 });
@@ -116,6 +129,7 @@ describe("useDemoSave", () => {
     expect(mock.setPendingDemo).toHaveBeenCalledWith({
       url: "https://sample.test/recipe",
       destination: "name:recipes",
+      source: "direct",
     });
     expect(mock.create).not.toHaveBeenCalled();
 
@@ -141,6 +155,7 @@ describe("useDemoSave", () => {
     const { result } = renderDemo({
       url: "https://example.com/",
       destination: null,
+      source: "direct",
     });
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.create).toHaveBeenCalledTimes(1);
@@ -302,6 +317,91 @@ describe("useDemoSave", () => {
     }
   });
 
+  it("records the first share for an onboarding share-sheet save", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result, onSaved } = renderDemo();
+    await flush(() => result.current.submitSharedUrl("https://example.com/"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+    expect(mock.recordShareSaved.mock.invocationCallOrder[0]).toBeLessThan(
+      onSaved.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("keeps an in-flight share's origin when a typed submit is rejected", async () => {
+    let resolveSave!: (value: ReturnType<typeof saved>) => void;
+    mock.create.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const { result } = renderDemo();
+
+    act(() => result.current.submitSharedUrl("https://example.com/shared"));
+    act(() => result.current.submitTyped("https://example.com/typed"));
+    expect(mock.create).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveSave(saved()));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("keeps the how-to card for a pasted or typed demo save", async () => {
+    mock.create.mockResolvedValue(saved());
+    const { result } = renderDemo();
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    await flush(() => result.current.submitTyped("https://example.com/b"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+  });
+
+  it("persists share origin until sign-in unlocks the save", async () => {
+    mock.authenticated = false;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+
+    act(() => result.current.submitSharedUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.setPendingDemo).toHaveBeenCalledWith({
+      url: "https://example.com/",
+      destination: null,
+      source: "share",
+    });
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+
+    mock.authenticated = true;
+    rerender();
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("records a resumed share on a fresh mount, including a reused save", async () => {
+    mock.create.mockResolvedValue(saved(true));
+    const { result } = renderDemo({
+      url: "https://example.com/",
+      destination: null,
+      source: "share",
+    });
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("does not record a reused item for a different shared URL", async () => {
+    mock.create.mockResolvedValue({
+      ...saved(true),
+      urlMatchesRequest: false,
+    });
+    const { result } = renderDemo({
+      url: "https://example.com/different",
+      destination: null,
+      source: "share",
+    });
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.recordShareSaved).not.toHaveBeenCalled();
+    expect(mock.setPendingDemo).toHaveBeenLastCalledWith({
+      url: "https://example.com/",
+      destination: null,
+      source: "direct",
+    });
+  });
+
   it("returns to picking when sign-in is cancelled", () => {
     mock.authenticated = false;
     const { result } = renderDemo();
@@ -345,7 +445,11 @@ describe("deriveDemoView", () => {
     );
     expect(
       deriveDemoView(
-        initialDemoSaveState({ url: "https://a.test", destination: null }),
+        initialDemoSaveState({
+          url: "https://a.test",
+          destination: null,
+          source: "direct",
+        }),
         query,
       ).view,
     ).toBe("auth");
@@ -364,6 +468,7 @@ describe("demoSaveReducer", () => {
     const state = initialDemoSaveState({
       url: "https://a.test",
       destination: null,
+      source: "direct",
     });
     expect(
       demoSaveReducer(state, { type: "submitFailed", used: false }),
@@ -379,7 +484,11 @@ describe("demoSaveReducer", () => {
     expect(
       demoSaveReducer(lost, {
         type: "submit",
-        request: { url: "https://b.test", destination: null },
+        request: {
+          url: "https://b.test",
+          destination: null,
+          source: "direct",
+        },
         authenticated: true,
         lost: true,
       }),

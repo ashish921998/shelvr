@@ -22,7 +22,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { createWidget, type WidgetEnvironment } from "expo-widgets";
 
-type WidgetSaveItem = {
+export type WidgetSaveItem = {
   id: string;
   title: string;
   subtitle: string;
@@ -31,11 +31,18 @@ type WidgetSaveItem = {
   imageUri?: string;
 };
 
-type RecentSavesWidgetProps = {
+export type RecentSavesWidgetProps = {
+  scheme?: "shelvr" | "shelvr-dev" | "shelvr-preview";
   items: WidgetSaveItem[];
   emptyTitle?: string;
   emptyHint?: string;
   locked?: boolean;
+  /**
+   * Epoch ms the current entitlement stays valid until. The widget locks
+   * itself once its own clock passes this, so a Pro entitlement that lapses
+   * while the app never runs stops showing saves on its own.
+   */
+  validUntil?: number;
 };
 
 // Everything (palette, helpers) lives inside the component: the `'widget'`
@@ -46,6 +53,10 @@ const RecentSavesWidget = (
   environment: WidgetEnvironment,
 ) => {
   "widget";
+  const scheme =
+    props.scheme === "shelvr-dev" || props.scheme === "shelvr-preview"
+      ? props.scheme
+      : "shelvr";
   const dark = environment.colorScheme === "dark";
   // Shelvr palette, mirrored from src/unistyles.ts.
   const c = dark
@@ -60,17 +71,23 @@ const RecentSavesWidget = (
         background: "#faf6ee",
         tile: "#f3ecdd",
         foreground: "#2b2418",
-        muted: "#8d8271",
+        muted: "#6f6455",
         accent: "#e6a23c",
       };
 
   const kindIcon = (kind: "image" | "link" | "note") =>
     kind === "link" ? "link" : kind === "note" ? "note.text" : "photo";
 
-  const items = props.items ?? [];
-  // Until the app writes its first snapshot, fail closed and show the Pro
-  // state rather than exposing a misleading free widget.
-  const locked = props.locked ?? true;
+  // Fail closed before the app writes its first snapshot (no `locked`), when
+  // told to lock, and once the widget's own clock passes the snapshot's
+  // expiry. The last covers a Pro entitlement that lapses while the app never
+  // runs: the app cannot republish, so the snapshot must expire on its own.
+  const expired =
+    props.validUntil !== undefined &&
+    environment.date.getTime() >= props.validUntil;
+  const locked = (props.locked ?? true) || expired;
+  // A locked widget never shows saved content, even if items came through.
+  const items = locked ? [] : (props.items ?? []);
 
   if (items.length === 0) {
     return (
@@ -78,7 +95,7 @@ const RecentSavesWidget = (
         spacing={6}
         modifiers={[
           containerBackground(c.background, "widget"),
-          widgetURL(locked ? "shelvr:///paywall" : "shelvr:///add"),
+          widgetURL(`${scheme}:///${locked ? "paywall" : "add"}`),
         ]}
       >
         <Image
@@ -170,7 +187,7 @@ const RecentSavesWidget = (
         modifiers={[
           containerBackground(c.background, "widget"),
           padding({ all: 12 }),
-          widgetURL("shelvr:///"),
+          widgetURL(`${scheme}:///`),
         ]}
       >
         <HStack spacing={7}>
@@ -252,7 +269,7 @@ const RecentSavesWidget = (
       modifiers={[
         containerBackground(c.background, "widget"),
         padding({ all: 13 }),
-        widgetURL("shelvr:///"),
+        widgetURL(`${scheme}:///`),
       ]}
     >
       <ZStack

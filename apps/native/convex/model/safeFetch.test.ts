@@ -81,8 +81,7 @@ describe("isPublicAddress", () => {
 // Connection-bound DNS: the validating lookup is the resolver undici's socket
 // uses. Tested directly with an injected resolver (deterministic, no network):
 // it must block any private answer, block mixed answer sets, and allow only
-// all-public answers. The spike (deleted before commit) additionally proved
-// end-to-end that a poisoned lookup prevents a real connection.
+// all-public answers.
 // ---------------------------------------------------------------------------
 
 /** Promisify the node-style callback signature makeValidatingLookup returns,

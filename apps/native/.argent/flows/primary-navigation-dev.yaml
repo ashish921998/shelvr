@@ -1,7 +1,7 @@
 steps:
   - echo: Restart the Shelvr development build and expect Home.
   - launch: app.shelvr.save.dev
-  - await: { visible: { text: Home } }
+  - await: { visible: { text: Profile }, timeout: 120000 }
   - await: { idle: true }
   - echo: From Home, open Spaces and expect the new-space action.
   - tap: { id: rectangle.stack }

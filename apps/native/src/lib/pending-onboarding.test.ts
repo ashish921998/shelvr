@@ -74,6 +74,7 @@ describe("onboarding recovery", () => {
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     setOnboardingProgress({
       saveKinds: ["Inspiration"],
@@ -84,7 +85,11 @@ describe("onboarding recovery", () => {
       saveKinds: ["Inspiration"],
       spaces: ["Inspiration"],
       step: 3,
-      demo: { url: "https://example.com/design", destination: "Inspiration" },
+      demo: {
+        url: "https://example.com/design",
+        destination: "Inspiration",
+        source: "share",
+      },
     });
     setPendingDemo(null);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -93,7 +98,11 @@ describe("onboarding recovery", () => {
 
   it("drops a completed demo when onboarding finishes, even with no spaces picked", () => {
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 2 });
-    setPendingDemo({ url: "https://example.com/design", destination: null });
+    setPendingDemo({
+      url: "https://example.com/design",
+      destination: null,
+      source: "direct",
+    });
     setOnboardingProgress({ saveKinds: [], spaces: [], step: 3 });
     // finish(): nothing for the replay hook to do, and no stale save left in
     // SecureStore that a later mount could replay.
@@ -107,11 +116,13 @@ describe("onboarding recovery", () => {
     setPendingDemo({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     updatePendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toEqual({
       url: "https://example.com/design",
       destination: "Inspiration",
+      source: "share",
     });
     setPendingSpaces(["Recipes"]);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -145,6 +156,7 @@ describe("progress written by an older onboarding flow", () => {
   it.each([
     ["no version", {}],
     ["an unknown version", { progressVersion: 1 }],
+    ["the flow before the source step", { progressVersion: 2 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -168,7 +180,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 2,
+        progressVersion: 3,
         saveKinds: ["Travel"],
         step: 2,
         demo: { url: "https://example.com/trip", destination: null },
@@ -179,7 +191,11 @@ describe("progress written by an older onboarding flow", () => {
       saveKinds: ["Travel"],
       spaces: ["Travel"],
       step: 2,
-      demo: { url: "https://example.com/trip", destination: null },
+      demo: {
+        url: "https://example.com/trip",
+        destination: null,
+        source: "direct",
+      },
     });
   });
 

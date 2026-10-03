@@ -10,18 +10,19 @@ import {
   vi,
 } from "vitest";
 import { api, internal } from "@convex/_generated/api";
+import { finalRecipe } from "./ai";
 import {
   extractBodyText,
   fetchInstagram,
   fetchXoEmbed,
   fetchXPost,
-  finalRecipe,
   firstLinkedUrl,
   linkEnrichment,
   parseInstagramEmbed,
-  sanitizeRecipe,
+  readPage,
   storePoster,
-} from "./ai";
+} from "./model/pageRead";
+import { sanitizeRecipe } from "./model/recipeMarkup";
 import articleSyndication from "./testdata/xSyndication/article.json";
 import escapedSyndication from "./testdata/xSyndication/escaped.json";
 import fxArticle from "./testdata/xSyndication/fxArticle.json";
@@ -64,7 +65,7 @@ describe("storePoster", () => {
     safeFetch.mockReset();
   });
 
-  it("falls back to the remote URL when Convex storage rejects the poster", async () => {
+  it("omits the stored preview when Convex storage rejects the poster", async () => {
     safeFetch.mockResolvedValue({
       ok: true,
       finalUrl: "https://example.com/poster.jpg",
@@ -145,6 +146,11 @@ describe("firstLinkedUrl", () => {
     expect(
       firstLinkedUrl("watch https://youtu.be/abc and https://x.com/a"),
     ).toBe(undefined);
+    expect(
+      firstLinkedUrl(
+        "saved from https://in.pinterest.com/pin/1/ and https://pin.it/abc",
+      ),
+    ).toBe(undefined);
     expect(firstLinkedUrl("no links here")).toBeUndefined();
     expect(firstLinkedUrl(undefined)).toBeUndefined();
   });
@@ -193,6 +199,15 @@ function serveX(
   fxtwitter: FakeResponse = { status: 599 },
 ) {
   safeFetch.mockImplementation(async (url: string) => {
+    if (url.startsWith("https://pbs.twimg.com/")) {
+      return {
+        ok: true,
+        finalUrl: url,
+        status: 200,
+        contentType: "image/jpeg",
+        bytes: new Uint8Array([1, 2, 3]),
+      };
+    }
     const response = url.startsWith(
       "https://cdn.syndication.twimg.com/tweet-result?",
     )
@@ -1172,10 +1187,9 @@ describe("processItem for X posts", () => {
       title: "GLP-1 App Growth",
       siteName: "X",
       author: "@adamtwtz",
-      heroImageUrl:
-        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 2.5,
-      imageUrl: null,
+      imageUrl: expect.stringContaining("/api/storage/"),
     });
     expect(item?.content).toMatch(/^An app spent \$21,418/);
     expect(item?.enrichment).toBeUndefined();
@@ -1293,8 +1307,7 @@ describe("processItem for X posts", () => {
       title: "GLP-1 App Growth",
       siteName: "X",
       author: "@adamtwtz",
-      heroImageUrl:
-        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 2.5,
     });
     expect(item?.enrichment).toBeUndefined();
@@ -1321,8 +1334,8 @@ describe("processItem for X posts", () => {
     const { item } = await saveLink(
       "https://x.com/maruyo_/status/1521844593804906496",
     );
-    expect(item?.heroImageUrl).toBe(
-      "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large",
+    expect(item?.heroImageUrl).toEqual(
+      expect.stringContaining("/api/storage/"),
     );
     expect(item?.aspectRatio).toBe(1200 / 1103);
     expect(item?.media?.map((m) => [m.kind, m.imageUrl])).toEqual([
@@ -1370,7 +1383,7 @@ describe("processItem for X posts", () => {
       siteName: "TikTok",
       author: "@scout2015",
       content: "Scramble up ur name & I’ll try to guess it😍❤️",
-      heroImageUrl: "https://p16-sign-va.tiktokcdn.com/poster.jpeg",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 720 / 1280,
     });
     expect(item).not.toHaveProperty("media");
@@ -2105,5 +2118,119 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
     const item = await save(cutAt(microdataHtml(), "the salt."), true);
     expect(item?.recipe).toBeUndefined();
     expect(item?.status).toBe("ready");
+  });
+});
+
+describe("readPage recipe eligibility", () => {
+  const TIKTOK_URL = "https://www.tiktok.com/@cook/video/7350000000000000000";
+  const RECIPE_PAGE = "https://recipes.test/one-pan-gnocchi";
+
+  beforeEach(async () => {
+    safeFetch.mockReset();
+    parseJson.mockReset();
+    decodeWithContentType.mockReset();
+    const actual =
+      await vi.importActual<typeof import("./model/safeFetch")>(
+        "./model/safeFetch",
+      );
+    parseJson.mockImplementation(actual.parseJson);
+    decodeWithContentType.mockImplementation(actual.decodeWithContentType);
+  });
+
+  /** A TikTok whose oEmbed caption is `caption`; `recipeHtml`, when given, is
+   * the page the caption links to. Every other fetch fails. */
+  function serveTikTok(caption: string, recipeHtml?: string) {
+    safeFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith("https://www.tiktok.com/oembed?")) {
+        return {
+          ok: true,
+          finalUrl: url,
+          status: 200,
+          contentType: "application/json",
+          bytes: new TextEncoder().encode(
+            JSON.stringify({ title: caption, author_unique_id: "cook" }),
+          ),
+        };
+      }
+      if (url === RECIPE_PAGE && recipeHtml !== undefined) {
+        return {
+          ok: true,
+          finalUrl: url,
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          bytes: new TextEncoder().encode(recipeHtml),
+        };
+      }
+      return { ok: false, code: "http_error", status: 599 };
+    });
+  }
+
+  it("asks for a recipe from a full caption with no markup", async () => {
+    serveTikTok("One-pan gnocchi: 500g gnocchi, 1 tin tomatoes. Fry, simmer.");
+    const read = await readPage(TIKTOK_URL);
+    expect(read).toMatchObject({
+      status: "ok",
+      askForRecipe: true,
+      shortForm: { site: "TikTok", video: true },
+    });
+  });
+
+  it("does not ask when the caption was cut short", async () => {
+    serveX({ status: 200, body: longVideoSyndication }, { status: 500 });
+    const read = await readPage(
+      "https://x.com/levelsio/status/2021693766793318833",
+    );
+    expect(read.status).toBe("ok");
+    expect(read.status === "ok" && read.page.truncated).toBe(true);
+    expect(read.status === "ok" && read.askForRecipe).toBe(false);
+  });
+
+  it("does not ask when the caption's linked page yielded markup", async () => {
+    const recipe = {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      name: "One-pan gnocchi",
+      recipeIngredient: ["500g gnocchi", "1 tin tomatoes"],
+      recipeInstructions: ["Fry the gnocchi.", "Add the tomatoes and simmer."],
+    };
+    serveTikTok(
+      `One-pan gnocchi, full recipe at ${RECIPE_PAGE}`,
+      `<html><head><script type="application/ld+json">${JSON.stringify(recipe)}</script></head><body></body></html>`,
+    );
+    const read = await readPage(TIKTOK_URL);
+    expect(read.status === "ok" && read.page.recipe?.ingredients).toEqual(
+      recipe.recipeIngredient,
+    );
+    expect(read.status === "ok" && read.askForRecipe).toBe(false);
+  });
+
+  it("marks an Instagram reel short-form without asking for a recipe", async () => {
+    // Short-form, but its caption is not a caption source the model may
+    // transcribe a recipe from.
+    instagramAnswers(REEL_PAGE, REEL_EMBED);
+    const read = await readPage("https://www.instagram.com/reel/DHVrPLrIyQ_/");
+    expect(read).toMatchObject({
+      status: "ok",
+      askForRecipe: false,
+      shortForm: { site: "Instagram", video: true },
+    });
+    expect(read.status === "ok" && read.page.content).toContain(
+      "Meet the National Geographic 33!",
+    );
+  });
+
+  it("does not ask for an ordinary web page", async () => {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(
+        "<html><head><title>Short page</title></head><body><p>Hi.</p></body></html>",
+      ),
+    }));
+    const read = await readPage("https://example.com/post");
+    expect(read).toMatchObject({ status: "ok", askForRecipe: false });
+    expect(read).not.toHaveProperty("shortForm");
   });
 });

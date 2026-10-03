@@ -152,6 +152,11 @@ async function deleteUserOwnedDataBatch(
   // and survive the deletion.
   if (!(await deleteExtensionAccessBatch(ctx, userKey))) return false;
 
+  // Capture tokens next, so Siri stops saving into the account the moment
+  // deletion starts rather than after its saves have drained.
+  if (!(await deleteCaptureTokensBatch(ctx, userId as Id<"users">)))
+    return false;
+
   // Raw deletes on purpose: every spaceItems write normally goes through
   // model/memberships.ts to keep the space summary exact, but these spaces
   // are deleted in the same pass, so patching their counters would be waste.
@@ -216,6 +221,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (reads.length === DELETE_BATCH) return false;
 
+  if (!(await deleteShareLinksBatch(ctx, userKey))) return false;
+
   const devices = await ctx.db
     .query("notificationDevices")
     .withIndex("by_user", (q) => q.eq("userId", userKey))
@@ -234,14 +241,7 @@ async function deleteUserOwnedDataBatch(
   }
   if (preferences.length === DELETE_BATCH) return false;
 
-  const digests = await ctx.db
-    .query("weeklyDigests")
-    .withIndex("by_user", (q) => q.eq("userId", userKey))
-    .take(DELETE_BATCH);
-  for (const digest of digests) {
-    await ctx.db.delete(digest._id);
-  }
-  if (digests.length === DELETE_BATCH) return false;
+  if (!(await deleteSentNotificationsBatch(ctx, userKey))) return false;
 
   // Feedback rows hold the user's authored messages, so they drain with the
   // account. Deleting a row cannot retract an already-delivered inbox email
@@ -268,6 +268,30 @@ async function deleteUserOwnedDataBatch(
   return true;
 }
 
+/** Deletes up to one batch each of the user's weekly digests and save
+ * reminders. Returns true when both tables are drained for this user. */
+async function deleteSentNotificationsBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const digests = await ctx.db
+    .query("weeklyDigests")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const digest of digests) {
+    await ctx.db.delete(digest._id);
+  }
+  if (digests.length === DELETE_BATCH) return false;
+  const reminders = await ctx.db
+    .query("saveReminders")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const reminder of reminders) {
+    await ctx.db.delete(reminder._id);
+  }
+  return reminders.length !== DELETE_BATCH;
+}
+
 /** Deletes up to one batch of the user's feedback submissions. Returns true
  * when the table is fully drained for this user. Feedback rows hold the
  * user's authored messages, so they drain with the account; deleting a row
@@ -285,6 +309,38 @@ async function deleteFeedbackBatch(
     await ctx.db.delete(submission._id);
   }
   return feedback.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's Siri capture tokens. Returns true
+ * when the table is fully drained for this user. */
+async function deleteCaptureTokensBatch(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const tokens = await ctx.db
+    .query("captureTokens")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const token of tokens) {
+    await ctx.db.delete(token._id);
+  }
+  return tokens.length !== DELETE_BATCH;
+}
+
+/** Deletes up to one batch of the user's branded share links. Returns true
+ * when the table is fully drained for this user. */
+async function deleteShareLinksBatch(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<boolean> {
+  const links = await ctx.db
+    .query("shareLinks")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .take(DELETE_BATCH);
+  for (const link of links) {
+    await ctx.db.delete(link._id);
+  }
+  return links.length !== DELETE_BATCH;
 }
 
 /** Sessions (+ refresh tokens), accounts (+ verification codes), then users. */

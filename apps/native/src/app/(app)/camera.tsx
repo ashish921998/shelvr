@@ -1,6 +1,5 @@
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
-import { parseExifDate } from "@/lib/date";
-import { resolvePickedImageLocation } from "@/lib/picked-image-location";
+import { pickAndSaveImages } from "@/lib/pick-and-save-images";
 import {
   type ImageSaveRequest,
   reportSaveFailures,
@@ -10,19 +9,19 @@ import { useSaveImageBatch } from "@/lib/use-save-image-batch";
 import type { Id } from "@convex/_generated/dataModel";
 import { openPaywall } from "@/lib/entitlement";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
@@ -59,6 +58,15 @@ export default function CameraScreen() {
   const saveImages = useSaveImages();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<CaptureMode>("photo");
+  // The light status bar belongs to the viewfinder; any route pushed above
+  // (paywall fallback) must get the root layout's theme-driven bar back.
+  const [cameraFocused, setCameraFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setCameraFocused(true);
+      return () => setCameraFocused(false);
+    }, []),
+  );
 
   // Slides the active-label highlight between Photo (0) and Sticker (1).
   const progress = useSharedValue(0);
@@ -84,8 +92,8 @@ export default function CameraScreen() {
         .activeOffsetX([-20, 20])
         .onEnd((event) => {
           "worklet";
-          if (event.translationX < -40) runOnJS(switchMode)("sticker");
-          else if (event.translationX > 40) runOnJS(switchMode)("photo");
+          if (event.translationX < -40) scheduleOnRN(switchMode, "sticker");
+          else if (event.translationX > 40) scheduleOnRN(switchMode, "photo");
         }),
     [switchMode],
   );
@@ -114,30 +122,7 @@ export default function CameraScreen() {
     },
   });
 
-  const pickFromLibrary = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-      exif: true,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    await runImageRequests(
-      await Promise.all(
-        result.assets.map(async (asset) => ({
-          image: {
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            mimeType: asset.mimeType,
-            capturedAt: parseExifDate(asset.exif),
-            ...(await resolvePickedImageLocation(asset)),
-          },
-        })),
-      ),
-    );
-  };
+  const pickFromLibrary = () => pickAndSaveImages(runImageRequests);
 
   // Saves a single already-built request (used for the initial capture AND for
   // a retry), reusing the request's operation id verbatim. A retry never
@@ -274,6 +259,10 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Light over the viewfinder only while no route stacks above (e.g. the
+          paywall fallback): on unmount expo-status-bar falls back to the
+          root layout's theme-driven bar. */}
+      {cameraFocused && <StatusBar style="light" />}
       <GestureDetector gesture={swipe}>
         <View style={styles.preview}>{body}</View>
       </GestureDetector>

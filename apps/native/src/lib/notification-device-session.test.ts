@@ -20,8 +20,10 @@ function setup(initial: string[] = [], getLocale?: () => string) {
     saveToken: vi.fn(async (_token: string, _locale?: string) => {}),
     revokeToken: vi.fn(async (_token: string) => {}),
     setWeeklyShelf: vi.fn(async (_enabled: boolean) => {}),
+    setSaveReminders: vi.fn(async (_enabled: boolean) => {}),
     signOut: vi.fn(async () => {}),
     deleteAccount: vi.fn(async () => {}),
+    clearWidget: vi.fn(async () => {}),
     resetAnalytics: vi.fn(),
     reportError: vi.fn(),
   };
@@ -265,6 +267,20 @@ describe("notification device session", () => {
     expect(deps.getToken).toHaveBeenCalledTimes(2);
   });
 
+  it("asks for permission before turning save reminders on, never to turn them off", async () => {
+    const { session, deps } = setup();
+    deps.getToken.mockResolvedValueOnce(null);
+    expect(await session.setSaveReminders(true)).toBe(false);
+    expect(deps.setSaveReminders).not.toHaveBeenCalled();
+    expect(await session.setSaveReminders(true)).toBe(true);
+    expect(deps.getToken).toHaveBeenLastCalledWith(true);
+    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(true);
+    expect(await session.setSaveReminders(false)).toBe(true);
+    expect(deps.setSaveReminders).toHaveBeenLastCalledWith(false);
+    expect(deps.getToken).toHaveBeenCalledTimes(2);
+    expect(deps.setWeeklyShelf).not.toHaveBeenCalled();
+  });
+
   it("surfaces token registration failures separately from denied permission", async () => {
     const { session, deps } = setup();
     deps.getToken.mockRejectedValueOnce(new Error("token service unavailable"));
@@ -284,6 +300,7 @@ describe("notification device session", () => {
     expect(deps.signOut).not.toHaveBeenCalled();
     expect(deps.resetAnalytics).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toBe("idle");
+    expect(deps.clearWidget).not.toHaveBeenCalled();
   });
 
   it("keeps successful deletion successful when local cleanup fails", async () => {
@@ -292,9 +309,35 @@ describe("notification device session", () => {
     await expect(session.deleteAccount()).resolves.toBeUndefined();
     expect(deps.revokeToken).toHaveBeenCalledBefore(deps.deleteAccount);
     expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.signOut);
+    expect(deps.clearWidget).toHaveBeenCalledOnce();
+    expect(deps.deleteAccount).toHaveBeenCalledBefore(deps.clearWidget);
+    expect(deps.clearWidget).toHaveBeenCalledBefore(deps.signOut);
+    // signOut failed after a successful deletion, so no auth edge will fire
+    // promptly — the fallback must have cleared the identity itself.
     expect(deps.resetAnalytics).toHaveBeenCalledOnce();
     expect(deps.reportError).toHaveBeenCalledOnce();
     expect(await session.register()).toBe(false);
     expect(deps.saveToken).not.toHaveBeenCalled();
+  });
+
+  it("reports widget failure without blocking successful account deletion", async () => {
+    const { session, deps } = setup();
+    deps.clearWidget.mockRejectedValueOnce(new Error("private native path"));
+    await expect(session.deleteAccount()).resolves.toBeUndefined();
+    expect(deps.signOut).toHaveBeenCalledOnce();
+    expect(deps.reportError).toHaveBeenCalledWith(
+      new Error("widget_clear_failed"),
+    );
+  });
+
+  it("preserves the safe file-cleanup category after account deletion", async () => {
+    const { session, deps } = setup();
+    deps.clearWidget.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    await session.deleteAccount();
+    expect(deps.reportError).toHaveBeenCalledWith(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
   });
 });

@@ -7,6 +7,10 @@ import { logEvent } from "./model/log";
 import { paymentTelemetryValidator } from "./model/paymentTelemetry";
 import { saveSourceValidator } from "./model/saveSource";
 import {
+  enrichmentValidator,
+  failureReasonValidator,
+} from "./model/itemFields";
+import {
   deliverPostHogEvent,
   newDeliveryId,
   scheduleCaptureRetry,
@@ -18,6 +22,12 @@ const MAX_PAYMENT_ATTEMPTS = 5;
 // A save is already committed by the time this runs; a lost event costs the
 // funnel one row, so it retries briefly and then warns.
 const MAX_SAVE_ATTEMPTS = 3;
+// The notification is already out by the time this runs, so a lost event costs
+// the funnel one row and nothing else. Same budget as a save.
+const MAX_NOTIFICATION_ATTEMPTS = 3;
+// A processing outcome is already written to the item row; the event only
+// feeds the funnel. Same budget as a save.
+const MAX_ITEM_PROCESSED_ATTEMPTS = 3;
 
 export const capturePayment = internalAction({
   args: {
@@ -90,6 +100,10 @@ export const captureSave = internalAction({
     savedAt: v.number(),
     sessionId: v.optional(v.string()),
     saveSource: v.optional(saveSourceValidator),
+    // The import operation the save went through, when it used the
+    // `itemOperations` ledger. Joins this event to the client-side
+    // `save_attempt_started`/`save_failed` attempts that minted the same id.
+    operationId: v.optional(v.string()),
     // Image saves only: photos held after this save, and the stored file size.
     photoCount: v.optional(v.number()),
     storedBytes: v.optional(v.number()),
@@ -112,6 +126,7 @@ export const captureSave = internalAction({
         saved_at: args.savedAt,
         save_session_id: args.sessionId,
         save_source: args.saveSource,
+        operation_id: args.operationId,
         photo_count: args.photoCount,
         stored_bytes: args.storedBytes,
         analytics_version: 1,
@@ -138,6 +153,141 @@ export const captureSave = internalAction({
     );
     if (!retried) {
       logEvent("warn", "save_telemetry_delivery_failed", {
+        attempts: attempt + 1,
+      });
+    }
+    return null;
+  },
+});
+
+export const captureItemProcessed = internalAction({
+  args: {
+    itemId: v.id("items"),
+    userId: v.string(),
+    itemType: v.union(v.literal("image"), v.literal("link"), v.literal("note")),
+    // `ready` includes `partial`/`no_article` enrichment, which is a usable
+    // item the user can act on; `failed` carries the bounded reason below.
+    outcome: v.union(v.literal("ready"), v.literal("failed")),
+    failureReason: v.optional(failureReasonValidator),
+    enrichment: v.optional(enrichmentValidator),
+    // How long the run that produced this outcome took, from its own start
+    // (not `_creationTime`, so a `reprocessItem` retry is measured alone).
+    processingMs: v.number(),
+    finishedAt: v.number(),
+    attempt: v.optional(v.number()),
+    eventId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!env.POSTHOG_PROJECT_TOKEN) return null;
+    const eventId = args.eventId ?? newDeliveryId();
+    const delivery = await deliverPostHogEvent({
+      event: "item_processed",
+      distinctId: args.userId,
+      deliveryId: eventId,
+      timestamp: args.finishedAt,
+      properties: {
+        $process_person_profile: false,
+        // Joins to `item_saved` by id, so the save funnel's last leg —
+        // did the persisted item become usable — is one query.
+        item_id: args.itemId,
+        item_type: args.itemType,
+        outcome: args.outcome,
+        failure_reason: args.failureReason,
+        enrichment: args.enrichment,
+        processing_ms: args.processingMs,
+        analytics_version: 1,
+      },
+    });
+    if (delivery.status === "delivered") return null;
+    if (delivery.status === "rejected") {
+      logEvent("warn", "item_processed_telemetry_rejected", {
+        status: delivery.httpStatus,
+      });
+      return null;
+    }
+    const attempt = args.attempt ?? 0;
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_ITEM_PROCESSED_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(
+          delayMs,
+          internal.analytics.captureItemProcessed,
+          {
+            ...args,
+            attempt: nextAttempt,
+            eventId,
+          },
+        ),
+    );
+    if (!retried) {
+      logEvent("warn", "item_processed_telemetry_delivery_failed", {
+        attempts: attempt + 1,
+      });
+    }
+    return null;
+  },
+});
+
+export const captureNotification = internalAction({
+  args: {
+    userId: v.string(),
+    /** The weekly digest or save reminder id; also the payload's `notificationId`. */
+    notificationId: v.string(),
+    kind: v.string(),
+    itemCount: v.number(),
+    /** Provider acceptance, not a device read. Expo reports that APNs or FCM
+     * took the message; nothing here knows whether it was shown or seen. */
+    delivered: v.boolean(),
+    sentAt: v.number(),
+    attempt: v.optional(v.number()),
+    eventId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!env.POSTHOG_PROJECT_TOKEN) return null;
+    const eventId = args.eventId ?? newDeliveryId();
+    const delivery = await deliverPostHogEvent({
+      event: "notification_sent",
+      distinctId: args.userId,
+      deliveryId: eventId,
+      timestamp: args.sentAt,
+      properties: {
+        $process_person_profile: false,
+        // The payload carries the same id, so an open recorded by the client
+        // joins to this row without a second identifier.
+        notification_id: args.notificationId,
+        notification_kind: args.kind,
+        item_count: args.itemCount,
+        delivered: args.delivered,
+        analytics_version: 1,
+      },
+    });
+    if (delivery.status === "delivered") return null;
+    if (delivery.status === "rejected") {
+      logEvent("warn", "notification_telemetry_rejected", {
+        status: delivery.httpStatus,
+      });
+      return null;
+    }
+    const attempt = args.attempt ?? 0;
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_NOTIFICATION_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(
+          delayMs,
+          internal.analytics.captureNotification,
+          {
+            ...args,
+            attempt: nextAttempt,
+            eventId,
+          },
+        ),
+    );
+    if (!retried) {
+      logEvent("warn", "notification_telemetry_delivery_failed", {
         attempts: attempt + 1,
       });
     }

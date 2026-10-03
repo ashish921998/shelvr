@@ -15,7 +15,8 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 // Older flows stored `step` as an index into a different step list, under the
 // same key. Their step and answers are ignored so progress restarts at the
 // opener; the replay fields (operationId, spaces, demoUrl) still apply.
-const PROGRESS_VERSION = 2;
+// Version 3 inserted the acquisition source step after the opener.
+const PROGRESS_VERSION = 3;
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
@@ -27,6 +28,8 @@ export type PendingDemo = {
   url: string;
   /** The demo's explicit single destination ("just my shelf" when null). */
   destination: string | null;
+  /** Only a URL received through Shelvr's share extension counts as a share. */
+  source: "direct" | "share";
 };
 
 type PendingRecord = {
@@ -85,7 +88,7 @@ function readPendingRecord(): PendingRecord | null {
     const spaces = stringArray(record.spaces);
     const saveKinds = stringArray(record.saveKinds) ?? [];
     const step = typeof record.step === "number" ? record.step : null;
-    const demo =
+    const storedDemo =
       record.demo !== null &&
       typeof record.demo === "object" &&
       typeof record.demo.url === "string" &&
@@ -93,6 +96,16 @@ function readPendingRecord(): PendingRecord | null {
         typeof record.demo.destination === "string")
         ? record.demo
         : null;
+    // Builds before the first-share fix did not persist origin. Treat those
+    // records as direct saves rather than hiding guidance on an assumption.
+    const demo: PendingDemo | null =
+      storedDemo === null
+        ? null
+        : {
+            url: storedDemo.url,
+            destination: storedDemo.destination,
+            source: storedDemo.source === "share" ? "share" : "direct",
+          };
     if (
       typeof record.operationId !== "string" ||
       record.operationId === "" ||

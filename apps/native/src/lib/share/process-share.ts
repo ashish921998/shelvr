@@ -3,7 +3,7 @@
 // image save, persistence) is injected, so the orchestration is unit-testable
 // with fakes and so a partial failure can never erase sibling successes.
 //
-// The contract (plan 004):
+// The contract:
 //   - classify(): convert resolved payloads into entries WITHOUT side effects,
 //     treating malformed input (no contentUri, blank text, bad website URL,
 //     unsupported types) as explicit failed/unsupported entries.
@@ -16,6 +16,7 @@ import { extractFirstUrl, isProbablyUrl } from "@/lib/url";
 import { userSafeMessage } from "@/lib/user-safe-message";
 import type { Id } from "@convex/_generated/dataModel";
 import type { ImageSaveResult, LocalImage } from "@/lib/use-save-image";
+import { MAX_SHARE_ENTRIES } from "./storage";
 import type {
   RawSharePayload,
   ShareEntry,
@@ -293,29 +294,32 @@ export async function processSession(
   deps: ShareSaveDeps,
   onEntrySettled?: (entry: ShareEntry) => void,
 ): Promise<ShareSession> {
+  if (
+    session.entries.length > MAX_SHARE_ENTRIES ||
+    resolved.length > MAX_SHARE_ENTRIES
+  )
+    throw new Error("Share batch is too large");
   const entries = session.entries.map((e) => ({ ...e }));
   const linkDeps = sharedLinkSaves(entries, resolved, deps);
 
-  await Promise.all(
-    entries.map(async (entry): Promise<void> => {
-      // Skip terminal entries: saved successes are never re-saved; unsupported
-      // entries have nothing to attempt.
-      if (entry.status === "saved" || entry.status === "unsupported") return;
-      // Already-processed-and-failed entries are retried; pending entries are
-      // attempted for the first time. Both go through the same path.
+  for (const entry of entries) {
+    // Skip terminal entries: saved successes are never re-saved; unsupported
+    // entries have nothing to attempt.
+    if (entry.status === "saved" || entry.status === "unsupported") continue;
+    // Already-processed-and-failed entries are retried; pending entries are
+    // attempted for the first time. Both go through the same path.
 
-      const settled = await processOne(entry, resolved, linkDeps);
-      // Merge the settled outcome onto this entry, including the re-derived kind.
-      // On a resume where classifyEntries did not run (a sibling was already
-      // settled), a pending entry may still carry its placeholder kind:'link';
-      // persisting settled.kind corrects it rather than leaving the wrong kind.
-      entry.kind = settled.kind;
-      entry.status = settled.status;
-      entry.itemId = settled.itemId;
-      entry.message = settled.message;
-      onEntrySettled?.(entry);
-    }),
-  );
+    const settled = await processOne(entry, resolved, linkDeps);
+    // Merge the settled outcome onto this entry, including the re-derived kind.
+    // On a resume where classifyEntries did not run (a sibling was already
+    // settled), a pending entry may still carry its placeholder kind:'link';
+    // persisting settled.kind corrects it rather than leaving the wrong kind.
+    entry.kind = settled.kind;
+    entry.status = settled.status;
+    entry.itemId = settled.itemId;
+    entry.message = settled.message;
+    onEntrySettled?.(entry);
+  }
 
   return { ...session, entries };
 }

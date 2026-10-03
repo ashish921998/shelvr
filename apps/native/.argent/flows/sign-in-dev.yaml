@@ -1,0 +1,11 @@
+steps:
+  - echo: Restart the dev build and establish a signed-in anonymous dev session.
+  - launch: app.shelvr.save.dev
+  - echo: If the sign-in screen is showing, use the passwordless dev login.
+  - await: { idle: true, timeout: 120000 }
+  - when: { visible: { id: dev-login-button } }
+    steps:
+      - tap: { id: dev-login-button }
+  - echo: Whether we just signed in or already were, end on Home.
+  - await: { visible: { text: Profile }, timeout: 120000 }
+  - await: { idle: true }

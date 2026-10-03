@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   Linking,
   Platform,
@@ -8,29 +8,15 @@ import {
   View,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { TERMS_VERSION } from "@convex/model/legalConsent";
+import { SettingCard } from "@/components/ui/setting-card";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { analytics } from "@/lib/analytics";
-import { useOnboarding } from "@/lib/onboarding";
-import { ScreenLoader } from "@/components/ui/screen-loader";
 
-/** Review follows sign-in/onboarding, before purchase UI can be presented. */
-export function LegalConsentBoundary({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const { onboarded } = useOnboarding();
-  const enabled = isAuthenticated && onboarded && Platform.OS === "ios";
-  const consent = useQuery(api.legalConsent.get, enabled ? {} : "skip");
-  if (isLoading) return <ScreenLoader label={t("loading.app")} />;
-  if (!enabled) return children;
-  if (consent === undefined) return <ScreenLoader label={t("loading.app")} />;
-  if (consent?.reviewedVersion !== TERMS_VERSION) return <LegalConsentReview />;
-  return children;
-}
-
-function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
+function LegalConsentReview({ onComplete }: { onComplete: () => void }) {
   useAppLocale();
   const review = useMutation(api.legalConsent.review);
   const [pending, setPending] = useState(false);
@@ -41,7 +27,7 @@ function LegalConsentReview({ onComplete }: { onComplete?: () => void }) {
     setFailed(false);
     try {
       await review({ version: TERMS_VERSION, accepted });
-      onComplete?.();
+      onComplete();
     } catch {
       analytics.captureError(
         "legal_consent_save_failed",
@@ -125,41 +111,38 @@ export function LegalConsentPreference() {
   };
   if (reviewing)
     return <LegalConsentReview onComplete={() => setReviewing(false)} />;
+  // A SettingCard like its neighbours on Settings, so it reads as one more
+  // setting rather than loose text between the cards.
   return (
-    <View style={styles.preference}>
-      <Text style={styles.heading}>{t("refundConsent.setting")}</Text>
-      <Text style={styles.body}>
-        {t(
+    <SettingCard
+      title={t("refundConsent.setting")}
+      description={t(
+        consent?.refundSharing
+          ? "refundConsent.enabled"
+          : "refundConsent.disabled",
+      )}
+      action={{
+        label: t(
           consent?.refundSharing
-            ? "refundConsent.enabled"
-            : "refundConsent.disabled",
-        )}
-      </Text>
-      {consent?.syncPending ? (
-        <Text style={styles.body}>{t("refundConsent.syncPending")}</Text>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        disabled={pending || consent === undefined}
-        style={styles.secondary}
-        onPress={() =>
-          consent?.refundSharing ? void turnOff() : setReviewing(true)
-        }
-      >
-        <Text style={styles.link}>
-          {t(
-            consent?.refundSharing
-              ? "refundConsent.withdraw"
-              : "refundConsent.review",
-          )}
-        </Text>
-      </Pressable>
-      {failed ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {t("refundConsent.error")}
-        </Text>
-      ) : null}
-    </View>
+            ? "refundConsent.withdraw"
+            : "refundConsent.review",
+        ),
+        disabled: consent === undefined,
+        busy: pending,
+        onPress: () =>
+          consent?.refundSharing ? void turnOff() : setReviewing(true),
+      }}
+      // Each message stays its own translated sentence on its own line, and
+      // a failed withdrawal still shows a sync the server reports as pending.
+      note={
+        [
+          failed ? t("refundConsent.error") : null,
+          consent?.syncPending ? t("refundConsent.syncPending") : null,
+        ]
+          .filter(Boolean)
+          .join("\n") || null
+      }
+    />
   );
 }
 
@@ -176,11 +159,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   title: {
     fontFamily: theme.fonts.display,
     fontSize: 28,
-    color: theme.colors.foreground,
-  },
-  heading: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
     color: theme.colors.foreground,
   },
   body: {
@@ -215,7 +193,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     padding: theme.gap(1),
   },
-  preference: { padding: theme.gap(2), gap: theme.gap(1) },
   error: {
     fontFamily: theme.fonts.regular,
     fontSize: 14,

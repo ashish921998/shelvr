@@ -6,13 +6,9 @@
       "@/*": ["./src/*"],
       "@convex/*": ["./convex/*"],
       "subject-lift": ["./modules/subject-lift"],
-      "progressive-blur": ["./modules/progressive-blur"]
+      "progressive-blur": ["./modules/progressive-blur"],
+      "recent-saves-widget": ["./modules/recent-saves-widget"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

@@ -1,14 +1,14 @@
 {
   "production": {
     "ios": {
-      "buildId": "b08ff398-5646-4924-9cce-44102d5bd045",
-      "fingerprint": "9ecfd739fc9136ff56b21ccc044eea28ab65f237",
-      "release": "1.0.4 (32), App Store, released 2026-09-20"
+      "buildId": "b0ec85a7-b248-4a35-8785-2451cb3e7b9c",
+      "fingerprint": "85007f7e35fe4f70395112f6c0c8cda3b5796537",
+      "release": "1.0.7 (39), App Store, released 2026-10-01"
     },
     "android": {
-      "buildId": "8f60c55c-7001-4dd3-8251-a9ba352699de",
-      "fingerprint": "b80eb4a91f139d7b5d037b3435b5fb0e5af08451",
-      "release": "1.0.3 (14), Google Play, released 2026-09-17"
+      "buildId": "0423e2d6-f787-4aa9-93ff-8d857d42b70e",
+      "fingerprint": "f8ca4aa556d4e90733a40fa4ad04cb40419ffd27",
+      "release": "1.0.7 (25), Google Play closed testing (Alpha), released 2026-10-01"
     }
   },
   "internal-test": { "ios": null, "android": null },

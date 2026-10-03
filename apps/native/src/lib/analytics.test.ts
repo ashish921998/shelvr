@@ -77,6 +77,14 @@ describe("item analytics", () => {
     });
   });
 
+  it.each(["digest", "map"])("preserves %s item-open attribution", (source) => {
+    analytics.itemOpened(item, source);
+    expect(mock.capture).toHaveBeenCalledWith(
+      "item_opened",
+      expect.objectContaining({ source }),
+    );
+  });
+
   it("excludes development fixtures", () => {
     analytics.itemOpened({ ...item, fixtureKey: "qa" }, "direct");
     analytics.itemAction({ ...item, fixtureKey: "qa" }, "copy");
@@ -178,6 +186,14 @@ describe("captureError", () => {
 });
 
 describe("resetIfIdentified", () => {
+  it("is the only reset the facade exposes", () => {
+    // Sign-out flows used to call an unconditional reset alongside the auth
+    // edge's conditional one. The auth edge (useAnalyticsIdentity) is the
+    // single owner now; an unconditional entry point must not come back.
+    expect("reset" in analytics).toBe(false);
+    expect(typeof analytics.resetIfIdentified).toBe("function");
+  });
+
   it("keeps a signed-out launch on its anonymous id", async () => {
     await analytics.resetIfIdentified();
     expect(mock.ready).toHaveBeenCalledOnce();

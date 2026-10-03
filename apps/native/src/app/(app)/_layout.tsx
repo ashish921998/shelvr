@@ -1,13 +1,20 @@
+import { AppIntentsBridge } from "@/lib/app-intents";
+import { useExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { ExitOfferSheetHost } from "@/lib/exit-offer-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
+import { useTrialReminder } from "@/lib/trial-reminder";
+import { useWelcomeSaveTracker } from "@/lib/welcome-save";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
+import { useReducedMotion } from "react-native-reanimated";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -17,11 +24,18 @@ export default function AppLayout() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { theme } = useUnistyles();
+  // Spatial slide transitions are the first thing to cut under Reduce Motion.
+  const reducedMotion = useReducedMotion();
 
   // After sign-in, replay deferred onboarding spaces + demo link, then paywall.
   useReplayOnboarding();
   // If a Share Sheet intent arrived while signed out / mid-onboarding, resume it.
   useResumePendingShare();
+  // Remind trialers two days before the yearly plan starts charging.
+  useTrialReminder();
+  // Right after Pro starts, Home hands off to one real save.
+  useWelcomeSaveTracker();
+  useExitOfferReminder();
 
   if (isLoading) {
     return <ScreenLoader label={t("loading.app")} />;
@@ -36,8 +50,12 @@ export default function AppLayout() {
   return (
     <HomeFeedProvider>
       <RecentSavesWidgetSync />
+      <AppIntentsBridge />
+      <ExitOfferSheetHost />
+      <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
+          animation: reducedMotion ? "fade" : "default",
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: theme.colors.primary,
@@ -65,7 +83,7 @@ export default function AppLayout() {
                 canGoBack ? null : (
                   <HeaderIconButton
                     icon="house.fill"
-                    label={t("capture.backToLibrary")}
+                    label={t("digest.backHome")}
                     onPress={() => router.replace("/")}
                   />
                 ),
@@ -74,6 +92,8 @@ export default function AppLayout() {
           <Stack.Screen
             name="space/[id]"
             options={{
+              // iOS 26 native soft scroll edge: the feed fades out under the header.
+              scrollEdgeEffects: { top: "soft" },
               title: "",
               headerBackButtonDisplayMode: "minimal",
             }}
@@ -94,18 +114,13 @@ export default function AppLayout() {
                   }
                 : {
                     presentation: "formSheet",
-                    // Android form sheets do not reliably render native-stack header
-                    // controls. Add owns an in-content toolbar there; iOS keeps the
-                    // native title and toolbar.
                     headerShown: true,
                     headerTransparent: false,
                     headerStyle: { backgroundColor: theme.colors.background },
                     sheetGrabberVisible: true,
-                    // Android does not resize a fit-to-content form sheet when Add
-                    // switches from the compact action menu to the note/article
-                    // composer. Use a large detent there so the native Back/Save
-                    // header and editor remain reachable; iOS can keep its compact,
-                    // dynamically sized sheet.
+                    // Sized to its content so the compact action menu and the
+                    // taller note/article composer both fit without a fixed
+                    // detent leaving the editor unreachable.
                     sheetAllowedDetents: "fitToContents",
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
@@ -162,6 +177,18 @@ export default function AppLayout() {
               headerTransparent: false,
               headerStyle: { backgroundColor: theme.colors.background },
               headerBackButtonDisplayMode: "minimal",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              presentation: "formSheet",
+              // Android form sheets have no native header, so the screen
+              // draws its own title and close button, as Profile does.
+              headerShown: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },

@@ -40,14 +40,17 @@ export function GhostButton({
   label,
   onPress,
   disabled,
+  testID,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  testID?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      testID={testID}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [

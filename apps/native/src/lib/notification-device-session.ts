@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { widgetClearErrorEvent } from "./widget-clear-error";
 
 function isOwnershipConflict(error: unknown): boolean {
   if (!(error instanceof ConvexError)) return false;
@@ -22,8 +23,10 @@ type SessionDependencies = {
   getLocale?: () => string;
   revokeToken: (token: string) => Promise<unknown>;
   setWeeklyShelf: (enabled: boolean) => Promise<unknown>;
+  setSaveReminders: (enabled: boolean) => Promise<unknown>;
   signOut: () => Promise<unknown>;
   deleteAccount: () => Promise<unknown>;
+  clearWidget: () => Promise<unknown>;
   resetAnalytics: () => void;
   reportError: (error: unknown) => void;
 };
@@ -151,10 +154,22 @@ export class NotificationDeviceSession {
   }
 
   setWeeklyShelf(enabled: boolean) {
+    return this.setPreference(enabled, this.deps.setWeeklyShelf);
+  }
+
+  setSaveReminders(enabled: boolean) {
+    return this.setPreference(enabled, this.deps.setSaveReminders);
+  }
+
+  /** Turning a kind on asks for permission first; `false` means it was denied. */
+  private setPreference(
+    enabled: boolean,
+    save: (enabled: boolean) => Promise<unknown>,
+  ) {
     return this.runOperation("preferences", async () => {
       if (enabled && !(await this.register(() => this.deps.getToken(true))))
         return false;
-      await this.deps.setWeeklyShelf(enabled);
+      await save(enabled);
       return true;
     });
   }
@@ -183,15 +198,21 @@ export class NotificationDeviceSession {
           throw error;
         }
         this.stop();
-        // Once the account is deleted, local cleanup cannot turn it into a failed deletion.
-        const cleanup =
-          operation === "delete_account"
-            ? [this.deps.signOut, this.deps.resetAnalytics]
-            : [this.deps.resetAnalytics];
-        for (const action of cleanup) {
+        // After a successful account deletion the server has already ended the
+        // session; clear the local Convex Auth credentials too.
+        if (operation === "delete_account") {
+          // Server deletion succeeded even if local auth cleanup fails next.
+          void this.deps.clearWidget().catch((error) => {
+            this.deps.reportError(new Error(widgetClearErrorEvent(error)));
+          });
           try {
-            await action();
+            await this.deps.signOut();
           } catch (error) {
+            // Local sign-out failed, so no unauthenticated auth edge may
+            // follow promptly and the identity hook would not fire — clear
+            // the PostHog identity here so events stop attributing to the
+            // deleted account.
+            this.deps.resetAnalytics();
             this.deps.reportError(error);
           }
         }

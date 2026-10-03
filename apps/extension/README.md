@@ -16,7 +16,7 @@ Apple flows need a redirect surface the extension does not have, and the
 marketing site has no auth to borrow. So the signed-in app vouches for the
 browser instead:
 
-1. In Shelvr: **Profile → Browser extension → Connect a browser**. The app shows
+1. In Shelvr: **Profile → Settings → Browser extension → Connect a browser**. The app shows
    an eight-character code, good for ten minutes and usable once.
 2. In the browser: open the Shelvr popup and type the code.
 3. The extension trades the code for a connection token at

@@ -28,7 +28,7 @@ const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
  * Generous for real links, bounded to deny pathological input. */
 export const MAX_URL_LENGTH = 2048;
 
-export class UrlPolicyErrorClass extends Error {
+class UrlPolicyErrorClass extends Error {
   constructor(
     public readonly code: UrlPolicyError,
     message: string,
@@ -238,4 +238,85 @@ export function xStatusId(url: string | undefined): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Pinterest's own domains, as they follow `pinterest.`: .com and the country
+ * domains it serves pins on. Any other two-letter TLD is someone else's. */
+const PINTEREST_DOMAIN_SUFFIXES = new Set([
+  "com",
+  "at",
+  "ca",
+  "ch",
+  "cl",
+  "co.kr",
+  "co.uk",
+  "com.au",
+  "com.mx",
+  "de",
+  "dk",
+  "es",
+  "fr",
+  "ie",
+  "it",
+  "jp",
+  "nz",
+  "ph",
+  "pt",
+  "ru",
+  "se",
+]);
+
+/** True for any Pinterest-owned host: pinterest.com, its country domains
+ * (pinterest.co.uk, in.pinterest.com), and the `pin.it` short host. */
+export function isPinterestHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === "pin.it") {
+    return true;
+  }
+  const suffix = host.match(/(?:^|\.)pinterest\.([a-z.]+)$/)?.[1];
+  return suffix !== undefined && PINTEREST_DOMAIN_SUFFIXES.has(suffix);
+}
+
+/** The numeric id of a Pinterest pin URL: `/pin/{id}/` and the slugged
+ * `/pin/{slug}--{id}/` shape Pinterest serves, with any trailing segment such
+ * as `/sent/` after a share. Boards, profiles, and look-alike hosts are not
+ * pins and return undefined. */
+export function pinterestPinId(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (!isPinterestHost(parsed.hostname)) {
+      return undefined;
+    }
+    return parsed.pathname.match(/^\/pin\/(?:[^/]*--)?(\d+)(?:\/.*)?$/)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+/** True for a `pin.it` short link, what the Pinterest app shares. It redirects
+ * to the pin, so its id is only known after the redirect. */
+export function isPinterestShortUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).hostname.toLowerCase() === "pin.it";
+  } catch {
+    return false;
+  }
+}
+
+/** The platforms whose links have their own reader instead of a plain page
+ * fetch. */
+export type LinkSource = "tiktok" | "x" | "instagram" | "pinterest";
+
+/** Which platform reader a saved link goes to, or undefined for a plain web
+ * page. The one place that answers "which platform is this URL". */
+export function linkSource(url: string | undefined): LinkSource | undefined {
+  if (isTikTokUrl(url)) return "tiktok";
+  if (xStatusId(url) !== undefined) return "x";
+  if (isInstagramUrl(url)) return "instagram";
+  if (pinterestPinId(url) !== undefined || isPinterestShortUrl(url)) {
+    return "pinterest";
+  }
+  return undefined;
 }

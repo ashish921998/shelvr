@@ -7,7 +7,7 @@ import { ConvexError } from "convex/values";
 // branches on `demoErrorCode(err)` instead. This module has no server-runtime
 // imports so the native app can load it as `@convex/model/demoErrors`.
 
-export const DEMO_ERROR_CODES = [
+const DEMO_ERROR_CODES = [
   // The allowance is spent and its item no longer belongs to the caller.
   "demo_used",
   // retryDemoItem without a demo row for the caller.
@@ -20,9 +20,9 @@ export const DEMO_ERROR_CODES = [
   "invalid_space_name",
 ] as const;
 
-export type DemoErrorCode = (typeof DEMO_ERROR_CODES)[number];
+type DemoErrorCode = (typeof DEMO_ERROR_CODES)[number];
 
-export type DemoErrorData = { code: DemoErrorCode; message: string };
+type DemoErrorData = { code: DemoErrorCode; message: string };
 
 export const DEMO_ERROR_MESSAGES: Record<DemoErrorCode, string> = {
   demo_used: "Demo save already used",

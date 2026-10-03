@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two cells wide: a two-column masonry of the latest saves, like the feed.
+     Photos keep their shape (RecentSavesRenderer clamps extreme ratios), and
+     the bottom tile is clipped by the widget edge. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/recent_saves_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/recent_saves_widget_background"
+  android:clipToOutline="true"
+  android:orientation="horizontal"
+  android:padding="8dp">
+
+  <LinearLayout
+    android:id="@+id/grid_c0"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:orientation="vertical">
+
+  <FrameLayout
+      android:id="@+id/grid_c0_s0"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c0_s0_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c0_s0_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c0_s0_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c0_s0_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+
+  <FrameLayout
+      android:id="@+id/grid_c0_s1"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="6dp"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c0_s1_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c0_s1_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c0_s1_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c0_s1_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+
+  <FrameLayout
+      android:id="@+id/grid_c0_s2"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="6dp"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c0_s2_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c0_s2_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c0_s2_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c0_s2_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+  </LinearLayout>
+
+  <LinearLayout
+    android:id="@+id/grid_c1"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:layout_marginStart="6dp"
+    android:orientation="vertical">
+
+  <FrameLayout
+      android:id="@+id/grid_c1_s0"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c1_s0_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c1_s0_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c1_s0_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c1_s0_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+
+  <FrameLayout
+      android:id="@+id/grid_c1_s1"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="6dp"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c1_s1_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c1_s1_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c1_s1_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c1_s1_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+
+  <FrameLayout
+      android:id="@+id/grid_c1_s2"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="6dp"
+      android:visibility="gone">
+
+      <ImageView
+        android:id="@+id/grid_c1_s2_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:clipToOutline="true"
+        android:scaleType="fitCenter" />
+
+      <LinearLayout
+        android:id="@+id/grid_c1_s2_text"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@drawable/recent_saves_widget_tile"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <ImageView
+          android:id="@+id/grid_c1_s2_icon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:importantForAccessibility="no"
+          android:tint="@color/recent_saves_widget_accent" />
+
+        <TextView
+          android:id="@+id/grid_c1_s2_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:textSize="12sp"
+          android:textColor="@color/recent_saves_widget_foreground"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:includeFontPadding="false"
+          android:fontFamily="sans-serif-medium"
+          android:layout_marginTop="4dp" />
+      </LinearLayout>
+    </FrameLayout>
+  </LinearLayout>
+</LinearLayout>

@@ -17,7 +17,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { analytics } from "@/lib/analytics";
-import { formatItemDate } from "@/lib/date";
+import { formatShortDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 
 /** A live pairing code: what to show, and when it stops being usable. */
@@ -218,10 +218,10 @@ export default function BrowserExtensionScreen() {
                   <Text style={styles.rowDetail}>
                     {connection.lastUsedAt === undefined
                       ? t("extension.connectedOn", {
-                          date: formatItemDate(connection.createdAt),
+                          date: formatShortDate(connection.createdAt),
                         })
                       : t("extension.lastUsed", {
-                          date: formatItemDate(connection.lastUsedAt),
+                          date: formatShortDate(connection.lastUsedAt),
                         })}
                   </Text>
                 </View>

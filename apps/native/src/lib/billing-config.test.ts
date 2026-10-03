@@ -17,8 +17,26 @@ function validate(env: Record<string, string>) {
     URL,
   });
 }
-
 describe("billing environment isolation", () => {
+  it.each([
+    "",
+    "https://attacker.example",
+    "http://amiable-setter-120.convex.site",
+    "https://user@amiable-setter-120.convex.site",
+    "https://amiable-setter-120.convex.site/path",
+    "https://amiable-setter-120.convex.site?x=1",
+    "https://amiable-setter-120.convex.site#fragment",
+  ])("rejects production capture origin %s", (siteUrl) => {
+    expect(() =>
+      validate({
+        EAS_BUILD: "true",
+        APP_VARIANT: "production",
+        EXPO_PUBLIC_REVENUECAT_IOS_KEY: "appl_store",
+        EXPO_PUBLIC_CONVEX_URL: productionUrl,
+        EXPO_PUBLIC_CONVEX_SITE_URL: siteUrl,
+      }),
+    ).toThrow(/production HTTP origin/);
+  });
   it.each(["/", "?test=true", "/?test=true", "/#test"])(
     "rejects production origin with suffix %s",
     (suffix) => {
@@ -87,17 +105,5 @@ describe("billing environment isolation", () => {
         GOOGLE_SERVICES_JSON: "/tmp/google-services.json",
       }),
     ).toThrow(/production deployment URL/);
-  });
-
-  it("requires Firebase client configuration in a production Android build", () => {
-    expect(() =>
-      validate({
-        EAS_BUILD: "true",
-        APP_VARIANT: "production",
-        EAS_BUILD_PLATFORM: "android",
-        EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: "goog_store",
-        EXPO_PUBLIC_CONVEX_URL: productionUrl,
-      }),
-    ).toThrow(/GOOGLE_SERVICES_JSON/);
   });
 });

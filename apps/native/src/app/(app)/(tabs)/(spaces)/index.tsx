@@ -13,10 +13,10 @@ import { useMutation } from "convex/react";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
-import { ProgressiveBlurHeader } from "progressive-blur";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { Alert, Platform, Pressable, Text, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import { Alert, Pressable, Text, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Standard OpenGraph image shape (1200×630) — the default when a link's real
@@ -197,6 +197,11 @@ export default function SpacesScreen() {
     ]);
   };
 
+  // Staggered entrances replay on recycled cells and jank the masonry list,
+  // so spaces render without them. The zoom handoff stays, but not under
+  // Reduce Motion.
+  const reducedMotion = useReducedMotion();
+
   if (spaces === undefined) {
     return <ScreenLoader label={t("loading.spaces")} />;
   }
@@ -222,18 +227,15 @@ export default function SpacesScreen() {
         keyExtractor={(space) => space._id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        renderItem={({ item: space, index }) => {
+        renderItem={({ item: space }) => {
           // `previews` can be briefly absent when the offline cache rehydrates an
           // older query shape before the live refetch lands. The newest item is
           // the cover; the rest of the pile is intentionally blank.
           const cover = (space.previews ?? [])[0];
           return (
-            <Animated.View
-              style={styles.cell}
-              entering={FadeInDown.delay(index * 60).duration(350)}
-            >
+            <Animated.View style={styles.cell}>
               <Link href={`/space/${space._id}`} asChild>
-                <Link.Trigger withAppleZoom>
+                <Link.Trigger withAppleZoom={!reducedMotion}>
                   {/* The whole card is the pressable that routes to the space. */}
                   <Pressable
                     testID={
@@ -241,38 +243,43 @@ export default function SpacesScreen() {
                         ? `fixture-space-${space.fixtureKey}`
                         : undefined
                     }
-                    style={({ pressed }) => pressed && styles.pressed}
                   >
-                    <CoverStack
-                      cover={cover}
-                      seed={space._id}
-                      name={space.name}
-                      itemCount={space.itemCount}
-                      suggestionCount={space.suggestionCount}
-                    />
-                    <View style={styles.caption}>
-                      <Text style={styles.title} numberOfLines={1}>
-                        {space.name}
-                      </Text>
-                      <ActionMenu
-                        label={t("spaces.actions")}
-                        title={t("spaces.actions")}
-                        actions={[
-                          {
-                            label: t("common.delete"),
-                            destructive: true,
-                            onPress: () => confirmDelete(space._id),
-                          },
-                        ]}
-                        style={styles.menuButton}
-                      >
-                        <AppSymbolIcon
-                          name="ellipsis"
-                          size={15}
-                          tintColor={theme.colors.foreground}
+                    {/* Link.Trigger's Slot drops a Pressable style function,
+                        so press feedback lives on this inner View. */}
+                    {({ pressed }) => (
+                      <View style={pressed ? styles.pressed : undefined}>
+                        <CoverStack
+                          cover={cover}
+                          seed={space._id}
+                          name={space.name}
+                          itemCount={space.itemCount}
+                          suggestionCount={space.suggestionCount}
                         />
-                      </ActionMenu>
-                    </View>
+                        <View style={styles.caption}>
+                          <Text style={styles.title} numberOfLines={1}>
+                            {space.name}
+                          </Text>
+                          <ActionMenu
+                            label={t("spaces.actions")}
+                            title={t("spaces.actions")}
+                            actions={[
+                              {
+                                label: t("common.delete"),
+                                destructive: true,
+                                onPress: () => confirmDelete(space._id),
+                              },
+                            ]}
+                            style={styles.menuButton}
+                          >
+                            <AppSymbolIcon
+                              name="ellipsis"
+                              size={15}
+                              tintColor={theme.colors.foreground}
+                            />
+                          </ActionMenu>
+                        </View>
+                      </View>
+                    )}
                   </Pressable>
                 </Link.Trigger>
                 <Link.Preview />
@@ -289,7 +296,7 @@ export default function SpacesScreen() {
           );
         }}
       />
-      {Platform.OS === "ios" ? <ProgressiveBlurHeader /> : null}
+      <HeaderScrim />
     </View>
   );
 }
@@ -310,8 +317,9 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.85,
   },
-  // Square area the pile is centered within. Kept square so every cell is the
-  // same height and the 2-column grid stays tidy regardless of cover shape.
+  // Square area the pile is centered within. Fixed so every cell in the
+  // 2-column grid has the same height regardless of cover shape; the covers
+  // scale themselves to fit.
   stack: {
     width: "100%",
     aspectRatio: 1,

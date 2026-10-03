@@ -8,6 +8,16 @@ import { components } from "../_generated/api";
 // allowance, rate/period = sustained refill. Generous for real use, fatal to loops.
 // ponytail: fixed limits; make them per-plan config if tiers ever need different caps.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
+  requestBodyIp: { kind: "token bucket", rate: 60, period: HOUR, capacity: 12 },
+  requestBodyGlobal: {
+    kind: "token bucket",
+    rate: 300,
+    period: MINUTE,
+    capacity: 100,
+  },
+  imageBegin: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  imageUpload: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  captureBody: { kind: "token bucket", rate: 240, period: HOUR, capacity: 60 },
   itemCreate: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
   findLinks: { kind: "token bucket", rate: 60, period: HOUR, capacity: 15 },
   // Bulk link import (X bookmarks). An export runs to hundreds of links, so
@@ -83,4 +93,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // a person (3 covers an immediate follow-up burst, 6/day sustained);
   // fatal to a looped or scripted client.
   feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
+  // The no-login web oracle: one model call per verdict, open to anyone. The
+  // IP bucket lets a visitor try a few modes; the global bucket caps what a
+  // viral spike or an IP-rotating script can spend.
+  oracleIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 4 },
+  oracleGlobal: {
+    kind: "token bucket",
+    rate: 120,
+    period: MINUTE,
+    capacity: 40,
+  },
 });

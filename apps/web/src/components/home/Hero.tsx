@@ -1,122 +1,33 @@
-import Image from "next/image";
-import type { CSSProperties } from "react";
-import AppStoreButton from "../AppStoreButton";
-import AndroidWaitlist from "./AndroidWaitlist";
-import styles from "./Hero.module.css";
-
-const floatingSaves = [
-  {
-    position: "recipes",
-    image: "/images/spaces/recipes.jpg",
-    label: "Weeknight ramen",
-    meta: "Recipes",
-  },
-  {
-    position: "prague",
-    image: "/images/spaces/prague.jpg",
-    label: "Prague someday",
-    meta: "Trips",
-  },
-  {
-    position: "reading",
-    image: "/images/spaces/reading.jpg",
-    label: "Reading list",
-    meta: "Ideas",
-  },
-  {
-    position: "gifts",
-    image: "/images/spaces/gifts.jpg",
-    label: "Coffee setup",
-    meta: "Wish list",
-  },
-] as const;
+import HeroStage from "./HeroStage";
+import StoreButton from "./StoreButton";
 
 export default function Hero() {
   return (
-    <section className={styles.hero} aria-labelledby="hero-title">
-      <div className={styles.glow} aria-hidden="true" />
-
-      <div aria-hidden="true">
-        {floatingSaves.map((save, index) => (
-          <figure
-            key={save.label}
-            className={`${styles.save} ${styles[save.position]}`}
-            style={{ "--save-index": index } as CSSProperties}
-          >
-            <span className={styles.saveImage}>
-              <Image
-                src={save.image}
-                alt=""
-                fill
-                priority={index < 2}
-                sizes="(max-width: 640px) 124px, (max-width: 1100px) 150px, 220px"
-              />
-            </span>
-            <figcaption>
-              <strong>{save.label}</strong>
-              <span>{save.meta}</span>
-            </figcaption>
-          </figure>
-        ))}
-
-        <aside className={styles.note}>
-          <span>NOTE</span>
-          <p>Build a home full of things worth remembering.</p>
-        </aside>
-
-        <aside className={styles.linkCard}>
-          <span className={styles.linkIcon}>↗</span>
-          <div>
-            <strong>The quiet joy of keeping things</strong>
-            <span>every.to</span>
-          </div>
-        </aside>
-      </div>
-
-      <div className={styles.center}>
-        <div className={styles.mark}>
-          <Image
-            src="/shelvr-mark.svg"
-            alt=""
-            width={52}
-            height={52}
-            priority
-            aria-hidden
-          />
-        </div>
-
-        <p className={styles.kicker}>Save it. Shelvr handles the rest.</p>
-        <h1 id="hero-title">
-          Your saved internet,
+    <section
+      id="top"
+      className="mx-auto grid max-w-[1200px] grid-cols-1 items-center justify-items-center gap-7 px-5 pt-10 text-center min-[1000px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[1000px]:gap-12 min-[1000px]:text-left"
+    >
+      <div className="flex min-w-0 flex-col items-center gap-[22px] min-[1000px]:items-start">
+        <h1 className="font-display max-w-[16ch] text-[clamp(40px,6.4vw,92px)] leading-[.95] tracking-[-.01em] text-balance min-[1000px]:text-[clamp(44px,4.6vw,68px)]">
+          Save the <span className="text-terracotta">mess</span>.
           <br />
-          <em>finally useful.</em>
+          Find it on a <span className="text-ember-deep">shelf</span>.
         </h1>
-        <p className={styles.copy}>
-          Save anything in one tap. Shelvr understands it, files it into the
-          right Space, and keeps it ready for later.
+        <p className="max-w-[36ch] text-[clamp(16px,1.4vw,20px)] leading-[1.45] text-pretty text-muted">
+          Links, photos and notes, saved in a tap and filed into the right
+          Space. No folders.
         </p>
-
-        <div
-          className={styles.route}
-          aria-label="Links, photos, and notes are automatically filed"
-        >
-          <span>Link</span>
-          <span>Photo</span>
-          <span>Note</span>
-          <b aria-hidden>→</b>
-          <strong>Auto-filed</strong>
+        <div className="mt-1">
+          <StoreButton source="hero" />
         </div>
-
-        <div className={styles.cta}>
-          <AppStoreButton source="hero" />
-          <AndroidWaitlist source="hero" />
-        </div>
-
-        <p className={styles.proof}>
-          Available on iPhone <span>·</span> Private by design <span>·</span> No
-          folder upkeep
+        <p className="text-[13px] font-medium text-muted">
+          Private by design · iPhone ·{" "}
+          <a href="#android" className="text-ember-deep underline">
+            Android? Join the waitlist
+          </a>
         </p>
       </div>
+      <HeroStage />
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -14,13 +15,21 @@ import {
 } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import { AppEntityView } from "expo-app-intents";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
 import * as Haptics from "expo-haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   Text,
@@ -28,6 +37,7 @@ import {
   View,
 } from "react-native";
 import { AppSymbolIcon } from "@/components/symbol";
+import { ProgressiveBlurHeader } from "progressive-blur";
 import Animated, { FadeOutDown, SlideInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -84,6 +94,87 @@ export default function ItemScreen() {
   return <ItemScreenContent />;
 }
 
+// Owns the item pager's route-param sync: deduped writes through the owning
+// screen's navigation, a blur-cancelled pending write, and a refocus resync.
+// expo-router's generated param types don't cover imperative setParams, and
+// @react-navigation/native isn't a direct dependency — owning writes only
+// need these two members.
+function usePagerParamSync(initialId: string) {
+  const navigation = useNavigation() as {
+    setParams: (params: { id?: string }) => void;
+    isFocused: () => boolean;
+  };
+  const activeIdRef = useRef(initialId);
+  const lastWrittenId = useRef(initialId);
+  const paramTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const writeParams = useCallback(
+    (nextId: string) => {
+      if (lastWrittenId.current === nextId) return;
+      lastWrittenId.current = nextId;
+      // Write through this screen's navigation: the owning route takes the
+      // update even while a pushed screen holds focus, where router.setParams
+      // would retarget the modal.
+      navigation.setParams({ id: nextId });
+    },
+    [navigation],
+  );
+
+  // A pending write is stale the moment the screen loses focus; on the way
+  // back, resync the URL to the page the user is actually on. The first
+  // focus is a no-op: writeParams dedupes against the pushed id. The
+  // cleanup runs on blur and unmount alike, so it owns the pending timer.
+  useFocusEffect(
+    useCallback(() => {
+      writeParams(activeIdRef.current);
+      return () => {
+        if (paramTimer.current) clearTimeout(paramTimer.current);
+      };
+    }, [writeParams]),
+  );
+
+  const scheduleParamWrite = useCallback(
+    (nextId: string) => {
+      if (paramTimer.current) clearTimeout(paramTimer.current);
+      paramTimer.current = setTimeout(() => writeParams(nextId), 350);
+    },
+    [writeParams],
+  );
+
+  return {
+    navigation,
+    activeIdRef,
+    writeParams,
+    scheduleParamWrite,
+    cancelParamWrite: useCallback(() => {
+      if (paramTimer.current) clearTimeout(paramTimer.current);
+    }, []),
+  };
+}
+
+/**
+ * Each page is bounded to the list so the inner vertical ScrollView has a
+ * fixed height to scroll within (rather than growing to fit). The height is
+ * the list's own, not the window's: on Android the opaque toolbar sits above
+ * the list, so a window-tall page would push its last header-height of
+ * content below the screen where no scroll reaches it. iOS keeps a
+ * transparent header and the list fills the window, so the two agree there.
+ * The window height only covers the first frame, before layout reports.
+ *
+ * Stable so an ItemScreen re-render (setActiveId on every swipe) doesn't hand
+ * FlashList a fresh renderItem/style and force every mounted page to re-render.
+ */
+function usePageStyle(width: number, windowHeight: number) {
+  const [listHeight, setListHeight] = useState<number | null>(null);
+  const onListLayout = useCallback(
+    (e: LayoutChangeEvent) => setListHeight(e.nativeEvent.layout.height),
+    [],
+  );
+  const height = listHeight ?? windowHeight;
+  const pageStyle = useMemo(() => ({ width, height }), [width, height]);
+  return { pageStyle, onListLayout };
+}
+
 function ItemScreenContent() {
   const { id, from, spaceId, q } = useLocalSearchParams<{
     id: string;
@@ -112,11 +203,7 @@ function ItemScreenContent() {
   // The home feed is paginated and shared through HomeFeedProvider, so every
   // page the user scrolled to is already here; the other two queries are warm
   // in the cache from the source screen. Either way this is a cache read, not
-  // a network round-trip.
-  // Conditional queries use the 'skip' sentinel, not `enabled`: a disabled
-  // React Query still subscribes through the Convex adapter, and an invalid
-  // arg (e.g. an empty-string id) throws ArgumentValidationError on every
-  // socket reconnect, which the server answers by closing the WebSocket.
+  // a network round-trip. The conditional args use the 'skip' sentinel above.
   const homeFeed = useHomeFeed();
   const spaceQ = useQuery(
     convexQuery(api.spaces.getSpace, spaceQueryArg(from, spaceId)),
@@ -170,48 +257,53 @@ function ItemScreenContent() {
   // so swiping (which rewrites the `id` param) never re-pairs the transition.
   const [pushedId] = useState(id);
   const [activeId, setActiveId] = useState(id);
+  const {
+    navigation,
+    activeIdRef,
+    writeParams,
+    scheduleParamWrite,
+    cancelParamWrite,
+  } = usePagerParamSync(id);
+  const goTo = useCallback(
+    (nextId: string) => {
+      activeIdRef.current = nextId;
+      setActiveId(nextId);
+    },
+    [activeIdRef],
+  );
 
   // Keeping the route `id` param in sync writes navigation state, which
   // re-renders the entire native-stack tree — a ~16ms cascade profiled as the
   // single most expensive JS event per swipe. `activeId` (local state) already
   // drives the header/toolbar/actions, so only the deep-link/restore URL needs
-  // the param. Debounce it so a run of swipes writes once, after it settles,
-  // instead of paying the cascade on every page.
-  const paramTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // the param (debounced so a run of swipes writes once, after it settles).
   const onViewable = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<DetailItem>[] }) => {
       const first = viewableItems[0]?.item as DetailItem | undefined;
       if (!first) return;
-      setActiveId(first._id);
-      if (paramTimer.current) clearTimeout(paramTimer.current);
-      paramTimer.current = setTimeout(() => {
-        router.setParams({ id: first._id });
-      }, 350);
+      // Offscreen layout passes and scroll corrections re-emit viewability
+      // for the page already shown — and while a pushed screen or a dismiss
+      // animation holds focus, position changes aren't the user's intent.
+      if (first._id === activeIdRef.current) return;
+      if (!navigation.isFocused()) return;
+      goTo(first._id);
+      scheduleParamWrite(first._id);
     },
-    [router],
-  );
-  useEffect(
-    () => () => {
-      if (paramTimer.current) clearTimeout(paramTimer.current);
-    },
-    [],
+    [navigation, activeIdRef, goTo, scheduleParamWrite],
   );
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 60 }),
     [],
   );
 
-  // Stable so an ItemScreen re-render (setActiveId on every swipe) doesn't hand
-  // FlashList a fresh renderItem/style and force every mounted page to re-render.
-  const pageStyle = useMemo(() => ({ width, height }), [width, height]);
+  const { pageStyle, onListLayout } = usePageStyle(width, height);
   const keyExtractor = useCallback((item: DetailItem) => item._id, []);
   const renderItem = useCallback(
     ({ item }: { item: DetailItem }) => (
-      // Each page is bounded to the screen so the inner vertical ScrollView
-      // has a fixed height to scroll within (rather than growing to fit).
-      <View style={pageStyle}>
+      // AppEntityView tells Siri which save is on screen ("send this to Sam").
+      <AppEntityView entity="item" entityId={item._id} style={pageStyle}>
         <ItemDetail item={item} isZoomTarget={item._id === pushedId} />
-      </View>
+      </AppEntityView>
     ),
     [pageStyle, pushedId],
   );
@@ -321,7 +413,7 @@ function ItemScreenContent() {
     if (!spaceId || !activeId || !items) return;
     // Cancel any pending debounced setParams so it doesn't revert the
     // immediate param write below to the just-dismissed item.
-    if (paramTimer.current) clearTimeout(paramTimer.current);
+    cancelParamWrite();
     // The dismissed item leaves the space's list; slide to a neighbour first,
     // mirroring delete, so the pager never lands on a vanished page.
     const idx = items.findIndex((i) => i._id === activeId);
@@ -332,8 +424,8 @@ function ItemScreenContent() {
         index: items.indexOf(neighbor),
         animated: true,
       });
-      setActiveId(neighbor._id);
-      router.setParams({ id: neighbor._id });
+      goTo(neighbor._id);
+      writeParams(neighbor._id);
     } else {
       router.back();
     }
@@ -342,19 +434,29 @@ function ItemScreenContent() {
       spaceId: spaceId as Id<"spaces">,
     });
     if (changed) analytics.capture("suggestion_dismissed");
-  }, [spaceId, activeId, items, dismissSuggestion, router]);
+  }, [
+    spaceId,
+    activeId,
+    items,
+    dismissSuggestion,
+    router,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  ]);
 
   const onDelete = useCallback(async () => {
     if (!activeItem || !items) return;
-    if (paramTimer.current) clearTimeout(paramTimer.current);
+    cancelParamWrite();
     const idx = items.findIndex((item) => item._id === activeItem._id);
     const neighbor = items[idx + 1] ?? items[idx - 1];
     try {
       await deleteItem({ id: activeItem._id });
+      forgetDeletedSharedItem(activeItem._id);
       analytics.capture("item_deleted", { item_type: activeItem.type });
       if (neighbor) {
-        setActiveId(neighbor._id);
-        router.setParams({ id: neighbor._id });
+        goTo(neighbor._id);
+        writeParams(neighbor._id);
         listRef.current?.scrollToIndex({
           index: Math.min(idx, items.length - 2),
           animated: true,
@@ -364,7 +466,15 @@ function ItemScreenContent() {
     } catch {
       Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
     }
-  }, [activeItem, items, deleteItem, router]);
+  }, [
+    activeItem,
+    items,
+    deleteItem,
+    router,
+    goTo,
+    writeParams,
+    cancelParamWrite,
+  ]);
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -386,6 +496,13 @@ function ItemScreenContent() {
           headerBackButtonDisplayMode: "minimal",
           ...(Platform.OS === "android"
             ? {
+                // Android has no progressive-blur band, so a transparent
+                // header leaves scrolled content running through the title
+                // text. Give the toolbar the opaque treatment the space
+                // screen uses; content then starts below it natively.
+                headerTransparent: false,
+                headerStyle: { backgroundColor: theme.colors.background },
+                headerTitleAlign: "center",
                 headerRight: () => (
                   <HeaderActionMenu
                     icon="ellipsis"
@@ -471,6 +588,7 @@ function ItemScreenContent() {
       <FlashList
         ref={listRef}
         style={styles.container}
+        onLayout={onListLayout}
         data={items}
         horizontal
         pagingEnabled
@@ -483,6 +601,19 @@ function ItemScreenContent() {
         onEndReached={onEndReached}
         onEndReachedThreshold={2}
       />
+
+      {/* A pinned blur band behind the transparent iOS header: without it,
+          scrolled article text and photos pass right through the header's
+          title and date. Android has no blur band, so it gets the opaque
+          toolbar below instead.
+
+          This header stacks a title over a date, filling the band down to its
+          bottom edge, so the default fade (which dissolves inside the band)
+          would leave that text in front of barely-blurred content. Carry the
+          blur across the whole band and land the fade where the reader
+          layout's content begins — the same gap(1.5) — so nothing at rest is
+          hazed. */}
+      <ProgressiveBlurHeader fadePastHeader={theme.gap(1.5)} />
 
       {activeIsSuggested ? (
         // SlideInDown (not a fade) so the bar never mounts at opacity 0 — a

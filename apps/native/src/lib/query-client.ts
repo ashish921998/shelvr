@@ -1,13 +1,14 @@
-import { ConvexQueryClient } from '@convex-dev/react-query';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
-import { QueryClient } from '@tanstack/react-query';
-import { ConvexReactClient } from 'convex/react';
-import { createMMKV } from 'react-native-mmkv';
+import { ConvexQueryClient } from "@convex-dev/react-query";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { QueryClient } from "@tanstack/react-query";
+import { ConvexReactClient } from "convex/react";
+import { createMMKV } from "react-native-mmkv";
+import { readConvexUrl } from "@/lib/convex-url";
 
 // Single Convex socket shared by ConvexAuthProvider (reactive mutations) and
 // the TanStack adapter (persisted reactive queries). One client => one
 // WebSocket => shared auth.
-export const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+export const convex = new ConvexReactClient(readConvexUrl(), {
   unsavedChangesWarning: false,
 });
 
@@ -44,7 +45,7 @@ export function restartConvexSubscription(queryHash: string): void {
 
 // MMKV is synchronous, so use the sync storage persister with a small shim.
 // MMKV v4 (Nitro) creates instances via createMMKV() and deletes with remove().
-const mmkv = createMMKV({ id: 'tanstack-query-cache' });
+const mmkv = createMMKV({ id: "tanstack-query-cache" });
 
 const clientStorage = {
   setItem: (key: string, value: string) => mmkv.set(key, value),

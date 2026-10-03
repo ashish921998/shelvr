@@ -95,7 +95,7 @@ function classifyPayment(
   };
 }
 
-export type CancelCategory =
+type CancelCategory =
   | "voluntary"
   | "refund"
   | "billing"

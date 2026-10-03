@@ -162,7 +162,7 @@ export type DnsResolver = (
  * returned to the caller, dangling a connection attempt. This bound fails the
  * lookup fast (well under every caller's timeoutMs) so no DNS work lingers.
  */
-export const DNS_LOOKUP_TIMEOUT_MS = 8000;
+const DNS_LOOKUP_TIMEOUT_MS = 8000;
 
 /** Race a promise against a timeout, rejecting with a coded error on expiry. */
 function withTimeout<T>(
@@ -259,7 +259,7 @@ export function makeValidatingLookup(resolver: DnsResolver) {
 }
 
 /** Build a production undici Agent whose connections use the validating lookup. */
-export function makeSafeDispatcher(
+function makeSafeDispatcher(
   resolver: DnsResolver = defaultResolver,
 ): Dispatcher {
   // undici forwards connect options to net.connect/tls.connect, so `lookup`
@@ -278,7 +278,7 @@ export function makeSafeDispatcher(
 let sharedDispatcher: Dispatcher | undefined;
 
 /** Return the process-wide shared validating dispatcher, creating it on first use. */
-export function getSharedDispatcher(): Dispatcher {
+function getSharedDispatcher(): Dispatcher {
   if (sharedDispatcher === undefined) {
     sharedDispatcher = makeSafeDispatcher(defaultResolver);
   }
@@ -289,7 +289,7 @@ export function getSharedDispatcher(): Dispatcher {
 // Result type (narrow — never exposes the raw Response)
 // ---------------------------------------------------------------------------
 
-export type SafeFetchOk = {
+type SafeFetchOk = {
   ok: true;
   /** Final, policy-validated URL after following redirects. Safe to log:
    * credentials are rejected at parse time; query strings may be present, so
@@ -307,7 +307,7 @@ export type SafeFetchOk = {
   truncated?: true;
 };
 
-export type SafeFetchResult =
+type SafeFetchResult =
   | SafeFetchOk
   | {
       ok: false;
@@ -320,7 +320,7 @@ export type SafeFetchResult =
 // Options
 // ---------------------------------------------------------------------------
 
-export type SafeFetchOptions = {
+type SafeFetchOptions = {
   /** Total deadline in ms, covering DNS resolution and every redirect hop. */
   timeoutMs: number;
   /** Hard cap on streamed body bytes, enforced even if Content-Length is absent
@@ -677,12 +677,6 @@ async function safeDump(body: BodyReadable | null | undefined): Promise<void> {
 // Convenience readers (operate on the already-bounded bytes)
 // ---------------------------------------------------------------------------
 
-/** Decode bounded bytes as text using UTF-8. The stream cap already bounded
- * the size; this just converts. Callers should still slice for their needs. */
-export function decodeUtf8(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8").decode(bytes);
-}
-
 /**
  * Charset labels the WHATWG Encoding Standard maps to windows-1252. Browsers
  * treat a page declared as ISO-8859-1 or ASCII as windows-1252, so the C1
@@ -766,5 +760,5 @@ export function decodeWithContentType(
 
 /** Parse bounded bytes as JSON. Throws on invalid JSON. */
 export function parseJson(bytes: Uint8Array): unknown {
-  return JSON.parse(decodeUtf8(bytes));
+  return JSON.parse(new TextDecoder("utf-8").decode(bytes));
 }

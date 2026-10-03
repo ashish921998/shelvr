@@ -9,16 +9,36 @@ const mock = vi.hoisted(() => ({
   finish: vi.fn(),
   alert: vi.fn(),
   settings: vi.fn(),
+  shelfEnabled: false,
+  pending: true,
+  queries: [] as unknown[],
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
-vi.mock("@/lib/first-share", () => ({
-  finishWeeklyNudge: mock.finish,
-  isWeeklyNudgePending: () => true,
-}));
+vi.mock("@/lib/first-share", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const listeners = new Set<() => void>();
+  return {
+    weeklyNudge: {
+      finish: (userId: string) => {
+        mock.finish(userId);
+        mock.pending = false;
+        for (const listener of listeners) listener();
+      },
+      usePending: () =>
+        useSyncExternalStore(
+          (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          () => mock.pending,
+        ),
+    },
+  };
+});
 vi.mock("@/lib/notifications", () => ({
   useNotificationSession: () => ({
     session: { setWeeklyShelf: mock.setWeeklyShelf },
@@ -62,11 +82,16 @@ vi.mock("@/components/onboarding/parts", () => ({
 vi.mock("@convex/_generated/api", () => ({
   api: { notifications: { getPreferences: "preferences" } },
 }));
-vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: { weeklyShelfEnabled: false } }),
+vi.mock("@convex-dev/react-query", () => ({
+  // Captures the skip sentinel so tests can assert the subscription flips.
+  convexQuery: (_api: unknown, options: unknown) => {
+    mock.queries.push(options);
+    return {};
+  },
 }));
-vi.mock("expo-router", () => ({ useFocusEffect: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: { weeklyShelfEnabled: mock.shelfEnabled } }),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -87,11 +112,14 @@ vi.mock("react-native", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mock.setWeeklyShelf.mockReset().mockResolvedValue(true);
+  mock.shelfEnabled = false;
+  mock.pending = true;
+  mock.queries.length = 0;
 });
 
 it("keeps the opt-in pending after denied permission and lets the user finish after Settings", async () => {
   mock.setWeeklyShelf.mockResolvedValueOnce(false);
-  render(<WeeklyNudgeSheet userId="user-a" />);
+  render(<WeeklyNudgeSheet userId="user-a" ready />);
   fireEvent.click(screen.getByText("weekly.remindMe"));
   await waitFor(() => expect(mock.alert).toHaveBeenCalledTimes(1));
   expect(mock.finish).not.toHaveBeenCalled();
@@ -111,7 +139,7 @@ it("keeps the opt-in pending after denied permission and lets the user finish af
 
 it("does not consume the opt-in while another session operation is busy", async () => {
   mock.setWeeklyShelf.mockResolvedValueOnce(undefined);
-  render(<WeeklyNudgeSheet userId="user-a" />);
+  render(<WeeklyNudgeSheet userId="user-a" ready />);
   fireEvent.click(screen.getByText("weekly.remindMe"));
   await waitFor(() => expect(mock.setWeeklyShelf).toHaveBeenCalledTimes(1));
   expect(mock.finish).not.toHaveBeenCalled();
@@ -120,7 +148,7 @@ it("does not consume the opt-in while another session operation is busy", async 
 
 it("keeps a failed preference save retryable", async () => {
   mock.setWeeklyShelf.mockRejectedValueOnce(new Error("offline"));
-  render(<WeeklyNudgeSheet userId="user-a" />);
+  render(<WeeklyNudgeSheet userId="user-a" ready />);
   fireEvent.click(screen.getByText("weekly.remindMe"));
   await waitFor(() =>
     expect(mock.alert).toHaveBeenCalledWith(
@@ -128,5 +156,23 @@ it("keeps a failed preference save retryable", async () => {
       "errors.trySoon",
     ),
   );
+  expect(mock.finish).not.toHaveBeenCalled();
+});
+
+it("finishes an already-enabled shelf and unsubscribes from preferences", async () => {
+  mock.shelfEnabled = true;
+  render(<WeeklyNudgeSheet userId="user-a" ready />);
+  await waitFor(() => expect(mock.finish).toHaveBeenCalledWith("user-a"));
+  // The query ran while the nudge was pending, then flipped to "skip" once
+  // alreadyOn finished it.
+  expect(mock.queries[0]).not.toBe("skip");
+  expect(mock.queries.at(-1)).toBe("skip");
+  expect(screen.queryByText("weekly.nudgeTitle")).toBeNull();
+});
+
+it("stays hidden and unsubscribed until Home says it is ready", () => {
+  render(<WeeklyNudgeSheet userId="user-a" ready={false} />);
+  expect(mock.queries.every((options) => options === "skip")).toBe(true);
+  expect(screen.queryByText("weekly.nudgeTitle")).toBeNull();
   expect(mock.finish).not.toHaveBeenCalled();
 });

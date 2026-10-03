@@ -1,9 +1,20 @@
+import { motion } from "@/lib/motion";
 import { needsNativeText } from "@/lib/text-shaping";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  advanceMorphTransition,
+  includeMorphExits,
+  layoutMorphText,
+  pruneMorphCells,
+  reconcileMorphCells,
+  resolveMorphRender,
+  type MorphTransition,
+} from "@/lib/text-morph";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Text as RNText,
   StyleSheet as RNStyleSheet,
   View,
+  useWindowDimensions,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -17,7 +28,9 @@ import {
   type SkFont,
 } from "@shopify/react-native-skia";
 import {
+  cancelAnimation,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withSpring,
@@ -25,139 +38,173 @@ import {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// A character-diffing text morph rendered through Skia so each glyph can carry a
-// real Gaussian blur. When `text` changes, characters shared with the previous
-// string persist (same key → same glyph) and glide to their new position, while
-// removed characters animate out (up + right, shrink, blur, fade) and added
-// characters animate in (rise from below, grow, sharpen, fade) — each staggered.
+// A character-diffing text morph rendered through Skia so each glyph can
+// carry a real Gaussian blur. When `text` changes, characters shared with the
+// previous string persist (same key → same glyph) and glide to their new
+// position, while removed characters animate out (up + right, shrink, blur,
+// fade) and added characters animate in (rise from below, grow, sharpen,
+// fade), staggered left to right. The scene is bounded by the slot width and
+// MAX_MORPH_GLYPHS, interruption-aware, and pruned in one batch, so a long
+// note or rapid paging cannot flood it with worklet nodes.
 
-const FONT = require("../../assets/fonts/ExposureTrial-0.otf");
+const FONTS: Record<string, number> = {
+  "CrimsonProRoman-Regular": require("../../assets/fonts/CrimsonProRoman-Regular.ttf"),
+  "Satoshi-Regular": require("../../assets/fonts/Satoshi-Regular.otf"),
+  "Satoshi-Medium": require("../../assets/fonts/Satoshi-Medium.otf"),
+  "Satoshi-Bold": require("../../assets/fonts/Satoshi-Bold.otf"),
+};
 
-const STAGGER_MS = 25; // per-character delay
-const ENTER_DELAY_MS = 120; // lead so exiting letters clear before new ones arrive
-const ENTER_RISE = 14; // px the incoming char rises from (below its target)
-const EXIT_UP = 12; // px the outgoing char translates up
-const EXIT_RIGHT = 8; // px the outgoing char translates right
-const SHRINK = 0.7; // scale a char starts/ends at while entering/exiting
-const BLUR_MAX = 6; // Gaussian blur (px) at the start of enter / end of exit
-const MOVE_DURATION = 260;
-const EXIT_DURATION = 240;
-const GLIDE_DELAY_MS = 140; // persistent chars wait before sliding to their new spot
-const GLIDE_DURATION = 320;
+const morph = motion.textMorph;
 const CANVAS_HEIGHT = 56;
-// Fixed canvas width. Kept just under the native header's title slot (~242pt
+// Fixed layout width. Kept just under the native header's title slot (~242pt
 // between the bar buttons) so it is never clamped — iOS then centers the whole
 // canvas on screen and the text, centered within it, lands dead-center.
 const DEFAULT_WIDTH = 240;
 const DEFAULT_FONT_SIZE = 24;
+// How long a slot may stay blank waiting for Skia to resolve its font, so the
+// title can rise into an empty header instead of replacing text already on
+// screen. About one screen transition, so the gap hides inside the push, and
+// bounded so a slow or failed font load still shows the title. Timed from
+// mount to resolve on an iOS simulator over Metro's fetch: 53ms for a
+// session's first slot, 30ms warm. Losing the race costs a late title and a
+// 2pt baseline step where the canvas replaces native text. The figures are
+// simulator ones; a real device or Android still pays a typeface parse, so
+// re-time it there before moving the hold.
+const FONT_HOLD_MS = motion.duration.enter;
 
-// Key each character by value + running occurrence count, so the n-th "a" keeps
-// a stable identity across a swap and reconciles to the same glyph.
-function toKeyedChars(text: string): { char: string; key: string }[] {
-  const counts: Record<string, number> = {};
-  return [...text].map((char) => {
-    const n = counts[char] ?? 0;
-    counts[char] = n + 1;
-    return { char, key: `${char}#${n}` };
-  });
+// How long a started transition stays active: the slowest of its staggered
+// entrance and its delayed position glide. An interrupted transition drops the
+// stagger, so it settles on the short feedback timing instead.
+function morphDuration(glyphs: number, interrupted: boolean) {
+  if (interrupted) return motion.timing.feedback.duration;
+  return Math.max(
+    morph.enterDelay +
+      Math.max(0, glyphs - 1) * morph.stagger +
+      morph.enter.duration,
+    morph.glideDelay + morph.glide.duration,
+  );
 }
 
-type Cell = {
-  key: string;
-  char: string;
-  x: number; // absolute left within the canvas
-  width: number;
-  index: number; // position used for stagger
-  phase: "present" | "exit";
-};
-
 type CharGlyphProps = {
-  cell: Cell;
+  char: string;
+  x: number;
+  glyphWidth: number;
+  charIndex: number;
+  isExiting: boolean;
+  animateIn: boolean;
+  interrupted: boolean;
   font: SkFont;
   color: string;
   fontSize: number;
   baselineY: number;
-  staggerMs: number;
   blurMax: number;
-  onExited: (key: string) => void;
 };
 
-// Memoized so removing one exited glyph (a setCells that keeps every other
-// cell's reference) doesn't re-render the whole string — only cells whose props
-// actually changed (e.g. a new x on a text swap, which drives the glide) rerun.
+// Primitive props let unchanged glyphs skip reconciliation work.
 const CharGlyph = memo(function CharGlyph({
-  cell,
+  char,
+  x,
+  glyphWidth,
+  charIndex,
+  isExiting,
+  animateIn,
+  interrupted,
   font,
   color,
   fontSize,
   baselineY,
-  staggerMs,
   blurMax,
-  onExited,
 }: CharGlyphProps) {
-  // gx = glide X (animates between layout positions); tx/ty = enter/exit offset.
-  const gx = useSharedValue(cell.x);
-  const tx = useSharedValue(0);
-  const ty = useSharedValue(ENTER_RISE);
-  const sc = useSharedValue(SHRINK);
-  const op = useSharedValue(0);
-  const bl = useSharedValue(blurMax);
+  const gx = useSharedValue(x);
+  const progress = useSharedValue(animateIn || isExiting ? 0 : 1);
+  const fade = useSharedValue(animateIn || isExiting ? 0 : 1);
+  const direction = useSharedValue(1);
 
-  // Glide: persistent characters slide (after a short wait) to their new x.
-  const firstX = useRef(true);
+  const isFirstLayout = useRef(true);
   useEffect(() => {
-    if (firstX.current) {
-      firstX.current = false;
+    if (isFirstLayout.current) {
+      isFirstLayout.current = false;
       return;
     }
+    cancelAnimation(gx);
     gx.set(
-      withDelay(
-        GLIDE_DELAY_MS,
-        withTiming(cell.x, { duration: GLIDE_DURATION }),
-      ),
+      interrupted
+        ? withTiming(x, motion.timing.feedback)
+        : withDelay(morph.glideDelay, withTiming(x, morph.glide)),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cell.x]);
+    // Rapid paging unmounts glyphs mid-glide, and withDelay keeps its timer
+    // running until the delay elapses. Stop it with the glyph.
+    return () => {
+      cancelAnimation(gx);
+    };
+  }, [x, interrupted, gx]);
 
-  // Exit: continue up + right, shrink, blur and fade, then drop the cell.
+  const firstAppearance = useRef(true);
   useEffect(() => {
-    if (cell.phase === "present") {
-      const delay = ENTER_DELAY_MS + cell.index * staggerMs;
-      tx.set(withTiming(0, { duration: MOVE_DURATION }));
-      ty.set(withDelay(delay, withSpring(0)));
-      sc.set(withDelay(delay, withSpring(1)));
-      op.set(withDelay(delay, withTiming(1, { duration: MOVE_DURATION })));
-      bl.set(withDelay(delay, withTiming(0, { duration: MOVE_DURATION })));
-      return;
-    }
-    const delay = cell.index * staggerMs;
-    ty.set(withDelay(delay, withTiming(-EXIT_UP, { duration: EXIT_DURATION })));
-    tx.set(
-      withDelay(delay, withTiming(EXIT_RIGHT, { duration: EXIT_DURATION })),
-    );
-    sc.set(withDelay(delay, withTiming(SHRINK, { duration: EXIT_DURATION })));
-    bl.set(withDelay(delay, withTiming(blurMax, { duration: EXIT_DURATION })));
-    op.set(withDelay(delay, withTiming(0, { duration: EXIT_DURATION })));
-    const timer = setTimeout(
-      () => onExited(cell.key),
-      delay + EXIT_DURATION + 40,
-    );
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cell.phase]);
+    const staggerEntrance = firstAppearance.current && animateIn;
+    firstAppearance.current = false;
 
-  const transform = useDerivedValue(() => [
-    { translateX: gx.value + tx.value },
-    { translateY: baselineY + ty.value },
-    { scale: sc.value },
-  ]);
+    // withDelay keeps the PREVIOUS animation running during its delay. Stop
+    // it explicitly, otherwise a returning letter continues fading to zero.
+    cancelAnimation(progress);
+    cancelAnimation(fade);
+
+    if (!isExiting) {
+      direction.set(1);
+      // Reversals resume immediately from the current value. Only a newly
+      // added letter receives the signature stagger.
+      const delay = staggerEntrance
+        ? morph.enterDelay + charIndex * morph.stagger
+        : 0;
+      progress.set(
+        interrupted
+          ? withTiming(1, motion.timing.feedback)
+          : withDelay(delay, withSpring(1, morph.enter)),
+      );
+      fade.set(
+        interrupted
+          ? withTiming(1, motion.timing.feedback)
+          : withDelay(delay, withTiming(1, morph.reveal)),
+      );
+    } else {
+      direction.set(-1);
+      const delay = charIndex * morph.stagger;
+      progress.set(withDelay(delay, withTiming(0, morph.exit)));
+      fade.set(withDelay(delay, withTiming(0, morph.exit)));
+    }
+
+    // Effect reactivation must always restore the target. A persistent phase
+    // guard would skip setup after Reanimated cancels values during cleanup.
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(fade);
+    };
+  }, [isExiting, animateIn, interrupted, charIndex, direction, progress, fade]);
+
+  const transform = useDerivedValue(() => {
+    const settled = progress.get();
+    const away = 1 - settled;
+    const leaving = direction.get() < 0;
+    return [
+      { translateX: gx.get() + (leaving ? morph.exitRight * away : 0) },
+      {
+        translateY:
+          baselineY + (leaving ? -morph.exitUp : morph.enterRise) * away,
+      },
+      { scale: morph.scale + (1 - morph.scale) * settled },
+    ];
+  });
+  const blur = useDerivedValue(() => blurMax * (1 - fade.get()));
   // Scale around the glyph's centre rather than the baseline origin.
-  const origin = { x: cell.width / 2, y: -fontSize * 0.34 };
+  const origin = useMemo(
+    () => ({ x: glyphWidth / 2, y: -fontSize * 0.34 }),
+    [glyphWidth, fontSize],
+  );
 
   return (
-    <Group transform={transform} origin={origin} opacity={op}>
-      <SkiaText x={0} y={0} text={cell.char} font={font} color={color} />
-      <BlurMask blur={bl} style="normal" />
+    <Group transform={transform} origin={origin} opacity={fade}>
+      <SkiaText x={0} y={0} text={char} font={font} color={color} />
+      <BlurMask blur={blur} style="normal" />
     </Group>
   );
 });
@@ -167,9 +214,8 @@ type AnimatedTextProps = {
   style?: StyleProp<TextStyle>;
   containerStyle?: StyleProp<ViewStyle>;
   width?: number;
-  /** Canvas height; shrink it to sit the morph in a compact slot like a header. */
+  /** Layout height. The canvas includes overflow for glyph travel and blur. */
   height?: number;
-  staggerMs?: number;
   blurMax?: number;
   truncate?: boolean;
 };
@@ -180,8 +226,7 @@ export function AnimatedText({
   containerStyle,
   width = DEFAULT_WIDTH,
   height = CANVAS_HEIGHT,
-  staggerMs = STAGGER_MS,
-  blurMax = BLUR_MAX,
+  blurMax = morph.blur,
   truncate = false,
 }: AnimatedTextProps) {
   const { theme } = useUnistyles();
@@ -190,20 +235,55 @@ export function AnimatedText({
     typeof flat.fontSize === "number" ? flat.fontSize : DEFAULT_FONT_SIZE;
   const color =
     typeof flat.color === "string" ? flat.color : theme.colors.foreground;
-  const font = useFont(FONT, fontSize);
+  const reducedMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
+  const font = useFont(
+    FONTS[flat.fontFamily ?? theme.fonts.display] ?? FONTS[theme.fonts.display],
+    fontSize,
+  );
 
+  // Native text shapes joined scripts, bidi, combining marks and emoji as
+  // runs; Dynamic Type and Reduce Motion skip the spatial glyph choreography.
   const nativeText =
     needsNativeText(text) ||
     Boolean(font?.getGlyphIDs(text).some((glyph) => glyph === 0));
-  // Native text shapes joined scripts, bidi, combining marks and emoji as runs.
-  if (!font || nativeText) {
+  const forceNative = nativeText || reducedMotion || fontScale > 1;
+
+  // Latches once native text has been on screen, so a later canvas mount can
+  // never blank a title the reader is already looking at. Native shaping
+  // latches on the next tick, having painted; a pending font gets the hold.
+  const [paintedNative, setPaintedNative] = useState(false);
+  useEffect(() => {
+    if (paintedNative) return;
+    // A resolved font with nothing painted yet is the one case that may
+    // stagger in, so it is also the one case that starts no timer.
+    if (font && !forceNative) return;
+    const timer = setTimeout(
+      () => setPaintedNative(true),
+      forceNative ? 0 : FONT_HOLD_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [paintedNative, forceNative, font]);
+
+  const { mode, animateOnMount } = resolveMorphRender(
+    Boolean(font),
+    forceNative,
+    paintedNative,
+  );
+
+  // The `!font` test never decides the branch, since mode is only "morph" once
+  // the font resolves. It is what narrows the type for the canvas below.
+  if (!font || mode !== "morph") {
     return (
-      <View style={[styles.container, containerStyle]}>
+      <View style={[styles.container, { width }, containerStyle]}>
         <RNText
           style={[
             style,
             { maxWidth: width },
             nativeText && { fontFamily: undefined },
+            // Laid out but unpainted: the canvas is about to rise into this
+            // slot, and the reader must not watch a title appear then vanish.
+            mode === "hold" && styles.held,
           ]}
           numberOfLines={truncate ? 1 : undefined}
         >
@@ -212,128 +292,184 @@ export function AnimatedText({
       </View>
     );
   }
+
+  // Compact header slots must not crop the rising/blurred letters at their
+  // edges: the canvas extends past the slot on every side.
+  const overscan = Math.ceil(
+    Math.max(morph.enterRise, morph.exitUp, morph.exitRight) + blurMax * 3,
+  );
+  const baselineY = overscan + height / 2 + fontSize * 0.34;
+
   return (
-    <GlyphText
+    <MorphText
       text={text}
       font={font}
       fontSize={fontSize}
       color={color}
-      containerStyle={containerStyle}
       width={width}
       height={height}
-      staggerMs={staggerMs}
+      overscan={overscan}
+      baselineY={baselineY}
       blurMax={blurMax}
       truncate={truncate}
+      animateOnMount={animateOnMount}
+      containerStyle={containerStyle}
     />
   );
 }
 
-// Unmount the glyph reconciliation state when native shaping takes over.
-// Returning to Latin text starts a fresh animation without stale exit glyphs.
-function GlyphText({
+// Mounts only when the font is ready. Its initial scene staggers in only when
+// the slot painted nothing before it, so rebuilding a native header never
+// replays a transparent title. Unmounting when native shaping takes over also
+// drops any stale exit glyphs.
+function MorphText({
   text,
   font,
   fontSize,
   color,
-  containerStyle,
   width,
   height,
-  staggerMs,
+  overscan,
+  baselineY,
   blurMax,
   truncate,
-}: Omit<Required<AnimatedTextProps>, "style" | "containerStyle"> & {
-  containerStyle?: StyleProp<ViewStyle>;
+  animateOnMount,
+  containerStyle,
+}: {
+  text: string;
   font: SkFont;
   fontSize: number;
   color: string;
+  width: number;
+  height: number;
+  overscan: number;
+  baselineY: number;
+  blurMax: number;
+  truncate: boolean;
+  animateOnMount: boolean;
+  containerStyle?: StyleProp<ViewStyle>;
 }) {
-  const baselineY = height / 2 + fontSize * 0.34;
-
-  const seenRef = useRef<Map<string, Cell>>(new Map());
-  const [cells, setCells] = useState<Cell[]>([]);
+  const measure = useMemo(
+    () => (char: string) =>
+      font
+        .getGlyphWidths(font.getGlyphIDs(char))
+        .reduce((sum, advance) => sum + advance, 0),
+    [font],
+  );
+  const [mount] = useState(() => {
+    const laid = layoutMorphText(text, width, overscan, measure, truncate);
+    if (!animateOnMount || laid.length === 0) {
+      return { cells: laid, deadline: null as number | null };
+    }
+    const now = performance.now();
+    return {
+      // Reconciling against no previous scene marks every glyph as added, so
+      // the whole title staggers in the way a text change does.
+      cells: reconcileMorphCells(
+        [],
+        laid,
+        now,
+        morph.exit.duration,
+        morph.stagger,
+      ),
+      // Record the entrance as a running transition. A title that changes
+      // mid-stagger must read as an interruption, not stack a second one.
+      deadline: now + morphDuration(laid.length, false),
+    };
+  });
+  const [{ cells, interrupted }, setTransition] = useState(() => ({
+    cells: mount.cells,
+    interrupted: false,
+  }));
+  const scene = useRef(mount.cells);
+  const lastChange = useRef<MorphTransition>({
+    text,
+    deadline: mount.deadline,
+  });
 
   useEffect(() => {
-    let displayText = text;
-    if (truncate) {
-      const chars = [...text];
-      const widths = font.getGlyphWidths(font.getGlyphIDs(text));
-      let totalWidth = widths.reduce((sum, value) => sum + value, 0);
-      if (totalWidth > width) {
-        const ellipsisWidth =
-          font.getGlyphWidths(font.getGlyphIDs("…"))[0] ?? 0;
-        while (chars.length > 0 && totalWidth + ellipsisWidth > width) {
-          chars.pop();
-          totalWidth -= widths.pop() ?? 0;
-        }
-        displayText = `${chars.join("")}…`;
-      }
-    }
-    const keyed = toKeyedChars(displayText);
-    // Use true glyph advance widths (not tight bounds) so spacing/positioning
-    // is accurate — tight bounds drop trailing spaces and side bearings.
-    const advances = font.getGlyphWidths(font.getGlyphIDs(displayText));
-    const total = advances.reduce((sum, w) => sum + w, 0);
-    // Center the string within the fixed-width canvas.
-    const originX = (width - total) / 2;
+    let cancelled = false;
+    const now = performance.now();
+    const present = layoutMorphText(text, width, overscan, measure, truncate);
+    const { interrupted, next: transition } = advanceMorphTransition(
+      lastChange.current,
+      text,
+      present.length,
+      now,
+      morphDuration,
+    );
+    const next = reconcileMorphCells(
+      scene.current,
+      present,
+      now,
+      morph.exit.duration,
+      morph.stagger,
+      interrupted,
+    );
+    scene.current = next;
+    lastChange.current = includeMorphExits(transition, next);
+    // Reconciling a stateful transition against the previous glyph scene is
+    // not a pure render derivation, so state is set from the effect by design.
+    setTransition({ cells: next, interrupted });
 
-    let cursor = originX;
-    const present: Cell[] = keyed.map((k, index) => {
-      const w = advances[index] ?? 0;
-      const cell: Cell = {
-        key: k.key,
-        char: k.char,
-        x: cursor,
-        width: w,
-        index,
-        phase: "present",
-      };
-      cursor += w;
-      return cell;
-    });
+    // Keep completion entirely on RN. A callback for each departing letter
+    // crossed Worklets' remote-function registry and rebuilt the Skia scene N
+    // times. One cancellable batch also prevents an old exit from deleting a
+    // letter that returned and started another exit in the meantime.
+    const lastExit = next.reduce(
+      (latest, cell) => Math.max(latest, cell.exitAt ?? 0),
+      0,
+    );
+    const timer =
+      lastExit > now
+        ? setTimeout(
+            () => {
+              if (cancelled) return;
+              const settled = pruneMorphCells(scene.current, performance.now());
+              scene.current = settled;
+              setTransition((current) => ({ ...current, cells: settled }));
+            },
+            lastExit - now + 80,
+          )
+        : undefined;
 
-    const presentKeys = new Set(present.map((c) => c.key));
-    const exiting: Cell[] = [];
-    seenRef.current.forEach((cell, key) => {
-      if (!presentKeys.has(key)) exiting.push({ ...cell, phase: "exit" });
-    });
-
-    const nextSeen = new Map<string, Cell>();
-    present.forEach((c) => nextSeen.set(c.key, c));
-    seenRef.current = nextSeen;
-
-    // Reconciling the previous glyph set against the new text is a stateful
-    // transition (persist / enter / exit animations keyed off the prior set),
-    // not a pure render derivation — so state is set from the effect by design.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCells([...present, ...exiting]);
-  }, [text, font, width, truncate]);
-
-  const removeCell = useCallback(
-    (key: string) =>
-      setCells((prev) =>
-        prev.filter((c) => c.key !== key || c.phase !== "exit"),
-      ),
-    [],
-  );
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [text, width, overscan, measure, truncate]);
 
   return (
     <View
-      style={[styles.container, containerStyle]}
+      style={[styles.container, { width, height }, containerStyle]}
       accessible
       accessibilityLabel={text}
     >
-      <Canvas style={{ width, height }}>
+      <Canvas
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: -overscan,
+          top: -overscan,
+          width: width + overscan * 2,
+          height: height + overscan * 2,
+        }}
+      >
         {cells.map((cell) => (
           <CharGlyph
             key={cell.key}
-            cell={cell}
+            char={cell.char}
+            x={cell.x}
+            glyphWidth={cell.width}
+            charIndex={cell.index}
+            isExiting={cell.phase === "exit"}
+            animateIn={cell.animateIn ?? false}
+            interrupted={interrupted}
             font={font}
             color={color}
             fontSize={fontSize}
             baselineY={baselineY}
-            staggerMs={staggerMs}
             blurMax={blurMax}
-            onExited={removeCell}
           />
         ))}
       </Canvas>
@@ -345,5 +481,8 @@ const styles = StyleSheet.create(() => ({
   container: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  held: {
+    opacity: 0,
   },
 }));

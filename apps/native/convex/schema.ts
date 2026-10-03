@@ -10,6 +10,7 @@ import {
   postMediaValidator,
   recipeValidator,
 } from "./model/itemFields";
+import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
@@ -36,11 +37,15 @@ export default defineSchema({
     acceptedAt: v.optional(v.number()),
     refundSharing: v.boolean(),
     changedAt: v.number(),
+    // Historical deployments wrote this field. Preserve it while those rows
+    // exist; dropping it rejects the deployment instead of rolling it back.
+    revision: v.optional(v.number()),
     deleting: v.optional(v.boolean()),
     syncState: v.union(
       v.literal("pending"),
       v.literal("syncing"),
       v.literal("synced"),
+      v.literal("failed"),
     ),
     nextSyncAt: v.number(),
     attempts: v.number(),
@@ -140,6 +145,30 @@ export default defineSchema({
     // back to `_creationTime` (their only run is the one create scheduled).
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
+    // Semantic retrieval vector over `model/embedding.ts`'s composed text.
+    // Optional because every row written before this existed has none: such a
+    // row is simply absent from the vector index (Convex indexes only
+    // documents that carry the field) until the backfill sweeper reaches it,
+    // and callers fall back to their pre-embedding path meanwhile.
+    //
+    // Deliberately NOT part of `itemFields`. That object is spread into
+    // `enrichedItemValidator`, the return shape of `listItems`, `getItem`,
+    // `searchItems`, the weekly digest, and `getSpace` — adding ~6 KB of
+    // floats to every feed row is exactly the cost the card/detail split
+    // exists to avoid. `enrichItem` strips it at the single chokepoint those
+    // reads share.
+    embedding: v.optional(v.array(v.float64())),
+    // Which generation of model + composed text produced `embedding`. See
+    // CURRENT_EMBEDDING_VERSION; `undefined` sorts before every number, so the
+    // sweeper's `lt(CURRENT)` range finds never-embedded and stale rows in one
+    // scan.
+    embeddingVersion: v.optional(v.number()),
+    // Consecutive item-specific embedding failures. Only incremented when the
+    // provider answered for the rest of the batch, so a provider outage never
+    // burns an item's allowance. Cleared on success; once it reaches
+    // MAX_EMBEDDING_ATTEMPTS the sweep stamps the row anyway so one
+    // permanently unembeddable item cannot block every row behind it.
+    embeddingAttempts: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     // Photo quota: count an account's image items without scanning links/notes.
@@ -162,8 +191,25 @@ export default defineSchema({
     // referenced by any completed item before deleting/adopting it, so a
     // malicious caller can't point attach at another user's storage object.
     .index("by_storage", ["storageId"])
+    // Embedding backfill/refresh sweeper: `ready` rows whose embeddingVersion
+    // is below the current generation, oldest generation first. Scoped to
+    // `ready` because nothing else is worth embedding — a `processing` row has
+    // no final text yet and a `failed` one has no text at all.
+    .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
+      filterFields: ["userId"],
+    })
+    // Semantic search and recommendation retrieval.
+    //
+    // `userId` is the only filter field on purpose. Convex vector filters
+    // support equality and `q.or(...)` but have no AND across different
+    // fields, so exactly one field can be pushed into the index — and it has
+    // to be the one whose failure would leak another account's saves. Status
+    // is filtered after hydration instead, where a plain predicate is free.
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: EMBEDDING_DIMENSIONS,
       filterFields: ["userId"],
     }),
 
@@ -247,10 +293,16 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("complete")),
     storageId: v.optional(v.id("_storage")),
     itemId: v.optional(v.id("items")),
+    uploadUrl: v.optional(v.string()),
+    uploadUrlIssuedAt: v.optional(v.number()),
+    uploadTokenHash: v.optional(v.string()),
+    uploadClaimedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     // The logical unique key — every mutation loads the row through this index.
     .index("by_user_operation", ["userId", "operationId"])
+    .index("by_user_and_kind_and_status", ["userId", "kind", "status"])
+    .index("by_upload_token_hash", ["uploadTokenHash"])
     // deleteItem cleanup: releases ledger rows whose item was deleted so the
     // same durable operationId can be re-performed. Pending rows have no
     // itemId and so are never returned by this index lookup.
@@ -294,7 +346,9 @@ export default defineSchema({
     // backward compatibility with rows created before this field existed.
     eventTimestampMs: v.optional(v.number()),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
   // One next-visit cancel-survey ask per user (convex/cancelSurvey.ts). The
   // row is the durable, cross-install record: its existence is the ask, and
@@ -371,13 +425,20 @@ export default defineSchema({
     weeklyShelfEnabled: v.boolean(),
     nextDigestAt: v.number(),
     timezone: v.optional(v.string()),
+    // Save reminders are on for anyone who allowed notifications; only an
+    // explicit `false` turns them off. Absent on rows written before they existed.
+    remindersEnabled: v.optional(v.boolean()),
+    // When the next reminder is due to be considered. Absent while reminders
+    // are off or the user has no device; `registerDevice` sets it again.
+    nextReminderAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_enabled_and_next_digest_at", [
       "weeklyShelfEnabled",
       "nextDigestAt",
-    ]),
+    ])
+    .index("by_next_reminder_at", ["nextReminderAt"]),
 
   // Read state is separate from items so opening a save does not rewrite the
   // item row that is rendered throughout the feed.
@@ -390,6 +451,30 @@ export default defineSchema({
     .index("by_user_and_item", ["userId", "itemId"])
     .index("by_user", ["userId"])
     .index("by_item", ["itemId"]),
+
+  // Per-device capture tokens for the iOS App Intents (Siri, Shortcuts). The
+  // intents save without launching the JavaScript app, so they have no Convex
+  // Auth JWT. Only the SHA-256 hex hash is stored; the raw token lives in the
+  // device keychain. See appIntents.ts.
+  captureTokens: defineTable({
+    userId: v.id("users"),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_user", ["userId"]),
+
+  // A public share link for one item. The random token, never the item id, is
+  // the capability: item ids travel through analytics, tokens do not.
+  shareLinks: defineTable({
+    token: v.string(),
+    userId: v.string(),
+    itemId: v.id("items"),
+  })
+    .index("by_token", ["token"])
+    .index("by_item", ["itemId"])
+    .index("by_user", ["userId"]),
 
   // A persisted weekly shelf keeps the notification payload and in-app view
   // stable even if the underlying saves are later deleted or reclassified.
@@ -407,9 +492,44 @@ export default defineSchema({
     deliveryAttempts: v.optional(v.number()),
     deliveryRecipients: v.optional(v.array(recipientValidator)),
     deliveryError: v.optional(v.string()),
+    // When Expo first accepted a push for this notification, stamped at the
+    // first finish that sees a ticket in hand. Separate from `deliveredAt`
+    // (the confirmation time) because `notification_sent` telemetry timestamps
+    // the send itself — otherwise a notification open can precede the
+    // notification's own "sent" event. Absent on rows that never sent.
+    deliverySentAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_week", ["userId", "weekStart"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
+
+  // One push that names one save: an unread article or a recipe to cook. A
+  // save is reminded about at most once, and these rows are also the budget's
+  // memory of what was sent and when. Delivery fields mirror weeklyDigests.
+  saveReminders: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    kind: v.union(v.literal("read"), v.literal("cook")),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+    // See weeklyDigests: the first accepted send, kept apart from the
+    // delivery-confirmation time so `notification_sent` timestamps the send.
+    deliverySentAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_item", ["userId", "itemId"])
     .index("by_delivery_status_and_attempt", [
       "deliveryStatus",
       "deliveryNextAttemptAt",
@@ -491,6 +611,10 @@ export default defineSchema({
     consentVersion: v.string(),
     consentText: v.string(),
     consentedAt: v.number(),
+    confirmedAt: v.optional(v.number()),
+    confirmed: v.optional(v.boolean()),
+    confirmationHash: v.optional(v.string()),
+    confirmationExpiresAt: v.optional(v.number()),
     firstSubmittedAt: v.number(),
     lastSubmittedAt: v.number(),
     resendStatus: v.union(
@@ -504,6 +628,12 @@ export default defineSchema({
     resendAttempts: v.optional(v.number()),
   })
     .index("by_email_and_product", ["email", "product"])
+    .index("by_confirmationHash", ["confirmationHash"])
+    .index("by_confirmed_and_resendStatus_and_resendAttempts", [
+      "confirmed",
+      "resendStatus",
+      "resendAttempts",
+    ])
     // Bounded Resend retry cron pages failed/pending/unconfigured rows below
     // the attempt cap without scanning the whole waitlist.
     .index("by_resendStatus_attempts", ["resendStatus", "resendAttempts"]),

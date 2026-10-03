@@ -12,7 +12,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { motion } from "@/lib/motion";
 import { useCardAnimation } from "@/lib/tidy/card-animation";
+import { swipeProgress } from "@/lib/tidy/swipe-decision";
 
 // Direction hint overlay, adapted from the Slack Catch Up recreation's
 // color-background + mark-view: a solid tint per swipe direction plus a badge
@@ -22,24 +24,25 @@ const BADGE_SIZE = 60;
 const STROKE_WIDTH = 3;
 const ICON_SIZE = 24;
 
-const KEEP_TINT = "#34d399";
-const KEEP_ACCENT = "#065f46";
-
 type Direction = "keep" | "delete" | "save";
 
-/** Fraction of the commit threshold covered, 0 at rest, 1 at commit. */
+/**
+ * Fraction of the commit threshold the dominant axis has covered toward this
+ * direction, 0 at rest, 1 at commit. A direction's cue fills only when that
+ * direction is the one the release would act on: a diagonal lights one
+ * badge instead of two, and a downward-dominant drag lights none.
+ */
 function useDirectionProgress(direction: Direction) {
   const { panX, panY, panDistanceX, panDistanceY } = useCardAnimation();
 
   return useDerivedValue(() => {
-    switch (direction) {
-      case "keep":
-        return panX.get() / panDistanceX;
-      case "delete":
-        return -panX.get() / panDistanceX;
-      case "save":
-        return -panY.get() / panDistanceY;
-    }
+    const { action, progress } = swipeProgress(
+      panX.get(),
+      panY.get(),
+      panDistanceX,
+      panDistanceY,
+    );
+    return action === direction ? progress : 0;
   });
 }
 
@@ -85,12 +88,15 @@ const Badge: FC<BadgeProps> = ({ direction, label, icon, accentColor }) => {
   const rCircleStyle = useAnimatedStyle(() => ({
     backgroundColor: withTiming(
       progress.get() + buffer > 1 ? "white" : "transparent",
-      { duration: 50 },
+      motion.timing.fade,
     ),
   }));
 
   const rAccentIconStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(progress.get() + buffer > 1 ? 1 : 0, { duration: 200 }),
+    opacity: withTiming(
+      progress.get() + buffer > 1 ? 1 : 0,
+      motion.timing.fade,
+    ),
   }));
 
   const arcPath = useDerivedValue(() => {
@@ -145,7 +151,7 @@ export const TidyHints: FC = () => {
 
   return (
     <View style={styles.container} pointerEvents="none">
-      <Tint direction="keep" color={KEEP_TINT} />
+      <Tint direction="keep" color={theme.colors.keep} />
       <Tint direction="delete" color={theme.colors.danger} />
       <Tint direction="save" color={theme.colors.primary} />
       <View style={styles.topRow}>
@@ -159,7 +165,7 @@ export const TidyHints: FC = () => {
           direction="keep"
           label={t("tidy.keep")}
           icon="checkmark"
-          accentColor={KEEP_ACCENT}
+          accentColor={theme.colors.onKeep}
         />
       </View>
       <View style={styles.bottomRow}>
