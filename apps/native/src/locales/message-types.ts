@@ -36,6 +36,10 @@ export type MessageParams = {
   "notifications.trialChannel": undefined;
   "notifications.trialEndingTitle": undefined;
   "notifications.trialEndingBody": undefined;
+  "notifications.trialPrimerTitle": undefined;
+  "notifications.trialPrimerBody": undefined;
+  "notifications.trialPrimerAllow": undefined;
+  "notifications.trialPrimerWhen": undefined;
   "notifications.trialFirstDayTitle": undefined;
   "notifications.trialFirstDayBody": undefined;
   "notifications.trialThirdDayTitle": undefined;

@@ -285,6 +285,7 @@ type AnalyticsEventProperties = {
   save_recall_dismissed: { match_count: number };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
+  trial_reminder_primer: { outcome: "accepted" | "declined" };
   // Post-purchase save handoff on Home (lib/welcome-save.ts).
   welcome_save_shown: { trial: boolean };
   welcome_save_action: { action: "save" | "dismiss"; trial: boolean };
