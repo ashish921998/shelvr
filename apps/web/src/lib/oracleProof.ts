@@ -50,6 +50,7 @@ export async function verifiedVerdict(
       atob(signature.replace(/-/g, "+").replace(/_/g, "/") + "="),
       (c) => c.charCodeAt(0),
     );
+    if (encodeBytes(bytes) !== signature) return undefined;
     const valid = await crypto.subtle.verify(
       "HMAC",
       await signingKey(),

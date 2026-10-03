@@ -37,7 +37,11 @@ export function redirectSystemPath({
       ["shelvr:", "shelvr-dev:", "shelvr-preview:"].includes(url.protocol) &&
       ((url.hostname === "auth" && url.pathname === "/callback") ||
         (url.hostname === "" && url.pathname === "/auth/callback"));
-    if (isOAuthCallback) {
+    const isClaimedOAuthCallback =
+      url.protocol === "https:" &&
+      url.hostname === "shelvr-web.vercel.app" &&
+      url.pathname === "/auth/callback";
+    if (isOAuthCallback || isClaimedOAuthCallback) {
       return "/sign-in";
     }
 

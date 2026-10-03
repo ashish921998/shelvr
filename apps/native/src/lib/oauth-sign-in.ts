@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useState } from "react";
+import { Platform } from "react-native";
 
 // Convex Auth OAuth sign-in (React Native), extracted from the sign-in screen
 // so the onboarding demo step can authenticate inline — without navigating
@@ -21,11 +22,18 @@ const oauthScheme =
     : Constants.expoConfig?.extra?.variant === "preview"
       ? "shelvr-preview"
       : "shelvr-dev";
-const oauthRedirectTo = makeRedirectUri({
-  native: `${oauthScheme}://auth/callback`,
-  scheme: oauthScheme,
-  path: "auth/callback",
-});
+const iosVersion = String(Platform.Version).split(".").map(Number);
+const preferUniversalLinks =
+  Platform.OS === "ios" &&
+  Constants.expoConfig?.extra?.variant === "production" &&
+  (iosVersion[0] > 17 || (iosVersion[0] === 17 && (iosVersion[1] ?? 0) >= 4));
+const oauthRedirectTo = preferUniversalLinks
+  ? "https://shelvr-web.vercel.app/auth/callback"
+  : makeRedirectUri({
+      native: `${oauthScheme}://auth/callback`,
+      scheme: oauthScheme,
+      path: "auth/callback",
+    });
 
 export type OAuthProvider = "apple" | "google" | "anonymous";
 
@@ -115,10 +123,16 @@ export function useOAuthSignIn(surface: OAuthSurface) {
         }
         stage = "browser";
         const browserStartedAt = Date.now();
-        const result = await WebBrowser.openAuthSessionAsync(
-          redirect.toString(),
-          oauthRedirectTo,
-        );
+        const result = preferUniversalLinks
+          ? await WebBrowser.openAuthSessionAsync(
+              redirect.toString(),
+              oauthRedirectTo,
+              { preferUniversalLinks: true },
+            )
+          : await WebBrowser.openAuthSessionAsync(
+              redirect.toString(),
+              oauthRedirectTo,
+            );
         if (result.type === "cancel" || result.type === "dismiss") {
           // A person needs seconds to back out; a sheet that ends in well under
           // one is the system failing to present it. Until the OS error below

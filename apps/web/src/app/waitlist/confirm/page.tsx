@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { clientIp } from "@/lib/convexForward";
 import type { Metadata } from "next";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 
@@ -21,11 +23,17 @@ export default async function ConfirmationPage({
       throw new Error(
         "Confirmation is unavailable. Please request a new link.",
       );
+    const ip = clientIp(
+      new Request("https://shelvr-web.vercel.app/waitlist/confirm", {
+        headers: await headers(),
+      }),
+    );
     const response = await fetch(`${site}/waitlist/confirm`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-waitlist-secret": secret,
+        ...(ip ? { "x-shelvr-client-ip": ip } : {}),
       },
       body: JSON.stringify({ token }),
       signal: AbortSignal.timeout(20_000),

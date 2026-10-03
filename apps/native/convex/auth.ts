@@ -34,7 +34,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
               "shelvr-dev://auth/callback",
               "shelvr-preview://auth/callback",
             ]
-          : ["shelvr://auth/callback"];
+          : [
+              "shelvr://auth/callback",
+              "https://shelvr-web.vercel.app/auth/callback",
+            ];
       if (!allowed.includes(redirectTo))
         throw new Error("Invalid OAuth callback");
       return redirectTo;

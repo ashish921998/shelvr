@@ -557,12 +557,13 @@ export const confirmSignup = internalMutation({
       confirmationHash: undefined,
       confirmationExpiresAt: undefined,
       resendStatus: "pending",
+      resendAttempts: 0,
     });
     return {
       id: row._id,
       email: row.email,
       product: row.product,
-      resendAttempts: row.resendAttempts ?? 0,
+      resendAttempts: 0,
     };
   },
 });

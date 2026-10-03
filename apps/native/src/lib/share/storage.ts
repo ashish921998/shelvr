@@ -176,6 +176,8 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
   const raw = store.getString(SESSION_KEY);
   if (raw === undefined) return null;
   try {
+    if (raw.length > MAX_SHARE_TEXT_BYTES * 2)
+      throw new Error("Oversized share session");
     const parsed = JSON.parse(raw) as Partial<ShareSession>;
     if (
       typeof parsed.version !== "number" ||
