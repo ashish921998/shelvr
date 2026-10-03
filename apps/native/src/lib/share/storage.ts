@@ -57,6 +57,22 @@ export type RawSharePayload = {
   mimeType?: string;
 };
 
+export const MAX_SHARE_ENTRIES = 20;
+export const MAX_SHARE_TEXT_BYTES = 256 * 1024;
+
+export function shareBatchAllowed(
+  payloads: readonly RawSharePayload[],
+): boolean {
+  if (payloads.length > MAX_SHARE_ENTRIES) return false;
+  let bytes = 0;
+  for (const payload of payloads) {
+    if (payload.value.length > MAX_SHARE_TEXT_BYTES) return false;
+    bytes += new TextEncoder().encode(payload.value).byteLength;
+    if (bytes > MAX_SHARE_TEXT_BYTES) return false;
+  }
+  return true;
+}
+
 /** The kind of item a resolved entry will save as. `unsupported` covers audio,
  * video, file, and any future content type the share target deliberately does
  * not import — it is reported, never silently coerced into a note. */
@@ -134,6 +150,8 @@ export const LAST_COMPLETED_SHARE_KEY = "last-completed-share";
 export function fingerprintSharePayloads(
   rawPayloads: RawSharePayload[],
 ): string {
+  if (!shareBatchAllowed(rawPayloads))
+    throw new Error("Share batch is too large");
   // Sort object keys for determinism: an undefined mimeType serialized as
   // {mimeType: undefined} vs {mimeType omitted} must not flip the fingerprint.
   const normalized = rawPayloads.map((p) => ({
@@ -158,6 +176,8 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
   const raw = store.getString(SESSION_KEY);
   if (raw === undefined) return null;
   try {
+    if (raw.length > MAX_SHARE_TEXT_BYTES * 2)
+      throw new Error("Oversized share session");
     const parsed = JSON.parse(raw) as Partial<ShareSession>;
     if (
       typeof parsed.version !== "number" ||
@@ -170,6 +190,7 @@ export function loadSession(store: SessionStoreAdapter): ShareSession | null {
       (parsed.phase !== "active" && parsed.phase !== "complete") ||
       !Array.isArray(parsed.entries) ||
       parsed.entries.length === 0 ||
+      parsed.entries.length > MAX_SHARE_ENTRIES ||
       !parsed.entries.every(isValidEntry)
     ) {
       // Unknown/incompatible shape — drop it so a fresh session starts clean.
@@ -335,6 +356,8 @@ export function startNewSession(
   generateSessionId: () => string,
   settled: SettledEntry[] = [],
 ): ShareSession {
+  if (!shareBatchAllowed(rawPayloads))
+    throw new Error("Share batch is too large");
   const sessionId = generateSessionId();
   const byIndex = new Map(settled.map((e) => [e.index, e]));
   const session: ShareSession = {

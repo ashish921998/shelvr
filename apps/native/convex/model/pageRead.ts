@@ -34,6 +34,7 @@ import {
   pinterestPinId,
   shortFormSource,
   xStatusId,
+  normalizeExternalUrl,
   type LinkSource,
 } from "./externalUrl";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
@@ -1294,9 +1295,9 @@ async function fetchPinterestPin(url: string): Promise<PageData> {
 }
 
 /**
- * Copy a poster into Convex storage. TikTok and Instagram poster URLs are
- * signed and expire, so the card would go blank without this. Best-effort:
- * a blocked or oversized image leaves the (short-lived) URL as the fallback.
+ * Copy a preview into Convex storage through the connection-bound URL policy.
+ * Clients receive only the stored copy. A refused or oversized image leaves
+ * the save without a cover rather than exposing the remote URL to clients.
  */
 export async function storePoster(
   ctx: { storage: { store: (blob: Blob) => Promise<Id<"_storage">> } },
@@ -1493,7 +1494,9 @@ async function fetchPage(url: string): Promise<PageData> {
     extractMetaContent(html, "twitter:image");
   if (heroImageUrl) {
     try {
-      heroImageUrl = new URL(heroImageUrl, finalUrl).toString();
+      heroImageUrl = normalizeExternalUrl(
+        new URL(heroImageUrl, finalUrl).toString(),
+      );
     } catch {
       heroImageUrl = undefined;
     }

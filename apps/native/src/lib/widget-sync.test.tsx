@@ -51,6 +51,9 @@ const tanstack = vi.hoisted(() => ({
   args: undefined as unknown,
 }));
 const analyticsMock = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { variant: "production" } } },
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
 
 vi.mock("react-native", () => ({

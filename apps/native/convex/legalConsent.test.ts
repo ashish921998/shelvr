@@ -46,6 +46,15 @@ function mockRevenueCat() {
 }
 
 describe("recorded terms and refund consent", () => {
+  it("preserves a historical consent revision when the user reviews terms", async () => {
+    const f = await fixture();
+    await f.review(true);
+    const consent = await f.row();
+    if (!consent) throw new Error("Missing consent");
+    await f.t.run((ctx) => ctx.db.patch(consent._id, { revision: 1 }));
+    await f.review(true);
+    expect((await f.row())?.revision).toBe(1);
+  });
   it("requires authentication and never infers consent for existing accounts", async () => {
     const f = await fixture();
     await expect(

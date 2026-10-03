@@ -34,10 +34,14 @@ export function redirectSystemPath({
     // try to render `/auth/callback`, which is not an app screen. Keep the
     // user on sign-in until Convex Auth flips the authenticated route guard.
     const isOAuthCallback =
-      url.protocol === "shelvr:" &&
+      ["shelvr:", "shelvr-dev:", "shelvr-preview:"].includes(url.protocol) &&
       ((url.hostname === "auth" && url.pathname === "/callback") ||
         (url.hostname === "" && url.pathname === "/auth/callback"));
-    if (isOAuthCallback) {
+    const isClaimedOAuthCallback =
+      url.protocol === "https:" &&
+      url.hostname === "shelvr-web.vercel.app" &&
+      url.pathname === "/auth/callback";
+    if (isOAuthCallback || isClaimedOAuthCallback) {
       return "/sign-in";
     }
 
