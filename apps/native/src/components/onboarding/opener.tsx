@@ -3,8 +3,13 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+
+// The collage never shrinks below this. When the headline pushes it past the
+// screen, the step scrolls instead.
+const COLLAGE_MIN_HEIGHT = 220;
 
 // Sample saves for the collage. The photos are generated for the app, so they
 // carry no licensing or brand questions.
@@ -90,16 +95,24 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
+  const [viewport, setViewport] = useState(0);
+  const [collageTop, setCollageTop] = useState(0);
+  // Only the largest text sizes overflow. Everywhere else the content is
+  // pinned to the viewport, so the collage fills the gap and its fade shows,
+  // exactly as before this step could scroll.
+  const overflows = viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport;
 
   return (
     <View style={styles.wrap}>
-      {/* The headline and collage scroll: at the largest text sizes the
-          headline alone can fill most of the screen. When everything fits,
-          the collage grows to fill the space. "Start yours" stays pinned. */}
+      {/* At the largest text sizes the headline alone can fill most of the
+          screen, so the headline and collage scroll. "Start yours" stays
+          pinned below. */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.body}
+        contentContainerStyle={[styles.body, overflows && styles.bodyScrolls]}
+        scrollEnabled={overflows}
         showsVerticalScrollIndicator={false}
+        onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
       >
         <View style={styles.head}>
           <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
@@ -107,7 +120,8 @@ export function OpenerStep({
         </View>
 
         <View
-          style={styles.collage}
+          style={[styles.collage, overflows && styles.collageScrolls]}
+          onLayout={(event) => setCollageTop(event.nativeEvent.layout.y)}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
@@ -172,8 +186,12 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   body: {
-    flexGrow: 1,
+    flex: 1,
     gap: theme.gap(2),
+  },
+  bodyScrolls: {
+    flex: 0,
+    flexGrow: 1,
   },
   head: {
     gap: theme.gap(1),
@@ -193,10 +211,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   collage: {
     flex: 1,
-    minHeight: 220,
+    minHeight: COLLAGE_MIN_HEIGHT,
     flexDirection: "row",
     gap: theme.gap(1),
     overflow: "hidden",
+  },
+  collageScrolls: {
+    flex: 0,
+    height: COLLAGE_MIN_HEIGHT,
   },
   fade: {
     position: "absolute",
