@@ -41,17 +41,19 @@ export function convexModules(fileNames) {
  * `item/[id]` for `item/[id].tsx`, `(home)` for the `(tabs)/(home)` group.
  * `list(relDir)` reads a directory relative to `(app)` with file types; `""`
  * is `(app)` itself. Directories are walked to any depth, except that a tab
- * group counts as one route and its inner screens are not listed.
+ * is one route named without the `(tabs)` prefix, whether it is a group
+ * directory or a single screen file, and a group's inner screens are not listed.
  */
 export function appRoutes(list, relDir = "") {
   const routes = [];
   for (const entry of list(relDir)) {
     if (entry.name.startsWith("_") || entry.name.startsWith("+")) continue;
-    const path = relDir ? `${relDir}/${entry.name}` : entry.name;
+    const inTabs = relDir === "(tabs)";
+    const path = relDir && !inTabs ? `${relDir}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
-      if (relDir === "(tabs)") routes.push(entry.name);
+      if (inTabs) routes.push(entry.name);
       else routes.push(...appRoutes(list, path));
-    } else if (entry.name.endsWith(".tsx") && relDir !== "(tabs)") {
+    } else if (entry.name.endsWith(".tsx")) {
       const route = path.slice(0, -4);
       routes.push(route.endsWith("/index") ? route.slice(0, -6) : route);
     }

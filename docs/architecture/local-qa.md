@@ -117,7 +117,7 @@ alias.
   client link with
   `adb shell am start -a android.intent.action.VIEW -d '<dev client url>' app.shelvr.save.dev`.
 - **Share intents.**
-  `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <url> -p app.shelvr.save.dev`.
+  `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT '<url>' -p app.shelvr.save.dev`.
   The dev client cannot test a cold-launch share: from a stopped app the
   launcher's server picker swallows the intent. Only a warm share works. To
   replay one, send the same intent with `-f 0x00100000`.

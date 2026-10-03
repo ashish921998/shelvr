@@ -49,14 +49,27 @@ test("names routes the way the doc writes them, at any depth", () => {
       dir("item"),
       dir("space"),
     ],
-    "(tabs)": [file("_layout.tsx"), dir("(home)"), dir("(search)")],
+    "(tabs)": [
+      file("_layout.tsx"),
+      dir("(home)"),
+      dir("(search)"),
+      file("inbox.tsx"),
+    ],
     item: [file("[id].tsx"), dir("[id]")],
     "item/[id]": [file("edit.tsx")],
     space: [file("_layout.tsx"), file("index.tsx")],
   };
   assert.deepEqual(
     appRoutes((relDir) => tree[relDir]),
-    ["add", "(home)", "(search)", "item/[id]", "item/[id]/edit", "space"],
+    [
+      "add",
+      "(home)",
+      "(search)",
+      "inbox",
+      "item/[id]",
+      "item/[id]/edit",
+      "space",
+    ],
   );
 });
 
