@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
+import { createSheetRequestStore } from "@/lib/sheet-request-store";
 
 /**
  * The exit offer's own full-screen sheet. RevenueCat's `presentPaywall` sheet
@@ -27,25 +28,14 @@ type Request = {
   /** Fires with the package's identifier the moment the user taps purchase —
    * the one purchase-start signal RevenueCat's component API exposes. */
   onPurchaseStarted?: (packageId: string) => void;
-  resolve: (result: RevenueCatPaywallResult) => void;
 };
 
-let request: Request | null = null;
+// Never superseded: `presentExitSheet` refuses while one is open.
+const sheet = createSheetRequestStore<Request, RevenueCatPaywallResult>(
+  "CANCELLED",
+);
 let hosts = 0;
-const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((read) => read());
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => listeners.delete(onChange);
-}
-
-function finish(result: RevenueCatPaywallResult): void {
-  const current = request;
-  if (!current) return;
-  request = null;
-  notify();
-  current.resolve(result);
-}
+const finish = sheet.resolve;
 
 /**
  * Shows the exit offering until the user buys, restores, closes it, or the
@@ -53,14 +43,11 @@ function finish(result: RevenueCatPaywallResult): void {
  * returns; NOT_PRESENTED when no host is mounted or the offer already ended.
  */
 export function presentExitSheet(
-  input: Omit<Request, "resolve">,
+  input: Request,
 ): Promise<RevenueCatPaywallResult> {
-  if (hosts === 0 || request || Date.now() >= input.endsAt)
+  if (hosts === 0 || sheet.current() || Date.now() >= input.endsAt)
     return Promise.resolve("NOT_PRESENTED");
-  return new Promise((resolve) => {
-    request = { ...input, resolve };
-    notify();
-  });
+  return sheet.request(input);
 }
 
 // The native view reports a dismissal that follows a purchase before or
@@ -68,7 +55,7 @@ export function presentExitSheet(
 const DISMISS_SETTLE_MS = 500;
 
 export function ExitOfferSheetHost() {
-  const current = useSyncExternalStore(subscribe, () => request);
+  const current = useSyncExternalStore(sheet.subscribe, sheet.current);
   const insets = useSafeAreaInsets();
   useAppLocale();
 
@@ -129,7 +116,7 @@ export function ExitOfferSheetHost() {
           onRestoreCompleted={() => finish("RESTORED")}
           onDismiss={() =>
             setTimeout(() => {
-              if (request === current) finish("CANCELLED");
+              if (sheet.current() === current) finish("CANCELLED");
             }, DISMISS_SETTLE_MS)
           }
         />
