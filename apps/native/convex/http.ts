@@ -38,6 +38,8 @@ import {
   isWaitlistSource,
   joinWaitlist,
 } from "./waitlist";
+import { oauthCallback as xOAuthCallback } from "./xImport";
+import { X_CALLBACK_PATH } from "./model/xApi";
 
 const http = httpRouter();
 
@@ -126,6 +128,13 @@ async function receiveImageUpload(
 
 // Convex Auth: JWT verification, JWKS, and OAuth callback HTTP actions.
 auth.addHttpRoutes(http);
+
+// X redirects here after the user approves bookmark access (xImport.ts).
+http.route({
+  path: X_CALLBACK_PATH,
+  method: "GET",
+  handler: xOAuthCallback,
+});
 
 /**
  * RevenueCat webhook receiver. RevenueCat posts server-to-server events here

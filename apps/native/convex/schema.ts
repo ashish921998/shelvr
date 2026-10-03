@@ -463,6 +463,49 @@ export default defineSchema({
     .index("by_token_hash", ["tokenHash"])
     .index("by_user", ["userId"]),
 
+  // One connected X account per user, for automatic bookmark import (see
+  // xImport.ts and docs/architecture/automatic-imports.md). The tokens are
+  // OAuth 2.0 user tokens X issued to Shelvr; they are needed raw to call the
+  // API, so they cannot be hashed like capture tokens. `status` "reconnect"
+  // means X refused the refresh token and the user must connect again.
+  xConnections: defineTable({
+    userId: v.id("users"),
+    xUserId: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    accessTokenExpiresAt: v.number(),
+    status: v.union(v.literal("active"), v.literal("reconnect")),
+    connectedAt: v.number(),
+    // Until one sync reads every bookmark X returns without being stopped,
+    // syncs page all the way down; afterwards they stop at the first page of
+    // bookmarks already seen.
+    backfillComplete: v.boolean(),
+    nextSyncAt: v.number(),
+    lastSyncedAt: v.optional(v.number()),
+    lastSyncError: v.optional(v.string()),
+    importedCount: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status_and_nextSyncAt", ["status", "nextSyncAt"]),
+
+  // X post ids a user's bookmark sync has already handled, so deleting an
+  // imported save never brings it back on the next sync.
+  xImportedPosts: defineTable({
+    userId: v.id("users"),
+    postId: v.string(),
+  }).index("by_user_and_postId", ["userId", "postId"]),
+
+  // Pending X OAuth handshakes: the `state` sent to X and the PKCE verifier
+  // that redeems its code. One row per user at most; the callback consumes it.
+  xOAuthStates: defineTable({
+    userId: v.id("users"),
+    state: v.string(),
+    codeVerifier: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_state", ["state"])
+    .index("by_user", ["userId"]),
+
   // A public share link for one item. The random token, never the item id, is
   // the capability: item ids travel through analytics, tokens do not.
   shareLinks: defineTable({
