@@ -1,3 +1,5 @@
+import { signVerdict } from "@/lib/oracleProof";
+import type { OracleMode, OracleVerdict } from "@/lib/oracle";
 import { NextResponse } from "next/server";
 
 import {
@@ -86,7 +88,12 @@ export async function POST(request: Request) {
     if (!response.ok) {
       throw new Error(`Convex oracle endpoint returned ${response.status}.`);
     }
-    return NextResponse.json(await response.json());
+    const verdict = (await response.json()) as OracleVerdict;
+    const shareCode = await signVerdict({
+      ...verdict,
+      mode: kind as OracleMode,
+    });
+    return NextResponse.json({ ...verdict, shareCode });
   } catch (error) {
     serverLog("error", "oracle_request_failed", {
       kind,

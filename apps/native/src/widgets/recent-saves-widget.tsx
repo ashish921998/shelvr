@@ -32,6 +32,7 @@ export type WidgetSaveItem = {
 };
 
 export type RecentSavesWidgetProps = {
+  scheme?: "shelvr" | "shelvr-dev" | "shelvr-preview";
   items: WidgetSaveItem[];
   emptyTitle?: string;
   emptyHint?: string;
@@ -52,6 +53,10 @@ const RecentSavesWidget = (
   environment: WidgetEnvironment,
 ) => {
   "widget";
+  const scheme =
+    props.scheme === "shelvr-dev" || props.scheme === "shelvr-preview"
+      ? props.scheme
+      : "shelvr";
   const dark = environment.colorScheme === "dark";
   // Shelvr palette, mirrored from src/unistyles.ts.
   const c = dark
@@ -90,7 +95,7 @@ const RecentSavesWidget = (
         spacing={6}
         modifiers={[
           containerBackground(c.background, "widget"),
-          widgetURL(locked ? "shelvr:///paywall" : "shelvr:///add"),
+          widgetURL(`${scheme}:///${locked ? "paywall" : "add"}`),
         ]}
       >
         <Image
@@ -182,7 +187,7 @@ const RecentSavesWidget = (
         modifiers={[
           containerBackground(c.background, "widget"),
           padding({ all: 12 }),
-          widgetURL("shelvr:///"),
+          widgetURL(`${scheme}:///`),
         ]}
       >
         <HStack spacing={7}>
@@ -264,7 +269,7 @@ const RecentSavesWidget = (
       modifiers={[
         containerBackground(c.background, "widget"),
         padding({ all: 13 }),
-        widgetURL("shelvr:///"),
+        widgetURL(`${scheme}:///`),
       ]}
     >
       <ZStack
