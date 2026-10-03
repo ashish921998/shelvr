@@ -13,7 +13,7 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   Re-sync fonts and components to update previously uploaded design previews.
 - Synced components are listed in `.design-sync/web-entry.ts`: `AppSymbolIcon`,
   `Button`, `EmptyState`, `HeaderIconButton`, `InlineCard`, `IntentChip`,
-  `ScreenLoader`, `SettingCard`, `SettingsGroup`, `SettingsRow`, `SuggestedBadge`,
+  `ItemCardFace`, `ScreenLoader`, `SettingCard`, `SettingsGroup`, `SettingsRow`, `SuggestedBadge`,
   `TagChip`, `ThemedText`, `Wordmark`. All get authored previews.
 - `Button` and `ThemedText` joined on 2026-10-03: they are the primitives
   `docs/architecture/design-system.md` tells new UI to use, and a design without
@@ -26,7 +26,12 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   stand-in toggle), `AppTabBar`, and `HeaderActionMenu` (below).
 - `ItemCard` is out (user decision). It needs Expo Router `Link.Trigger`/`Link.Menu`,
   three Convex mutations, `Alert`, `Share`, and haptics, and would crash in designs
-  without a Convex provider. Revisit if a presentational card with plain props exists.
+  without a Convex provider. `ItemCardFace` (`src/components/item-card-face.tsx`) is
+  synced in its place: the card's visual body with plain props, which `ItemCard`
+  renders inside its `Link` and `Pressable`. Its overflow control is an `ActionMenu`,
+  so on web the three dots render and do nothing (same `MenuView` limit as
+  `HeaderActionMenu`). The feed cell's 4px padding and the entrance fade stay in
+  `ItemCard`; the preview adds the padding as layout glue.
 - `GlassView` is not synced (user decision).
 - No Storybook exists (user confirmed); shape is `package`.
 - `HeaderActionMenu` (same file as `HeaderIconButton`) is not synced: its menu is
@@ -49,6 +54,11 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   - `PlatformColor` is not exported; `expo-symbols` imports it (Android-only call).
   - `expo-font`'s web build imports `node:async_hooks` (server-only path). Stubbed.
   - A `process` global is expected (`react-native-worklets`, `semver`). Banner shim.
+  - `expo-image` (first pulled in by `ItemCardFace`) imports `expo`, whose web entry
+    loads `expo/src/async-require`: Metro's lazy-bundle loader and, under `__DEV__`,
+    its fast-refresh, HMR and message sockets. With no Metro server they log
+    `WebSocket connection to 'ws://hot/' failed` on every load. `index.ts` and
+    `setup.ts` there are stubbed empty.
 - Unistyles writes theme CSS variables into `<style id="unistyles-web">` only when the
   first style is applied (`recreate()` runs on `css.add`). A card or design that uses
   only `AppSymbolIcon` (no unistyles styles) got no `--colors-*`/`--fonts-*` at all.
@@ -70,6 +80,10 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   are hand-written in `config.json` `dtsPropsFor`. `build-web.mjs` fails when either
   union drifts from the keys of `SF_TO_MATERIAL` in `src/components/symbol.tsx`; when an
   icon is added or removed, update every icon union (`SettingsRow.icon` is a third).
+- `ItemCardFace.item` is the app's `FeedItem`, which collapses too. Its `dtsPropsFor`
+  entry lists only the fields a designer sets and types `_id` as a plain string.
+  `build-web.mjs` fails when a listed field is no longer in `FeedItem`; a field added
+  to `FeedItem` is not flagged, so add it by hand if designs should set it.
 - `ThemedText.variant` (the 23-step type ramp) collapses the same way and is
   hand-written too. `build-web.mjs` fails when it drifts from `theme.type` in
   `src/unistyles.ts`.
@@ -81,6 +95,8 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   InlineCard from `feedback/feedback-invitation.tsx`, tags and intent labels from
   `convex/devFixtures.ts` (tags are short lowercase words, two per save).
 - `EmptyState` fills its parent (`flex: 1`); its previews give it a 300px-tall frame.
+- `ItemCardFace` previews use inline SVG `data:` URIs with a flat fill for images, so
+  they need no network. Titles and tags come from `convex/devFixtures.ts`.
 
 ## Known build and render warns
 
@@ -95,7 +111,9 @@ What can go stale without failing loudly:
 
 - `build-web.mjs` patches exact strings in dependencies: `export default Appearance;`
   and `var defaultId = 'react-native-stylesheet';` in react-native-web. A version bump
-  that changes either makes the `.replace` a silent no-op. Symptoms: every card fails
+  that changes either makes the `.replace` a silent no-op. The `expo/src/async-require`
+  stub matches by path the same way; if the `ws://hot/` console errors return, the
+  files moved. Symptoms: every card fails
   `[RENDER] root empty` (stylesheet id), or the bundle throws
   `Appearance_default.setColorScheme is not a function` at load.
 - The unistyles plugin's reanimated path (`lib/module/component`) and the
