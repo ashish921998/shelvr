@@ -24,12 +24,25 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+      - name: Clear reserved review tooling path
+        run: rm -rf .secure-review-tooling
+      - name: Checkout immutable trusted review tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: 754266328766453337830533266339f30a368749
+          path: .secure-review-tooling
+          persist-credentials: false
+          sparse-checkout: |
+            .github/actions/secure-review
+            tools/harden-review-action.mjs
+            tools/main-module.mjs
       - name: Prepare pinned droid dependencies
-        uses: ./.github/actions/secure-review
+        uses: ./.secure-review-tooling/.github/actions/secure-review
         with:
           provider: droid
       - name: Run Droid Auto Review
-        uses: ./.github/runtime/droid
+        uses: ./.secure-review-tooling/runtime/droid
         with:
           github_token: ${{ github.token }}
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}

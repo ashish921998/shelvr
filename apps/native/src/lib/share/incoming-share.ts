@@ -303,10 +303,10 @@ function requestSave(
 ): Step {
   const sid = session.sessionId;
   if (state.running === sid) return none(state);
+  if (ctx.entitlementLoading) return none(state);
   if (state.android && state.confirmed !== sid) {
     return none({ ...state, phase: { kind: "confirm", session } });
   }
-  if (ctx.entitlementLoading) return none(state);
   // Saving is Pro. Set the locked phase before presenting, so a cancel lands
   // on the explicit Pro gate, and present once per session.
   if (!ctx.entitled) {
