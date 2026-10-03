@@ -25,7 +25,8 @@ Proof a reviewer can open: a CI run link, pasted output, or a read-back of a set
 For any change a person can see, screenshots or a recording go here. Drag images into this box.
 CI requires one when the pull request touches UI files (screens, styles, motion, copy, assets,
 native view modules, app config, push copy, apps/web UI). If those files changed but nothing on
-screen did, say why here; only the owner can waive the screenshot, with the "no-ui-change" label.
+screen did, say why here; only the owner waives the screenshot, with the "no-ui-change" label
+(a rule, not a check: CI cannot tell who added the label, so agents never add it).
 Paywall changes live in RevenueCat, so CI cannot see them: they still need screenshots.
 -->
 

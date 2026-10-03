@@ -78,6 +78,7 @@ test("placeholders and nested headings are not content", () => {
   assert.equal(hasContent("- [ ] "), false);
   assert.equal(hasContent("#### TODO"), false);
   assert.equal(hasContent("TBD"), false);
+  assert.equal(hasContent("TODO: run checks later"), false);
   assert.equal(hasContent("- **TODO**"), false);
   assert.equal(hasContent("Nothing"), true);
   const body = filled({ evidence: "#### TODO" });

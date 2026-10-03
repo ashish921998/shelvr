@@ -333,7 +333,7 @@ needed at runtime by the features that use them:
   naming it. So reverting the commit that added the field fails the deploy instead
   of rolling it back. To back a field out, stop writing it and leave it declared
   `v.optional(...)`; drop the declaration only once no row still has it.
-- Every pull request fills in the template's Verification section: what was run and its result,
+- Every pull request (Renovate and Dependabot aside) fills in the template's Verification section: what was run and its result,
   the evidence, and what was not verified. Never call work "done" or "verified" without evidence
   a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
   assets, native view modules, app config, push copy, `apps/web` UI) embeds a screenshot or

@@ -89,7 +89,7 @@ export function section(body, title) {
 
 // A line that only restates the template's shape, or promises content later,
 // is not content: empty bullets and boxes, nested headings, placeholders.
-const PLACEHOLDER = /^(todo|tbd|tbc|wip|pending|n\/?a|-+|\.+)$/i;
+const PLACEHOLDER = /^((todo|tbd|tbc|wip)\b.*|pending|n\/?a|-+|\.+)$/i;
 
 export function hasContent(text) {
   if (text === null) return false;
