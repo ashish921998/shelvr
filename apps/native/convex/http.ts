@@ -87,9 +87,9 @@ async function receiveImageUpload(
     });
     if (result.kind === "reject") return captureUnauthorized();
     if (result.kind === "stored") {
-      // Consume only a bounded retry body. Canceling a valid incoming stream
-      // before replying can reset HTTP/2 and hide the successful receipt.
-      await readBoundedBlob(req, MAX_STORED_IMAGE_BYTES);
+      // This capability already has its immutable receipt. Do not parse or
+      // cancel the irrelevant retry body: cancellation resets HTTP/2, and
+      // revalidation could incorrectly refuse an upload already accepted.
       return json({ storageId: result.storageId }, 200);
     }
     claim = result;

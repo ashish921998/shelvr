@@ -39,9 +39,11 @@ test("review preparations pin every upstream checkout and run before secrets are
     "claude-code-review",
   ]) {
     const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
-    assert.ok(
-      source.indexOf("uses: ./.github/actions/secure-review") <
-        source.indexOf("uses: ./.github/runtime/"),
-    );
+    const preparation = source.indexOf("uses: ./.github/actions/secure-review");
+    const runtime = source.indexOf("uses: ./.github/runtime/");
+    assert.notEqual(preparation, -1);
+    assert.notEqual(runtime, -1);
+    assert.ok(preparation < runtime);
+    assert.match(source, /fetch-depth: 1\s+persist-credentials: false/);
   }
 });

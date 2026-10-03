@@ -56,6 +56,13 @@ describe("bounded upload endpoint", () => {
       body: new Uint8Array([4]),
     });
     expect(await retry.json()).toEqual(result);
+    const oversizedRetry = await t.fetch(path, {
+      method: "POST",
+      body: new Uint8Array([4]),
+      headers: { "content-length": "20000000" },
+    });
+    expect(await oversizedRetry.json()).toEqual(result);
+    expect(oversizedRetry.status).toBe(200);
     let canceled = false;
     const streamedRetry = new ReadableStream<Uint8Array>({
       start(controller) {
