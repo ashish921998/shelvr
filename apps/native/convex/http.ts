@@ -86,6 +86,11 @@ async function receiveImageUpload(
       tokenHash: await sha256Hex(token),
     });
     if (result.kind === "reject") return captureUnauthorized();
+    if (result.kind === "busy") {
+      const response = json({ error: "rate_limited" }, 429);
+      response.headers.set("retry-after", "60");
+      return response;
+    }
     if (result.kind === "stored") {
       // This capability already has its immutable receipt. Do not parse or
       // cancel the irrelevant retry body: cancellation resets HTTP/2, and

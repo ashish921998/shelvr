@@ -27,7 +27,7 @@ test("Droid cannot use remote installers, mutable marketplace sources, or unveri
   );
   assert.match(result, /[a-f0-9]{64}.*sha256sum --check --status/);
   assert.ok(result.indexOf("sha256sum") < result.indexOf("chmod +x"));
-  assert.match(result, /GITHUB_WORKSPACE.*\.github\/runtime\/factory-plugins/);
+  assert.match(result, /GITHUB_WORKSPACE.*\.secure-review-tooling\/runtime\/factory-plugins/);
 });
 
 test("Claude pins both dependencies and native executable without executing a moving installer", () => {

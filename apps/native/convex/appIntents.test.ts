@@ -132,7 +132,7 @@ describe("bounded upload endpoint", () => {
     });
     expect(
       await t.mutation(internal.items.claimImageUpload, { tokenHash }),
-    ).toEqual({ kind: "reject" });
+    ).toEqual({ kind: "busy" });
     if (claim.kind !== "accept") throw new Error("Expected claim");
     const storageId = await t.run((ctx) =>
       ctx.storage.store(new Blob(["loser"])),

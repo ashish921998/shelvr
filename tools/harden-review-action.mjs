@@ -44,7 +44,7 @@ export function hardenActionSource(provider, source) {
     result = replaceExact(
       result,
       "droid plugin marketplace add https://github.com/Factory-AI/factory-plugins 2>/dev/null || true",
-      'droid plugin marketplace add "${GITHUB_WORKSPACE}/.github/runtime/factory-plugins"',
+      'droid plugin marketplace add "${GITHUB_WORKSPACE}/.secure-review-tooling/runtime/factory-plugins"',
     );
     return replaceExact(
       result,

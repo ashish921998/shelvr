@@ -3,6 +3,7 @@
 # dependencies
 node_modules
 .github/runtime/
+.secure-review-tooling/
 .pnp
 .pnp.js
 

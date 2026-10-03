@@ -1007,7 +1007,7 @@ export async function beginImageImportForUser(
   const siteOrigin =
     process.env.CONVEX_SITE_URL ??
     new URL(platformUrl).origin.replace(".convex.cloud", ".convex.site");
-  const uploadUrl = `${siteOrigin}/image-upload?token=${uploadToken}`;
+  const uploadUrl = `${siteOrigin.replace(/\/+$/, "")}/image-upload?token=${uploadToken}`;
   if (op === null) {
     // (userId, operationId) uniqueness is enforced by Convex's serializable
     // transactions: if two begins race on an empty index range, only one
@@ -1101,6 +1101,7 @@ export const claimImageUpload = internalMutation({
       claimTime: v.number(),
     }),
     v.object({ kind: v.literal("stored"), storageId: v.id("_storage") }),
+    v.object({ kind: v.literal("busy") }),
     v.object({ kind: v.literal("reject") }),
   ),
   handler: async (ctx, { tokenHash }) => {
@@ -1120,17 +1121,15 @@ export const claimImageUpload = internalMutation({
     const userId = ctx.db.normalizeId("users", op.userId);
     if (!userId) return { kind: "reject" as const };
     await requireProEntitlement(ctx, userId);
+    if (op.storageId)
+      return { kind: "stored" as const, storageId: op.storageId };
+    if (op.status !== "pending") return { kind: "reject" as const };
+    if (op.uploadClaimedAt !== undefined && now - op.uploadClaimedAt < 60_000)
+      return { kind: "busy" as const };
     await rateLimiter.limit(ctx, "imageUpload", {
       key: op.userId,
       throws: true,
     });
-    if (op.storageId)
-      return { kind: "stored" as const, storageId: op.storageId };
-    if (
-      op.status !== "pending" ||
-      (op.uploadClaimedAt !== undefined && now - op.uploadClaimedAt < 60_000)
-    )
-      return { kind: "reject" as const };
     await ctx.db.patch(op._id, { uploadClaimedAt: now, updatedAt: now });
     return { kind: "accept" as const, operationId: op._id, claimTime: now };
   },

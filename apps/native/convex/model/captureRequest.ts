@@ -26,7 +26,7 @@ export async function readBoundedBlob(
   }
   if (
     req.headers.get("content-encoding") &&
-    req.headers.get("content-encoding") !== "identity"
+    req.headers.get("content-encoding")?.trim().toLowerCase() !== "identity"
   ) {
     await req.body?.cancel();
     throw new BodyTooLargeError();
