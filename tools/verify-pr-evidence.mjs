@@ -47,7 +47,8 @@ const stripComments = (text) => text.replace(/<!--[\s\S]*?-->/g, "");
 
 // Pasted output in a code fence is evidence that something ran, but an image
 // tag quoted inside one shows nothing.
-const stripFences = (text) => text.replace(/^(```|~~~)[\s\S]*?^\1/gm, "");
+const stripFences = (text) =>
+  text.replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1/gm, "");
 
 // A line opening or closing a code fence; a heading inside one is quoted text.
 const FENCE = /^[ \t]*(```|~~~)/;
@@ -120,7 +121,7 @@ export function hasVisualEvidence(text) {
   const clean = stripFences(stripComments(text));
   const markdown = new RegExp(String.raw`!\[[^\]]*\]\(\s*${IMAGE_URL}\s*\)`);
   const tag = new RegExp(
-    String.raw`<(img|video|source)\b[^>]*\bsrc=["']?${IMAGE_URL}`,
+    String.raw`<(img|video|source)\b[^>]*\bsrc=["']?${IMAGE_URL}(?=["'\s>/])`,
     "i",
   );
   const bare = new RegExp(String.raw`(^|\s)${IMAGE_URL}(?=\s|$)`, "m");
@@ -174,8 +175,8 @@ export function evidenceProblems(body, changedFiles, labels = []) {
   return problems;
 }
 
-function changedFilesSince(base) {
-  return execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
+function changedFilesSince(base, head) {
+  return execFileSync("git", ["diff", "--name-only", `${base}...${head}`], {
     encoding: "utf8",
   })
     .split("\n")
@@ -183,17 +184,17 @@ function changedFilesSince(base) {
 }
 
 function main() {
-  const base = process.argv[2];
+  const [base, head = "HEAD"] = process.argv.slice(2);
   if (!base) {
     console.error(
-      "usage: verify-pr-evidence.mjs <base-sha>  (PR_BODY, PR_LABELS in env)",
+      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS in env)",
     );
     process.exit(2);
   }
   const labels = JSON.parse(process.env.PR_LABELS || "[]");
   const problems = evidenceProblems(
     process.env.PR_BODY ?? "",
-    changedFilesSince(base),
+    changedFilesSince(base, head),
     labels,
   );
   const summary = process.env.GITHUB_STEP_SUMMARY;

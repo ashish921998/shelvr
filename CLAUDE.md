@@ -339,7 +339,7 @@ needed at runtime by the features that use them:
   assets, native view modules, app config, push copy, `apps/web` UI) embeds a screenshot or
   recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
   never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
-  branch has it) fails a ready pull request otherwise and re-runs on description and label edits.
+  branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 

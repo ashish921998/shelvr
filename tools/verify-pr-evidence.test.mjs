@@ -117,6 +117,11 @@ test("malformed or non-image links are not visual evidence", () => {
     false,
   );
   assert.equal(hasVisualEvidence("https://x.dev/a.png.exe"), false);
+  assert.equal(hasVisualEvidence('<img src="https://x.dev/a.png.exe">'), false);
+  assert.equal(
+    hasVisualEvidence("  ```\n  ![shot](https://x.dev/a.png)\n  ```"),
+    false,
+  );
   assert.equal(
     hasVisualEvidence("```\n![shot](https://x.dev/a.png)\n```"),
     false,
