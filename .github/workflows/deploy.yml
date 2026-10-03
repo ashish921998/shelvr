@@ -60,7 +60,7 @@ jobs:
 
       - name: Verify CI and that main has not moved past it
         id: verify
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             await require('./tools/verify-ci.cjs')({ github, context, core });
@@ -82,7 +82,7 @@ jobs:
       # later run does not invalidate this one, so main may have moved since the
       # verdict that let this job start.
       - name: Confirm main did not move while approval was pending
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             await require('./tools/verify-ci.cjs').requireTip({ github, context, core });
