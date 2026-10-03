@@ -3,8 +3,17 @@ import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
-import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+
+// The collage never shrinks below this. When the headline pushes it past the
+// screen, the step scrolls instead.
+const COLLAGE_MIN_HEIGHT = 220;
+
+// Below this much room above the footer, the pinned scroll area is too small
+// to read, so the footer joins the scrolling content instead.
+const SCROLL_MIN_HEIGHT = 160;
 
 // Sample saves for the collage. The photos are generated for the app, so they
 // carry no licensing or brand questions.
@@ -90,66 +99,103 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
+  const [height, setHeight] = useState(0);
+  const [footHeight, setFootHeight] = useState(0);
+  const [viewport, setViewport] = useState(0);
+  const [collageTop, setCollageTop] = useState(0);
+  // On a small phone at the largest sizes the footer alone can take most of
+  // the screen. Then everything scrolls together, footer last, so nothing
+  // ends up out of reach.
+  const footScrolls =
+    height > 0 && footHeight > 0 && height - footHeight < SCROLL_MIN_HEIGHT;
+  // Only the largest text sizes overflow. Everywhere else the content is
+  // pinned to the viewport, so the collage fills the gap and its fade shows,
+  // exactly as before this step could scroll.
+  const overflows =
+    footScrolls || (viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport);
+
+  const foot = (
+    <View
+      style={styles.foot}
+      onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
+    >
+      <View style={styles.proLine}>
+        <View style={styles.proPill}>
+          <Text style={styles.proPillText}>Pro</Text>
+        </View>
+        <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
+      </View>
+      <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
+      <Pressable
+        accessibilityRole="button"
+        onPress={onSignIn}
+        style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.signInText}>
+          {t("onboarding.haveAccount")}{" "}
+          <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.head}>
-        <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
-        <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
-      </View>
-
-      <View
-        style={styles.collage}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+    <View
+      style={styles.wrap}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+    >
+      {/* At the largest text sizes the headline alone can fill most of the
+          screen, so the headline and collage scroll. "Start yours" stays
+          pinned below unless the footer itself is too tall to pin. */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.body, overflows && styles.bodyScrolls]}
+        scrollEnabled={overflows}
+        showsVerticalScrollIndicator={false}
+        onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
       >
-        {COLUMNS.map((column, index) => (
-          <View key={index} style={styles.column}>
-            {column.map((tile) =>
-              tile.kind === "note" ? (
-                <View key={tile.titleKey} style={[styles.tile, styles.note]}>
-                  <Text style={styles.noteText}>{t(tile.titleKey)}</Text>
-                </View>
-              ) : (
-                <View key={tile.titleKey} style={styles.tile}>
-                  <Image
-                    source={tile.image}
-                    contentFit="cover"
-                    style={[styles.thumb, { height: tile.height }]}
-                  />
-                  <View style={styles.meta}>
-                    <Text style={styles.tileTitle} numberOfLines={2}>
-                      {t(tile.titleKey)}
-                    </Text>
-                    <Text style={styles.domain}>{tile.domain}</Text>
-                  </View>
-                </View>
-              ),
-            )}
-          </View>
-        ))}
-        <View pointerEvents="none" style={styles.fade} />
-      </View>
-
-      <View style={styles.foot}>
-        <View style={styles.proLine}>
-          <View style={styles.proPill}>
-            <Text style={styles.proPillText}>Pro</Text>
-          </View>
-          <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
+        <View style={styles.head}>
+          <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
+          <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
         </View>
-        <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={onSignIn}
-          style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+
+        <View
+          style={[styles.collage, overflows && styles.collageScrolls]}
+          onLayout={(event) => setCollageTop(event.nativeEvent.layout.y)}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         >
-          <Text style={styles.signInText}>
-            {t("onboarding.haveAccount")}{" "}
-            <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
-          </Text>
-        </Pressable>
-      </View>
+          {COLUMNS.map((column, index) => (
+            <View key={index} style={styles.column}>
+              {column.map((tile) =>
+                tile.kind === "note" ? (
+                  <View key={tile.titleKey} style={[styles.tile, styles.note]}>
+                    <Text style={styles.noteText}>{t(tile.titleKey)}</Text>
+                  </View>
+                ) : (
+                  <View key={tile.titleKey} style={styles.tile}>
+                    <Image
+                      source={tile.image}
+                      contentFit="cover"
+                      style={[styles.thumb, { height: tile.height }]}
+                    />
+                    <View style={styles.meta}>
+                      <Text style={styles.tileTitle} numberOfLines={2}>
+                        {t(tile.titleKey)}
+                      </Text>
+                      <Text style={styles.domain}>{tile.domain}</Text>
+                    </View>
+                  </View>
+                ),
+              )}
+            </View>
+          ))}
+          <View pointerEvents="none" style={styles.fade} />
+        </View>
+        {footScrolls ? foot : null}
+      </ScrollView>
+
+      {footScrolls ? null : foot}
     </View>
   );
 }
@@ -158,6 +204,17 @@ const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
     gap: theme.gap(2),
+  },
+  scroll: {
+    flex: 1,
+  },
+  body: {
+    flex: 1,
+    gap: theme.gap(2),
+  },
+  bodyScrolls: {
+    flex: 0,
+    flexGrow: 1,
   },
   head: {
     gap: theme.gap(1),
@@ -177,10 +234,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   collage: {
     flex: 1,
-    minHeight: 220,
+    minHeight: COLLAGE_MIN_HEIGHT,
     flexDirection: "row",
     gap: theme.gap(1),
     overflow: "hidden",
+  },
+  collageScrolls: {
+    flex: 0,
+    height: COLLAGE_MIN_HEIGHT,
   },
   fade: {
     position: "absolute",
