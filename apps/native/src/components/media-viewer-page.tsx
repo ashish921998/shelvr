@@ -12,7 +12,7 @@ import {
   sheetUnderHeader,
   toggleCaption,
 } from "@/lib/media-viewer";
-import { resolveReelEmbedUrl } from "@/lib/reel-player";
+import { IN_APP_REELS, resolveReelEmbedUrl } from "@/lib/reel-player";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
 import { setStatusBarStyle } from "expo-status-bar";
@@ -196,7 +196,7 @@ export function MediaViewerPage({
   const hero = video ? (
     <PostMediaButton
       site={video.site}
-      label={t("item.playVideo")}
+      label={IN_APP_REELS ? t("item.playVideo") : undefined}
       playable
       onPressIn={stillTap.onPressIn}
       onPress={(e) => {
@@ -439,6 +439,10 @@ function useReelPlayback(
     openSource();
   };
   const play = () => {
+    if (!IN_APP_REELS) {
+      openSource();
+      return;
+    }
     const id = item._id;
     pendingPlay.current = id;
     setPlaying({ id, uri: undefined });

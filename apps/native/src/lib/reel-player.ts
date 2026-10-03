@@ -1,6 +1,13 @@
 import { instagramMedia, isTikTokUrl } from "@convex/model/externalUrl";
 
 /**
+ * Whether a reel's poster plays it inside the app. Off until playing TikTok
+ * and Instagram embeds in a paid app is cleared against their terms and App
+ * Review 5.2.2 / 5.2.3; while off, the poster opens the post, as before.
+ */
+export const IN_APP_REELS = false;
+
+/**
  * The official embed player for a reel or video post, which plays inside the
  * app: TikTok's player and Instagram's embed page. Undefined when the link
  * names no video the player can load (a TikTok short link, an Instagram share
