@@ -135,7 +135,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
   retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
-  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
+  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
+  `image: null` Apple's provider emits, which the users schema rejects.
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
   identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
@@ -204,6 +205,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 - Design tokens live in `src/unistyles.ts` (type, spacing, color, controls) and motion in
   `src/lib/motion.ts`. Read [design system](docs/architecture/design-system.md) before adding
   UI, and [display font](docs/architecture/display-font.md) before touching the title face.
+- To run a branch or worktree on a simulator (Metro port, dev client link, sign-in, fixtures,
+  forcing onboarding or the paywall), read [local QA](docs/architecture/local-qa.md) first.
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
@@ -370,6 +373,9 @@ needed at runtime by the features that use them:
   `v.optional(...)`; drop the declaration only once no row still has it.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
+- A new schema table, top-level Convex module or `(app)` route needs a line in this file.
+  `tools/verify-agent-docs.mjs` (`pnpm run verify:agent-docs`, part of `pnpm run check` and CI)
+  fails until the name appears here in backticks.
 
 <!-- convex-ai-start -->
 

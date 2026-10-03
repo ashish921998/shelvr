@@ -65,6 +65,9 @@ with `apps/web`.
   bundles that tree.
 - **Design handoffs, marketing assets and store media** are not in this repo.
   They live in the separate `shelvr-notes` repo.
+- **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
+  setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
+  paywall.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
 
 ## Naming conventions
