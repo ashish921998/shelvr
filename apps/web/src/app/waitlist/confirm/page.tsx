@@ -1,4 +1,6 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 import { clientIp } from "@/lib/convexForward";
 import type { Metadata } from "next";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
@@ -12,38 +14,66 @@ export const metadata: Metadata = {
 export default async function ConfirmationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; status?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token, status } = await searchParams;
   async function confirm() {
     "use server";
     const site = convexSiteUrl();
     const secret = process.env.WAITLIST_SHARED_SECRET;
-    if (!site || !secret || !token || !/^[a-f0-9]{64}$/.test(token))
-      throw new Error(
-        "Confirmation is unavailable. Please request a new link.",
-      );
+    if (!site || !secret) redirect("/waitlist/confirm?status=unavailable");
+    if (!token || !/^[a-f0-9]{64}$/.test(token))
+      redirect("/waitlist/confirm?status=expired");
     const ip = clientIp(
       new Request("https://shelvr-web.vercel.app/waitlist/confirm", {
         headers: await headers(),
       }),
     );
-    const response = await fetch(`${site}/waitlist/confirm`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-waitlist-secret": secret,
-        ...(ip ? { "x-shelvr-client-ip": ip } : {}),
-      },
-      body: JSON.stringify({ token }),
-      signal: AbortSignal.timeout(20_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${site}/waitlist/confirm`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-waitlist-secret": secret,
+          ...(ip ? { "x-shelvr-client-ip": ip } : {}),
+        },
+        body: JSON.stringify({ token }),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      redirect("/waitlist/confirm?status=unavailable");
+    }
     if (!response.ok)
-      throw new Error(
-        "This confirmation link is expired or already used. Please request a new link.",
+      redirect(
+        response.status === 400
+          ? "/waitlist/confirm?status=expired"
+          : "/waitlist/confirm?status=unavailable",
       );
-    const { redirect } = await import("next/navigation");
     redirect("/waitlist/confirmed");
+  }
+  if (
+    status === "expired" ||
+    status === "unavailable" ||
+    !token ||
+    !/^[a-f0-9]{64}$/.test(token)
+  ) {
+    return (
+      <main className="container py-16">
+        <h1 className="text-3xl">Confirmation unavailable</h1>
+        <p className="mt-4">
+          {status === "unavailable"
+            ? "We couldn’t confirm your request right now. Please try again later."
+            : "This link has expired or has already been used. Request a new confirmation if you still want to join."}
+        </p>
+        <Link
+          href="/#android-waitlist-email"
+          className="mt-6 inline-block underline"
+        >
+          Request a new confirmation
+        </Link>
+      </main>
+    );
   }
   return (
     <main className="container py-16">
@@ -53,7 +83,12 @@ export default async function ConfirmationPage({
         did not request it.
       </p>
       <form action={confirm}>
-        <button type="submit">Confirm my request</button>
+        <button
+          type="submit"
+          className="mt-6 min-h-12 rounded-xl bg-ember px-6 font-semibold text-ink"
+        >
+          Confirm my request
+        </button>
       </form>
     </main>
   );
