@@ -97,7 +97,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`items.ts`** — public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
   `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
   `beginImageImport` → `attachImageUpload` → `finalizeImageImport`, all keyed on a
-  client-generated `operationId` in `itemOperations`. Other public mutations are
+  client-generated `operationId` in `itemOperations`.
+  The returned upload URL now targets `/image-upload`, which claims a single
+  receiver, caps the streamed body at the image limit, and records its storage ID
+  before replying. Begin and upload budgets, pending-operation reservations,
+  stale-operation cleanup, and a paginated orphan-storage sweep bound abandoned
+  work. Successful upload retries return the same storage ID.
+  Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
   `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,

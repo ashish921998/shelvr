@@ -261,6 +261,38 @@ export default function ShareScreen() {
 
   // --- Phase render ---------------------------------------------------------
 
+  if (phase.kind === "confirm") {
+    return (
+      <PhaseSurface key={phase.session.sessionId} phaseKey="confirm">
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        >
+          {rawPayloads.map((payload, index) => (
+            <Text key={index} style={styles.subtitle(theme)} numberOfLines={4}>
+              {/^(file|content):/i.test(payload.value)
+                ? t("capture.photos")
+                : payload.value}
+            </Text>
+          ))}
+        </ScrollView>
+        <View style={styles.actions}>
+          <Button
+            label={t("common.cancel")}
+            theme={theme}
+            onPress={() => dispatch({ type: "cancel" })}
+          />
+          <Button
+            label={t("common.save")}
+            theme={theme}
+            primary
+            onPress={() => dispatch({ type: "confirm" })}
+          />
+        </View>
+      </PhaseSurface>
+    );
+  }
+
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
   // until it resolves.

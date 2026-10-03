@@ -163,13 +163,6 @@ async function loadPreviews(
           suggested,
         });
       }
-    } else if (item.heroImageUrl) {
-      previews.push({
-        url: item.heroImageUrl,
-        type: item.type,
-        aspectRatio: item.aspectRatio,
-        suggested,
-      });
     }
   }
   return previews;

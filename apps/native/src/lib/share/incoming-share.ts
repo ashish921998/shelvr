@@ -35,6 +35,7 @@ import {
 export type SharePhase =
   | { kind: "idle" }
   | { kind: "locked" }
+  | { kind: "confirm"; session: ShareSession }
   | { kind: "saving"; session: ShareSession }
   | { kind: "partial"; session: ShareSession }
   | { kind: "clearFailed"; session: ShareSession }
@@ -43,6 +44,7 @@ export type SharePhase =
 export type IncomingShareState = {
   phase: SharePhase;
   android: boolean;
+  confirmed: string | null;
   /** The session id of the persisted record as this owner last wrote or
    * reconciled it. A newer share replaces the record; a run for the older
    * session is then stale and must not tombstone over the newer batch. */
@@ -91,6 +93,7 @@ export type ShareEvent =
   | { type: "complete"; session: ShareSession }
   | { type: "retry"; live: ShareSession | null }
   | { type: "cancel" }
+  | { type: "confirm" }
   | { type: "unlock" };
 
 /** Effects run in order. `nativeClear` is always last in its list: its
@@ -131,6 +134,7 @@ export function initialIncomingShare(android: boolean): IncomingShareState {
   return {
     phase: { kind: "idle" },
     android,
+    confirmed: null,
     recordId: null,
     running: null,
     completing: null,
@@ -150,6 +154,16 @@ export function stepIncomingShare(
   switch (event.type) {
     case "reconciled":
       return reconciled(state, event.result, ctx);
+    case "confirm": {
+      if (state.phase.kind !== "confirm") return none(state);
+      const session = state.phase.session;
+      if (ctx.storedSessionId !== session.sessionId) return none(state);
+      return requestSave(
+        { ...state, confirmed: session.sessionId },
+        session,
+        ctx,
+      );
+    }
     case "entrySettled": {
       // Progress for a session no longer on screen is persisted (scoped to
       // its own record) but never drawn over the current phase.
@@ -290,6 +304,9 @@ function requestSave(
   const sid = session.sessionId;
   if (state.running === sid) return none(state);
   if (ctx.entitlementLoading) return none(state);
+  if (state.android && state.confirmed !== sid) {
+    return none({ ...state, phase: { kind: "confirm", session } });
+  }
   // Saving is Pro. Set the locked phase before presenting, so a cancel lands
   // on the explicit Pro gate, and present once per session.
   if (!ctx.entitled) {

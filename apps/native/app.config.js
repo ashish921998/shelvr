@@ -1,4 +1,9 @@
 const appConfig = require("./app.json");
+const {
+  productionCloudOrigin,
+  productionSiteOrigin,
+  isExactOrigin,
+} = require("./production-origins");
 const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
@@ -36,7 +41,7 @@ function requireProductionValue(name, value, isValid, expected) {
 // the rejected build artifact contained a different key from the current
 // RevenueCat App Store app. Keep this as a permanent release guardrail.
 const buildPlatform = process.env.EAS_BUILD_PLATFORM;
-const productionConvexUrl = "https://amiable-setter-120.convex.cloud";
+const productionConvexUrl = productionCloudOrigin;
 const developmentTestKey = "test_VOYicTvOGPXCBFMVdHzyxRndiRi";
 if (!isProduction) {
   let convexOrigin;
@@ -81,16 +86,15 @@ if (buildPlatform === "android") {
 requireProductionValue(
   "EXPO_PUBLIC_CONVEX_URL",
   process.env.EXPO_PUBLIC_CONVEX_URL,
-  (value) => {
-    if (!value) return false;
-    try {
-      const url = new URL(value);
-      return url.origin === productionConvexUrl && url.pathname === "/";
-    } catch {
-      return false;
-    }
-  },
+  (value) => isExactOrigin(value, productionCloudOrigin),
   "the Shelvr production deployment URL",
+);
+
+requireProductionValue(
+  "EXPO_PUBLIC_CONVEX_SITE_URL",
+  process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
+  (value) => isExactOrigin(value, productionSiteOrigin),
+  "the Shelvr production HTTP origin",
 );
 
 function displayName(base) {
