@@ -1,0 +1,72 @@
+name: PR evidence
+
+# A pull request says how it was verified, and a UI change shows a screenshot.
+# This lives apart from ci.yml because it has to re-run when the description or
+# labels change, and that should not re-run the whole test suite.
+#
+# pull_request_target runs this file and the validator as the base branch has
+# them, so a pull request cannot edit its way past its own gate. That trigger
+# is only safe because nothing from the pull request runs here: its commits are
+# fetched for `git diff --name-only` and nothing else, and the token it keeps
+# for that fetch is read-only.
+on:
+  pull_request_target:
+    types:
+      [
+        opened,
+        edited,
+        synchronize,
+        reopened,
+        ready_for_review,
+        converted_to_draft,
+        labeled,
+        unlabeled,
+      ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    name: verification evidence
+    # A draft is work in progress; the check applies once it is marked ready.
+    # Dependency bots open pull requests nobody ran by hand, so CI is their
+    # evidence. Any other app, an AI agent included, is held to the rule.
+    if: >-
+      !github.event.pull_request.draft &&
+      !contains(fromJSON('["renovate[bot]","dependabot[bot]"]'), github.event.pull_request.user.login)
+    runs-on: ubuntu-latest
+    steps:
+      # The base branch, never the pull request's head: this checkout is the
+      # code that runs.
+      - name: Check out the base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.0
+
+      # The head commits arrive as data for the diff; they are never checked out.
+      # The exact head this event names, so a later push cannot leave it unfetched.
+      - name: Fetch the pull request's commits
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git fetch --no-tags origin "$HEAD_SHA"
+
+      # The body and labels go through the environment, never into the script
+      # text, so nothing a description says can run as shell.
+      - name: Check the description for verification evidence
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node tools/verify-pr-evidence.mjs "$BASE_SHA" "$HEAD_SHA"

@@ -333,6 +333,13 @@ needed at runtime by the features that use them:
   naming it. So reverting the commit that added the field fails the deploy instead
   of rolling it back. To back a field out, stop writing it and leave it declared
   `v.optional(...)`; drop the declaration only once no row still has it.
+- Every pull request (Renovate and Dependabot aside) fills in the template's Verification section: what was run and its result,
+  the evidence, and what was not verified. Never call work "done" or "verified" without evidence
+  a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
+  assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
+  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
 
