@@ -5,7 +5,8 @@
 ## Verification
 
 <!--
-CI fails this pull request until this section is filled in (tools/verify-pr-evidence.mjs).
+CI fails this pull request, once it is out of draft, until every subsection is filled in
+(tools/verify-pr-evidence.mjs).
 Only claim what was actually run and seen. "Should work" is not verification.
 -->
 
@@ -20,10 +21,12 @@ Only claim what was actually run and seen. "Should work" is not verification.
 ### Evidence
 
 <!--
-Screenshots or a recording for any change a person can see. Drag images into this box.
-CI requires one when the pull request touches apps/native/src/**/*.tsx, locales, assets, or apps/web UI.
-If those files changed but nothing on screen did, write instead:
-No UI change: <the reason, in a sentence>
+Proof a reviewer can open: a CI run link, pasted output, or a read-back of a setting after saving.
+For any change a person can see, screenshots or a recording go here. Drag images into this box.
+CI requires one when the pull request touches UI files (screens, styles, motion, copy, assets,
+native view modules, app config, push copy, apps/web UI). If those files changed but nothing on
+screen did, say why here; only the owner can waive the screenshot, with the "no-ui-change" label.
+Paywall changes live in RevenueCat, so CI cannot see them: they still need screenshots.
 -->
 
 ### Not verified

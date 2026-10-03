@@ -1,11 +1,21 @@
 name: PR evidence
 
 # A pull request says how it was verified, and a UI change shows a screenshot.
-# This lives apart from ci.yml because it has to re-run when the description is
-# edited, and an edit should not re-run the whole test suite.
+# This lives apart from ci.yml because it has to re-run when the description or
+# labels change, and that should not re-run the whole test suite.
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, ready_for_review]
+    types:
+      [
+        opened,
+        edited,
+        synchronize,
+        reopened,
+        ready_for_review,
+        converted_to_draft,
+        labeled,
+        unlabeled,
+      ]
 
 permissions:
   contents: read
@@ -17,8 +27,12 @@ concurrency:
 jobs:
   evidence:
     name: verification evidence
-    # Dependency bots open pull requests nobody ran by hand; CI is their evidence.
-    if: github.event.pull_request.user.type != 'Bot'
+    # A draft is work in progress; the check applies once it is marked ready.
+    # Dependency bots open pull requests nobody ran by hand, so CI is their
+    # evidence. Any other app, an AI agent included, is held to the rule.
+    if: >-
+      !github.event.pull_request.draft &&
+      !contains(fromJSON('["renovate[bot]","dependabot[bot]"]'), github.event.pull_request.user.login)
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -32,10 +46,24 @@ jobs:
         with:
           node-version: 20.20.0
 
-      # The body goes through the environment, never into the script text, so
-      # nothing a description says can run as shell.
+      # The validator runs as the base branch has it, so a pull request cannot
+      # loosen the rule it is being judged by. Only the pull request that
+      # introduces the validator falls back to its own copy.
+      - name: Take the validator from the base branch
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          dir="$RUNNER_TEMP/evidence"
+          mkdir -p "$dir"
+          for f in verify-pr-evidence.mjs main-module.mjs; do
+            git show "$BASE_SHA:tools/$f" > "$dir/$f" 2>/dev/null || cp "tools/$f" "$dir/$f"
+          done
+
+      # The body and labels go through the environment, never into the script
+      # text, so nothing a description says can run as shell.
       - name: Check the description for verification evidence
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node tools/verify-pr-evidence.mjs "$BASE_SHA"
+        run: node "$RUNNER_TEMP/evidence/verify-pr-evidence.mjs" "$BASE_SHA"
