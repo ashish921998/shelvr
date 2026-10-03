@@ -91,13 +91,16 @@ export async function resolveReelEmbedUrl(
 }
 
 /**
- * Runs inside the embed player. Tells the app once the page has loaded (and
- * starts its video if it sits paused), or
+ * Runs inside the embed player. Tells the app once the page has loaded, or
  * fails when TikTok's player reports an error (its player API posts
  * onPlayerReady / onError messages to its parent, which is the page itself
  * when it is loaded on its own). Also sends any link tap (the creator, "watch on Instagram") to the app, which
  * opens the post in its browser: the player is too small to browse in, and an
  * iOS web view drops links that ask for a new window.
+ *
+ * It never starts a video or presses anything on the page: playback is the
+ * player's own (TikTok's documented autoplay parameter, Instagram's own play
+ * button), so the embed runs as each site ships it.
  */
 export const REEL_PLAYER_SCRIPT = `(function () {
   function send(type) {
@@ -126,33 +129,8 @@ export const REEL_PLAYER_SCRIPT = `(function () {
     if (data.type === "onPlayerReady") send("ready");
     else if (data.type === "onError") send("error");
   });
-  // The user already tapped play in the app, so start a video the page
-  // left paused: play its <video> once there is one, else press the page's
-  // own play button (Instagram's embed builds the video on that press).
-  // Tried for a few seconds, then left to the user.
-  function autoplay(triesLeft) {
-    var video = document.querySelector("video");
-    if (video && !video.paused) return;
-    if (video && video.play) {
-      var started = video.play();
-      if (started && started.catch) started.catch(function () {});
-    } else {
-      var button = document.querySelector(
-        '[aria-label="Play"], [aria-label="play"], [class*="PlayButton"], [class*="playButton"], [class*="Play"]'
-      );
-      if (button && !(button.closest && button.closest("a[href]"))) {
-        button.dispatchEvent(
-          new MouseEvent("click", { bubbles: true, cancelable: true })
-        );
-      }
-    }
-    if (triesLeft > 0) {
-      setTimeout(function () { autoplay(triesLeft - 1); }, 500);
-    }
-  }
   function ready() {
     send("ready");
-    autoplay(6);
   }
   if (document.readyState === "complete") ready();
   else window.addEventListener("load", ready);
