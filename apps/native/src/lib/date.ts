@@ -31,35 +31,57 @@ export function formatShortDate(ms: number): string {
 export type TrialPeriod = { unit: string; count: number };
 
 /**
- * Dates for the paywall's trial timeline, filled into its `{{ custom.* }}`
- * labels ("Today · Oct 2"). The dashboard defaults are empty, so a build that
- * passes nothing shows the bare labels. `trial` is the offer's own length, so
- * the dates follow it; the reminder is two days before the end, as in
- * `trial-reminder.ts`. The variable names keep the seven-day wording the
- * dashboard already references.
+ * Dates and day numbers for the paywall's trial timeline, filled into its
+ * `{{ custom.* }}` labels ("Day 5 · Oct 7"). `trial` is the offer's own
+ * length, so both follow it; the reminder is two days before the end, as in
+ * `trial-reminder.ts`. The dashboard defaults are empty dates and the day
+ * numbers of a seven-day trial, so a build that passes nothing shows the bare
+ * labels. `trial_day5` and `trial_day7` keep the names the dashboard already
+ * references: they are the reminder and end dates.
  */
 export function trialTimelineVariables(
   now: number = Date.now(),
   trial: TrialPeriod = { unit: "DAY", count: 7 },
 ) {
-  const end = new Date(now);
-  if (trial.unit === "YEAR") end.setFullYear(end.getFullYear() + trial.count);
-  else if (trial.unit === "MONTH") end.setMonth(end.getMonth() + trial.count);
-  else
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  const months =
+    trial.unit === "YEAR"
+      ? trial.count * 12
+      : trial.unit === "MONTH"
+        ? trial.count
+        : 0;
+  if (months > 0) {
+    // Jan 31 plus a month is the last day of February, not a date in March.
+    end.setDate(1);
+    end.setMonth(end.getMonth() + months);
+    const lastDay = new Date(
+      end.getFullYear(),
+      end.getMonth() + 1,
+      0,
+    ).getDate();
+    end.setDate(Math.min(start.getDate(), lastDay));
+  } else {
     end.setDate(end.getDate() + trial.count * (trial.unit === "WEEK" ? 7 : 1));
-  const day = (from: Date, offset: number) => {
-    const date = new Date(from);
-    date.setDate(date.getDate() + offset);
-    return date.toLocaleDateString(formattingLocale(), {
+  }
+  const remind = new Date(end);
+  remind.setDate(remind.getDate() - 2);
+  const label = (date: Date) =>
+    date.toLocaleDateString(formattingLocale(), {
       month: "short",
       day: "numeric",
     });
-  };
+  // Rounded, so a daylight saving change inside the trial cannot shift a day.
+  const dayNumber = (date: Date) =>
+    String(Math.round((date.getTime() - start.getTime()) / 86_400_000));
   const string = (value: string) => ({ type: "string", value }) as const;
   return {
-    trial_today: string(` · ${day(new Date(now), 0)}`),
-    trial_day5: string(` · ${day(end, -2)}`),
-    trial_day7: string(` · ${day(end, 0)}`),
-    trial_remind_date: string(day(end, -2)),
+    trial_today: string(` · ${label(start)}`),
+    trial_day5: string(` · ${label(remind)}`),
+    trial_day7: string(` · ${label(end)}`),
+    trial_remind_date: string(label(remind)),
+    trial_remind_day: string(dayNumber(remind)),
+    trial_end_day: string(dayNumber(end)),
   };
 }
