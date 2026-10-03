@@ -11,7 +11,7 @@ import { verifyAppleJws } from "./appleJws";
 const SHELVR_APP_APPLE_ID = 6798143550;
 
 // Apple's body is three certificates and a short payload, about 5 KB.
-const MAX_BODY_BYTES = 32 * 1024;
+export const RETENTION_MAX_BODY_BYTES = 32 * 1024;
 
 export type RetentionReply = {
   status: 200 | 400;
@@ -36,7 +36,6 @@ export async function answerRetentionRequest(
     body: { error: "bad_request" },
     reason,
   });
-  if (body.length > MAX_BODY_BYTES) return reject("body_too_large");
   let signedPayload: unknown;
   try {
     signedPayload = JSON.parse(body)?.signedPayload;

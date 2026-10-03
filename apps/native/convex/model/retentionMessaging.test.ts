@@ -131,8 +131,5 @@ describe("answerRetentionRequest", () => {
       status: 400,
       reason: "jws_shape",
     });
-    expect(
-      await answerRetentionRequest("x".repeat(40_000), options),
-    ).toMatchObject({ status: 400, reason: "body_too_large" });
   });
 });

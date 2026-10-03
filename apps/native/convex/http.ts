@@ -27,7 +27,10 @@ import { errorName, logEvent } from "./model/log";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
 import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
-import { answerRetentionRequest } from "./model/retentionMessaging";
+import {
+  RETENTION_MAX_BODY_BYTES,
+  answerRetentionRequest,
+} from "./model/retentionMessaging";
 import { saveErrorCode } from "./model/saveErrors";
 import {
   MAX_STORED_IMAGE_BYTES,
@@ -272,7 +275,19 @@ http.route({
   path: "/retention-messaging",
   method: "POST",
   handler: httpAction(async (_ctx, req) => {
-    const reply = await answerRetentionRequest(await req.text(), {
+    let body: string;
+    try {
+      body = await readBoundedText(req, RETENTION_MAX_BODY_BYTES);
+    } catch (error) {
+      logEvent("warn", "retention_request_rejected", {
+        reason:
+          error instanceof BodyTooLargeError
+            ? "body_too_large"
+            : "body_unreadable",
+      });
+      return json({ error: "bad_request" }, 400);
+    }
+    const reply = await answerRetentionRequest(body, {
       root: APPLE_ROOT_CA_G3,
       now: Date.now(),
       messageId: env.APPLE_RETENTION_MESSAGE_ID,
