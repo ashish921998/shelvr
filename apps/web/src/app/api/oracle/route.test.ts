@@ -70,7 +70,9 @@ describe("POST /api/oracle", () => {
     const result = await POST(request(tabs));
 
     expect(result.status).toBe(200);
-    await expect(result.json()).resolves.toEqual(verdict);
+    const resultBody = await result.json();
+    expect(resultBody).toMatchObject(verdict);
+    expect(resultBody.shareCode).toEqual(expect.any(String));
     const [url, init] = mocks.fetch.mock.calls[0];
     expect(url).toBe("https://example.convex.site/oracle");
     expect(init.body).toBe(tabs);

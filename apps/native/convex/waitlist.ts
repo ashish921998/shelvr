@@ -456,7 +456,7 @@ export async function joinWaitlist(
     };
   }
   const apiKey = env.RESEND_API_KEY;
-  const from = env.RESEND_WAITLIST_FROM_EMAIL ?? env.RESEND_FEEDBACK_FROM_EMAIL;
+  const from = env.RESEND_FEEDBACK_FROM_EMAIL;
   if (!apiKey || !from) {
     await ctx.runMutation(internal.waitlist.updateResendStatus, {
       id: signup.id,
