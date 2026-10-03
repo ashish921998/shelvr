@@ -26,6 +26,11 @@ import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
 import { parseOracleInput } from "./model/oracle";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
+import { APPLE_ROOT_CA_G3 } from "./model/appleJws";
+import {
+  RETENTION_MAX_BODY_BYTES,
+  answerRetentionRequest,
+} from "./model/retentionMessaging";
 import { saveErrorCode } from "./model/saveErrors";
 import {
   MAX_STORED_IMAGE_BYTES,
@@ -259,6 +264,40 @@ function json(body: unknown, status: number): Response {
     headers: { "content-type": "application/json" },
   });
 }
+
+/**
+ * Apple's Get Retention Message endpoint. The App Store posts a signed request
+ * while a subscriber views the page where they can cancel, and the reply picks
+ * the message shown on the cancel sheet. The request is authenticated by its
+ * signature alone, so there is no shared secret. Apple allows 700 ms, which is
+ * why this reads no database.
+ */
+http.route({
+  path: "/retention-messaging",
+  method: "POST",
+  handler: httpAction(async (_ctx, req) => {
+    let body: string;
+    try {
+      body = await readBoundedText(req, RETENTION_MAX_BODY_BYTES);
+    } catch (error) {
+      logEvent("warn", "retention_request_rejected", {
+        reason:
+          error instanceof BodyTooLargeError
+            ? "body_too_large"
+            : "body_unreadable",
+      });
+      return json({ error: "bad_request" }, 400);
+    }
+    const reply = await answerRetentionRequest(body, {
+      root: APPLE_ROOT_CA_G3,
+      now: Date.now(),
+      messageId: env.APPLE_RETENTION_MESSAGE_ID,
+    });
+    if (reply.reason)
+      logEvent("warn", "retention_request_rejected", { reason: reply.reason });
+    return json(reply.body, reply.status);
+  }),
+});
 
 /** The marketing server claims a bounded parsing budget before reading the
  * visitor's request. No visitor body is accepted by this endpoint. */
