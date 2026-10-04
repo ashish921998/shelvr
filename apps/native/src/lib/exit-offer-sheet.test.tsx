@@ -9,6 +9,9 @@ type PaywallProps = {
     resume: (proceed: boolean) => void;
   }) => void;
   onPurchaseCompleted: () => void;
+  onRestoreCompleted: (event: {
+    customerInfo: { entitlements: { active: object } };
+  }) => void;
   onDismiss: () => void;
 };
 
@@ -16,6 +19,7 @@ const mock = vi.hoisted(() => ({
   appState: null as ((state: string) => void) | null,
   paywall: null as PaywallProps | null,
   capture: vi.fn(),
+  alert: vi.fn(),
   modal: ({ children }: { children: ReactNode }) => children,
   icon: () => null,
   view: ({ children }: { children: ReactNode }) => children,
@@ -33,6 +37,8 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
+  Alert: { alert: mock.alert },
+  Platform: { OS: "ios" },
   AppState: {
     addEventListener: (_: string, listener: (state: string) => void) => {
       mock.appState = listener;
@@ -82,6 +88,7 @@ beforeEach(() => {
   vi.setSystemTime(now);
   mock.paywall = null;
   mock.capture.mockReset();
+  mock.alert.mockReset();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -165,6 +172,25 @@ describe("presentExitSheet", () => {
     });
     await act(async () => vi.advanceTimersByTime(1_000));
     await expect(result).resolves.toBe("PURCHASED");
+    host.unmount();
+  });
+
+  it("stays open and says so when a restore finds nothing", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    const result = open();
+    await act(async () => {});
+    act(() =>
+      mock.paywall!.onRestoreCompleted({
+        customerInfo: { entitlements: { active: {} } },
+      }),
+    );
+    expect(mock.alert).toHaveBeenCalledTimes(1);
+    act(() =>
+      mock.paywall!.onRestoreCompleted({
+        customerInfo: { entitlements: { active: { "Shelvr Pro": {} } } },
+      }),
+    );
+    await expect(result).resolves.toBe("RESTORED");
     host.unmount();
   });
 

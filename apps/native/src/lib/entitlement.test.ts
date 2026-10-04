@@ -276,6 +276,25 @@ describe("paywall activation funnel", () => {
   });
 });
 
+describe("restore from the paywall", () => {
+  it("treats a restore that found nothing as a close", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+  });
+
+  it("counts a restore that found an entitlement", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { "Shelvr Pro": {} } },
+    });
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+});
+
 describe("customer center latch", () => {
   it("refuses the Customer Center while a paywall is live", async () => {
     const { openPaywall, presentCustomerCenter } = await loadReady();

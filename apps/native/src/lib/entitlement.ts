@@ -34,6 +34,7 @@ import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
+  restoreFoundAccess,
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from "@/lib/paywall-result";
@@ -387,7 +388,8 @@ async function presentPaywallImpl(
     const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall({ offering, customVariables }),
+      () =>
+        rcui.presentPaywall({ offering, customVariables }).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -400,6 +402,19 @@ async function presentPaywallImpl(
   } catch {
     return "unavailable";
   }
+}
+
+/**
+ * RevenueCat's sheet resolves RESTORED once Restore was tapped, even when
+ * nothing was found. An empty restore is a close, so the caller is not told
+ * the user subscribed and the exit offer still follows.
+ */
+async function confirmRestore(result: string): Promise<string> {
+  if (result !== "RESTORED") return result;
+  const info = await getPurchases()
+    ?.getCustomerInfo()
+    .catch(() => null);
+  return restoreFoundAccess(info) ? result : "CANCELLED";
 }
 
 // Home re-reads the open offer whenever it is claimed or released.
