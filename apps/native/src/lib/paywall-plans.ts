@@ -35,6 +35,8 @@ type PaywallAction =
   | { type: "selectPlan"; plan: Plan }
   /** The user picked a slide by swiping or tapping a dot. */
   | { type: "showSlide"; slide: number }
+  /** A swipe started; autoplay must not move the slide under it. */
+  | { type: "pause" }
   /** The autoplay timer fired. */
   | { type: "autoplay" };
 
@@ -56,6 +58,8 @@ export function paywallReducer(
       if (slide === state.slide && state.paused) return state;
       return { ...state, slide, paused: true };
     }
+    case "pause":
+      return state.paused ? state : { ...state, paused: true };
     case "autoplay":
       // Autoplay only runs on the first step, and never after the user
       // took over the carousel.

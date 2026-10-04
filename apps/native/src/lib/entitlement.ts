@@ -668,6 +668,9 @@ export function useExitOfferEndsAt(userId: string | undefined): number | null {
 // A RevenueCat promise that never settles must not hold the latch for the
 // life of the process; past this age the sheet is presumed gone.
 const SHEET_STALE_MS = 5 * 60_000;
+// How often a waiter past the stale age checks whether the paywall screen
+// that kept the sheet live has closed without releasing it.
+const SHEET_RECHECK_MS = 5_000;
 
 type OpenSheet = {
   startedAt: number;
@@ -711,15 +714,23 @@ export function whenSheetSettled(): Promise<void> {
       setTimeout(resolve, SHEET_SETTLE_MS);
       return;
     }
+    let stale: ReturnType<typeof setTimeout>;
     const onRelease = () => {
       clearTimeout(stale);
       setTimeout(resolve, SHEET_SETTLE_MS);
     };
-    const stale = setTimeout(
-      () => {
-        sheetWaiters.delete(onRelease);
-        resolve();
-      },
+    // Same lifetime rule as `liveSheet`: the app's own paywall screen keeps
+    // the sheet live past the stale age, so keep waiting while it is open.
+    const checkStale = () => {
+      if (liveSheet() === live) {
+        stale = setTimeout(checkStale, SHEET_RECHECK_MS);
+        return;
+      }
+      sheetWaiters.delete(onRelease);
+      resolve();
+    };
+    stale = setTimeout(
+      checkStale,
       SHEET_STALE_MS - (Date.now() - live.startedAt),
     );
     sheetWaiters.add(onRelease);

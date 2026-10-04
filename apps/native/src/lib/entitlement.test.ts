@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
+  screenOpen: false,
   presentExitSheet: vi.fn(),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
@@ -72,7 +73,7 @@ seedRequire("react-native-purchases-ui", {
 // boundary, standing in for the native sheet the suite was written against.
 vi.mock("./paywall-session", () => ({
   presentPaywallScreen: () => mock.presentPaywall(),
-  isPaywallScreenOpen: () => false,
+  isPaywallScreenOpen: () => mock.screenOpen,
   classifyPurchaseError: () => "failed",
 }));
 vi.mock("./exit-offer-sheet", () => ({
@@ -140,6 +141,7 @@ async function loadReady() {
 
 beforeEach(() => {
   mock.presentPaywall.mockReset();
+  mock.screenOpen = false;
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
   mock.captureError.mockReset();
@@ -250,6 +252,25 @@ describe("presentPaywall concurrency", () => {
     await openPaywall(router, "share");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("whenSheetSettled", () => {
+  it("keeps waiting past the stale age while the paywall screen is open", async () => {
+    const { openPaywall, whenSheetSettled } = await loadReady();
+    vi.useFakeTimers();
+    mock.screenOpen = true;
+    mock.presentPaywall.mockReturnValueOnce(new Promise(() => {}));
+    void openPaywall(router, "share");
+
+    const settled = vi.fn();
+    void whenSheetSettled().then(settled);
+    await vi.advanceTimersByTimeAsync(SHEET_STALE_MS + 60_000);
+    expect(settled).not.toHaveBeenCalled();
+
+    mock.screenOpen = false;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(settled).toHaveBeenCalled();
   });
 });
 

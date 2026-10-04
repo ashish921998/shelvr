@@ -159,6 +159,12 @@ describe("paywallReducer", () => {
     expect(state).toMatchObject({ slide: 2, paused: true });
   });
 
+  it("stops autoplay once a swipe starts, before it lands", () => {
+    const state = run({ type: "pause" }, { type: "autoplay" });
+    expect(state.slide).toBe(0);
+    expect(state.paused).toBe(true);
+  });
+
   it("doesn't autoplay behind step 2", () => {
     expect(run({ type: "continue" }, { type: "autoplay" }).slide).toBe(0);
   });

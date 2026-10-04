@@ -99,6 +99,7 @@ export default function PaywallScreen() {
   const owner = useRef<PaywallRequest | null>(null);
   const result = useRef<RevenueCatPaywallResult>("CANCELLED");
   const purchase = useRef<Promise<PurchaseOutcome> | null>(null);
+  const restoring = useRef<ReturnType<typeof restorePurchases> | null>(null);
   const standaloneAttempt = useRef<string | null>(null);
   const mounted = useRef(true);
 
@@ -117,12 +118,24 @@ export default function PaywallScreen() {
   useEffect(() => {
     const settle = () => {
       const pending = purchase.current;
+      const restore = restoring.current;
       const mine = owner.current;
-      // A purchase in flight outlives the screen: report what it became.
+      // A purchase or restore in flight outlives the screen: report what it
+      // became.
       if (pending) {
         void pending.then((outcome) => {
           if (outcome === "purchased") finishPaywall("PURCHASED", mine);
           else if (mine) finishPaywall(result.current, mine);
+        });
+      } else if (restore) {
+        // `restorePurchases` records the access itself, so a restore with
+        // nobody waiting needs nothing more.
+        void restore.then((outcome) => {
+          if (!mine) return;
+          finishPaywall(
+            outcome === "restored" ? "RESTORED" : result.current,
+            mine,
+          );
         });
       } else if (mine) {
         // With no request, a purchase already recorded itself in `close`.
@@ -173,6 +186,7 @@ export default function PaywallScreen() {
   );
 
   const autoplay = useCallback(() => dispatch({ type: "autoplay" }), []);
+  const pause = useCallback(() => dispatch({ type: "pause" }), []);
   const showSlide = useCallback(
     (slide: number) => dispatch({ type: "showSlide", slide }),
     [],
@@ -227,7 +241,10 @@ export default function PaywallScreen() {
   const restore = async () => {
     if (busy) return;
     setBusy("restore");
-    const outcome = await restorePurchases();
+    const pending = restorePurchases();
+    restoring.current = pending;
+    const outcome = await pending;
+    restoring.current = null;
     setBusy(null);
     if (outcome === "restored") close("RESTORED");
     else if (outcome === "none")
@@ -287,6 +304,7 @@ export default function PaywallScreen() {
                   slide={state.slide}
                   paused={state.paused}
                   onAutoplay={autoplay}
+                  onPause={pause}
                   onShowSlide={showSlide}
                 />
               ) : (

@@ -43,11 +43,13 @@ export function UnlockStep({
   slide,
   paused,
   onAutoplay,
+  onPause,
   onShowSlide,
 }: {
   slide: number;
   paused: boolean;
   onAutoplay: () => void;
+  onPause: () => void;
   onShowSlide: (slide: number) => void;
 }) {
   const reducedMotion = useReducedMotion();
@@ -75,6 +77,11 @@ export function UnlockStep({
       Gesture.Pan()
         .activeOffsetX([-12, 12])
         .failOffsetY([-12, 12])
+        // Pause as the swipe takes hold, so the autoplay timer can't move
+        // the slide out from under the finger.
+        .onStart(() => {
+          scheduleOnRN(onPause);
+        })
         .onUpdate((event) => {
           const min = -(SLIDE_COUNT - 1) * width;
           offset.set(
@@ -90,7 +97,7 @@ export function UnlockStep({
           offset.set(withTiming(-target * width, SLIDE_TIMING));
           scheduleOnRN(onShowSlide, target);
         }),
-    [offset, slide, width, onShowSlide],
+    [offset, slide, width, onPause, onShowSlide],
   );
 
   const track = useAnimatedStyle(() => ({
