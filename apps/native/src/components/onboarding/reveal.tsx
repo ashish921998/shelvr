@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
-  openPaywall,
+  openPaywallKeepingExitOffer,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
@@ -89,7 +89,10 @@ export function RevealStep({
     }
     setPaywallOpen(true);
     try {
-      if (await openPaywall(router, "onboarding")) {
+      // Closing the paywall here can open the exit offer. A later tap on
+      // Keep saving, or the relaunch auto-open, reopens that discounted sheet
+      // while its window lasts rather than the full-price paywall.
+      if (await openPaywallKeepingExitOffer(router, "onboarding")) {
         notePurchasedDuringOnboarding();
         onFinish();
       }

@@ -447,6 +447,55 @@ describe("exit offer after a paywall close", () => {
     });
   });
 
+  it("keeps the open offer when onboarding asks again", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+
+    // First tap: paywall, then the exit offer on close.
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding"),
+    ).resolves.toBe(false);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+
+    // Second tap inside the window: the discounted sheet, not full price.
+    mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding"),
+    ).resolves.toBe(true);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_requested",
+      expect.objectContaining({
+        placement: "exit_offer",
+        source_placement: "onboarding",
+      }),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("opens the onboarding paywall once the window has closed", async () => {
+    mock.store.set(
+      "shelvr.exitOffer.shownAt.user_1",
+      String(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding"),
+    ).resolves.toBe(false);
+
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_requested",
+      expect.objectContaining({ placement: "onboarding" }),
+    );
+  });
+
   it("opens the regular paywall once the window has closed", async () => {
     mock.store.set(
       "shelvr.exitOffer.shownAt.user_1",

@@ -550,25 +550,29 @@ function exitOfferVariables(endsAt: number) {
 }
 
 /**
- * Reopen the exit offer from its Home countdown while the window is open.
- * If the window closed or the offering vanished since Home rendered, the
- * regular paywall opens instead, so the tap never dead-ends.
+ * Reopen the exit offer while its window is open. If the window closed or the
+ * offering vanished, the regular paywall opens at `fallbackPlacement`
+ * instead, so the tap never dead-ends.
  */
-async function presentOpenExitOfferImpl(): Promise<PaywallOutcome> {
-  if (!(await awaitRcSyncReady())) return presentPaywallImpl("home_card");
+async function presentOpenExitOfferImpl(
+  sourcePlacement: string,
+  fallbackPlacement: string,
+): Promise<PaywallOutcome> {
+  if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
   const userId = _rcSyncedUserId;
   const rc = getPurchases();
   const rcui = getRCUI();
   const endsAt = userId
     ? exitOfferEndsAt(readShownAt(userId), Date.now())
     : null;
-  if (!rc || !rcui || endsAt === null) return presentPaywallImpl("home_card");
+  if (!rc || !rcui || endsAt === null)
+    return presentPaywallImpl(fallbackPlacement);
   if (!(await syncRevenueCatUILocale(rc))) return "unavailable";
   const offering = await findExitOffering(exitOfferDeps(rc));
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
-    return presentPaywallImpl("home_card");
-  return showExitOffering(rcui, offering, "home_countdown", endsAt);
+    return presentPaywallImpl(fallbackPlacement);
+  return showExitOffering(rcui, offering, sourcePlacement, endsAt);
 }
 
 function subscribeExitOffer(onChange: () => void): () => void {
@@ -721,13 +725,32 @@ export async function openPaywall(
 export async function openExitOffer(
   router: ReturnType<typeof useRouter>,
 ): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall(
-    "home_countdown",
-    presentOpenExitOfferImpl,
+  const { outcome, owned } = await presentPaywall("home_countdown", () =>
+    presentOpenExitOfferImpl("home_countdown", "home_card"),
   );
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
   }
+  return outcome === "success";
+}
+
+/**
+ * `openPaywall` that keeps an open exit offer: while its window is open the
+ * discounted sheet opens instead of full price, so someone who just closed
+ * the offer is not shown the higher price on their next tap. Otherwise it is
+ * `openPaywall`, exit offer on close included.
+ */
+export async function openPaywallKeepingExitOffer(
+  router: ReturnType<typeof useRouter>,
+  placement: string,
+): Promise<boolean> {
+  const { outcome, owned } = await presentPaywall(placement, () =>
+    presentOpenExitOfferImpl(placement, placement),
+  );
+  if (owned && shouldOpenPaywallFallback(outcome)) {
+    router.push("/(app)/paywall");
+  }
+  recordBlockedAction(placement, outcome === "success");
   return outcome === "success";
 }
 
