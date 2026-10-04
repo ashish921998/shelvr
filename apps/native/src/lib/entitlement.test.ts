@@ -311,6 +311,32 @@ describe("paywall activation funnel", () => {
 });
 
 describe("restore from the paywall", () => {
+  it("leaves recording a restore to restorePurchases", async () => {
+    const { openPaywall, hook } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { "Shelvr Pro": {} } },
+    });
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+
+    mock.useQuery.mockReturnValue({
+      data: { status: "pro", expiresAt: Date.now() + 60 * 60 * 1000 },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+
+    // The screen's own restore went through `restorePurchases` (mocked away
+    // here), so presenting the screen records nothing a second time.
+    expect(mock.capture).not.toHaveBeenCalledWith(
+      "entitlement_activated",
+      expect.anything(),
+    );
+  });
+
   it("treats a restore that found nothing as a close", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("RESTORED");

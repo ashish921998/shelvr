@@ -400,9 +400,9 @@ async function presentPaywallImpl(
         }).then(confirmRestore),
       activeProductId,
     );
-    if (result === "PURCHASED" || result === "RESTORED") {
-      recordAccess(result === "RESTORED" ? "restore" : "purchase");
-    }
+    // The screen's Restore goes through `restorePurchases`, which records the
+    // restore itself, so only a purchase is recorded here.
+    if (result === "PURCHASED") recordAccess("purchase");
     // PAYWALL_RESULT values: NOT_PRESENTED, ERROR, CANCELLED, PURCHASED, RESTORED
     const outcome = mapPaywallResult(result);
     if (outcome !== "cancelled" || !rcui) return outcome;
@@ -884,13 +884,16 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   const rc = getPurchases();
   if (!rc) return "unavailable";
   try {
+    // Read before the restore, so a webhook that lands mid-restore still
+    // counts as this restore's activation.
+    const wasEntitled = hasActiveEntitlement();
     const customerInfo = await rc.restorePurchases();
     if (Object.keys(customerInfo.entitlements.active).length === 0)
       return "none";
     // A Profile restore arms the same activation measurement a sheet restore
-    // does — but only while nothing is entitled: restoring an already-visible
+    // does — but only while nothing was entitled: restoring an already-visible
     // entitlement made nothing new visible, so it reports nothing.
-    if (!hasActiveEntitlement()) recordAccess("restore");
+    if (!wasEntitled) recordAccess("restore");
     return "restored";
   } catch {
     return "unavailable";
