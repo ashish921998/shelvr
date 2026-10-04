@@ -1140,22 +1140,29 @@ async function resolvePinterestUrl(
   if (id !== undefined || !isPinterestShortUrl(url)) {
     return { id, url };
   }
+  // Only the landing URL matters, but keep the page cap: a live read showed a
+  // smaller cap stalling past the deadline while the rest of a pin page is
+  // drained, and every pin.it link timing out.
   const result = await safeFetch(url, {
     ...PAGE_FETCH_OPTIONS,
-    // Only the landing URL matters, not the page.
-    maxBytes: 64 * 1024,
     // pin.it hops through api.pinterest.com and a /sent/ share URL.
     maxRedirects: 5,
   });
   if (!result.ok) {
     throw new PageFetchError(result.code, result.status);
   }
-  // A code Pinterest does not know redirects to its home page rather than
-  // 404ing. Saving that page would save Pinterest itself, so it is gone.
-  if (new URL(result.finalUrl).pathname === "/") {
+  if (isPinterestHomePage(result.finalUrl)) {
     throw new PageFetchError("http_error", 404);
   }
   return { id: pinterestPinId(result.finalUrl), url: result.finalUrl };
+}
+
+/** Pinterest answers a pin.it code it does not know, and a deleted pin's
+ * page, with a 200 redirect to its home page rather than a 404. Saving that
+ * page would save Pinterest itself, so a read that lands there is gone. */
+function isPinterestHomePage(url: string): boolean {
+  const parsed = new URL(url);
+  return isPinterestHost(parsed.hostname) && parsed.pathname === "/";
 }
 
 async function readPinterestWidget(id: string): Promise<PinterestWidget> {
@@ -1289,9 +1296,26 @@ async function fetchPinterestPin(url: string): Promise<PageData> {
     logEvent("warn", "pinterest_widget_failed", {
       error_category: widget.errorCategory,
     });
-    return { ...(await fetchPage(resolved.url)), incomplete: true };
+    return {
+      ...(await fetchPage(resolved.url, isPinterestHomePage)),
+      incomplete: true,
+    };
   }
-  return fetchPage(resolved.url);
+  // The widget has no such pin. Pinterest still serves a 200 shell page for a
+  // pin id that never existed, so a whole page with no image, description or
+  // text is no pin at all: fail it as gone rather than save "Pinterest". A
+  // real pin page runs past the read cap, which can cut its tags off, so a
+  // truncated page is kept.
+  const page = await fetchPage(resolved.url, isPinterestHomePage);
+  if (
+    page.truncated !== true &&
+    page.heroImageUrl === undefined &&
+    !page.description?.trim() &&
+    !page.content?.trim()
+  ) {
+    throw new PageFetchError("http_error", 404);
+  }
+  return page;
 }
 
 /**
@@ -1473,12 +1497,19 @@ async function withLinkedRecipe(page: PageData): Promise<PageData> {
   }
 }
 
-async function fetchPage(url: string): Promise<PageData> {
+async function fetchPage(
+  url: string,
+  /** A landing URL that means the page is gone despite a 200. */
+  isGone?: (finalUrl: string) => boolean,
+): Promise<PageData> {
   const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
   if (!result.ok) {
     // Surface only the policy code (+ status for http_error); readPage decides
     // whether the item can still be saved.
     throw new PageFetchError(result.code, result.status);
+  }
+  if (isGone?.(result.finalUrl)) {
+    throw new PageFetchError("http_error", 404);
   }
   const finalUrl = result.finalUrl;
   const html = decodeWithContentType(result.bytes, result.contentType);
