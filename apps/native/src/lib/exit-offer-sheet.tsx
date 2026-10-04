@@ -137,12 +137,13 @@ export function ExitOfferSheetHost() {
           }}
           onPurchaseCompleted={() => finish("PURCHASED")}
           onRestoreCompleted={({ customerInfo }) => {
+            // A restore that lands after this sheet closed must not settle
+            // or speak for whatever is open now.
+            if (request !== current) return;
             if (restoreFoundAccess(customerInfo)) {
               finish("RESTORED");
               return;
             }
-            // A restore that lands after the sheet closed has nothing to say.
-            if (request !== current) return;
             // Nothing to restore: the offer stays open and says so.
             Alert.alert(
               t("pro.notFoundTitle"),
