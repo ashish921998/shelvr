@@ -20,7 +20,17 @@ const mock = vi.hoisted(() => ({
   paywall: null as PaywallProps | null,
   capture: vi.fn(),
   alert: vi.fn(),
-  modal: ({ children }: { children: ReactNode }) => children,
+  dismissed: null as (() => void) | null,
+  modal: ({
+    children,
+    onDismiss,
+  }: {
+    children: ReactNode;
+    onDismiss: () => void;
+  }) => {
+    mock.dismissed = onDismiss;
+    return children;
+  },
   icon: () => null,
   view: ({ children }: { children: ReactNode }) => children,
   pressable: ({
@@ -64,7 +74,7 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture },
 }));
 
-const { ExitOfferSheetHost, presentExitSheet } =
+const { ExitOfferSheetHost, presentExitSheet, whenExitSheetDismissed } =
   await import("./exit-offer-sheet");
 
 function Paywall(props: PaywallProps) {
@@ -75,11 +85,12 @@ function Paywall(props: PaywallProps) {
 const offering = { identifier: "exit_offer" } as never;
 const now = 1_000_000_000_000;
 
-function open(endsAt = now + 60_000) {
+function open(endsAt = now + 60_000, onDeclined?: () => void) {
   return presentExitSheet({
     Paywall: Paywall as never,
     offering,
     endsAt,
+    onDeclined,
   });
 }
 
@@ -224,6 +235,49 @@ describe("presentExitSheet", () => {
     await act(async () => {});
     act(() => host.getByText("common.close").click());
     await expect(result).resolves.toBe("CANCELLED");
+    host.unmount();
+  });
+
+  it("tells a close by the person from a close by the deadline", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    const declined = vi.fn();
+    const expired = open(now + 5_000, declined);
+    await act(async () => {});
+    await act(async () => vi.advanceTimersByTime(6_000));
+    await expect(expired).resolves.toBe("CANCELLED");
+    expect(declined).not.toHaveBeenCalled();
+
+    const closed = open(now + 60_000, declined);
+    await act(async () => {});
+    act(() => host.getByText("common.close").click());
+    await expect(closed).resolves.toBe("CANCELLED");
+    expect(declined).toHaveBeenCalledTimes(1);
+    host.unmount();
+  });
+
+  it("reports the dismissal when the sheet has left the screen", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    void open();
+    await act(async () => {});
+    act(() => host.getByText("common.close").click());
+    let left = false;
+    void whenExitSheetDismissed().then(() => (left = true));
+    await act(async () => {});
+    expect(left).toBe(false);
+    await act(async () => mock.dismissed!());
+    expect(left).toBe(true);
+    host.unmount();
+  });
+
+  it("stops waiting for a dismissal that is never reported", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    void open();
+    await act(async () => {});
+    act(() => host.getByText("common.close").click());
+    let left = false;
+    void whenExitSheetDismissed().then(() => (left = true));
+    await act(async () => vi.advanceTimersByTime(1_500));
+    expect(left).toBe(true);
     host.unmount();
   });
 });

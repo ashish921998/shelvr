@@ -47,7 +47,7 @@ import {
   REVENUECAT_DISABLED_BY_BUILD,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
-import { presentExitSheet } from "./exit-offer-sheet";
+import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
@@ -493,6 +493,7 @@ async function showExitOffering(
   sourcePlacement: string,
   endsAt: number,
   onNotPresented: () => void | Promise<void> = () => {},
+  onDeclined?: () => void,
 ): Promise<PaywallOutcome> {
   const properties = {
     placement: "exit_offer",
@@ -512,6 +513,7 @@ async function showExitOffering(
           offering,
           customVariables: exitOfferVariables(endsAt),
           endsAt,
+          onDeclined,
           // The one paywall mounted as a component, so the one place the
           // purchase tap itself is observable.
           onPurchaseStarted: (packageId) =>
@@ -573,17 +575,22 @@ async function presentOpenExitOfferImpl(
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
     return presentPaywallImpl(fallbackPlacement);
+  // Only the person's own close counts. A sheet closed by its deadline or by
+  // a torn-down host must not put another paywall in front of them.
+  let declined = false;
   const outcome = await showExitOffering(
     rcui,
     offering,
     sourcePlacement,
     endsAt,
+    undefined,
+    paywallOnDecline ? () => void (declined = true) : undefined,
   );
-  if (!paywallOnDecline || outcome !== "cancelled") return outcome;
+  if (!declined || outcome !== "cancelled") return outcome;
   // The offer carries one plan. Declining it must still leave the trial and
   // the other plans one step away. Inside the cooldown, so closing that
   // paywall does not open the offer again.
-  await waitForSheetTransition();
+  await whenExitSheetDismissed();
   return presentPaywallImpl(fallbackPlacement);
 }
 
@@ -749,16 +756,18 @@ export async function openExitOffer(
 /**
  * `openPaywall` that keeps an open exit offer: while its window is open the
  * discounted sheet opens instead of full price, so someone who just closed
- * the offer is not shown the higher price on their next tap. Declining it
- * there opens the regular paywall. Otherwise it is `openPaywall`, exit offer
- * on close included.
+ * the offer is not shown the higher price on their next tap. With
+ * `paywallOnDecline`, declining it there opens the regular paywall: right for
+ * a tap, too much for a sheet nobody asked for. Otherwise it is `openPaywall`,
+ * exit offer on close included.
  */
 export async function openPaywallKeepingExitOffer(
   router: ReturnType<typeof useRouter>,
   placement: string,
+  paywallOnDecline: boolean,
 ): Promise<boolean> {
   const { outcome, owned } = await presentPaywall(placement, () =>
-    presentOpenExitOfferImpl(placement, placement, true),
+    presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");

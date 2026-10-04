@@ -82,7 +82,7 @@ export function RevealStep({
       });
   }, [saved, isAuthenticated, createDemoItem, onSaved]);
 
-  const keepSaving = async () => {
+  const keepSaving = async (tapped: boolean) => {
     if (entitled) {
       onFinish();
       return;
@@ -91,8 +91,9 @@ export function RevealStep({
     try {
       // Closing the paywall here can open the exit offer. A later tap on
       // Keep saving, or the relaunch auto-open, reopens that discounted sheet
-      // while its window lasts rather than the full-price paywall.
-      if (await openPaywallKeepingExitOffer(router, "onboarding")) {
+      // while its window lasts rather than the full-price paywall. Declining
+      // it after a tap opens the regular paywall; the auto-open just closes.
+      if (await openPaywallKeepingExitOffer(router, "onboarding", tapped)) {
         notePurchasedDuringOnboarding();
         onFinish();
       }
@@ -112,7 +113,7 @@ export function RevealStep({
     }
     autoPaywallRef.current = true;
     if (entitled) return;
-    void waitForSheetTransition().then(() => keepSavingRef.current());
+    void waitForSheetTransition().then(() => keepSavingRef.current(false));
   }, [entitlementLoading, entitled, isAuthenticated]);
 
   const card: FeedItem | null = item
@@ -176,7 +177,7 @@ export function RevealStep({
       <View style={styles.foot}>
         <CtaButton
           label={t(entitled ? "common.continue" : "reveal.keepSaving")}
-          onPress={() => void keepSaving()}
+          onPress={() => void keepSaving(true)}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
         {/* A lapsed account has used its trial, so only a first-time
