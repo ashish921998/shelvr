@@ -194,6 +194,20 @@ describe("presentExitSheet", () => {
     host.unmount();
   });
 
+  it("stays quiet when an empty restore lands after the sheet closed", async () => {
+    const host = render(<ExitOfferSheetHost />);
+    const result = open();
+    await act(async () => {});
+    const paywall = mock.paywall!;
+    act(() => host.getByText("common.close").click());
+    await expect(result).resolves.toBe("CANCELLED");
+    paywall.onRestoreCompleted({
+      customerInfo: { entitlements: { active: {} } },
+    });
+    expect(mock.alert).not.toHaveBeenCalled();
+    host.unmount();
+  });
+
   it("reports a close as a cancel", async () => {
     const host = render(<ExitOfferSheetHost />);
     const result = open();

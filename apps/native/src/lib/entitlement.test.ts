@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
+  observed: vi.fn(),
   presentExitSheet: vi.fn(),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
@@ -85,7 +86,11 @@ vi.mock("@/lib/paywall-telemetry", () => ({
   observePaywallPresentation: async (
     _p: unknown,
     run: () => Promise<unknown>,
-  ) => run(),
+  ) => {
+    const result = await run();
+    mock.observed(result);
+    return result;
+  },
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: { _id: "user_1" } }),
@@ -133,6 +138,7 @@ async function loadReady() {
 
 beforeEach(() => {
   mock.presentPaywall.mockReset();
+  mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
   mock.captureError.mockReset();
@@ -282,6 +288,8 @@ describe("restore from the paywall", () => {
     mock.presentPaywall.mockResolvedValue("RESTORED");
 
     await expect(openPaywall(router, "share")).resolves.toBe(false);
+    // Telemetry sees the close too, not a restore.
+    expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
   });
 
   it("keeps a restore whose customer info could not be read", async () => {

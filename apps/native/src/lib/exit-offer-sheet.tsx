@@ -141,6 +141,8 @@ export function ExitOfferSheetHost() {
               finish("RESTORED");
               return;
             }
+            // A restore that lands after the sheet closed has nothing to say.
+            if (request !== current) return;
             // Nothing to restore: the offer stays open and says so.
             Alert.alert(
               t("pro.notFoundTitle"),
