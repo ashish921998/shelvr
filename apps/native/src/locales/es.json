@@ -671,7 +671,7 @@
   "paywall.renews": "Se renueva a %{price}. Cancela cuando quieras desde Perfil.",
   "paywall.cancelAnyTime": "Cancela desde Perfil y Pro sigue activo hasta que termine tu año pagado.",
   "paywall.switchAnnual": "Cámbiate al plan anual por %{price}/año, %{perMonth} al mes.",
-  "paywall.annualChip": "Prueba el anual con 7 días de prueba",
+  "paywall.annualChip": "El plan anual incluye 7 días de prueba",
   "paywall.ctaTrial": "Iniciar prueba de 7 días",
   "paywall.ctaAnnual": "Suscribirse anualmente",
   "paywall.ctaMonthly": "Suscribirse mensualmente",

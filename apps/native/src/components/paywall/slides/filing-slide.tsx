@@ -103,6 +103,8 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 50,
     paddingVertical: 4,
     paddingHorizontal: 10,
+    // A long translated tag wraps inside the column instead of clipping.
+    maxWidth: "100%",
   },
   chipText: {
     fontFamily: theme.fonts.medium,

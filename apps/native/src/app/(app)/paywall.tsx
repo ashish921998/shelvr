@@ -103,6 +103,7 @@ export default function PaywallScreen() {
   const restoring = useRef<ReturnType<typeof restorePurchases> | null>(null);
   const standaloneAttempt = useRef<string | null>(null);
   const mounted = useRef(true);
+  const closing = useRef(false);
 
   useEffect(() => {
     owner.current ??= claimPaywallRequest();
@@ -178,9 +179,14 @@ export default function PaywallScreen() {
       // A purchase that resolves after the screen closed must not pop
       // whatever is underneath it.
       if (!mounted.current) return;
+      const access = outcome === "PURCHASED" || outcome === "RESTORED";
+      // A purchase landing while the screen slides away still counts, but
+      // must not navigate a second time and pop the screen underneath.
+      if (closing.current && !access) return;
       result.current = outcome;
-      if (!owner.current && (outcome === "PURCHASED" || outcome === "RESTORED"))
-        finishPaywall(outcome, null);
+      if (!owner.current && access) finishPaywall(outcome, null);
+      if (closing.current) return;
+      closing.current = true;
       if (router.canGoBack()) router.back();
       else router.replace("/");
     },

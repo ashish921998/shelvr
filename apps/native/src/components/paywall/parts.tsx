@@ -83,7 +83,8 @@ export function PrimaryButton({
       style={({ pressed }) => [
         styles.button,
         pressed && styles.buttonPressed,
-        inactive && styles.buttonInactive,
+        // A purchase in flight stays readable; an unavailable action fades.
+        busy ? styles.buttonBusy : disabled && styles.buttonInactive,
       ]}
     >
       <Text style={styles.buttonLabel}>{label}</Text>
@@ -136,7 +137,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
   },
   buttonPressed: { opacity: 0.85 },
-  buttonInactive: { opacity: theme.opacity.pressed },
+  buttonInactive: { opacity: theme.opacity.disabled },
+  buttonBusy: { opacity: theme.opacity.pressed },
   buttonLabel: {
     fontFamily: theme.fonts.bold,
     fontSize: 17,

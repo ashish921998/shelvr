@@ -69,6 +69,8 @@ export function UnlockStep({
   useEffect(() => {
     offset.set(withTiming(-slide * width, SLIDE_TIMING));
   }, [slide, width, offset]);
+  // Where the track was when the swipe took hold, mid-transition included.
+  const panStart = useSharedValue(0);
 
   // Memoized so a re-render hands GestureDetector the same instance; a
   // fresh one re-attaches the handler and cancels a swipe in flight.
@@ -80,12 +82,13 @@ export function UnlockStep({
         // Pause as the swipe takes hold, so the autoplay timer can't move
         // the slide out from under the finger.
         .onStart(() => {
+          panStart.set(offset.get());
           scheduleOnRN(onPause);
         })
         .onUpdate((event) => {
           const min = -(SLIDE_COUNT - 1) * width;
           offset.set(
-            Math.min(0, Math.max(min, -slide * width + event.translationX)),
+            Math.min(0, Math.max(min, panStart.get() + event.translationX)),
           );
         })
         .onEnd((event) => {
@@ -97,7 +100,7 @@ export function UnlockStep({
           offset.set(withTiming(-target * width, SLIDE_TIMING));
           scheduleOnRN(onShowSlide, target);
         }),
-    [offset, slide, width, onPause, onShowSlide],
+    [offset, panStart, width, onPause, onShowSlide],
   );
 
   const track = useAnimatedStyle(() => ({

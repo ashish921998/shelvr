@@ -1,7 +1,10 @@
 import { Image } from "expo-image";
 import { View, useWindowDimensions } from "react-native";
+import { useEffect } from "react";
 import Animated, {
+  useAnimatedReaction,
   useAnimatedStyle,
+  useSharedValue,
   type SharedValue,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -27,13 +30,20 @@ const CARDS = [
   { left: 210, top: 104, rest: 13, enter: -18, delay: 0.2 },
 ] as const;
 const MIN_CARD_TOP = Math.min(...CARDS.map((card) => card.top));
+const LAST_DELAY = Math.max(...CARDS.map((card) => card.delay));
 
 function useTossStyle(
   progress: SharedValue<number>,
+  firstLap: SharedValue<boolean>,
   card: (typeof CARDS)[number],
 ) {
   return useAnimatedStyle(() => {
-    const p = phase(progress.value, -card.delay);
+    // A delayed card waits hidden on the first lap instead of starting at
+    // the wrapped end of its loop, as a CSS animation-delay would.
+    const p =
+      firstLap.value && progress.value < card.delay
+        ? 0
+        : phase(progress.value, -card.delay);
     return {
       opacity: track(p, [0, 0.16, 0.82, 0.94], [0, 1, 1, 0]),
       transform: [
@@ -61,9 +71,20 @@ export function ShotsSlide({
     top: Math.max(height - DESIGN_HEIGHT, -MIN_CARD_TOP),
     transform: [{ scale: Math.min(1, width / DESIGN_WIDTH) }],
   };
-  const styleA = useTossStyle(progress, CARDS[0]);
-  const styleB = useTossStyle(progress, CARDS[1]);
-  const styleC = useTossStyle(progress, CARDS[2]);
+  // True from each start until every card's delay has passed once.
+  const firstLap = useSharedValue(true);
+  useEffect(() => {
+    firstLap.set(true);
+  }, [animate, firstLap]);
+  useAnimatedReaction(
+    () => progress.value >= LAST_DELAY,
+    (past) => {
+      if (past) firstLap.set(false);
+    },
+  );
+  const styleA = useTossStyle(progress, firstLap, CARDS[0]);
+  const styleB = useTossStyle(progress, firstLap, CARDS[1]);
+  const styleC = useTossStyle(progress, firstLap, CARDS[2]);
   const at = (index: number) => ({
     left: CARDS[index].left,
     top: CARDS[index].top,
