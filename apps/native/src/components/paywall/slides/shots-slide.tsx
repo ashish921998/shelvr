@@ -26,6 +26,7 @@ const CARDS = [
   { left: 118, top: 84, rest: 5, enter: 22, delay: 0.1 },
   { left: 210, top: 104, rest: 13, enter: -18, delay: 0.2 },
 ] as const;
+const MIN_CARD_TOP = Math.min(...CARDS.map((card) => card.top));
 
 function useTossStyle(
   progress: SharedValue<number>,
@@ -54,42 +55,53 @@ export function ShotsSlide({
 }) {
   const progress = useLoop(LOOP_MS, animate, 0.5);
   const width = useWindowDimensions().width - 40;
-  const dx = (width - DESIGN_WIDTH) / 2;
-  const dy = height - DESIGN_HEIGHT;
+  // The design's stage, centred and shrunk to fit a narrow phone.
+  const stage = {
+    left: (width - DESIGN_WIDTH) / 2,
+    top: Math.max(height - DESIGN_HEIGHT, -MIN_CARD_TOP),
+    transform: [{ scale: Math.min(1, width / DESIGN_WIDTH) }],
+  };
   const styleA = useTossStyle(progress, CARDS[0]);
   const styleB = useTossStyle(progress, CARDS[1]);
   const styleC = useTossStyle(progress, CARDS[2]);
   const at = (index: number) => ({
-    left: CARDS[index].left + dx,
-    top: Math.max(0, CARDS[index].top + dy),
+    left: CARDS[index].left,
+    top: CARDS[index].top,
   });
 
   return (
     <View style={styles.fill}>
       <View style={styles.shelf} />
-      <Animated.View style={[styles.card, styles.receipt, at(0), styleA]}>
-        <View style={styles.bar(7, 46, 0.75)} />
-        <View style={[styles.bar(5, 62, 0.18), styles.gap]} />
-        <View style={[styles.bar(5, 54, 0.18), styles.gap]} />
-        <View style={[styles.bar(5, 60, 0.18), styles.gap]} />
-        <View style={styles.rule} />
-        <View style={styles.totals}>
-          <View style={styles.bar(6, 26, 0.5)} />
-          <View style={styles.bar(6, 22, 0.75)} />
-        </View>
-      </Animated.View>
-      <Animated.View style={[styles.card, at(1), styleB]}>
-        <Image source={TEE} style={styles.photo} contentFit="cover" />
-      </Animated.View>
-      <Animated.View style={[styles.card, at(2), styleC]}>
-        <Image source={ESPRESSO} style={styles.photo} contentFit="cover" />
-      </Animated.View>
+      <View style={[styles.stage, stage]} pointerEvents="none">
+        <Animated.View style={[styles.card, styles.receipt, at(0), styleA]}>
+          <View style={styles.bar(7, 46, 0.75)} />
+          <View style={[styles.bar(5, 62, 0.18), styles.gap]} />
+          <View style={[styles.bar(5, 54, 0.18), styles.gap]} />
+          <View style={[styles.bar(5, 60, 0.18), styles.gap]} />
+          <View style={styles.rule} />
+          <View style={styles.totals}>
+            <View style={styles.bar(6, 26, 0.5)} />
+            <View style={styles.bar(6, 22, 0.75)} />
+          </View>
+        </Animated.View>
+        <Animated.View style={[styles.card, at(1), styleB]}>
+          <Image source={TEE} style={styles.photo} contentFit="cover" />
+        </Animated.View>
+        <Animated.View style={[styles.card, at(2), styleC]}>
+          <Image source={ESPRESSO} style={styles.photo} contentFit="cover" />
+        </Animated.View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   fill: { flex: 1 },
+  stage: {
+    position: "absolute",
+    width: DESIGN_WIDTH,
+    height: DESIGN_HEIGHT,
+  },
   shelf: {
     position: "absolute",
     left: 0,

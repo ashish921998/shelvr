@@ -28,6 +28,8 @@ export type PaywallRequest = {
   attemptId: string;
   /** Set once the screen has mounted for this request. */
   claimed: boolean;
+  /** Cleared when that screen closes, even if a purchase still holds it. */
+  onScreen: boolean;
   /** Created for a route that was already open, so nothing navigated. */
   adopted: boolean;
   resolve: (result: RevenueCatPaywallResult) => void;
@@ -66,6 +68,7 @@ export function presentPaywallScreen(input: {
       placement: input.placement,
       attemptId: input.attemptId,
       claimed: false,
+      onScreen: false,
       adopted: input.navigate !== undefined,
       resolve,
     };
@@ -94,12 +97,22 @@ export function claimPaywallRequest(
   if (!request || request.claimed) return null;
   if (only === "adopted" && !request.adopted) return null;
   request.claimed = true;
+  request.onScreen = true;
   return request;
 }
 
-/** True while a mounted paywall screen holds a request. */
+/**
+ * True while a mounted paywall screen holds a request. A screen that closed
+ * with a purchase still in flight no longer counts, so a purchase that never
+ * settles can't keep the sheet latch past its stale age.
+ */
 export function isPaywallScreenOpen(): boolean {
-  return request?.claimed === true;
+  return request?.onScreen === true;
+}
+
+/** The screen that claimed `owner` has closed. */
+export function leavePaywallScreen(owner: PaywallRequest | null): void {
+  if (owner) owner.onScreen = false;
 }
 
 /**

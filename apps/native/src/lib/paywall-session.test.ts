@@ -40,6 +40,20 @@ describe("paywall session", () => {
     expect(mock.recordAccess).not.toHaveBeenCalled();
   });
 
+  it("stops counting a closed screen as open while its purchase is pending", async () => {
+    const session = await load();
+    const result = session.presentPaywallScreen({
+      placement: "share",
+      attemptId: "a1",
+    });
+    const owner = session.claimPaywallRequest();
+    session.leavePaywallScreen(owner);
+    expect(session.isPaywallScreenOpen()).toBe(false);
+    // The request still waits for the purchase to report.
+    session.finishPaywall("PURCHASED", owner);
+    await expect(result).resolves.toBe("PURCHASED");
+  });
+
   it("settles a request once", async () => {
     const session = await load();
     const result = session.presentPaywallScreen({

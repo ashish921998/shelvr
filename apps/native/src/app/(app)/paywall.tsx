@@ -23,6 +23,7 @@ import type { RevenueCatPaywallResult } from "@/lib/paywall-result";
 import {
   claimPaywallRequest,
   finishPaywall,
+  leavePaywallScreen,
   subscribePaywallRequest,
   type PaywallRequest,
   type PurchaseOutcome,
@@ -120,6 +121,7 @@ export default function PaywallScreen() {
       const pending = purchase.current;
       const restore = restoring.current;
       const mine = owner.current;
+      leavePaywallScreen(mine);
       // A purchase or restore in flight outlives the screen: report what it
       // became.
       if (pending) {

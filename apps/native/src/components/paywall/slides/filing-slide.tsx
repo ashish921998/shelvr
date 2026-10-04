@@ -78,6 +78,8 @@ const styles = StyleSheet.create((theme) => ({
   row: { flex: 1, flexDirection: "row", padding: 20, gap: 14 },
   photo: {
     width: 156,
+    // Narrow phones keep half the row for the title, tags and pill.
+    maxWidth: "50%",
     height: "100%",
     borderRadius: theme.radius.sm,
     borderWidth: 1,

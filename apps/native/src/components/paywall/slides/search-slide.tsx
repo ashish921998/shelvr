@@ -138,7 +138,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   tile: {
-    width: "31%",
+    width: "30%",
     flexGrow: 1,
     aspectRatio: 5 / 6,
     borderRadius: theme.radius.sm,

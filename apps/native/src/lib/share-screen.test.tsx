@@ -39,6 +39,8 @@ const mock = vi.hoisted(() => ({
   resolvedSharedPayloads: [] as unknown[],
   isResolving: false,
   openPaywall: vi.fn(),
+  paywallPending: false,
+  sheetSettled: Promise.resolve(),
   createLinkItem: vi.fn(),
   createNoteItem: vi.fn(),
   saveImages: vi.fn(),
@@ -73,8 +75,8 @@ vi.mock("@/lib/analytics", () => ({
   },
 }));
 vi.mock("@/lib/entitlement", () => ({
-  isPaywallPending: () => false,
-  whenSheetSettled: () => Promise.resolve(),
+  isPaywallPending: () => mock.paywallPending,
+  whenSheetSettled: () => mock.sheetSettled,
   openPaywall: mock.openPaywall,
   useEntitlement: () => ({
     entitled: mock.entitled,
@@ -192,6 +194,8 @@ async function confirmShare() {
 beforeEach(() => {
   vi.clearAllMocks();
   mock.entitled = false;
+  mock.paywallPending = false;
+  mock.sheetSettled = Promise.resolve();
   mock.entitlementLoading = false;
   mock.sharedPayloads = [link];
   mock.resolvedSharedPayloads = [];
@@ -227,6 +231,26 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   });
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
+});
+
+it("goes home only once the paywall that sold Pro has closed", async () => {
+  const view = render(<ShareScreen />);
+  await confirmShare();
+  await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
+  mock.resolvedSharedPayloads = [resolvedLink];
+
+  // The purchase flips the entitlement while the paywall is still on top.
+  let close!: () => void;
+  mock.sheetSettled = new Promise<void>((resolve) => (close = resolve));
+  mock.paywallPending = true;
+  mock.entitled = true;
+  view.rerender(<ShareScreen />);
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  await settle();
+  expect(mock.router.replace).not.toHaveBeenCalled();
+
+  close();
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 });
 
 it("previews new and resumed Android shares without saving until confirmed", async () => {
