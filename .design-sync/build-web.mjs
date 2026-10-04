@@ -80,6 +80,14 @@ const webGaps = {
       contents: 'export class AsyncLocalStorage { getStore() {} run(_s, cb) { return cb(); } }',
       loader: 'js',
     }));
+    // expo-image imports `expo`, whose web entry loads Metro's lazy-bundle
+    // loader and, under __DEV__, its fast-refresh, HMR and message sockets.
+    // There is no Metro server behind a design, so the sockets only log
+    // connection errors.
+    b.onLoad({ filter: /[\\/]expo[\\/]src[\\/]async-require[\\/](index|setup)\.ts$/ }, () => ({
+      contents: '',
+      loader: 'js',
+    }));
     // The unistyles plugin rewrites imports to components/native/<Name>. Its
     // exports map targets extensionless files, which Metro resolves and esbuild
     // doesn't; point at the browser build (<Name>.js, not <Name>.native.js).
@@ -156,6 +164,26 @@ for (const [component, prop, names, source] of [
     );
     process.exit(1);
   }
+}
+
+// ItemCardFace's `item` is the app's FeedItem, too long for the converter, so
+// the fields a designer sets are hand-written. Fail when one leaves FeedItem.
+const faceSrc = readFileSync(join(NATIVE, 'src/components/item-card-face.tsx'), 'utf8');
+const feedItemStart = faceSrc.indexOf('export type FeedItem = {');
+const feedItemFields = new Set(
+  [...faceSrc.slice(feedItemStart, faceSrc.indexOf('\n};', feedItemStart)).matchAll(/^ {2}(\w+)\??:/gm)].map(
+    (m) => m[1],
+  ),
+);
+const faceItem = /^item: \{(.*?)\}; menuActions:/.exec(cfg.dtsPropsFor?.ItemCardFace ?? '')?.[1] ?? '';
+const faceFields = [...faceItem.replace(/\{[^}]*\}/g, '').matchAll(/(\w+)\??:/g)].map((m) => m[1]);
+const staleFields = faceFields.filter((f) => !feedItemFields.has(f));
+if (!faceFields.length || staleFields.length) {
+  console.error(
+    'build-web: config.json dtsPropsFor.ItemCardFace `item` is out of sync with FeedItem in item-card-face.tsx' +
+      (staleFields.length ? `\n  not in FeedItem: ${staleFields.join(', ')}` : '\n  (no fields parsed)'),
+  );
+  process.exit(1);
 }
 
 // -- bundle ---------------------------------------------------------------------

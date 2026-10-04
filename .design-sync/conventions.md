@@ -58,6 +58,13 @@ settings rows are at least 48px tall; `HeaderIconButton` is a 40px circle.
   `display: flex; flex-direction: column` parent with a real height.
 - `InlineCard` brings its own 16px side margin and card frame; pass the actions as
   children.
+- `ItemCardFace` is a save as it appears in the home feed, a space, and search: pass
+  the save as `item` and `menuActions={[]}`. Use it wherever a design shows a save
+  card instead of drawing one. It fills its parent's width, so lay cards out as the
+  feed does: a two-column masonry (two flex columns, each card wrapped in 4px of
+  padding). Images keep their own `aspectRatio`, clamped between 0.5 and 2. The
+  three-dot overflow control renders but opens nothing on the web. `suggested` adds
+  the sparkle badge, for a card suggested into a space.
 - Icons take one of the names in `AppSymbolIconProps['name']`. `HeaderIconButton.icon`
   takes the same names. `tintColor` accepts `var(--colors-*)` strings.
 - Tags are short lowercase words. `IntentChip` covers eight `kind`s, each with a fixed icon.
