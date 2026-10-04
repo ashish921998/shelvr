@@ -13,6 +13,7 @@ import {
   readPaywallContext,
   recordAccess,
   recordBlockedAction,
+  restoreCameBackEmpty,
   resumeBlockedAction,
   useEntitlementActivation,
 } from "@/lib/paywall-funnel";
@@ -396,7 +397,7 @@ async function presentPaywallImpl(
           placement,
           attemptId: properties.paywall_attempt_id,
           navigate,
-        }),
+        }).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -470,6 +471,13 @@ export async function purchasePaywallPackage(
   } catch (error) {
     return classifyPurchaseError(error);
   }
+}
+
+/** An empty restore is a close, so the caller is not told the user subscribed
+ * and the exit offer still follows. */
+async function confirmRestore(result: string): Promise<string> {
+  if (result !== "RESTORED") return result;
+  return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
 }
 
 // Home re-reads the open offer whenever it is claimed or released.

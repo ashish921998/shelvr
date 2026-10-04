@@ -12,11 +12,26 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
 - The display face is `CrimsonProRoman-Regular.ttf`, licensed under SIL OFL 1.1.
   Re-sync fonts and components to update previously uploaded design previews.
 - Synced components are listed in `.design-sync/web-entry.ts`: `AppSymbolIcon`,
-  `EmptyState`, `HeaderIconButton`, `InlineCard`, `IntentChip`, `ScreenLoader`,
-  `SuggestedBadge`, `TagChip`, `Wordmark`. All get authored previews.
+  `Button`, `EmptyState`, `HeaderIconButton`, `InlineCard`, `IntentChip`,
+  `ItemCardFace`, `ScreenLoader`, `SettingCard`, `SettingsGroup`, `SettingsRow`, `SuggestedBadge`,
+  `TagChip`, `ThemedText`, `Wordmark`. All get authored previews.
+- `Button` and `ThemedText` joined on 2026-10-03: they are the primitives
+  `docs/architecture/design-system.md` tells new UI to use, and a design without
+  them hand-rolls buttons and font sizes. `Button` renders its solid capsule on
+  web (`hasLiquidGlass` is true only on iOS 26 and later, when the runtime
+  glass API is present).
+- Not synced from `components/ui`: `PromptSheet` (a `Modal`, which portals out of a
+  preview card, and it reads the i18n catalog), `HeaderScrim` (returns null off iOS),
+  `AnimatedSwitch` (`@expo/ui` native `Switch`; the `SettingCard` preview draws a
+  stand-in toggle), `AppTabBar`, and `HeaderActionMenu` (below).
 - `ItemCard` is out (user decision). It needs Expo Router `Link.Trigger`/`Link.Menu`,
   three Convex mutations, `Alert`, `Share`, and haptics, and would crash in designs
-  without a Convex provider. Revisit if a presentational card with plain props exists.
+  without a Convex provider. `ItemCardFace` (`src/components/item-card-face.tsx`) is
+  synced in its place: the card's visual body with plain props, which `ItemCard`
+  renders inside its `Link` and `Pressable`. Its overflow control is an `ActionMenu`,
+  so on web the three dots render and do nothing (same `MenuView` limit as
+  `HeaderActionMenu`). The feed cell's 4px padding and the entrance fade stay in
+  `ItemCard`; the preview adds the padding as layout glue.
 - `GlassView` is not synced (user decision).
 - No Storybook exists (user confirmed); shape is `package`.
 - `HeaderActionMenu` (same file as `HeaderIconButton`) is not synced: its menu is
@@ -39,6 +54,11 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   - `PlatformColor` is not exported; `expo-symbols` imports it (Android-only call).
   - `expo-font`'s web build imports `node:async_hooks` (server-only path). Stubbed.
   - A `process` global is expected (`react-native-worklets`, `semver`). Banner shim.
+  - `expo-image` (first pulled in by `ItemCardFace`) imports `expo`, whose web entry
+    loads `expo/src/async-require`: Metro's lazy-bundle loader and, under `__DEV__`,
+    its fast-refresh, HMR and message sockets. With no Metro server they log
+    `WebSocket connection to 'ws://hot/' failed` on every load. `index.ts` and
+    `setup.ts` there are stubbed empty.
 - Unistyles writes theme CSS variables into `<style id="unistyles-web">` only when the
   first style is applied (`recreate()` runs on `css.add`). A card or design that uses
   only `AppSymbolIcon` (no unistyles styles) got no `--colors-*`/`--fonts-*` at all.
@@ -59,7 +79,14 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   `AppSymbolName` (53 names) is one, so `AppSymbolIcon.name` and `HeaderIconButton.icon`
   are hand-written in `config.json` `dtsPropsFor`. `build-web.mjs` fails when either
   union drifts from the keys of `SF_TO_MATERIAL` in `src/components/symbol.tsx`; when an
-  icon is added or removed, update both unions.
+  icon is added or removed, update every icon union (`SettingsRow.icon` is a third).
+- `ItemCardFace.item` is the app's `FeedItem`, which collapses too. Its `dtsPropsFor`
+  entry lists only the fields a designer sets and types `_id` as a plain string.
+  `build-web.mjs` fails when a listed field is no longer in `FeedItem`; a field added
+  to `FeedItem` is not flagged, so add it by hand if designs should set it.
+- `ThemedText.variant` (the 23-step type ramp) collapses the same way and is
+  hand-written too. `build-web.mjs` fails when it drifts from `theme.type` in
+  `src/unistyles.ts`.
 - Previews cannot import `react-native` (it is not in the bundle). Layout glue is plain
   `div`s. Theme values are CSS variables unistyles registers on `:root`, named
   `--<group>-<kebab-key>`: `--colors-background`, `--colors-primary-foreground`,
@@ -68,6 +95,8 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   InlineCard from `feedback/feedback-invitation.tsx`, tags and intent labels from
   `convex/devFixtures.ts` (tags are short lowercase words, two per save).
 - `EmptyState` fills its parent (`flex: 1`); its previews give it a 300px-tall frame.
+- `ItemCardFace` previews use inline SVG `data:` URIs with a flat fill for images, so
+  they need no network. Sample titles and tags mostly mirror `convex/devFixtures.ts`.
 
 ## Known build and render warns
 
@@ -82,7 +111,9 @@ What can go stale without failing loudly:
 
 - `build-web.mjs` patches exact strings in dependencies: `export default Appearance;`
   and `var defaultId = 'react-native-stylesheet';` in react-native-web. A version bump
-  that changes either makes the `.replace` a silent no-op. Symptoms: every card fails
+  that changes either makes the `.replace` a silent no-op. The `expo/src/async-require`
+  stub matches by path the same way; if the `ws://hot/` console errors return, the
+  files moved. Symptoms: every card fails
   `[RENDER] root empty` (stylesheet id), or the bundle throws
   `Appearance_default.setColorScheme is not a function` at load.
 - The unistyles plugin's reanimated path (`lib/module/component`) and the
@@ -91,10 +122,11 @@ What can go stale without failing loudly:
 - The theme flush depends on web `UnistylesRuntime.updateTheme` calling `recreate()`.
   If `AppSymbolIcon` previews lose their background and tints, re-probe
   `--colors-background` on its card.
-- `dtsPropsFor` icon unions are guarded by `build-web.mjs`. The `NAMES` list in
+- `dtsPropsFor` icon and type-ramp unions are guarded by `build-web.mjs`. The `NAMES` list in
   `previews/AppSymbolIcon.tsx` is not; update it when `SF_TO_MATERIAL` changes.
 - Preview copy mirrors app strings that can change: EmptyState titles and messages
-  (tab screens), feedback invitation and cancel survey copy, `CANCEL_REASON_LABELS`.
+  (tab screens), feedback invitation and cancel survey copy, `CANCEL_REASON_LABELS`,
+  and the Profile and Settings rows (`src/locales/en.json`).
   The InlineCard preview re-expresses those screens' button styles as CSS.
 - `TagChip`'s `emphasized` variant is previewed but unused by any screen.
 - Only the light palette is visually graded. Dark values were checked as CSS variables

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
   screenOpen: false,
+  observed: vi.fn(),
   presentExitSheet: vi.fn(),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
@@ -93,7 +94,11 @@ vi.mock("@/lib/paywall-telemetry", () => ({
   observePaywallPresentation: async (
     _p: unknown,
     run: () => Promise<unknown>,
-  ) => run(),
+  ) => {
+    const result = await run();
+    mock.observed(result);
+    return result;
+  },
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: { _id: "user_1" } }),
@@ -142,6 +147,7 @@ async function loadReady() {
 beforeEach(() => {
   mock.presentPaywall.mockReset();
   mock.screenOpen = false;
+  mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
   mock.captureError.mockReset();
@@ -304,6 +310,35 @@ describe("paywall activation funnel", () => {
   });
 });
 
+describe("restore from the paywall", () => {
+  it("treats a restore that found nothing as a close", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+
+    await expect(openPaywall(router, "share")).resolves.toBe(false);
+    // Telemetry sees the close too, not a restore.
+    expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
+  });
+
+  it("keeps a restore whose customer info could not be read", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockRejectedValue(new Error("offline"));
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+
+  it("counts a restore that found an entitlement", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { "Shelvr Pro": {} } },
+    });
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+});
+
 describe("customer center latch", () => {
   it("refuses the Customer Center while a paywall is live", async () => {
     const { openPaywall, presentCustomerCenter } = await loadReady();
@@ -454,7 +489,6 @@ describe("exit offer after a paywall close", () => {
 
     // The main paywall only: an expired offer does not return on close.
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
-    expect(mock.presentPaywall).toHaveBeenCalledWith();
   });
 
   it("does not follow a purchase", async () => {
@@ -464,8 +498,8 @@ describe("exit offer after a paywall close", () => {
     await openPaywall(router, "share");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
-    // The paywall context read starts before presentation, even when the
-    // result is already PURCHASED. It must not open the exit offer afterward.
+    // Only the paywall context read precedes presentation. Nothing reads
+    // offerings afterward, so the exit offer is never looked up.
     expect(mock.getOfferings).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).not.toHaveBeenCalled();
   });

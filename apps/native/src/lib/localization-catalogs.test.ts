@@ -114,6 +114,8 @@ describe("shipped localization resources", () => {
         body: Record<string, string>;
         named: Record<string, string>;
         namedSingle: string;
+        namedShelf: Record<string, string>;
+        namedShelfSingle: string;
         reminder: Record<"read" | "cook", { title: string; body: string }>;
       }
     > = notificationTranslations;
@@ -122,6 +124,8 @@ describe("shipped localization resources", () => {
       body: messages["digest.waitingCount"],
       named: messages["digest.namedCount"],
       namedSingle: messages["digest.namedSingle"],
+      namedShelf: messages["digest.namedShelfCount"],
+      namedShelfSingle: messages["digest.namedShelfSingle"],
       reminder: {
         read: {
           title: messages["reminder.readTitle"],
