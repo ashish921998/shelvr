@@ -96,7 +96,7 @@ fallback), Material Symbols instead of SF Symbols, no haptics.
   `convex/devFixtures.ts` (tags are short lowercase words, two per save).
 - `EmptyState` fills its parent (`flex: 1`); its previews give it a 300px-tall frame.
 - `ItemCardFace` previews use inline SVG `data:` URIs with a flat fill for images, so
-  they need no network. Titles and tags come from `convex/devFixtures.ts`.
+  they need no network. Sample titles and tags mostly mirror `convex/devFixtures.ts`.
 
 ## Known build and render warns
 

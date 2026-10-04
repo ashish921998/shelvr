@@ -1,5 +1,5 @@
 import type { TextMessageKey } from "@/locales/message-types";
-import { formattingLocale, t } from "@/lib/i18n";
+import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { SuggestedBadge } from "@/components/suggested-badge";
 import { clampRatio } from "@/lib/aspect-ratio";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
@@ -254,6 +254,7 @@ export function ItemCardFace({
   onAcceptSuggestion?: () => void;
   pressed?: boolean;
 }) {
+  useAppLocale();
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const failedLabel = failureLabel(item);
