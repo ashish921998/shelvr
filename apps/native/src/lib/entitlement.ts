@@ -530,6 +530,9 @@ async function showExitOffering(
     }
     if (result === "NOT_PRESENTED" || result === "ERROR")
       await onNotPresented();
+    // Held until the sheet has slid away, so the latch is not released while
+    // UIKit would still refuse the next paywall.
+    else await whenExitSheetDismissed();
     return mapPaywallResult(result);
   } catch {
     await onNotPresented();
@@ -589,8 +592,8 @@ async function presentOpenExitOfferImpl(
   if (!declined || outcome !== "cancelled") return outcome;
   // The offer carries one plan. Declining it must still leave the trial and
   // the other plans one step away. Inside the cooldown, so closing that
-  // paywall does not open the offer again.
-  await whenExitSheetDismissed();
+  // paywall does not open the offer again. `showExitOffering` already waited
+  // for the sheet to leave the screen.
   return presentPaywallImpl(fallbackPlacement);
 }
 

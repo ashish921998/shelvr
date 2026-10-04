@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   presentPaywall: vi.fn(),
   observed: vi.fn(),
   presentExitSheet: vi.fn(),
+  dismissed: vi.fn(async () => {}),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
   captureError: vi.fn(),
@@ -71,7 +72,7 @@ seedRequire("react-native-purchases-ui", {
 });
 vi.mock("./exit-offer-sheet", () => ({
   presentExitSheet: mock.presentExitSheet,
-  whenExitSheetDismissed: async () => {},
+  whenExitSheetDismissed: () => mock.dismissed(),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("expo-secure-store", () => ({
@@ -560,6 +561,33 @@ describe("exit offer after a paywall close", () => {
       "paywall_requested",
       expect.objectContaining({ placement: "onboarding" }),
     );
+  });
+
+  it("holds the sheet latch until the exit sheet has slid away", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openExitOffer, isPaywallPending } = await loadReady();
+    let slidAway = () => {};
+    mock.dismissed.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        slidAway = resolve;
+      }),
+    );
+    mock.presentExitSheet.mockResolvedValueOnce("CANCELLED");
+
+    let settled = false;
+    const closing = openExitOffer(router).then(() => {
+      settled = true;
+    });
+    await vi.waitFor(() =>
+      expect(mock.presentExitSheet).toHaveBeenCalledTimes(1),
+    );
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(isPaywallPending()).toBe(true);
+
+    slidAway();
+    await closing;
+    expect(isPaywallPending()).toBe(false);
   });
 
   it("opens the regular paywall once the window has closed", async () => {
