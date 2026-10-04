@@ -476,6 +476,35 @@ describe("exit offer after a paywall close", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("opens the regular paywall when the reopened offer is declined", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+    mock.presentPaywall.mockResolvedValue("PURCHASED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding"),
+    ).resolves.toBe(true);
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reopen the offer when that paywall is closed too", async () => {
+    mock.store.set("shelvr.exitOffer.shownAt.user_1", String(Date.now()));
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentExitSheet.mockResolvedValue("CANCELLED");
+    mock.presentPaywall.mockResolvedValue("CANCELLED");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding"),
+    ).resolves.toBe(false);
+
+    expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
+    expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("opens the onboarding paywall once the window has closed", async () => {
     mock.store.set(
       "shelvr.exitOffer.shownAt.user_1",

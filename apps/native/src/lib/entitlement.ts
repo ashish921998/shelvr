@@ -557,6 +557,7 @@ function exitOfferVariables(endsAt: number) {
 async function presentOpenExitOfferImpl(
   sourcePlacement: string,
   fallbackPlacement: string,
+  paywallOnDecline = false,
 ): Promise<PaywallOutcome> {
   if (!(await awaitRcSyncReady())) return presentPaywallImpl(fallbackPlacement);
   const userId = _rcSyncedUserId;
@@ -572,7 +573,18 @@ async function presentOpenExitOfferImpl(
   // The lookup can outlast the window; never sell the offer after it closes.
   if (!offering || exitOfferEndsAt(readShownAt(userId!), Date.now()) === null)
     return presentPaywallImpl(fallbackPlacement);
-  return showExitOffering(rcui, offering, sourcePlacement, endsAt);
+  const outcome = await showExitOffering(
+    rcui,
+    offering,
+    sourcePlacement,
+    endsAt,
+  );
+  if (!paywallOnDecline || outcome !== "cancelled") return outcome;
+  // The offer carries one plan. Declining it must still leave the trial and
+  // the other plans one step away. Inside the cooldown, so closing that
+  // paywall does not open the offer again.
+  await waitForSheetTransition();
+  return presentPaywallImpl(fallbackPlacement);
 }
 
 function subscribeExitOffer(onChange: () => void): () => void {
@@ -737,15 +749,16 @@ export async function openExitOffer(
 /**
  * `openPaywall` that keeps an open exit offer: while its window is open the
  * discounted sheet opens instead of full price, so someone who just closed
- * the offer is not shown the higher price on their next tap. Otherwise it is
- * `openPaywall`, exit offer on close included.
+ * the offer is not shown the higher price on their next tap. Declining it
+ * there opens the regular paywall. Otherwise it is `openPaywall`, exit offer
+ * on close included.
  */
 export async function openPaywallKeepingExitOffer(
   router: ReturnType<typeof useRouter>,
   placement: string,
 ): Promise<boolean> {
   const { outcome, owned } = await presentPaywall(placement, () =>
-    presentOpenExitOfferImpl(placement, placement),
+    presentOpenExitOfferImpl(placement, placement, true),
   );
   if (owned && shouldOpenPaywallFallback(outcome)) {
     router.push("/(app)/paywall");
