@@ -1,10 +1,20 @@
 import { analytics } from "@/lib/analytics";
-import type { RevenueCatPaywallResult } from "@/lib/paywall-result";
+import {
+  restoreFoundAccess,
+  type RevenueCatPaywallResult,
+} from "@/lib/paywall-result";
 import type RevenueCatUI from "react-native-purchases-ui";
 import type { CustomVariables } from "react-native-purchases-ui";
 import type { PurchasesOffering } from "react-native-purchases";
 import { useEffect, useSyncExternalStore } from "react";
-import { AppState, Modal, Pressable, View } from "react-native";
+import {
+  Alert,
+  AppState,
+  Modal,
+  Platform,
+  Pressable,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -126,7 +136,22 @@ export function ExitOfferSheetHost() {
             current.onPurchaseStarted?.(packageBeingPurchased.identifier);
           }}
           onPurchaseCompleted={() => finish("PURCHASED")}
-          onRestoreCompleted={() => finish("RESTORED")}
+          onRestoreCompleted={({ customerInfo }) => {
+            // A restore that lands after this sheet closed must not settle
+            // or speak for whatever is open now.
+            if (request !== current) return;
+            if (restoreFoundAccess(customerInfo)) {
+              finish("RESTORED");
+              return;
+            }
+            // Nothing to restore: the offer stays open and says so.
+            Alert.alert(
+              t("pro.notFoundTitle"),
+              t("pro.notFoundBody", {
+                store: Platform.OS === "ios" ? "App Store" : "Google Play",
+              }),
+            );
+          }}
           onDismiss={() =>
             setTimeout(() => {
               if (request === current) finish("CANCELLED");

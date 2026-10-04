@@ -6,6 +6,7 @@ import {
 } from "@/lib/analytics";
 import type { TrialPeriod } from "@/lib/date";
 import { getPurchases } from "@/lib/revenuecat-module";
+import { restoreFoundAccess } from "@/lib/paywall-result";
 
 /**
  * The paywall funnel's in-session memory and RevenueCat context reads.
@@ -288,4 +289,20 @@ export async function activeProductId(): Promise<{ product_id?: string }> {
   // Bounded: the purchase result waits on this read before it reaches the
   // caller, so a stalled SDK call must not hold up the unlocked action.
   return withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS);
+}
+
+/**
+ * RevenueCat's sheet resolves RESTORED once Restore was tapped, even when
+ * nothing was found. True only when customer info loads and shows no
+ * entitlement: a failed or slow read keeps the SDK's word, so a real restore
+ * is never mistaken for an empty one.
+ */
+export async function restoreCameBackEmpty(): Promise<boolean> {
+  const rc = getPurchases();
+  if (!rc) return false;
+  const read = async (): Promise<{ empty?: boolean }> => ({
+    empty: !restoreFoundAccess(await rc.getCustomerInfo()),
+  });
+  // Bounded for the same reason as `activeProductId`.
+  return (await withTimeout(read(), PAYWALL_CONTEXT_TIMEOUT_MS)).empty === true;
 }

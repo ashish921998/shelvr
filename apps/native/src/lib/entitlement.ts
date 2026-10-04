@@ -14,6 +14,7 @@ import {
   readPaywallOffering,
   recordAccess,
   recordBlockedAction,
+  restoreCameBackEmpty,
   resumeBlockedAction,
   useEntitlementActivation,
 } from "@/lib/paywall-funnel";
@@ -387,7 +388,8 @@ async function presentPaywallImpl(
     const customVariables = trial && trialTimelineVariables(Date.now(), trial);
     const result = await observePaywallPresentation(
       enriched,
-      () => rcui.presentPaywall({ offering, customVariables }),
+      () =>
+        rcui.presentPaywall({ offering, customVariables }).then(confirmRestore),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -400,6 +402,13 @@ async function presentPaywallImpl(
   } catch {
     return "unavailable";
   }
+}
+
+/** An empty restore is a close, so the caller is not told the user subscribed
+ * and the exit offer still follows. */
+async function confirmRestore(result: string): Promise<string> {
+  if (result !== "RESTORED") return result;
+  return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
 }
 
 // Home re-reads the open offer whenever it is claimed or released.
