@@ -104,6 +104,7 @@ export default function PaywallScreen() {
   const standaloneAttempt = useRef<string | null>(null);
   const mounted = useRef(true);
   const closing = useRef(false);
+  const settled = useRef(false);
 
   useEffect(() => {
     owner.current ??= claimPaywallRequest();
@@ -119,6 +120,10 @@ export default function PaywallScreen() {
 
   useEffect(() => {
     const settle = () => {
+      // The closing transition and the unmount fallback can both get here;
+      // only the first reports, so a purchase is never recorded twice.
+      if (settled.current) return;
+      settled.current = true;
       const pending = purchase.current;
       const restore = restoring.current;
       const mine = owner.current;
