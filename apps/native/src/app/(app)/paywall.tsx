@@ -184,7 +184,10 @@ export default function PaywallScreen() {
       // must not navigate a second time and pop the screen underneath.
       if (closing.current && !access) return;
       result.current = outcome;
-      if (!owner.current && access) finishPaywall(outcome, null);
+      // `restorePurchases` records a restore itself; only a purchase with
+      // nobody waiting needs recording here.
+      if (!owner.current && outcome === "PURCHASED")
+        finishPaywall(outcome, null);
       if (closing.current) return;
       closing.current = true;
       if (router.canGoBack()) router.back();
