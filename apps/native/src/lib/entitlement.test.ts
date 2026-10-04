@@ -284,6 +284,14 @@ describe("restore from the paywall", () => {
     await expect(openPaywall(router, "share")).resolves.toBe(false);
   });
 
+  it("keeps a restore whose customer info could not be read", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("RESTORED");
+    mock.getCustomerInfo.mockRejectedValue(new Error("offline"));
+
+    await expect(openPaywall(router, "share")).resolves.toBe(true);
+  });
+
   it("counts a restore that found an entitlement", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywall.mockResolvedValue("RESTORED");

@@ -14,6 +14,7 @@ import {
   readPaywallOffering,
   recordAccess,
   recordBlockedAction,
+  restoreCameBackEmpty,
   resumeBlockedAction,
   useEntitlementActivation,
 } from "@/lib/paywall-funnel";
@@ -34,7 +35,6 @@ import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
-  restoreFoundAccess,
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from "@/lib/paywall-result";
@@ -404,17 +404,11 @@ async function presentPaywallImpl(
   }
 }
 
-/**
- * RevenueCat's sheet resolves RESTORED once Restore was tapped, even when
- * nothing was found. An empty restore is a close, so the caller is not told
- * the user subscribed and the exit offer still follows.
- */
+/** An empty restore is a close, so the caller is not told the user subscribed
+ * and the exit offer still follows. */
 async function confirmRestore(result: string): Promise<string> {
   if (result !== "RESTORED") return result;
-  const info = await getPurchases()
-    ?.getCustomerInfo()
-    .catch(() => null);
-  return restoreFoundAccess(info) ? result : "CANCELLED";
+  return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
 }
 
 // Home re-reads the open offer whenever it is claimed or released.
