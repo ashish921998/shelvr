@@ -191,7 +191,8 @@ export default function PaywallScreen() {
       result.current = outcome;
       // `restorePurchases` records a restore itself; only a purchase with
       // nobody waiting needs recording here.
-      if (!owner.current && outcome === "PURCHASED")
+      // Once settled, the settle path reports the purchase instead.
+      if (!owner.current && outcome === "PURCHASED" && !settled.current)
         finishPaywall(outcome, null);
       if (closing.current) return;
       closing.current = true;
