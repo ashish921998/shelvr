@@ -201,6 +201,14 @@ test("an HTML link to a screenshot counts as evidence", () => {
   );
 });
 
+test("a > inside a quoted attribute does not end the tag", () => {
+  const body = filled({
+    evidence: '<img alt="Before > After" src="https://x.dev/home.png">',
+  });
+  assert.deepEqual(evidenceProblems(body, [SCREEN]), []);
+  assert.equal(hasContent("<span title='a > b'></span>"), false);
+});
+
 test("a shorter fence inside a longer one stays quoted", () => {
   const quoted = "````\n```\n![shot](https://x.dev/a.png)\n````";
   assert.equal(hasVisualEvidence(quoted), false);

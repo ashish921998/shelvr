@@ -105,9 +105,10 @@ export function section(body, title) {
 
 // Raw HTML, read left to right: a comment runs to its "-->" (or, as on
 // GitHub, to the end), so a tag inside one is never seen. Markup itself is
-// not text; only what lies between tags is.
+// not text; only what lies between tags is. A quoted attribute value may
+// hold a ">" without closing its tag.
 const HTML_PIECES =
-  /<!--[\s\S]*?(?:-->|$)|<\/?([a-zA-Z][\w-]*)\b[^>]*>|[^<]+|</g;
+  /<!--[\s\S]*?(?:-->|$)|<\/?([a-zA-Z][\w-]*)\b(?:"[^"]*"|'[^']*'|[^"'>])*>|[^<]+|</g;
 
 // The attribute that opens each tag's target: media embeds and links.
 const SOURCE_ATTRIBUTE = { img: "src", video: "src", source: "src", a: "href" };
