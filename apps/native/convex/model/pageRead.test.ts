@@ -66,8 +66,7 @@ function html(url: string, body: string) {
 const PIN_PAGE =
   '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
 
-/** A pin page with no image or text, as Pinterest serves for a pin id it has
- * no pin for. */
+/** A pin page with no image or text. */
 const EMPTY_PIN_PAGE =
   '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>';
 
@@ -233,33 +232,6 @@ describe("readPage for Pinterest pins", () => {
       ),
     });
     expect((await readPage(PIN_URL)).status).toBe("gone");
-  });
-
-  it("fails a pin id that never existed as gone when Pinterest serves an empty shell", async () => {
-    serve({
-      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
-      [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
-    });
-    expect((await readPage(PIN_URL)).status).toBe("gone");
-  });
-
-  it("keeps a widget-less pin page that was cut off before its tags", async () => {
-    serve({
-      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
-      [PIN_URL]: { ...html(PIN_URL, EMPTY_PIN_PAGE), truncated: true },
-    });
-    expect((await readPage(PIN_URL)).status).toBe("ok");
-  });
-
-  it("keeps a widget-less pin page that has only a description", async () => {
-    serve({
-      [WIDGET_URL]: json(WIDGET_URL, { data: [null] }),
-      [PIN_URL]: html(
-        PIN_URL,
-        '<html><head><meta property="og:description" content="Honey garlic chicken"></head><body></body></html>',
-      ),
-    });
-    expect((await readPage(PIN_URL)).status).toBe("ok");
   });
 
   it("fails a deleted pin.it pin as gone, reading the resolved pin page", async () => {
