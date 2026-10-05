@@ -100,6 +100,14 @@ describe("pinterestPage", () => {
     });
   });
 
+  it("decodes a pinner name Pinterest encoded more than once", () => {
+    const pin = {
+      ...videoPin,
+      pinner: { full_name: "CatPawPrintables &amp;amp;amp; TheKnitNut" },
+    };
+    expect(pinterestPage(pin)?.author).toBe("CatPawPrintables & TheKnitNut");
+  });
+
   it("does not call a photo pin a video", () => {
     const { videos: _videos, ...photoPin } = videoPin;
     expect(pinterestPage(photoPin)?.video).toBeUndefined();
