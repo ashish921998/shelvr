@@ -175,6 +175,32 @@ test("what GitHub renders around a comment still counts", () => {
   assert.ok(hasVisualEvidence("![badge](https://x.dev/a.png"));
 });
 
+test("empty markup is not content", () => {
+  assert.equal(hasContent("<div></div>"), false);
+  assert.equal(hasContent("<p>\n</p>"), false);
+  assert.equal(hasContent("- <span></span>"), false);
+  assert.equal(hasContent("<p>ran the suite</p>"), true);
+  assert.equal(hasContent(`<img src="${SHOT}">`), true);
+  const empty = filled({ evidence: "<div></div>" });
+  assert.match(evidenceProblems(empty, [])[0], /Evidence/);
+});
+
+test("an HTML link to a screenshot counts as evidence", () => {
+  const body = filled({
+    evidence: '<a href="https://x.dev/home.png">home screen</a>',
+  });
+  assert.deepEqual(evidenceProblems(body, [SCREEN]), []);
+  assert.ok(hasVisualEvidence(`<p><a href='${SHOT}'>recording</a></p>`));
+  assert.equal(
+    hasVisualEvidence('<a href="https://github.com/o/r/pull/1">pr</a>'),
+    false,
+  );
+  assert.equal(
+    hasVisualEvidence('<!-- <a href="https://x.dev/home.png">x</a> -->'),
+    false,
+  );
+});
+
 test("a shorter fence inside a longer one stays quoted", () => {
   const quoted = "````\n```\n![shot](https://x.dev/a.png)\n````";
   assert.equal(hasVisualEvidence(quoted), false);

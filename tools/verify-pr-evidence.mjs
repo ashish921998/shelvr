@@ -104,23 +104,48 @@ export function section(body, title) {
 }
 
 // Raw HTML, read left to right: a comment runs to its "-->" (or, as on
-// GitHub, to the end), so a tag inside one is never seen.
+// GitHub, to the end), so a tag inside one is never seen. Markup itself is
+// not text; only what lies between tags is.
 const HTML_PIECES =
-  /<!--[\s\S]*?(?:-->|$)|<(img|video|source)\b[^>]*>|[^<]+|</g;
+  /<!--[\s\S]*?(?:-->|$)|<\/?([a-zA-Z][\w-]*)\b[^>]*>|[^<]+|</g;
 
-/** What raw HTML shows: its text outside comments, and its media sources. */
+// The attribute that opens each tag's target: media embeds and links.
+const SOURCE_ATTRIBUTE = { img: "src", video: "src", source: "src", a: "href" };
+
+const attribute = (tag, name) =>
+  new RegExp(
+    String.raw`\s${name}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`,
+    "i",
+  )
+    .exec(tag)
+    ?.slice(1)
+    .find((value) => value !== undefined);
+
+/**
+ * What raw HTML shows: its text outside comments and tags, and the targets
+ * its media embeds and links open.
+ */
 function readHtml(html) {
   let text = "";
   const sources = [];
-  for (const [piece, tag] of html.matchAll(HTML_PIECES)) {
+  for (const [piece, name] of html.matchAll(HTML_PIECES)) {
     if (piece.startsWith("<!--")) continue;
-    text += piece;
-    if (!tag) continue;
-    const src = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(piece);
-    if (src) sources.push(src[1] ?? src[2] ?? src[3]);
+    if (name === undefined) {
+      text += piece;
+      continue;
+    }
+    const target = SOURCE_ATTRIBUTE[name.toLowerCase()];
+    const value = target && attribute(piece, target);
+    if (value) sources.push(value);
   }
   return { text, sources };
 }
+
+/** Whether raw HTML shows anything: text, an embed, or a link. */
+const htmlHasContent = (html) => {
+  const { text, sources } = readHtml(html);
+  return text.trim().length > 0 || sources.length > 0;
+};
 
 // A line that only restates the template's shape, or promises content later,
 // is not content: empty bullets and boxes, nested headings, placeholders.
@@ -145,7 +170,7 @@ function inlineText(token) {
         case "image":
           return "[image]";
         case "html_inline":
-          return readHtml(child.content).text;
+          return htmlHasContent(child.content) ? "[html]" : "";
         default:
           return "";
       }
@@ -161,7 +186,7 @@ function tokensHaveContent(tokens) {
       case "code_block":
         return token.content.trim().length > 0;
       case "html_block":
-        return readHtml(token.content).text.trim().length > 0;
+        return htmlHasContent(token.content);
       case "inline":
         // A heading is not content, even inside a list or quote.
         if (tokens[i - 1]?.type === "heading_open") return false;
