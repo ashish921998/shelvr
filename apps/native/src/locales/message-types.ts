@@ -504,10 +504,11 @@ export type MessageParams = {
   "demo.samplesOr": undefined;
   "demo.shareTitle": undefined;
   "demo.shareSupport": undefined;
-  "demo.shareOthers": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "demo.shareDismissed": undefined;
+  "demo.shareRetry": undefined;
   "splash.tagline": undefined;
   "refundConsent.title": undefined;
   "refundConsent.disclosure": undefined;
