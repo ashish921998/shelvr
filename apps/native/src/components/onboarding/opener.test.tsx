@@ -146,3 +146,16 @@ it("drops measurements from the old text size when the font scale changes", asyn
   layout("foot", { height: 650 });
   expect(footScrolls()).toBe(true);
 });
+
+it("moves a pinned footer into the scroll when bigger text no longer fits", async () => {
+  const rerender = await renderOpener();
+  layout("wrap", { height: 700 });
+  layout("foot", { height: 200 });
+  expect(footScrolls()).toBe(false);
+
+  screenState.fontScale = 3;
+  rerender();
+  layout("wrap", { height: 700 });
+  layout("foot", { height: 600 });
+  expect(footScrolls()).toBe(true);
+});
