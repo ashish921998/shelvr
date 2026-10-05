@@ -1,20 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
-import {
-  ACCESSIBILITY_TEXT_SCALE,
-  CtaButton,
-  HEADLINE_MAX_SCALE,
-} from "@/components/onboarding/parts";
+import { CtaButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 // The collage never shrinks below this. When the headline pushes it past the
@@ -112,8 +103,7 @@ export function OpenerStep({
   // At the accessibility sizes the pinned footer would leave only a sliver to
   // scroll the headline in, so the sign-in link moves up under the headline
   // and the Pro line stacks instead of squeezing beside its pill.
-  const signInScrolls =
-    useWindowDimensions().fontScale > ACCESSIBILITY_TEXT_SCALE;
+  const largeText = useLargeText();
   const [height, setHeight] = useState(0);
   const [footHeight, setFootHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
@@ -147,14 +137,16 @@ export function OpenerStep({
       style={styles.foot}
       onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
     >
-      <View style={[styles.proLine, signInScrolls && styles.proLineStacked]}>
+      <View style={[styles.proLine, largeText && styles.proLineStacked]}>
         <View style={styles.proPill}>
           <Text style={styles.proPillText}>Pro</Text>
         </View>
-        <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
+        <Text style={[styles.proText, largeText && styles.proTextStacked]}>
+          {t("onboarding.proLine")}
+        </Text>
       </View>
       <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-      {signInScrolls ? null : signIn}
+      {largeText ? null : signIn}
     </View>
   );
 
@@ -182,7 +174,7 @@ export function OpenerStep({
           </Text>
           <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
         </View>
-        {signInScrolls ? signIn : null}
+        {largeText ? signIn : null}
 
         <View
           style={[styles.collage, overflows && styles.collageScrolls]}
@@ -345,10 +337,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   proText: {
     flexShrink: 1,
-    textAlign: "center",
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     color: theme.colors.muted,
+  },
+  proTextStacked: {
+    textAlign: "center",
   },
   signIn: {
     minHeight: 44,

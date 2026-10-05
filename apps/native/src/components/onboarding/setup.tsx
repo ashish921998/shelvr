@@ -1,22 +1,13 @@
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import { t, useAppLocale } from "@/lib/i18n";
-import {
-  ACCESSIBILITY_TEXT_SCALE,
-  CtaButton,
-  HEADLINE_MAX_SCALE,
-} from "@/components/onboarding/parts";
+import { CtaButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
 import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
 import { Image } from "expo-image";
 import { useState } from "react";
-import {
-  Pressable,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const KIND_IMAGES: Record<SaveKind, number> = {
@@ -49,7 +40,7 @@ export function SetupStep({
   const { theme } = useUnistyles();
   // At the accessibility sizes two cards no longer fit a label across, so the
   // grid drops to one column instead of breaking words.
-  const oneColumn = useWindowDimensions().fontScale > ACCESSIBILITY_TEXT_SCALE;
+  const oneColumn = useLargeText();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 

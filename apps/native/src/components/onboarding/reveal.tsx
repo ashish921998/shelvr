@@ -13,6 +13,7 @@ import {
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { api } from "@convex/_generated/api";
 import { demoErrorCode } from "@convex/model/demoErrors";
@@ -136,7 +137,7 @@ export function RevealStep({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.verdict}>
+      <Text style={styles.verdict} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
         {t(empty ? "reveal.emptyTitle" : "reveal.title")}{" "}
         <Text style={styles.verdictMuted}>
           {t(empty ? "reveal.emptySubtitle" : "reveal.subtitle")}

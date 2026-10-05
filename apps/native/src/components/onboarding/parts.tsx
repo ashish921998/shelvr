@@ -1,15 +1,6 @@
 import { ActivityIndicator, Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// Step headlines are already display size. Like iOS's own titles they grow
-// less than body text at the accessibility sizes, so the content under them
-// stays on screen.
-export const HEADLINE_MAX_SCALE = 2;
-
-// iOS's accessibility text sizes start a little above this scale. Steps
-// switch to a roomier layout past it.
-export const ACCESSIBILITY_TEXT_SCALE = 1.4;
-
 /** The primary CTA used by every step's footer. */
 export function CtaButton({
   label,

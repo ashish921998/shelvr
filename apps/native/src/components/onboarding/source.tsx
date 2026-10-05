@@ -5,7 +5,8 @@ import {
   sourceLabel,
   type AcquisitionSource,
 } from "@/lib/acquisition-source";
-import { GhostButton, HEADLINE_MAX_SCALE } from "@/components/onboarding/parts";
+import { GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
