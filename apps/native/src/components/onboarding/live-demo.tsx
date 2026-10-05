@@ -272,7 +272,7 @@ function SharePicker({
               size={18}
               tintColor={theme.colors.primaryForeground}
             />
-            <Text style={styles.inputActionText}>
+            <Text style={[styles.inputActionText, styles.shareLabel]}>
               {t(retry ? "demo.shareRetry" : "demo.shareThis")}
             </Text>
           </Pressable>
@@ -585,10 +585,16 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.gap(1),
-    height: 52,
+    minHeight: 52,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primary,
+  },
+  shareLabel: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   pasteToggle: {
     alignSelf: "center",
