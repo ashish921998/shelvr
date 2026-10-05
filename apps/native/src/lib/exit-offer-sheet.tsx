@@ -86,7 +86,9 @@ export function presentExitSheet(
 ): Promise<RevenueCatPaywallResult> {
   if (hosts === 0 || sheet.current() || Date.now() >= input.endsAt)
     return Promise.resolve("NOT_PRESENTED");
-  return sheet.request(input);
+  // A fresh object per request, so the host never mistakes a reused input for
+  // the sheet still sliding away.
+  return sheet.request({ ...input });
 }
 
 // The native view reports a dismissal that follows a purchase before or
