@@ -1108,14 +1108,14 @@ export async function fetchInstagram(url: string): Promise<PageData> {
   // Instagram answers 200 for a deleted or made-up post. The only "gone"
   // signal is that nothing about the post was read and the embed shows its
   // broken-media box, so that pair fails the save instead of saving it blank.
-  // A cut read is no proof the metadata is missing, so it is not gone; it is
-  // marked incomplete instead, so the save can retry.
-  const looksRemoved =
+  // A cut read is no proof the metadata is missing, and may end before the
+  // box, so a cut read with nothing in it is marked incomplete instead, so the
+  // save can retry.
+  const readNothing =
     card === undefined &&
     embedded.caption === undefined &&
-    embedded.posterUrl === undefined &&
-    embedded.brokenMedia === true;
-  if (looksRemoved && !truncated) {
+    embedded.posterUrl === undefined;
+  if (readNothing && embedded.brokenMedia === true && !truncated) {
     throw new PageFetchError("http_error", 404);
   }
   const cardTitle = card?.title;
@@ -1142,7 +1142,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     content: caption,
     video: card?.video,
     ...(truncated ? { truncated: true as const } : {}),
-    ...(embed.status === "transient" || looksRemoved
+    ...(embed.status === "transient" || (readNothing && truncated)
       ? { incomplete: true as const }
       : {}),
   };

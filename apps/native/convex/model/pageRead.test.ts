@@ -310,20 +310,19 @@ describe("readPage for Instagram posts", () => {
   });
 
   it.each([
-    ["the page", true, false],
-    ["the embed", false, true],
+    ["the page", true, false, BROKEN_EMBED],
+    ["the embed", false, true, BROKEN_EMBED],
+    // A cut embed can end before its broken-media box ever arrives.
+    ["the embed, before its broken-media box,", false, true, "<html><body>"],
   ])(
     "keeps a post retryable, not gone, when %s was cut short",
-    async (_, pageCut, embedCut) => {
+    async (_, pageCut, embedCut, embedBody) => {
       const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
       const cut = (read: ReturnType<typeof html>, isCut: boolean) =>
         isCut ? { ...read, truncated: true } : read;
       serve({
         [reelUrl]: cut(html(reelUrl, INSTAGRAM_SHELL), pageCut),
-        [`${reelUrl}embed/captioned/`]: cut(
-          html(reelUrl, BROKEN_EMBED),
-          embedCut,
-        ),
+        [`${reelUrl}embed/captioned/`]: cut(html(reelUrl, embedBody), embedCut),
       });
       const read = await readPage(reelUrl);
       expect(read).toMatchObject({
