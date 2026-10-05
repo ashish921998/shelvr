@@ -80,6 +80,9 @@ test("placeholders and nested headings are not content", () => {
   assert.equal(hasContent("TBD"), false);
   assert.equal(hasContent("TODO: run checks later"), false);
   assert.equal(hasContent("- **TODO**"), false);
+  assert.equal(hasContent("> ### TODO"), false);
+  assert.equal(hasContent("- ### TODO"), false);
+  assert.equal(hasContent("- [ ] TBD"), false);
   assert.equal(hasContent("Nothing"), true);
   const body = filled({ evidence: "#### TODO" });
   assert.match(evidenceProblems(body, [])[0], /Evidence/);
@@ -176,6 +179,7 @@ test("which files count as UI", () => {
     "apps/native/src/lib/appearance.ts",
     "apps/native/src/lib/onboarding-labels.ts",
     "apps/native/src/lib/onboarding-demo.ts",
+    "apps/native/src/lib/tab-stack-chrome.ts",
     "apps/native/src/components/splash/timeline.ts",
     "apps/web/src/lib/motion.ts",
     "apps/native/src/locales/en.json",

@@ -24,7 +24,12 @@ describe("reminder budget", () => {
           maxLength: 200,
         }),
         fc.boolean(),
-        (gaps, shelfOn) => {
+        // When in the week the shelf is due; it then repeats weekly.
+        fc.integer({ min: 0, max: WEEK_MS - 1 }),
+        (gaps, shelfOn, shelfOffset) => {
+          const nextShelf = (at: number) =>
+            shelfOffset +
+            (Math.floor((at - shelfOffset) / WEEK_MS) + 1) * WEEK_MS;
           let now = 0;
           const sent: number[] = [];
           for (const gap of gaps) {
@@ -37,7 +42,7 @@ describe("reminder budget", () => {
               .reverse()
               .map((createdAt) => ({ createdAt, opened: true }));
             const shelf = shelfOn
-              ? { nextAt: now + 3 * 24 * HOUR_MS, sentThisWeek: false }
+              ? { nextAt: nextShelf(now), sentThisWeek: false }
               : undefined;
             if (reminderBlocked(now, sentAt, recent, shelf) === undefined) {
               sent.push(now);
@@ -45,6 +50,12 @@ describe("reminder budget", () => {
           }
           for (let i = 1; i < sent.length; i++) {
             expect(sent[i] - sent[i - 1]).toBeGreaterThanOrEqual(MIN_GAP_MS);
+          }
+          // Reminders make room for the shelf: none inside the gap before it.
+          if (shelfOn) {
+            for (const at of sent) {
+              expect(nextShelf(at) - at).toBeGreaterThanOrEqual(MIN_GAP_MS);
+            }
           }
           for (const start of sent) {
             const inWeek = sent.filter(

@@ -18,7 +18,7 @@ const UI_PATTERNS = [
   /^apps\/native\/src\/.+\.(tsx|jsx)$/,
   /^apps\/native\/src\/(components|widgets)\/.+\.ts$/,
   /^apps\/native\/src\/unistyles\.ts$/,
-  /^apps\/native\/src\/lib\/(appearance|appearance-runtime|color|header-layout|motion|tab-bar-motion|onboarding-labels|onboarding-demo)\.ts$/,
+  /^apps\/native\/src\/lib\/(appearance|appearance-runtime|color|header-layout|motion|tab-bar-motion|onboarding-labels|onboarding-demo|tab-stack-chrome)\.ts$/,
   /^apps\/native\/src\/locales\/.+\.json$/,
   /^apps\/native\/locales\//,
   /^apps\/native\/assets\//,
@@ -131,9 +131,11 @@ export function hasContent(text) {
   if (text === null) return false;
   return fencedLines(text).some(({ line: raw, fenced }) => {
     if (fenced) return !FENCE_OPEN.test(raw) && raw.trim().length > 0;
-    if (/^[ \t]*#{1,6}[ \t]/.test(raw)) return false;
-    const line = raw
-      .replace(/^\s*([-*+>]|\d+\.)?\s*(\[[ xX]?\])?\s*/, "")
+    // A heading is not content, even behind a list or quote marker.
+    const unmarked = raw.replace(/^(\s*([-*+>]|\d+\.)\s*)+/, "");
+    if (/^[ \t]*#{1,6}[ \t]/.test(unmarked)) return false;
+    const line = unmarked
+      .replace(/^\s*(\[[ xX]?\])?\s*/, "")
       .replace(/[*_`]/g, "")
       .trim();
     return line.length > 0 && !PLACEHOLDER.test(line);
