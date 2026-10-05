@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
+import { createSheetRequestStore } from "@/lib/sheet-request-store";
 
 /**
  * The exit offer's own full-screen sheet. RevenueCat's `presentPaywall` sheet
@@ -40,17 +41,13 @@ type Request = {
   /** Fires when the person closes the sheet themselves, not when the deadline
    * or a torn-down host closes it. */
   onDeclined?: () => void;
-  resolve: (result: RevenueCatPaywallResult) => void;
 };
 
-let request: Request | null = null;
+// Never superseded: `presentExitSheet` refuses while one is open.
+const sheet = createSheetRequestStore<Request, RevenueCatPaywallResult>(
+  "CANCELLED",
+);
 let hosts = 0;
-const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((read) => read());
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => listeners.delete(onChange);
-}
 
 // A sheet that never reports its dismissal (Android, a torn-down host) must
 // not hold the next presentation back.
@@ -59,16 +56,16 @@ let dismissal: Promise<void> = Promise.resolve();
 let settleDismissal: () => void = () => {};
 
 function finish(result: RevenueCatPaywallResult, declined = false): void {
-  const current = request;
+  const current = sheet.current();
   if (!current) return;
-  request = null;
   dismissal = new Promise((resolve) => {
     settleDismissal = resolve;
     setTimeout(resolve, DISMISSAL_CAP_MS);
   });
-  notify();
+  // Clears the request and notifies the host; the caller's await resumes
+  // only after this function returns, so `onDeclined` still runs first.
+  sheet.resolve(result);
   if (declined) current.onDeclined?.();
-  current.resolve(result);
 }
 
 /**
@@ -85,14 +82,13 @@ export function whenExitSheetDismissed(): Promise<void> {
  * returns; NOT_PRESENTED when no host is mounted or the offer already ended.
  */
 export function presentExitSheet(
-  input: Omit<Request, "resolve">,
+  input: Request,
 ): Promise<RevenueCatPaywallResult> {
-  if (hosts === 0 || request || Date.now() >= input.endsAt)
+  if (hosts === 0 || sheet.current() || Date.now() >= input.endsAt)
     return Promise.resolve("NOT_PRESENTED");
-  return new Promise((resolve) => {
-    request = { ...input, resolve };
-    notify();
-  });
+  // A fresh object per request, so the host never mistakes a reused input for
+  // the sheet still sliding away.
+  return sheet.request({ ...input });
 }
 
 // The native view reports a dismissal that follows a purchase before or
@@ -100,7 +96,7 @@ export function presentExitSheet(
 const DISMISS_SETTLE_MS = 500;
 
 export function ExitOfferSheetHost() {
-  const current = useSyncExternalStore(subscribe, () => request);
+  const current = useSyncExternalStore(sheet.subscribe, sheet.current);
   // The sheet stays rendered while it slides away, so iOS reports when the
   // dismissal has finished.
   const [shown, setShown] = useState(current);
@@ -157,7 +153,7 @@ export function ExitOfferSheetHost() {
           onPurchasePackageInitiated={({ resume }) => {
             const open = Date.now() < shown.endsAt;
             // A sheet that is already sliding away sells nothing.
-            resume(open && request === shown);
+            resume(open && sheet.current() === shown);
             if (!open) {
               analytics.capture("exit_offer_expired_open", {});
               finish("CANCELLED");
@@ -170,7 +166,7 @@ export function ExitOfferSheetHost() {
           onRestoreCompleted={({ customerInfo }) => {
             // A restore that lands after this sheet closed must not settle
             // or speak for whatever is open now.
-            if (request !== shown) return;
+            if (sheet.current() !== shown) return;
             if (restoreFoundAccess(customerInfo)) {
               finish("RESTORED");
               return;
@@ -185,7 +181,7 @@ export function ExitOfferSheetHost() {
           }}
           onDismiss={() =>
             setTimeout(() => {
-              if (request === shown) finish("CANCELLED", true);
+              if (sheet.current() === shown) finish("CANCELLED", true);
             }, DISMISS_SETTLE_MS)
           }
         />
