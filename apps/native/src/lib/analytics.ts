@@ -271,6 +271,13 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
+  // The share sheet closed without Shelvr receiving the sample. `fallback` is
+  // true when this miss saved the sample directly instead of asking again.
+  onboarding_share_missed: {
+    reason: "dismissed" | "other_app";
+    misses: number;
+    fallback: boolean;
+  };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
