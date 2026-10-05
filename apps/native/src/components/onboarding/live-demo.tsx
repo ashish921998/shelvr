@@ -16,6 +16,7 @@ import {
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
@@ -251,7 +252,12 @@ function SharePicker({
   return (
     <>
       <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.shareTitle")}</Text>
+        <Text
+          style={styles.headline}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("demo.shareTitle")}
+        </Text>
         <Text style={styles.support}>{t("demo.shareSupport")}</Text>
       </View>
 
@@ -311,7 +317,12 @@ function PastePicker({
   return (
     <>
       <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.title")}</Text>
+        <Text
+          style={styles.headline}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("demo.title")}
+        </Text>
         <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 

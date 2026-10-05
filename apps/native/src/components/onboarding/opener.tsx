@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { CtaButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
 import { withAlpha } from "@/lib/color";
 import { Image } from "expo-image";
 import { useState } from "react";
@@ -99,6 +100,10 @@ export function OpenerStep({
   onSignIn: () => void;
 }) {
   useAppLocale();
+  // At the accessibility sizes the pinned footer would leave only a sliver to
+  // scroll the headline in, so the sign-in link moves up under the headline
+  // and the Pro line stacks instead of squeezing beside its pill.
+  const largeText = useLargeText();
   const [height, setHeight] = useState(0);
   const [footHeight, setFootHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
@@ -114,28 +119,34 @@ export function OpenerStep({
   const overflows =
     footScrolls || (viewport > 0 && collageTop + COLLAGE_MIN_HEIGHT > viewport);
 
+  const signIn = (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onSignIn}
+      style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={styles.signInText}>
+        {t("onboarding.haveAccount")}{" "}
+        <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
+      </Text>
+    </Pressable>
+  );
+
   const foot = (
     <View
       style={styles.foot}
       onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
     >
-      <View style={styles.proLine}>
+      <View style={[styles.proLine, largeText && styles.proLineStacked]}>
         <View style={styles.proPill}>
           <Text style={styles.proPillText}>Pro</Text>
         </View>
-        <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
+        <Text style={[styles.proText, largeText && styles.proTextStacked]}>
+          {t("onboarding.proLine")}
+        </Text>
       </View>
       <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
-      <Pressable
-        accessibilityRole="button"
-        onPress={onSignIn}
-        style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
-      >
-        <Text style={styles.signInText}>
-          {t("onboarding.haveAccount")}{" "}
-          <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
-        </Text>
-      </Pressable>
+      {largeText ? null : signIn}
     </View>
   );
 
@@ -155,9 +166,15 @@ export function OpenerStep({
         onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
       >
         <View style={styles.head}>
-          <Text style={styles.headline}>{t("onboarding.openerTitle")}</Text>
+          <Text
+            style={styles.headline}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
+            {t("onboarding.openerTitle")}
+          </Text>
           <Text style={styles.support}>{t("onboarding.openerBody")}</Text>
         </View>
+        {largeText ? signIn : null}
 
         <View
           style={[styles.collage, overflows && styles.collageScrolls]}
@@ -302,6 +319,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     gap: theme.gap(1),
   },
+  proLineStacked: {
+    flexDirection: "column",
+  },
   proPill: {
     paddingHorizontal: theme.gap(0.75),
     paddingVertical: 2,
@@ -320,6 +340,9 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     color: theme.colors.muted,
+  },
+  proTextStacked: {
+    textAlign: "center",
   },
   signIn: {
     minHeight: 44,
