@@ -6,6 +6,7 @@ import {
   whenSheetSettled,
 } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { createSheetRequestStore } from "@/lib/sheet-request-store";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -230,36 +231,17 @@ export async function scheduleTrialReminder(
 // OS asks. A bare system prompt gives no reason, and a reason is what gets a
 // yes. The hook awaits the answer; `TrialReminderPrimerSheet` renders it.
 // Resolves true or false for the user's choice, null when the app closed it.
-let primerAnswer: ((allow: boolean | null) => void) | null = null;
-const primerListeners = new Set<() => void>();
-const emitPrimer = () => primerListeners.forEach((listener) => listener());
-
-function closePrimer(result: boolean | null) {
-  const resolve = primerAnswer;
-  if (!resolve) return;
-  primerAnswer = null;
-  emitPrimer();
-  resolve(result);
-}
+const primer = createSheetRequestStore<true, boolean | null>(null);
 
 export const trialReminderPrimer = {
-  subscribe(listener: () => void) {
-    primerListeners.add(listener);
-    return () => primerListeners.delete(listener);
-  },
-  isOpen: () => primerAnswer !== null,
+  subscribe: primer.subscribe,
+  isOpen: () => primer.current() !== null,
   /** Opens the primer and resolves with the choice. */
-  request(): Promise<boolean | null> {
-    closePrimer(null);
-    return new Promise((resolve) => {
-      primerAnswer = resolve;
-      emitPrimer();
-    });
-  },
+  request: () => primer.request(true),
   /** The user's choice. */
-  answer: (allow: boolean) => closePrimer(allow),
+  answer: (allow: boolean) => primer.resolve(allow),
   /** Closes it without a choice: the trial it was for has ended. */
-  dismiss: () => closePrimer(null),
+  dismiss: () => primer.resolve(null),
 };
 
 // From a trial starting until its primer is answered or skipped. The welcome

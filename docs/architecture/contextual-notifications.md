@@ -12,12 +12,26 @@ record.
 
 Every notification about saves names one of them, or it is not sent.
 
-| Kind            | Example                                                  | When                                                         | Switch         |
-| --------------- | -------------------------------------------------------- | ------------------------------------------------------------ | -------------- |
-| `weekly_shelf`  | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3+ unopened saves from the week     | Weekly shelf   |
-| `read_reminder` | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)        | Save reminders |
-| `cook_reminder` | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week      | Save reminders |
-| trial reminder  | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`) | OS permission  |
+| Kind            | Example                                                  | When                                                             | Switch         |
+| --------------- | -------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
+| `weekly_shelf`  | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
+| `read_reminder` | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)            | Save reminders |
+| `cook_reminder` | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
+| trial reminder  | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
+
+### Weekly shelf
+
+The shelf holds three unopened saves. When an unopened save from before the
+past seven days turns up, it takes one slot and this week's saves take at most
+two, picked for a mix of types; otherwise all three can come from this week.
+Older saves also fill any slots the week left empty, so someone who saved
+little that week can still get a shelf. Older saves are drawn in a shuffled
+order that changes weekly, from the newest 1,000 saves, with read state checked
+for at most 50 of them, so an unopened older save beyond that sample is not
+found that week. A save on any of the last 12 shelves is skipped. No shelf is
+sent unless three eligible saves are found. When the shelf holds an older save,
+the push drops "saved this week" and reads _"The 12-hour short rib" and 2 more
+saves waiting on your shelf_.
 
 ### Save reminders
 

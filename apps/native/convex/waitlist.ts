@@ -9,6 +9,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import ipaddr from "ipaddr.js";
+import { newCaptureToken, sha256Hex } from "./model/captureTokens";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -114,6 +115,7 @@ export const upsertSignup = internalMutation({
     product: productValidator,
     source: sourceValidator,
     ip: v.optional(v.string()),
+    confirmationHash: v.optional(v.string()),
   },
   returns: v.object({
     id: v.id("waitlistSignups"),
@@ -147,6 +149,13 @@ export const upsertSignup = internalMutation({
       await ctx.db.patch(existing._id, {
         source: args.source,
         lastSubmittedAt: now,
+        ...(existing.confirmedAt === undefined
+          ? {
+              confirmed: false,
+              confirmationHash: args.confirmationHash,
+              confirmationExpiresAt: now + 24 * 60 * 60 * 1000,
+            }
+          : {}),
       });
       return {
         id: existing._id,
@@ -165,7 +174,10 @@ export const upsertSignup = internalMutation({
           : CONSENT_VERSION,
       consentText:
         args.product === "shelvr-android" ? ANDROID_CONSENT_TEXT : CONSENT_TEXT,
-      consentedAt: now,
+      consentedAt: 0,
+      confirmed: false,
+      confirmationHash: args.confirmationHash,
+      confirmationExpiresAt: now + 24 * 60 * 60 * 1000,
       firstSubmittedAt: now,
       lastSubmittedAt: now,
       resendStatus: "pending",
@@ -233,13 +245,15 @@ export const listSignupsNeedingResendSync = internalQuery({
       // fill the retry window and starve newer, still-retryable rows.
       const page = await ctx.db
         .query("waitlistSignups")
-        .withIndex("by_resendStatus_attempts", (q) =>
+        .withIndex("by_confirmed_and_resendStatus_and_resendAttempts", (q) =>
           q
+            .eq("confirmed", true)
             .eq("resendStatus", status)
             .lt("resendAttempts", RESEND_MAX_ATTEMPTS),
         )
         .take(RESEND_RETRY_SCAN);
       for (const row of page) {
+        if (row.confirmedAt === undefined) continue;
         out.push({
           id: row._id,
           email: row.email,
@@ -403,6 +417,7 @@ type JoinWaitlistArgs = {
 };
 
 type JoinWaitlistResult = {
+  confirmationSent?: boolean;
   saved: boolean;
   emailProviderSynced: boolean;
 };
@@ -425,25 +440,64 @@ export async function joinWaitlist(
   const ip = normalizeIp(args.ip);
   const product = args.product ?? "shelvr";
 
+  const token = newCaptureToken();
   const signup = await ctx.runMutation(internal.waitlist.upsertSignup, {
     email,
     product,
     source: args.source,
     ip,
+    confirmationHash: await sha256Hex(token),
   });
 
-  if (signup.resendStatus === "synced") {
-    return { saved: true, emailProviderSynced: true };
+  const row = await ctx.runQuery(internal.waitlist.getSignup, {
+    id: signup.id,
+  });
+  if (row?.confirmedAt !== undefined || signup.resendStatus === "synced") {
+    // Public resubmits never change existing provider preferences.
+    return {
+      saved: true,
+      emailProviderSynced: signup.resendStatus === "synced",
+    };
   }
-
-  const emailProviderSynced = await persistResendSync(
-    ctx,
-    signup.id,
-    email,
-    product,
-    signup.resendAttempts,
-  );
-  return { saved: true, emailProviderSynced };
+  const apiKey = env.RESEND_API_KEY;
+  const from = env.RESEND_FEEDBACK_FROM_EMAIL;
+  if (!apiKey || !from) {
+    await ctx.runMutation(internal.waitlist.updateResendStatus, {
+      id: signup.id,
+      status: "unconfigured",
+      preserveError: true,
+    });
+    return { saved: true, emailProviderSynced: false, confirmationSent: false };
+  }
+  let confirmationSent = false;
+  try {
+    const response = await resendRequest(apiKey, RESEND_USER_AGENT, "/emails", {
+      method: "POST",
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: "Confirm your Shelvr waitlist request",
+        text: `Confirm that you requested a Shelvr launch notification: https://shelvr-web.vercel.app/waitlist/confirm?token=${token}\n\nThis link expires in 24 hours. If you did not request this, ignore this email. You are not subscribed.`,
+      }),
+    });
+    if (!response.ok)
+      throw new ResendResponseError("confirmation", response.status);
+    confirmationSent = true;
+  } catch (error) {
+    const { category, status } = classifyResendError(
+      error,
+      "invalid_recipient",
+    );
+    logEvent("error", "waitlist_confirmation_failed", { category, status });
+    await ctx.runMutation(internal.waitlist.updateResendStatus, {
+      id: signup.id,
+      status: "failed",
+      errorCategory: category,
+      errorStatus: status,
+      attempts: signup.resendAttempts + 1,
+    });
+  }
+  return { saved: true, emailProviderSynced: false, confirmationSent };
 }
 
 export const retryFailedResendSyncs = internalAction({
@@ -462,6 +516,121 @@ export const retryFailedResendSyncs = internalAction({
         row.product,
         row.resendAttempts,
       );
+    }
+    return null;
+  },
+});
+
+export const getSignup = internalQuery({
+  args: { id: v.id("waitlistSignups") },
+  returns: v.union(v.null(), v.object({ confirmedAt: v.optional(v.number()) })),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.id);
+    return row ? { confirmedAt: row.confirmedAt } : null;
+  },
+});
+
+export const confirmSignup = internalMutation({
+  args: { tokenHash: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      id: v.id("waitlistSignups"),
+      email: v.string(),
+      product: productValidator,
+      resendAttempts: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("waitlistSignups")
+      .withIndex("by_confirmationHash", (q) =>
+        q.eq("confirmationHash", args.tokenHash),
+      )
+      .unique();
+    if (
+      !row ||
+      row.confirmedAt !== undefined ||
+      (row.confirmationExpiresAt ?? 0) <= Date.now()
+    )
+      return null;
+    await ctx.db.patch(row._id, {
+      confirmedAt: Date.now(),
+      confirmed: true,
+      consentedAt: Date.now(),
+      confirmationHash: undefined,
+      confirmationExpiresAt: undefined,
+      resendStatus: "pending",
+      resendAttempts: 0,
+    });
+    return {
+      id: row._id,
+      email: row.email,
+      product: row.product,
+      resendAttempts: 0,
+    };
+  },
+});
+
+export async function confirmWaitlist(
+  ctx: ActionCtx,
+  token: string,
+): Promise<boolean> {
+  if (!/^[a-f0-9]{64}$/.test(token)) return false;
+  const row = await ctx.runMutation(internal.waitlist.confirmSignup, {
+    tokenHash: await sha256Hex(token),
+  });
+  if (!row) return false;
+  await persistResendSync(
+    ctx,
+    row.id,
+    row.email,
+    row.product,
+    row.resendAttempts,
+  );
+  return true;
+}
+
+export const listLegacySignups = internalQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      email: v.string(),
+      product: productValidator,
+      source: sourceValidator,
+    }),
+  ),
+  handler: async (ctx) => {
+    for (const status of ["pending", "failed", "unconfigured"] as const) {
+      const rows = await ctx.db
+        .query("waitlistSignups")
+        .withIndex("by_confirmed_and_resendStatus_and_resendAttempts", (q) =>
+          q.eq("confirmed", undefined).eq("resendStatus", status),
+        )
+        .take(8);
+      if (rows.length > 0)
+        return rows.map((row) => ({
+          email: row.email,
+          product: row.product,
+          source: row.source,
+        }));
+    }
+    return [];
+  },
+});
+
+export const requestLegacyConfirmations = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    if (!env.RESEND_API_KEY || !env.RESEND_FEEDBACK_FROM_EMAIL) return null;
+    const rows = await ctx.runQuery(internal.waitlist.listLegacySignups, {});
+    for (const row of rows) {
+      try {
+        await joinWaitlist(ctx, row);
+      } catch {
+        logEvent("warn", "legacy_confirmation_deferred", {});
+      }
     }
     return null;
   },

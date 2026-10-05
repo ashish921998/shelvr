@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
 import {
+  ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   restoreOnboardingStep,
@@ -30,16 +31,18 @@ import {
 import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
+import { SourceStep } from "@/components/onboarding/source";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { Platform, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
+  source: 0.125,
   setup: 0.25,
   demo: 0.5,
   reveal: 1,
@@ -59,6 +62,7 @@ function holdIncomingShare() {
 export default function OnboardingScreen() {
   useAppLocale();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { theme } = useUnistyles();
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
@@ -92,6 +96,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
+      flow_version: ONBOARDING_FLOW_VERSION,
     });
   }, [step, stepIndex]);
 
@@ -100,6 +105,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_step_completed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
+      flow_version: ONBOARDING_FLOW_VERSION,
       duration_ms: Math.max(0, Date.now() - stepEnteredAt.current),
     });
     trackedStepsRef.current.add(step);
@@ -184,7 +190,10 @@ export default function OnboardingScreen() {
         />
       </View>
 
-      {step === "opener" ? (
+      {step === "opener" || step === "source" ? (
+        // A static frame, not the shared ScrollView. The source list scrolls
+        // inside it so Skip stays on screen on small phones and at large text
+        // sizes.
         <View
           style={[
             styles.content,
@@ -192,7 +201,19 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + theme.gap(1) },
           ]}
         >
-          <OpenerStep onStart={advance} onSignIn={() => setShowSignIn(true)} />
+          {step === "opener" ? (
+            <OpenerStep
+              // On iOS, a live text-size change can leave native text
+              // measurements stale (react-native#57512), so the expected
+              // onLayout updates never arrive. Remounting forces fresh
+              // measurement.
+              key={fontScale}
+              onStart={advance}
+              onSignIn={() => setShowSignIn(true)}
+            />
+          ) : (
+            <SourceStep onAdvance={advance} />
+          )}
         </View>
       ) : (
         <ScrollView

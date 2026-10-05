@@ -8,6 +8,16 @@ import { components } from "../_generated/api";
 // allowance, rate/period = sustained refill. Generous for real use, fatal to loops.
 // ponytail: fixed limits; make them per-plan config if tiers ever need different caps.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
+  requestBodyIp: { kind: "token bucket", rate: 60, period: HOUR, capacity: 12 },
+  requestBodyGlobal: {
+    kind: "token bucket",
+    rate: 300,
+    period: MINUTE,
+    capacity: 100,
+  },
+  imageBegin: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  imageUpload: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
+  captureBody: { kind: "token bucket", rate: 240, period: HOUR, capacity: 60 },
   itemCreate: { kind: "token bucket", rate: 120, period: HOUR, capacity: 30 },
   findLinks: { kind: "token bucket", rate: 60, period: HOUR, capacity: 15 },
   // Bulk link import (X bookmarks). An export runs to hundreds of links, so

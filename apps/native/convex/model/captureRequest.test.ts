@@ -5,9 +5,67 @@ import {
   parseImageBegin,
   parseImageFinish,
   parseLinkOrNote,
+  readBoundedText,
+  BodyTooLargeError,
 } from "./captureRequest";
 
 const OP = "siri:11111111-1111-4111-8111-111111111111";
+
+describe("bounded request bodies", () => {
+  it.each([undefined, "1"])(
+    "rejects a false or absent size header %s",
+    async (length) => {
+      const request = new Request("https://example.com", {
+        method: "POST",
+        body: "ééé",
+        headers: length ? { "content-length": length } : {},
+      });
+      await expect(readBoundedText(request, 5)).rejects.toBeInstanceOf(
+        BodyTooLargeError,
+      );
+    },
+  );
+
+  it("stops a streaming body and cancels the remainder", async () => {
+    let canceled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(8));
+      },
+      cancel() {
+        canceled = true;
+      },
+    });
+    const request = new Request("https://example.com", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+    await expect(readBoundedText(request, 10)).rejects.toBeInstanceOf(
+      BodyTooLargeError,
+    );
+    expect(canceled).toBe(true);
+  });
+
+  it("accepts the byte boundary and rejects compressed bodies", async () => {
+    await expect(
+      readBoundedText(
+        new Request("https://example.com", { method: "POST", body: "é" }),
+        2,
+      ),
+    ).resolves.toBe("é");
+    await expect(
+      readBoundedText(
+        new Request("https://example.com", {
+          method: "POST",
+          body: "data",
+          headers: { "content-encoding": "gzip" },
+        }),
+        100,
+      ),
+    ).rejects.toBeInstanceOf(BodyTooLargeError);
+  });
+});
 
 describe("parseLinkOrNote", () => {
   it("accepts a link and a note", () => {

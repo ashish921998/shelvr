@@ -46,22 +46,22 @@ function freeUser(userId: string): TestCtx {
   return newConvexTest().withIdentity({ subject: `${userId}|session-1` });
 }
 
-/** Insert a ready note item; `heroImageUrl` gives it a cover for previews. */
+/** Insert a ready link with a stored cover for previews. */
 async function seedItem(
   t: TestCtx,
   userId: string,
   label: string,
   withImage = true,
 ): Promise<Id<"items">> {
-  return await t.run((ctx) =>
+  return await t.run(async (ctx) =>
     ctx.db.insert("items", {
       userId,
       type: "link",
       status: "ready",
       title: label,
       url: `https://example.com/${label}`,
-      heroImageUrl: withImage
-        ? `https://img.example.com/${label}.jpg`
+      storageId: withImage
+        ? await ctx.storage.store(new Blob([label]))
         : undefined,
       tags: [],
       searchText: label,
@@ -534,7 +534,7 @@ describe("denormalized space summary", () => {
     // The newest member has no imagery and is skipped; the older one covers.
     expect(listed.previews).toEqual([
       {
-        url: "https://img.example.com/img.jpg",
+        url: expect.stringContaining("/api/storage/"),
         type: "link",
         suggested: false,
       },
@@ -554,7 +554,11 @@ describe("denormalized space summary", () => {
     expect(listed.itemCount).toBe(7);
     expect(listed.suggestionCount).toBe(3);
     expect(listed.previews).toEqual([
-      { url: "https://img.example.com/img.jpg", type: "link", suggested: true },
+      {
+        url: expect.stringContaining("/api/storage/"),
+        type: "link",
+        suggested: true,
+      },
     ]);
   });
 
@@ -592,11 +596,15 @@ describe("denormalized space summary", () => {
     const [listed] = await t.query(api.spaces.listSpaces, {});
     expect(listed.itemCount).toBe(2);
     expect(listed.suggestionCount).toBe(1);
-    expect(listed.previews.map((p) => p.url)).toEqual([
-      "https://img.example.com/b.jpg",
-      "https://img.example.com/a.jpg",
-      "https://img.example.com/s.jpg",
-    ]);
+    const covers = await t.run(async (ctx) =>
+      Promise.all(
+        [b, a, s].map(async (id) => {
+          const item = await ctx.db.get(id);
+          return await ctx.storage.getUrl(item!.storageId!);
+        }),
+      ),
+    );
+    expect(listed.previews.map((p) => p.url)).toEqual(covers);
     // A query never writes: the row is still legacy.
     expect(await readSpace(t, legacy)).not.toHaveProperty("savedCount");
 
