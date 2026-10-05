@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { runInNewContext } from "node:vm";
 
 test("workflows execute immutable action revisions and an exact EAS version", () => {
   for (const file of readdirSync(".github/workflows")) {
@@ -62,3 +63,107 @@ test("tag-triggered paid agents require an authorized author before job executio
     assert.match(source, /author_association/);
   }
 });
+
+for (const name of ["claude", "droid"]) {
+  test(`${name} rejects fork PRs before the secret-bearing job runs`, async () => {
+    const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
+    assert.match(
+      source,
+      new RegExp(
+        `${name}:\\s+needs: authorize\\s+if: \\|\\s+needs\\.authorize\\.outputs\\.allowed == 'true' &&`,
+      ),
+    );
+    const authorization = source.split(`\n  ${name}:`)[0];
+    assert.doesNotMatch(authorization, /secrets\.|checkout@|write/);
+    const script = authorization.match(/script: \|\n([\s\S]+)$/)?.[1];
+    assert.ok(script);
+
+    const events = [
+      { eventName: "pull_request", payload: { pull_request: { number: 42 } } },
+      {
+        eventName: "pull_request_review",
+        payload: { pull_request: { number: 42 } },
+      },
+      {
+        eventName: "pull_request_review_comment",
+        payload: { pull_request: { number: 42 } },
+      },
+      {
+        eventName: "issue_comment",
+        payload: { issue: { number: 42, pull_request: {} } },
+      },
+    ];
+    for (const event of events) {
+      for (const origin of ["ashish921998/shelvr", "outsider/shelvr", null]) {
+        const outputs = [];
+        const requests = [];
+        await runInNewContext(`(async () => { ${script} })()`, {
+          context: {
+            ...event,
+            repo: { owner: "ashish921998", repo: "shelvr" },
+          },
+          github: {
+            rest: {
+              pulls: {
+                get: async (request) => {
+                  requests.push(request);
+                  return {
+                    data: {
+                      head: { repo: origin ? { full_name: origin } : null },
+                    },
+                  };
+                },
+              },
+            },
+          },
+          core: { setOutput: (...output) => outputs.push(output) },
+        });
+        assert.deepEqual(outputs, [
+          ["allowed", String(origin === "ashish921998/shelvr")],
+        ]);
+        assert.equal(requests.length, 1);
+        assert.equal(requests[0].pull_number, 42);
+        assert.equal(requests[0].owner, "ashish921998");
+        assert.equal(requests[0].repo, "shelvr");
+      }
+    }
+
+    for (const event of [
+      { eventName: "issues", payload: { issue: { number: 42 } } },
+      { eventName: "issue_comment", payload: { issue: { number: 42 } } },
+      { eventName: "pull_request_review_comment", payload: {} },
+    ]) {
+      const outputs = [];
+      await runInNewContext(`(async () => { ${script} })()`, {
+        context: event,
+        github: {},
+        core: { setOutput: (...output) => outputs.push(output) },
+      });
+      assert.deepEqual(outputs, [
+        ["allowed", String(event.eventName !== "pull_request_review_comment")],
+      ]);
+    }
+
+    const outputs = [];
+    await assert.rejects(
+      runInNewContext(`(async () => { ${script} })()`, {
+        context: {
+          ...events[0],
+          repo: { owner: "ashish921998", repo: "shelvr" },
+        },
+        github: {
+          rest: {
+            pulls: {
+              get: async () => {
+                throw new Error("Unavailable");
+              },
+            },
+          },
+        },
+        core: { setOutput: (...output) => outputs.push(output) },
+      }),
+      /Unavailable/,
+    );
+    assert.deepEqual(outputs, []);
+  });
+}
