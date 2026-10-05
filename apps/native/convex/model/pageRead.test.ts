@@ -313,7 +313,7 @@ describe("readPage for Instagram posts", () => {
     ["the page", true, false],
     ["the embed", false, true],
   ])(
-    "never calls a post gone when %s was cut short",
+    "keeps a post retryable, not gone, when %s was cut short",
     async (_, pageCut, embedCut) => {
       const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
       const cut = (read: ReturnType<typeof html>, isCut: boolean) =>
@@ -325,10 +325,15 @@ describe("readPage for Instagram posts", () => {
           embedCut,
         ),
       });
-      await expect(readPage(reelUrl)).resolves.toMatchObject({
+      const read = await readPage(reelUrl);
+      expect(read).toMatchObject({
         status: "ok",
-        page: { truncated: true },
+        page: { truncated: true, incomplete: true },
       });
+      // Incomplete, so the save offers a retry instead of a blank ready item.
+      expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+        "partial",
+      );
     },
   );
 
