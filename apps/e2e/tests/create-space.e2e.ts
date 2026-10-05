@@ -12,5 +12,9 @@ test("creates a space", async ({ agent, screen }) => {
     params: { name: unique(name) },
   });
 
-  await expect(screen.getByText(name)).toBeVisible({ timeout: 30_000 });
+  // The name also sits in the form's text field, so look for the button the
+  // Spaces list shows once the space exists.
+  await expect(screen.getByRole("button", name)).toBeVisible({
+    timeout: 30_000,
+  });
 });

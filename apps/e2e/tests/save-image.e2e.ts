@@ -11,6 +11,6 @@ test("saves a photo from the library", async ({ agent }) => {
 
   await agent.waitFor(
     "Home shows five saves: the four seeded ones and one new photo save, with nothing still uploading",
-    { timeout: 120_000, vision: true },
+    { timeout: 120_000, vision: "only" },
   );
 });

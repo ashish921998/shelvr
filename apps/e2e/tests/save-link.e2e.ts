@@ -4,14 +4,23 @@ import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
-test("saves a link as an article", async ({ agent }) => {
-  await agent.act("add a new Article save for the link {url} and save it", {
-    params: { url: "https://example.com" },
-  });
+// Every control on this path is in the accessibility tree, so the steps are
+// plain locators and only the result needs a model.
+test("saves a link as an article", async ({ agent, screen }) => {
+  await screen.getByRole("button", "Add").tap();
+  await screen.getByTestId("add-option-article").tap();
+  await screen
+    .getByTestId("add-article-input")
+    .fill("https://en.wikipedia.org/wiki/Sourdough");
+  await screen.getByRole("button", "Save").tap();
 
-  // The backend fetches the page and an LLM titles it, so the card's wording
-  // is not fixed.
-  await agent.waitFor("Home shows a save for example.com or 'Example Domain'", {
-    timeout: 120_000,
-  });
+  // The backend reads the page and an LLM titles it, so the card's wording
+  // is not fixed. Cards are also missing from the accessibility tree.
+  await agent.waitFor(
+    "Home shows exactly one finished save about sourdough from wikipedia.org",
+    {
+      timeout: 120_000,
+      vision: "only",
+    },
+  );
 });

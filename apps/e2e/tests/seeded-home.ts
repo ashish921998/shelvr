@@ -12,7 +12,7 @@ export function startOnSeededHome(): void {
   beforeEach(async ({ app, screen }) => {
     await app.open();
 
-    const profile = screen.getByTestId("person");
+    const profile = screen.getByRole("button", "Profile");
     const devLogin = screen.getByTestId("dev-login-button");
     await expect
       .poll(
@@ -25,7 +25,10 @@ export function startOnSeededHome(): void {
     if (await devLogin.isVisible()) await devLogin.tap();
 
     await profile.tap({ timeout: BUNDLE_TIMEOUT });
-    await screen.getByTestId("reset-flow-fixtures").tap();
+    await screen.getByRole("button", "Settings").tap();
+    const reset = screen.getByTestId("reset-flow-fixtures");
+    await screen.scrollUntilVisible(reset);
+    await reset.tap();
     await screen.getByRole("button", "Reset").tap();
     await expect(screen.getByText("Flow fixtures ready")).toBeVisible({
       timeout: 30_000,

@@ -20,10 +20,11 @@ dismisses each suggestion.
 
 ## Monorepo layout
 
-| Path          | Role                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists |
-| `apps/native` | Expo Router native app (includes `convex/` backend)                           |
+| Path          | Role                                                                               |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists      |
+| `apps/native` | Expo Router native app (includes `convex/` backend)                                |
+| `apps/e2e`    | End-to-end flow tests for the iOS simulator (pilot; see the README's Test section) |
 
 Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
 
