@@ -377,6 +377,8 @@ export type MessageParams = {
   "digest.waitingCount": { count: number };
   "digest.namedCount": { title: string; count: number };
   "digest.namedSingle": { title: string };
+  "digest.namedShelfCount": { title: string; count: number };
+  "digest.namedShelfSingle": { title: string };
   "reminder.readTitle": undefined;
   "reminder.readBody": { title: string };
   "reminder.cookTitle": undefined;
@@ -502,10 +504,11 @@ export type MessageParams = {
   "demo.samplesOr": undefined;
   "demo.shareTitle": undefined;
   "demo.shareSupport": undefined;
-  "demo.shareOthers": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "demo.shareDismissed": undefined;
+  "demo.shareRetry": undefined;
   "splash.tagline": undefined;
   "refundConsent.title": undefined;
   "refundConsent.disclosure": undefined;

@@ -10,6 +10,11 @@
       "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte aus dieser Woche"
     },
     "namedSingle": "„%{title}“ – diese Woche gespeichert",
+    "namedShelf": {
+      "one": "„%{title}“ und %{formattedCount} weiterer gespeicherter Inhalt warten in deinem Regal",
+      "other": "„%{title}“ und %{formattedCount} weitere gespeicherte Inhalte warten in deinem Regal"
+    },
+    "namedShelfSingle": "„%{title}“ wartet in deinem Regal",
     "reminder": {
       "read": {
         "title": "Für später gespeichert",
@@ -32,6 +37,11 @@
       "other": "“%{title}” and %{formattedCount} more you saved this week"
     },
     "namedSingle": "“%{title}”, saved this week",
+    "namedShelf": {
+      "one": "“%{title}” and %{formattedCount} more save waiting on your shelf",
+      "other": "“%{title}” and %{formattedCount} more saves waiting on your shelf"
+    },
+    "namedShelfSingle": "“%{title}” is waiting on your shelf",
     "reminder": {
       "read": {
         "title": "Saved for later",
@@ -56,6 +66,12 @@
       "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
     },
     "namedSingle": "«%{title}», guardado esta semana",
+    "namedShelf": {
+      "one": "«%{title}» y %{formattedCount} contenido más te esperan en tu estantería",
+      "many": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería",
+      "other": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería"
+    },
+    "namedShelfSingle": "«%{title}» te espera en tu estantería",
     "reminder": {
       "read": {
         "title": "Guardado para después",
@@ -80,6 +96,12 @@
       "other": "«%{title}» y %{formattedCount} contenidos más que guardaste esta semana"
     },
     "namedSingle": "«%{title}», guardado esta semana",
+    "namedShelf": {
+      "one": "«%{title}» y %{formattedCount} contenido más te esperan en tu estantería",
+      "many": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería",
+      "other": "«%{title}» y %{formattedCount} contenidos más te esperan en tu estantería"
+    },
+    "namedShelfSingle": "«%{title}» te espera en tu estantería",
     "reminder": {
       "read": {
         "title": "Guardado para después",
@@ -104,6 +126,12 @@
       "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
     },
     "namedSingle": "« %{title} », enregistré cette semaine",
+    "namedShelf": {
+      "one": "« %{title} » et %{formattedCount} autre contenu vous attendent sur votre étagère",
+      "many": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère",
+      "other": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère"
+    },
+    "namedShelfSingle": "« %{title} » vous attend sur votre étagère",
     "reminder": {
       "read": {
         "title": "Enregistré pour plus tard",
@@ -128,6 +156,12 @@
       "other": "« %{title} » et %{formattedCount} autres contenus enregistrés cette semaine"
     },
     "namedSingle": "« %{title} », enregistré cette semaine",
+    "namedShelf": {
+      "one": "« %{title} » et %{formattedCount} autre contenu vous attendent sur votre étagère",
+      "many": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère",
+      "other": "« %{title} » et %{formattedCount} autres contenus vous attendent sur votre étagère"
+    },
+    "namedShelfSingle": "« %{title} » vous attend sur votre étagère",
     "reminder": {
       "read": {
         "title": "Enregistré pour plus tard",
@@ -148,6 +182,10 @@
       "other": "「%{title}」ほか%{formattedCount}件を今週保存しました"
     },
     "namedSingle": "「%{title}」を今週保存しました",
+    "namedShelf": {
+      "other": "「%{title}」ほか%{formattedCount}件がシェルフで待っています"
+    },
+    "namedShelfSingle": "「%{title}」がシェルフで待っています",
     "reminder": {
       "read": {
         "title": "あとで読む",
@@ -168,6 +206,10 @@
       "other": "'%{title}' 외 %{formattedCount}개를 이번 주에 저장했어요"
     },
     "namedSingle": "이번 주에 저장한 '%{title}'",
+    "namedShelf": {
+      "other": "'%{title}' 외 %{formattedCount}개가 책장에서 기다리고 있어요"
+    },
+    "namedShelfSingle": "'%{title}', 책장에서 기다리고 있어요",
     "reminder": {
       "read": {
         "title": "나중에 볼 글",
@@ -192,6 +234,12 @@
       "other": "“%{title}” e mais %{formattedCount} conteúdos salvos esta semana"
     },
     "namedSingle": "“%{title}”, salvo esta semana",
+    "namedShelf": {
+      "one": "“%{title}” e mais %{formattedCount} conteúdo esperando na sua estante",
+      "many": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante",
+      "other": "“%{title}” e mais %{formattedCount} conteúdos esperando na sua estante"
+    },
+    "namedShelfSingle": "“%{title}” está esperando na sua estante",
     "reminder": {
       "read": {
         "title": "Salvo para depois",
