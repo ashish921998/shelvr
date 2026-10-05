@@ -89,10 +89,8 @@ export function RevealStep({
     }
     setPaywallOpen(true);
     try {
-      // Closing the paywall here can open the exit offer. A later tap on
-      // Keep saving, or the relaunch auto-open, reopens that discounted sheet
-      // while its window lasts rather than the full-price paywall. Declining
-      // it after a tap opens the regular paywall; the auto-open just closes.
+      // Only a tap earns the regular paywall after a declined offer; the
+      // relaunch auto-open just closes.
       if (await openPaywallKeepingExitOffer(router, "onboarding", tapped)) {
         notePurchasedDuringOnboarding();
         onFinish();

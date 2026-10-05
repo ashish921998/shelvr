@@ -590,10 +590,9 @@ async function presentOpenExitOfferImpl(
     paywallOnDecline ? () => void (declined = true) : undefined,
   );
   if (!declined || outcome !== "cancelled") return outcome;
-  // The offer carries one plan. Declining it must still leave the trial and
-  // the other plans one step away. Inside the cooldown, so closing that
-  // paywall does not open the offer again. `showExitOffering` already waited
-  // for the sheet to leave the screen.
+  // The offer carries one plan, so declining it must still leave the trial
+  // and the other plans one step away. Closing that paywall is inside the
+  // cooldown and does not open the offer again.
   return presentPaywallImpl(fallbackPlacement);
 }
 
