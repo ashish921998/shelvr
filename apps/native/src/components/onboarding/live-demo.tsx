@@ -247,6 +247,7 @@ function SharePicker({
   const { theme } = useUnistyles();
   const [featured] = samples;
   const [pasting, setPasting] = useState(false);
+  const shareLabel = t(retry ? "demo.shareRetry" : "demo.shareThis");
   return (
     <>
       <View style={styles.head}>
@@ -259,7 +260,7 @@ function SharePicker({
           <SharePost sample={featured} />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${t("demo.shareThis")}, ${featured.pageHeading}, ${featured.domain}`}
+            accessibilityLabel={`${shareLabel}, ${featured.pageHeading}, ${featured.domain}`}
             disabled={disabled}
             onPress={() => onShare(featured.url)}
             style={({ pressed }) => [
@@ -273,7 +274,7 @@ function SharePicker({
               tintColor={theme.colors.primaryForeground}
             />
             <Text style={[styles.inputActionText, styles.shareLabel]}>
-              {t(retry ? "demo.shareRetry" : "demo.shareThis")}
+              {shareLabel}
             </Text>
           </Pressable>
         </>
