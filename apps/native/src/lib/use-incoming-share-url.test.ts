@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawSharePayload } from "@/lib/share/storage";
 import {
+  MAX_SHEET_DISMISSALS,
   SHARE_SHEET_DISMISS_MS,
   decideShareIntake,
   useIncomingShareUrl,
@@ -243,15 +244,32 @@ describe("useIncomingShareUrl", () => {
       expect(onError).toHaveBeenLastCalledWith("demo.pickShelvr");
     });
 
-    it("does nothing when the sheet was dismissed", async () => {
+    it("explains where Shelvr is when the sheet was dismissed", async () => {
       const { onSharedUrl, onDirectUrl, onError } = await runSample(
         { action: "dismissedAction" },
         [],
       );
       expect(onSharedUrl).not.toHaveBeenCalled();
       expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(null);
+      expect(onError).toHaveBeenLastCalledWith("demo.shareDismissed");
+    });
+
+    it("saves the sample directly after the second dismissal", async () => {
+      vi.useFakeTimers();
+      mock.share.mockResolvedValue({ action: "dismissedAction" });
+      const { result, onDirectUrl, onError } = renderShare({
+        readOnMount: false,
+      });
+      for (let i = 0; i < MAX_SHEET_DISMISSALS; i++) {
+        await act(async () => {
+          const done = result.current.shareSample("https://sample.test/a");
+          await vi.advanceTimersByTimeAsync(SHARE_SHEET_DISMISS_MS);
+          await done;
+        });
+      }
+      expect(onError).toHaveBeenCalledWith("demo.shareDismissed");
+      expect(onDirectUrl).toHaveBeenCalledTimes(1);
+      expect(onDirectUrl).toHaveBeenCalledWith("https://sample.test/a");
     });
 
     it("saves the sample directly when the sheet cannot open", async () => {

@@ -203,6 +203,7 @@ export function LiveDemoStep({
           disabled={demo.submitting}
           error={errorLine}
           pasteRow={pasteRow}
+          retry={demo.error === "demo.shareDismissed"}
           onShare={(url) => void shareSample(url)}
         />
       ) : (
@@ -239,8 +240,9 @@ function SharePicker({
   disabled,
   error,
   pasteRow,
+  retry,
   onShare,
-}: PickerProps & { onShare: (url: string) => void }) {
+}: PickerProps & { retry: boolean; onShare: (url: string) => void }) {
   useAppLocale();
   const { theme } = useUnistyles();
   const [featured] = samples;
@@ -270,7 +272,9 @@ function SharePicker({
               size={18}
               tintColor={theme.colors.primaryForeground}
             />
-            <Text style={styles.inputActionText}>{t("demo.shareThis")}</Text>
+            <Text style={styles.inputActionText}>
+              {t(retry ? "demo.shareRetry" : "demo.shareThis")}
+            </Text>
           </Pressable>
         </>
       )}

@@ -507,6 +507,8 @@ export type MessageParams = {
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;
+  "demo.shareDismissed": undefined;
+  "demo.shareRetry": undefined;
   "splash.tagline": undefined;
   "refundConsent.title": undefined;
   "refundConsent.disclosure": undefined;

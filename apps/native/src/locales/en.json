@@ -560,6 +560,8 @@
   "demo.pasteOwn": "Or paste your own link",
   "demo.pickShelvr": "That went to another app. Tap Share again and pick Shelvr.",
   "demo.shareThis": "Share this post",
+  "demo.shareDismissed": "Shelvr sits at the end of the app row. Swipe left, tap More, then pick Shelvr.",
+  "demo.shareRetry": "Try again",
   "splash.tagline": "Save it for later",
   "refundConsent.title": "Updated terms",
   "refundConsent.disclosure": "We have updated our terms to cover Apple refund reviews. By agreeing below, you accept the updated terms and allow Shelvr, through RevenueCat, to share purchase and delivery information with Apple when you request a refund. Apple makes the final decision. Your saved links, notes, and photos are not shared.",

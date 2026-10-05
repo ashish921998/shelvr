@@ -10,6 +10,9 @@ import { AppState, Linking, Share } from "react-native";
 const SHARE_EXTENSION_SUFFIX = ".expo-sharing-extension";
 // iOS ignores a modal presented while the share sheet is still animating out.
 export const SHARE_SHEET_DISMISS_MS = 500;
+// After this many dismissed sheets the sample is saved directly, so a user who
+// cannot find Shelvr in the app row is not stuck on the step.
+export const MAX_SHEET_DISMISSALS = 2;
 
 type ShareIntake =
   | { kind: "none" }
@@ -52,6 +55,7 @@ export function useIncomingShareUrl({
   onError: (error: TextMessageKey | null) => void;
 }) {
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const dismissals = useRef(0);
 
   const consumeShare = useCallback((): boolean => {
     let intake: ShareIntake;
@@ -95,7 +99,17 @@ export function useIncomingShareUrl({
         setTimeout(resolve, SHARE_SHEET_DISMISS_MS),
       );
       setShareSheetOpen(false);
-      if (result.action !== Share.sharedAction) return;
+      if (result.action !== Share.sharedAction) {
+        dismissals.current += 1;
+        if (dismissals.current < MAX_SHEET_DISMISSALS) {
+          onError("demo.shareDismissed");
+        } else {
+          dismissals.current = 0;
+          onDirectUrl(url);
+        }
+        return;
+      }
+      dismissals.current = 0;
       if (consumeShare()) return;
       if (result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
         onSharedUrl(url);
