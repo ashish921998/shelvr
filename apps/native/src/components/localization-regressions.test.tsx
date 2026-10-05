@@ -198,6 +198,8 @@ vi.mock("@/components/symbol", () => ({
 }));
 vi.mock("./onboarding/parts", () => ({
   CtaButton: vi.fn(({ label }: { label: string }) => <button>{label}</button>),
+  ACCESSIBILITY_TEXT_SCALE: 1.4,
+  HEADLINE_MAX_SCALE: 2,
 }));
 
 function changeLanguage(tag: string) {

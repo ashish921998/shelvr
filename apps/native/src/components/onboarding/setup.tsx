@@ -1,12 +1,22 @@
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import { t, useAppLocale } from "@/lib/i18n";
-import { CtaButton } from "@/components/onboarding/parts";
+import {
+  ACCESSIBILITY_TEXT_SCALE,
+  CtaButton,
+  HEADLINE_MAX_SCALE,
+} from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
 import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const KIND_IMAGES: Record<SaveKind, number> = {
@@ -37,6 +47,9 @@ export function SetupStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  // At the accessibility sizes two cards no longer fit a label across, so the
+  // grid drops to one column instead of breaking words.
+  const oneColumn = useWindowDimensions().fontScale > ACCESSIBILITY_TEXT_SCALE;
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -51,7 +64,9 @@ export function SetupStep({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>{t("onboarding.setupTitle")}</Text>
+      <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {t("onboarding.setupTitle")}
+      </Text>
 
       <View style={styles.grid}>
         {SAVE_KINDS.map((kind) => {
@@ -64,6 +79,7 @@ export function SetupStep({
               onPress={() => onToggleKind(kind)}
               style={({ pressed }) => [
                 styles.kind,
+                oneColumn && styles.kindFull,
                 active && styles.kindActive,
                 pressed && { opacity: 0.85 },
               ]}
@@ -75,7 +91,6 @@ export function SetupStep({
               />
               <Text
                 style={[styles.kindLabel, active && styles.kindLabelActive]}
-                numberOfLines={1}
               >
                 {onboardingLabel(kind)}
               </Text>
@@ -198,6 +213,9 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 2,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  kindFull: {
+    flexBasis: "100%",
   },
   kindActive: {
     borderColor: theme.colors.primary,

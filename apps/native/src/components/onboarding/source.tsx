@@ -5,7 +5,7 @@ import {
   sourceLabel,
   type AcquisitionSource,
 } from "@/lib/acquisition-source";
-import { GhostButton } from "@/components/onboarding/parts";
+import { GhostButton, HEADLINE_MAX_SCALE } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
@@ -59,7 +59,12 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headline}>{t("onboarding.sourceTitle")}</Text>
+        <Text
+          style={styles.headline}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("onboarding.sourceTitle")}
+        </Text>
         <View
           accessibilityRole="radiogroup"
           accessibilityLabel={t("onboarding.sourceTitle")}
