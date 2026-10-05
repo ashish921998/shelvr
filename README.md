@@ -194,7 +194,10 @@ JWT `sub`) — never from a client argument.
 
 **Web** deploys itself: Vercel's Git integration builds and publishes every
 commit on `main` (`apps/web/vercel.json` sets `turbo run build` as the build
-command). Android waitlist signup needs `CONVEX_URL` at runtime:
+command). Its `ignoreCommand` runs `turbo-ignore`, so Vercel skips the build
+when a push changes nothing the web app depends on, such as a native-only
+change. Keep the `turbo-ignore` version in step with `turbo` in the root
+`package.json`. Android waitlist signup needs `CONVEX_URL` at runtime:
 
 ```sh
 pnpm --filter web-app build
