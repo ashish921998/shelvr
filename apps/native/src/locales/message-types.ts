@@ -504,7 +504,6 @@ export type MessageParams = {
   "demo.samplesOr": undefined;
   "demo.shareTitle": undefined;
   "demo.shareSupport": undefined;
-  "demo.shareOthers": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
   "demo.shareThis": undefined;

@@ -242,7 +242,9 @@ function SharePicker({
   onShare,
 }: PickerProps & { onShare: (url: string) => void }) {
   useAppLocale();
-  const [featured, ...others] = samples;
+  const { theme } = useUnistyles();
+  const [featured] = samples;
+  const [pasting, setPasting] = useState(false);
   return (
     <>
       <View style={styles.head}>
@@ -251,34 +253,44 @@ function SharePicker({
       </View>
 
       {featured === undefined ? null : (
-        <SharePost
-          sample={featured}
-          disabled={disabled}
-          onShare={() => onShare(featured.url)}
-        />
+        <>
+          <SharePost sample={featured} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t("demo.shareThis")}, ${featured.pageHeading}, ${featured.domain}`}
+            disabled={disabled}
+            onPress={() => onShare(featured.url)}
+            style={({ pressed }) => [
+              styles.shareButton,
+              disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
+            ]}
+          >
+            <AppSymbolIcon
+              name="square.and.arrow.up"
+              size={18}
+              tintColor={theme.colors.primaryForeground}
+            />
+            <Text style={styles.inputActionText}>{t("demo.shareThis")}</Text>
+          </Pressable>
+        </>
       )}
 
       {error}
 
-      {others.length === 0 ? null : (
+      {pasting ? (
         <View style={styles.samples}>
-          <Text style={styles.samplesLabel}>{t("demo.shareOthers")}</Text>
-          {others.map((candidate) => (
-            <SampleRow
-              key={candidate.url}
-              sample={candidate}
-              icon="square.and.arrow.up"
-              disabled={disabled}
-              onPress={() => onShare(candidate.url)}
-            />
-          ))}
+          <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
+          {pasteRow}
         </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPasting(true)}
+          style={styles.pasteToggle}
+        >
+          <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
+        </Pressable>
       )}
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
-        {pasteRow}
-      </View>
     </>
   );
 }
@@ -350,28 +362,10 @@ function ShareHint() {
   );
 }
 
-/** The sample post the share sheet opens over, with its own Share button. */
-function SharePost({
-  sample,
-  disabled,
-  onShare,
-}: {
-  sample: DemoSample;
-  disabled: boolean;
-  onShare: () => void;
-}) {
-  const { theme } = useUnistyles();
+/** The sample post the share sheet opens over. Not a control. */
+function SharePost({ sample }: { sample: DemoSample }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
-      disabled={disabled}
-      onPress={onShare}
-      style={({ pressed }) => [
-        styles.post,
-        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-      ]}
-    >
+    <View style={styles.post}>
       <Image
         source={SAMPLE_IMAGES[sample.kind]}
         contentFit="cover"
@@ -386,15 +380,8 @@ function SharePost({
             {sample.domain}
           </Text>
         </View>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name="square.and.arrow.up"
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -405,7 +392,7 @@ function SampleRow({
   onPress,
 }: {
   sample: DemoSample;
-  icon: "plus" | "square.and.arrow.up";
+  icon: "plus";
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -588,6 +575,20 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(1),
+    height: 52,
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primary,
+  },
+  pasteToggle: {
+    alignSelf: "center",
+    paddingVertical: theme.gap(1),
   },
   hintIcon: {
     width: 36,
