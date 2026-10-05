@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
-  openPaywall,
+  openPaywallKeepingExitOffer,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
@@ -13,6 +13,7 @@ import {
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { api } from "@convex/_generated/api";
 import { demoErrorCode } from "@convex/model/demoErrors";
@@ -82,14 +83,16 @@ export function RevealStep({
       });
   }, [saved, isAuthenticated, createDemoItem, onSaved]);
 
-  const keepSaving = async () => {
+  const keepSaving = async (tapped: boolean) => {
     if (entitled) {
       onFinish();
       return;
     }
     setPaywallOpen(true);
     try {
-      if (await openPaywall(router, "onboarding")) {
+      // Only a tap earns the regular paywall after a declined offer; the
+      // relaunch auto-open just closes.
+      if (await openPaywallKeepingExitOffer(router, "onboarding", tapped)) {
         notePurchasedDuringOnboarding();
         onFinish();
       }
@@ -109,7 +112,7 @@ export function RevealStep({
     }
     autoPaywallRef.current = true;
     if (entitled) return;
-    void waitForSheetTransition().then(() => keepSavingRef.current());
+    void waitForSheetTransition().then(() => keepSavingRef.current(false));
   }, [entitlementLoading, entitled, isAuthenticated]);
 
   const card: FeedItem | null = item
@@ -134,7 +137,7 @@ export function RevealStep({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.verdict}>
+      <Text style={styles.verdict} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
         {t(empty ? "reveal.emptyTitle" : "reveal.title")}{" "}
         <Text style={styles.verdictMuted}>
           {t(empty ? "reveal.emptySubtitle" : "reveal.subtitle")}
@@ -173,7 +176,7 @@ export function RevealStep({
       <View style={styles.foot}>
         <CtaButton
           label={t(entitled ? "common.continue" : "reveal.keepSaving")}
-          onPress={() => void keepSaving()}
+          onPress={() => void keepSaving(true)}
           busy={paywallOpen || (entitlementLoading && isAuthenticated)}
         />
         {/* A lapsed account has used its trial, so only a first-time

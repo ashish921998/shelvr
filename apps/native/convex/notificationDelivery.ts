@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import {
   awaitingOutcome,
   recipientValidator,
+  DIGEST_WINDOW_MS,
   digestCopy,
   reachedDevice,
   recipientError,
@@ -268,6 +269,7 @@ export const claim = internalMutation({
       recipients: v.array(recipientValidator),
       itemCount: v.number(),
       featuredTitle: v.optional(v.string()),
+      olderIncluded: v.boolean(),
     }),
   ),
   handler: async (ctx, { digestId }) => {
@@ -329,6 +331,10 @@ export const claim = internalMutation({
         (item) => item.title !== undefined && item.enrichment === undefined,
       ) ?? ready.find((item) => item.title !== undefined)
     )?.title;
+    // An archive save on the shelf rules out "saved this week" copy.
+    const olderIncluded = ready.some(
+      (item) => item._creationTime < digest.createdAt - DIGEST_WINDOW_MS,
+    );
     if (recipients.length === 0 || itemCount === 0) {
       await close(itemCount === 0 ? "no_items" : "no_devices");
       return null;
@@ -340,7 +346,7 @@ export const claim = internalMutation({
       deliveryRecipients: recipients,
       deliveryNextAttemptAt: now + LEASE_MS,
     });
-    return { attempt, recipients, itemCount, featuredTitle };
+    return { attempt, recipients, itemCount, featuredTitle, olderIncluded };
   },
 });
 
@@ -512,6 +518,7 @@ export const send = internalAction({
         recipient.locale,
         delivery.itemCount,
         delivery.featuredTitle,
+        { olderIncluded: delivery.olderIncluded },
       ),
       data: {
         url: `/digest/${digestId}`,

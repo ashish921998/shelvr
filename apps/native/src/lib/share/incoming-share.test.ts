@@ -65,7 +65,21 @@ function run(
   let state = from;
   const effects: ShareEffect[][] = [];
   for (const event of events) {
-    const next = stepIncomingShare(state, event, context);
+    let next = stepIncomingShare(state, event, context);
+    if (next.state.phase.kind === "confirm") {
+      const confirmed = stepIncomingShare(
+        next.state,
+        { type: "confirm" },
+        {
+          ...context,
+          storedSessionId: next.state.phase.session.sessionId,
+        },
+      );
+      next = {
+        state: confirmed.state,
+        effects: [...next.effects, ...confirmed.effects],
+      };
+    }
     state = next.state;
     effects.push(next.effects);
   }
@@ -75,6 +89,52 @@ function run(
 const types = (effects: ShareEffect[]) => effects.map((e) => e.type);
 
 describe("incoming share owner", () => {
+  it.each(["new", "resume"] as const)(
+    "requires Android consent for a %s share",
+    (kind) => {
+      const s1 = session("s1");
+      const context = ctx({ storedSessionId: "s1" });
+      const preview = stepIncomingShare(
+        initialIncomingShare(true),
+        {
+          type: "reconciled",
+          result: { kind, session: s1 },
+        },
+        context,
+      );
+      expect(preview.effects).toEqual([]);
+      expect(preview.state.phase.kind).toBe("confirm");
+      expect(
+        stepIncomingShare(
+          preview.state,
+          { type: "confirm" },
+          ctx({ storedSessionId: "s2" }),
+        ).effects,
+      ).toEqual([]);
+      const saved = stepIncomingShare(
+        preview.state,
+        { type: "confirm" },
+        context,
+      );
+      expect(types(saved.effects)).toEqual(["save"]);
+      expect(
+        stepIncomingShare(saved.state, { type: "confirm" }, context).effects,
+      ).toEqual([]);
+      const canceled = stepIncomingShare(
+        preview.state,
+        { type: "cancel" },
+        context,
+      );
+      expect(types(canceled.effects)).not.toContain("save");
+      const newer = stepIncomingShare(
+        saved.state,
+        { type: "reconciled", result: { kind: "new", session: session("s2") } },
+        context,
+      );
+      expect(newer.effects).toEqual([]);
+      expect(newer.state.phase.kind).toBe("confirm");
+    },
+  );
   it("starts one save when reconcile runs twice for the same session", () => {
     const s1 = session("s1");
     const { state, effects } = run([
@@ -235,7 +295,10 @@ describe("incoming share owner", () => {
   it("presents one paywall per locked session, then saves once entitled", () => {
     const s1 = session("s1");
     const locked = ctx({ entitled: false });
-    let state = initialIncomingShare(true);
+    let state: IncomingShareState = {
+      ...initialIncomingShare(true),
+      confirmed: "s1",
+    };
     const step = (event: ShareEvent, context: ShareContext) => {
       const next = stepIncomingShare(state, event, context);
       state = next.state;

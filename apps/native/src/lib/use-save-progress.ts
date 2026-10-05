@@ -1,13 +1,18 @@
+import { analytics } from "@/lib/analytics";
 import {
   dismissSaveProgressCard,
   isFirstSession,
   isSaveProgressCardDismissed,
   shouldOfferWeeklyNudge,
 } from "@/lib/first-share";
+import { trackSaveGoal } from "@/lib/save-goal";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+// Accounts whose card was already reported shown in this launch.
+const shownThisLaunch = new Set<string>();
 
 /**
  * A new shelf's first three real saves (the onboarding demo does not count):
@@ -23,6 +28,8 @@ export function useSaveProgress(
   });
   const progress = query.data;
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  // The account whose card Home has actually put on screen this launch.
+  const [shownFor, setShownFor] = useState<string | null>(null);
   // Read once per account per launch; the first read of a new account marks
   // this launch as its first session.
   const firstSession = useMemo(
@@ -40,17 +47,54 @@ export function useSaveProgress(
     if (userId === undefined) return;
     dismissSaveProgressCard(userId);
     setDismissedFor(userId);
-  }, [userId]);
+    analytics.capture("save_progress_card_action", {
+      action: "dismiss",
+      saved: progress?.saved ?? 0,
+    });
+  }, [userId, progress?.saved]);
+
+  const saved = progress?.saved;
+  const goal = progress?.goal;
+  useEffect(() => {
+    if (userId === undefined || saved === undefined || goal === undefined) {
+      return;
+    }
+    trackSaveGoal(
+      userId,
+      { saved, goal },
+      {
+        cardDismissed: isSaveProgressCardDismissed(userId),
+        // The clock starts when the card is on screen, not merely eligible
+        // behind a loader or another screen.
+        cardVisible: visible && shownFor === userId,
+      },
+    );
+  }, [userId, saved, goal, visible, shownFor]);
+
+  // Called by the card itself once Home shows it focused, so a card that
+  // never reached the screen is not counted.
+  const markShown = useCallback(() => {
+    if (userId === undefined) return;
+    setShownFor(userId);
+    if (shownThisLaunch.has(userId)) return;
+    shownThisLaunch.add(userId);
+    analytics.capture("save_progress_card_shown", { saved: saved ?? 0 });
+  }, [userId, saved]);
+
   // A failed read settles as "no card", so it never holds other cards back.
   const pending = progress === undefined && !query.isError;
   return {
     /** What the card shows, or null when it is not on Home. */
     card: visible ? progress : null,
+    /** A signed-in account's count has not loaded yet, so the card may
+     * still come. */
+    pending: pending && userId !== undefined,
     /** Later Home prompts wait while an earlier card holds the slot, and
      * while this one is up or may still come. */
     deferLater: defer || visible || pending,
     firstSession,
     nudgeReady: shouldOfferWeeklyNudge({ firstSession, progress }),
     dismiss,
+    markShown,
   };
 }

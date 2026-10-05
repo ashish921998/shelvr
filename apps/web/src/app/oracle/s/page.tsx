@@ -5,14 +5,15 @@ import Logo from "@/components/common/Logo";
 import SharedVerdictView from "@/components/oracle/SharedVerdictView";
 import StoreCta from "@/components/oracle/StoreCta";
 import VerdictCard from "@/components/oracle/VerdictCard";
-import { decodeSharedVerdict, sharedVerdictImagePath } from "@/lib/oracleShare";
+import { verifiedVerdict } from "@/lib/oracleProof";
+import { sharedVerdictImagePath } from "@/lib/oracleShare";
 
 type PageProps = { searchParams: Promise<{ c?: string | string[] }> };
 
 async function load({ searchParams }: PageProps) {
   const { c } = await searchParams;
   const code = typeof c === "string" ? c : "";
-  return { code, verdict: decodeSharedVerdict(code) };
+  return { code, verdict: await verifiedVerdict(code) };
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {

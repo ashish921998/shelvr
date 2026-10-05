@@ -10,6 +10,9 @@ import { AppState, Linking, Share } from "react-native";
 const SHARE_EXTENSION_SUFFIX = ".expo-sharing-extension";
 // iOS ignores a modal presented while the share sheet is still animating out.
 export const SHARE_SHEET_DISMISS_MS = 500;
+// After this many sheets that did not reach Shelvr the sample is saved directly, so a user who
+// cannot find Shelvr in the app row is not stuck on the step.
+export const MAX_SHEET_MISSES = 2;
 
 type ShareIntake =
   | { kind: "none" }
@@ -47,11 +50,13 @@ export function useIncomingShareUrl({
   readOnMount: boolean;
   /** A URL the share extension actually delivered to Shelvr. */
   onSharedUrl: (url: string) => void;
-  /** A sample saved only because the system share sheet failed to open. */
+  /** A sample saved without the share extension: the sheet failed to open, or
+   * the user missed Shelvr twice. */
   onDirectUrl: (url: string) => void;
   onError: (error: TextMessageKey | null) => void;
 }) {
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const misses = useRef(0);
 
   const consumeShare = useCallback((): boolean => {
     let intake: ShareIntake;
@@ -95,12 +100,35 @@ export function useIncomingShareUrl({
         setTimeout(resolve, SHARE_SHEET_DISMISS_MS),
       );
       setShareSheetOpen(false);
-      if (result.action !== Share.sharedAction) return;
-      if (consumeShare()) return;
+      // A dismissed sheet and a share to another app both mean the user has
+      // not found Shelvr. Ask again, then save the sample directly.
+      const miss = (reason: "dismissed" | "other_app") => {
+        misses.current += 1;
+        const fallback = misses.current >= MAX_SHEET_MISSES;
+        analytics.capture("onboarding_share_missed", {
+          reason,
+          misses: misses.current,
+          fallback,
+        });
+        if (!fallback) {
+          onError(
+            reason === "dismissed" ? "demo.shareDismissed" : "demo.pickShelvr",
+          );
+          return;
+        }
+        misses.current = 0;
+        onDirectUrl(url);
+      };
+      if (result.action !== Share.sharedAction) return miss("dismissed");
+      if (consumeShare()) {
+        misses.current = 0;
+        return;
+      }
       if (result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
+        misses.current = 0;
         onSharedUrl(url);
       } else {
-        onError("demo.pickShelvr");
+        miss("other_app");
       }
     },
     [consumeShare, onDirectUrl, onError, onSharedUrl],

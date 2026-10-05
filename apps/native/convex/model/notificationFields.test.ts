@@ -15,6 +15,22 @@ describe("digest copy", () => {
     );
   });
 
+  it("drops 'this week' when the shelf carries older saves", () => {
+    const older = { olderIncluded: true };
+    expect(digestCopy("en", 3, "The 12-hour short rib", older).body).toBe(
+      "“The 12-hour short rib” and 2 more saves waiting on your shelf",
+    );
+    expect(digestCopy("en", 2, "The 12-hour short rib", older).body).toBe(
+      "“The 12-hour short rib” and 1 more save waiting on your shelf",
+    );
+    expect(digestCopy("en", 1, "The 12-hour short rib", older).body).toBe(
+      "“The 12-hour short rib” is waiting on your shelf",
+    );
+    expect(digestCopy("fr", 3, "Une note", older).body).toBe(
+      "« Une note » et 2 autres contenus vous attendent sur votre étagère",
+    );
+  });
+
   it("counts instead of naming when no save has a usable title", () => {
     expect(digestCopy("en", 3).body).toBe("3 saves waiting for you");
     expect(digestCopy("en", 3, "   ").body).toBe("3 saves waiting for you");
