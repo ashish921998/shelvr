@@ -1553,6 +1553,8 @@ const REEL_PAGE_WITH_DESCRIPTION = REEL_PAGE.replace(
 const SHELL_PAGE =
   "<html><head><title>Instagram</title></head><body><div>Log in Sign up</div></body></html>";
 
+const BROKEN_EMBED = `<div class="Embed"><div class="EmbedBrokenMedia"><p>This post may be broken, or the post may have been removed.</p></div></div>`;
+
 const encoder = new TextEncoder();
 
 function html(body: string) {
@@ -1599,6 +1601,13 @@ describe("parseInstagramEmbed", () => {
       username: "natgeo",
       posterUrl: "https://cdn.fbcdn.net/poster.jpg?x=1&y=2",
     });
+  });
+
+  it("reports Instagram's broken-media box", () => {
+    expect(parseInstagramEmbed(BROKEN_EMBED)).toMatchObject({
+      brokenMedia: true,
+    });
+    expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
   });
 
   it("returns nothing from a page without an embed", () => {
@@ -1659,6 +1668,7 @@ describe("fetchInstagram", () => {
       heroAspectRatio: 9 / 16,
       content:
         "Meet the National Geographic 33!\n\nWe're honoring modern trailblazers. #NatGeo33",
+      video: true,
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://www.instagram.com/reel/DHVrPLrIyQ_/embed/captioned/",
@@ -1682,6 +1692,8 @@ describe("fetchInstagram", () => {
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 1,
       content: undefined,
+      // The card calls this /p/ link a reel.
+      video: true,
     });
   });
 
@@ -1695,6 +1707,62 @@ describe("fetchInstagram", () => {
       '12K likes, 80 comments - natgeo on March 20, 2025: "Meet the 33"',
     );
     expect(page.incomplete).toBeUndefined();
+  });
+
+  it("keeps a post whose embed is broken but whose page has a card", async () => {
+    instagramAnswers(REEL_PAGE, BROKEN_EMBED);
+    const page = await fetchInstagram(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+    );
+    expect(page.title).toBe("National Geographic (@natgeo) • Instagram reel");
+    expect(page.heroImageUrl).toBe(
+      "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
+    );
+  });
+
+  it("reads a /reels/ link at its /reel/ address, not the login redirect", async () => {
+    instagramAnswers(REEL_PAGE, REEL_EMBED);
+    const page = await fetchInstagram(
+      "https://www.instagram.com/reels/DHVrPLrIyQ_/?igsh=MWQ1ZGUxMzBkMA==",
+    );
+    expect(page.content).toContain("Meet the National Geographic 33!");
+    expect(page.description).toBe(
+      "National Geographic (@natgeo) • Instagram reel",
+    );
+    expect(safeFetch).toHaveBeenCalledWith(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+      expect.anything(),
+    );
+    expect(safeFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/reels/"),
+      expect.anything(),
+    );
+  });
+
+  it("never takes the login shell's bare title as the card", async () => {
+    instagramAnswers(
+      SHELL_PAGE.replace(
+        "</head>",
+        '<meta property="og:title" content="Instagram" /></head>',
+      ),
+      REEL_EMBED,
+    );
+    const page = await fetchInstagram(
+      "https://www.instagram.com/reel/DHVrPLrIyQ_/",
+    );
+    expect(page.title).toBe("Meet the National Geographic 33!");
+    expect(page.description).toBeUndefined();
+  });
+
+  it("leaves a /p/ photo post a photo", async () => {
+    instagramAnswers(
+      REEL_PAGE.replace("Instagram reel", "Instagram photo"),
+      REEL_EMBED,
+    );
+    const page = await fetchInstagram(
+      "https://www.instagram.com/p/DHVrPLrIyQ_/",
+    );
+    expect(page.video).toBeUndefined();
   });
 
   it.each<[string, EmbedFailure | "throws"]>([
@@ -1793,6 +1861,7 @@ describe("fetchInstagram", () => {
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 9 / 16,
       content: undefined,
+      video: true,
     });
     expect(safeFetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/embed/captioned/"),
@@ -1884,6 +1953,21 @@ describe("processItem for Instagram links", () => {
     });
     expect(item?.content).toBeUndefined();
     expect(item?.storageId).toBeUndefined();
+  });
+
+  it("fails a deleted reel without asking the model", async () => {
+    instagramAnswers(SHELL_PAGE, BROKEN_EMBED);
+    const t = newConvexTest();
+    const itemId = await reel(t);
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      status: "failed",
+      failureReason: "not_found",
+    });
+    expect(generateObject).not.toHaveBeenCalled();
   });
 
   it("offers a retry when the caption fetch fails transiently", async () => {

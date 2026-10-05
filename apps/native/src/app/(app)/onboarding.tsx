@@ -36,7 +36,7 @@ import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { Platform, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -62,6 +62,7 @@ function holdIncomingShare() {
 export default function OnboardingScreen() {
   useAppLocale();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { theme } = useUnistyles();
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
@@ -202,6 +203,11 @@ export default function OnboardingScreen() {
         >
           {step === "opener" ? (
             <OpenerStep
+              // On iOS, a live text-size change can leave native text
+              // measurements stale (react-native#57512), so the expected
+              // onLayout updates never arrive. Remounting forces fresh
+              // measurement.
+              key={fontScale}
               onStart={advance}
               onSignIn={() => setShowSignIn(true)}
             />
