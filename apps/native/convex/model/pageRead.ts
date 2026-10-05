@@ -919,7 +919,7 @@ export async function fetchXPost(url: string): Promise<PageData> {
  * a square-cropped `og:image`. Its captioned embed adds the caption and the
  * uncropped poster. Parsed apart from the fetch so it is testable.
  */
-export type InstagramEmbedFields = {
+type InstagramEmbedFields = {
   caption?: string;
   username?: string;
   posterUrl?: string;
@@ -1103,10 +1103,14 @@ export async function fetchInstagram(url: string): Promise<PageData> {
   const embedded: InstagramEmbedFields =
     embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
   const card = instagramCard(html);
+  const truncated =
+    page.truncated === true || (embed.status === "ok" && embed.truncated);
   // Instagram answers 200 for a deleted or made-up post. The only "gone"
   // signal is that nothing about the post was read and the embed shows its
   // broken-media box, so that pair fails the save instead of saving it blank.
+  // A cut read is no proof the metadata is missing, so it never counts.
   if (
+    !truncated &&
     card === undefined &&
     embedded.caption === undefined &&
     embedded.posterUrl === undefined &&
@@ -1137,9 +1141,7 @@ export async function fetchInstagram(url: string): Promise<PageData> {
     heroAspectRatio,
     content: caption,
     video: card?.video,
-    ...(page.truncated || (embed.status === "ok" && embed.truncated)
-      ? { truncated: true as const }
-      : {}),
+    ...(truncated ? { truncated: true as const } : {}),
     ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }

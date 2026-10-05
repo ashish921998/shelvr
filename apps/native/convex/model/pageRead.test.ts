@@ -309,6 +309,41 @@ describe("readPage for Instagram posts", () => {
     });
   });
 
+  it.each([
+    ["the page", true, false],
+    ["the embed", false, true],
+  ])(
+    "never calls a post gone when %s was cut short",
+    async (_, pageCut, embedCut) => {
+      const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+      const cut = (read: ReturnType<typeof html>, isCut: boolean) =>
+        isCut ? { ...read, truncated: true } : read;
+      serve({
+        [reelUrl]: cut(html(reelUrl, INSTAGRAM_SHELL), pageCut),
+        [`${reelUrl}embed/captioned/`]: cut(
+          html(reelUrl, BROKEN_EMBED),
+          embedCut,
+        ),
+      });
+      await expect(readPage(reelUrl)).resolves.toMatchObject({
+        status: "ok",
+        page: { truncated: true },
+      });
+    },
+  );
+
+  it.each([
+    ["a /share/p/ link", "https://www.instagram.com/share/p/BAbc123xyz/", "p"],
+    ["a /tv/ link", "https://www.instagram.com/tv/AAAAAAAAAAA/", "tv"],
+  ])("fails %s to a deleted post as gone", async (_, url, kind) => {
+    const postUrl = `https://www.instagram.com/${kind}/AAAAAAAAAAA/`;
+    serve({
+      [url]: html(postUrl, INSTAGRAM_SHELL),
+      [`${postUrl}embed/captioned/`]: html(postUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(url)).resolves.toMatchObject({ status: "gone" });
+  });
+
   it("marks a /p/ post short-form video when its card says video", async () => {
     const postUrl = "https://www.instagram.com/p/fA9uwTtkSN/";
     serve({

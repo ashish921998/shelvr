@@ -1722,8 +1722,12 @@ describe("fetchInstagram", () => {
 
   it("reads a /reels/ link at its /reel/ address, not the login redirect", async () => {
     instagramAnswers(REEL_PAGE, REEL_EMBED);
-    await fetchInstagram(
+    const page = await fetchInstagram(
       "https://www.instagram.com/reels/DHVrPLrIyQ_/?igsh=MWQ1ZGUxMzBkMA==",
+    );
+    expect(page.content).toContain("Meet the National Geographic 33!");
+    expect(page.description).toBe(
+      "National Geographic (@natgeo) • Instagram reel",
     );
     expect(safeFetch).toHaveBeenCalledWith(
       "https://www.instagram.com/reel/DHVrPLrIyQ_/",
@@ -1949,6 +1953,21 @@ describe("processItem for Instagram links", () => {
     });
     expect(item?.content).toBeUndefined();
     expect(item?.storageId).toBeUndefined();
+  });
+
+  it("fails a deleted reel without asking the model", async () => {
+    instagramAnswers(SHELL_PAGE, BROKEN_EMBED);
+    const t = newConvexTest();
+    const itemId = await reel(t);
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      status: "failed",
+      failureReason: "not_found",
+    });
+    expect(generateObject).not.toHaveBeenCalled();
   });
 
   it("offers a retry when the caption fetch fails transiently", async () => {
