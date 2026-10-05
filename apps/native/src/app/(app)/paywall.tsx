@@ -261,6 +261,9 @@ export default function PaywallScreen() {
     const pending = restorePurchases();
     restoring.current = pending;
     const outcome = await pending;
+    // Kept before the pending restore is cleared, so a settle that runs
+    // after an unmount still reports the restore.
+    if (outcome === "restored") result.current = "RESTORED";
     restoring.current = null;
     setBusy(null);
     if (outcome === "restored") close("RESTORED");
