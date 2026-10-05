@@ -1,4 +1,5 @@
 import * as fc from "fast-check";
+import ipaddr from "ipaddr.js";
 import { describe, expect, it } from "vitest";
 
 import { isPublicAddress } from "./safeFetch";
@@ -57,7 +58,8 @@ describe("isPublicAddress", () => {
   it("never allows a string that is not an IP address", () => {
     fc.assert(
       fc.property(fc.string(), (s) => {
-        fc.pre(!/^[\d.:a-fA-F]+$/.test(s));
+        // Let the parser decide: ipaddr.js also accepts forms like `0x8.8.8.8`.
+        fc.pre(!ipaddr.isValid(s));
         expect(isPublicAddress(s)).toBe(false);
       }),
     );
