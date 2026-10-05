@@ -1,11 +1,12 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestConvexForDataModel } from "convex-test";
 import { api, internal } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
+import type { DataModel, Id } from "./_generated/dataModel";
 import { nextWeeklyDigestAt } from "./model/notificationSchedule";
 import { DUE_DIGEST_BATCH_SIZE } from "./notifications";
+import { archiveCheckOrder, shelfCandidates } from "./model/weeklyShelf";
 import { newConvexTest } from "./test.setup";
 
 type TestCtx = TestConvexForDataModel<DataModel>;
@@ -552,5 +553,354 @@ describe("weekly shelf notifications", () => {
     });
 
     expect(await t.query(api.notifications.getDigest, {})).toBeNull();
+  });
+});
+
+describe("weekly shelf archive saves", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const START = Date.UTC(2026, 0, 4, 12);
+
+  async function seedAt(
+    t: TestCtx,
+    at: number,
+    type: "image" | "link" | "note",
+  ) {
+    vi.setSystemTime(at);
+    return await seedItem(t, "user-a", type);
+  }
+
+  async function prepare(t: TestCtx, now: number) {
+    vi.setSystemTime(now);
+    await t.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: true,
+      nextDigestAt: now - 1,
+    });
+    await t.mutation(internal.notifications.prepareWeeklyDigest, {
+      userId: "user-a",
+      now,
+    });
+    return await t.query(api.notifications.getDigest, {});
+  }
+
+  it("sends a shelf of older unopened saves when nothing was saved this week", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const old = [
+        await seedAt(t, START, "link"),
+        await seedAt(t, START + DAY, "note"),
+        await seedAt(t, START + 2 * DAY, "image"),
+      ];
+      const opened = await seedAt(t, START + 3 * DAY, "link");
+      await t.mutation(api.notifications.markItemOpened, { itemId: opened });
+
+      const digest = await prepare(t, START + 90 * DAY);
+
+      expect(digest?.items.map((item) => item._id).sort()).toEqual(
+        [...old].sort(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps one slot for an older save beside this week's", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      const old = await seedAt(t, START, "note");
+      const now = START + 60 * DAY;
+      const recent = [
+        await seedAt(t, now - 3 * DAY, "link"),
+        await seedAt(t, now - 2 * DAY, "image"),
+        await seedAt(t, now - DAY, "note"),
+      ];
+
+      const digest = await prepare(t, now);
+      const ids = digest?.items.map((item) => item._id) ?? [];
+
+      expect(ids).toHaveLength(3);
+      expect(ids).toContain(old);
+      // This week's saves lead, so the push names one of them.
+      expect(ids[2]).toBe(old);
+      expect(recent).toEqual(expect.arrayContaining(ids.slice(0, 2)));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not bring back an archive save shown on a recent shelf", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      for (let i = 0; i < 4; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+
+      const first = await prepare(t, START + 60 * DAY);
+      const second = await prepare(t, START + 67 * DAY);
+
+      expect(first?.items).toHaveLength(3);
+      // Only one unseen save is left, which is not enough for a shelf.
+      expect(second?._id).toBe(first?._id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tells delivery when the shelf holds older saves", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t = newConvexTest().withIdentity({ subject: "user-a|session-1" });
+      for (let i = 0; i < 3; i++) {
+        await seedAt(t, START + i * DAY, "note");
+      }
+      const now = START + 60 * DAY;
+      const digest = await prepare(t, now);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("notificationDevices", {
+          userId: "user-a",
+          token: "live-a",
+          enabled: true,
+          platform: "ios",
+          lastSeenAt: now,
+        });
+      });
+
+      const claimed = await t.mutation(internal.notificationDelivery.claim, {
+        digestId: digest!._id,
+      });
+
+      expect(claimed?.olderIncluded).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("weekly shelf selection", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const START = Date.UTC(2026, 0, 4, 12);
+  const NOW = START + 120 * DAY;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function user() {
+    return newConvexTest().withIdentity({ subject: "user-a|session-1" });
+  }
+
+  async function seedOld(t: TestCtx, count: number) {
+    for (let i = 0; i < count; i++) {
+      vi.setSystemTime(START + i * 60_000);
+      await seedItem(t, "user-a", "note");
+    }
+  }
+
+  async function seedRecent(t: TestCtx, count: number) {
+    const types = ["link", "image", "note"] as const;
+    const ids: Id<"items">[] = [];
+    for (let i = 0; i < count; i++) {
+      vi.setSystemTime(NOW - (count - i) * 60_000);
+      ids.push(await seedItem(t, "user-a", types[i % types.length]));
+    }
+    return ids.reverse(); // newest first, as the shelf orders them
+  }
+
+  /** The older saves in the order this week's preparation checks them. */
+  async function checkOrder(t: TestCtx) {
+    const items = await t.run((ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+        .order("desc")
+        .take(1000),
+    );
+    const { archive } = shelfCandidates(items, new Set(), NOW);
+    return archiveCheckOrder(archive, "user-a", NOW).map((item) => item._id);
+  }
+
+  async function markOpened(t: TestCtx, itemIds: Id<"items">[]) {
+    await t.run(async (ctx) => {
+      for (const itemId of itemIds) {
+        await ctx.db.insert("itemReads", {
+          userId: "user-a",
+          itemId,
+          firstOpenedAt: START,
+          lastOpenedAt: START,
+        });
+      }
+    });
+  }
+
+  /**
+   * Two read rows for one save make its read check throw (`.unique()`), so a
+   * preparation that succeeds proves the save was never checked.
+   */
+  async function poison(t: TestCtx, itemIds: Id<"items">[]) {
+    await markOpened(t, itemIds);
+    await markOpened(t, itemIds);
+  }
+
+  async function prepare(t: TestCtx) {
+    vi.setSystemTime(NOW);
+    await t.mutation(api.notifications.setPreferences, {
+      weeklyShelfEnabled: true,
+      nextDigestAt: NOW - 1,
+    });
+    await t.mutation(internal.notifications.prepareWeeklyDigest, {
+      userId: "user-a",
+      now: NOW,
+    });
+    return await t.query(api.notifications.getDigest, {});
+  }
+
+  const shelfIds = (digest: { items: { _id: string }[] } | null) =>
+    digest?.items.map((item) => item._id);
+
+  it("keeps two of a full week beside one older save", async () => {
+    const t = user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 4);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[0],
+      recent[1],
+      order[0],
+    ]);
+  });
+
+  it("adds one older save to two from this week", async () => {
+    const t = user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 2);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([...recent, order[0]]);
+  });
+
+  it("adds two older saves to one from this week", async () => {
+    const t = user();
+    await seedOld(t, 5);
+    const recent = await seedRecent(t, 1);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual([recent[0], order[0], order[1]]);
+  });
+
+  it("fills a shelf from older saves when the week is empty", async () => {
+    const t = user();
+    await seedOld(t, 5);
+    const order = await checkOrder(t);
+
+    expect(shelfIds(await prepare(t))).toEqual(order.slice(0, 3));
+  });
+
+  it("keeps three from this week when every older save is opened", async () => {
+    const t = user();
+    await seedOld(t, 4);
+    await markOpened(t, await checkOrder(t));
+    const recent = await seedRecent(t, 3);
+
+    expect(shelfIds(await prepare(t))).toEqual(recent);
+  });
+
+  it("skips opened older saves in check order", async () => {
+    const t = user();
+    await seedOld(t, 6);
+    const order = await checkOrder(t);
+    await markOpened(t, [order[0], order[2]]);
+
+    expect(shelfIds(await prepare(t))).toEqual([order[1], order[3], order[4]]);
+  });
+
+  it("creates no shelf from fewer than three saves but still moves the schedule", async () => {
+    const t = user();
+    await seedOld(t, 1);
+    await seedRecent(t, 1);
+
+    expect(await prepare(t)).toBeNull();
+    const preferences = await t.query(api.notifications.getPreferences, {});
+    expect(preferences.nextDigestAt).toBeGreaterThan(NOW);
+  });
+
+  it("fails a preparation that checks a poisoned save", async () => {
+    const t = user();
+    await seedOld(t, 3);
+    await poison(t, [(await checkOrder(t))[0]]);
+
+    await expect(prepare(t)).rejects.toThrow();
+  });
+
+  it("stops checking older saves once a full week needs only one", async () => {
+    const t = user();
+    await seedOld(t, 4);
+    const order = await checkOrder(t);
+    await poison(t, order.slice(1));
+    const recent = await seedRecent(t, 3);
+
+    expect(shelfIds(await prepare(t))).toEqual([
+      recent[0],
+      recent[1],
+      order[0],
+    ]);
+  });
+
+  it("stops checking older saves once the shelf is full", async () => {
+    const t = user();
+    await seedOld(t, 6);
+    const order = await checkOrder(t);
+    await poison(t, order.slice(3));
+
+    expect(shelfIds(await prepare(t))).toEqual(order.slice(0, 3));
+  });
+
+  it("checks at most fifty older saves", async () => {
+    const t = user();
+    await seedOld(t, 53);
+    const order = await checkOrder(t);
+    expect(order).toHaveLength(50);
+    await markOpened(t, order);
+    const unchecked = (
+      await t.run((ctx) =>
+        ctx.db
+          .query("items")
+          .withIndex("by_user", (q) => q.eq("userId", "user-a"))
+          .collect(),
+      )
+    )
+      .map((item) => item._id)
+      .filter((id) => !order.includes(id));
+    expect(unchecked).toHaveLength(3);
+    await poison(t, unchecked);
+
+    // The three unopened saves sit past the fiftieth check, so none is found.
+    expect(await prepare(t)).toBeNull();
+  }, 20_000);
+
+  it("tells delivery a this-week shelf holds no older saves", async () => {
+    const t = user();
+    await seedRecent(t, 3);
+    const digest = await prepare(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("notificationDevices", {
+        userId: "user-a",
+        token: "live-a",
+        enabled: true,
+        platform: "ios",
+        lastSeenAt: NOW,
+      });
+    });
+
+    const claimed = await t.mutation(internal.notificationDelivery.claim, {
+      digestId: digest!._id,
+    });
+
+    expect(claimed?.olderIncluded).toBe(false);
   });
 });

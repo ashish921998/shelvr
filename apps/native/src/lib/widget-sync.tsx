@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/components/item-card";
 import { analytics } from "@/lib/analytics";
@@ -290,7 +291,14 @@ async function syncWidget(
       emptyTitle: t("widget.proTitle"),
       emptyHint: t("widget.proBody"),
     };
+    const scheme =
+      Constants.expoConfig?.extra?.variant === "production"
+        ? "shelvr"
+        : Constants.expoConfig?.extra?.variant === "preview"
+          ? "shelvr-preview"
+          : "shelvr-dev";
     const current: RecentSavesWidgetProps = {
+      scheme,
       items: widgetItems,
       ...(locked
         ? proEmpty
@@ -307,7 +315,12 @@ async function syncWidget(
       // Schedule a second, dated entry so the widget swaps to the locked Pro
       // state at the expiry with no app launch. The live entry also carries
       // `validUntil`, so it fails closed on the widget's own clock.
-      await host.publish(current, { items: [], ...proEmpty, locked: true });
+      await host.publish(current, {
+        items: [],
+        ...proEmpty,
+        locked: true,
+        scheme,
+      });
     } else {
       await host.publish(current);
     }

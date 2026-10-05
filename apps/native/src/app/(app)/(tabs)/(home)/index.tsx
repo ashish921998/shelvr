@@ -35,7 +35,7 @@ import { useSaveRecall } from "@/lib/use-save-recall";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { welcomeSave } from "@/lib/welcome-save";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -216,10 +216,8 @@ export default function HomeScreen() {
     return <ScreenLoader label={t("loading.home")} />;
   }
 
-  const showHowTo = shouldShowHowTo({
-    firstShareSaved,
-    itemCount: items.length,
-  });
+  const progressCard = saveProgressCard(progress);
+  const showHowTo = howToVisible(progress, firstShareSaved, items.length);
   const nudge = user ? (
     <HomeSheets
       userId={user._id}
@@ -240,19 +238,15 @@ export default function HomeScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.container}>
-        {proCard || showHowTo ? (
-          <ScrollView
-            contentInsetAdjustmentBehavior="automatic"
-            contentContainerStyle={styles.howToOnly}
-          >
-            {proCard ?? <SaveHowTo />}
-          </ScrollView>
-        ) : (
-          <EmptyState
-            title={t("home.emptyTitle")}
-            message={t("home.emptyBody")}
-          />
-        )}
+        {emptyFeedStarter(proCard, showHowTo, progressCard) ??
+          // Nothing while the count loads, so the empty state never
+          // flashes before the progress card.
+          (progress.pending ? null : (
+            <EmptyState
+              title={t("home.emptyTitle")}
+              message={t("home.emptyBody")}
+            />
+          ))}
         {/* A canceller with zero saves is exactly who the survey is for. */}
         {cancelSurveyCard}
         {nudge}
@@ -291,7 +285,7 @@ export default function HomeScreen() {
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
-          saveProgressCard(progress) ??
+          progressCard ??
           recallCard ??
           (feedback.invitationVisible && !busySaving ? (
             <FeedbackInvitation
@@ -310,12 +304,55 @@ export default function HomeScreen() {
   );
 }
 
+/** The save progress card covers sharing too, so it replaces the share
+ * how-to while it is up. The how-to also waits while the card may still
+ * come (count loading, or held behind another prompt), so it never shows
+ * first and then gets swapped out. */
+function howToVisible(
+  progress: ReturnType<typeof useSaveProgress>,
+  firstShareSaved: boolean,
+  itemCount: number,
+): boolean {
+  return (
+    !progress.deferLater && shouldShowHowTo({ firstShareSaved, itemCount })
+  );
+}
+
+/** What an empty feed shows above everything else, if anything: the Pro
+ * card, the share how-to, or the save progress card. */
+function emptyFeedStarter(
+  proCard: ReactNode,
+  showHowTo: boolean,
+  progressCard: ReactNode,
+): ReactNode {
+  if (proCard || showHowTo) {
+    return (
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.howToOnly}
+      >
+        {proCard ?? <SaveHowTo />}
+      </ScrollView>
+    );
+  }
+  if (!progressCard) return null;
+  return (
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.progressOnly}
+    >
+      {progressCard}
+    </ScrollView>
+  );
+}
+
 function saveProgressCard(progress: ReturnType<typeof useSaveProgress>) {
   return progress.card ? (
     <SaveProgressCard
       saved={progress.card.saved}
       goal={progress.card.goal}
       onDismiss={progress.dismiss}
+      onShown={progress.markShown}
     />
   ) : null;
 }
@@ -326,6 +363,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   howToOnly: {
     padding: theme.gap(2),
+  },
+  // The card brings its own side margins; this matches the how-to's
+  // vertical rhythm.
+  progressOnly: {
+    paddingVertical: theme.gap(1),
   },
   howToHeader: {
     gap: theme.gap(2.5),

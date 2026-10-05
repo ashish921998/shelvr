@@ -11,25 +11,39 @@
  * configuration failure, which made a normal cancel look like a RevenueCat outage.
  */
 
-export type PaywallOutcome = 'success' | 'cancelled' | 'unavailable';
+export type PaywallOutcome = "success" | "cancelled" | "unavailable";
 
 /** The PAYWALL_RESULT string values returned by react-native-purchases-ui. */
 export type RevenueCatPaywallResult =
-  | 'NOT_PRESENTED'
-  | 'ERROR'
-  | 'CANCELLED'
-  | 'PURCHASED'
-  | 'RESTORED'
+  | "NOT_PRESENTED"
+  | "ERROR"
+  | "CANCELLED"
+  | "PURCHASED"
+  | "RESTORED"
   | string;
 
 /**
  * Classifies a RevenueCat paywall result. Unknown strings are treated as
  * unavailable so a future SDK value cannot be mistaken for a successful purchase.
  */
-export function mapPaywallResult(result: RevenueCatPaywallResult | null | undefined): PaywallOutcome {
-  if (result === 'PURCHASED' || result === 'RESTORED') return 'success';
-  if (result === 'CANCELLED') return 'cancelled';
-  return 'unavailable';
+export function mapPaywallResult(
+  result: RevenueCatPaywallResult | null | undefined,
+): PaywallOutcome {
+  if (result === "PURCHASED" || result === "RESTORED") return "success";
+  if (result === "CANCELLED") return "cancelled";
+  return "unavailable";
+}
+
+/**
+ * RevenueCat reports a restore as completed even when it found nothing, so a
+ * restore only counts once the customer actually holds an entitlement.
+ */
+export function restoreFoundAccess(
+  customerInfo: { entitlements: { active: object } } | null | undefined,
+): boolean {
+  return (
+    !!customerInfo && Object.keys(customerInfo.entitlements.active).length > 0
+  );
 }
 
 /**
@@ -37,5 +51,5 @@ export function mapPaywallResult(result: RevenueCatPaywallResult | null | undefi
  * cancellation must return the user to the previous screen without routing.
  */
 export function shouldOpenPaywallFallback(outcome: PaywallOutcome): boolean {
-  return outcome === 'unavailable';
+  return outcome === "unavailable";
 }

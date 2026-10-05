@@ -65,7 +65,7 @@ describe("storePoster", () => {
     safeFetch.mockReset();
   });
 
-  it("falls back to the remote URL when Convex storage rejects the poster", async () => {
+  it("omits the stored preview when Convex storage rejects the poster", async () => {
     safeFetch.mockResolvedValue({
       ok: true,
       finalUrl: "https://example.com/poster.jpg",
@@ -199,6 +199,15 @@ function serveX(
   fxtwitter: FakeResponse = { status: 599 },
 ) {
   safeFetch.mockImplementation(async (url: string) => {
+    if (url.startsWith("https://pbs.twimg.com/")) {
+      return {
+        ok: true,
+        finalUrl: url,
+        status: 200,
+        contentType: "image/jpeg",
+        bytes: new Uint8Array([1, 2, 3]),
+      };
+    }
     const response = url.startsWith(
       "https://cdn.syndication.twimg.com/tweet-result?",
     )
@@ -1178,10 +1187,9 @@ describe("processItem for X posts", () => {
       title: "GLP-1 App Growth",
       siteName: "X",
       author: "@adamtwtz",
-      heroImageUrl:
-        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 2.5,
-      imageUrl: null,
+      imageUrl: expect.stringContaining("/api/storage/"),
     });
     expect(item?.content).toMatch(/^An app spent \$21,418/);
     expect(item?.enrichment).toBeUndefined();
@@ -1299,8 +1307,7 @@ describe("processItem for X posts", () => {
       title: "GLP-1 App Growth",
       siteName: "X",
       author: "@adamtwtz",
-      heroImageUrl:
-        "https://pbs.twimg.com/media/HRpC3HfbAAARTL7.jpg?name=large",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 2.5,
     });
     expect(item?.enrichment).toBeUndefined();
@@ -1327,8 +1334,8 @@ describe("processItem for X posts", () => {
     const { item } = await saveLink(
       "https://x.com/maruyo_/status/1521844593804906496",
     );
-    expect(item?.heroImageUrl).toBe(
-      "https://pbs.twimg.com/media/FRu0eYvVgAA83Et.jpg?name=large",
+    expect(item?.heroImageUrl).toEqual(
+      expect.stringContaining("/api/storage/"),
     );
     expect(item?.aspectRatio).toBe(1200 / 1103);
     expect(item?.media?.map((m) => [m.kind, m.imageUrl])).toEqual([
@@ -1376,7 +1383,7 @@ describe("processItem for X posts", () => {
       siteName: "TikTok",
       author: "@scout2015",
       content: "Scramble up ur name & I’ll try to guess it😍❤️",
-      heroImageUrl: "https://p16-sign-va.tiktokcdn.com/poster.jpeg",
+      heroImageUrl: expect.stringContaining("/api/storage/"),
       aspectRatio: 720 / 1280,
     });
     expect(item).not.toHaveProperty("media");

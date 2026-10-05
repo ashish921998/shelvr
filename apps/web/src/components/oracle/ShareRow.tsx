@@ -4,11 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
 import type { OracleMode, OracleVerdict } from "@/lib/oracle";
-import {
-  encodeSharedVerdict,
-  sharedVerdictImagePath,
-  sharedVerdictPath,
-} from "@/lib/oracleShare";
+import { sharedVerdictImagePath } from "@/lib/oracleShare";
 
 const IMAGE_NAME = "shelvr-oracle.png";
 
@@ -30,23 +26,15 @@ export default function ShareRow({
   const [copied, setCopied] = useState(false);
   const [image, setImage] = useState<File>();
   const { code, url } = useMemo(() => {
-    const sharedVerdict = {
-      mode,
-      persona: verdict.persona,
-      tagline: verdict.tagline,
-      spaces: verdict.spaces,
-      score: verdict.score,
-    };
-    return {
-      code: encodeSharedVerdict(sharedVerdict),
-      url: `${window.location.origin}${sharedVerdictPath(sharedVerdict)}`,
-    };
-  }, [mode, verdict]);
+    const code = verdict.shareCode ?? "";
+    return { code, url: `${window.location.origin}/oracle/s?c=${code}` };
+  }, [verdict]);
   const imagePath = sharedVerdictImagePath(code, "story");
 
   // Safari only shares inside the tap's user activation, so the card is
   // fetched ahead of the tap rather than after it.
   useEffect(() => {
+    if (!code) return;
     const controller = new AbortController();
     fetch(imagePath, { signal: controller.signal })
       .then((response) => (response.ok ? response.blob() : undefined))
@@ -55,7 +43,7 @@ export default function ShareRow({
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [imagePath]);
+  }, [imagePath, code]);
 
   function shared(method: string) {
     captureWebAnalyticsEvent("oracle_shared", { mode, method });
@@ -90,6 +78,7 @@ export default function ShareRow({
     }
   }
 
+  if (!code) return null;
   return (
     <>
       <button type="button" onClick={share} className={buttonClass}>
