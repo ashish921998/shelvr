@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 
+import MarkdownIt from "markdown-it";
+
 import { isMainModule } from "./main-module.mjs";
 
 /**
@@ -43,56 +45,13 @@ export function isUiFile(path) {
 /** The label only the repository owner adds to waive the screenshot. */
 export const WAIVER_LABEL = "no-ui-change";
 
-// The template explains each section inside HTML comments. Those comments are
-// not evidence, so a body left as the bare template has to read as empty.
-// GitHub hides an unclosed comment to the end of the body, so this does too,
-// and repeats until nothing changes so a removal cannot splice a new "<!--".
-function stripComments(text) {
-  let previous;
-  let current = text;
-  do {
-    previous = current;
-    current = current.replace(/<!--[\s\S]*?(-->|$)/g, "");
-  } while (current !== previous);
-  return current;
-}
+// One CommonMark parse decides what the description renders as, the way
+// GitHub does: a fence, an indented code block, a quoted fence, or an HTML
+// comment is one node, and whatever it holds is never read as a heading,
+// content, or media.
+const markdown = new MarkdownIt({ html: true, linkify: true });
 
-// A line that opens a code fence: a run of three or more backticks or tildes.
-const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})/;
-
-/**
- * Splits `text` into lines, each marked with whether it sits inside a code
- * fence (fence lines included). As in CommonMark, a fence closes only on a run
- * of the same character at least as long as the one that opened it, so a
- * shorter fence quoted inside a longer one stays quoted.
- */
-function fencedLines(text) {
-  let open = null;
-  return text.split(/\r?\n/).map((line) => {
-    const run = FENCE_OPEN.exec(line)?.[1];
-    if (open === null) {
-      if (run) open = run;
-      return { line, fenced: Boolean(run) };
-    }
-    if (
-      run &&
-      run[0] === open[0] &&
-      run.length >= open.length &&
-      line.trim() === run
-    ) {
-      open = null;
-    }
-    return { line, fenced: true };
-  });
-}
-
-// Pasted output in a code fence is evidence that something ran, but an image
-// tag quoted inside one shows nothing.
-const stripFences = (text) =>
-  fencedLines(text)
-    .filter((l) => !l.fenced)
-    .map((l) => l.line)
-    .join("\n");
+const parse = (body) => markdown.parse(body ?? "", {});
 
 const normalizeTitle = (title) =>
   title
@@ -100,74 +59,158 @@ const normalizeTitle = (title) =>
     .replace(/[:\s#]+$/, "")
     .toLowerCase();
 
+const headingLevel = (token) => Number(token.tag.slice(1));
+
 /**
- * The text under the heading titled exactly `title` (case-insensitive, a
- * trailing colon allowed), up to the next heading of the same or a higher
- * level. Null when there is no such heading.
+ * The tokens under the top-level heading titled exactly `title`
+ * (case-insensitive, a trailing colon allowed), up to the next top-level
+ * heading of the same or a higher level. Null when there is no such heading.
+ * A heading inside a list or quote is part of the content, not a boundary.
  */
-export function section(body, title) {
+function sectionTokens(tokens, title) {
   const want = normalizeTitle(title);
-  let level = 0;
-  const out = [];
-  for (const { line, fenced } of fencedLines(stripComments(body))) {
-    const heading = fenced ? null : /^(#{1,6})[ \t]+(.*)$/.exec(line);
-    if (level === 0) {
-      if (heading && normalizeTitle(heading[2]) === want) {
-        level = heading[1].length;
-      }
-      continue;
-    }
-    if (heading && heading[1].length <= level) break;
-    out.push(line);
+  const start = tokens.findIndex(
+    (t, i) =>
+      t.type === "heading_open" &&
+      t.level === 0 &&
+      normalizeTitle(tokens[i + 1].content) === want,
+  );
+  if (start === -1) return null;
+  const level = headingLevel(tokens[start]);
+  let end = start + 3;
+  while (
+    end < tokens.length &&
+    !(
+      tokens[end].type === "heading_open" &&
+      tokens[end].level === 0 &&
+      headingLevel(tokens[end]) <= level
+    )
+  ) {
+    end++;
   }
-  return level === 0 ? null : out.join("\n");
+  return tokens.slice(start + 3, end);
+}
+
+/** The source text of section `title` in `body`, or null. */
+export function section(body, title) {
+  const tokens = sectionTokens(parse(body), title);
+  if (tokens === null) return null;
+  const lines = (body ?? "").split(/\r?\n/);
+  const mapped = tokens.filter((t) => t.map);
+  if (mapped.length === 0) return "";
+  return lines
+    .slice(mapped[0].map[0], mapped[mapped.length - 1].map[1])
+    .join("\n");
+}
+
+// Raw HTML, read left to right: a comment runs to its "-->" (or, as on
+// GitHub, to the end), so a tag inside one is never seen.
+const HTML_PIECES =
+  /<!--[\s\S]*?(?:-->|$)|<(img|video|source)\b[^>]*>|[^<]+|</g;
+
+/** What raw HTML shows: its text outside comments, and its media sources. */
+function readHtml(html) {
+  let text = "";
+  const sources = [];
+  for (const [piece, tag] of html.matchAll(HTML_PIECES)) {
+    if (piece.startsWith("<!--")) continue;
+    text += piece;
+    if (!tag) continue;
+    const src = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(piece);
+    if (src) sources.push(src[1] ?? src[2] ?? src[3]);
+  }
+  return { text, sources };
 }
 
 // A line that only restates the template's shape, or promises content later,
 // is not content: empty bullets and boxes, nested headings, placeholders.
 const PLACEHOLDER = /^((todo|tbd|tbc|wip)\b.*|pending|n\/?a|-+|\.+)$/i;
 
-export function hasContent(text) {
-  if (text === null) return false;
-  return fencedLines(text).some(({ line: raw, fenced }) => {
-    if (fenced) return !FENCE_OPEN.test(raw) && raw.trim().length > 0;
-    // A heading is not content, even behind a list or quote marker.
-    const unmarked = raw.replace(/^(\s*([-*+>]|\d+\.)\s*)+/, "");
-    if (/^[ \t]*#{1,6}[ \t]/.test(unmarked)) return false;
-    const line = unmarked
-      .replace(/^\s*(\[[ xX]?\])?\s*/, "")
-      .replace(/[*_`]/g, "")
-      .trim();
-    return line.length > 0 && !PLACEHOLDER.test(line);
+const isContentLine = (raw) => {
+  const line = raw.replace(/^\s*(\[[ xX]?\])?\s*/, "").trim();
+  return line.length > 0 && !PLACEHOLDER.test(line);
+};
+
+/** The visible text of an inline token; an embedded image counts as text. */
+function inlineText(token) {
+  return token.children
+    .map((child) => {
+      switch (child.type) {
+        case "text":
+        case "code_inline":
+          return child.content;
+        case "softbreak":
+        case "hardbreak":
+          return "\n";
+        case "image":
+          return "[image]";
+        case "html_inline":
+          return readHtml(child.content).text;
+        default:
+          return "";
+      }
+    })
+    .join("");
+}
+
+function tokensHaveContent(tokens) {
+  if (tokens === null) return false;
+  return tokens.some((token, i) => {
+    switch (token.type) {
+      case "fence":
+      case "code_block":
+        return token.content.trim().length > 0;
+      case "html_block":
+        return readHtml(token.content).text.trim().length > 0;
+      case "inline":
+        // A heading is not content, even inside a list or quote.
+        if (tokens[i - 1]?.type === "heading_open") return false;
+        return inlineText(token).split("\n").some(isContentLine);
+      default:
+        return false;
+    }
   });
 }
 
-const MEDIA_URL = String.raw`https:\/\/[^\s)"'<>]+\.(png|jpe?g|gif|webp|mp4|mov|webm)(\?[^\s)"'<>]*)?`;
-const ATTACHMENT_URL = String.raw`https:\/\/github\.com\/user-attachments\/assets\/[0-9a-f-]{8,}`;
-const IMAGE_URL = `(${MEDIA_URL}|${ATTACHMENT_URL})`;
+/** Whether `text` holds anything beyond template shape and placeholders. */
+export function hasContent(text) {
+  return text !== null && tokensHaveContent(parse(text));
+}
+
+const MEDIA_URL =
+  /^https:\/\/[^\s)"'<>]+\.(png|jpe?g|gif|webp|mp4|mov|webm)(\?[^\s"'<>]*)?$/i;
+const ATTACHMENT_URL =
+  /^https:\/\/github\.com\/user-attachments\/assets\/[0-9a-f-]{8,}$/;
+
+const isMediaUrl = (url) => MEDIA_URL.test(url) || ATTACHMENT_URL.test(url);
+
+/** Every URL a reader can open as media from these tokens. */
+function* mediaSources(tokens) {
+  for (const token of tokens) {
+    if (token.type === "html_block") yield* readHtml(token.content).sources;
+    if (token.type !== "inline") continue;
+    for (const child of token.children) {
+      // An embed, or a link (written or bare) to a recording: both open it.
+      if (child.type === "image") yield child.attrGet("src");
+      if (child.type === "link_open") yield child.attrGet("href");
+      if (child.type === "html_inline") {
+        yield* readHtml(child.content).sources;
+      }
+    }
+  }
+}
 
 /**
- * Whether `text` shows the change: an embedded image or video, or a bare link
+ * Whether these tokens show the change: an embedded image or video, or a link
  * to one. GitHub's drag-and-drop uploads land on user-attachments asset URLs
  * that carry no file extension, so those count on their own; its `files`
  * attachments (logs, archives) do not.
  */
+const tokensShowMedia = (tokens) =>
+  [...mediaSources(tokens)].some((url) => url && isMediaUrl(url));
+
 export function hasVisualEvidence(text) {
-  const clean = stripFences(stripComments(text));
-  // An embed, or a plain link to a recording: both open the media.
-  const markdown = new RegExp(
-    String.raw`!?\[[^\]]*\]\(\s*${IMAGE_URL}(\s+("[^"]*"|'[^']*'))?\s*\)`,
-  );
-  const tag = new RegExp(
-    String.raw`<(img|video|source)\b[^>]*\bsrc=["']?${IMAGE_URL}(?=["'\s>/])`,
-    "i",
-  );
-  // Sentence punctuation may follow a bare link; another extension may not.
-  const bare = new RegExp(
-    String.raw`(^|\s)${IMAGE_URL}(?=[,;:!?)]?(\s|$)|\.(\s|$))`,
-    "m",
-  );
-  return markdown.test(clean) || tag.test(clean) || bare.test(clean);
+  return tokensShowMedia(parse(text));
 }
 
 /**
@@ -176,27 +219,27 @@ export function hasVisualEvidence(text) {
  */
 export function evidenceProblems(body, changedFiles, labels = []) {
   const problems = [];
-  const text = body ?? "";
+  const tokens = parse(body);
 
-  const verification = section(text, "Verification");
+  const verification = sectionTokens(tokens, "Verification");
   const evidence =
-    verification === null ? null : section(verification, "Evidence");
+    verification === null ? null : sectionTokens(verification, "Evidence");
   if (verification === null) {
     problems.push(
       'The description has no "## Verification" section. Use the pull request template.',
     );
   } else {
-    if (!hasContent(section(verification, "What I ran"))) {
+    if (!tokensHaveContent(sectionTokens(verification, "What I ran"))) {
       problems.push(
         '"### What I ran" is empty. List the commands, tests, or manual checks that were run, with their results.',
       );
     }
-    if (!hasContent(evidence)) {
+    if (!tokensHaveContent(evidence)) {
       problems.push(
         '"### Evidence" is empty. Link the CI run, paste the output, or add screenshots.',
       );
     }
-    if (!hasContent(section(verification, "Not verified"))) {
+    if (!tokensHaveContent(sectionTokens(verification, "Not verified"))) {
       problems.push(
         '"### Not verified" is empty. Say what was not checked (for example real device, Android, TikTok), or write "Nothing".',
       );
@@ -204,7 +247,7 @@ export function evidenceProblems(body, changedFiles, labels = []) {
   }
 
   const uiFiles = changedFiles.filter(isUiFile);
-  const shown = evidence !== null && hasVisualEvidence(evidence);
+  const shown = evidence !== null && tokensShowMedia(evidence);
   if (uiFiles.length > 0 && !shown && !labels.includes(WAIVER_LABEL)) {
     const list = uiFiles.slice(0, 5).join(", ");
     const more = uiFiles.length > 5 ? ` and ${uiFiles.length - 5} more` : "";

@@ -115,7 +115,7 @@ test("the owner's waiver label passes a UI change; a sentence alone does not", (
 });
 
 test("malformed or non-image links are not visual evidence", () => {
-  assert.equal(hasVisualEvidence("![badge](https://x.dev/a.png"), false);
+  assert.equal(hasVisualEvidence("![badge](not-a-url.png)"), false);
   assert.equal(
     hasVisualEvidence("https://github.com/user-attachments/files/123/log.txt"),
     false,
@@ -139,10 +139,40 @@ test("malformed or non-image links are not visual evidence", () => {
     hasVisualEvidence("<!-- hidden\n![shot](https://x.dev/a.png)"),
     false,
   );
-  assert.equal(
+});
+
+test("media inside an indented or quoted code block is not evidence", () => {
+  const indented = filled({
+    evidence: "Output:\n\n    ![shot](https://x.dev/a.png)",
+  });
+  assert.equal(evidenceProblems(indented, [SCREEN]).length, 1);
+  const quotedFence = filled({
+    evidence: '> ```html\n> <img src="https://x.dev/a.png">\n> ```',
+  });
+  assert.equal(evidenceProblems(quotedFence, [SCREEN]).length, 1);
+  const quotedList = filled({
+    evidence: "- log:\n\n  > ```\n  > ![shot](https://x.dev/a.png)\n  > ```",
+  });
+  assert.equal(evidenceProblems(quotedList, [SCREEN]).length, 1);
+});
+
+test("a comment marker inside a code fence hides nothing after it", () => {
+  const body = filled({
+    evidence:
+      "```html\n<!-- rendered by the share page\n<p>ok</p>\n```\n\n" +
+      `![share page](${SHOT})`,
+  });
+  assert.deepEqual(evidenceProblems(body, [SCREEN]), []);
+  assert.equal(section(body, "Not verified").trim(), "- Real iPhone");
+});
+
+test("what GitHub renders around a comment still counts", () => {
+  // The comment closes before the image, so a reader sees the image.
+  assert.ok(
     hasVisualEvidence("<!<!-- x -->-- ![shot](https://x.dev/a.png) -->"),
-    false,
   );
+  // GitHub autolinks a URL after "(", so a broken embed still links the image.
+  assert.ok(hasVisualEvidence("![badge](https://x.dev/a.png"));
 });
 
 test("a shorter fence inside a longer one stays quoted", () => {
