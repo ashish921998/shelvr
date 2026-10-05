@@ -1,0 +1,38 @@
+name: Prepare pinned review agent
+description: Prepare reviewed upstream action sources with frozen tools and plugins.
+inputs:
+  provider:
+    required: true
+    description: droid or claude
+runs:
+  using: composite
+  steps:
+    - name: Fetch reviewed Droid action
+      if: inputs.provider == 'droid'
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: Factory-AI/droid-action
+        ref: efd4574f8244f28cf1da43e7733fd36840ba2880
+        path: .secure-review-tooling/runtime/droid
+        persist-credentials: false
+    - name: Fetch reviewed security plugin
+      if: inputs.provider == 'droid'
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: Factory-AI/factory-plugins
+        ref: d362dc1823301bee56315bd73f22b5614392365c
+        path: .secure-review-tooling/runtime/factory-plugins
+        persist-credentials: false
+    - name: Fetch reviewed Claude action
+      if: inputs.provider == 'claude'
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: anthropics/claude-code-action
+        ref: ed670b4cf9de2a5a570d130d2f6197b9e543cd64
+        path: .secure-review-tooling/runtime/claude
+        persist-credentials: false
+    - name: Harden transitive executable dependencies
+      shell: bash
+      env:
+        REVIEW_PROVIDER: ${{ inputs.provider }}
+      run: node "$GITHUB_ACTION_PATH/../../../tools/harden-review-action.mjs" "$REVIEW_PROVIDER" ".secure-review-tooling/runtime/$REVIEW_PROVIDER"

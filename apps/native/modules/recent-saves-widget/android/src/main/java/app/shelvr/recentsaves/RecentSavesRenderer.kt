@@ -26,6 +26,11 @@ internal class RecentSavesRenderer(
   // still rejects an update for its bitmap size.
   withImages: Boolean = true,
 ) {
+  private val scheme = when (context.packageName) {
+    "app.shelvr.save.dev" -> "shelvr-dev"
+    "app.shelvr.save.preview" -> "shelvr-preview"
+    else -> "shelvr"
+  }
   private val locked = snapshot.isLocked(now)
   // A locked widget never shows saved content, even if items came through.
   private val items = if (locked) emptyList() else snapshot.items
@@ -73,14 +78,14 @@ internal class RecentSavesRenderer(
     views.setViewVisibility(R.id.recent_saves_empty_hint, if (hint.isEmpty()) View.GONE else View.VISIBLE)
     views.setOnClickPendingIntent(
       R.id.recent_saves_root,
-      open(if (locked) "shelvr:///paywall" else "shelvr:///add"),
+      open(if (locked) "$scheme:///paywall" else "$scheme:///add"),
     )
     return views
   }
 
   private fun grid(): RemoteViews {
     val views = RemoteViews(context.packageName, R.layout.recent_saves_widget_grid)
-    views.setOnClickPendingIntent(R.id.recent_saves_root, open("shelvr:///"))
+    views.setOnClickPendingIntent(R.id.recent_saves_root, open("$scheme:///"))
     val columns = RecentSavesLayout.gridColumns(items)
     views.setViewVisibility(R.id.grid_c1, if (columns[1].isEmpty()) View.GONE else View.VISIBLE)
     for ((c, column) in columns.withIndex()) {
@@ -112,7 +117,7 @@ internal class RecentSavesRenderer(
 
   private fun list(): RemoteViews {
     val views = RemoteViews(context.packageName, R.layout.recent_saves_widget_list)
-    views.setOnClickPendingIntent(R.id.recent_saves_root, open("shelvr:///"))
+    views.setOnClickPendingIntent(R.id.recent_saves_root, open("$scheme:///"))
 
     val featured = items.first()
     val bitmap = thumbnails[featured.id]
@@ -158,7 +163,7 @@ internal class RecentSavesRenderer(
     return views
   }
 
-  private fun itemUrl(item: WidgetSaveItem) = "shelvr:///item/${Uri.encode(item.id)}"
+  private fun itemUrl(item: WidgetSaveItem) = "$scheme:///item/${Uri.encode(item.id)}"
 
   // Deep links open in the app like the iOS widgetURL. Each URL gets its own
   // request code so one tap target's intent never replaces another's.
