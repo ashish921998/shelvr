@@ -278,7 +278,92 @@ describe("readPage for Pinterest pins", () => {
   });
 });
 
+/** Instagram's crawler login shell: no card for any post. */
+const INSTAGRAM_SHELL =
+  '<html><head><title>Instagram</title><meta property="og:title" content="Instagram" /></head><body></body></html>';
+
+// Probed 2026-10-02: a removed or made-up post's captioned embed answers 200
+// with this box in place of the media and caption.
+const BROKEN_EMBED =
+  '<div class="_aa4c"><div class="EmbedBrokenMedia"><p>This post may be broken, or the post may have been removed.</p></div></div>';
+
 describe("readPage for Instagram posts", () => {
+  it("fails a deleted reel as gone instead of saving it blank", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: html(reelUrl, INSTAGRAM_SHELL),
+      [`${reelUrl}embed/captioned/`]: html(reelUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(reelUrl)).resolves.toMatchObject({ status: "gone" });
+  });
+
+  it("fails a share link to a deleted reel as gone", async () => {
+    const shareUrl = "https://www.instagram.com/share/reel/BAbc123xyz/";
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [shareUrl]: html(reelUrl, INSTAGRAM_SHELL),
+      [`${reelUrl}embed/captioned/`]: html(reelUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(shareUrl)).resolves.toMatchObject({
+      status: "gone",
+    });
+  });
+
+  it.each([
+    ["the page", true, false, BROKEN_EMBED],
+    ["the embed", false, true, BROKEN_EMBED],
+    // A cut embed can end before its broken-media box ever arrives.
+    ["the embed, before its broken-media box,", false, true, "<html><body>"],
+  ])(
+    "keeps a post retryable, not gone, when %s was cut short",
+    async (_, pageCut, embedCut, embedBody) => {
+      const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+      const cut = (read: ReturnType<typeof html>, isCut: boolean) =>
+        isCut ? { ...read, truncated: true } : read;
+      serve({
+        [reelUrl]: cut(html(reelUrl, INSTAGRAM_SHELL), pageCut),
+        [`${reelUrl}embed/captioned/`]: cut(html(reelUrl, embedBody), embedCut),
+      });
+      const read = await readPage(reelUrl);
+      expect(read).toMatchObject({
+        status: "ok",
+        page: { truncated: true, incomplete: true },
+      });
+      // Incomplete, so the save offers a retry instead of a blank ready item.
+      expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+        "partial",
+      );
+    },
+  );
+
+  it.each([
+    ["a /share/p/ link", "https://www.instagram.com/share/p/BAbc123xyz/", "p"],
+    ["a /tv/ link", "https://www.instagram.com/tv/AAAAAAAAAAA/", "tv"],
+  ])("fails %s to a deleted post as gone", async (_, url, kind) => {
+    const postUrl = `https://www.instagram.com/${kind}/AAAAAAAAAAA/`;
+    serve({
+      [url]: html(postUrl, INSTAGRAM_SHELL),
+      [`${postUrl}embed/captioned/`]: html(postUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(url)).resolves.toMatchObject({ status: "gone" });
+  });
+
+  it("marks a /p/ post short-form video when its card says video", async () => {
+    const postUrl = "https://www.instagram.com/p/fA9uwTtkSN/";
+    serve({
+      [postUrl]: html(
+        postUrl,
+        '<html><head><meta name="twitter:title" content="Diego (@diegoquinteiro) &#x2022; Instagram video" /></head></html>',
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: { video: true },
+      shortForm: { site: "Instagram", video: true },
+    });
+  });
+
   it("still follows the caption's link to its recipe", async () => {
     const postUrl = "https://www.instagram.com/p/ABC123/";
     const embedUrl = "https://www.instagram.com/p/ABC123/embed/captioned/";
