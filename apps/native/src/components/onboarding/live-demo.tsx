@@ -294,13 +294,10 @@ function SharePicker({
           {pasteRow}
         </View>
       ) : (
-        <Pressable
-          accessibilityRole="button"
+        <GhostButton
+          label={t("demo.pasteOwn")}
           onPress={() => setPasting(true)}
-          style={styles.pasteToggle}
-        >
-          <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
-        </Pressable>
+        />
       )}
     </>
   );
@@ -336,7 +333,6 @@ function PastePicker({
           <SampleRow
             key={candidate.url}
             sample={candidate}
-            icon="plus"
             disabled={disabled}
             onPress={() => onPick(candidate.url)}
           />
@@ -403,12 +399,10 @@ function SharePost({ sample }: { sample: DemoSample }) {
 
 function SampleRow({
   sample,
-  icon,
   disabled,
   onPress,
 }: {
   sample: DemoSample;
-  icon: "plus";
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -437,7 +431,7 @@ function SampleRow({
           {sample.domain}
         </Text>
       </View>
-      <AppSymbolIcon name={icon} size={16} tintColor={theme.colors.primary} />
+      <AppSymbolIcon name="plus" size={16} tintColor={theme.colors.primary} />
     </Pressable>
   );
 }
@@ -607,10 +601,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   shareLabel: {
     flexShrink: 1,
     textAlign: "center",
-  },
-  pasteToggle: {
-    alignSelf: "center",
-    paddingVertical: theme.gap(1),
   },
   hintIcon: {
     width: 36,

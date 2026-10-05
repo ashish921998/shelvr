@@ -50,7 +50,8 @@ export function useIncomingShareUrl({
   readOnMount: boolean;
   /** A URL the share extension actually delivered to Shelvr. */
   onSharedUrl: (url: string) => void;
-  /** A sample saved only because the system share sheet failed to open. */
+  /** A sample saved without the share extension: the sheet failed to open, or
+   * the user missed Shelvr twice. */
   onDirectUrl: (url: string) => void;
   onError: (error: TextMessageKey | null) => void;
 }) {
