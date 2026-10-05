@@ -302,6 +302,17 @@ export default function PaywallScreen() {
         <View style={styles.center}>
           <Text style={styles.message}>{t("pro.loadFailed")}</Text>
           <PrimaryButton label={t("common.tryAgain")} onPress={retry} />
+          {/* Restoring needs no offering, so a returning subscriber is never
+              stuck behind a failed load. */}
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy !== null}
+            onPress={() => void restore()}
+            hitSlop={8}
+            style={styles.failedRestore}
+          >
+            <Text style={styles.link}>{t("paywall.restore")}</Text>
+          </Pressable>
         </View>
       ) : state.step === 1 && !prices ? (
         <View style={styles.center}>
@@ -416,7 +427,7 @@ const styles = StyleSheet.create((theme) => ({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.gap(2.5),
   },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1 },
@@ -427,32 +438,30 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
   },
   message: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
+    ...theme.type.subhead,
     lineHeight: 22,
     color: theme.colors.muted,
     textAlign: "center",
   },
-  footer: { paddingTop: 16, gap: 10 },
+  footer: { paddingTop: theme.gap(2), gap: theme.gap(1.25) },
   helper: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
+    ...theme.type.caption,
     lineHeight: 18,
     color: theme.colors.muted,
     textAlign: "center",
   },
   links: {
-    marginTop: 2,
+    marginTop: theme.gap(0.25),
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 18,
+    gap: theme.gap(2.25),
   },
   link: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
+    ...theme.type.label,
     color: theme.colors.muted,
   },
+  failedRestore: { alignSelf: "center" },
   dot: {
     width: 3,
     height: 3,
