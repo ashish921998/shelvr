@@ -81,6 +81,14 @@ export const motion = {
       reduceMotion: ReduceMotion.System,
     },
   },
+  // The paywall carousel's slide change, from the paywall design handoff.
+  carousel: {
+    slide: {
+      duration: 550,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      reduceMotion: ReduceMotion.System,
+    },
+  },
   spring: {
     settle: {
       duration: 400,

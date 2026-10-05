@@ -1,12 +1,11 @@
 import { t } from "@/lib/i18n";
+import { motion } from "@/lib/motion";
 import { SLIDE_COUNT } from "@/lib/paywall-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 import { useEffect, useMemo } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  Easing,
-  ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -21,11 +20,6 @@ import { ShareSlide } from "./slides/share-slide";
 import { ShotsSlide } from "./slides/shots-slide";
 
 const AUTOPLAY_MS = 3800;
-const SLIDE_TIMING = {
-  duration: 550,
-  easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-  reduceMotion: ReduceMotion.System,
-};
 
 const CAPTIONS: readonly { title: TextMessageKey; body: TextMessageKey }[] = [
   { title: "paywall.slideShareTitle", body: "paywall.slideShareBody" },
@@ -67,7 +61,7 @@ export function UnlockStep({
 
   const offset = useSharedValue(-slide * width);
   useEffect(() => {
-    offset.set(withTiming(-slide * width, SLIDE_TIMING));
+    offset.set(withTiming(-slide * width, motion.carousel.slide));
   }, [slide, width, offset]);
   // Where the track was when the swipe took hold, mid-transition included.
   const panStart = useSharedValue(0);
@@ -97,7 +91,7 @@ export function UnlockStep({
             SLIDE_COUNT - 1,
             Math.max(0, Math.round(-projected / width)),
           );
-          offset.set(withTiming(-target * width, SLIDE_TIMING));
+          offset.set(withTiming(-target * width, motion.carousel.slide));
           scheduleOnRN(onShowSlide, target);
         }),
     [offset, panStart, width, onPause, onShowSlide],
