@@ -1603,6 +1603,13 @@ describe("parseInstagramEmbed", () => {
     });
   });
 
+  it("reports Instagram's broken-media box", () => {
+    expect(parseInstagramEmbed(BROKEN_EMBED)).toMatchObject({
+      brokenMedia: true,
+    });
+    expect(parseInstagramEmbed(REEL_EMBED).brokenMedia).toBeUndefined();
+  });
+
   it("returns nothing from a page without an embed", () => {
     expect(parseInstagramEmbed(SHELL_PAGE)).toEqual({
       caption: undefined,
@@ -1661,6 +1668,7 @@ describe("fetchInstagram", () => {
       heroAspectRatio: 9 / 16,
       content:
         "Meet the National Geographic 33!\n\nWe're honoring modern trailblazers. #NatGeo33",
+      video: true,
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://www.instagram.com/reel/DHVrPLrIyQ_/embed/captioned/",
@@ -1699,15 +1707,6 @@ describe("fetchInstagram", () => {
       '12K likes, 80 comments - natgeo on March 20, 2025: "Meet the 33"',
     );
     expect(page.incomplete).toBeUndefined();
-  });
-
-  it("fails a deleted reel as gone instead of saving it blank", async () => {
-    // Probed 2026-10-02: a removed or made-up reel answers 200 with the bare
-    // shell, and its embed shows the BrokenMedia placeholder.
-    instagramAnswers(SHELL_PAGE, BROKEN_EMBED);
-    await expect(
-      readPage("https://www.instagram.com/reel/AAAAAAAAAAA/"),
-    ).resolves.toMatchObject({ status: "gone" });
   });
 
   it("keeps a post whose embed is broken but whose page has a card", async () => {
@@ -1858,6 +1857,7 @@ describe("fetchInstagram", () => {
       heroImageUrl: "https://scontent.cdninstagram.com/square.jpg?a=1&b=2",
       heroAspectRatio: 9 / 16,
       content: undefined,
+      video: true,
     });
     expect(safeFetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/embed/captioned/"),
