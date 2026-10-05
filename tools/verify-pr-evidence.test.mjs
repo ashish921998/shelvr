@@ -132,6 +132,14 @@ test("malformed or non-image links are not visual evidence", () => {
     false,
   );
   assert.equal(hasVisualEvidence("see https://github.com/o/r/pull/1"), false);
+  assert.equal(
+    hasVisualEvidence("<!-- hidden\n![shot](https://x.dev/a.png)"),
+    false,
+  );
+  assert.equal(
+    hasVisualEvidence("<!<!-- x -->-- ![shot](https://x.dev/a.png) -->"),
+    false,
+  );
 });
 
 test("a shorter fence inside a longer one stays quoted", () => {

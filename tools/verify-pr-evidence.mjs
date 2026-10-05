@@ -45,7 +45,17 @@ export const WAIVER_LABEL = "no-ui-change";
 
 // The template explains each section inside HTML comments. Those comments are
 // not evidence, so a body left as the bare template has to read as empty.
-const stripComments = (text) => text.replace(/<!--[\s\S]*?-->/g, "");
+// GitHub hides an unclosed comment to the end of the body, so this does too,
+// and repeats until nothing changes so a removal cannot splice a new "<!--".
+function stripComments(text) {
+  let previous;
+  let current = text;
+  do {
+    previous = current;
+    current = current.replace(/<!--[\s\S]*?(-->|$)/g, "");
+  } while (current !== previous);
+  return current;
+}
 
 // A line that opens a code fence: a run of three or more backticks or tildes.
 const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})/;
