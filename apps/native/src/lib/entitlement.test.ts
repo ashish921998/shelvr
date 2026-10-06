@@ -16,6 +16,10 @@ const mock = vi.hoisted(() => ({
   dismissed: vi.fn(async () => {}),
   paywall: () => null,
   presentCustomerCenter: vi.fn(),
+  syncSuperwallUser: vi.fn(async () => {}),
+  resetSuperwallUser: vi.fn(async () => {}),
+  authenticated: true,
+  appStateListeners: new Set<(state: string) => void>(),
   captureError: vi.fn(),
   capture: vi.fn(),
   getOfferings: vi.fn(),
@@ -31,7 +35,12 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
-  AppState: { addEventListener: () => ({ remove: () => {} }) },
+  AppState: {
+    addEventListener: (_: string, listener: (state: string) => void) => {
+      mock.appStateListeners.add(listener);
+      return { remove: () => mock.appStateListeners.delete(listener) };
+    },
+  },
   NativeModules: { RNPaywalls: {}, RNPurchases: {} },
   Platform: { OS: "ios" },
 }));
@@ -74,6 +83,10 @@ vi.mock("./exit-offer-sheet", () => ({
   presentExitSheet: mock.presentExitSheet,
   whenExitSheetDismissed: () => mock.dismissed(),
 }));
+vi.mock("./superwall", () => ({
+  syncSuperwallUser: mock.syncSuperwallUser,
+  resetSuperwallUser: mock.resetSuperwallUser,
+}));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
@@ -111,7 +124,10 @@ vi.mock("@convex/model/entitlement", () => ({
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useConvexAuth: () => ({
+    isAuthenticated: mock.authenticated,
+    isLoading: false,
+  }),
 }));
 vi.mock("@tanstack/react-query", () => ({ useQuery: mock.useQuery }));
 
@@ -143,6 +159,8 @@ beforeEach(() => {
   mock.observed.mockReset();
   mock.presentExitSheet.mockReset();
   mock.presentCustomerCenter.mockReset();
+  mock.syncSuperwallUser.mockClear();
+  mock.resetSuperwallUser.mockClear();
   mock.captureError.mockReset();
   mock.capture.mockReset();
   mock.getOfferings.mockReset().mockResolvedValue({ all: {} });
@@ -153,6 +171,8 @@ beforeEach(() => {
   mock.useQuery.mockReset().mockReturnValue({});
   mock.isEntitled.mockReset().mockReturnValue(false);
   mock.store.clear();
+  mock.appStateListeners.clear();
+  mock.authenticated = true;
   mock.apiKey.REVENUECAT_API_KEY = "appl_test";
   mock.apiKey.REVENUECAT_DISABLED_BY_BUILD = false;
   push.mockClear();
@@ -169,6 +189,7 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/(app)/paywall");
+    expect(mock.syncSuperwallUser).not.toHaveBeenCalled();
   });
 
   it("still reports a missing key the build did not choose", async () => {
@@ -184,6 +205,36 @@ describe("useEntitlementSync on a build with RevenueCat disabled", () => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("Superwall identity", () => {
+  it("follows the user RevenueCat is logged in as", async () => {
+    await loadReady();
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
+    expect(mock.syncSuperwallUser).toHaveBeenCalledWith("user_1");
+  });
+
+  it("resets Superwall when the user signs out", async () => {
+    const { hook } = await loadReady();
+    expect(mock.resetSuperwallUser).not.toHaveBeenCalled();
+    mock.authenticated = false;
+    hook.rerender();
+    expect(mock.resetSuperwallUser).toHaveBeenCalledTimes(1);
+    mock.appStateListeners.forEach((listener) => listener("active"));
+    expect(mock.resetSuperwallUser).toHaveBeenCalledTimes(2);
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
+    hook.unmount();
+  });
+
+  it("retries the Superwall sync on every foreground", async () => {
+    const { hook } = await loadReady();
+    mock.appStateListeners.forEach((listener) => listener("background"));
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(1);
+    mock.appStateListeners.forEach((listener) => listener("active"));
+    expect(mock.syncSuperwallUser).toHaveBeenCalledTimes(2);
+    expect(mock.syncSuperwallUser).toHaveBeenLastCalledWith("user_1");
+    hook.unmount();
+  });
 });
 
 describe("presentPaywall concurrency", () => {

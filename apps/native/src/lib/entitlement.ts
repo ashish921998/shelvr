@@ -47,6 +47,7 @@ import {
   REVENUECAT_DISABLED_BY_BUILD,
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
+import { resetSuperwallUser, syncSuperwallUser } from "./superwall";
 import { presentExitSheet, whenExitSheetDismissed } from "./exit-offer-sheet";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
@@ -211,7 +212,12 @@ export function useEntitlementSync(): void {
       // The funnel memory belongs to the account that earned it, so a
       // sign-out or account change drops it (see `forgetPaywallFunnel`).
       forgetPaywallFunnel();
-      return;
+      void resetSuperwallUser();
+      // A sign-out that failed partway finishes on the next foreground.
+      const signedOut = AppState.addEventListener("change", (state) => {
+        if (state === "active") void resetSuperwallUser();
+      });
+      return () => signedOut.remove();
     }
     // A build that deliberately has no key would only burn the retry budget
     // and report the absence as a sync failure on every foreground. Readiness
@@ -233,11 +239,19 @@ export function useEntitlementSync(): void {
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
-      onReady: () => markRcUserSynced(sub),
+      onReady: () => {
+        markRcUserSynced(sub);
+        // Superwall buys through RevenueCat, so it follows RevenueCat's user.
+        void syncSuperwallUser(sub);
+      },
       onError: reportRevenueCatIdentityError,
     });
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") observer.retry();
+      if (state !== "active") return;
+      observer.retry();
+      // RevenueCat marks ready once; a Superwall sync that failed after that
+      // gets its retry here. Repeats are cheap: identify runs only on change.
+      if (_rcSyncedUserId === sub) void syncSuperwallUser(sub);
     });
 
     return () => {
