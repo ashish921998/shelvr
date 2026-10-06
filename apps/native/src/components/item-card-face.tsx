@@ -390,9 +390,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: 2,
   },
   captionTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    ...theme.type.captionStrong,
+    lineHeight: 15,
     color: theme.colors.foreground,
   },
   captionHostRow: {
@@ -402,9 +401,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   captionHost: {
     flexShrink: 1,
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    ...theme.type.finePrint,
+    fontFamily: theme.fonts.medium,
+    lineHeight: 14,
     color: theme.colors.muted,
   },
   menuButton: {
