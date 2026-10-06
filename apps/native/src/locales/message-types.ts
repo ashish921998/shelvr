@@ -410,11 +410,8 @@ export type MessageParams = {
   "cancelSurvey.other": undefined;
   "cancelSurvey.skipLabel": undefined;
   "cancelSurvey.skip": undefined;
-  "import.fromX": undefined;
   "import.title": undefined;
   "import.description": undefined;
-  "import.xHintTitle": undefined;
-  "import.xHintBody": undefined;
   "import.placeholder": undefined;
   "import.urlReady": { count: number };
   "import.progress": { count: number };

@@ -431,11 +431,8 @@
   "cancelSurvey.other": "その他",
   "cancelSurvey.skipLabel": "解約アンケートをスキップ",
   "cancelSurvey.skip": "スキップ",
-  "import.fromX": "Xからインポート",
   "import.title": "リンクをインポート",
   "import.description": "下にURLのリストを貼り付けてください — 1行に1つ、またはJSON配列で入力できます。各リンクは通常の保存と同様にShelvrに保存され、自動で整理されます。",
-  "import.xHintTitle": "Xのブックマークをインポート",
-  "import.xHintBody": "1. Xで「設定 → アカウント → データのアーカイブをダウンロード」に進みます。\n2. アーカイブを受け取ったら、Bookmarksファイルを開き内容（JSONリスト）をコピーします。\n3. 上に貼り付けて「インポート」をタップします。",
   "import.placeholder": "ここにURLを貼り付け…",
   "import.urlReady": {
     "other": "%{formattedCount}件のURLをインポート準備完了"
