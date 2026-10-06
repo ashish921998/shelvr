@@ -116,10 +116,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   headline: {
     marginBottom: theme.gap(1),
-    fontFamily: theme.fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.4,
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
     color: theme.colors.foreground,
   },
   scroll: {
