@@ -10,13 +10,13 @@ import {
 } from "./media-viewer";
 
 describe("isMediaSave", () => {
-  it("opens photos in the viewer", () => {
+  it("keeps photos on the page layout", () => {
     expect(isMediaSave({ type: "image", imageUrl: "https://x/p.jpg" })).toBe(
-      true,
+      false,
     );
   });
 
-  it("keeps stickers and photos without a picture on the page layout", () => {
+  it("keeps stickers and saves without a picture on the page layout", () => {
     expect(
       isMediaSave({
         type: "image",

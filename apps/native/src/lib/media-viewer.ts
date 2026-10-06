@@ -15,15 +15,14 @@ type MediaCandidate = {
 };
 
 /**
- * Whether a save opens in the full-screen media viewer: a photo, or a social
- * post (reel, short, carousel) that has a picture to show. Articles, notes and
- * plain links keep the reading layout, and a die-cut sticker keeps its paper
- * ground, where its cut-out edge reads.
+ * Whether a save opens in the full-screen media viewer: a social post (reel,
+ * short, carousel) that has a picture to show. Photos, articles, notes and
+ * plain links keep the page layout, where the save's space, tags and similar
+ * saves sit on the first screen.
  */
 export function isMediaSave(item: MediaCandidate | undefined): boolean {
   if (!item || item.isSticker) return false;
   if (!(item.imageUrl ?? item.heroImageUrl)) return false;
-  if (item.type === "image") return true;
   return socialPost(item) !== undefined;
 }
 
