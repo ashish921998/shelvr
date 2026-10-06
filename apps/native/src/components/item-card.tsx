@@ -13,6 +13,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { Link, useRouter } from "expo-router";
+import type { SFSymbol } from "expo-symbols";
 import { Alert, Pressable, Share } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -32,6 +33,12 @@ export type ItemSource =
   | { from: "digest" }
   | { from: "map" };
 
+// One list of what a card offers. It feeds the ellipsis menu, the screen
+// reader's actions and the iOS long-press menu, so the three can't drift.
+// Screen reader actions dispatch on `id`, which stays fixed across locales.
+type CardActionId = "accept" | "dismiss" | "share" | "changeSpaces" | "delete";
+type CardAction = ActionMenuItem & { id: CardActionId; icon: SFSymbol };
+
 function cardMenuActions({
   isSuggested,
   hasUrl,
@@ -50,29 +57,45 @@ function cardMenuActions({
   share: () => void;
   changeSpaces: () => void;
   confirmDelete: () => void;
-}): ActionMenuItem[] {
+}): CardAction[] {
   if (isSuggested) {
     return [
-      { label: t("spaces.addItem"), onPress: accept },
       {
+        id: "accept",
+        label: t("spaces.addItem"),
+        icon: "plus",
+        onPress: accept,
+      },
+      {
+        id: "dismiss",
         label: t("spaces.dismissSuggestion"),
+        icon: "xmark",
         destructive: true,
         onPress: dismiss,
       },
     ];
   }
-  const actions: ActionMenuItem[] = [];
+  const actions: CardAction[] = [];
   if (hasUrl) {
-    actions.push({ label: t("common.share"), onPress: share });
+    actions.push({
+      id: "share",
+      label: t("common.share"),
+      icon: "square.and.arrow.up",
+      onPress: share,
+    });
   }
   if (isReady) {
     actions.push({
+      id: "changeSpaces",
       label: t("spaces.changeMembership"),
+      icon: "tray.and.arrow.up",
       onPress: changeSpaces,
     });
   }
   actions.push({
+    id: "delete",
     label: t("common.delete"),
+    icon: "trash",
     destructive: true,
     onPress: confirmDelete,
   });
@@ -209,8 +232,8 @@ export const ItemCard = memo(function ItemCard({
     // so an accessibilityRole there would never reach the screen reader.
     role: "button" as const,
     accessibilityLabel,
-    accessibilityActions: menuActions.map(({ label }) => ({
-      name: label,
+    accessibilityActions: menuActions.map(({ id, label }) => ({
+      name: id,
       label,
     })),
     onAccessibilityAction: ({
@@ -218,9 +241,7 @@ export const ItemCard = memo(function ItemCard({
     }: {
       nativeEvent: { actionName: string };
     }) => {
-      menuActions
-        .find(({ label }) => label === nativeEvent.actionName)
-        ?.onPress();
+      menuActions.find(({ id }) => id === nativeEvent.actionName)?.onPress();
     },
     // VoiceOver's double-tap. Without it iOS falls back to a synthetic touch
     // at the cell's centre, which only opens the card while the centre lands
@@ -257,45 +278,18 @@ export const ItemCard = memo(function ItemCard({
         {/* The iOS long-press context menu. Expo Router walks the Link's
             direct children by element type, so these must be literal
             Link.Menu / Link.MenuAction elements here — a component returning
-            them is silently discarded and the menu renders empty. */}
+            them is silently discarded and the menu renders empty. A .map()
+            that returns the elements directly is fine. */}
         <Link.Menu>
-          {isSuggested && (
+          {menuActions.map((action) => (
             <Link.MenuAction
-              title={t("spaces.addItem")}
-              icon="plus"
-              onPress={accept}
+              key={action.id}
+              title={action.label}
+              icon={action.icon}
+              destructive={action.destructive}
+              onPress={action.onPress}
             />
-          )}
-          {isSuggested && (
-            <Link.MenuAction
-              title={t("spaces.dismissSuggestion")}
-              icon="xmark"
-              destructive
-              onPress={dismiss}
-            />
-          )}
-          {!isSuggested && item.url ? (
-            <Link.MenuAction
-              title={t("common.share")}
-              icon="square.and.arrow.up"
-              onPress={share}
-            />
-          ) : null}
-          {!isSuggested && item.status === "ready" ? (
-            <Link.MenuAction
-              title={t("spaces.changeMembership")}
-              icon="tray.and.arrow.up"
-              onPress={changeSpaces}
-            />
-          ) : null}
-          {!isSuggested && (
-            <Link.MenuAction
-              title={t("common.delete")}
-              icon="trash"
-              destructive
-              onPress={confirmDelete}
-            />
-          )}
+          ))}
         </Link.Menu>
       </Link>
     </Animated.View>

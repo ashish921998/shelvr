@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { View } from "react-native";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { Alert, Pressable, View, type ViewProps } from "react-native";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
 
 // Every query below goes through the accessibility tree, so the mocks resolve
@@ -76,8 +76,20 @@ vi.mock("expo-router", () => {
   Link.Menu = function LinkMenu({ children }: { children?: ReactNode }) {
     return <ul data-testid="link-menu">{children}</ul>;
   };
-  Link.MenuAction = function LinkMenuAction({ title }: { title: string }) {
-    return <li>{title}</li>;
+  Link.MenuAction = function LinkMenuAction({
+    title,
+    icon,
+    destructive,
+  }: {
+    title: string;
+    icon?: string;
+    destructive?: boolean;
+  }) {
+    return (
+      <li data-icon={icon} data-destructive={destructive ? "" : undefined}>
+        {title}
+      </li>
+    );
   };
   return { Link, useRouter: () => ({ push: routerPush }) };
 });
@@ -263,34 +275,116 @@ describe("on iOS", () => {
       params: { id: "item-1" },
     });
   });
+});
 
-  it("offers the card's menu actions to the screen reader", () => {
-    renderOnIos({ title: "Miso soup recipe", url: "https://example.com" });
-    const props = cellProps("Miso soup recipe");
-    expect(props.accessibilityActions?.map(({ label }) => label)).toEqual([
-      "Share",
-      "Change spaces",
-      "Delete",
+// The card's actions reach the screen reader from a different host on each
+// platform (see item-card.tsx), so each platform is pinned explicitly rather
+// than left to whatever EXPO_OS the test run happens to have.
+describe.each([
+  { os: "ios", host: View, other: Pressable },
+  { os: "android", host: Pressable, other: View },
+] as const)("screen reader actions on $os", ({ os, host, other }) => {
+  const original = process.env.EXPO_OS;
+  beforeEach(() => {
+    process.env.EXPO_OS = os;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    process.env.EXPO_OS = original;
+  });
+
+  /** The props of the one element the screen reader reads as the card. */
+  function hostProps(name: string) {
+    const labelled = (calls: { accessibilityLabel?: string }[][]) =>
+      calls.filter(([props]) => props.accessibilityLabel === name);
+    expect(labelled(vi.mocked(other).mock.calls)).toEqual([]);
+    const call = labelled(vi.mocked(host).mock.calls).at(-1);
+    if (!call) throw new Error(`no ${os} host labelled ${name}`);
+    return call[0] as ViewProps;
+  }
+
+  it("lists the menu actions under ids that don't change with the language", () => {
+    render(
+      <ItemCard
+        item={{
+          ...base,
+          title: "Miso soup recipe",
+          url: "https://example.com",
+        }}
+      />,
+    );
+    expect(hostProps("Miso soup recipe").accessibilityActions).toEqual([
+      { name: "share", label: "Share" },
+      { name: "changeSpaces", label: "Change spaces" },
+      { name: "delete", label: "Delete" },
     ]);
+  });
+
+  it("runs the action the screen reader picked", () => {
+    render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
+    hostProps("Miso soup recipe").onAccessibilityAction?.({
+      nativeEvent: { actionName: "delete" },
+    } as never);
+    expect(Alert.alert).toHaveBeenCalledExactlyOnceWith(
+      "Delete this save?",
+      expect.any(String),
+      expect.any(Array),
+    );
+  });
+
+  it("ignores an action name it does not know", () => {
+    render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
+    hostProps("Miso soup recipe").onAccessibilityAction?.({
+      nativeEvent: { actionName: "Delete" },
+    } as never);
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 });
 
-it("runs a menu action picked from the screen reader's actions", async () => {
-  const { Alert } = await import("react-native");
-  vi.mocked(View).mockClear();
-  render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
-  const { Pressable } = await import("react-native");
-  const call = vi
-    .mocked(Pressable)
-    .mock.calls.findLast(
-      ([props]) => props.accessibilityLabel === "Miso soup recipe",
+// The long-press menu is built from the same list as the screen reader's
+// actions, so the two always offer the same things in the same order.
+it.each([
+  {
+    kind: "a saved card",
+    item: { url: "https://example.com" },
+    source: undefined,
+    menu: [
+      ["Share", "square.and.arrow.up", false],
+      ["Change spaces", "tray.and.arrow.up", false],
+      ["Delete", "trash", true],
+    ],
+  },
+  {
+    kind: "a processing card with no link",
+    item: { status: "processing" as const },
+    source: undefined,
+    menu: [["Delete", "trash", true]],
+  },
+  {
+    kind: "a suggested card",
+    item: { suggested: true },
+    source: { from: "space" as const, spaceId: "space-1" },
+    menu: [
+      ["Add to space", "plus", false],
+      ["Dismiss suggestion", "xmark", true],
+    ],
+  },
+])(
+  "long-press menu for $kind matches its actions",
+  ({ item, source, menu }) => {
+    render(
+      <ItemCard
+        item={{ ...base, title: "Miso soup recipe", ...item }}
+        source={source}
+      />,
     );
-  call?.[0].onAccessibilityAction?.({
-    nativeEvent: { actionName: "Delete" },
-  } as never);
-  expect(Alert.alert).toHaveBeenCalledWith(
-    "Delete this save?",
-    expect.any(String),
-    expect.any(Array),
-  );
-});
+    const entries = [
+      ...screen.getByTestId("link-menu").querySelectorAll("li"),
+    ].map((li) => [
+      li.textContent,
+      li.dataset.icon,
+      li.dataset.destructive !== undefined,
+    ]);
+    expect(entries).toEqual(menu);
+  },
+);
