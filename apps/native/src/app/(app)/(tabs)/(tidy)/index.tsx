@@ -315,7 +315,11 @@ const PermissionGate: FC<{
   return (
     <View style={styles.gate}>
       <EmptyState title={t("tidy.introTitle")} message={t("tidy.introBody")} />
-      <Pressable style={styles.gateButton} onPress={handlePress}>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.gateButton}
+        onPress={handlePress}
+      >
         <Text style={styles.gateButtonText}>
           {permission.canAskAgain
             ? t("permissions.allowPhotos")

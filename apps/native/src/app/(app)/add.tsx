@@ -71,6 +71,7 @@ function ActionButton({
   return (
     <Pressable
       testID={testID}
+      accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
       style={[styles.action, disabled && { opacity: 0.4 }]}

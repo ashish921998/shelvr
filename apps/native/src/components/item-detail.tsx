@@ -623,6 +623,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
       {isTerminalFailure(item.failureReason) ||
       state === "no_article" ? null : (
         <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
             guard(async () => {

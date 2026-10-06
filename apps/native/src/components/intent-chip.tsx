@@ -30,6 +30,7 @@ export function IntentChip({
   const icon = ICONS[kind] ?? "sparkles";
   return (
     <Pressable
+      accessibilityRole="button"
       style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
       onPress={onPress}
       // The pill stays compact; the slop brings the touch target to 48.
