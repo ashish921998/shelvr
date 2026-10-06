@@ -264,7 +264,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(0.75),
   },
   chip: {
-    minHeight: 40,
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(0.75),

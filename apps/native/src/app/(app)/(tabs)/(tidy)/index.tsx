@@ -371,6 +371,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gateButton: {
     alignSelf: "center",
+    justifyContent: "center",
+    minHeight: theme.control.minHeight,
     marginBottom: theme.gap(6),
     paddingHorizontal: theme.gap(3),
     paddingVertical: theme.gap(1.5),

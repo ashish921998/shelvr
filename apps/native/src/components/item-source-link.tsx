@@ -56,7 +56,8 @@ export function ItemSourceLink({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t("item.openSite", { site })}
-      hitSlop={6}
+      // A single text line is ~18pt tall; the slop lifts the target to 48.
+      hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
       style={style}
       onPress={() => openItemSource(item)}
     >

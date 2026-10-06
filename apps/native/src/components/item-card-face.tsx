@@ -413,12 +413,15 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 14,
     color: theme.colors.muted,
   },
+  // 44pt touch target; the negative margin keeps the caption's footprint at 40
+  // so the grid rhythm does not change.
   menuButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    margin: -2,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
+    borderRadius: 22,
   },
   suggestedBadge: {
     position: "absolute",

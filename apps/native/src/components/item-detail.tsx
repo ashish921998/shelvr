@@ -413,7 +413,7 @@ function ItemDetailBody({
           onPress={() => {
             openItemSource(item);
           }}
-          hitSlop={4}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
         >
           <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
           <Text style={styles.urlText} numberOfLines={2}>
@@ -642,7 +642,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
             })
           }
           disabled={retrying || entitlementLoading}
-          hitSlop={6}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
           {retrying ? (
             <ActivityIndicator size="small" color={theme.colors.primaryText} />
@@ -803,8 +803,8 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 6,
     backgroundColor: theme.colors.primarySoft,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
     borderRadius: 50,
   },
   chipLabel: {
