@@ -63,6 +63,7 @@ vi.mock("react-native", () => {
 // Slot, via @radix-ui/react-slot: `{...slotProps, ...childProps}`), so the card
 // has to win that merge to read as a button. Mirroring the spread here is what
 // makes the role assertions mean anything.
+const routerPush = vi.hoisted(() => vi.fn());
 vi.mock("expo-router", () => {
   const Link = ({ children }: { children?: ReactNode }) => <>{children}</>;
   Link.Trigger = ({ children }: { children?: ReactNode }) =>
@@ -78,7 +79,7 @@ vi.mock("expo-router", () => {
   Link.MenuAction = function LinkMenuAction({ title }: { title: string }) {
     return <li>{title}</li>;
   };
-  return { Link, useRouter: () => ({ push: vi.fn() }) };
+  return { Link, useRouter: () => ({ push: routerPush }) };
 });
 
 vi.mock("react-native-reanimated", async () => {
@@ -251,6 +252,16 @@ describe("on iOS", () => {
     const props = cellProps("Miso soup recipe");
     expect(props.accessible).toBe(true);
     expect(props.testID).toBe("fixture-item-ramen");
+  });
+
+  it("opens the save when VoiceOver activates the card", () => {
+    renderOnIos({ title: "Miso soup recipe" });
+    routerPush.mockClear();
+    cellProps("Miso soup recipe").onAccessibilityTap?.();
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/item/[id]",
+      params: { id: "item-1" },
+    });
   });
 
   it("offers the card's menu actions to the screen reader", () => {

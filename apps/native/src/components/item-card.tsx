@@ -99,6 +99,10 @@ export const ItemCard = memo(function ItemCard({
   const spaceId =
     source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
   const isSuggested = item.suggested === true && spaceId !== undefined;
+  const href = {
+    pathname: "/item/[id]" as const,
+    params: { id: item._id, ...source },
+  };
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
   const shareLink = useShareLink();
@@ -218,6 +222,10 @@ export const ItemCard = memo(function ItemCard({
         .find(({ label }) => label === nativeEvent.actionName)
         ?.onPress();
     },
+    // VoiceOver's double-tap. Without it iOS falls back to a synthetic touch
+    // at the cell's centre, which only opens the card while the centre lands
+    // on the Pressable. Opening here is a plain push, without the zoom.
+    onAccessibilityTap: () => router.push(href),
     testID: item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined,
   };
   const a11yOnCell = process.env.EXPO_OS === "ios";
@@ -228,10 +236,7 @@ export const ItemCard = memo(function ItemCard({
       style={styles.cell}
       {...(a11yOnCell ? cardA11y : {})}
     >
-      <Link
-        href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
-        asChild
-      >
+      <Link href={href} asChild>
         <Link.Trigger withAppleZoom={!reducedMotion}>
           <Pressable {...(a11yOnCell ? {} : cardA11y)}>
             {/* Link.Trigger's Slot drops a Pressable style function (it merges
