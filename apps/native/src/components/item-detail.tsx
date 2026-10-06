@@ -5,6 +5,7 @@ import { ProductsSection } from "@/components/products-section";
 import { RecipeSection } from "@/components/recipe-section";
 import { ArticleReaderView } from "@/components/article-reader-view";
 import { ItemSpaces } from "@/components/item-spaces";
+import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
 import { NoteEditor } from "@/components/note-editor";
 import { analytics } from "@/lib/analytics";
@@ -15,6 +16,7 @@ import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
 import { usePaywallGuard } from "@/lib/entitlement";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
+import { fitMedia, isMediaSave } from "@/lib/media-viewer";
 import { socialPost, type SocialPost } from "@/lib/social-post";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
@@ -73,6 +75,13 @@ type Props = {
   // Only the page matching the pushed id owns the Apple-zoom transition target;
   // pairing more than one target with a single push confuses the animation.
   isZoomTarget: boolean;
+  // The pager's page height, which a media save's stage fills.
+  pageHeight: number;
+  // The pager pins a bar over this page's bottom (a suggestion decision, or
+  // its undo), so a media caption must sit above it.
+  reserveFooter: boolean;
+  onSheetUnderHeader?: (itemId: string, under: boolean) => void;
+  onSourceBrowser?: (open: boolean) => void;
 };
 
 // Shared data for both render paths: the full document (list rows carry
@@ -142,6 +151,10 @@ function useItemDetailData(item: DetailItem) {
 export const ItemDetail = memo(function ItemDetail({
   item,
   isZoomTarget,
+  pageHeight,
+  reserveFooter,
+  onSheetUnderHeader,
+  onSourceBrowser,
 }: Props) {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
@@ -203,6 +216,44 @@ export const ItemDetail = memo(function ItemDetail({
       ...scoped.filter((i) => !seen.has(`${i.kind}|${i.value.toLowerCase()}`)),
     ];
   })();
+
+  if (heroUri && isMediaSave(item)) {
+    return (
+      <MediaViewerPage
+        item={item}
+        social={social}
+        heroUri={heroUri}
+        isZoomTarget={isZoomTarget}
+        pageHeight={pageHeight}
+        headerInset={headerInset}
+        reserveFooter={reserveFooter}
+        onSheetUnderHeader={onSheetUnderHeader}
+        onSourceBrowser={onSourceBrowser}
+        scrollRef={scrollRef}
+        testID={
+          item.fixtureKey ? `fixture-item-detail-${item.fixtureKey}` : undefined
+        }
+        notice={<SaveStatusNotice item={detail} onMedia />}
+        actions={<IntentsRow item={item} intents={intents} align="start" />}
+        details={
+          bodyPending ? (
+            <View style={styles.bodyPending}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : (
+            <ItemSheetBody
+              item={item}
+              detail={detail}
+              spaces={spaces}
+              similar={similar}
+              paragraphs={paragraphs}
+              social={social}
+            />
+          )
+        }
+      />
+    );
+  }
 
   // Cap the hero so a tall portrait image can't fill the whole screen and hide
   // the title, description, and actions below it.
@@ -321,7 +372,7 @@ export const ItemDetail = memo(function ItemDetail({
     <ScrollView {...scrollProps}>
       {heroBlock}
 
-      <ItemDetailBody
+      <ItemPageBody
         item={item}
         detail={detail}
         spaces={spaces}
@@ -337,7 +388,50 @@ export const ItemDetail = memo(function ItemDetail({
 
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
-function ItemDetailBody({
+/** A carousel post's photos after the first, at the top of the media
+ * viewer's details sheet. Each opens the post, as the first one does. */
+function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
+  const { theme } = useUnistyles();
+  const { width, height } = useWindowDimensions();
+  const rest = (item.media ?? []).slice(1);
+  if (rest.length === 0) return null;
+  const inset = theme.gap(2) * 2 + theme.gap(1) * 2;
+  return (
+    <View style={styles.moreMediaList}>
+      {rest.map((media, index) => (
+        <View key={index} style={styles.heroContainer}>
+          <PostMediaButton
+            site={site}
+            playable={media.kind !== "photo"}
+            onPress={() => openItemSource(item)}
+          >
+            <Image
+              source={{ uri: media.imageUrl }}
+              recyclingKey={`${item._id}-media-${index}`}
+              contentFit="contain"
+              style={[
+                styles.heroImage,
+                fitMedia(media.aspectRatio, width - inset, height * 0.55),
+              ]}
+            />
+          </PostMediaButton>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+type DetailBodyProps = {
+  item: DetailItem;
+  detail: ReturnType<typeof useItemDetailData>["detail"];
+  spaces: ReturnType<typeof useItemDetailData>["spaces"];
+  similar: ReturnType<typeof useItemDetailData>["similar"];
+  paragraphs: string[];
+  social: SocialPost | undefined;
+};
+
+/** The body of a save's own page, under its hero. */
+function ItemPageBody({
   item,
   detail,
   spaces,
@@ -346,13 +440,7 @@ function ItemDetailBody({
   social,
   intents,
   heroUri,
-}: {
-  item: DetailItem;
-  detail: ReturnType<typeof useItemDetailData>["detail"];
-  spaces: ReturnType<typeof useItemDetailData>["spaces"];
-  similar: ReturnType<typeof useItemDetailData>["similar"];
-  paragraphs: string[];
-  social: SocialPost | undefined;
+}: DetailBodyProps & {
   intents: ItemIntent[];
   heroUri: string | null | undefined;
 }) {
@@ -422,6 +510,62 @@ function ItemDetailBody({
         </Pressable>
       ) : null}
 
+      <DetailSections
+        item={item}
+        detail={detail}
+        similar={similar}
+        paragraphs={paragraphs}
+        social={social}
+      />
+    </View>
+  );
+}
+
+/** The details sheet under a media save. Its caption already carries the
+ * status, source and actions; the sheet adds a carousel's other photos and
+ * the full description. */
+function ItemSheetBody({
+  item,
+  detail,
+  spaces,
+  similar,
+  paragraphs,
+  social,
+}: DetailBodyProps) {
+  useAppLocale();
+  return (
+    <View style={styles.body}>
+      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+
+      {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
+
+      {item.description ? (
+        <Text style={styles.description}>{item.description}</Text>
+      ) : null}
+
+      <DetailSections
+        item={item}
+        detail={detail}
+        similar={similar}
+        paragraphs={paragraphs}
+        social={social}
+      />
+    </View>
+  );
+}
+
+/** What a save's page and a media save's sheet both show after their heads:
+ * the post caption, tags, products, recipe or article, and similar saves. */
+function DetailSections({
+  item,
+  detail,
+  similar,
+  paragraphs,
+  social,
+}: Omit<DetailBodyProps, "spaces">) {
+  const { theme } = useUnistyles();
+  return (
+    <>
       {social && paragraphs.length > 0 ? (
         <Text selectable style={styles.paragraph}>
           {paragraphs.join("\n\n")}
@@ -456,7 +600,7 @@ function ItemDetailBody({
           <SimilarGrid items={similar} />
         </View>
       ) : null}
-    </View>
+    </>
   );
 }
 
@@ -464,13 +608,21 @@ function ItemDetailBody({
 function IntentsRow({
   item,
   intents,
+  align = "center",
 }: {
   item: DetailItem;
   intents: ItemIntent[];
+  // "start" lines the chips up with a media save's left-aligned caption.
+  align?: "center" | "start";
 }) {
   if (intents.length === 0) return null;
   return (
-    <View style={styles.intentsRow}>
+    <View
+      style={[
+        styles.intentsRow,
+        align === "start" && { justifyContent: "flex-start" },
+      ]}
+    >
       {intents.map((intent, index) => (
         <IntentChip
           key={`${intent.kind}-${index}`}
@@ -566,7 +718,14 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  *
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
-function SaveStatusNotice({ item }: { item: DetailItem }) {
+function SaveStatusNotice({
+  item,
+  onMedia = false,
+}: {
+  item: DetailItem;
+  // Over a media save's dark caption scrim rather than the page.
+  onMedia?: boolean;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
@@ -592,8 +751,13 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   if (processing && state === null) {
     return (
       <View style={styles.processingRow}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={styles.processingText}>{t("item.reading")}</Text>
+        <ActivityIndicator
+          size="small"
+          color={onMedia ? "white" : theme.colors.primary}
+        />
+        <Text style={[styles.processingText, onMedia && styles.onMediaText]}>
+          {t("item.reading")}
+        </Text>
       </View>
     );
   }
@@ -619,7 +783,9 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
               : theme.colors.danger
         }
       />
-      <Text style={styles.noticeText}>{noticeFor(state, item.type)}</Text>
+      <Text style={[styles.noticeText, onMedia && styles.onMediaText]}>
+        {noticeFor(state, item.type)}
+      </Text>
       {isTerminalFailure(item.failureReason) ||
       state === "no_article" ? null : (
         <Pressable
@@ -685,6 +851,11 @@ const styles = StyleSheet.create((theme) => ({
   moreMedia: {
     marginTop: theme.gap(2),
   },
+  moreMediaList: {
+    gap: theme.gap(2),
+    // The sheet body is already inset; the frames bring their own margin.
+    marginHorizontal: -theme.gap(2),
+  },
   heroImage: {
     borderRadius: theme.radius.md,
     borderCurve: "continuous",
@@ -702,6 +873,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
+  },
+  onMediaText: {
+    color: "rgba(255, 255, 255, 0.86)",
   },
   processingText: {
     fontFamily: theme.fonts.medium,

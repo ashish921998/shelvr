@@ -361,6 +361,8 @@
   "item.noteTitlePlaceholder": "Titel",
   "item.noteTitleLabel": "Notiztitel",
   "item.noteTextLabel": "Notiztext",
+  "item.details": "Details",
+  "item.toggleCaption": "Blendet die Beschriftung ein oder aus",
   "capture.partialFailure": "%{saved} von %{total} gespeichert.\n%{reason}\nFehlgeschlagene Bilder erneut speichern?",
   "pro.restoredBody": "Dein Kauf bei %{store} wurde gefunden. Es kann kurz dauern, bis Shelvr Pro aktualisiert wird.",
   "pro.notFoundBody": "Für dieses %{store}-Konto wurde kein aktiver Shelvr Pro-Kauf gefunden.",
@@ -375,6 +377,10 @@
   "spaces.saveCount": {
     "one": "%{formattedCount} gespeicherter Inhalt",
     "other": "%{formattedCount} gespeicherte Inhalte"
+  },
+  "item.moreMedia": {
+    "one": "%{formattedCount} weiteres Foto in diesem Beitrag",
+    "other": "%{formattedCount} weitere Fotos in diesem Beitrag"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} Vorschlag",
