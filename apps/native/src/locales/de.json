@@ -442,11 +442,8 @@
   "cancelSurvey.other": "Etwas anderes",
   "cancelSurvey.skipLabel": "Umfrage zur Kündigung überspringen",
   "cancelSurvey.skip": "Überspringen",
-  "import.fromX": "Aus X importieren",
   "import.title": "Links importieren",
   "import.description": "Füge unten eine Liste von URLs ein — eine pro Zeile oder als JSON-Array. Jeder Link wird in Shelvr gespeichert und automatisch organisiert, genau wie ein normaler Speichervorgang.",
-  "import.xHintTitle": "X-Lesezeichen importieren",
-  "import.xHintBody": "1. Gehe in X zu Einstellungen → Dein Konto → Lade ein Archiv deiner Daten herunter.\n2. Öffne nach Erhalt des Archivs die Bookmarks-Datei und kopiere ihren Inhalt (die JSON-Liste).\n3. Füge sie oben ein und tippe auf Importieren.",
   "import.placeholder": "URLs hier einfügen…",
   "import.urlReady": {
     "one": "%{formattedCount} URL bereit zum Importieren",

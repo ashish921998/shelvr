@@ -442,11 +442,8 @@
   "cancelSurvey.other": "Something else",
   "cancelSurvey.skipLabel": "Skip cancellation survey",
   "cancelSurvey.skip": "Skip",
-  "import.fromX": "Import from X",
   "import.title": "Import links",
   "import.description": "Paste a list of URLs below — one per line or as a JSON array. Each link will be saved and auto-organized by Shelvr, just like a regular save.",
-  "import.xHintTitle": "Importing X bookmarks",
-  "import.xHintBody": "1. In X, go to Settings → Your account → Download an archive of your data.\n2. After receiving the archive, open the Bookmarks file and copy its contents (the JSON list).\n3. Paste them above and tap Import.",
   "import.placeholder": "Paste URLs here…",
   "import.urlReady": {
     "one": "%{formattedCount} URL ready to import",
