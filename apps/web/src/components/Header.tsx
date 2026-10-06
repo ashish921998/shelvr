@@ -34,7 +34,7 @@ export default function Header() {
               <li key={item.name}>
                 <a
                   href={item.href}
-                  className="flex h-10 items-center px-3.5 text-sm font-medium text-muted transition-colors hover:text-ember-deep"
+                  className="flex h-11 items-center px-3.5 text-sm font-medium text-muted transition-colors hover:text-ember-deep"
                 >
                   {item.name}
                 </a>
