@@ -359,6 +359,8 @@ export type MessageParams = {
   "item.noteTitlePlaceholder": undefined;
   "item.noteTitleLabel": undefined;
   "item.noteTextLabel": undefined;
+  "item.details": undefined;
+  "item.toggleCaption": undefined;
   "capture.partialFailure": { saved: number; total: number; reason: string };
   "pro.restoredBody": { store: string };
   "pro.notFoundBody": { store: string };
@@ -368,6 +370,7 @@ export type MessageParams = {
   "share.progress": { saved: number; total: number };
   "share.failureCount": { count: number };
   "spaces.saveCount": { count: number };
+  "item.moreMedia": { count: number };
   "spaces.suggestionCount": { count: number };
   "tidy.keptCount": { count: number };
   "tidy.savedCount": { count: number };
