@@ -1,0 +1,31 @@
+PR 273, commit 945d188e, iPhone 17 Pro simulator, iOS 26.5, dev client (app.shelvr.save.dev)
+Anonymous dev user with fixtures. Accessibility tree from argent `describe` (ax-service).
+Frames are normalized (x, y, width, height).
+
+== Home, before the long press ==
+AXButton "Profile"  (0.050, 0.076, 0.090, 0.041)
+AXButton "Add"  (0.861, 0.076, 0.090, 0.041)
+AXStaticText "shelvr"  (0.401, 0.076, 0.197, 0.040)
+AXStaticText "How's Shelvr so far?"  (0.082, 0.170, 0.836, 0.022)
+AXButton "Send feedback"  (0.364, 0.236, 0.322, 0.050)
+AXButton "Dismiss feedback invitation"  (0.706, 0.236, 0.212, 0.050)
+AXButton "Abstract Blue Gradient"  (0.000, 0.305, 0.500, 0.283)
+AXButton "Green circle"  (0.500, 0.305, 0.500, 0.283)
+AXButton "Abstract red block"  (0.000, 0.588, 0.500, 0.353)
+AXButton "The Value of Craft" id="fixture-item-value-of-craft"  (0.500, 0.588, 0.500, 0.172)
+AXButton "Apartment Shopping Checklist" id="fixture-item-apartment-checklist"  (0.500, 0.760, 0.500, 0.172)
+AXButton "Belém Tower" id="fixture-item-belem-tower"  (0.500, 0.931, 0.500, 0.069)
+AXButton "Weeknight Miso Ramen" id="fixture-item-ramen"  (0.000, 0.941, 0.500, 0.059)
+
+Note: the three image cards (Abstract Blue Gradient, Green circle, Abstract red block)
+are Buttons but list no id in this tree; the four link and note cards carry fixture ids.
+
+== After a long press on "The Value of Craft" (link save) ==
+AXButton "Dismiss context menu"  (0.000, 0.000, 1.000, 1.000)
+AXGroup "Preview"  (0.040, 0.148, 0.920, 0.605)
+AXButton "Share"  (0.338, 0.783, 0.622, 0.048)
+AXTextField "Share" id="square.and.arrow.up"  (0.415, 0.793, 0.047, 0.025)
+AXButton "Change spaces"  (0.338, 0.831, 0.622, 0.048)
+AXTextField "outbox" id="tray.and.arrow.up"  (0.409, 0.841, 0.059, 0.025)
+AXButton "Delete"  (0.338, 0.879, 0.622, 0.048)
+AXTextField "trash" id="trash"  (0.415, 0.891, 0.047, 0.024)
