@@ -361,6 +361,8 @@
   "item.noteTitlePlaceholder": "Titel",
   "item.noteTitleLabel": "Notiztitel",
   "item.noteTextLabel": "Notiztext",
+  "item.details": "Details",
+  "item.toggleCaption": "Blendet die Beschriftung ein oder aus",
   "capture.partialFailure": "%{saved} von %{total} gespeichert.\n%{reason}\nFehlgeschlagene Bilder erneut speichern?",
   "pro.restoredBody": "Dein Kauf bei %{store} wurde gefunden. Es kann kurz dauern, bis Shelvr Pro aktualisiert wird.",
   "pro.notFoundBody": "Für dieses %{store}-Konto wurde kein aktiver Shelvr Pro-Kauf gefunden.",
@@ -375,6 +377,10 @@
   "spaces.saveCount": {
     "one": "%{formattedCount} gespeicherter Inhalt",
     "other": "%{formattedCount} gespeicherte Inhalte"
+  },
+  "item.moreMedia": {
+    "one": "%{formattedCount} weiteres Foto in diesem Beitrag",
+    "other": "%{formattedCount} weitere Fotos in diesem Beitrag"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} Vorschlag",
@@ -442,11 +448,8 @@
   "cancelSurvey.other": "Etwas anderes",
   "cancelSurvey.skipLabel": "Umfrage zur Kündigung überspringen",
   "cancelSurvey.skip": "Überspringen",
-  "import.fromX": "Aus X importieren",
   "import.title": "Links importieren",
   "import.description": "Füge unten eine Liste von URLs ein — eine pro Zeile oder als JSON-Array. Jeder Link wird in Shelvr gespeichert und automatisch organisiert, genau wie ein normaler Speichervorgang.",
-  "import.xHintTitle": "X-Lesezeichen importieren",
-  "import.xHintBody": "1. Gehe in X zu Einstellungen → Dein Konto → Lade ein Archiv deiner Daten herunter.\n2. Öffne nach Erhalt des Archivs die Bookmarks-Datei und kopiere ihren Inhalt (die JSON-Liste).\n3. Füge sie oben ein und tippe auf Importieren.",
   "import.placeholder": "URLs hier einfügen…",
   "import.urlReady": {
     "one": "%{formattedCount} URL bereit zum Importieren",

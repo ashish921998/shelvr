@@ -362,6 +362,8 @@
   "item.noteTitlePlaceholder": "Titre",
   "item.noteTitleLabel": "Titre de la note",
   "item.noteTextLabel": "Texte de la note",
+  "item.details": "Détails",
+  "item.toggleCaption": "Affiche ou masque la légende",
   "capture.partialFailure": "%{saved} sur %{total} enregistrés.\n%{reason}\nRéessayer les images en échec ?",
   "pro.restoredBody": "Votre achat %{store} a été trouvé. La mise à jour de Shelvr Pro peut prendre un instant.",
   "pro.notFoundBody": "Aucun achat Shelvr Pro actif n'a été trouvé pour ce compte %{store}.",
@@ -378,6 +380,11 @@
     "one": "%{formattedCount} contenu enregistré",
     "many": "%{formattedCount} contenus enregistrés",
     "other": "%{formattedCount} contenus enregistrés"
+  },
+  "item.moreMedia": {
+    "one": "%{formattedCount} autre photo dans cette publication",
+    "many": "%{formattedCount} autres photos dans cette publication",
+    "other": "%{formattedCount} autres photos dans cette publication"
   },
   "spaces.suggestionCount": {
     "one": "%{formattedCount} suggestion",
@@ -453,11 +460,8 @@
   "cancelSurvey.other": "Autre raison",
   "cancelSurvey.skipLabel": "Ignorer le questionnaire d’annulation",
   "cancelSurvey.skip": "Ignorer",
-  "import.fromX": "Importer de X",
   "import.title": "Importer des liens",
   "import.description": "Collez une liste d’URLs ci-dessous — une par ligne ou sous forme de tableau JSON. Chaque lien sera enregistré et organisé automatiquement par Shelvr, comme une sauvegarde normale.",
-  "import.xHintTitle": "Importer les signets X",
-  "import.xHintBody": "1. Dans X, allez dans Paramètres → Votre compte → Téléchargez une archive de vos données.\n2. Après avoir reçu l’archive, ouvrez le fichier Bookmarks et copiez son contenu (la liste JSON).\n3. Collez-les ci-dessus et appuyez sur Importer.",
   "import.placeholder": "Collez les URLs ici…",
   "import.urlReady": {
     "one": "%{formattedCount} URL prête à importer",

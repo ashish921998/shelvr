@@ -237,10 +237,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1),
   },
   headline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.5,
+    fontFamily: theme.fonts.display,
+    fontSize: 32,
+    lineHeight: 38,
     color: theme.colors.foreground,
   },
   support: {

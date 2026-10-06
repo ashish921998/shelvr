@@ -178,9 +178,11 @@ function CardCaption({
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
-        <Text style={styles.captionTitle} numberOfLines={1}>
-          {captionTitle}
-        </Text>
+        {captionTitle !== undefined ? (
+          <Text style={styles.captionTitle} numberOfLines={1}>
+            {captionTitle}
+          </Text>
+        ) : null}
         {item.type === "link" && item.url ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
@@ -258,7 +260,12 @@ export function ItemCardFace({
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const failedLabel = failureLabel(item);
-  const captionTitle = cardTitles(item).find((title) => title !== undefined);
+  // A tile without media already prints its title on the text face, so the
+  // caption repeats it only under an image.
+  const hasMedia = Boolean(item.imageUrl ?? item.heroImageUrl);
+  const captionTitle = hasMedia
+    ? cardTitles(item).find((title) => title !== undefined)
+    : undefined;
   return (
     <View
       style={[
@@ -390,9 +397,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: 2,
   },
   captionTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    ...theme.type.captionStrong,
+    lineHeight: 15,
     color: theme.colors.foreground,
   },
   captionHostRow: {
@@ -402,17 +408,20 @@ const styles = StyleSheet.create((theme) => ({
   },
   captionHost: {
     flexShrink: 1,
-    fontFamily: theme.fonts.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    ...theme.type.finePrint,
+    fontFamily: theme.fonts.medium,
+    lineHeight: 14,
     color: theme.colors.muted,
   },
+  // 44pt touch target; the negative margin keeps the caption's footprint at 40
+  // so the grid rhythm does not change.
   menuButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    margin: -2,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
+    borderRadius: 22,
   },
   suggestedBadge: {
     position: "absolute",
