@@ -30,6 +30,11 @@ export function startOnSeededHome(): void {
         { timeout: BUNDLE_TIMEOUT },
       )
       .toBe(true);
+    // The app mounts under the launch splash, so its controls can appear in
+    // the accessibility tree before they can receive touches.
+    await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+      timeout: 30_000,
+    });
     if (await openerSignIn.isVisible()) await openerSignIn.tap();
     if (!(await profile.isVisible())) await devLogin.tap({ timeout: 30_000 });
 
@@ -46,5 +51,8 @@ export function startOnSeededHome(): void {
 
     await app.open();
     await expect(profile).toBeVisible({ timeout: BUNDLE_TIMEOUT });
+    await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
+      timeout: 30_000,
+    });
   });
 }

@@ -6,7 +6,7 @@ import { startOnSeededHome } from "./seeded-home.ts";
 startOnSeededHome();
 
 test("finds a save by a word in its title", async ({ screen }) => {
-  await screen.getByRole("button", "Search").tap();
+  await screen.getByRole("tab", "Search").tap();
   await screen.getByRole("textbox", "Search your saves").fill("ramen");
 
   // The query is debounced and runs on the backend, so the toBeVisible wait
