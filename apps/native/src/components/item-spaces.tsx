@@ -1,17 +1,19 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
-import { Text } from "react-native";
+import { Text, type StyleProp, type TextStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function ItemSpaces({
   spaces,
+  style,
 }: {
   spaces: { _id: Id<"spaces">; name: string }[];
+  style?: StyleProp<TextStyle>;
 }) {
   useAppLocale();
 
   return (
-    <Text style={styles.label} numberOfLines={2}>
+    <Text style={[styles.label, style]} numberOfLines={2}>
       {spaces.length > 0
         ? t("item.inSpaces", {
             spaces: spaces.map((space) => space.name).join(", "),

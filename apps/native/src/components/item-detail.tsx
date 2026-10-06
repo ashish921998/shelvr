@@ -376,9 +376,11 @@ function ItemDetailBody({
         heroUri ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
-      <SaveStatusNotice item={item} />
+      <SaveStatusNotice item={item} centered />
 
-      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+      {item.status === "ready" ? (
+        <ItemSpaces spaces={spaces} style={styles.centeredText} />
+      ) : null}
 
       {item.url ? (
         <View style={styles.titleContainer}>
@@ -566,7 +568,15 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  *
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
-function SaveStatusNotice({ item }: { item: DetailItem }) {
+// `centered` follows the link layout, whose title, source and chips all sit on
+// the centre axis; the note layout keeps the notice flush with its editor.
+function SaveStatusNotice({
+  item,
+  centered = false,
+}: {
+  item: DetailItem;
+  centered?: boolean;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
@@ -591,7 +601,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
 
   if (processing && state === null) {
     return (
-      <View style={styles.processingRow}>
+      <View style={[styles.processingRow, centered && styles.centeredRow]}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <Text style={styles.processingText}>{t("item.reading")}</Text>
       </View>
@@ -603,7 +613,7 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
   }
 
   return (
-    <View style={styles.noticeRow}>
+    <View style={[styles.noticeRow, centered && styles.centeredRow]}>
       <AppSymbolIcon
         name={
           state === "no_article"
@@ -619,7 +629,9 @@ function SaveStatusNotice({ item }: { item: DetailItem }) {
               : theme.colors.danger
         }
       />
-      <Text style={styles.noticeText}>{noticeFor(state, item.type)}</Text>
+      <Text style={[styles.noticeText, centered && styles.centeredText]}>
+        {noticeFor(state, item.type)}
+      </Text>
       {isTerminalFailure(item.failureReason) ||
       state === "no_article" ? null : (
         <Pressable
@@ -721,6 +733,12 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     lineHeight: 18,
     color: theme.colors.muted,
+  },
+  centeredRow: {
+    justifyContent: "center",
+  },
+  centeredText: {
+    textAlign: "center",
   },
   titleContainer: {
     gap: theme.gap(1),
