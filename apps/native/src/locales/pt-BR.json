@@ -453,11 +453,8 @@
   "cancelSurvey.other": "Outro motivo",
   "cancelSurvey.skipLabel": "Pular pesquisa de cancelamento",
   "cancelSurvey.skip": "Pular",
-  "import.fromX": "Importar do X",
   "import.title": "Importar links",
   "import.description": "Cole uma lista de URLs abaixo — uma por linha ou como um array JSON. Cada link será salvo e organizado automaticamente pelo Shelvr, como um salvamento normal.",
-  "import.xHintTitle": "Importar favoritos do X",
-  "import.xHintBody": "1. No X, vá em Configurações → Sua conta → Baixe um arquivo dos seus dados.\n2. Após receber o arquivo, abra o arquivo de Bookmarks e copie seu conteúdo (a lista JSON).\n3. Cole-as acima e toque em Importar.",
   "import.placeholder": "Cole URLs aqui…",
   "import.urlReady": {
     "one": "%{formattedCount} URL pronta para importar",
