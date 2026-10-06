@@ -352,7 +352,6 @@
   "item.link": "링크",
   "item.photo": "사진",
   "item.openSite": "%{site} 열기",
-  "item.playVideo": "동영상 재생",
   "item.hideTags": "태그 숨기기: %{tags}",
   "item.showTags": "태그 보기: %{tags}",
   "item.inSpaces": "%{spaces}에 있음",

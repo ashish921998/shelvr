@@ -4,19 +4,16 @@ import type { ReactNode } from "react";
 import { type GestureResponderEvent, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** A post's image or video poster that opens the post on its site, or plays
- * it where the caller can (the media viewer). Videos get a play button. */
+/** A post's image or video poster that opens the post on its site. Videos
+ * get a play button because the app cannot play them itself. */
 export function PostMediaButton({
   site,
-  label,
   playable,
   onPress,
   onPressIn,
   children,
 }: {
   site: string;
-  // Replaces "Open {site}" for a poster that does something else.
-  label?: string;
   playable: boolean;
   onPress: (e: GestureResponderEvent) => void;
   onPressIn?: (e: GestureResponderEvent) => void;
@@ -25,7 +22,7 @@ export function PostMediaButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label ?? t("item.openSite", { site })}
+      accessibilityLabel={t("item.openSite", { site })}
       onPress={onPress}
       onPressIn={onPressIn}
     >

@@ -349,7 +349,6 @@ export type MessageParams = {
   "item.link": undefined;
   "item.photo": undefined;
   "item.openSite": { site: string };
-  "item.playVideo": undefined;
   "item.hideTags": { tags: string };
   "item.showTags": { tags: string };
   "item.inSpaces": { spaces: string };

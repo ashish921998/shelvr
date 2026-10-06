@@ -352,7 +352,6 @@
   "item.link": "Lien",
   "item.photo": "Photo",
   "item.openSite": "Ouvrir %{site}",
-  "item.playVideo": "Lire la vidéo",
   "item.hideTags": "Masquer les étiquettes : %{tags}",
   "item.showTags": "Afficher les étiquettes : %{tags}",
   "item.inSpaces": "Dans %{spaces}",
