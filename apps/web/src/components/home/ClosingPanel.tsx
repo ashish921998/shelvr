@@ -6,14 +6,14 @@ const spine = "block rounded-[4px_4px_1px_1px] origin-bottom";
 export default function ClosingPanel() {
   return (
     <section id="get" className="mx-auto mt-18 max-w-[1200px] px-5 pb-10">
-      <div className="relative flex flex-col items-center gap-6 overflow-hidden rounded-[28px] bg-dark px-6 pt-[clamp(48px,7vw,96px)] pb-[132px] text-center text-dark-text">
+      <div className="relative flex flex-col items-center gap-6 overflow-hidden rounded-[28px] bg-dark px-6 pt-[clamp(48px,7vw,96px)] pb-[156px] text-center min-[760px]:pb-[132px] text-dark-text">
         <div
           aria-hidden
           className="absolute inset-x-6 bottom-14 h-3 rounded-[3px] bg-linear-to-b from-dark-plank-2 via-dark-plank to-dark-3 shadow-[0_12px_20px_rgba(0,0,0,.5)]"
         />
         <div
           aria-hidden
-          className="absolute bottom-[68px] left-11 hidden items-end gap-[5px] min-[760px]:flex"
+          className="absolute bottom-[68px] left-7 flex items-end gap-[5px] min-[760px]:left-11"
         >
           <span className={`${spine} h-[70px] w-[22px] bg-ember`} />
           <span className={`${spine} h-[58px] w-[18px] bg-terracotta`} />
@@ -23,7 +23,7 @@ export default function ClosingPanel() {
         </div>
         <div
           aria-hidden
-          className="absolute right-11 bottom-[68px] hidden items-end gap-[5px] min-[760px]:flex"
+          className="absolute right-7 bottom-[68px] flex items-end gap-[5px] min-[760px]:right-11"
         >
           <span className={`${spine} h-16 w-5 bg-[#8d8271]`} />
           <span className={`${spine} h-20 w-6 bg-ember`} />
