@@ -5,10 +5,10 @@ import Logo from "./common/Logo";
 import StoreButton from "./home/StoreButton";
 
 const navigation = [
-  { name: "Spaces", href: "#shelves" },
-  { name: "Search", href: "#find" },
-  { name: "Photo tidy", href: "#tidy" },
-  { name: "FAQ", href: "#faq" },
+  { name: "Spaces", href: "/#shelves" },
+  { name: "Search", href: "/#find" },
+  { name: "Photo tidy", href: "/#tidy" },
+  { name: "FAQ", href: "/#faq" },
 ];
 
 export default function Header() {
