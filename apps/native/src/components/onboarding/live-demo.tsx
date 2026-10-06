@@ -132,61 +132,68 @@ export function LiveDemoStep({
     demo.error === null ? null : (
       <Text style={styles.error}>{t(demo.error)}</Text>
     );
+  // An error about the link field sits under the field; everything else
+  // (a dismissed share sheet, a failed save) stays by the control it came from.
+  const inputError =
+    demo.error === "demo.clipboardNoLink" || demo.error === "demo.notALink";
 
   const pasteRow = (
-    <View style={styles.inputRow}>
-      <TextInput
-        value={draft}
-        onChangeText={(text) => {
-          setDraft(text);
-          setError(null);
-        }}
-        placeholder={t("demo.pastePlaceholder")}
-        placeholderTextColor={theme.colors.faint}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        returnKeyType="go"
-        accessibilityLabel={t("demo.linkLabel")}
-        style={styles.input}
-        onSubmitEditing={() => demo.submitTyped(draft)}
-      />
-      {draft.trim() !== "" ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={demo.submitting}
-          onPress={() => demo.submitTyped(draft)}
-          style={({ pressed }) => [
-            styles.inputAction,
-            (pressed || demo.submitting) && { opacity: 0.85 },
-          ]}
-        >
-          <Text style={styles.inputActionText}>{t("demo.save")}</Text>
-        </Pressable>
-      ) : Clipboard.isPasteButtonAvailable ? (
-        <Clipboard.ClipboardPasteButton
-          acceptedContentTypes={["url", "plain-text"]}
-          displayMode="iconAndLabel"
-          cornerStyle="large"
-          backgroundColor={theme.colors.primary}
-          foregroundColor={theme.colors.primaryForeground}
-          style={styles.pasteControl}
-          onPress={(data) => {
-            if (data.type === "text") savePasted(data.text);
+    <View style={styles.inputBlock}>
+      <View style={styles.inputRow}>
+        <TextInput
+          value={draft}
+          onChangeText={(text) => {
+            setDraft(text);
+            setError(null);
           }}
+          placeholder={t("demo.pastePlaceholder")}
+          placeholderTextColor={theme.colors.faint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          returnKeyType="go"
+          accessibilityLabel={t("demo.linkLabel")}
+          style={styles.input}
+          onSubmitEditing={() => demo.submitTyped(draft)}
         />
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void pasteClipboard()}
-          style={({ pressed }) => [
-            styles.inputAction,
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          <Text style={styles.inputActionText}>{t("common.paste")}</Text>
-        </Pressable>
-      )}
+        {draft.trim() !== "" ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={demo.submitting}
+            onPress={() => demo.submitTyped(draft)}
+            style={({ pressed }) => [
+              styles.inputAction,
+              (pressed || demo.submitting) && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={styles.inputActionText}>{t("demo.save")}</Text>
+          </Pressable>
+        ) : Clipboard.isPasteButtonAvailable ? (
+          <Clipboard.ClipboardPasteButton
+            acceptedContentTypes={["url", "plain-text"]}
+            displayMode="iconAndLabel"
+            cornerStyle="large"
+            backgroundColor={theme.colors.primary}
+            foregroundColor={theme.colors.primaryForeground}
+            style={styles.pasteControl}
+            onPress={(data) => {
+              if (data.type === "text") savePasted(data.text);
+            }}
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void pasteClipboard()}
+            style={({ pressed }) => [
+              styles.inputAction,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={styles.inputActionText}>{t("common.paste")}</Text>
+          </Pressable>
+        )}
+      </View>
+      {inputError ? errorLine : null}
     </View>
   );
 
@@ -202,7 +209,7 @@ export function LiveDemoStep({
         <SharePicker
           samples={samples}
           disabled={demo.submitting}
-          error={errorLine}
+          error={inputError ? null : errorLine}
           pasteRow={pasteRow}
           retry={demo.error === "demo.shareDismissed"}
           onShare={(url) => void shareSample(url)}
@@ -211,7 +218,7 @@ export function LiveDemoStep({
         <PastePicker
           samples={samples}
           disabled={demo.submitting}
-          error={errorLine}
+          error={inputError ? null : errorLine}
           pasteRow={pasteRow}
           onPick={demo.submitUrl}
         />
@@ -543,10 +550,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.gap(1),
   },
   headline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.4,
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
     color: theme.colors.foreground,
   },
   support: {
@@ -657,6 +663,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontFamily: theme.fonts.regular,
     fontSize: 12,
     color: theme.colors.faint,
+  },
+  inputBlock: {
+    gap: theme.gap(1),
   },
   inputRow: {
     flexDirection: "row",

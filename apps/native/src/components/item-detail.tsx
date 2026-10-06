@@ -464,9 +464,11 @@ function ItemPageBody({
         heroUri ? { paddingTop: theme.gap(5) } : null,
       ]}
     >
-      <SaveStatusNotice item={item} />
+      <SaveStatusNotice item={item} centered />
 
-      {item.status === "ready" ? <ItemSpaces spaces={spaces} /> : null}
+      {item.status === "ready" ? (
+        <ItemSpaces spaces={spaces} style={styles.centeredText} />
+      ) : null}
 
       {item.url ? (
         <View style={styles.titleContainer}>
@@ -501,7 +503,7 @@ function ItemPageBody({
           onPress={() => {
             openItemSource(item);
           }}
-          hitSlop={4}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
         >
           <AppSymbolIcon name="link" size={11} tintColor={theme.colors.faint} />
           <Text style={styles.urlText} numberOfLines={2}>
@@ -718,11 +720,15 @@ function noticeFor(state: SaveState, type: DetailItem["type"]): string {
  *
  * A `not_found` page is gone for good, so it gets no retry — only a reason.
  */
+// `centered` follows the link layout, whose title, source and chips all sit on
+// the centre axis; the note layout keeps the notice flush with its editor.
 function SaveStatusNotice({
   item,
+  centered = false,
   onMedia = false,
 }: {
   item: DetailItem;
+  centered?: boolean;
   // Over a media save's dark caption scrim rather than the page.
   onMedia?: boolean;
 }) {
@@ -750,7 +756,7 @@ function SaveStatusNotice({
 
   if (processing && state === null) {
     return (
-      <View style={styles.processingRow}>
+      <View style={[styles.processingRow, centered && styles.centeredRow]}>
         <ActivityIndicator
           size="small"
           color={onMedia ? "white" : theme.colors.primary}
@@ -767,7 +773,7 @@ function SaveStatusNotice({
   }
 
   return (
-    <View style={styles.noticeRow}>
+    <View style={[styles.noticeRow, centered && styles.centeredRow]}>
       <AppSymbolIcon
         name={
           state === "no_article"
@@ -783,12 +789,19 @@ function SaveStatusNotice({
               : theme.colors.danger
         }
       />
-      <Text style={[styles.noticeText, onMedia && styles.onMediaText]}>
+      <Text
+        style={[
+          styles.noticeText,
+          centered && styles.centeredText,
+          onMedia && styles.onMediaText,
+        ]}
+      >
         {noticeFor(state, item.type)}
       </Text>
       {isTerminalFailure(item.failureReason) ||
       state === "no_article" ? null : (
         <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
           onPress={() =>
             guard(async () => {
@@ -808,7 +821,7 @@ function SaveStatusNotice({
             })
           }
           disabled={retrying || entitlementLoading}
-          hitSlop={6}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
           {retrying ? (
             <ActivityIndicator size="small" color={theme.colors.primaryText} />
@@ -895,6 +908,12 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
     color: theme.colors.muted,
   },
+  centeredRow: {
+    justifyContent: "center",
+  },
+  centeredText: {
+    textAlign: "center",
+  },
   titleContainer: {
     gap: theme.gap(1),
     alignItems: "center",
@@ -977,8 +996,8 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 6,
     backgroundColor: theme.colors.primarySoft,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
     borderRadius: 50,
   },
   chipLabel: {
