@@ -181,7 +181,9 @@ create a space, and search. Save-a-link is scripted with plain locators; the oth
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
-Convex deployment, and `AUTH_ENABLE_ANONYMOUS=true` on that deployment. Each
+Convex deployment, `AUTH_ENABLE_ANONYMOUS=true` on that deployment, and at
+least one photo in the simulator's Photos library for the save-a-photo flow
+(`xcrun simctl addmedia booted path/to/photo.jpg` adds one). Each
 test signs in as the anonymous dev user and resets its data through Settings >
 "Reset flow fixtures", so run it only against a throwaway dev user.
 
