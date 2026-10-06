@@ -145,6 +145,7 @@ export function SignInView({
             return (
               <Text
                 key={index}
+                accessibilityRole="link"
                 style={styles.termsLink}
                 onPress={() =>
                   void Linking.openURL(
@@ -256,8 +257,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   terms: {
     fontFamily: theme.fonts.regular,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 20,
     color: theme.colors.faint,
     textAlign: "center",
     paddingHorizontal: theme.gap(4),
