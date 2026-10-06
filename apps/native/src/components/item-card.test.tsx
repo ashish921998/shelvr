@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { cloneElement, isValidElement, type ReactNode } from "react";
-import { expect, it, vi } from "vitest";
+import { View } from "react-native";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard, type FeedItem } from "./item-card";
 
 // Every query below goes through the accessibility tree, so the mocks resolve
@@ -9,8 +10,11 @@ import { ItemCard, type FeedItem } from "./item-card";
 // was set: React Native reads `role` ahead of `accessibilityRole`
 // (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt) and an
 // accessibilityLabel replaces the child text instead of falling back to it.
+// An element marked `accessible` is one leaf to the screen reader, so its
+// children are hidden from these queries the way iOS hides them.
 type A11yProps = {
   children?: ReactNode;
+  accessible?: boolean;
   role?: string;
   accessibilityRole?: string;
   accessibilityLabel?: string;
@@ -18,12 +22,13 @@ type A11yProps = {
 vi.mock("react-native", () => {
   const a11yElement = ({
     children,
+    accessible,
     role,
     accessibilityRole,
     accessibilityLabel,
   }: A11yProps) => (
     <div role={role ?? accessibilityRole} aria-label={accessibilityLabel}>
-      {children}
+      {accessible ? <div aria-hidden>{children}</div> : children}
     </div>
   );
   return {
@@ -195,19 +200,86 @@ it("stays a button even though Link marks the trigger a link", () => {
   expect(screen.queryByRole("link")).toBeNull();
 });
 
-// Reachability is a separate question from rendering: iOS folds this control
-// into the card, because Pressable is an accessibility element by default. That
-// was true before the card carried a label too, and is not what this asserts —
-// only that labelling the card did not drop either set of actions.
+// Reachability is a separate question from rendering: the card is one
+// accessibility element, so this control is folded into it (its actions reach
+// the screen reader as the card's accessibility actions, tested below). This
+// asserts only that labelling the card did not drop either set of actions.
 it("still renders the save-actions control and the long-press menu", () => {
   render(
     <ItemCard
       item={{ ...base, title: "Miso soup recipe", url: "https://example.com" }}
     />,
   );
-  expect(screen.getByRole("button", { name: "Save actions" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Save actions", hidden: true }),
+  ).toBeTruthy();
   const menu = screen.getByTestId("link-menu").textContent;
   expect(menu).toContain("Share");
   expect(menu).toContain("Change spaces");
   expect(menu).toContain("Delete");
+});
+
+describe("on iOS", () => {
+  // expo-router wraps the trigger in zero-size native views there, which hide
+  // anything below them from VoiceOver and XCTest, so the cell carries the card.
+  const os = process.env.EXPO_OS;
+  afterEach(() => {
+    process.env.EXPO_OS = os;
+  });
+
+  function renderOnIos(item: Partial<FeedItem>) {
+    process.env.EXPO_OS = "ios";
+    vi.mocked(View).mockClear();
+    render(<ItemCard item={{ ...base, ...item }} />);
+  }
+
+  /** The props of the one View the screen reader sees as the card. */
+  function cellProps(name: string) {
+    const call = vi
+      .mocked(View)
+      .mock.calls.find(([props]) => props.accessibilityLabel === name);
+    if (!call) throw new Error(`no View labelled ${name}`);
+    return call[0];
+  }
+
+  it("reads the card from the cell, as one button, with its fixture id", () => {
+    renderOnIos({ title: "Miso soup recipe", fixtureKey: "ramen" });
+    expect(
+      screen.getAllByRole("button", { name: "Miso soup recipe" }),
+    ).toHaveLength(1);
+    expect(screen.queryByRole("link")).toBeNull();
+    const props = cellProps("Miso soup recipe");
+    expect(props.accessible).toBe(true);
+    expect(props.testID).toBe("fixture-item-ramen");
+  });
+
+  it("offers the card's menu actions to the screen reader", () => {
+    renderOnIos({ title: "Miso soup recipe", url: "https://example.com" });
+    const props = cellProps("Miso soup recipe");
+    expect(props.accessibilityActions?.map(({ label }) => label)).toEqual([
+      "Share",
+      "Change spaces",
+      "Delete",
+    ]);
+  });
+});
+
+it("runs a menu action picked from the screen reader's actions", async () => {
+  const { Alert } = await import("react-native");
+  vi.mocked(View).mockClear();
+  render(<ItemCard item={{ ...base, title: "Miso soup recipe" }} />);
+  const { Pressable } = await import("react-native");
+  const call = vi
+    .mocked(Pressable)
+    .mock.calls.findLast(
+      ([props]) => props.accessibilityLabel === "Miso soup recipe",
+    );
+  call?.[0].onAccessibilityAction?.({
+    nativeEvent: { actionName: "Delete" },
+  } as never);
+  expect(Alert.alert).toHaveBeenCalledWith(
+    "Delete this save?",
+    expect.any(String),
+    expect.any(Array),
+  );
 });
