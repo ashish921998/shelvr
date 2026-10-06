@@ -30,6 +30,9 @@ vi.mock("@/lib/entitlement", () => ({
       mock.settle.push(resolve);
     }),
 }));
+vi.mock("@/lib/trial-reminder", () => ({
+  whenTrialPrimerDone: () => Promise.resolve(),
+}));
 vi.mock("expo-router", async () => {
   const { useEffect, useSyncExternalStore } = await import("react");
   return {

@@ -64,7 +64,11 @@ function html(url: string, body: string) {
 }
 
 const PIN_PAGE =
-  '<html><head><meta property="og:title" content="Chicken | recipes"></head><body></body></html>';
+  '<html><head><meta property="og:title" content="Chicken | recipes"><meta property="og:image" content="https://i.pinimg.com/736x/7a/11/ce/x.jpg"><meta property="og:image:width" content="736"><meta property="og:image:height" content="1104"></head><body></body></html>';
+
+/** A pin page with no image or text. */
+const EMPTY_PIN_PAGE =
+  '<html><head><meta property="og:site_name" content="Pinterest"></head><body></body></html>';
 
 /** Serves `routes` by exact URL; every other fetch fails. */
 function serve(routes: Record<string, unknown>) {
@@ -94,6 +98,14 @@ describe("pinterestPage", () => {
       linkedUrl: SOURCE_URL,
       linkedTitle: "25 Healthy Chicken Recipes - Neutral Eating",
     });
+  });
+
+  it("decodes a pinner name Pinterest encoded more than once", () => {
+    const pin = {
+      ...videoPin,
+      pinner: { full_name: "CatPawPrintables &amp;amp;amp; TheKnitNut" },
+    };
+    expect(pinterestPage(pin)?.author).toBe("CatPawPrintables & TheKnitNut");
   });
 
   it("does not call a photo pin a video", () => {
@@ -164,9 +176,11 @@ describe("readPage for Pinterest pins", () => {
     });
     const read = await readPage(shortUrl);
     expect(read.status === "ok" && read.page.siteName).toBe("Pinterest");
+    // The page cap, not a smaller one: draining a pin page past a 64 KiB cap
+    // stalled to the deadline on live Pinterest.
     expect(safeFetch).toHaveBeenCalledWith(
       shortUrl,
-      expect.objectContaining({ maxRedirects: 5 }),
+      expect.objectContaining({ maxRedirects: 5, maxBytes: 1024 * 1024 }),
     );
   });
 
@@ -187,7 +201,8 @@ describe("readPage for Pinterest pins", () => {
   it("marks the page read incomplete when the widget fails transiently", async () => {
     serve({
       [WIDGET_URL]: { ok: false, code: "http_error", status: 503 },
-      [PIN_URL]: html(PIN_URL, PIN_PAGE),
+      // Even an empty page is kept: the widget may answer on a retry.
+      [PIN_URL]: html(PIN_URL, EMPTY_PIN_PAGE),
     });
     const read = await readPage(PIN_URL);
     expect(read.status === "ok" && read.page.incomplete).toBe(true);
@@ -200,7 +215,7 @@ describe("readPage for Pinterest pins", () => {
     safeFetch.mockImplementation(async (url: string) => {
       if (url === WIDGET_URL) throw new Error("socket hang up");
       return url === PIN_URL
-        ? html(PIN_URL, PIN_PAGE)
+        ? html(PIN_URL, EMPTY_PIN_PAGE)
         : { ok: false, code: "http_error", status: 599 };
     });
     const read = await readPage(PIN_URL);
@@ -213,6 +228,17 @@ describe("readPage for Pinterest pins", () => {
         ? json(url, { data: [] })
         : { ok: false, code: "http_error", status: 404 },
     );
+    expect((await readPage(PIN_URL)).status).toBe("gone");
+  });
+
+  it("fails a deleted pin as gone when its page redirects to Pinterest's home page", async () => {
+    serve({
+      [WIDGET_URL]: json(WIDGET_URL, { data: [] }),
+      [PIN_URL]: html(
+        "https://www.pinterest.com/?show_error=true",
+        '<html><head><meta property="og:title" content="Pinterest"></head></html>',
+      ),
+    });
     expect((await readPage(PIN_URL)).status).toBe("gone");
   });
 
@@ -252,7 +278,92 @@ describe("readPage for Pinterest pins", () => {
   });
 });
 
+/** Instagram's crawler login shell: no card for any post. */
+const INSTAGRAM_SHELL =
+  '<html><head><title>Instagram</title><meta property="og:title" content="Instagram" /></head><body></body></html>';
+
+// Probed 2026-10-02: a removed or made-up post's captioned embed answers 200
+// with this box in place of the media and caption.
+const BROKEN_EMBED =
+  '<div class="_aa4c"><div class="EmbedBrokenMedia"><p>This post may be broken, or the post may have been removed.</p></div></div>';
+
 describe("readPage for Instagram posts", () => {
+  it("fails a deleted reel as gone instead of saving it blank", async () => {
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [reelUrl]: html(reelUrl, INSTAGRAM_SHELL),
+      [`${reelUrl}embed/captioned/`]: html(reelUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(reelUrl)).resolves.toMatchObject({ status: "gone" });
+  });
+
+  it("fails a share link to a deleted reel as gone", async () => {
+    const shareUrl = "https://www.instagram.com/share/reel/BAbc123xyz/";
+    const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+    serve({
+      [shareUrl]: html(reelUrl, INSTAGRAM_SHELL),
+      [`${reelUrl}embed/captioned/`]: html(reelUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(shareUrl)).resolves.toMatchObject({
+      status: "gone",
+    });
+  });
+
+  it.each([
+    ["the page", true, false, BROKEN_EMBED],
+    ["the embed", false, true, BROKEN_EMBED],
+    // A cut embed can end before its broken-media box ever arrives.
+    ["the embed, before its broken-media box,", false, true, "<html><body>"],
+  ])(
+    "keeps a post retryable, not gone, when %s was cut short",
+    async (_, pageCut, embedCut, embedBody) => {
+      const reelUrl = "https://www.instagram.com/reel/AAAAAAAAAAA/";
+      const cut = (read: ReturnType<typeof html>, isCut: boolean) =>
+        isCut ? { ...read, truncated: true } : read;
+      serve({
+        [reelUrl]: cut(html(reelUrl, INSTAGRAM_SHELL), pageCut),
+        [`${reelUrl}embed/captioned/`]: cut(html(reelUrl, embedBody), embedCut),
+      });
+      const read = await readPage(reelUrl);
+      expect(read).toMatchObject({
+        status: "ok",
+        page: { truncated: true, incomplete: true },
+      });
+      // Incomplete, so the save offers a retry instead of a blank ready item.
+      expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+        "partial",
+      );
+    },
+  );
+
+  it.each([
+    ["a /share/p/ link", "https://www.instagram.com/share/p/BAbc123xyz/", "p"],
+    ["a /tv/ link", "https://www.instagram.com/tv/AAAAAAAAAAA/", "tv"],
+  ])("fails %s to a deleted post as gone", async (_, url, kind) => {
+    const postUrl = `https://www.instagram.com/${kind}/AAAAAAAAAAA/`;
+    serve({
+      [url]: html(postUrl, INSTAGRAM_SHELL),
+      [`${postUrl}embed/captioned/`]: html(postUrl, BROKEN_EMBED),
+    });
+    await expect(readPage(url)).resolves.toMatchObject({ status: "gone" });
+  });
+
+  it("marks a /p/ post short-form video when its card says video", async () => {
+    const postUrl = "https://www.instagram.com/p/fA9uwTtkSN/";
+    serve({
+      [postUrl]: html(
+        postUrl,
+        '<html><head><meta name="twitter:title" content="Diego (@diegoquinteiro) &#x2022; Instagram video" /></head></html>',
+      ),
+    });
+    const read = await readPage(postUrl);
+    expect(read).toMatchObject({
+      status: "ok",
+      page: { video: true },
+      shortForm: { site: "Instagram", video: true },
+    });
+  });
+
   it("still follows the caption's link to its recipe", async () => {
     const postUrl = "https://www.instagram.com/p/ABC123/";
     const embedUrl = "https://www.instagram.com/p/ABC123/embed/captioned/";

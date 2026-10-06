@@ -5,6 +5,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
+import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
@@ -51,6 +52,7 @@ export default function AppLayout() {
       <RecentSavesWidgetSync />
       <AppIntentsBridge />
       <ExitOfferSheetHost />
+      <TrialReminderPrimerSheet />
       <Stack
         screenOptions={{
           animation: reducedMotion ? "fade" : "default",
@@ -162,6 +164,18 @@ export default function AppLayout() {
               headerTransparent: false,
               headerStyle: { backgroundColor: theme.colors.background },
               headerBackButtonDisplayMode: "minimal",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              presentation: "formSheet",
+              // Android form sheets have no native header, so the screen
+              // draws its own title and close button, as Profile does.
+              headerShown: false,
               sheetGrabberVisible: true,
               sheetAllowedDetents: "fitToContents",
               contentStyle: { backgroundColor: theme.colors.background },

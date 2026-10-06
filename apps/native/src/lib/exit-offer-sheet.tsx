@@ -1,14 +1,25 @@
 import { analytics } from "@/lib/analytics";
-import type { RevenueCatPaywallResult } from "@/lib/paywall-result";
+import {
+  restoreFoundAccess,
+  type RevenueCatPaywallResult,
+} from "@/lib/paywall-result";
 import type RevenueCatUI from "react-native-purchases-ui";
 import type { CustomVariables } from "react-native-purchases-ui";
 import type { PurchasesOffering } from "react-native-purchases";
-import { useEffect, useSyncExternalStore } from "react";
-import { AppState, Modal, Pressable, View } from "react-native";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  Alert,
+  AppState,
+  Modal,
+  Platform,
+  Pressable,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
+import { createSheetRequestStore } from "@/lib/sheet-request-store";
 
 /**
  * The exit offer's own full-screen sheet. RevenueCat's `presentPaywall` sheet
@@ -27,24 +38,42 @@ type Request = {
   /** Fires with the package's identifier the moment the user taps purchase —
    * the one purchase-start signal RevenueCat's component API exposes. */
   onPurchaseStarted?: (packageId: string) => void;
-  resolve: (result: RevenueCatPaywallResult) => void;
+  /** Fires when the person closes the sheet themselves, not when the deadline
+   * or a torn-down host closes it. */
+  onDeclined?: () => void;
 };
 
-let request: Request | null = null;
+// Never superseded: `presentExitSheet` refuses while one is open.
+const sheet = createSheetRequestStore<Request, RevenueCatPaywallResult>(
+  "CANCELLED",
+);
 let hosts = 0;
-const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((read) => read());
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => listeners.delete(onChange);
+
+// A sheet that never reports its dismissal (Android, a torn-down host) must
+// not hold the next presentation back.
+const DISMISSAL_CAP_MS = 1500;
+let dismissal: Promise<void> = Promise.resolve();
+let settleDismissal: () => void = () => {};
+
+function finish(result: RevenueCatPaywallResult, declined = false): void {
+  const current = sheet.current();
+  if (!current) return;
+  dismissal = new Promise((resolve) => {
+    settleDismissal = resolve;
+    setTimeout(resolve, DISMISSAL_CAP_MS);
+  });
+  // Clears the request and notifies the host; the caller's await resumes
+  // only after this function returns, so `onDeclined` still runs first.
+  sheet.resolve(result);
+  if (declined) current.onDeclined?.();
 }
 
-function finish(result: RevenueCatPaywallResult): void {
-  const current = request;
-  if (!current) return;
-  request = null;
-  notify();
-  current.resolve(result);
+/**
+ * Resolves once the last sheet has left the screen. UIKit refuses a new
+ * presentation while one is still dismissing.
+ */
+export function whenExitSheetDismissed(): Promise<void> {
+  return dismissal;
 }
 
 /**
@@ -53,14 +82,13 @@ function finish(result: RevenueCatPaywallResult): void {
  * returns; NOT_PRESENTED when no host is mounted or the offer already ended.
  */
 export function presentExitSheet(
-  input: Omit<Request, "resolve">,
+  input: Request,
 ): Promise<RevenueCatPaywallResult> {
-  if (hosts === 0 || request || Date.now() >= input.endsAt)
+  if (hosts === 0 || sheet.current() || Date.now() >= input.endsAt)
     return Promise.resolve("NOT_PRESENTED");
-  return new Promise((resolve) => {
-    request = { ...input, resolve };
-    notify();
-  });
+  // A fresh object per request, so the host never mistakes a reused input for
+  // the sheet still sliding away.
+  return sheet.request({ ...input });
 }
 
 // The native view reports a dismissal that follows a purchase before or
@@ -68,7 +96,11 @@ export function presentExitSheet(
 const DISMISS_SETTLE_MS = 500;
 
 export function ExitOfferSheetHost() {
-  const current = useSyncExternalStore(subscribe, () => request);
+  const current = useSyncExternalStore(sheet.subscribe, sheet.current);
+  // The sheet stays rendered while it slides away, so iOS reports when the
+  // dismissal has finished.
+  const [shown, setShown] = useState(current);
+  if (current && current !== shown) setShown(current);
   const insets = useSafeAreaInsets();
   useAppLocale();
 
@@ -98,38 +130,58 @@ export function ExitOfferSheetHost() {
     };
   }, [current]);
 
-  if (!current) return null;
-  const { Paywall } = current;
+  if (!shown) return null;
+  const { Paywall } = shown;
   return (
     <Modal
-      visible
+      visible={current !== null}
       animationType="slide"
       presentationStyle="fullScreen"
-      onRequestClose={() => finish("CANCELLED")}
+      onRequestClose={() => finish("CANCELLED", true)}
+      onDismiss={() => {
+        setShown(null);
+        settleDismissal();
+      }}
     >
       <View style={{ flex: 1 }}>
         <Paywall
           style={{ flex: 1 }}
           options={{
-            offering: current.offering,
-            customVariables: current.customVariables,
+            offering: shown.offering,
+            customVariables: shown.customVariables,
           }}
           onPurchasePackageInitiated={({ resume }) => {
-            const open = Date.now() < current.endsAt;
-            resume(open);
+            const open = Date.now() < shown.endsAt;
+            // A sheet that is already sliding away sells nothing.
+            resume(open && sheet.current() === shown);
             if (!open) {
               analytics.capture("exit_offer_expired_open", {});
               finish("CANCELLED");
             }
           }}
           onPurchaseStarted={({ packageBeingPurchased }) => {
-            current.onPurchaseStarted?.(packageBeingPurchased.identifier);
+            shown.onPurchaseStarted?.(packageBeingPurchased.identifier);
           }}
           onPurchaseCompleted={() => finish("PURCHASED")}
-          onRestoreCompleted={() => finish("RESTORED")}
+          onRestoreCompleted={({ customerInfo }) => {
+            // A restore that lands after this sheet closed must not settle
+            // or speak for whatever is open now.
+            if (sheet.current() !== shown) return;
+            if (restoreFoundAccess(customerInfo)) {
+              finish("RESTORED");
+              return;
+            }
+            // Nothing to restore: the offer stays open and says so.
+            Alert.alert(
+              t("pro.notFoundTitle"),
+              t("pro.notFoundBody", {
+                store: Platform.OS === "ios" ? "App Store" : "Google Play",
+              }),
+            );
+          }}
           onDismiss={() =>
             setTimeout(() => {
-              if (request === current) finish("CANCELLED");
+              if (sheet.current() === shown) finish("CANCELLED", true);
             }, DISMISS_SETTLE_MS)
           }
         />
@@ -137,7 +189,7 @@ export function ExitOfferSheetHost() {
           screen (shown when a design fails to render) has none, so the app
           always keeps a way out. */}
         <Pressable
-          onPress={() => finish("CANCELLED")}
+          onPress={() => finish("CANCELLED", true)}
           accessibilityRole="button"
           accessibilityLabel={t("common.close")}
           hitSlop={12}

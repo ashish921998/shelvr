@@ -22,6 +22,21 @@ import {
   finalizeImageImportForUser,
 } from "./items";
 import { requireProEntitlement } from "./subscriptions";
+import { rateLimiter } from "./model/rateLimiter";
+
+export const authorizeCaptureBody = internalMutation({
+  args: { tokenHash: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { tokenHash }) => {
+    const token = await claimCaptureToken(ctx, tokenHash);
+    if (!token) return false;
+    await rateLimiter.limit(ctx, "captureBody", {
+      key: token.userId,
+      throws: true,
+    });
+    return true;
+  },
+});
 
 // The iOS App Intents (Siri, Shortcuts, the share sheet's Shortcuts actions)
 // save without launching the JavaScript app, so they cannot present a Convex

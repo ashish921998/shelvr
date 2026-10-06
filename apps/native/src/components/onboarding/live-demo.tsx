@@ -16,6 +16,7 @@ import {
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
@@ -203,6 +204,7 @@ export function LiveDemoStep({
           disabled={demo.submitting}
           error={errorLine}
           pasteRow={pasteRow}
+          retry={demo.error === "demo.shareDismissed"}
           onShare={(url) => void shareSample(url)}
         />
       ) : (
@@ -239,46 +241,64 @@ function SharePicker({
   disabled,
   error,
   pasteRow,
+  retry,
   onShare,
-}: PickerProps & { onShare: (url: string) => void }) {
+}: PickerProps & { retry: boolean; onShare: (url: string) => void }) {
   useAppLocale();
-  const [featured, ...others] = samples;
+  const { theme } = useUnistyles();
+  const [featured] = samples;
+  const [pasting, setPasting] = useState(false);
+  const shareLabel = t(retry ? "demo.shareRetry" : "demo.shareThis");
   return (
     <>
       <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.shareTitle")}</Text>
+        <Text
+          style={styles.headline}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("demo.shareTitle")}
+        </Text>
         <Text style={styles.support}>{t("demo.shareSupport")}</Text>
       </View>
 
       {featured === undefined ? null : (
-        <SharePost
-          sample={featured}
-          disabled={disabled}
-          onShare={() => onShare(featured.url)}
-        />
+        <>
+          <SharePost sample={featured} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${shareLabel}, ${featured.pageHeading}, ${featured.domain}`}
+            disabled={disabled}
+            onPress={() => onShare(featured.url)}
+            style={({ pressed }) => [
+              styles.shareButton,
+              disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
+            ]}
+          >
+            <AppSymbolIcon
+              name="square.and.arrow.up"
+              size={18}
+              tintColor={theme.colors.primaryForeground}
+            />
+            <Text style={[styles.inputActionText, styles.shareLabel]}>
+              {shareLabel}
+            </Text>
+          </Pressable>
+        </>
       )}
 
       {error}
 
-      {others.length === 0 ? null : (
+      {pasting ? (
         <View style={styles.samples}>
-          <Text style={styles.samplesLabel}>{t("demo.shareOthers")}</Text>
-          {others.map((candidate) => (
-            <SampleRow
-              key={candidate.url}
-              sample={candidate}
-              icon="square.and.arrow.up"
-              disabled={disabled}
-              onPress={() => onShare(candidate.url)}
-            />
-          ))}
+          <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
+          {pasteRow}
         </View>
+      ) : (
+        <GhostButton
+          label={t("demo.pasteOwn")}
+          onPress={() => setPasting(true)}
+        />
       )}
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
-        {pasteRow}
-      </View>
     </>
   );
 }
@@ -294,7 +314,12 @@ function PastePicker({
   return (
     <>
       <View style={styles.head}>
-        <Text style={styles.headline}>{t("demo.title")}</Text>
+        <Text
+          style={styles.headline}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+        >
+          {t("demo.title")}
+        </Text>
         <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 
@@ -308,7 +333,6 @@ function PastePicker({
           <SampleRow
             key={candidate.url}
             sample={candidate}
-            icon="plus"
             disabled={disabled}
             onPress={() => onPick(candidate.url)}
           />
@@ -350,28 +374,10 @@ function ShareHint() {
   );
 }
 
-/** The sample post the share sheet opens over, with its own Share button. */
-function SharePost({
-  sample,
-  disabled,
-  onShare,
-}: {
-  sample: DemoSample;
-  disabled: boolean;
-  onShare: () => void;
-}) {
-  const { theme } = useUnistyles();
+/** The sample post the share sheet opens over. Not a control. */
+function SharePost({ sample }: { sample: DemoSample }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${t("demo.shareThis")}, ${sample.pageHeading}, ${sample.domain}`}
-      disabled={disabled}
-      onPress={onShare}
-      style={({ pressed }) => [
-        styles.post,
-        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-      ]}
-    >
+    <View style={styles.post}>
       <Image
         source={SAMPLE_IMAGES[sample.kind]}
         contentFit="cover"
@@ -386,26 +392,17 @@ function SharePost({
             {sample.domain}
           </Text>
         </View>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name="square.and.arrow.up"
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
 function SampleRow({
   sample,
-  icon,
   disabled,
   onPress,
 }: {
   sample: DemoSample;
-  icon: "plus" | "square.and.arrow.up";
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -434,7 +431,7 @@ function SampleRow({
           {sample.domain}
         </Text>
       </View>
-      <AppSymbolIcon name={icon} size={16} tintColor={theme.colors.primary} />
+      <AppSymbolIcon name="plus" size={16} tintColor={theme.colors.primary} />
     </Pressable>
   );
 }
@@ -588,6 +585,22 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  shareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(1),
+    minHeight: 52,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primary,
+  },
+  shareLabel: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   hintIcon: {
     width: 36,

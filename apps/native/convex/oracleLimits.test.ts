@@ -34,6 +34,59 @@ function consult(
 }
 
 describe("oracleLimits.claim", () => {
+  it("limits parsing budgets independently of Oracle model usage", async () => {
+    const t = newConvexTest();
+    for (let i = 0; i < 12; i++) {
+      await t.mutation(internal.oracleLimits.claimRequestBody, {
+        ip: IP,
+        route: "oracle",
+      });
+    }
+    await expect(
+      t.mutation(internal.oracleLimits.claimRequestBody, {
+        ip: IP,
+        route: "oracle",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(internal.oracleLimits.claimRequestBody, {
+        ip: IP,
+        route: "waitlist",
+      }),
+    ).resolves.toBeNull();
+    await expect(claim(t, IP)).resolves.toBeNull();
+  });
+
+  it("authenticates parsing-budget requests before any body is read", async () => {
+    vi.stubEnv("WAITLIST_SHARED_SECRET", SECRET);
+    const t = newConvexTest();
+    expect((await t.fetch("/request-body", { method: "POST" })).status).toBe(
+      401,
+    );
+    expect(
+      (
+        await t.fetch("/request-body", {
+          method: "POST",
+          headers: {
+            [WAITLIST_SECRET_HEADER]: SECRET,
+            "x-shelvr-body-route": "unknown",
+          },
+        })
+      ).status,
+    ).toBe(400);
+    const headers = {
+      [WAITLIST_SECRET_HEADER]: SECRET,
+      "x-shelvr-body-route": "oracle",
+      [WAITLIST_CLIENT_IP_HEADER]: IP,
+    };
+    for (let i = 0; i < 12; i++)
+      expect(
+        (await t.fetch("/request-body", { method: "POST", headers })).status,
+      ).toBe(200);
+    expect(
+      (await t.fetch("/request-body", { method: "POST", headers })).status,
+    ).toBe(429);
+  });
   it("stops the fifth consult from one IP within the hour", async () => {
     const t = newConvexTest();
 

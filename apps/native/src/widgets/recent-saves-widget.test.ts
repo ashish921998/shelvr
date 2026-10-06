@@ -18,6 +18,7 @@ type WidgetSaveItem = {
 };
 
 type WidgetSnapshotProps = {
+  scheme?: string;
   items?: WidgetSaveItem[];
   emptyTitle?: string;
   emptyHint?: string;
@@ -231,3 +232,14 @@ describe("RecentSavesWidget", () => {
     expect(JSON.stringify(tree)).not.toContain("Chair");
   });
 });
+
+it.each(["shelvr-dev", "shelvr-preview"])(
+  "opens the owning %s app from a widget",
+  (scheme) => {
+    const tree = widget()(
+      { items: [], locked: true, scheme },
+      { colorScheme: "light", widgetFamily: "systemSmall", date: new Date() },
+    );
+    expect(widgetUrl(tree)).toBe(`${scheme}:///paywall`);
+  },
+);

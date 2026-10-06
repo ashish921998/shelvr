@@ -1,4 +1,9 @@
 const appConfig = require("./app.json");
+const {
+  productionCloudOrigin,
+  productionSiteOrigin,
+  isExactOrigin,
+} = require("./production-origins");
 const localizationConfig = require("./localization.config.json");
 const supportedLocales = [
   ...new Set(Object.values(localizationConfig.storeLocales)),
@@ -36,7 +41,7 @@ function requireProductionValue(name, value, isValid, expected) {
 // the rejected build artifact contained a different key from the current
 // RevenueCat App Store app. Keep this as a permanent release guardrail.
 const buildPlatform = process.env.EAS_BUILD_PLATFORM;
-const productionConvexUrl = "https://amiable-setter-120.convex.cloud";
+const productionConvexUrl = productionCloudOrigin;
 const developmentTestKey = "test_VOYicTvOGPXCBFMVdHzyxRndiRi";
 if (!isProduction) {
   let convexOrigin;
@@ -81,16 +86,15 @@ if (buildPlatform === "android") {
 requireProductionValue(
   "EXPO_PUBLIC_CONVEX_URL",
   process.env.EXPO_PUBLIC_CONVEX_URL,
-  (value) => {
-    if (!value) return false;
-    try {
-      const url = new URL(value);
-      return url.origin === productionConvexUrl && url.pathname === "/";
-    } catch {
-      return false;
-    }
-  },
+  (value) => isExactOrigin(value, productionCloudOrigin),
   "the Shelvr production deployment URL",
+);
+
+requireProductionValue(
+  "EXPO_PUBLIC_CONVEX_SITE_URL",
+  process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
+  (value) => isExactOrigin(value, productionSiteOrigin),
+  "the Shelvr production HTTP origin",
 );
 
 function displayName(base) {
@@ -127,6 +131,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: displayName(appConfig.expo.name ?? "Shelvr"),
   icon: isProduction ? appConfig.expo.icon : "./assets/icon-dev.png",
+  scheme: isProduction ? "shelvr" : `shelvr${idSuffix.replace(".", "-")}`,
   ios: {
     ...appConfig.expo.ios,
     ...config?.ios,
@@ -149,6 +154,12 @@ module.exports = ({ config }) => ({
         : {}),
     },
     bundleIdentifier: bundleId,
+    associatedDomains: isProduction
+      ? [
+          "applinks:shelvr-web.vercel.app",
+          "webcredentials:shelvr-web.vercel.app",
+        ]
+      : [],
   },
   android: {
     ...appConfig.expo.android,
@@ -205,7 +216,7 @@ module.exports = ({ config }) => ({
     [
       "expo-widgets",
       {
-        groupIdentifier: "group.app.shelvr.save",
+        groupIdentifier: `group.${bundleId}`,
         widgets: [
           {
             name: "RecentSaves",
@@ -247,6 +258,12 @@ module.exports = ({ config }) => ({
                 ? {
                     ...ext,
                     bundleIdentifier: `${bundleId}.expo-sharing-extension`,
+                    entitlements: {
+                      ...ext.entitlements,
+                      "com.apple.security.application-groups": [
+                        `group.${bundleId}`,
+                      ],
+                    },
                   }
                 : ext,
             ),
