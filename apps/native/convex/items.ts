@@ -39,6 +39,7 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  MAX_USER_NOTE_CHARS,
   postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
@@ -139,6 +140,7 @@ const itemFields = {
   media: v.optional(v.array(postMediaValidator)),
   articleMedia: v.optional(v.array(articleMediaValidator)),
   note: v.optional(v.string()),
+  userNote: v.optional(v.string()),
   intents: v.optional(v.array(intentValidator)),
   products: v.optional(v.array(productValidator)),
   productsStatus: v.optional(productsStatusValidator),
@@ -213,6 +215,7 @@ export const itemCardValidator = enrichedItemValidator.omit(
   "searchText",
   "products",
   "productsStatus",
+  "userNote",
 );
 
 export type ItemCard = Infer<typeof itemCardValidator>;
@@ -268,6 +271,7 @@ async function toItemCard(
     searchText: _searchText,
     products: _products,
     productsStatus: _productsStatus,
+    userNote: _userNote,
     ...card
   } = await enrichItem(ctx, item);
   return card;
@@ -291,6 +295,7 @@ function buildSearchText(parts: {
   tags: string[];
   siteName?: string;
   note?: string;
+  userNote?: string;
   content?: string;
 }): string {
   return [
@@ -299,6 +304,7 @@ function buildSearchText(parts: {
     ...parts.tags,
     parts.siteName,
     parts.note?.slice(0, MAX_SEARCH_NOTE_CHARS),
+    parts.userNote,
     parts.content?.slice(0, MAX_SEARCH_CONTENT_CHARS),
   ]
     .filter((p): p is string => typeof p === "string" && p.length > 0)
@@ -1923,6 +1929,46 @@ export const importLinks = mutation({
   },
 });
 
+/**
+ * The owner writes, edits or clears their own note on a save: a line about
+ * why they kept it. It reaches search at once. The classifier never reads or
+ * writes it, so nothing is re-classified. A note-type save has no separate
+ * note; its text is the note.
+ */
+export const setItemUserNote = mutation({
+  args: { id: v.id("items"), note: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    await requireProEntitlement(ctx, userId);
+    const item = await ctx.db.get(args.id);
+    if (item === null || item.userId !== userId || item.type === "note") {
+      throw new Error("Item not found");
+    }
+    const note = args.note.trim();
+    if (note.length > MAX_USER_NOTE_CHARS) {
+      throw new Error("Note text is too long");
+    }
+    const userNote = note === "" ? undefined : note;
+    if (userNote === item.userNote) {
+      return null;
+    }
+    await ctx.db.patch(item._id, {
+      userNote,
+      searchText: buildSearchText({
+        title: item.title,
+        description: item.description,
+        tags: item.tags,
+        siteName: item.siteName,
+        note: item.note,
+        userNote,
+        content: item.content,
+      }),
+    });
+    return null;
+  },
+});
+
 /** Delay before an edited note is re-classified. Each edit in the window
  * supersedes the scheduled run, so a burst of typing costs one model call. */
 export const NOTE_REFRESH_DELAY_MS = 20_000;
@@ -1992,6 +2038,7 @@ export const updateNoteItem = mutation({
         description: item.description,
         tags: item.tags,
         note: text,
+        userNote: item.userNote,
         content: item.content,
       }),
       // The note's own words are most of what it is embedded from, so an edit
@@ -2446,6 +2493,7 @@ export const finalizeItem = internalMutation({
       tags: args.tags,
       siteName: args.siteName,
       note: item.note,
+      userNote: item.userNote,
       content: args.content,
     });
     await ctx.db.patch(args.itemId, {
@@ -2678,6 +2726,7 @@ export const setEmbeddingsInternal = internalMutation({
         tags: item.tags,
         siteName: item.siteName,
         note: item.note,
+        userNote: item.userNote,
         content: item.content,
       });
       const reindex =

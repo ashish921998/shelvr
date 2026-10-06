@@ -362,6 +362,8 @@
   "item.noteTitlePlaceholder": "Título",
   "item.noteTitleLabel": "Título de la nota",
   "item.noteTextLabel": "Texto de la nota",
+  "item.userNotePlaceholder": "Añade una nota",
+  "item.userNoteLabel": "Tu nota",
   "item.details": "Detalles",
   "item.toggleCaption": "Muestra u oculta el texto",
   "capture.partialFailure": "%{saved} de %{total} imágenes guardadas.\n%{reason}\n¿Volver a intentar guardar las imágenes que fallaron?",
