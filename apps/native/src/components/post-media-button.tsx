@@ -1,7 +1,7 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { t } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { type GestureResponderEvent, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** A post's image or video poster that opens the post on its site. Videos
@@ -10,11 +10,13 @@ export function PostMediaButton({
   site,
   playable,
   onPress,
+  onPressIn,
   children,
 }: {
   site: string;
   playable: boolean;
-  onPress: () => void;
+  onPress: (e: GestureResponderEvent) => void;
+  onPressIn?: (e: GestureResponderEvent) => void;
   children: ReactNode;
 }) {
   return (
@@ -22,6 +24,7 @@ export function PostMediaButton({
       accessibilityRole="button"
       accessibilityLabel={t("item.openSite", { site })}
       onPress={onPress}
+      onPressIn={onPressIn}
     >
       {children}
       {playable ? (

@@ -70,7 +70,7 @@ export default async function SharedItemPage({ params }: PageProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={preview.imageUrl}
-              alt=""
+              alt={preview.type === "image" ? preview.title : ""}
               className="h-56 w-full object-cover sm:h-72"
             />
           )}

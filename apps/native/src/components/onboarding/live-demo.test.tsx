@@ -231,4 +231,20 @@ describe("iOS share step", () => {
     ).toBeNull();
     expect(screen.getByText("demo.shareDismissed")).not.toBeNull();
   });
+
+  it("keeps a link-field error next to the field, and a share error away from it", () => {
+    mock.demo.error = "demo.clipboardNoLink";
+    const { rerender } = render(step());
+    fireEvent.click(pasteLink());
+    const fieldBlock = linkField()!.parentElement!.parentElement!;
+    expect(fieldBlock.contains(screen.getByText("demo.clipboardNoLink"))).toBe(
+      true,
+    );
+
+    mock.demo.error = "demo.shareDismissed";
+    rerender(step());
+    expect(fieldBlock.contains(screen.getByText("demo.shareDismissed"))).toBe(
+      false,
+    );
+  });
 });

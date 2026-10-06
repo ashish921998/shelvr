@@ -72,7 +72,7 @@ const SHELVES: { name: string; count: number; src: string; books: Book[] }[] = [
 ];
 
 const lift =
-  "origin-bottom [transform:rotate(var(--lean,0deg))] transition-transform duration-250 hover:[transform:translateY(-10px)_rotate(0deg)]";
+  "origin-bottom [transform:rotate(var(--lean,0deg))] transition-transform duration-250 motion-reduce:transition-none hover:[transform:translateY(-10px)_rotate(0deg)]";
 
 export default function Spaces() {
   return (

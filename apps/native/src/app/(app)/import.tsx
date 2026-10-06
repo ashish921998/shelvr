@@ -310,7 +310,7 @@ const styles = StyleSheet.create((theme) => ({
   primaryButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 15,
-    color: "#fff",
+    color: theme.colors.onTint,
   },
   importButton: {
     alignItems: "center",
@@ -322,6 +322,6 @@ const styles = StyleSheet.create((theme) => ({
   importButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: "#fff",
+    color: theme.colors.onTint,
   },
 }));
