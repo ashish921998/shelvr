@@ -18,9 +18,15 @@ export default {
       app: {
         bundleId: "app.shelvr.save.dev",
         // Skip the dev launcher and keep the dev menu from covering the app.
+        // The locators match English labels, so run the app in English
+        // whatever the simulator's language.
         launchArguments: [
           "--initialUrl",
           metroUrl,
+          "-AppleLanguages",
+          "(en)",
+          "-AppleLocale",
+          "en_US",
           "-EXDevMenuShowsAtLaunch",
           "NO",
           "-EXDevMenuIsOnboardingFinished",

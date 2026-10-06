@@ -5,19 +5,20 @@ import { startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
-test("finds a save by a word in its title", async ({ agent, screen }) => {
-  await agent.act("go to the Search tab and search your saves for {query}", {
-    params: { query: "ramen" },
-  });
+test("finds a save by a word in its title", async ({ screen }) => {
+  await screen.getByRole("button", "Search").tap();
+  await screen.getByRole("textbox", "Search your saves").fill("ramen");
 
-  await expect(screen.getByRole("textbox", "Search your saves")).toHaveValue(
-    "ramen",
-  );
-  // Save cards are missing from the iOS accessibility tree, so only a
-  // screenshot can tell which results came back. The query is debounced and
-  // runs on the backend, so keep looking until the results arrive.
-  await agent.waitFor(
-    'the results show exactly one save, titled "Weeknight Miso Ramen", and no "Belém Tower"',
-    { timeout: 30_000, vision: "only" },
-  );
+  // The query is debounced and runs on the backend, so the toBeVisible wait
+  // covers the round trip. Then none of the other seeded saves may show.
+  await expect(screen.getByTestId("fixture-item-ramen")).toBeVisible({
+    timeout: 30_000,
+  });
+  for (const other of [
+    "belem-tower",
+    "apartment-checklist",
+    "value-of-craft",
+  ]) {
+    await expect(screen.getByTestId(`fixture-item-${other}`)).toBeHidden();
+  }
 });

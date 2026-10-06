@@ -181,9 +181,10 @@ create a space, and search. Save-a-link is scripted with plain locators; the oth
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
-Convex deployment, `AUTH_ENABLE_ANONYMOUS=true` on that deployment, and at
-least one photo in the simulator's Photos library for the save-a-photo flow
-(`xcrun simctl addmedia booted path/to/photo.jpg` adds one). Each
+Convex deployment, and `AUTH_ENABLE_ANONYMOUS=true` on that deployment. The
+app runs in English whatever the simulator's language, and the save-a-photo
+flow adds its own photo (`apps/e2e/fixtures/photo.png`) to the simulator's
+library. Each
 test signs in as the anonymous dev user and resets its data through Settings >
 "Reset flow fixtures", so run it only against a throwaway dev user.
 
@@ -205,10 +206,10 @@ model call, and fall back to the model when the screen has changed. The
 recordings are gitignored for now, so each machine makes its own.
 `pnpm exec e2e run --no-cache` forces every step back through the model.
 
-Save cards are missing from the iOS accessibility tree, so the checks that read
-a card (`agent.assert` and `agent.waitFor` with `vision`) judge a screenshot
-with one model call each on every run. Checks on anything the tree does list
-use plain locators and need no model.
+Checks use plain locators wherever the label is known in advance; seeded
+saves carry `fixture-item-*` test IDs. Only the count of saves after a new link
+or photo, whose title the model writes, is judged from a screenshot
+(`agent.waitFor` with `vision`), at one model call per run.
 
 ## Domain model (Convex)
 
