@@ -99,6 +99,10 @@ export const ItemCard = memo(function ItemCard({
   const spaceId =
     source?.from === "space" ? (source.spaceId as Id<"spaces">) : undefined;
   const isSuggested = item.suggested === true && spaceId !== undefined;
+  const href = {
+    pathname: "/item/[id]" as const,
+    params: { id: item._id, ...source },
+  };
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
   const shareLink = useShareLink();
@@ -189,27 +193,52 @@ export const ItemCard = memo(function ItemCard({
     confirmDelete,
   });
 
+  // Where the card's accessibility lives. On iOS, expo-router hosts the
+  // trigger inside two native views with a zero-size frame (the zoom source
+  // and the link preview host), and iOS drops every accessibility element
+  // under a zero-size container, so a label on the Pressable never reaches
+  // VoiceOver or XCTest. The cell above them has a real frame, so iOS reads
+  // the card there. Android has no such wrappers, so the Pressable keeps it.
+  // The long-press menu's actions ride along as accessibility actions, since
+  // the ellipsis button inside is folded into the card on both platforms.
+  const cardA11y = {
+    accessible: true,
+    // `role`, not `accessibilityRole`: Link spreads its own role="link"
+    // onto the trigger, and React Native reads `role` first on both
+    // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
+    // so an accessibilityRole there would never reach the screen reader.
+    role: "button" as const,
+    accessibilityLabel,
+    accessibilityActions: menuActions.map(({ label }) => ({
+      name: label,
+      label,
+    })),
+    onAccessibilityAction: ({
+      nativeEvent,
+    }: {
+      nativeEvent: { actionName: string };
+    }) => {
+      menuActions
+        .find(({ label }) => label === nativeEvent.actionName)
+        ?.onPress();
+    },
+    // VoiceOver's double-tap. Without it iOS falls back to a synthetic touch
+    // at the cell's centre, which only opens the card while the centre lands
+    // on the Pressable. Opening here is a plain push, without the zoom.
+    onAccessibilityTap: () => router.push(href),
+    testID: item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined,
+  };
+  const a11yOnCell = process.env.EXPO_OS === "ios";
+
   return (
     <Animated.View
       entering={reducedMotion ? undefined : FadeIn.duration(300)}
       style={styles.cell}
+      {...(a11yOnCell ? cardA11y : {})}
     >
-      <Link
-        href={{ pathname: "/item/[id]", params: { id: item._id, ...source } }}
-        asChild
-      >
+      <Link href={href} asChild>
         <Link.Trigger withAppleZoom={!reducedMotion}>
-          <Pressable
-            // `role`, not `accessibilityRole`: Link spreads its own role="link"
-            // onto this trigger, and React Native reads `role` first on both
-            // platforms (RCTViewComponentView.mm, ReactAccessibilityDelegate.kt),
-            // so an accessibilityRole here would never reach the screen reader.
-            role="button"
-            accessibilityLabel={accessibilityLabel}
-            testID={
-              item.fixtureKey ? `fixture-item-${item.fixtureKey}` : undefined
-            }
-          >
+          <Pressable {...(a11yOnCell ? {} : cardA11y)}>
             {/* Link.Trigger's Slot drops a Pressable style function (it merges
                 style by object spread), so the card's look lives on the face's
                 View, driven by the Pressable's render-prop children. */}
