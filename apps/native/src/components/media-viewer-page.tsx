@@ -13,7 +13,6 @@ import {
 } from "@/lib/media-viewer";
 import type { SocialPost } from "@/lib/social-post";
 import { Image } from "expo-image";
-import { setStatusBarStyle } from "expo-status-bar";
 import { Link } from "expo-router";
 import {
   useEffect,
@@ -52,6 +51,8 @@ const CAPTION_SCRIM = `linear-gradient(180deg, ${[
 // pins over the bottom of the page.
 const FOOTER_CLEARANCE = 72;
 
+const EXPANDED_LINES = 10;
+
 type Props = {
   item: DetailItem;
   social: SocialPost | undefined;
@@ -67,6 +68,9 @@ type Props = {
   // Told when the details sheet reaches (true) or leaves (false) the header,
   // so the pager can hand the header back its light-page colors.
   onSheetUnderHeader?: (itemId: string, under: boolean) => void;
+  // Told when the in-app browser opens (true) and closes (false) over this
+  // page, so the pager can lift its light status bar while it is up.
+  onSourceBrowser?: (open: boolean) => void;
   testID?: string;
   // Save status (processing, failed, retry) shown in the caption.
   notice: ReactNode;
@@ -93,6 +97,7 @@ export function MediaViewerPage({
   reserveFooter,
   scrollRef,
   onSheetUnderHeader,
+  onSourceBrowser,
   testID,
   notice,
   actions,
@@ -115,22 +120,13 @@ export function MediaViewerPage({
   // scroll doesn't push header options every frame. A recycled page starts
   // at the top, so it reports its new item as clear of the header.
   const stillTap = useStillTap();
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   // The pager's light status bar would sit white-on-white over the in-app
-  // browser; hand it back once the browser closes, unless the page has gone
-  // since.
+  // browser. The pager owns the bar, so it decides what comes back when the
+  // browser closes (the sheet may be up, or the screen gone).
   const openSource = () => {
-    setStatusBarStyle("dark");
-    openItemSource(item, () => {
-      if (mounted.current) setStatusBarStyle("light");
-    });
+    onSourceBrowser?.(true);
+    openItemSource(item, () => onSourceBrowser?.(false));
   };
 
   const captionHidden = caption.hidden;
@@ -300,7 +296,9 @@ export function MediaViewerPage({
             >
               <Text
                 style={styles.description}
-                numberOfLines={expanded ? undefined : 2}
+                // Capped so a long caption can't push the title off the top of
+                // the stage; the sheet below carries the full text.
+                numberOfLines={expanded ? EXPANDED_LINES : 2}
               >
                 {item.description}
               </Text>
