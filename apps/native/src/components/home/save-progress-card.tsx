@@ -1,30 +1,147 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { analytics } from "@/lib/analytics";
+import { pickAndSaveImages } from "@/lib/pick-and-save-images";
+import { progressTitleKey } from "@/lib/save-goal";
+import { useSaveImageBatch } from "@/lib/use-save-image-batch";
+import { usePaywallGuard } from "@/lib/entitlement";
 import { InlineCard } from "@/components/ui/inline-card";
-import { CtaButton } from "@/components/onboarding/parts";
-import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+/** Funnel placement for a save the server refuses for Pro. */
+const PAYWALL_PLACEMENT = "home_progress";
+
+function Way({
+  icon,
+  title,
+  help,
+  onPress,
+  disabled,
+  testID,
+}: {
+  icon: AppSymbolName;
+  title: string;
+  help?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const { theme } = useUnistyles();
+  const body = (
+    <>
+      <View style={styles.wayIcon}>
+        <AppSymbolIcon
+          name={icon}
+          size={17}
+          weight="semibold"
+          tintColor={theme.colors.primaryText}
+        />
+      </View>
+      <View style={styles.wayText}>
+        <Text style={styles.wayTitle}>{title}</Text>
+        {help ? <Text style={styles.wayHelp}>{help}</Text> : null}
+      </View>
+      {onPress ? (
+        <AppSymbolIcon
+          name="chevron.right"
+          size={13}
+          tintColor={theme.colors.faint}
+        />
+      ) : null}
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={styles.way} testID={testID}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.way,
+        (pressed || disabled) && { opacity: 0.6 },
+      ]}
+    >
+      {body}
+    </Pressable>
+  );
+}
 
 /**
  * The "save your next two" card on Home: how far a new shelf is from its
- * first three real saves. Purely presentational; Home decides when it shows.
+ * first three real saves, and the real ways to get there. Sharing is shown
+ * as a how-to (it starts in another app); Photos and a note start right here.
+ * Home decides when it shows.
  */
 export function SaveProgressCard({
   saved,
   goal,
   onDismiss,
+  onShown,
 }: {
   saved: number;
   goal: number;
   onDismiss: () => void;
+  /** Fires each time Home is focused with the card on screen. */
+  onShown: () => void;
 }) {
   useAppLocale();
   const router = useRouter();
+  useFocusEffect(useCallback(() => onShown(), [onShown]));
+  const [busy, setBusy] = useState(false);
   const count = t("home.progressCount", { saved, total: goal });
+
+  const runImageRequests = useSaveImageBatch({
+    saveSource: "photo_import",
+    paywallPlacement: PAYWALL_PLACEMENT,
+    setBusy,
+    onAllSaved: (results) => {
+      if (results.length > 0) {
+        analytics.capture("images_saved", { image_count: results.length });
+      }
+      // The batch leaves busy set on success (Add closes instead), and this
+      // card stays up until the goal, so release it here.
+      setBusy(false);
+    },
+    onDismiss: () => {},
+    onUnexpectedError: (error) => {
+      analytics.captureError("image_upload_failed", error);
+      Alert.alert(t("errors.saveTitle"), t("errors.batchUpload"));
+    },
+  });
+
+  // The card only shows while Pro reads active, but Pro can lapse between
+  // render and tap, so the picker waits behind the same guard as Add.
+  const { guard } = usePaywallGuard(PAYWALL_PLACEMENT);
+  const pickPhotos = () => {
+    analytics.capture("save_progress_card_action", { action: "photos", saved });
+    void guard(() => {
+      void pickAndSaveImages(runImageRequests).catch((error: unknown) => {
+        analytics.captureError("image_pick_failed", error);
+        Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
+      });
+    });
+  };
+
+  const writeNote = () => {
+    analytics.capture("save_progress_card_action", { action: "note", saved });
+    router.push({ pathname: "/add", params: { mode: "note" } });
+  };
+
   return (
     <InlineCard
       testID="save-progress-card"
-      title={t("home.progressTitle")}
+      title={t(progressTitleKey(saved, goal))}
       body={t("home.progressBody")}
     >
       <View style={styles.progress} accessible accessibilityLabel={count}>
@@ -38,10 +155,32 @@ export function SaveProgressCard({
         </View>
         <Text style={styles.count}>{count}</Text>
       </View>
-      <CtaButton
-        label={t("home.progressAdd")}
-        onPress={() => router.push("/add")}
-      />
+      <View style={styles.ways}>
+        <Way
+          testID="save-progress-share"
+          icon="square.and.arrow.up"
+          title={
+            Platform.OS === "android"
+              ? t("home.progressShareAndroid")
+              : t("home.progressShare")
+          }
+          help={t("home.progressShareHelp")}
+        />
+        <Way
+          testID="save-progress-photos"
+          icon="photo.on.rectangle"
+          title={t("home.progressPhotos")}
+          onPress={pickPhotos}
+          disabled={busy}
+        />
+        <Way
+          testID="save-progress-note"
+          icon="square.and.pencil"
+          title={t("home.progressNote")}
+          onPress={writeNote}
+          disabled={busy}
+        />
+      </View>
       <View style={styles.buttonRow}>
         <Pressable
           accessibilityRole="button"
@@ -84,6 +223,39 @@ const styles = StyleSheet.create((theme) => ({
   count: {
     fontFamily: theme.fonts.medium,
     fontSize: 13,
+    color: theme.colors.muted,
+  },
+  ways: {
+    gap: theme.gap(0.5),
+  },
+  way: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+    paddingVertical: theme.gap(0.75),
+  },
+  wayIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wayText: {
+    flex: 1,
+    gap: 2,
+  },
+  wayTitle: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 15,
+    color: theme.colors.foreground,
+  },
+  wayHelp: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
     color: theme.colors.muted,
   },
   buttonRow: {

@@ -2,6 +2,9 @@
 
 This file provides guidance when working with code in this repository.
 
+@AGENTS.md carries the "where things live" map for both apps. Check it before searching
+for a module.
+
 > Expo docs change quickly. Before writing native app code, read the versioned docs
 > for the SDK pinned in `apps/native/package.json` (currently Expo SDK 57):
 > https://docs.expo.dev/versions/v57.0.0/
@@ -82,6 +85,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `waitlistSignups` — waitlist source of truth, projected to Resend
   - `feedbackSubmissions` — in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
+  - `legalConsents` — versioned terms acceptance and the refund-data sharing choice
+    (see [refund consent](docs/architecture/refund-consent.md))
+  - `cancelSurveys` — one next-visit cancel-survey ask per user; the first recorded outcome wins
+  - `captureTokens` — hashed per-device tokens the iOS App Intents use in place of a JWT
+  - `onboardingDemos` — the one pre-payment demo save each user is allowed
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -89,7 +97,13 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`items.ts`** — public queries `listItems`, `getItem`, `searchItems`, `similarItems`,
   `photoUsage`, and `getImportOperation`. Image saves run a three-step, idempotent import:
   `beginImageImport` → `attachImageUpload` → `finalizeImageImport`, all keyed on a
-  client-generated `operationId` in `itemOperations`. Other public mutations are
+  client-generated `operationId` in `itemOperations`.
+  The returned upload URL now targets `/image-upload`, which claims a single
+  receiver, caps the streamed body at the image limit, and records its storage ID
+  before replying. Begin and upload budgets, pending-operation reservations,
+  stale-operation cleanup, and a paginated orphan-storage sweep bound abandoned
+  work. Successful upload retries return the same storage ID.
+  Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
   `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
@@ -119,14 +133,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   hourly bounded retry. See [feedback delivery](docs/architecture/feedback.md).
 - **`http.ts`** — Convex Auth HTTP routes (`auth.addHttpRoutes`), the RevenueCat webhook at
   `/webhooks/revenuecat` (authenticated with the `REVENUECAT_WEBHOOK_SECRET` bearer secret),
-  the waitlist receiver at `/waitlist/join`, and `GET /health` (200/503 probe for uptime
+  the waitlist receiver at `/waitlist/join`, the web Oracle at `/oracle`, the App Intents
+  capture routes under `/app-intents/`, Apple's Get Retention Message endpoint at
+  `/retention-messaging` (authenticated by the App Store's JWS signature, checked in
+  `model/appleJws.ts`), and `GET /health` (200/503 probe for uptime
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`** — refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
   recovery, hourly feedback inbox delivery retry, embedding sweep, and daily payment-receipt
   retention purge.
 - **`auth.ts`** — `convexAuth()` setup: Google + Apple OAuth (Auth.js providers) and an optional
-  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`).
+  Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
+  `image: null` Apple's provider emits, which the users schema rejects.
 - **`users.ts`** — `getCurrentUser` query, used by the client for email display and RevenueCat
   identity sync, plus `deleteCurrentUserAccount` and its batched internal deletion.
 - **`devFixtures.ts`** — `canResetCurrentUser` / `resetCurrentUser`. Both are inert unless
@@ -135,16 +153,36 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   capture. Every one is a no-op when `POSTHOG_PROJECT_TOKEN` is unset.
 - **`ai.ts`** (`"use node"` action) — the processing pipeline. On create, a mutation inserts the
   item as `status: "processing"` and schedules `internal.ai.processItem`. That action: for links,
-  fetches the page and extracts the article body (Mozilla **Readability** via `linkedom`, with a
-  regex fallback) + OpenGraph metadata + hero image aspect ratio (read from raw header bytes);
-  for notes it feeds the content to the model; for images it sends the stored bytes as a file
-  part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
+  calls `readPage(url)` from `model/pageRead.ts`, which returns the article body, metadata and
+  hero image; for notes it feeds the content to the model; for images it sends the stored bytes
+  as a file part. It calls `generateObject` (Vercel AI SDK, Zod schema) to produce
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
   matches become `suggested` memberships. The file also holds `recommendForSpace` (one pass over
   existing items, scheduled by `createSpace`), `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
-  `SERPAPI_KEY`).
+  `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
+  [embeddings](docs/architecture/embeddings.md)).
+- **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
+  one entry point: it picks the reader for the host (TikTok oEmbed, X syndication, Instagram
+  embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
+  image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
+  schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
+- **`model/safeFetch.ts`**, **`model/externalUrl.ts`** — every backend fetch of an external URL
+  goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
+  `externalUrl.ts` is the runtime-agnostic URL policy and host detection (`linkSource`,
+  `isInstagramUrl`, `isPinterestHost`), usable from mutations as well as Node actions.
+- **`appIntents.ts`** — saves from the iOS App Intents (Siri, Shortcuts), which run without the
+  JavaScript app and so have no JWT. The app mints a per-device capture token
+  (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
+  user and run the same save helpers, gates and limits as the app's own mutations.
+- **`demo.ts`** — the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
+  per user, tracked in `onboardingDemos`.
+- **`cancelSurvey.ts`** — the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
+  client boundary is `src/lib/cancel-survey.ts`.
+- **`oracle.ts`**, **`oracleLimits.ts`** — the web Oracle. The internal `consult` action reads
+  pages and makes one model call inside the web route's deadline; `claim` is its rate limit.
+  Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
 - **`model/auth.ts`** — `requireUserId(ctx)` returns the stable Convex Auth users-table id (not the
   session-bearing JWT `sub`). **Every public function derives `userId` from this, never from a client
   argument.**
@@ -168,15 +206,23 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
 
 - UI localization uses `expo-localization` and i18n-js. Read
   [`docs/architecture/localization.md`](docs/architecture/localization.md) before adding visible copy;
-  update all catalogs and run `pnpm localization:generate` after translation changes.
+  update all catalogs and run `pnpm localization:generate` after translation changes. It is a
+  root script, so run it from the repo root. It writes `src/locales/catalogs.ts`,
+  `src/locales/message-types.ts` and `convex/model/notificationTranslations.json`; never edit
+  those by hand.
+- Design tokens live in `src/unistyles.ts` (type, spacing, color, controls) and motion in
+  `src/lib/motion.ts`. Read [design system](docs/architecture/design-system.md) before adding
+  UI, and [display font](docs/architecture/display-font.md) before touching the title face.
+- To run a branch or worktree on a simulator (Metro port, dev client link, sign-in, fixtures,
+  forcing onboarding or the paywall), read [local QA](docs/architecture/local-qa.md) first.
 - Expo Router under `src/app`, with `(auth)` and `(app)` groups
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
 - Tabs under `(app)/(tabs)`: `(home)`, `(spaces)`, `(tidy)`, `(map)`, `(search)`. iOS uses
   `NativeTabs` from `expo-router/unstable-native-tabs`; other platforms fall back to `AppTabs`
-- Other `(app)` routes: `add`, `camera`, `share`, `onboarding`, `paywall`, `profile`,
-  `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
+- Other `(app)` routes: `add`, `camera`, `share`, `import`, `onboarding`, `paywall`, `profile`,
+  `settings`, `new-space`, `manage-spaces`, `item/[id]`, `space/[id]`, `digest/[id]`
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides
@@ -243,6 +289,9 @@ needed at runtime by the features that use them:
 - `CONVEX_SITE_URL` — set by Convex; `auth.config.ts` uses it as the JWT issuer domain
 - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials
 - `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET` — Sign-in-with-Apple Service ID + signed JWT secret
+- `APPLE_RETENTION_MESSAGE_ID` — id of the Apple-approved retention message
+  `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
+  the default message configured for the product
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by
@@ -333,8 +382,18 @@ needed at runtime by the features that use them:
   naming it. So reverting the commit that added the field fails the deploy instead
   of rolling it back. To back a field out, stop writing it and leave it declared
   `v.optional(...)`; drop the declaration only once no row still has it.
+- Every pull request (Renovate and Dependabot aside) fills in the template's Verification section: what was run and its result,
+  the evidence, and what was not verified. Never call work "done" or "verified" without evidence
+  a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
+  assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
+  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. Only the owner waives that, with the `no-ui-change` label; an agent
+  never adds it. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
+  branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
 - Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
   bare `convexTest(schema, ...)`.
+- A new schema table, top-level Convex module or `(app)` route needs a line in this file.
+  `tools/verify-agent-docs.mjs` (`pnpm run verify:agent-docs`, part of `pnpm run check` and CI)
+  fails until the name appears here in backticks.
 
 <!-- convex-ai-start -->
 

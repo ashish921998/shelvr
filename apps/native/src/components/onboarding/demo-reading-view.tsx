@@ -1,6 +1,7 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ActivityIndicator, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -70,14 +71,22 @@ export function DemoReadingView({
 
       {failed ? (
         <View style={styles.head}>
-          <Text style={styles.headline}>{t("demo.linkSaved")}</Text>
+          <Text
+            style={styles.headline}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
+            {t("demo.linkSaved")}
+          </Text>
           <Text style={styles.support}>
             {terminal ? t("demo.notFoundHelp") : t("demo.processingFailed")}
           </Text>
         </View>
       ) : (
         <View style={[styles.head, styles.centered]}>
-          <Text style={[styles.headline, styles.center]}>
+          <Text
+            style={[styles.headline, styles.center]}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
             {timedOut ? t("demo.slow") : t("demo.reading")}
           </Text>
           <ReadingSteps />

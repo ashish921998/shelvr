@@ -7,6 +7,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "verify:codegen": "node tools/verify-convex-codegen.mjs",
+    "verify:agent-docs": "node tools/verify-agent-docs.mjs",
     "verify:fingerprint": "node tools/verify-native-fingerprint.mjs",
     "verify:convex-api": "node tools/verify-convex-api.mjs",
     "verify:ota": "node tools/verify-ota-compatibility.mjs",
@@ -17,7 +18,7 @@
     "knip:dependencies": "knip --include dependencies,devDependencies,unlisted --reporter compact",
     "syncpack:lint": "syncpack lint",
     "audit": "pnpm audit --audit-level high",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run verify:codegen && pnpm run test:tools && pnpm run coverage && pnpm run knip && pnpm run syncpack:lint && pnpm run audit",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run verify:codegen && pnpm run verify:agent-docs && pnpm run test:tools && pnpm run coverage && pnpm run knip && pnpm run syncpack:lint && pnpm run audit",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
     "prepare": "husky",
@@ -28,6 +29,7 @@
     "knip": "^5.88.1",
     "lint-staged": "^16.4.0",
     "make-plural": "^7.5.0",
+    "markdown-it": "^14.3.2",
     "prettier": "3.8.3",
     "syncpack": "^15.3.3",
     "turbo": "2.9.14"
@@ -45,6 +47,8 @@
       "brace-expansion@<1.1.20": "1.1.20",
       "brace-expansion@>=3.0.0 <5.0.11": "5.0.11",
       "js-cookie": "^3.0.7",
+      "compression": "^1.8.2",
+      "source-map-js": "^1.2.2",
       "expo-app-intents>@expo/ui": "~57.0.10"
     },
     "auditConfig": {

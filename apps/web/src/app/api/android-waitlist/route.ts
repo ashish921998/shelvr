@@ -8,23 +8,40 @@ import {
 } from "@/lib/convexForward";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
+import {
+  BodyTooLargeError,
+  readBoundedText,
+  authorizeRequestBody,
+} from "@/lib/requestBody";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type WaitlistSource = "hero" | "footer" | "unknown";
 
-type JoinWaitlistResult = { saved: boolean; emailProviderSynced: boolean };
+type JoinWaitlistResult = {
+  saved: boolean;
+  emailProviderSynced: boolean;
+  confirmationSent?: boolean;
+};
 
 function normalizeSource(value: unknown): WaitlistSource {
   return value === "hero" || value === "footer" ? value : "unknown";
 }
 
 export async function POST(request: Request) {
+  const refused = await authorizeRequestBody(request, "waitlist");
+  if (refused) return refused;
   let body: { email?: unknown; company?: unknown; source?: unknown };
 
   try {
-    body = await request.json();
-  } catch {
+    body = JSON.parse(await readBoundedText(request, 4096));
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return NextResponse.json(
+        { message: "Invalid request." },
+        { status: 413 },
+      );
+    }
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
@@ -98,9 +115,18 @@ export async function POST(request: Request) {
       throw new Error("Convex did not confirm the signup.");
     }
 
+    if (result.confirmationSent === false)
+      return NextResponse.json(
+        {
+          message:
+            "Confirmation email is temporarily unavailable. Please try again later.",
+        },
+        { status: 503 },
+      );
     return NextResponse.json({
       ok: true,
       emailProviderSynced: result.emailProviderSynced === true,
+      ...(result.confirmationSent === true ? { confirmationSent: true } : {}),
     });
   } catch (error) {
     serverLog("error", "android_waitlist_failed", {

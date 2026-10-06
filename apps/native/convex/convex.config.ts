@@ -4,6 +4,9 @@ import rateLimiter from "@convex-dev/rate-limiter/convex.config";
 
 const app = defineApp({
   env: {
+    // Id of the Apple-approved message POST /retention-messaging names on the
+    // cancel sheet. Unset, the reply is empty and Apple shows its default.
+    APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),

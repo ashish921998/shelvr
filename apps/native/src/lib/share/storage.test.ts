@@ -714,3 +714,22 @@ describe("session-scoped mutations (new-share-during-in-flight-run safety)", () 
     expect(loadSession(store)?.phase).toBe("active");
   });
 });
+
+it("rejects oversized raw share batches before writing a session", async () => {
+  const { shareBatchAllowed, MAX_SHARE_ENTRIES, MAX_SHARE_TEXT_BYTES } =
+    await import("./storage");
+  expect(
+    shareBatchAllowed(
+      Array.from({ length: MAX_SHARE_ENTRIES + 1 }, () => ({
+        value: "x",
+        shareType: "text",
+      })),
+    ),
+  ).toBe(false);
+  expect(
+    shareBatchAllowed([
+      { value: "é".repeat(MAX_SHARE_TEXT_BYTES), shareType: "text" },
+    ]),
+  ).toBe(false);
+  expect(shareBatchAllowed([{ value: "valid", shareType: "text" }])).toBe(true);
+});

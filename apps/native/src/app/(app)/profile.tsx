@@ -209,7 +209,7 @@ export default function ProfileScreen() {
           />
         </ActionMenu>
         <SettingsRow
-          label={t("import.fromX")}
+          label={t("import.title")}
           onPress={() => router.push("/import")}
         />
         <SettingsRow
