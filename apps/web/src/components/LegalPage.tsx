@@ -14,7 +14,7 @@ export function LegalPage({
   return (
     <div className="bg-paper min-h-screen">
       <Header />
-      <main className="container max-w-3xl py-10 sm:py-16">
+      <main className="container max-w-2xl py-10 sm:py-16">
         <h1 className="font-display text-3xl sm:text-4xl text-ink">{title}</h1>
         <p className="mt-2 text-sm text-muted">Last updated: {lastUpdated}</p>
 
