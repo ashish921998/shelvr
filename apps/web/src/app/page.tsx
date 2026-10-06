@@ -9,15 +9,17 @@ import Spaces from "@/components/home/Spaces";
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-paper">
+    <div className="min-h-screen overflow-x-clip bg-paper">
       <Header />
-      <Hero />
-      <Spaces />
-      <Search />
-      <PhotoTidy />
-      <Faq />
-      <ClosingPanel />
+      <main>
+        <Hero />
+        <Spaces />
+        <Search />
+        <PhotoTidy />
+        <Faq />
+        <ClosingPanel />
+      </main>
       <Footer />
-    </main>
+    </div>
   );
 }
