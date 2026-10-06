@@ -178,9 +178,11 @@ function CardCaption({
   return (
     <View style={styles.caption}>
       <View style={styles.captionText}>
-        <Text style={styles.captionTitle} numberOfLines={1}>
-          {captionTitle}
-        </Text>
+        {captionTitle !== undefined ? (
+          <Text style={styles.captionTitle} numberOfLines={1}>
+            {captionTitle}
+          </Text>
+        ) : null}
         {item.type === "link" && item.url ? (
           <View style={styles.captionHostRow}>
             <Text style={styles.captionHost} numberOfLines={1}>
@@ -258,7 +260,12 @@ export function ItemCardFace({
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
   const failedLabel = failureLabel(item);
-  const captionTitle = cardTitles(item).find((title) => title !== undefined);
+  // A tile without media already prints its title on the text face, so the
+  // caption repeats it only under an image.
+  const hasMedia = Boolean(item.imageUrl ?? item.heroImageUrl);
+  const captionTitle = hasMedia
+    ? cardTitles(item).find((title) => title !== undefined)
+    : undefined;
   return (
     <View
       style={[
