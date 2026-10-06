@@ -381,6 +381,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   gateButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: "white",
+    color: theme.colors.onTint,
   },
 }));
