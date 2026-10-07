@@ -1,4 +1,5 @@
-import { useAppLocale } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
+import { orderAcquisitionSources } from "@/lib/acquisition-source";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { orderDemoSamples, practiceShareSample } from "@/lib/onboarding-demo";
@@ -6,6 +7,7 @@ import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
@@ -33,11 +35,12 @@ import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { SourceStep } from "@/components/onboarding/source";
+import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -82,7 +85,10 @@ export default function OnboardingScreen() {
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [sourceOrder] = useState(() => orderAcquisitionSources());
+  const [sourceAnswered, setSourceAnswered] = useState(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
+  const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
@@ -95,6 +101,9 @@ export default function OnboardingScreen() {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
+    // Going back re-enters a step; the funnel counts the first entry only.
+    if (viewedStepsRef.current.has(step)) return;
+    viewedStepsRef.current.add(step);
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
@@ -180,16 +189,34 @@ export default function OnboardingScreen() {
 
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
+  const previous = previousOnboardingStep(step);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={[styles.barWrap, progress === null && styles.barHidden]}>
-        <View
-          style={[
-            styles.bar,
-            { width: `${Math.round((progress ?? 0) * 100)}%` },
-          ]}
-        />
+      <View style={styles.header}>
+        {previous ? (
+          <Pressable
+            onPress={() => setStep(previous)}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.back")}
+            hitSlop={12}
+            style={styles.back}
+          >
+            <AppSymbolIcon
+              name="chevron.left"
+              size={20}
+              tintColor={theme.colors.foreground}
+            />
+          </Pressable>
+        ) : null}
+        <View style={[styles.barWrap, progress === null && styles.barHidden]}>
+          <View
+            style={[
+              styles.bar,
+              { width: `${Math.round((progress ?? 0) * 100)}%` },
+            ]}
+          />
+        </View>
       </View>
 
       {step === "opener" || step === "source" ? (
@@ -214,7 +241,12 @@ export default function OnboardingScreen() {
               onSignIn={() => setShowSignIn(true)}
             />
           ) : (
-            <SourceStep onAdvance={advance} />
+            <SourceStep
+              order={sourceOrder}
+              correcting={sourceAnswered}
+              onAnswered={() => setSourceAnswered(true)}
+              onAdvance={advance}
+            />
           )}
         </View>
       ) : (
@@ -282,7 +314,19 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
+  // Tall enough for the back button, so the bar sits at one height on every
+  // step whether or not the button shows.
+  header: {
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+  },
+  back: {
+    padding: theme.gap(0.5),
+  },
   barWrap: {
+    flex: 1,
     height: 3,
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 2,

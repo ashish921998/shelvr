@@ -93,12 +93,18 @@ export function orderAcquisitionSources(
 }
 
 export const acquisitionSourceAnalytics = {
-  answered(source: AcquisitionSource, position: number): void {
+  answered(
+    source: AcquisitionSource,
+    position: number,
+    correcting = false,
+  ): void {
+    const person = { acquisition_source: source };
     analytics.capture("acquisition_source_answered", {
       source,
       position,
-      // $set_once keeps the first answer if onboarding is ever replayed.
-      $set_once: { acquisition_source: source },
+      // $set_once keeps the first answer if onboarding is ever replayed. An
+      // answer changed after going back is a correction, so it replaces it.
+      ...(correcting ? { $set: person } : { $set_once: person }),
     });
   },
 

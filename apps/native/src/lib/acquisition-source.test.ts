@@ -27,6 +27,19 @@ describe("acquisitionSourceAnalytics", () => {
     );
   });
 
+  it("replaces the person property when the answer is a correction", () => {
+    acquisitionSourceAnalytics.answered("friend", 6, true);
+
+    expect(analyticsMock.capture).toHaveBeenCalledWith(
+      "acquisition_source_answered",
+      {
+        source: "friend",
+        position: 6,
+        $set: { acquisition_source: "friend" },
+      },
+    );
+  });
+
   it("emits skipped with no properties", () => {
     acquisitionSourceAnalytics.skipped();
 

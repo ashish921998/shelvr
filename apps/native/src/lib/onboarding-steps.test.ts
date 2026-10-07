@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { restoreOnboardingStep } from "./onboarding-steps";
+import {
+  previousOnboardingStep,
+  restoreOnboardingStep,
+} from "./onboarding-steps";
 
 describe("restoreOnboardingStep", () => {
   it.each([
@@ -17,6 +20,22 @@ describe("restoreOnboardingStep", () => {
     "restarts a missing or out-of-range index (%s) at the opener",
     (stored) => {
       expect(restoreOnboardingStep(stored)).toBe("opener");
+    },
+  );
+});
+
+describe("previousOnboardingStep", () => {
+  it.each([
+    ["source", "opener"],
+    ["setup", "source"],
+  ] as const)("goes back from %s to %s", (step, expected) => {
+    expect(previousOnboardingStep(step)).toBe(expected);
+  });
+
+  it.each(["opener", "demo", "reveal", "share"] as const)(
+    "has no way back from %s",
+    (step) => {
+      expect(previousOnboardingStep(step)).toBeNull();
     },
   );
 });

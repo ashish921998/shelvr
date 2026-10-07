@@ -25,6 +25,19 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   share: "share_practice",
 };
 
+// Only the two answer steps go back. From the demo on, the one demo save is
+// spent and sign-in may have happened, so an earlier screen would be stale.
+const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
+  source: "opener",
+  setup: "source",
+};
+
+export function previousOnboardingStep(
+  step: OnboardingStep,
+): OnboardingStep | null {
+  return PREVIOUS_STEP[step] ?? null;
+}
+
 // Takes an index written by this flow. getOnboardingProgress already returns
 // null for records from older flows, whose indexes point at different steps.
 export function restoreOnboardingStep(step: number | null): OnboardingStep {

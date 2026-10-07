@@ -1,7 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   acquisitionSourceAnalytics,
-  orderAcquisitionSources,
   sourceLabel,
   type AcquisitionSource,
 } from "@/lib/acquisition-source";
@@ -17,10 +16,21 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const ADVANCE_DELAY_MS = 220;
 
 /** One tap answers and moves on; "Skip" moves on without an answer. */
-export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
+export function SourceStep({
+  order,
+  correcting,
+  onAnswered,
+  onAdvance,
+}: {
+  /** Owned by the screen, so the rows keep their places after going back. */
+  order: AcquisitionSource[];
+  /** An answer was already recorded on an earlier visit to this step. */
+  correcting: boolean;
+  onAnswered: () => void;
+  onAdvance: () => void;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const [order] = useState(() => orderAcquisitionSources());
   const [picked, setPicked] = useState<AcquisitionSource | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,7 +50,8 @@ export function SourceStep({ onAdvance }: { onAdvance: () => void }) {
     done.current = true;
     setPicked(source);
     if (process.env.EXPO_OS === "ios") Haptics.selectionAsync();
-    acquisitionSourceAnalytics.answered(source, position);
+    acquisitionSourceAnalytics.answered(source, position, correcting);
+    onAnswered();
     timer.current = setTimeout(onAdvance, ADVANCE_DELAY_MS);
   };
 

@@ -249,12 +249,15 @@ type AnalyticsEventProperties = {
   };
   // Onboarding "How did you hear about Shelvr?" (lib/acquisition-source.ts).
   // `source` is a fixed id; `position` is the row it sat in (0-based), since
-  // the social rows are shuffled. The person property keeps the first answer.
+  // the social rows are shuffled. The person property keeps the first answer,
+  // unless the person went back and corrected it, which sends `$set`.
   acquisition_source_answered: {
     source: AcquisitionSource;
     position: number;
-    $set_once: { acquisition_source: AcquisitionSource };
-  };
+  } & (
+    | { $set_once: { acquisition_source: AcquisitionSource } }
+    | { $set: { acquisition_source: AcquisitionSource } }
+  );
   acquisition_source_skipped: Record<string, never>;
   // Feedback events never carry message text; see lib/feedback.ts. The
   // submission event fires only after Convex acknowledges persistence — the
