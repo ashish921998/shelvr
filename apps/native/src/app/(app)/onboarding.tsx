@@ -1,5 +1,4 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { orderAcquisitionSources } from "@/lib/acquisition-source";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { orderDemoSamples, practiceShareSample } from "@/lib/onboarding-demo";
@@ -34,7 +33,6 @@ import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
-import { SourceStep } from "@/components/onboarding/source";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
@@ -46,7 +44,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  source: 0.125,
   setup: 0.25,
   demo: 0.5,
   reveal: 0.85,
@@ -85,8 +82,6 @@ export default function OnboardingScreen() {
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [sourceOrder] = useState(() => orderAcquisitionSources());
-  const [sourceAnswered, setSourceAnswered] = useState(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -219,10 +214,9 @@ export default function OnboardingScreen() {
         </View>
       </View>
 
-      {step === "opener" || step === "source" ? (
-        // A static frame, not the shared ScrollView. The source list scrolls
-        // inside it so Skip stays on screen on small phones and at large text
-        // sizes.
+      {step === "opener" ? (
+        // A static frame, not the shared ScrollView: the opener lays out its
+        // own scrolling wall and pinned buttons.
         <View
           style={[
             styles.content,
@@ -230,24 +224,15 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + theme.gap(1) },
           ]}
         >
-          {step === "opener" ? (
-            <OpenerStep
-              // On iOS, a live text-size change can leave native text
-              // measurements stale (react-native#57512), so the expected
-              // onLayout updates never arrive. Remounting forces fresh
-              // measurement.
-              key={fontScale}
-              onStart={advance}
-              onSignIn={() => setShowSignIn(true)}
-            />
-          ) : (
-            <SourceStep
-              order={sourceOrder}
-              correcting={sourceAnswered}
-              onAnswered={() => setSourceAnswered(true)}
-              onAdvance={advance}
-            />
-          )}
+          <OpenerStep
+            // On iOS, a live text-size change can leave native text
+            // measurements stale (react-native#57512), so the expected
+            // onLayout updates never arrive. Remounting forces fresh
+            // measurement.
+            key={fontScale}
+            onStart={advance}
+            onSignIn={() => setShowSignIn(true)}
+          />
         </View>
       ) : (
         <ScrollView

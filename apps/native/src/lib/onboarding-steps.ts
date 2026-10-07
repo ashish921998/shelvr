@@ -1,6 +1,5 @@
 export const ONBOARDING_STEPS = [
   "opener",
-  "source",
   "setup",
   "demo",
   "reveal",
@@ -9,8 +8,9 @@ export const ONBOARDING_STEPS = [
 // Sent with every step event. step_index means different steps in different
 // flows, so funnels split by this or filter on step_id. 3 added the source step.
 // 4 made the first save one tap on every platform, previews a ready-made
-// sample before sign-in, and added the share step.
-export const ONBOARDING_FLOW_VERSION = 4;
+// sample before sign-in, and added the share step. 5 dropped the source step
+// and the preview: a signed-out sample asks for sign-in, then saves once.
+export const ONBOARDING_FLOW_VERSION = 5;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -18,18 +18,16 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 // comparable with earlier onboarding versions.
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
-  source: "acquisition_source",
   setup: "setup",
   demo: "live_demo",
   reveal: "reveal",
   share: "share_practice",
 };
 
-// Only the two answer steps go back. From the demo on, the one demo save is
-// spent and sign-in may have happened, so an earlier screen would be stale.
+// Only setup goes back. From the demo on, the one demo save is spent and
+// sign-in may have happened, so an earlier screen would be stale.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
-  source: "opener",
-  setup: "source",
+  setup: "opener",
 };
 
 export function previousOnboardingStep(

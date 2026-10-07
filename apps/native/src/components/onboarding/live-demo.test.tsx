@@ -37,7 +37,6 @@ const mock = vi.hoisted(() => {
       retry: vi.fn(),
       keepWaiting: vi.fn(),
       continueAfterTimeout: vi.fn(),
-      previewed: vi.fn(),
     },
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
@@ -90,7 +89,6 @@ const mock = vi.hoisted(() => {
       </button>
     ),
     reading: () => <div>reading</div>,
-    sampleSignIn: () => <div>sample-sign-in</div>,
   };
 });
 
@@ -122,7 +120,6 @@ vi.mock("@/components/onboarding/parts", () => ({
 }));
 vi.mock("@/components/onboarding/demo-reading-view", () => ({
   DemoLinkRow: mock.nothing,
-  DemoPreviewView: mock.reading,
   DemoReadingView: mock.reading,
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -150,9 +147,6 @@ vi.mock("@/lib/use-demo-save", () => ({
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({
   useIncomingShareUrl: () => undefined,
-}));
-vi.mock("@/components/onboarding/sample-sign-in", () => ({
-  SampleSignIn: mock.sampleSignIn,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
@@ -245,16 +239,15 @@ describe("first-save picker", () => {
     );
   });
 
-  it("asks for sign-in on the sample's own screen, and in a sheet for a pasted link", () => {
+  it("asks for sign-in in a sheet over the picker, for a sample and a pasted link alike", () => {
     mock.demo.view = "auth";
     mock.demo.authUrl = DEMO_SAMPLES[0].url;
     const { rerender } = render(step());
-    expect(screen.getByText("sample-sign-in")).toBeTruthy();
-    expect(linkField()).toBeNull();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+    expect(linkField()).not.toBeNull();
 
     mock.demo.authUrl = "https://a.test/p";
     rerender(step());
-    expect(screen.queryByText("sample-sign-in")).toBeNull();
     expect(screen.getByText("demo.signInTitle")).toBeTruthy();
   });
 });

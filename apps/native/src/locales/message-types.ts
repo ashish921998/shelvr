@@ -446,14 +446,6 @@ export type MessageParams = {
   "onboarding.spacesChangeable": undefined;
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
-  "onboarding.sourceTitle": undefined;
-  "onboarding.sourceFriend": undefined;
-  "onboarding.sourceSharedLink": undefined;
-  "onboarding.sourceAi": undefined;
-  "onboarding.sourceAppStore": undefined;
-  "onboarding.sourceGooglePlay": undefined;
-  "onboarding.sourceOther": undefined;
-  "onboarding.sourceSkip": undefined;
   "demo.shareHelp": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
@@ -464,9 +456,6 @@ export type MessageParams = {
   "demo.eitherWay": undefined;
   "reveal.title": undefined;
   "reveal.subtitle": undefined;
-  "reveal.previewTitle": undefined;
-  "reveal.previewSubtitle": undefined;
-  "reveal.saveShelf": undefined;
   "reveal.filedIn": { space: string };
   "reveal.explainer": undefined;
   "reveal.emptyTitle": undefined;

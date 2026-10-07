@@ -18,23 +18,21 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 // Signed in, every path is real: the save runs through api.demo.createDemoItem
-// (one per user, no Pro needed) and the actual pipeline. Signed out, a
-// ready-made sample is previewed first (the reading steps play with no save),
-// then the step asks for sign-in; a pasted or typed link has nothing to
-// preview, so it asks at once. Either way the request waits in "auth" and is
-// saved here once sign-in lands, so one lifecycle owns every first save. The
-// persisted request survives an app kill mid-OAuth and stays through reveal
-// so a relaunch re-attaches to the same server item; finish() drops it. A
-// relaunch resumes into "auth", which is where a preview ends too.
+// (one per user, no Pro needed) and the actual pipeline. Signed out, a pick
+// asks for sign-in at once: the request waits in "auth" and is saved here
+// once sign-in lands, so one lifecycle owns every first save and the reading
+// steps play exactly once. The persisted request survives an app kill
+// mid-OAuth and stays through reveal so a relaunch re-attaches to the same
+// server item; finish() drops it. A relaunch resumes into "auth".
 
 const TIMEOUT_MS = 15_000;
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
-type DemoView = "share" | "auth" | "preview" | "reading" | "failed";
+type DemoView = "share" | "auth" | "reading" | "failed";
 
 /** "saved" watches the server item; the reading/failed view mirrors its status. */
-type StoredPhase = "share" | "auth" | "preview" | "saved";
+type StoredPhase = "share" | "auth" | "saved";
 
 type DemoSaveState = {
   phase: StoredPhase;
@@ -55,11 +53,8 @@ type DemoSaveAction =
       type: "submit";
       request: PendingDemo;
       authenticated: boolean;
-      /** A signed-out sample: preview it instead of asking for sign-in. */
-      preview: boolean;
       lost: boolean;
     }
-  | { type: "previewed" }
   | { type: "saved"; itemId: Id<"items"> }
   | { type: "submitFailed"; used: boolean }
   | { type: "cancelAuth" }
@@ -109,14 +104,8 @@ export function demoSaveReducer(
       if (action.authenticated) {
         return { ...next, authRequest: null, submitting: true };
       }
-      return {
-        ...next,
-        authRequest: action.request,
-        phase: action.preview ? "preview" : "auth",
-      };
+      return { ...next, authRequest: action.request, phase: "auth" };
     }
-    case "previewed":
-      return state.phase === "preview" ? { ...state, phase: "auth" } : state;
     case "saved":
       return {
         ...state,
@@ -280,7 +269,6 @@ export function useDemoSave({
         type: "submit",
         request: trimmed,
         authenticated: isAuthenticated,
-        preview: sample,
         lost,
       });
       if (!isAuthenticated) return;
@@ -404,9 +392,6 @@ export function useDemoSave({
     }
   };
 
-  // Stable, since the preview's step timer restarts when its onDone changes.
-  const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
-
   const continueAfterTimeout = () => {
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
@@ -450,7 +435,6 @@ export function useDemoSave({
     cancelAuth,
     retry,
     submitSharedUrl,
-    previewed,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

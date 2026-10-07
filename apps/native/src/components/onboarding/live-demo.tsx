@@ -8,12 +8,10 @@ import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import {
   DemoLinkRow,
-  DemoPreviewView,
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard, SampleRow } from "@/components/onboarding/sample-card";
-import { SampleSignIn } from "@/components/onboarding/sample-sign-in";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { isTerminalFailure } from "@convex/model/itemFields";
@@ -63,7 +61,7 @@ export function LiveDemoStep({
   const { view, setError } = demo;
 
   useEffect(() => {
-    onReadingChange(view === "reading" || view === "preview");
+    onReadingChange(view === "reading");
   }, [view, onReadingChange]);
 
   // A paste saves at once when it holds a link and shows just that link.
@@ -86,36 +84,6 @@ export function LiveDemoStep({
       setError("demo.clipboardNoLink");
     }
   };
-
-  if (view === "preview") {
-    const url = demo.savingUrl ?? "";
-    return (
-      <DemoPreviewView
-        title={
-          DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
-          displayHost(url)
-        }
-        url={url}
-        onDone={demo.previewed}
-      />
-    );
-  }
-
-  // A previewed sample (or one restored after a relaunch) asks for sign-in
-  // on its own screen; once signed in, the save runs here like any other.
-  const authSample =
-    view === "auth"
-      ? DEMO_SAMPLES.find((sample) => sample.url === demo.authUrl)
-      : undefined;
-  if (authSample !== undefined && !demo.isAuthenticated) {
-    return (
-      <SampleSignIn
-        sample={authSample}
-        space={demo.authRequest?.destination ?? null}
-        onNotNow={demo.cancelAuth}
-      />
-    );
-  }
 
   if (view === "reading" || view === "failed") {
     const failed = view === "failed";

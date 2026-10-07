@@ -7,16 +7,15 @@ import {
 describe("restoreOnboardingStep", () => {
   it.each([
     [0, "opener"],
-    [1, "source"],
-    [2, "setup"],
-    [3, "demo"],
-    [4, "reveal"],
-    [5, "share"],
+    [1, "setup"],
+    [2, "demo"],
+    [3, "reveal"],
+    [4, "share"],
   ] as const)("restores step %i to %s", (stored, expected) => {
     expect(restoreOnboardingStep(stored)).toBe(expected);
   });
 
-  it.each([null, -1, 6, 7, 1.5])(
+  it.each([null, -1, 5, 6, 1.5])(
     "restarts a missing or out-of-range index (%s) at the opener",
     (stored) => {
       expect(restoreOnboardingStep(stored)).toBe("opener");
@@ -25,11 +24,8 @@ describe("restoreOnboardingStep", () => {
 });
 
 describe("previousOnboardingStep", () => {
-  it.each([
-    ["source", "opener"],
-    ["setup", "source"],
-  ] as const)("goes back from %s to %s", (step, expected) => {
-    expect(previousOnboardingStep(step)).toBe(expected);
+  it("goes back from setup to the opener", () => {
+    expect(previousOnboardingStep("setup")).toBe("opener");
   });
 
   it.each(["opener", "demo", "reveal", "share"] as const)(

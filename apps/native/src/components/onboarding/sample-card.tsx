@@ -5,8 +5,8 @@ import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-// The ready-made sample cards onboarding shows: the first-save picker, the
-// sign-in prompt after its preview, and the share-sheet practice.
+// The ready-made sample cards onboarding shows: the first-save picker and
+// the share-sheet practice.
 
 const APP_ICON = require("../../../assets/icon.png");
 const SAMPLE_IMAGES: Record<DemoKind, number> = {
@@ -47,8 +47,7 @@ export function ShareHint() {
 }
 
 /** A large sample card. "save" saves it in one tap; "share" opens the real
- * share sheet over it, so the save goes through the Shelvr tile; "preview"
- * only shows it. */
+ * share sheet over it, so the save goes through the Shelvr tile. */
 export function SampleCard({
   sample,
   action,
@@ -56,21 +55,16 @@ export function SampleCard({
   onPress,
 }: {
   sample: DemoSample;
-  action: "save" | "share" | "preview";
+  action: "save" | "share";
   disabled: boolean;
   onPress?: () => void;
 }) {
   const { theme } = useUnistyles();
   const share = action === "share";
-  const preview = action === "preview";
   return (
     <Pressable
-      accessibilityRole={preview ? undefined : "button"}
-      accessibilityLabel={
-        preview
-          ? `${sample.pageHeading}, ${sample.domain}`
-          : `${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`
-      }
+      accessibilityRole="button"
+      accessibilityLabel={`${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -92,15 +86,13 @@ export function SampleCard({
             {sample.domain}
           </Text>
         </View>
-        {preview ? null : (
-          <View style={styles.hintShare}>
-            <AppSymbolIcon
-              name={share ? "square.and.arrow.up" : "plus"}
-              size={18}
-              tintColor={theme.colors.primaryForeground}
-            />
-          </View>
-        )}
+        <View style={styles.hintShare}>
+          <AppSymbolIcon
+            name={share ? "square.and.arrow.up" : "plus"}
+            size={18}
+            tintColor={theme.colors.primaryForeground}
+          />
+        </View>
       </View>
     </Pressable>
   );
