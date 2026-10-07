@@ -63,7 +63,11 @@ export function NotificationsStep({
     ),
   );
 
+  // `busy` lands a render later, so a quick second tap must be stopped here.
+  const tapped = useRef(false);
   const turnOn = async () => {
+    if (tapped.current) return;
+    tapped.current = true;
     setBusy(true);
     let granted = false;
     try {

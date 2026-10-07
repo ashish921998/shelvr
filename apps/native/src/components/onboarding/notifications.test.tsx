@@ -102,6 +102,16 @@ describe("NotificationsStep", () => {
     });
   });
 
+  it("asks once when Turn on is tapped twice", async () => {
+    const onAdvance = vi.fn();
+    render(<NotificationsStep saved={null} onAdvance={onAdvance} />);
+    const turnOn = await screen.findByText("onboarding.notifyAllow");
+    fireEvent.click(turnOn);
+    fireEvent.click(turnOn);
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.request).toHaveBeenCalledOnce();
+  });
+
   it("keeps the weekly shelf off when the OS prompt is declined", async () => {
     mock.request.mockResolvedValue(false);
     const onAdvance = vi.fn();
