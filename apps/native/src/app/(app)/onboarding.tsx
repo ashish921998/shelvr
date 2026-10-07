@@ -319,6 +319,9 @@ const styles = StyleSheet.create((theme) => ({
     height: 28,
     marginTop: -12,
     marginBottom: -13,
+    // The step below overlaps this row by that margin. Stay on top of it, or
+    // the lower half of the back button stops taking taps.
+    zIndex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.5),
