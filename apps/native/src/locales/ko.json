@@ -495,6 +495,8 @@
   "onboarding.remindSkip": "알리지 않기",
   "onboarding.remindSavedNow": "방금 저장함",
   "onboarding.remindFallbackTitle": "첫 번째 저장",
+  "onboarding.remindPledge": "일요일마다 저장한 것을 다시 볼게요.",
+  "onboarding.remindHoldHint": "길게 눌러 동의하기",
   "onboarding.sourceFriend": "친구가 알려줬어요",
   "onboarding.sourceSharedLink": "누군가 Shelvr 링크를 공유해 줬어요",
   "onboarding.sourceAi": "ChatGPT 등 AI",

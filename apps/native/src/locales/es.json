@@ -531,6 +531,8 @@
   "onboarding.remindSkip": "No me lo recuerdes",
   "onboarding.remindSavedNow": "guardado hace un momento",
   "onboarding.remindFallbackTitle": "Tu primer guardado",
+  "onboarding.remindPledge": "Los domingos repasaré lo que he guardado.",
+  "onboarding.remindHoldHint": "Mantén pulsado para aceptar",
   "onboarding.sourceFriend": "Me lo recomendó un amigo",
   "onboarding.sourceSharedLink": "Alguien compartió un enlace de Shelvr",
   "onboarding.sourceAi": "ChatGPT u otra IA",

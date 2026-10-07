@@ -1,5 +1,16 @@
+import * as Haptics from "expo-haptics";
+import { useRef } from "react";
 import { ActivityIndicator, Pressable, Text } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { scheduleOnRN } from "react-native-worklets";
+
+const HOLD_MS = 900;
 
 /** The primary CTA used by every step's footer. */
 export function CtaButton({
@@ -26,6 +37,77 @@ export function CtaButton({
         pressed && !inactive && { opacity: 0.85 },
       ]}
     >
+      {busy ? (
+        <ActivityIndicator color={theme.colors.primaryForeground} />
+      ) : (
+        <Text style={styles.ctaText}>{label}</Text>
+      )}
+    </Pressable>
+  );
+}
+
+/**
+ * The primary CTA as a press-and-hold: a fill runs across the button while it
+ * is held, and only a full hold counts, with a light tap of haptics. Letting
+ * go early drains the fill. Assistive tech activates it directly.
+ */
+export function HoldButton({
+  label,
+  hint,
+  onComplete,
+  busy,
+}: {
+  label: string;
+  hint: string;
+  onComplete: () => void;
+  busy?: boolean;
+}) {
+  const { theme } = useUnistyles();
+  const progress = useSharedValue(0);
+  const completed = useRef(false);
+
+  const complete = () => {
+    if (completed.current) return;
+    completed.current = true;
+    if (process.env.EXPO_OS !== "web")
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onComplete();
+  };
+
+  const fill = useAnimatedStyle(() => ({
+    transform: [{ scaleX: progress.value }],
+  }));
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ disabled: !!busy, busy: !!busy }}
+      accessibilityActions={[{ name: "activate" }]}
+      onAccessibilityAction={() => {
+        if (!busy) complete();
+      }}
+      disabled={busy}
+      onPressIn={() => {
+        if (completed.current) return;
+        progress.set(
+          withTiming(
+            1,
+            { duration: HOLD_MS, easing: Easing.linear },
+            (done) => {
+              if (done) scheduleOnRN(complete);
+            },
+          ),
+        );
+      }}
+      onPressOut={() => {
+        if (completed.current) return;
+        progress.set(withTiming(0, { duration: 180 }));
+      }}
+      style={styles.cta}
+    >
+      <Animated.View pointerEvents="none" style={[styles.holdFill, fill]} />
       {busy ? (
         <ActivityIndicator color={theme.colors.primaryForeground} />
       ) : (
@@ -74,6 +156,13 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "stretch",
+    overflow: "hidden",
+  },
+  holdFill: {
+    ...StyleSheet.absoluteFillObject,
+    transformOrigin: "left",
+    backgroundColor: theme.colors.primaryForeground,
+    opacity: 0.22,
   },
   ctaDisabled: {
     opacity: 0.4,

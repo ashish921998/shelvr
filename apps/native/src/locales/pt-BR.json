@@ -531,6 +531,8 @@
   "onboarding.remindSkip": "Não me lembre",
   "onboarding.remindSavedNow": "salvo agora mesmo",
   "onboarding.remindFallbackTitle": "Seu primeiro salvamento",
+  "onboarding.remindPledge": "Aos domingos, vou rever o que salvei.",
+  "onboarding.remindHoldHint": "Toque e segure para concordar",
   "onboarding.sourceFriend": "Um amigo me contou",
   "onboarding.sourceSharedLink": "Alguém compartilhou um link do Shelvr",
   "onboarding.sourceAi": "ChatGPT ou outra IA",

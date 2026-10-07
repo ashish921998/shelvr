@@ -513,6 +513,8 @@
   "onboarding.remindSkip": "Nicht erinnern",
   "onboarding.remindSavedNow": "gerade gespeichert",
   "onboarding.remindFallbackTitle": "Dein erstes Gespeichertes",
+  "onboarding.remindPledge": "Sonntags schaue ich mir an, was ich gespeichert habe.",
+  "onboarding.remindHoldHint": "Zum Zustimmen gedrückt halten",
   "onboarding.sourceFriend": "Von Freunden",
   "onboarding.sourceSharedLink": "Jemand hat einen Shelvr-Link geteilt",
   "onboarding.sourceAi": "ChatGPT oder eine andere KI",

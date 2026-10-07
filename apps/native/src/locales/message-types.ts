@@ -460,6 +460,8 @@ export type MessageParams = {
   "onboarding.remindSkip": undefined;
   "onboarding.remindSavedNow": undefined;
   "onboarding.remindFallbackTitle": undefined;
+  "onboarding.remindPledge": undefined;
+  "onboarding.remindHoldHint": undefined;
   "onboarding.sourceFriend": undefined;
   "onboarding.sourceSharedLink": undefined;
   "onboarding.sourceAi": undefined;
