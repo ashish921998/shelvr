@@ -259,9 +259,15 @@ export function LiveDemoStep({
   const footer =
     demo.demoUsed || alreadySaved ? (
       <GhostButton label={t("common.continue")} onPress={demo.advance} />
-    ) : demo.canSkip ? (
-      <GhostButton label={t("common.continue")} onPress={demo.skip} />
-    ) : null;
+    ) : (
+      // Always a way on: after a failed save it reads as carrying on, before
+      // one as skipping the first save.
+      <GhostButton
+        label={t(demo.canSkip ? "common.continue" : "demo.skip")}
+        onPress={demo.skip}
+        disabled={demo.submitting}
+      />
+    );
 
   return (
     <View style={styles.wrap}>
@@ -274,7 +280,7 @@ export function LiveDemoStep({
         onPick={demo.submitUrl}
       />
 
-      {footer === null ? null : <View style={styles.foot}>{footer}</View>}
+      <View style={styles.foot}>{footer}</View>
 
       <DemoAuthSheet
         visible={view === "auth" && !demo.isAuthenticated}

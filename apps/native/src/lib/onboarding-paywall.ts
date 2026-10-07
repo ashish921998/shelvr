@@ -4,13 +4,14 @@ import {
   noteDeclinedDuringOnboarding,
   notePurchasedDuringOnboarding,
 } from "@/lib/replay-onboarding";
+import { useConvexAuth } from "convex/react";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * The paywall at the end of onboarding, after the share practice. `ask` waits
- * for the entitlement to load, then lets a Pro account through and shows
- * everyone else the paywall once. A relaunch lands back on the share step and
+ * for the entitlement to load, then lets a Pro or signed-out account through
+ * and shows everyone else the paywall once. A relaunch lands back on the share step and
  * asks again.
  */
 export function useOnboardingPaywall({
@@ -21,6 +22,7 @@ export function useOnboardingPaywall({
   onDecline: () => void;
 }): () => void {
   const router = useRouter();
+  const { isAuthenticated } = useConvexAuth();
   const { entitled, loading } = useEntitlement();
   const [asked, setAsked] = useState(false);
   const started = useRef(false);
@@ -32,7 +34,9 @@ export function useOnboardingPaywall({
   useEffect(() => {
     if (!asked || loading || started.current) return;
     started.current = true;
-    if (entitled) {
+    // Skipping the first save skips sign-in too, and a purchase needs an
+    // account. The app asks for both once onboarding is done.
+    if (entitled || !isAuthenticated) {
       handlers.current.onPro();
       return;
     }
@@ -52,7 +56,7 @@ export function useOnboardingPaywall({
         analytics.captureError("onboarding_paywall_failed", error);
         decline();
       });
-  }, [asked, loading, entitled, router]);
+  }, [asked, loading, entitled, isAuthenticated, router]);
 
   return useCallback(() => setAsked(true), []);
 }

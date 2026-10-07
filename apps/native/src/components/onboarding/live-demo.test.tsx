@@ -280,6 +280,13 @@ describe("first-save picker", () => {
     rerender(step());
     expect(props.onBackChange).toHaveBeenLastCalledWith(null);
   });
+  it("lets the first save be skipped", () => {
+    mock.demo.view = "share";
+    render(step());
+    fireEvent.click(screen.getByText("demo.skip"));
+    expect(mock.actions.skip).toHaveBeenCalledTimes(1);
+  });
+
   it("offers the way on when the first save already exists", () => {
     mock.demo.view = "share";
     const { rerender } = render(step());

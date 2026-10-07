@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useOnboardingPaywall } from "./onboarding-paywall";
 
 const state = vi.hoisted(() => ({
+  signedIn: true,
   entitlement: { entitled: false, loading: false },
   open: vi.fn<() => Promise<boolean>>(),
   purchased: vi.fn(),
@@ -11,6 +12,9 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
+vi.mock("convex/react", () => ({
+  useConvexAuth: () => ({ isAuthenticated: state.signedIn }),
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => state.entitlement,
@@ -36,6 +40,14 @@ async function ask(entitlement: { entitled: boolean; loading: boolean }) {
 describe("useOnboardingPaywall", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    state.signedIn = true;
+  });
+
+  it("lets a signed-out account through without a paywall", async () => {
+    state.signedIn = false;
+    const { onPro } = await ask({ entitled: false, loading: false });
+    expect(onPro).toHaveBeenCalledOnce();
+    expect(state.open).not.toHaveBeenCalled();
   });
 
   it("sends a Pro account on without a paywall", async () => {

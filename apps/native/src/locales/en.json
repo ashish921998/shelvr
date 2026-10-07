@@ -224,6 +224,7 @@
   "demo.slow": "Taking longer than usual.",
   "demo.keepWaiting": "Keep waiting",
   "demo.continueWaiting": "Continue without waiting",
+  "demo.skip": "Skip for now",
   "demo.pastePlaceholder": "Paste or type a link",
   "demo.linkLabel": "Link to save",
   "common.paste": "Paste",

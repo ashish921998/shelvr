@@ -226,6 +226,7 @@
   "demo.slow": "いつもより時間がかかっています。",
   "demo.keepWaiting": "このまま待つ",
   "demo.continueWaiting": "待たずに続ける",
+  "demo.skip": "今はスキップ",
   "demo.pastePlaceholder": "リンクをペーストまたは入力",
   "demo.linkLabel": "保存するリンク",
   "common.paste": "貼り付け",

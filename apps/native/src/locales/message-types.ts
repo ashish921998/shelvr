@@ -225,6 +225,7 @@ export type MessageParams = {
   "demo.slow": undefined;
   "demo.keepWaiting": undefined;
   "demo.continueWaiting": undefined;
+  "demo.skip": undefined;
   "demo.pastePlaceholder": undefined;
   "demo.linkLabel": undefined;
   "common.paste": undefined;

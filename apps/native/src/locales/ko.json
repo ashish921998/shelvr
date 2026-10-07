@@ -226,6 +226,7 @@
   "demo.slow": "평소보다 오래 걸리고 있어요.",
   "demo.keepWaiting": "계속 기다리기",
   "demo.continueWaiting": "기다리지 않고 계속",
+  "demo.skip": "지금은 건너뛰기",
   "demo.pastePlaceholder": "링크 붙여넣기 또는 입력",
   "demo.linkLabel": "저장할 링크",
   "common.paste": "붙여넣기",

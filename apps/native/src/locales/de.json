@@ -224,6 +224,7 @@
   "demo.slow": "Das dauert länger als üblich.",
   "demo.keepWaiting": "Weiter warten",
   "demo.continueWaiting": "Ohne Warten fortfahren",
+  "demo.skip": "Vorerst überspringen",
   "demo.pastePlaceholder": "Link einfügen oder eintippen",
   "demo.linkLabel": "Link zum Speichern",
   "common.paste": "Einfügen",

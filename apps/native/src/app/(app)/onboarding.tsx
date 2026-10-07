@@ -223,7 +223,10 @@ export default function OnboardingScreen() {
 
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
-  const previous = previousOnboardingStep(step);
+  // With no first save the reminder step passes itself by, so going back
+  // from the share step has to clear it too.
+  const previous =
+    step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
   const goBack = previous
     ? () => setStep(previous)
     : step === "demo"
