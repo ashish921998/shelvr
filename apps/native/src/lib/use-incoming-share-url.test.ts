@@ -3,8 +3,6 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawSharePayload } from "@/lib/share/storage";
 import {
-  MAX_SHEET_MISSES,
-  SHARE_SHEET_DISMISS_MS,
   decideShareIntake,
   useIncomingShareUrl,
 } from "./use-incoming-share-url";
@@ -57,19 +55,11 @@ function renderShare({
   readOnMount = true,
 }: { accepting?: boolean; readOnMount?: boolean } = {}) {
   const onSharedUrl = vi.fn();
-  const onDirectUrl = vi.fn();
-  const onError = vi.fn();
   const canAccept = vi.fn(() => accepting);
   const hook = renderHook(() =>
-    useIncomingShareUrl({
-      canAccept,
-      readOnMount,
-      onSharedUrl,
-      onDirectUrl,
-      onError,
-    }),
+    useIncomingShareUrl({ canAccept, readOnMount, onSharedUrl }),
   );
-  return { ...hook, onSharedUrl, onDirectUrl, onError, canAccept };
+  return { ...hook, onSharedUrl, canAccept };
 }
 
 beforeEach(() => {
@@ -190,131 +180,5 @@ describe("useIncomingShareUrl", () => {
       "onboarding_hold_share_failed",
       expect.any(Error),
     );
-  });
-
-  describe("shareSample", () => {
-    async function runSample(
-      result: { action: string; activityType?: string },
-      payloads: RawSharePayload[],
-    ) {
-      vi.useFakeTimers();
-      mock.share.mockResolvedValue(result);
-      const hook = renderShare({ readOnMount: false });
-      let done!: Promise<void>;
-      act(() => {
-        done = hook.result.current.shareSample("https://sample.test/a");
-      });
-      expect(hook.result.current.shareSheetOpen).toBe(true);
-      mock.payloads = payloads;
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(SHARE_SHEET_DISMISS_MS);
-        await done;
-      });
-      expect(hook.result.current.shareSheetOpen).toBe(false);
-      return hook;
-    }
-
-    it("saves the link Shelvr received", async () => {
-      const { onSharedUrl, onDirectUrl } = await runSample(
-        { action: "sharedAction" },
-        [link("https://sample.test/a")],
-      );
-      expect(onSharedUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
-    });
-
-    it("falls back to the sample when the extension's payload is not readable", async () => {
-      const { onSharedUrl, onDirectUrl } = await runSample(
-        {
-          action: "sharedAction",
-          activityType: "app.shelvr.save.expo-sharing-extension",
-        },
-        [],
-      );
-      expect(onSharedUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(onDirectUrl).not.toHaveBeenCalled();
-    });
-
-    it("asks for Shelvr when another app was picked", async () => {
-      const { onSharedUrl, onDirectUrl, onError } = await runSample(
-        {
-          action: "sharedAction",
-          activityType: "com.apple.UIKit.activity.CopyToPasteboard",
-        },
-        [],
-      );
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenLastCalledWith("demo.pickShelvr");
-    });
-
-    it("explains where Shelvr is when the sheet was dismissed", async () => {
-      const { onSharedUrl, onDirectUrl, onError } = await runSample(
-        { action: "dismissedAction" },
-        [],
-      );
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenLastCalledWith("demo.shareDismissed");
-    });
-
-    it("counts a share to another app toward the direct save", async () => {
-      vi.useFakeTimers();
-      mock.share.mockResolvedValue({
-        action: "sharedAction",
-        activityType: "com.apple.UIKit.activity.CopyToPasteboard",
-      });
-      const { result, onDirectUrl, onError } = renderShare({
-        readOnMount: false,
-      });
-      for (let i = 0; i < MAX_SHEET_MISSES; i++) {
-        await act(async () => {
-          const done = result.current.shareSample("https://sample.test/a");
-          await vi.advanceTimersByTimeAsync(SHARE_SHEET_DISMISS_MS);
-          await done;
-        });
-      }
-      expect(onError).toHaveBeenCalledWith("demo.pickShelvr");
-      expect(onDirectUrl).toHaveBeenCalledTimes(1);
-    });
-
-    it("reports each miss without content", async () => {
-      await runSample({ action: "dismissedAction" }, []);
-      expect(mock.capture).toHaveBeenCalledWith("onboarding_share_missed", {
-        reason: "dismissed",
-        misses: 1,
-        fallback: false,
-      });
-    });
-
-    it("saves the sample directly after the second dismissal", async () => {
-      vi.useFakeTimers();
-      mock.share.mockResolvedValue({ action: "dismissedAction" });
-      const { result, onDirectUrl, onError } = renderShare({
-        readOnMount: false,
-      });
-      for (let i = 0; i < MAX_SHEET_MISSES; i++) {
-        await act(async () => {
-          const done = result.current.shareSample("https://sample.test/a");
-          await vi.advanceTimersByTimeAsync(SHARE_SHEET_DISMISS_MS);
-          await done;
-        });
-      }
-      expect(onError).toHaveBeenCalledWith("demo.shareDismissed");
-      expect(onDirectUrl).toHaveBeenCalledTimes(1);
-      expect(onDirectUrl).toHaveBeenCalledWith("https://sample.test/a");
-    });
-
-    it("saves the sample directly when the sheet cannot open", async () => {
-      mock.share.mockRejectedValue(new Error("sheet"));
-      const { result, onSharedUrl, onDirectUrl } = renderShare({
-        readOnMount: false,
-      });
-      await act(() => result.current.shareSample("https://sample.test/a"));
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(result.current.shareSheetOpen).toBe(false);
-    });
   });
 });

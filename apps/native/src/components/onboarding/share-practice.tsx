@@ -2,19 +2,19 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
-import { SHARE_SHEET_DISMISS_MS } from "@/lib/use-incoming-share-url";
+import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
-import { SampleCard, ShareHint } from "@/components/onboarding/live-demo";
+import { SampleCard, ShareHint } from "@/components/onboarding/sample-card";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking, Platform, Share, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { Platform, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-const SHARE_EXTENSION_SUFFIX = ".expo-sharing-extension";
-
-type Outcome = "saved" | "other_app" | "skipped" | "sheet_failed";
+/** "received" means the share reached Shelvr and waits for the share
+ * screen, which saves it after onboarding; nothing is saved here. */
+type Outcome = "received" | "other_app" | "skipped" | "sheet_failed";
 
 function hasIncomingShare(): boolean {
   try {
@@ -41,7 +41,7 @@ export function SharePracticeStep({
 }) {
   useAppLocale();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
   const reported = useRef(false);
 
@@ -53,7 +53,7 @@ export function SharePracticeStep({
     analytics.capture("onboarding_share_practice", { outcome });
   }, []);
 
-  const markSaved = useCallback(() => {
+  const markReceived = useCallback(() => {
     try {
       markPendingShareOnDevice();
     } catch (err) {
@@ -63,57 +63,33 @@ export function SharePracticeStep({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setWrongApp(false);
-    setSaved(true);
-    report("saved");
+    setReceived(true);
+    report("received");
   }, [report]);
 
   // Android hands a share to Shelvr by relaunching it, so the payload is
   // noticed when the app comes back rather than from the share result.
-  useEffect(() => {
-    const check = () => {
-      if (!saved && hasIncomingShare()) markSaved();
-    };
-    const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active") check();
-    });
-    const links = Linking.addEventListener("url", ({ url }) => {
-      if (url.includes("expo-sharing")) check();
-    });
-    return () => {
-      appState.remove();
-      links.remove();
-    };
-  }, [saved, markSaved]);
+  useShareArrival(
+    useCallback(() => {
+      if (!received && hasIncomingShare()) markReceived();
+    }, [received, markReceived]),
+    false,
+  );
 
   const share = async () => {
     if (sample === undefined) return;
     setWrongApp(false);
     setSheetOpen(true);
-    let result: Awaited<ReturnType<typeof Share.share>>;
-    try {
-      result = await Share.share(
-        Platform.OS === "ios" ? { url: sample.url } : { message: sample.url },
-      );
-    } catch (err) {
-      analytics.captureError("onboarding_share_practice_sheet_failed", err);
-      setSheetOpen(false);
-      report("sheet_failed");
-      onFinish();
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, SHARE_SHEET_DISMISS_MS));
+    const result = await presentShareSheet(sample.url, hasIncomingShare);
     setSheetOpen(false);
-    if (
-      hasIncomingShare() ||
-      result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)
-    ) {
-      markSaved();
-      return;
-    }
-    // Android cannot say which app received the share.
-    if (Platform.OS === "ios" && result.action === Share.sharedAction) {
+    if (result === "shelvr") {
+      markReceived();
+    } else if (result === "other_app") {
       setWrongApp(true);
       report("other_app");
+    } else if (result === "failed") {
+      report("sheet_failed");
+      onFinish();
     }
   };
 
@@ -129,14 +105,14 @@ export function SharePracticeStep({
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
-          {t(saved ? "sharePractice.savedTitle" : "sharePractice.title")}
+          {t(received ? "sharePractice.savedTitle" : "sharePractice.title")}
         </Text>
         <Text style={styles.support}>
-          {t(saved ? "sharePractice.savedBody" : "sharePractice.body")}
+          {t(received ? "sharePractice.savedBody" : "sharePractice.body")}
         </Text>
       </View>
 
-      {saved ? null : (
+      {received ? null : (
         <>
           {sample === undefined ? null : (
             <SampleCard
@@ -161,7 +137,7 @@ export function SharePracticeStep({
       )}
 
       <View style={styles.foot}>
-        {saved ? (
+        {received ? (
           <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
         ) : (
           <GhostButton

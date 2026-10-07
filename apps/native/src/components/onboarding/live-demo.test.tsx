@@ -16,6 +16,7 @@ const mock = vi.hoisted(() => {
     item: undefined,
     savingUrl: null,
     authUrl: "",
+    authRequest: null,
     submitting: false,
     timedOut: false,
     demoUsed: false,
@@ -36,8 +37,8 @@ const mock = vi.hoisted(() => {
       retry: vi.fn(),
       keepWaiting: vi.fn(),
       continueAfterTimeout: vi.fn(),
+      previewed: vi.fn(),
     },
-    shareSample: vi.fn(),
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
@@ -89,6 +90,7 @@ const mock = vi.hoisted(() => {
       </button>
     ),
     reading: () => <div>reading</div>,
+    sampleSignIn: () => <div>sample-sign-in</div>,
   };
 });
 
@@ -147,10 +149,10 @@ vi.mock("@/lib/use-demo-save", () => ({
   useDemoSave: () => ({ ...mock.demo, ...mock.actions }),
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({
-  useIncomingShareUrl: () => ({
-    shareSheetOpen: false,
-    shareSample: mock.shareSample,
-  }),
+  useIncomingShareUrl: () => undefined,
+}));
+vi.mock("@/components/onboarding/sample-sign-in", () => ({
+  SampleSignIn: mock.sampleSignIn,
 }));
 
 const { LiveDemoStep } = await import("@/components/onboarding/live-demo");
@@ -172,6 +174,7 @@ beforeEach(() => {
   mock.demo.view = "pick";
   mock.demo.error = null;
   mock.demo.demoUsed = false;
+  mock.demo.authUrl = "";
   vi.clearAllMocks();
   mock.actions.canAcceptShare.mockReturnValue(true);
 });
@@ -240,5 +243,18 @@ describe("first-save picker", () => {
     expect(fieldBlock.contains(screen.getByText("demo.saveFailed"))).toBe(
       false,
     );
+  });
+
+  it("asks for sign-in on the sample's own screen, and in a sheet for a pasted link", () => {
+    mock.demo.view = "auth";
+    mock.demo.authUrl = DEMO_SAMPLES[0].url;
+    const { rerender } = render(step());
+    expect(screen.getByText("sample-sign-in")).toBeTruthy();
+    expect(linkField()).toBeNull();
+
+    mock.demo.authUrl = "https://a.test/p";
+    rerender(step());
+    expect(screen.queryByText("sample-sign-in")).toBeNull();
+    expect(screen.getByText("demo.signInTitle")).toBeTruthy();
   });
 });

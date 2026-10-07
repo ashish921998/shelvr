@@ -1,37 +1,25 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
-import {
-  DEMO_SAMPLES,
-  type DemoKind,
-  type DemoSample,
-} from "@/lib/onboarding-demo";
+import { DEMO_SAMPLES, type DemoSample } from "@/lib/onboarding-demo";
 import type { PendingDemo } from "@/lib/pending-onboarding";
 import { displayHost } from "@/lib/url";
 import { useDemoSave, linkFromText, type DemoSaved } from "@/lib/use-demo-save";
 import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
-import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
+import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import {
   DemoLinkRow,
   DemoPreviewView,
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
+import { SampleCard, SampleRow } from "@/components/onboarding/sample-card";
+import { SampleSignIn } from "@/components/onboarding/sample-sign-in";
+import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { AppSymbolIcon } from "@/components/symbol";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
-import { Image } from "expo-image";
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // The first save is a pasted, typed or ready-made link; a link shared from
@@ -39,14 +27,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 // useDemoSave, share intake in useIncomingShareUrl.
 
 export type { DemoSaved };
-
-const APP_ICON = require("../../../assets/icon.png");
-const SAMPLE_IMAGES: Record<DemoKind, number> = {
-  Articles: require("../../../assets/onboarding/demo-article.jpg"),
-  Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
-  Products: require("../../../assets/onboarding/demo-product.jpg"),
-  Travel: require("../../../assets/onboarding/demo-travel.jpg"),
-};
 
 export function LiveDemoStep({
   samples,
@@ -74,12 +54,10 @@ export function LiveDemoStep({
     onSaved,
     onAdvance,
   });
-  const { shareSheetOpen } = useIncomingShareUrl({
+  useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
-    onDirectUrl: demo.submitUrl,
-    onError: demo.setError,
   });
   const [draft, setDraft] = useState("");
   const { view, setError } = demo;
@@ -118,7 +96,23 @@ export function LiveDemoStep({
           displayHost(url)
         }
         url={url}
-        onDone={demo.advance}
+        onDone={demo.previewed}
+      />
+    );
+  }
+
+  // A previewed sample (or one restored after a relaunch) asks for sign-in
+  // on its own screen; once signed in, the save runs here like any other.
+  const authSample =
+    view === "auth"
+      ? DEMO_SAMPLES.find((sample) => sample.url === demo.authUrl)
+      : undefined;
+  if (authSample !== undefined && !demo.isAuthenticated) {
+    return (
+      <SampleSignIn
+        sample={authSample}
+        space={demo.authRequest?.destination ?? null}
+        onNotNow={demo.cancelAuth}
       />
     );
   }
@@ -231,7 +225,7 @@ export function LiveDemoStep({
       {footer === null ? null : <View style={styles.foot}>{footer}</View>}
 
       <DemoAuthSheet
-        visible={view === "auth" && !demo.isAuthenticated && !shareSheetOpen}
+        visible={view === "auth" && !demo.isAuthenticated}
         url={demo.authUrl}
         onCancel={demo.cancelAuth}
       />
@@ -304,137 +298,6 @@ function SamplePicker({
   );
 }
 
-/** An illustration of the share gesture, not a control. */
-export function ShareHint() {
-  useAppLocale();
-  const { theme } = useUnistyles();
-  return (
-    <View
-      style={styles.hint}
-      accessible
-      accessibilityLabel={t("demo.shareHelp")}
-    >
-      <View style={styles.hintArt}>
-        <View style={styles.hintShare}>
-          <AppSymbolIcon
-            name="square.and.arrow.up"
-            size={18}
-            tintColor={theme.colors.primaryForeground}
-          />
-        </View>
-        <AppSymbolIcon
-          name="chevron.right"
-          size={12}
-          tintColor={theme.colors.faint}
-        />
-        <Image source={APP_ICON} style={styles.hintIcon} />
-      </View>
-      <Text style={styles.hintText}>{t("demo.shareHelp")}</Text>
-    </View>
-  );
-}
-
-/** A large sample card. "save" saves it in one tap; "share" opens the real
- * share sheet over it, so the save goes through the Shelvr tile; "preview"
- * only shows it. */
-export function SampleCard({
-  sample,
-  action,
-  disabled,
-  onPress,
-}: {
-  sample: DemoSample;
-  action: "save" | "share" | "preview";
-  disabled: boolean;
-  onPress?: () => void;
-}) {
-  const { theme } = useUnistyles();
-  const share = action === "share";
-  const preview = action === "preview";
-  return (
-    <Pressable
-      accessibilityRole={preview ? undefined : "button"}
-      accessibilityLabel={
-        preview
-          ? `${sample.pageHeading}, ${sample.domain}`
-          : `${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`
-      }
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.post,
-        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-      ]}
-    >
-      <Image
-        source={SAMPLE_IMAGES[sample.kind]}
-        contentFit="cover"
-        style={styles.postImage}
-      />
-      <View style={styles.postBody}>
-        <View style={styles.linkText}>
-          <Text style={styles.postTitle} numberOfLines={2}>
-            {sample.pageHeading}
-          </Text>
-          <Text style={styles.linkUrl} numberOfLines={1}>
-            {sample.domain}
-          </Text>
-        </View>
-        {preview ? null : (
-          <View style={styles.hintShare}>
-            <AppSymbolIcon
-              name={share ? "square.and.arrow.up" : "plus"}
-              size={18}
-              tintColor={theme.colors.primaryForeground}
-            />
-          </View>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-function SampleRow({
-  sample,
-  icon,
-  disabled,
-  onPress,
-}: {
-  sample: DemoSample;
-  icon: "plus" | "square.and.arrow.up";
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${sample.pageHeading}, ${sample.domain}`}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.sampleRow,
-        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-      ]}
-    >
-      <Image
-        source={SAMPLE_IMAGES[sample.kind]}
-        contentFit="cover"
-        style={styles.sampleThumb}
-      />
-      <View style={styles.linkText}>
-        <Text style={styles.linkHost} numberOfLines={1}>
-          {sample.pageHeading}
-        </Text>
-        <Text style={styles.linkUrl} numberOfLines={1}>
-          {sample.domain}
-        </Text>
-      </View>
-      <AppSymbolIcon name={icon} size={16} tintColor={theme.colors.primary} />
-    </Pressable>
-  );
-}
-
 function DemoAuthSheet({
   visible,
   url,
@@ -495,77 +358,6 @@ function DemoAuthSheet({
     </Modal>
   );
 }
-
-/** Apple (iOS), Google and the dev login, with the failure line and the
- * privacy note. The caller owns the OAuth state, so a sheet can stay open
- * while a sign-in is in flight. */
-export function SignInButtons({
-  oauth,
-}: {
-  oauth: ReturnType<typeof useOAuthSignIn>;
-}) {
-  useAppLocale();
-  const { theme } = useUnistyles();
-  const { signInWith, pendingProvider, lastError, interrupted } = oauth;
-  const busy = pendingProvider !== null;
-  const signIn = (provider: OAuthProvider) => {
-    void signInWith(provider);
-  };
-
-  return (
-    <>
-      {!busy && (lastError !== null || interrupted) ? (
-        <Text style={styles.error}>{t("demo.signInFailed")}</Text>
-      ) : null}
-
-      {Platform.OS === "ios" ? (
-        <Pressable
-          onPress={() => signIn("apple")}
-          disabled={busy}
-          style={({ pressed }) => [
-            styles.authBtn,
-            styles.authBtnApple,
-            busy && { opacity: 0.4 },
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          {pendingProvider === "apple" ? (
-            <ActivityIndicator color={theme.colors.background} />
-          ) : (
-            <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
-              {t("account.apple")}
-            </Text>
-          )}
-        </Pressable>
-      ) : null}
-      <Pressable
-        onPress={() => signIn("google")}
-        disabled={busy}
-        style={({ pressed }) => [
-          styles.authBtn,
-          busy && { opacity: 0.4 },
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        {pendingProvider === "google" ? (
-          <ActivityIndicator color={theme.colors.foreground} />
-        ) : (
-          <Text style={styles.authBtnText}>{t("account.google")}</Text>
-        )}
-      </Pressable>
-      {isAnonymousAuthEnabled() ? (
-        <GhostButton
-          label={t("account.anonymous")}
-          onPress={() => signIn("anonymous")}
-          disabled={busy}
-          testID="onboarding-dev-login"
-        />
-      ) : null}
-      <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
-    </>
-  );
-}
-
 const styles = StyleSheet.create((theme, rt) => ({
   wrap: {
     flex: 1,
@@ -595,83 +387,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     marginTop: "auto",
     gap: theme.gap(1),
   },
-  hint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  hintArt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
-  hintShare: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hintIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-  },
-  hintText: {
-    flex: 1,
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
-    color: theme.colors.foreground,
-  },
-  post: {
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: "hidden",
-  },
-  postImage: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  postBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(1.5),
-  },
-  postTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 17,
-    lineHeight: 22,
-    color: theme.colors.foreground,
-  },
   pasteControl: {
     width: 104,
     height: 48,
-  },
-  linkText: {
-    flex: 1,
-    gap: 2,
-  },
-  linkHost: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 14,
-    color: theme.colors.foreground,
-  },
-  linkUrl: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 12,
-    color: theme.colors.faint,
   },
   inputBlock: {
     gap: theme.gap(1),
@@ -717,25 +435,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 13,
     color: theme.colors.muted,
   },
-  sampleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.25),
-    padding: theme.gap(1),
-    paddingRight: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  sampleThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primarySoft,
-  },
   scrim: {
     flex: 1,
     backgroundColor: theme.colors.overlay,
@@ -763,33 +462,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 22,
     lineHeight: 28,
     color: theme.colors.foreground,
-  },
-  authBtn: {
-    minHeight: 52,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authBtnApple: {
-    backgroundColor: theme.colors.foreground,
-    borderColor: theme.colors.foreground,
-  },
-  authBtnText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    color: theme.colors.foreground,
-  },
-  authBtnTextApple: {
-    color: theme.colors.background,
-  },
-  privacy: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 12,
-    textAlign: "center",
-    color: theme.colors.faint,
   },
 }));

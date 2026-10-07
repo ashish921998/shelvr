@@ -19,12 +19,13 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 
 // Signed in, every path is real: the save runs through api.demo.createDemoItem
 // (one per user, no Pro needed) and the actual pipeline. Signed out, a
-// ready-made sample is previewed instead: the step plays the reading steps
-// and the reveal shows the sample, then asks for sign-in, after which the
-// reveal saves the persisted request for real. A pasted or typed link has
-// nothing to preview, so it still asks for sign-in here. The persisted
-// request survives an app kill mid-OAuth and stays through reveal so a
-// relaunch re-attaches to the same server item; finish() drops it.
+// ready-made sample is previewed first (the reading steps play with no save),
+// then the step asks for sign-in; a pasted or typed link has nothing to
+// preview, so it asks at once. Either way the request waits in "auth" and is
+// saved here once sign-in lands, so one lifecycle owns every first save. The
+// persisted request survives an app kill mid-OAuth and stays through reveal
+// so a relaunch re-attaches to the same server item; finish() drops it. A
+// relaunch resumes into "auth", which is where a preview ends too.
 
 const TIMEOUT_MS = 15_000;
 
@@ -58,6 +59,7 @@ type DemoSaveAction =
       preview: boolean;
       lost: boolean;
     }
+  | { type: "previewed" }
   | { type: "saved"; itemId: Id<"items"> }
   | { type: "submitFailed"; used: boolean }
   | { type: "cancelAuth" }
@@ -107,10 +109,14 @@ export function demoSaveReducer(
       if (action.authenticated) {
         return { ...next, authRequest: null, submitting: true };
       }
-      return action.preview
-        ? { ...next, authRequest: null, phase: "preview" }
-        : { ...next, authRequest: action.request, phase: "auth" };
+      return {
+        ...next,
+        authRequest: action.request,
+        phase: action.preview ? "preview" : "auth",
+      };
     }
+    case "previewed":
+      return state.phase === "preview" ? { ...state, phase: "auth" } : state;
     case "saved":
       return {
         ...state,
@@ -163,6 +169,10 @@ export function deriveDemoView(
     isSuccess: boolean;
   },
 ): { view: DemoView; lostError: TextMessageKey | null } {
+  // Signed in from the auth view: the save is on its way, so show it reading.
+  if (state.phase === "auth" && state.submitting) {
+    return { view: "reading", lostError: null };
+  }
   if (state.phase !== "saved") return { view: state.phase, lostError: null };
   const { item } = query;
   if (item?.status === "failed") return { view: "failed", lostError: null };
@@ -419,6 +429,7 @@ export function useDemoSave({
     item,
     isAuthenticated,
     savingUrl: state.savingUrl,
+    authRequest: state.authRequest,
     authUrl: state.authRequest?.url ?? state.savingUrl ?? "",
     submitting: state.submitting,
     error: state.error ?? lostError,
@@ -434,6 +445,7 @@ export function useDemoSave({
     cancelAuth,
     retry,
     submitSharedUrl,
+    previewed: () => dispatch({ type: "previewed" }),
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

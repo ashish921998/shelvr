@@ -5,8 +5,6 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
-import { DEMO_SAMPLES } from "@/lib/onboarding-demo";
-import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   noteDeclinedDuringOnboarding,
@@ -16,11 +14,7 @@ import { ItemCard, type FeedItem } from "@/components/item-card";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import {
-  SampleCard,
-  SignInButtons,
-  type DemoSaved,
-} from "@/components/onboarding/live-demo";
+import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { api } from "@convex/_generated/api";
 import { demoErrorCode } from "@convex/model/demoErrors";
 import { convexQuery } from "@convex-dev/react-query";
@@ -79,14 +73,12 @@ export function RevealStep({
       spaceName: demo.destination ?? undefined,
       analyticsSessionId: analytics.sessionId(),
     })
-      .then((result) => {
-        // A previewed sample is first saved here, after the reveal's sign-in.
-        if (!result.reused) analytics.capture("onboarding_demo_submitted");
+      .then((result) =>
         onSaved({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
-        });
-      })
+        }),
+      )
       .catch((err: unknown) => {
         setAttaching(false);
         if (demoErrorCode(err) !== "demo_used") {
@@ -142,39 +134,10 @@ export function RevealStep({
         tags: item.tags,
       }
     : null;
-  // Signed out with a ready-made sample picked: the demo previewed it, so the
-  // reveal shows the sample and asks for sign-in. Signing in saves it for real
-  // through the attach effect above.
-  const pending = attaching ? getOnboardingProgress().demo : null;
-  const previewSample =
-    isAuthenticated || pending === null
-      ? undefined
-      : DEMO_SAMPLES.find((sample) => sample.url === pending.url);
-  const preview =
-    previewSample === undefined
-      ? null
-      : { sample: previewSample, space: pending?.destination ?? null };
-
   // Skipped after a failed save, or the saved item was deleted since.
   const empty = item === null || (saved === null && !attaching);
   const space = empty ? undefined : saved?.savedSpaceNames[0];
   const previewTitle = item?.title;
-
-  if (preview !== null) {
-    return (
-      <SamplePreview
-        sample={preview.sample}
-        space={preview.space}
-        onNotNow={() => {
-          analytics.capture("onboarding_signin_prompt", {
-            surface: "reveal",
-            action: "dismissed",
-          });
-          onFinish();
-        }}
-      />
-    );
-  }
 
   return (
     <View style={styles.wrap}>
@@ -240,70 +203,6 @@ export function RevealStep({
   );
 }
 
-/** The signed-out reveal: the previewed sample, then "Save your shelf". */
-function SamplePreview({
-  sample,
-  space,
-  onNotNow,
-}: {
-  sample: (typeof DEMO_SAMPLES)[number];
-  space: string | null;
-  onNotNow: () => void;
-}) {
-  useAppLocale();
-  const oauth = useOAuthSignIn("reveal");
-  const busy = oauth.pendingProvider !== null;
-
-  useEffect(() => {
-    analytics.capture("onboarding_signin_prompt", {
-      surface: "reveal",
-      action: "shown",
-    });
-  }, []);
-
-  return (
-    <View style={styles.wrap}>
-      <Text style={styles.verdict} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
-        {t("reveal.previewTitle")}{" "}
-        <Text style={styles.verdictMuted}>{t("reveal.previewSubtitle")}</Text>
-      </Text>
-
-      <View pointerEvents="none">
-        <SampleCard sample={sample} action="preview" disabled={false} />
-      </View>
-
-      {space ? (
-        <View style={styles.dest}>
-          <Text style={styles.destText}>{t("reveal.filedIn", { space })}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.sunday}>
-        <Text style={styles.label}>{t("reveal.everySunday")}</Text>
-        <NotificationPreview
-          body={t("weekly.previewBody", { title: sample.pageHeading })}
-        />
-      </View>
-
-      <View style={styles.foot}>
-        <Text
-          style={styles.saveShelf}
-          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-        >
-          {t("reveal.saveShelf")}
-        </Text>
-        <Text style={styles.support}>{t("demo.signInHelp")}</Text>
-        <SignInButtons oauth={oauth} />
-        <GhostButton
-          label={t("common.notNow")}
-          onPress={onNotNow}
-          disabled={busy}
-        />
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
@@ -356,11 +255,5 @@ const styles = StyleSheet.create((theme) => ({
   foot: {
     marginTop: "auto",
     gap: theme.gap(1),
-  },
-  saveShelf: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
-    lineHeight: 28,
-    color: theme.colors.foreground,
   },
 }));

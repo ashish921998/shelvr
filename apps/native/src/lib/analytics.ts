@@ -43,7 +43,7 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * apart, because the onboarding route renders both the full-page view and the
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
-export type OAuthSurface = "sign_in_view" | "demo_sheet" | "reveal";
+export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -271,27 +271,21 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
-  // The share sheet closed without Shelvr receiving the sample. `fallback` is
-  // true when this miss saved the sample directly instead of asking again.
-  onboarding_share_missed: {
-    reason: "dismissed" | "other_app";
-    misses: number;
-    fallback: boolean;
-  };
   // A first-save pick, before any sign-in. `sample` is a ready-made link
   // (previewed when signed out); otherwise a pasted, typed or shared one.
   onboarding_demo_picked: { sample: boolean; signed_in: boolean };
   // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
-  // the reveal (a previewed sample). "dismissed" is the sheet's scrim or back,
-  // or the reveal's "Not now"; a sign-in itself shows as auth_started.
+  // the screen after a previewed sample. "dismissed" is the sheet's scrim or
+  // back, or that screen's "Not now"; a sign-in itself shows as auth_started.
   onboarding_signin_prompt: {
-    surface: "demo_sheet" | "reveal";
+    surface: "demo_sheet" | "sample_preview";
     action: "shown" | "dismissed";
   };
   // The share-sheet practice after the paywall (onboarding/share-practice.tsx).
-  // "other_app" can repeat; the other outcomes fire once per mount.
+  // "received" is a share that reached Shelvr, saved later by the share
+  // screen. "other_app" can repeat; the other outcomes fire once per mount.
   onboarding_share_practice: {
-    outcome: "saved" | "other_app" | "skipped" | "sheet_failed";
+    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
   };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";

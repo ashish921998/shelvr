@@ -9,8 +9,7 @@ export const ONBOARDING_STEPS = [
 // Sent with every step event. step_index means different steps in different
 // flows, so funnels split by this or filter on step_id. 3 added the source step.
 // 4 made the first save one tap on every platform, previews a ready-made
-// sample before sign-in (sign-in moved to the reveal), and added the share
-// step.
+// sample before sign-in, and added the share step.
 export const ONBOARDING_FLOW_VERSION = 4;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
