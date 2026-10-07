@@ -447,6 +447,20 @@ export type MessageParams = {
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
   "onboarding.sourceTitle": undefined;
+  "onboarding.remindTitle": undefined;
+  "onboarding.remindQuestion": undefined;
+  "onboarding.remindTonight": undefined;
+  "onboarding.remindTomorrow": undefined;
+  "onboarding.remindWeekend": undefined;
+  "onboarding.remindNextWeek": undefined;
+  "onboarding.remindCtaTonight": undefined;
+  "onboarding.remindCtaTomorrow": undefined;
+  "onboarding.remindCtaWeekend": undefined;
+  "onboarding.remindCtaNextWeek": undefined;
+  "onboarding.remindSkip": undefined;
+  "onboarding.remindSavedNow": undefined;
+  "onboarding.remindFallbackTitle": undefined;
+  "onboarding.remindPledge": undefined;
   "onboarding.sourceFriend": undefined;
   "onboarding.sourceSharedLink": undefined;
   "onboarding.sourceAi": undefined;
@@ -469,7 +483,6 @@ export type MessageParams = {
   "reveal.emptyTitle": undefined;
   "reveal.emptySubtitle": undefined;
   "reveal.emptyExplainer": undefined;
-  "reveal.everySunday": undefined;
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;
   "weekly.previewTime": undefined;

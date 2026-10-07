@@ -28,6 +28,7 @@ import {
   LiveDemoStep,
   type DemoSaved,
 } from "@/components/onboarding/live-demo";
+import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
@@ -45,6 +46,7 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   source: 0.125,
   setup: 0.25,
   demo: 0.5,
+  notifications: 0.8,
   reveal: 1,
 };
 const READING_PROGRESS = 0.625;
@@ -251,6 +253,10 @@ export default function OnboardingScreen() {
               onReadingChange={setReading}
               onAdvance={advance}
             />
+          )}
+
+          {step === "notifications" && (
+            <NotificationsStep saved={saved} onAdvance={advance} />
           )}
 
           {step === "reveal" && (
