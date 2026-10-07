@@ -473,7 +473,6 @@ export type MessageParams = {
   "reveal.emptyTitle": undefined;
   "reveal.emptySubtitle": undefined;
   "reveal.emptyExplainer": undefined;
-  "reveal.everySunday": undefined;
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;
   "weekly.previewTime": undefined;
