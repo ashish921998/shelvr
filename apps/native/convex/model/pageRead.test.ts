@@ -392,3 +392,45 @@ describe("readPage for Instagram posts", () => {
     );
   });
 });
+
+describe("readPage for YouTube videos", () => {
+  const videoUrl = "https://youtu.be/dQw4w9WgXcQ";
+  const oEmbedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(videoUrl)}`;
+
+  it("reads the title, channel and thumbnail from oEmbed", async () => {
+    serve({
+      [oEmbedUrl]: json(oEmbedUrl, {
+        title: "Never Gonna Give You Up",
+        author_name: "Rick Astley",
+        thumbnail_url: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        thumbnail_width: 480,
+        thumbnail_height: 360,
+      }),
+    });
+    await expect(readPage(videoUrl)).resolves.toMatchObject({
+      status: "ok",
+      page: {
+        title: "Never Gonna Give You Up",
+        siteName: "YouTube",
+        author: "Rick Astley",
+        heroImageUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        heroAspectRatio: 480 / 360,
+      },
+    });
+    // The bot-gated watch page is never loaded.
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the page when oEmbed refuses the link", async () => {
+    serve({
+      [videoUrl]: html(
+        videoUrl,
+        '<html><head><meta property="og:title" content="A private video"></head><body></body></html>',
+      ),
+    });
+    await expect(readPage(videoUrl)).resolves.toMatchObject({
+      status: "ok",
+      page: { title: "A private video" },
+    });
+  });
+});

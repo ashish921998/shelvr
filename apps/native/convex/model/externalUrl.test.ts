@@ -366,6 +366,10 @@ describe("linkSource", () => {
     expect(linkSource("https://www.instagram.com/reel/abc/")).toBe("instagram");
     expect(linkSource("https://www.pinterest.com/pin/1/")).toBe("pinterest");
     expect(linkSource("https://pin.it/abc")).toBe("pinterest");
+    expect(linkSource("https://www.youtube.com/watch?v=abc")).toBe("youtube");
+    expect(linkSource("https://youtu.be/abc")).toBe("youtube");
+    expect(linkSource("https://m.youtube.com/shorts/abc")).toBe("youtube");
+    expect(linkSource("https://notyoutube.com/watch?v=abc")).toBeUndefined();
     expect(
       linkSource("https://www.pinterest.com/cook/dinners/"),
     ).toBeUndefined();

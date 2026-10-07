@@ -307,7 +307,7 @@ export function isPinterestShortUrl(url: string | undefined): boolean {
 
 /** The platforms whose links have their own reader instead of a plain page
  * fetch. */
-export type LinkSource = "tiktok" | "x" | "instagram" | "pinterest";
+export type LinkSource = "tiktok" | "x" | "instagram" | "pinterest" | "youtube";
 
 /** Which platform reader a saved link goes to, or undefined for a plain web
  * page. The one place that answers "which platform is this URL". */
@@ -318,5 +318,23 @@ export function linkSource(url: string | undefined): LinkSource | undefined {
   if (pinterestPinId(url) !== undefined || isPinterestShortUrl(url)) {
     return "pinterest";
   }
+  if (isYouTubeUrl(url)) return "youtube";
   return undefined;
+}
+
+/** True for a YouTube video link: youtube.com (www, m, music) and the youtu.be
+ * short host. YouTube often answers a server's page load with a consent or
+ * bot-check page that has no video metadata, so these go to its oEmbed. */
+export function isYouTubeUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "youtu.be" ||
+      host === "youtube.com" ||
+      host.endsWith(".youtube.com")
+    );
+  } catch {
+    return false;
+  }
 }
