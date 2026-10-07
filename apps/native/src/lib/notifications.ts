@@ -42,28 +42,6 @@ const tokenStore = {
     SecureStore.setItemAsync(tokenStorageKey, JSON.stringify(tokens)),
 };
 
-// A weekly shelf opt-in given before it could be saved: signed out, offline,
-// or while registration failed. Kept until a signed-in session saves it.
-const WEEKLY_OPT_IN_KEY = "shelvr.weeklyShelfOptIn";
-
-export function queueWeeklyShelfOptIn(): void {
-  SecureStore.setItem(WEEKLY_OPT_IN_KEY, "1");
-}
-
-// The opt-in belongs to whoever gave it, so it never outlives their session.
-function dropWeeklyShelfOptIn(): void {
-  SecureStore.setItem(WEEKLY_OPT_IN_KEY, "");
-}
-
-/** Saves a queued opt-in; it stays queued until the save goes through. */
-export async function saveQueuedWeeklyShelf(
-  session: NotificationDeviceSession,
-): Promise<void> {
-  if (SecureStore.getItem(WEEKLY_OPT_IN_KEY) !== "1") return;
-  if ((await session.setWeeklyShelf(true)) === true)
-    SecureStore.setItem(WEEKLY_OPT_IN_KEY, "");
-}
-
 const NotificationSessionContext =
   createContext<NotificationDeviceSession | null>(null);
 
@@ -124,12 +102,10 @@ export function NotificationSessionProvider({
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
-          dropWeeklyShelfOptIn();
           await clearExitOfferReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
-          dropWeeklyShelfOptIn();
           await clearExitOfferReminder();
         },
         clearWidget: clearRecentSavesWidget,
@@ -161,9 +137,6 @@ export function NotificationSessionProvider({
       return;
     }
     session.start();
-    saveQueuedWeeklyShelf(session).catch((error: unknown) =>
-      analytics.captureError("weekly_shelf_preference_failed", error),
-    );
 
     const register = async (
       devicePushToken?: Notifications.DevicePushToken,

@@ -256,7 +256,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "notifications" && (
-            <NotificationsStep onAdvance={advance} />
+            <NotificationsStep saved={saved} onAdvance={advance} />
           )}
 
           {step === "reveal" && (

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import {
   NotificationSessionProvider,
-  queueWeeklyShelfOptIn,
   useNotificationObserver,
   useNotificationSession,
 } from "./notifications";
@@ -25,7 +24,6 @@ const mock = vi.hoisted(() => ({
   appState: null as null | ((state: string) => void),
   tapped: null as null | ((response: unknown) => void),
   rotated: null as null | ((token: { type: string; data: string }) => void),
-  stored: new Map<string, string>(),
 }));
 vi.mock("@/lib/i18n", () => ({
   currentLocale: () => mock.locale,
@@ -67,8 +65,6 @@ vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async () => "[]",
   setItemAsync: vi.fn(),
-  getItem: (key: string) => mock.stored.get(key) ?? null,
-  setItem: (key: string, value: string) => mock.stored.set(key, value),
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "android" },
@@ -108,7 +104,6 @@ beforeEach(() => {
   mock.authenticated = true;
   mock.locale = "en";
   mock.lastResponse = null;
-  mock.stored.clear();
   mock.token.mockReset().mockResolvedValue("expo-token");
   mock.register.mockReset().mockResolvedValue(undefined);
 });
@@ -118,63 +113,6 @@ function renderSession() {
     wrapper: NotificationSessionProvider,
   });
 }
-
-describe("queued weekly shelf opt-in", () => {
-  it("saves an opt-in queued before sign-in once the session starts", async () => {
-    queueWeeklyShelfOptIn();
-    renderSession();
-    await waitFor(() =>
-      expect(mock.otherMutation).toHaveBeenCalledWith(
-        expect.objectContaining({ weeklyShelfEnabled: true }),
-      ),
-    );
-    await waitFor(() =>
-      expect(mock.stored.get("shelvr.weeklyShelfOptIn")).toBe(""),
-    );
-  });
-
-  it("keeps the opt-in queued when the save fails", async () => {
-    queueWeeklyShelfOptIn();
-    mock.otherMutation.mockRejectedValueOnce(new Error("offline"));
-    renderSession();
-    await waitFor(() =>
-      expect(mock.captureError).toHaveBeenCalledWith(
-        "weekly_shelf_preference_failed",
-        new Error("offline"),
-      ),
-    );
-    expect(mock.stored.get("shelvr.weeklyShelfOptIn")).toBe("1");
-  });
-
-  it.each(["signOut", "deleteAccount"] as const)(
-    "drops a queued opt-in on %s, so the next account never inherits it",
-    async (end) => {
-      mock.otherMutation.mockRejectedValueOnce(new Error("offline"));
-      queueWeeklyShelfOptIn();
-      const { result } = renderSession();
-      await waitFor(() =>
-        expect(mock.captureError).toHaveBeenCalledWith(
-          "weekly_shelf_preference_failed",
-          new Error("offline"),
-        ),
-      );
-      await act(async () => {
-        await result.current.session[end]();
-      });
-      expect(mock.stored.get("shelvr.weeklyShelfOptIn")).toBe("");
-    },
-  );
-
-  it("changes no preference when nothing is queued", async () => {
-    const { result } = renderSession();
-    await waitFor(() =>
-      expect(result.current.session.isRegistered()).toBe(true),
-    );
-    expect(mock.otherMutation).not.toHaveBeenCalledWith(
-      expect.objectContaining({ weeklyShelfEnabled: true }),
-    );
-  });
-});
 
 describe("notification session lifecycle", () => {
   it("reports the safe file-cleanup category from account deletion", async () => {
