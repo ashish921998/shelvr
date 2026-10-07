@@ -108,6 +108,10 @@ export async function scheduleFirstSaveReminder({
  * not outlive the account that made it.
  */
 export async function clearFirstSaveReminder(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID);
-  await Notifications.dismissNotificationAsync(FIRST_SAVE_REMINDER_ID);
+  // Settled independently: a failed cancel must not leave a delivered
+  // reminder in the tray, and cleanup must never fail a sign-out.
+  await Promise.allSettled([
+    Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID),
+    Notifications.dismissNotificationAsync(FIRST_SAVE_REMINDER_ID),
+  ]);
 }

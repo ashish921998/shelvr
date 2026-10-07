@@ -110,4 +110,10 @@ describe("clearFirstSaveReminder", () => {
     expect(notifications.cancel).toHaveBeenCalledWith(FIRST_SAVE_REMINDER_ID);
     expect(notifications.dismiss).toHaveBeenCalledWith(FIRST_SAVE_REMINDER_ID);
   });
+
+  it("still dismisses a delivered reminder when the cancel fails", async () => {
+    notifications.cancel.mockRejectedValueOnce(new Error("no"));
+    await expect(clearFirstSaveReminder()).resolves.toBeUndefined();
+    expect(notifications.dismiss).toHaveBeenCalledWith(FIRST_SAVE_REMINDER_ID);
+  });
 });
