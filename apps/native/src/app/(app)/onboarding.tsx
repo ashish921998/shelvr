@@ -273,6 +273,7 @@ export default function OnboardingScreen() {
               samples={orderDemoSamples(kinds)}
               spaces={spaces}
               resume={initialStep === "demo" ? initialProgress.demo : null}
+              alreadySaved={saved !== null}
               onSaved={setSaved}
               onReadingChange={setReading}
               onBackChange={changeDemoBack}

@@ -12,7 +12,6 @@ import {
   notePurchasedDuringOnboarding,
 } from "@/lib/replay-onboarding";
 import { ItemCard, type FeedItem } from "@/components/item-card";
-import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import { SampleCard } from "@/components/onboarding/sample-card";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
@@ -146,7 +145,6 @@ export function RevealStep({
     item?.status === "processing"
       ? DEMO_SAMPLES.find((candidate) => candidate.url === item.url)
       : undefined;
-  const previewTitle = sample?.pageHeading ?? item?.title;
 
   return (
     <View style={styles.wrap}>
@@ -178,17 +176,6 @@ export function RevealStep({
           ? t("demo.partial")
           : t(empty ? "reveal.emptyExplainer" : "reveal.explainer")}
       </Text>
-
-      <View style={styles.sunday}>
-        <Text style={styles.label}>{t("reveal.everySunday")}</Text>
-        <NotificationPreview
-          body={
-            previewTitle
-              ? t("weekly.previewBody", { title: previewTitle })
-              : t("weekly.previewFallback")
-          }
-        />
-      </View>
 
       <View style={styles.foot}>
         <CtaButton
@@ -247,16 +234,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 21,
     color: theme.colors.muted,
-  },
-  sunday: {
-    gap: theme.gap(1),
-  },
-  label: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
   },
   trialNote: {
     fontFamily: theme.fonts.regular,

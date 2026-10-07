@@ -162,6 +162,7 @@ const props = {
   samples: [...DEMO_SAMPLES],
   spaces: [],
   resume: null,
+  alreadySaved: false,
   onSaved: vi.fn(),
   onReadingChange: vi.fn(),
   onBackChange: vi.fn(),
@@ -277,5 +278,14 @@ describe("first-save picker", () => {
     mock.demo.authUrl = "";
     rerender(step());
     expect(props.onBackChange).toHaveBeenLastCalledWith(null);
+  });
+  it("offers the way on when the first save already exists", () => {
+    mock.demo.view = "share";
+    const { rerender } = render(step());
+    expect(screen.queryByText("common.continue")).toBeNull();
+
+    rerender(<LiveDemoStep {...props} alreadySaved />);
+    fireEvent.click(screen.getByText("common.continue"));
+    expect(mock.actions.advance).toHaveBeenCalledTimes(1);
   });
 });

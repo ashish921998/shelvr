@@ -24,12 +24,16 @@ describe("restoreOnboardingStep", () => {
 });
 
 describe("previousOnboardingStep", () => {
-  it("goes back from setup to the opener", () => {
-    expect(previousOnboardingStep("setup")).toBe("opener");
+  it.each([
+    ["setup", "opener"],
+    ["reveal", "demo"],
+    ["share", "reveal"],
+  ] as const)("goes back from %s to %s", (step, expected) => {
+    expect(previousOnboardingStep(step)).toBe(expected);
   });
 
-  it.each(["opener", "demo", "reveal", "share"] as const)(
-    "has no way back from %s",
+  it.each(["opener", "demo"] as const)(
+    "leaves %s without a fixed step to go back to",
     (step) => {
       expect(previousOnboardingStep(step)).toBeNull();
     },

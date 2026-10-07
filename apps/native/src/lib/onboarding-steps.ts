@@ -24,10 +24,12 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   share: "share_practice",
 };
 
-// Only setup goes back. From the demo on, the one demo save is spent and
-// sign-in may have happened, so an earlier screen would be stale.
+// The demo step is missing on purpose: what back means there depends on
+// which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
   setup: "opener",
+  reveal: "demo",
+  share: "reveal",
 };
 
 export function previousOnboardingStep(

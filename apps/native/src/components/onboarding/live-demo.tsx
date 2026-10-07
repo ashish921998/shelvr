@@ -36,6 +36,7 @@ export function LiveDemoStep({
   samples,
   spaces,
   resume,
+  alreadySaved,
   onSaved,
   onReadingChange,
   onBackChange,
@@ -48,6 +49,8 @@ export function LiveDemoStep({
   spaces: string[];
   /** A save captured before an earlier sign-in or relaunch. */
   resume: PendingDemo | null;
+  /** Came back from the reveal: the first save exists, so offer the way on. */
+  alreadySaved: boolean;
   onSaved: (saved: DemoSaved) => void;
   onReadingChange: (reading: boolean) => void;
   /** Hands the screen's back button what to do here, or null to hide it. */
@@ -77,15 +80,15 @@ export function LiveDemoStep({
   }, [view, onReadingChange]);
 
   // The sign-in ask after a previewed sample goes back to the picker, and
-  // the picker goes back a step while nobody is
-  // signed in and nothing is saving. Nothing else here has a way back.
+  // the picker goes back a step unless a save is on its way. The preview and
+  // the reading view have no way back: they move on by themselves.
   const cancelAuthRef = useRef(demo.cancelAuth);
   useEffect(() => {
     cancelAuthRef.current = demo.cancelAuth;
   });
   const signInAsk =
     view === "auth" && !demo.isAuthenticated && isDemoSample(demo.authUrl);
-  const picking = view === "share" && !demo.isAuthenticated && !demo.submitting;
+  const picking = view === "share" && !demo.submitting;
   useEffect(() => {
     if (signInAsk) {
       onBackChange(() => {
@@ -244,11 +247,12 @@ export function LiveDemoStep({
     </View>
   );
 
-  const footer = demo.demoUsed ? (
-    <GhostButton label={t("common.continue")} onPress={demo.advance} />
-  ) : demo.canSkip ? (
-    <GhostButton label={t("common.continue")} onPress={demo.skip} />
-  ) : null;
+  const footer =
+    demo.demoUsed || alreadySaved ? (
+      <GhostButton label={t("common.continue")} onPress={demo.advance} />
+    ) : demo.canSkip ? (
+      <GhostButton label={t("common.continue")} onPress={demo.skip} />
+    ) : null;
 
   return (
     <View style={styles.wrap}>
