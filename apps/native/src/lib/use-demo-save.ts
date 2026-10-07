@@ -18,26 +18,33 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 // Signed in, every path is real: the save runs through api.demo.createDemoItem
-// (one per user, no Pro needed) and the actual pipeline. Signed out, a pick
-// asks for sign-in at once: the request waits in "auth" and is saved here
-// once sign-in lands, so one lifecycle owns every first save and the reading
-// steps play exactly once. The persisted request survives an app kill
-// mid-OAuth and stays through reveal so a relaunch re-attaches to the same
-// server item; finish() drops it. A relaunch resumes into "auth".
+// (one per user, no Pro needed) and the actual pipeline. Signed out, a
+// ready-made sample is previewed first (the reading steps play with no save),
+// then the step asks for sign-in; a pasted or typed link has nothing to
+// preview, so it asks at once. Either way the request waits in "auth" and is
+// saved here once sign-in lands, so one lifecycle owns every first save. A
+// previewed sample has already played the reading steps, so its save goes
+// straight on to the reveal instead of playing them again, and picking it
+// again after "Not now" returns to the sign-in ask without a replay. The
+// persisted request survives an app kill mid-OAuth and stays through reveal
+// so a relaunch re-attaches to the same server item; finish() drops it. A
+// relaunch resumes into "auth", which is where a preview ends too.
 
 const TIMEOUT_MS = 15_000;
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
-type DemoView = "share" | "auth" | "reading" | "failed";
+type DemoView = "share" | "auth" | "preview" | "reading" | "failed";
 
 /** "saved" watches the server item; the reading/failed view mirrors its status. */
-type StoredPhase = "share" | "auth" | "saved";
+type StoredPhase = "share" | "auth" | "preview" | "saved";
 
 type DemoSaveState = {
   phase: StoredPhase;
   authRequest: PendingDemo | null;
   savingUrl: string | null;
+  /** The sample whose preview has played to the end, so it never replays. */
+  previewedUrl: string | null;
   itemId: Id<"items"> | null;
   submitting: boolean;
   error: TextMessageKey | null;
@@ -53,8 +60,11 @@ type DemoSaveAction =
       type: "submit";
       request: PendingDemo;
       authenticated: boolean;
+      /** A signed-out sample: preview it instead of asking for sign-in. */
+      preview: boolean;
       lost: boolean;
     }
+  | { type: "previewed" }
   | { type: "saved"; itemId: Id<"items"> }
   | { type: "submitFailed"; used: boolean }
   | { type: "cancelAuth" }
@@ -72,6 +82,7 @@ export function initialDemoSaveState(
     phase: resume ? "auth" : "share",
     authRequest: resume,
     savingUrl: null,
+    previewedUrl: null,
     itemId: null,
     submitting: false,
     error: null,
@@ -102,10 +113,27 @@ export function demoSaveReducer(
         savingUrl: action.request.url,
       };
       if (action.authenticated) {
-        return { ...next, authRequest: null, submitting: true };
+        // A previewed sample keeps its sign-in screen up while the save
+        // lands, and that screen shows the request's space.
+        return {
+          ...next,
+          authRequest: alreadyPreviewed(next) ? state.authRequest : null,
+          submitting: true,
+        };
       }
-      return { ...next, authRequest: action.request, phase: "auth" };
+      return {
+        ...next,
+        authRequest: action.request,
+        phase:
+          action.preview && state.previewedUrl !== action.request.url
+            ? "preview"
+            : "auth",
+      };
     }
+    case "previewed":
+      return state.phase === "preview"
+        ? { ...state, phase: "auth", previewedUrl: state.savingUrl }
+        : state;
     case "saved":
       return {
         ...state,
@@ -118,6 +146,7 @@ export function demoSaveReducer(
       return {
         ...state,
         submitting: false,
+        authRequest: null,
         demoUsed: action.used,
         saveFailed: state.saveFailed || !action.used,
         error: action.used ? "demo.alreadyUsed" : "demo.saveFailed",
@@ -149,6 +178,11 @@ type ItemSnapshot = {
   status: "processing" | "ready" | "failed";
 } | null;
 
+/** The save in flight is for a sample whose reading steps already played. */
+function alreadyPreviewed(state: DemoSaveState): boolean {
+  return state.previewedUrl !== null && state.previewedUrl === state.savingUrl;
+}
+
 /** What the step shows, derived from local state and the watched item. */
 export function deriveDemoView(
   state: DemoSaveState,
@@ -158,9 +192,14 @@ export function deriveDemoView(
     isSuccess: boolean;
   },
 ): { view: DemoView; lostError: TextMessageKey | null } {
-  // Signed in from the auth view: the save is on its way, so show it reading.
+  // Signed in from the auth view: the save is on its way, so show it reading,
+  // unless the preview already did; then the sign-in ask stays up until the
+  // save lands and the step moves on.
   if (state.phase === "auth" && state.submitting) {
-    return { view: "reading", lostError: null };
+    return {
+      view: alreadyPreviewed(state) ? "auth" : "reading",
+      lostError: null,
+    };
   }
   if (state.phase !== "saved") return { view: state.phase, lostError: null };
   const { item } = query;
@@ -256,6 +295,7 @@ export function useDemoSave({
       if (url === "" || inFlightRef.current) return;
       const trimmed = { ...request, url };
       const sample = isDemoSample(url);
+      const skipReading = resumed && state.previewedUrl === url;
       // Fires before any sign-in, so the funnel shows a pick that never got
       // past the sign-in sheet. Resuming after sign-in is not a new pick.
       if (!resumed) {
@@ -269,6 +309,7 @@ export function useDemoSave({
         type: "submit",
         request: trimmed,
         authenticated: isAuthenticated,
+        preview: sample,
         lost,
       });
       if (!isAuthenticated) return;
@@ -303,6 +344,7 @@ export function useDemoSave({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
         });
+        if (skipReading) advance();
       } catch (err) {
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
@@ -316,7 +358,14 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, lost, onSaved],
+    [
+      advance,
+      createDemoItem,
+      isAuthenticated,
+      lost,
+      onSaved,
+      state.previewedUrl,
+    ],
   );
 
   const submitUrl = useCallback(
@@ -392,6 +441,9 @@ export function useDemoSave({
     }
   };
 
+  // Stable, since the preview's step timer restarts when its onDone changes.
+  const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
+
   const continueAfterTimeout = () => {
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
@@ -435,6 +487,7 @@ export function useDemoSave({
     cancelAuth,
     retry,
     submitSharedUrl,
+    previewed,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

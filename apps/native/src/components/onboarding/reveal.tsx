@@ -5,6 +5,7 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import { DEMO_SAMPLES } from "@/lib/onboarding-demo";
 import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   noteDeclinedDuringOnboarding,
@@ -13,6 +14,7 @@ import {
 import { ItemCard, type FeedItem } from "@/components/item-card";
 import { NotificationPreview } from "@/components/notification-preview";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { SampleCard } from "@/components/onboarding/sample-card";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { api } from "@convex/_generated/api";
@@ -137,7 +139,14 @@ export function RevealStep({
   // Skipped after a failed save, or the saved item was deleted since.
   const empty = item === null || (saved === null && !attaching);
   const space = empty ? undefined : saved?.savedSpaceNames[0];
-  const previewTitle = item?.title;
+  // A previewed sample arrives here while its real save is still being read.
+  // Its sample card stands in until then, so the result the preview showed
+  // does not turn into a loading card.
+  const sample =
+    item?.status === "processing"
+      ? DEMO_SAMPLES.find((candidate) => candidate.url === item.url)
+      : undefined;
+  const previewTitle = sample?.pageHeading ?? item?.title;
 
   return (
     <View style={styles.wrap}>
@@ -148,7 +157,11 @@ export function RevealStep({
         </Text>
       </Text>
 
-      {card ? (
+      {sample ? (
+        <View pointerEvents="none">
+          <SampleCard sample={sample} action="preview" disabled={false} />
+        </View>
+      ) : card ? (
         <View pointerEvents="none">
           <ItemCard item={card} />
         </View>
