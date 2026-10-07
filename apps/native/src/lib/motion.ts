@@ -2,6 +2,7 @@ import {
   cubicBezier,
   Easing,
   FadeIn,
+  FadeInDown,
   FadeOut,
   ReduceMotion,
 } from "react-native-reanimated";
@@ -104,6 +105,14 @@ export const fadeIn = FadeIn.duration(duration.enter)
 export const fadeOut = FadeOut.duration(duration.exit)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
+
+/** A staged entrance: fade in while settling down into place. Reduce Motion
+ * drops it and the content is simply there. */
+export const riseIn = (delay: number) =>
+  FadeInDown.delay(delay)
+    .duration(420)
+    .easing(easing.out)
+    .reduceMotion(ReduceMotion.System);
 
 // Reduced motion keeps the state change legible without translation or scale.
 export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)

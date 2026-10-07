@@ -39,11 +39,14 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
 }));
-vi.mock("react-native-reanimated", () => ({ default: { View: mock.view } }));
-vi.mock("@/lib/motion", () => ({ fadeIn: {} }));
-vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.nothing }));
+vi.mock("react-native-reanimated", () => ({
+  default: { View: mock.view, Text: mock.text },
+}));
+vi.mock("@/lib/motion", () => ({ riseIn: () => ({}) }));
+vi.mock("@/components/onboarding/celebration", () => ({
+  CelebrationBadge: mock.nothing,
+}));
 vi.mock("expo-haptics", () => ({
   notificationAsync: mock.haptic,
   NotificationFeedbackType: { Success: "success" },

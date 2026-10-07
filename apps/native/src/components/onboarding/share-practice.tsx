@@ -10,14 +10,21 @@ import {
   SampleRow,
   ShareHint,
 } from "@/components/onboarding/sample-card";
-import { AppSymbolIcon } from "@/components/symbol";
-import { fadeIn } from "@/lib/motion";
+import { CelebrationBadge } from "@/components/onboarding/celebration";
+import { riseIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
+
+// The done screen arrives in beats: the badge pops, then the words, then the
+// shared link lands, then the way on.
+const RISE_TITLE = riseIn(260);
+const RISE_BODY = riseIn(380);
+const RISE_ROW = riseIn(620);
+const RISE_CTA = riseIn(900);
 
 /** "received" means the share reached Shelvr and waits for the share
  * screen, which saves it after onboarding; nothing is saved here. */
@@ -47,7 +54,6 @@ export function SharePracticeStep({
   onFinish: () => void;
 }) {
   useAppLocale();
-  const { theme } = useUnistyles();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
@@ -120,32 +126,36 @@ export function SharePracticeStep({
   if (received) {
     return (
       <View style={styles.wrap}>
-        <Animated.View entering={fadeIn} style={styles.done}>
-          <View style={styles.badge}>
-            <AppSymbolIcon
-              name="checkmark"
-              size={28}
-              tintColor={theme.colors.primaryText}
-            />
-          </View>
-          <Text
-            style={[styles.headline, styles.center]}
+        <View style={styles.done}>
+          <CelebrationBadge />
+          <Animated.Text
+            entering={RISE_TITLE}
+            style={[styles.doneTitle, styles.center]}
             maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
           >
             {t("sharePractice.savedTitle")}
-          </Text>
-          <Text style={[styles.support, styles.center]}>
+          </Animated.Text>
+          <Animated.Text
+            entering={RISE_BODY}
+            style={[styles.support, styles.center]}
+          >
             {t("sharePractice.savedBody")}
-          </Text>
-          {/* The link they just shared, so "it lands on your shelf" has
+          </Animated.Text>
+          {/* The link they just shared, landing: "on your shelf" has
               something to point at. */}
           {sample === undefined ? null : (
-            <View style={styles.shared} pointerEvents="none">
+            <Animated.View
+              entering={RISE_ROW}
+              style={styles.shared}
+              pointerEvents="none"
+            >
               <SampleRow sample={sample} icon="checkmark" disabled={false} />
-            </View>
+            </Animated.View>
           )}
+        </View>
+        <Animated.View entering={RISE_CTA}>
+          <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
         </Animated.View>
-        <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
       </View>
     );
   }
@@ -234,14 +244,12 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     gap: theme.gap(1.5),
   },
-  badge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: theme.gap(1),
-    backgroundColor: theme.colors.primarySoft,
+  doneTitle: {
+    marginTop: theme.gap(2),
+    fontFamily: theme.fonts.display,
+    fontSize: 34,
+    lineHeight: 40,
+    color: theme.colors.foreground,
   },
   center: {
     textAlign: "center",
