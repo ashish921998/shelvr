@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 // The onboarding reminder step: skipped when there is nothing to remind about
 // or no way to notify, otherwise the OS prompt comes only from the tap.
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DemoSaved } from "./live-demo";
@@ -157,6 +163,26 @@ describe("NotificationsStep", () => {
     vi.setSystemTime(new Date(2026, 9, 7, 21, 0));
     fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
     expect(mock.request).not.toHaveBeenCalled();
+    expect(onAdvance).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTomorrow"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({ at: new Date(2026, 9, 8, 20, 0) }),
+    );
+  });
+
+  it("shows fresh times when the pick passes during the OS prompt", async () => {
+    let answer: (granted: boolean) => void = () => {};
+    mock.request.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => (answer = resolve)),
+    );
+    const onAdvance = renderStep();
+    // Tap at 7:59 pm, answer the prompt at 8:01 pm.
+    vi.setSystemTime(new Date(2026, 9, 7, 19, 59));
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    vi.setSystemTime(new Date(2026, 9, 7, 20, 1));
+    await act(async () => answer(true));
+    expect(mock.schedule).not.toHaveBeenCalled();
     expect(onAdvance).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("onboarding.remindCtaTomorrow"));
     await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());

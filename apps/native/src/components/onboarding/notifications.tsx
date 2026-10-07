@@ -117,20 +117,27 @@ export function NotificationsStep({
   const host = hostOf(item?.url);
   const title = item?.title || item?.siteName || host;
 
+  // A choice that passed while the screen sat open (or while the OS prompt
+  // waited) is replaced by fresh times instead of being scheduled.
+  const expired = () => {
+    if (choice.at.getTime() > Date.now()) return false;
+    setOptions(reminderOptions(new Date()));
+    setPicked(0);
+    return true;
+  };
+
   const remind = async () => {
-    if (done.current || saved === null) return;
-    // The screen can sit open past a choice (the app left in the background):
-    // show fresh times instead of scheduling one that already passed.
-    if (choice.at.getTime() <= Date.now()) {
-      setOptions(reminderOptions(new Date()));
-      setPicked(0);
-      return;
-    }
+    if (done.current || saved === null || expired()) return;
     done.current = true;
     setBusy(true);
     let granted = false;
     try {
       granted = await requestNotificationPermission();
+      if (granted && expired()) {
+        done.current = false;
+        setBusy(false);
+        return;
+      }
       if (granted) {
         await scheduleFirstSaveReminder({
           itemId: saved.itemId,
@@ -140,15 +147,14 @@ export function NotificationsStep({
       }
     } catch (error) {
       analytics.captureError("onboarding_reminder_failed", error);
-    } finally {
-      analytics.capture("onboarding_reminder", {
-        action: "remind",
-        slot: choice.slot,
-        granted,
-      });
-      setBusy(false);
-      advanceRef.current();
     }
+    analytics.capture("onboarding_reminder", {
+      action: "remind",
+      slot: choice.slot,
+      granted,
+    });
+    setBusy(false);
+    advanceRef.current();
   };
 
   const skip = () => {
