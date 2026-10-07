@@ -8,6 +8,9 @@ const app = defineApp({
     // cancel sheet. Unset, the reply is empty and Apple shows its default.
     APPLE_RETENTION_MESSAGE_ID: v.optional(v.string()),
     AUTH_ENABLE_ANONYMOUS: v.optional(v.string()),
+    // Google OAuth web client id, also read by Convex Auth's Google provider.
+    // Native Android sign-in checks its ID tokens were issued for this client.
+    AUTH_GOOGLE_ID: v.optional(v.string()),
     GOOGLE_GENERATIVE_AI_API_KEY: v.string(),
     POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     POSTHOG_HOST: v.optional(v.string()),

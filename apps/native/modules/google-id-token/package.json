@@ -1,0 +1,7 @@
+{
+  "name": "google-id-token",
+  "version": "1.0.0",
+  "description": "Android Google account sheet (Credential Manager) that returns a Google ID token.",
+  "main": "index.ts",
+  "private": true
+}

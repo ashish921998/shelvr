@@ -27,6 +27,7 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly APPLE_RETENTION_MESSAGE_ID: string | undefined;
   readonly AUTH_ENABLE_ANONYMOUS: string | undefined;
+  readonly AUTH_GOOGLE_ID: string | undefined;
   readonly GOOGLE_GENERATIVE_AI_API_KEY: string;
   readonly OBSERVABILITY_ENV: string | undefined;
   readonly POSTHOG_HOST: string | undefined;

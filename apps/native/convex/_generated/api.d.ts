@@ -35,6 +35,7 @@ import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_feedbackFields from "../model/feedbackFields.js";
+import type * as model_googleIdToken from "../model/googleIdToken.js";
 import type * as model_imagePolicy from "../model/imagePolicy.js";
 import type * as model_imageSize from "../model/imageSize.js";
 import type * as model_itemFields from "../model/itemFields.js";
@@ -108,6 +109,7 @@ declare const fullApi: ApiFromModules<{
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/feedbackFields": typeof model_feedbackFields;
+  "model/googleIdToken": typeof model_googleIdToken;
   "model/imagePolicy": typeof model_imagePolicy;
   "model/imageSize": typeof model_imageSize;
   "model/itemFields": typeof model_itemFields;

@@ -4,11 +4,15 @@ import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { convexAuth, type AuthProviderConfig } from "@convex-dev/auth/server";
 import { env } from "./_generated/server";
 import { normalizeAppleProfile } from "./appleProfile";
+import { GoogleIdToken } from "./model/googleIdToken";
 import { recordAccountCreated } from "./model/accountCreated";
 
 // Google and Apple are configured via @auth/core providers. Their client
 // id/secret come from the AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and
 // AUTH_APPLE_ID / AUTH_APPLE_SECRET deployment env vars.
+//
+// GoogleIdToken is the Android account sheet: it signs in with a Google ID
+// token the app gets from Credential Manager, onto the same "google" account.
 //
 // Anonymous is an instant sign-in (no credentials) used only for local
 // development. It is gated behind AUTH_ENABLE_ANONYMOUS so a production
@@ -17,6 +21,7 @@ import { recordAccountCreated } from "./model/accountCreated";
 const providers: AuthProviderConfig[] = [
   Google,
   Apple({ profile: normalizeAppleProfile }),
+  GoogleIdToken,
 ];
 if (env.AUTH_ENABLE_ANONYMOUS === "true") {
   providers.push(Anonymous);
