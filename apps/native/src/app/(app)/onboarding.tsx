@@ -314,10 +314,12 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
-  // Tall enough for the back button, so the bar sits at one height on every
-  // step whether or not the button shows.
+  // Tall enough to hold the back button and take its taps. The negative
+  // margins give back all but the bar's own 3pt, so no step's content moves.
   header: {
-    minHeight: 28,
+    height: 28,
+    marginTop: -12,
+    marginBottom: -13,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.5),
