@@ -483,7 +483,7 @@
   "onboarding.newSpacePlaceholder": "스페이스 이름",
   "onboarding.sourceTitle": "Shelvr를 어떻게 알게 되셨나요?",
   "onboarding.notifyTitle": "저장한 것을 다시 만나보세요",
-  "onboarding.notifyBody": "알림을 켜면 Shelvr가 저장한 것을 다시 보여 드려요. 매주 일요일 주간 책장, 그리고 읽거나 만들려던 것에 대한 알림을 가끔 보내 드려요.",
+  "onboarding.notifyBody": "알림을 켜면 Shelvr가 저장한 것을 다시 보여 드려요. 열어보지 않은 저장이 쌓이면 일요일에 주간 책장을, 그리고 읽거나 만들려던 것에 대한 알림을 가끔 보내 드려요.",
   "onboarding.notifyNote": "각 알림은 언제든 설정에서 끌 수 있어요.",
   "onboarding.notifyAllow": "알림 켜기",
   "onboarding.sourceFriend": "친구가 알려줬어요",

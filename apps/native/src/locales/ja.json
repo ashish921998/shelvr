@@ -483,7 +483,7 @@
   "onboarding.newSpacePlaceholder": "スペース名",
   "onboarding.sourceTitle": "Shelvrを何で知りましたか？",
   "onboarding.notifyTitle": "保存したものを、また手元に",
-  "onboarding.notifyBody": "通知をオンにすると、Shelvrが保存したものを届けます。毎週日曜日の「今週のシェルフ」と、読もう・作ろうと思っていたもののリマインダーをときどきお知らせします。",
+  "onboarding.notifyBody": "通知をオンにすると、Shelvrが保存したものを届けます。未読の保存がたまった週は日曜日に「今週のシェルフ」を、読もう・作ろうと思っていたもののリマインダーもときどきお知らせします。",
   "onboarding.notifyNote": "それぞれいつでも設定からオフにできます。",
   "onboarding.notifyAllow": "通知をオンにする",
   "onboarding.sourceFriend": "友だちから聞いた",
