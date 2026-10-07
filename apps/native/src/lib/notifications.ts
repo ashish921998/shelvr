@@ -97,8 +97,15 @@ export function NotificationSessionProvider({
             weeklyShelfEnabled: enabled,
             timezone: getNotificationTimezone(),
           }),
-        setSaveReminders: (enabled) =>
-          setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
+        setSaveReminders: async (enabled) => {
+          await setSaveReminders({
+            enabled,
+            timezone: getNotificationTimezone(),
+          });
+          // The onboarding reminder is a save reminder too, so the switch
+          // turns it off with the rest.
+          if (!enabled) await clearFirstSaveReminder();
+        },
         signOut: async () => {
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);

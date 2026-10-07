@@ -150,6 +150,20 @@ describe("NotificationsStep", () => {
     });
   });
 
+  it("shows fresh times instead of scheduling one that has passed", async () => {
+    const onAdvance = renderStep();
+    // Left open until after 8 pm, so "tonight" has gone.
+    vi.setSystemTime(new Date(2026, 9, 7, 21, 0));
+    fireEvent.click(screen.getByText("onboarding.remindCtaTonight"));
+    expect(mock.request).not.toHaveBeenCalled();
+    expect(onAdvance).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("onboarding.remindCtaTomorrow"));
+    await waitFor(() => expect(onAdvance).toHaveBeenCalledOnce());
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({ at: new Date(2026, 9, 8, 20, 0) }),
+    );
+  });
+
   it("asks once when the button is tapped twice", async () => {
     const onAdvance = renderStep();
     const remind = screen.getByText("onboarding.remindCtaTonight");

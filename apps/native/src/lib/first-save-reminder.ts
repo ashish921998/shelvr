@@ -15,8 +15,9 @@ const CHANNEL_ID = "save-reminders";
 const EVENING_HOUR = 20;
 const WEEKEND_HOUR = 10;
 const WEEKDAY_HOUR = 18;
+const SUNDAY = 0;
 const SATURDAY = 6;
-const TUESDAY = 2;
+const MONDAY = 1;
 // "Tonight" needs at least this long before 8 pm to still mean tonight.
 const TONIGHT_LEAD_MS = 60 * 60 * 1000;
 
@@ -38,33 +39,46 @@ function nextWeekday(day: Date, weekday: number, hour: number): Date {
 }
 
 /**
- * Three moments in local time, earliest first: this evening (or tomorrow's,
- * once it is too late), the coming weekend, and a weekday evening after it.
+ * A morning in the current weekend (or the coming one, on a weekday) that
+ * still lies after `after`. None once the weekend has nothing left: a later
+ * Saturday would be next weekend, not this one.
+ */
+function thisWeekend(now: Date, after: Date): Date | undefined {
+  const saturday =
+    now.getDay() === SUNDAY
+      ? atHour(addDays(now, -1), WEEKEND_HOUR)
+      : now.getDay() === SATURDAY
+        ? atHour(now, WEEKEND_HOUR)
+        : nextWeekday(now, SATURDAY, WEEKEND_HOUR);
+  return [saturday, addDays(saturday, 1)].find((at) => at > after);
+}
+
+/**
+ * Up to three moments in local time, earliest first: this evening (or
+ * tomorrow's, once it is too late), this weekend while some of it is left,
+ * and Tuesday evening of next week. Each is worked out from what its label
+ * means, so a label never names a different week.
  */
 export function reminderOptions(now: Date): ReminderOption[] {
   const tonight = atHour(now, EVENING_HOUR);
   const first: ReminderOption =
     tonight.getTime() - now.getTime() >= TONIGHT_LEAD_MS
       ? { slot: "tonight", at: tonight }
-      : { slot: "tomorrow", at: nextDay(tonight) };
-
-  let weekend =
-    now.getDay() === SATURDAY
-      ? atHour(nextDay(now), WEEKEND_HOUR)
-      : nextWeekday(now, SATURDAY, WEEKEND_HOUR);
-  if (weekend <= first.at)
-    weekend = nextWeekday(first.at, SATURDAY, WEEKEND_HOUR);
+      : { slot: "tomorrow", at: addDays(tonight, 1) };
+  const weekend = thisWeekend(now, first.at);
+  // Weeks start on Monday, so from a Sunday "next week" is the day after.
+  const nextWeek = addDays(nextWeekday(now, MONDAY, WEEKDAY_HOUR), 1);
 
   return [
     first,
-    { slot: "weekend", at: weekend },
-    { slot: "nextWeek", at: nextWeekday(weekend, TUESDAY, WEEKDAY_HOUR) },
+    ...(weekend ? [{ slot: "weekend" as const, at: weekend }] : []),
+    { slot: "nextWeek", at: nextWeek },
   ];
 }
 
-function nextDay(day: Date): Date {
+function addDays(day: Date, days: number): Date {
   const at = new Date(day);
-  at.setDate(at.getDate() + 1);
+  at.setDate(at.getDate() + days);
   return at;
 }
 

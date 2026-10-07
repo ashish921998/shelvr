@@ -45,6 +45,14 @@ describe("reminderOptions", () => {
     expect(slots(at(7, 19, 0))[0]).toEqual(["tonight", at(7, 20)]);
   });
 
+  it("on a Friday night, this weekend is Sunday, not next Saturday", () => {
+    expect(slots(at(9, 22))).toEqual([
+      ["tomorrow", at(10, 20)],
+      ["weekend", at(11, 10)],
+      ["nextWeek", at(13, 18)],
+    ]);
+  });
+
   it("on a Saturday, the weekend is Sunday morning", () => {
     expect(slots(at(10, 9))).toEqual([
       ["tonight", at(10, 20)],
@@ -53,19 +61,14 @@ describe("reminderOptions", () => {
     ]);
   });
 
-  it("late on a Saturday, the weekend moves past tomorrow evening", () => {
+  it("once the weekend has nothing left, it is not offered", () => {
     expect(slots(at(10, 22))).toEqual([
       ["tomorrow", at(11, 20)],
-      ["weekend", at(17, 10)],
-      ["nextWeek", at(20, 18)],
+      ["nextWeek", at(13, 18)],
     ]);
-  });
-
-  it("on a Sunday, the weekend is the coming Saturday", () => {
     expect(slots(at(11, 9))).toEqual([
       ["tonight", at(11, 20)],
-      ["weekend", at(17, 10)],
-      ["nextWeek", at(20, 18)],
+      ["nextWeek", at(13, 18)],
     ]);
   });
 
@@ -75,6 +78,14 @@ describe("reminderOptions", () => {
         const times = reminderOptions(at(day, hour)).map((o) => o.at.getTime());
         expect(times[0]).toBeGreaterThan(at(day, hour).getTime());
         expect([...times].sort((a, b) => a - b)).toEqual(times);
+        const weekend = reminderOptions(at(day, hour)).find(
+          (o) => o.slot === "weekend",
+        );
+        // Never a Saturday or Sunday more than six days out.
+        if (weekend)
+          expect(weekend.at.getTime() - at(day, hour).getTime()).toBeLessThan(
+            6 * 24 * 60 * 60 * 1000,
+          );
       }
     }
   });

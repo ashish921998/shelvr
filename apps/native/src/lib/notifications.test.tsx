@@ -165,6 +165,20 @@ describe("notification session lifecycle", () => {
       expect(mock.clearFirstSave).toHaveBeenCalled();
     },
   );
+  it("turning save reminders off also clears the first-save reminder", async () => {
+    const { result } = renderSession();
+    await waitFor(() =>
+      expect(result.current.session.isRegistered()).toBe(true),
+    );
+    await act(async () => {
+      await result.current.session.setSaveReminders(true);
+    });
+    expect(mock.clearFirstSave).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.session.setSaveReminders(false);
+    });
+    expect(mock.clearFirstSave).toHaveBeenCalledOnce();
+  });
   it("clears the widget after successful server account deletion", async () => {
     const { result } = renderSession();
     await waitFor(() =>

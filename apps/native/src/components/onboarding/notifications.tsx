@@ -69,7 +69,7 @@ export function NotificationsStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const [options] = useState(() => reminderOptions(new Date()));
+  const [options, setOptions] = useState(() => reminderOptions(new Date()));
   const [picked, setPicked] = useState(0);
   const [busy, setBusy] = useState(false);
   // The step leaves once: by its own check on entry, or by one tap. `busy`
@@ -119,6 +119,13 @@ export function NotificationsStep({
 
   const remind = async () => {
     if (done.current || saved === null) return;
+    // The screen can sit open past a choice (the app left in the background):
+    // show fresh times instead of scheduling one that already passed.
+    if (choice.at.getTime() <= Date.now()) {
+      setOptions(reminderOptions(new Date()));
+      setPicked(0);
+      return;
+    }
     done.current = true;
     setBusy(true);
     let granted = false;
