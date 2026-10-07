@@ -217,6 +217,11 @@ export type MessageParams = {
   "demo.notFoundHelp": undefined;
   "demo.processingFailed": undefined;
   "demo.title": undefined;
+  "demo.titleArticles": undefined;
+  "demo.titleRecipes": undefined;
+  "demo.titleProducts": undefined;
+  "demo.titleTravel": undefined;
+  "demo.titleVideos": undefined;
   "demo.reading": undefined;
   "demo.slow": undefined;
   "demo.keepWaiting": undefined;

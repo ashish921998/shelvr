@@ -5,7 +5,7 @@ import { SPACE_PRESETS, type SaveKind } from "@/lib/save-kinds";
 // stay untranslated.
 export type DemoKind = Extract<
   SaveKind,
-  "Articles" | "Recipes" | "Products" | "Travel"
+  "Articles" | "Recipes" | "Products" | "Travel" | "Videos"
 >;
 
 export type DemoSample = {
@@ -35,6 +35,12 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
     domain: "lonelyplanet.com",
   },
   {
+    kind: "Videos",
+    url: "https://www.ted.com/talks/tim_urban_inside_the_mind_of_a_master_procrastinator",
+    pageHeading: "Inside the mind of a master procrastinator",
+    domain: "ted.com",
+  },
+  {
     kind: "Articles",
     url: "https://fs.blog/reading/",
     pageHeading: "Use These Simple Strategies to Retain Everything You Read",
@@ -53,6 +59,16 @@ export function orderDemoSamples(kinds: readonly SaveKind[]): DemoSample[] {
   return [...DEMO_SAMPLES]
     .sort((a, b) => rank(a) - rank(b))
     .slice(0, SAMPLE_COUNT);
+}
+
+/** The kind the picker's headline names: the leading sample's, when setup
+ * picked it. Null when nothing picked has a sample, and the headline says
+ * "link". */
+export function featuredDemoKind(kinds: readonly SaveKind[]): DemoKind | null {
+  const featured = orderDemoSamples(kinds)[0];
+  return featured !== undefined && kinds.includes(featured.kind)
+    ? featured.kind
+    : null;
 }
 
 /** The share-sheet practice after the first save: the reading article

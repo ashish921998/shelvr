@@ -160,6 +160,7 @@ const { DEMO_SAMPLES } = await import("@/lib/onboarding-demo");
 
 const props = {
   samples: [...DEMO_SAMPLES],
+  titleKind: null,
   spaces: [],
   resume: null,
   alreadySaved: false,

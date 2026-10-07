@@ -1,7 +1,11 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
-import { orderDemoSamples, practiceShareSample } from "@/lib/onboarding-demo";
+import {
+  featuredDemoKind,
+  orderDemoSamples,
+  practiceShareSample,
+} from "@/lib/onboarding-demo";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -271,6 +275,7 @@ export default function OnboardingScreen() {
           {step === "demo" && (
             <LiveDemoStep
               samples={orderDemoSamples(kinds)}
+              titleKind={featuredDemoKind(kinds)}
               spaces={spaces}
               resume={initialStep === "demo" ? initialProgress.demo : null}
               alreadySaved={saved !== null}

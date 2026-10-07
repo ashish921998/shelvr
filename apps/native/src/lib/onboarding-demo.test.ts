@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   demoDestination,
+  featuredDemoKind,
   orderDemoSamples,
   practiceShareSample,
 } from "./onboarding-demo";
@@ -13,11 +14,22 @@ describe("orderDemoSamples", () => {
   });
 
   it("offers three samples when no picked kind has one", () => {
-    expect(orderDemoSamples(["Videos"]).map((s) => s.domain)).toEqual([
+    expect(orderDemoSamples(["Fitness"]).map((s) => s.domain)).toEqual([
       "bbcgoodfood.com",
       "apple.com",
       "lonelyplanet.com",
     ]);
+  });
+});
+
+describe("featuredDemoKind", () => {
+  it("names the leading sample's kind when setup picked it", () => {
+    expect(featuredDemoKind(["Fitness", "Videos", "Recipes"])).toBe("Videos");
+  });
+
+  it("is null when nothing picked has a sample", () => {
+    expect(featuredDemoKind(["Fitness"])).toBeNull();
+    expect(featuredDemoKind([])).toBeNull();
   });
 });
 

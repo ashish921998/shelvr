@@ -3,8 +3,10 @@ import { analytics } from "@/lib/analytics";
 import {
   DEMO_SAMPLES,
   isDemoSample,
+  type DemoKind,
   type DemoSample,
 } from "@/lib/onboarding-demo";
+import type { TextMessageKey } from "@/locales/message-types";
 import type { PendingDemo } from "@/lib/pending-onboarding";
 import { displayHost } from "@/lib/url";
 import { useDemoSave, linkFromText, type DemoSaved } from "@/lib/use-demo-save";
@@ -32,8 +34,19 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export type { DemoSaved };
 
+// The headline names what the leading sample is, so a person who said they
+// save videos is asked to save a video.
+const TITLES: Record<DemoKind, TextMessageKey> = {
+  Articles: "demo.titleArticles",
+  Recipes: "demo.titleRecipes",
+  Products: "demo.titleProducts",
+  Travel: "demo.titleTravel",
+  Videos: "demo.titleVideos",
+};
+
 export function LiveDemoStep({
   samples,
+  titleKind,
   spaces,
   resume,
   alreadySaved,
@@ -45,6 +58,8 @@ export function LiveDemoStep({
 }: {
   /** Ready-made links, the picked kinds first. */
   samples: DemoSample[];
+  /** The leading sample's kind when setup picked it, else null. */
+  titleKind: DemoKind | null;
   /** Stable preset identities kept in setup. */
   spaces: string[];
   /** A save captured before an earlier sign-in or relaunch. */
@@ -258,6 +273,7 @@ export function LiveDemoStep({
     <View style={styles.wrap}>
       <SamplePicker
         samples={samples}
+        titleKind={titleKind}
         disabled={demo.submitting}
         error={inputError ? null : errorLine}
         pasteRow={pasteRow}
@@ -277,6 +293,7 @@ export function LiveDemoStep({
 
 type PickerProps = {
   samples: DemoSample[];
+  titleKind: DemoKind | null;
   disabled: boolean;
   error: ReactNode;
   pasteRow: ReactNode;
@@ -287,6 +304,7 @@ type PickerProps = {
  * (see share-practice.tsx). */
 function SamplePicker({
   samples,
+  titleKind,
   disabled,
   error,
   pasteRow,
@@ -301,7 +319,7 @@ function SamplePicker({
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
-          {t("demo.title")}
+          {t(titleKind === null ? "demo.title" : TITLES[titleKind])}
         </Text>
         <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>

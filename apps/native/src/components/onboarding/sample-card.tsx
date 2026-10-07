@@ -14,6 +14,7 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
   Products: require("../../../assets/onboarding/demo-product.jpg"),
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
+  Videos: require("../../../assets/onboarding/videos.jpg"),
 };
 
 /** An illustration of the share gesture, not a control. */
