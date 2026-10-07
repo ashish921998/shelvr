@@ -3,7 +3,6 @@ import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { NotificationPreview } from "@/components/notification-preview";
 import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard } from "@/components/onboarding/sample-card";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
@@ -61,13 +60,6 @@ export function SampleSignIn({
         </View>
       ) : null}
 
-      <View style={styles.sunday}>
-        <Text style={styles.label}>{t("reveal.everySunday")}</Text>
-        <NotificationPreview
-          body={t("weekly.previewBody", { title: sample.pageHeading })}
-        />
-      </View>
-
       <View style={styles.foot}>
         <Text
           style={styles.saveShelf}
@@ -120,16 +112,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 15,
     lineHeight: 21,
     color: theme.colors.muted,
-  },
-  sunday: {
-    gap: theme.gap(1),
-  },
-  label: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.faint,
   },
   foot: {
     marginTop: "auto",
