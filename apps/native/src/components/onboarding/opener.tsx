@@ -137,7 +137,6 @@ export function OpenerStep({
       style={styles.foot}
       onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
     >
-      <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
       <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
       {largeText ? null : signIn}
     </View>
@@ -304,12 +303,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   foot: {
     gap: theme.gap(1.5),
-  },
-  proText: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    textAlign: "center",
-    color: theme.colors.muted,
   },
   signIn: {
     minHeight: 44,

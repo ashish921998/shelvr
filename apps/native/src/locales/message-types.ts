@@ -428,7 +428,6 @@ export type MessageParams = {
   "import.more": undefined;
   "onboarding.openerTitle": undefined;
   "onboarding.openerBody": undefined;
-  "onboarding.proLine": undefined;
   "onboarding.startYours": undefined;
   "onboarding.haveAccount": undefined;
   "onboarding.signIn": undefined;
