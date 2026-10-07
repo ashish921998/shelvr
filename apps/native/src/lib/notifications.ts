@@ -50,6 +50,11 @@ export function queueWeeklyShelfOptIn(): void {
   SecureStore.setItem(WEEKLY_OPT_IN_KEY, "1");
 }
 
+// The opt-in belongs to whoever gave it, so it never outlives their session.
+function dropWeeklyShelfOptIn(): void {
+  SecureStore.setItem(WEEKLY_OPT_IN_KEY, "");
+}
+
 /** Saves a queued opt-in; it stays queued until the save goes through. */
 export async function saveQueuedWeeklyShelf(
   session: NotificationDeviceSession,
@@ -119,10 +124,12 @@ export function NotificationSessionProvider({
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
+          dropWeeklyShelfOptIn();
           await clearExitOfferReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
+          dropWeeklyShelfOptIn();
           await clearExitOfferReminder();
         },
         clearWidget: clearRecentSavesWidget,

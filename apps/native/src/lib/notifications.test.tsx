@@ -146,6 +146,25 @@ describe("queued weekly shelf opt-in", () => {
     expect(mock.stored.get("shelvr.weeklyShelfOptIn")).toBe("1");
   });
 
+  it.each(["signOut", "deleteAccount"] as const)(
+    "drops a queued opt-in on %s, so the next account never inherits it",
+    async (end) => {
+      mock.otherMutation.mockRejectedValueOnce(new Error("offline"));
+      queueWeeklyShelfOptIn();
+      const { result } = renderSession();
+      await waitFor(() =>
+        expect(mock.captureError).toHaveBeenCalledWith(
+          "weekly_shelf_preference_failed",
+          new Error("offline"),
+        ),
+      );
+      await act(async () => {
+        await result.current.session[end]();
+      });
+      expect(mock.stored.get("shelvr.weeklyShelfOptIn")).toBe("");
+    },
+  );
+
   it("changes no preference when nothing is queued", async () => {
     const { result } = renderSession();
     await waitFor(() =>
