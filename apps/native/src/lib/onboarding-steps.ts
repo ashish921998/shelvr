@@ -1,7 +1,7 @@
 export const ONBOARDING_STEPS = [
   "opener",
-  "setup",
   "interests",
+  "setup",
   "demo",
   "reveal",
   "share",
@@ -11,7 +11,7 @@ export const ONBOARDING_STEPS = [
 // 4 made the first save one tap on every platform, previews a ready-made
 // sample before sign-in, and added the share step. 5 dropped the source step,
 // and a previewed sample goes from sign-in straight to the reveal. 6 added
-// the interests step after setup.
+// the interests step after the opener.
 export const ONBOARDING_FLOW_VERSION = 6;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
@@ -30,8 +30,8 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
 // The demo step is missing on purpose: what back means there depends on
 // which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
-  setup: "opener",
-  interests: "setup",
+  interests: "opener",
+  setup: "interests",
   reveal: "demo",
   share: "reveal",
 };

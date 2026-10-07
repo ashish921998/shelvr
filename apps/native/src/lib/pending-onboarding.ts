@@ -16,7 +16,7 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 // same key. Their step and answers are ignored so progress restarts at the
 // opener; the replay fields (operationId, spaces, demoUrl) still apply.
 // Version 3 inserted the acquisition source step after the opener; 4 removed
-// it again; 5 inserted the interests step after setup.
+// it again; 5 inserted the interests step after the opener.
 const PROGRESS_VERSION = 5;
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch

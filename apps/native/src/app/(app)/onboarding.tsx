@@ -50,8 +50,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  setup: 0.2,
-  interests: 0.35,
+  interests: 0.2,
+  setup: 0.35,
   demo: 0.5,
   reveal: 0.85,
   share: 1,
@@ -94,7 +94,7 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
-  const exitDemo = useCallback(() => setStep("interests"), []);
+  const exitDemo = useCallback(() => setStep("setup"), []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);

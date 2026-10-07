@@ -7,8 +7,8 @@ import {
 describe("restoreOnboardingStep", () => {
   it.each([
     [0, "opener"],
-    [1, "setup"],
-    [2, "interests"],
+    [1, "interests"],
+    [2, "setup"],
     [3, "demo"],
     [4, "reveal"],
     [5, "share"],
@@ -26,8 +26,8 @@ describe("restoreOnboardingStep", () => {
 
 describe("previousOnboardingStep", () => {
   it.each([
-    ["setup", "opener"],
-    ["interests", "setup"],
+    ["interests", "opener"],
+    ["setup", "interests"],
     ["reveal", "demo"],
     ["share", "reveal"],
   ] as const)("goes back from %s to %s", (step, expected) => {
