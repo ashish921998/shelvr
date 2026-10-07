@@ -1,9 +1,5 @@
 import { analytics } from "@/lib/analytics";
-import {
-  openPaywallKeepingExitOffer,
-  useEntitlement,
-  waitForSheetTransition,
-} from "@/lib/entitlement";
+import { openPaywallKeepingExitOffer, useEntitlement } from "@/lib/entitlement";
 import {
   noteDeclinedDuringOnboarding,
   notePurchasedDuringOnboarding,
@@ -12,10 +8,10 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * The paywall between the first save and the share practice. `ask` waits for
- * the entitlement to load, then sends a Pro account straight on and shows
- * everyone else the paywall once: a purchase goes on, anything else leaves
- * for the app. A relaunch lands back on the step before it and asks again.
+ * The paywall at the end of onboarding, after the share practice. `ask` waits
+ * for the entitlement to load, then lets a Pro account through and shows
+ * everyone else the paywall once. A relaunch lands back on the share step and
+ * asks again.
  */
 export function useOnboardingPaywall({
   onPro,
@@ -44,10 +40,9 @@ export function useOnboardingPaywall({
       noteDeclinedDuringOnboarding();
       handlers.current.onDecline();
     };
-    // The reminder step may have just closed the OS permission prompt.
-    waitForSheetTransition()
-      // Nobody tapped for this sheet, so a declined exit offer just closes.
-      .then(() => openPaywallKeepingExitOffer(router, "onboarding", false))
+    // Skipping the practice reaches this without asking for a paywall, so a
+    // declined exit offer just closes.
+    openPaywallKeepingExitOffer(router, "onboarding", false)
       .then((purchased) => {
         if (!purchased) return decline();
         notePurchasedDuringOnboarding();

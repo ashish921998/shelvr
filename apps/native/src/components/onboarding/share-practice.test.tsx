@@ -44,6 +44,9 @@ vi.mock("react-native-reanimated", () => ({
   default: { View: mock.view, Text: mock.text },
 }));
 vi.mock("@/lib/motion", () => ({ settleIn: () => ({}) }));
+vi.mock("@/lib/entitlement", () => ({
+  useEntitlement: () => ({ entitled: true, loading: false }),
+}));
 vi.mock("@/components/onboarding/celebration", () => ({
   CelebrationBadge: mock.nothing,
 }));

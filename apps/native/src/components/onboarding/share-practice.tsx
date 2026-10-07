@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { useEntitlement } from "@/lib/entitlement";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
@@ -40,7 +41,7 @@ function sharedPayloadCount(): number {
 }
 
 /**
- * After the first save and the paywall: one save through the real share
+ * After the first save and before the paywall: one save through the real share
  * sheet, so the Shelvr tile is found once while help is on screen. The
  * shared link is not saved here. It stays in expo-sharing, flagged for the
  * share screen, which saves it the normal way once onboarding finishes.
@@ -51,9 +52,11 @@ export function SharePracticeStep({
 }: {
   /** A sample other than the one saved in the demo. */
   sample: DemoSample | undefined;
+  /** Leaves onboarding; the screen puts the paywall in front of the app. */
   onFinish: () => void;
 }) {
   useAppLocale();
+  const { entitled, loading: entitlementLoading } = useEntitlement();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
@@ -154,7 +157,15 @@ export function SharePracticeStep({
           )}
         </View>
         <Animated.View entering={SETTLE_CTA}>
-          <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
+          {/* Saving is Pro: anyone without it gets the paywall from here. */}
+          <CtaButton
+            label={t(
+              entitled || entitlementLoading
+                ? "sharePractice.toShelf"
+                : "reveal.keepSaving",
+            )}
+            onPress={onFinish}
+          />
         </Animated.View>
       </View>
     );

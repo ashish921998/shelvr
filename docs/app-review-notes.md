@@ -6,7 +6,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - Sign in with **Sign in with Apple** or **Google**.
 - No password account is required.
-- Reviewer path: onboarding opener → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
+- Reviewer path: onboarding opener → setup → save a link in the demo, choosing **Continue with Apple** when the save asks for an account → reminder → share practice → paywall → Home. Existing accounts can use **Already have an account? Sign in** on the opener.
 - App Review can use its own Apple account through Sign in with Apple; no developer-issued credentials, one-time code, invitation, or special account state is required.
 - A dedicated Google test account is optional fallback access. If one is supplied, enter the credentials in App Store Connect only—never in this repo or the app binary.
 - Anonymous / “Continue without account” is **dev-only** and disabled in production builds.
@@ -18,10 +18,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 3. **Demo:** saves one real link. On iOS the user shares a sample post through the system share sheet to Shelvr; on Android the user pastes a link or picks a sample. When the save needs an account, Sign in with Apple or Google appears inline. If the save fails, for example while offline, the demo offers a way to continue without saving.
 4. **Reading:** a short wait while Shelvr reads, titles, and files the link.
 5. **Reminder:** “When should it come back?” offers one reminder for the save just made. Picking a time is the only place onboarding asks for notifications. **Not now** skips it.
-6. **Paywall:** the RevenueCat paywall opens by itself after the reminder step. Closing it goes to Home; new saves stay Pro-gated.
-7. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
-8. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-9. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
+6. **Share practice:** “Now save one from the Share menu.” has the user share one sample link to Shelvr through the system share sheet, or skip with **I'll try it later**. A successful share shows “You nailed it.”
+7. **Paywall:** “Keep saving with Pro” on that screen (or skipping the practice) opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
+8. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
+9. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
+10. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
 
 ## Core save loop
 
@@ -113,7 +114,7 @@ Account access:
 
 Subscription testing:
 
-1. After the reminder step, the RevenueCat paywall opens by itself in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
+1. After the share practice, tap "Keep saving with Pro" (or "I'll try it later") to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
 4. Restore Purchases is also available from Profile.

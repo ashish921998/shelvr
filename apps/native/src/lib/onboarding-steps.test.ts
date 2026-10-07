@@ -29,11 +29,12 @@ describe("previousOnboardingStep", () => {
     ["interests", "opener"],
     ["setup", "interests"],
     ["notifications", "demo"],
+    ["share", "notifications"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
 
-  it.each(["opener", "demo", "share"] as const)(
+  it.each(["opener", "demo"] as const)(
     "leaves %s without a fixed step to go back to",
     (step) => {
       expect(previousOnboardingStep(step)).toBeNull();

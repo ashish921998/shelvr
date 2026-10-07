@@ -14,7 +14,6 @@ vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => state.entitlement,
-  waitForSheetTransition: () => Promise.resolve(),
   openPaywallKeepingExitOffer: state.open,
 }));
 vi.mock("@/lib/replay-onboarding", () => ({

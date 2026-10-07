@@ -10,8 +10,7 @@ export const ONBOARDING_STEPS = [
 // flows, so funnels split by this or filter on step_id. 3 added the source step,
 // 4 the notifications step. 5 and 6 never shipped. 7 dropped the source step,
 // added the interests step after the opener and the share step at the end,
-// dropped the reveal step (the paywall opens straight after the notifications
-// step), made the first save one tap on every platform, previews a ready-made
+// dropped the reveal step (the paywall opens when the share step is left), made the first save one tap on every platform, previews a ready-made
 // sample before sign-in, and takes a previewed sample from sign-in straight on.
 export const ONBOARDING_FLOW_VERSION = 7;
 
@@ -29,12 +28,12 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
 };
 
 // The demo step is missing on purpose: what back means there depends on
-// which of its screens is up, so the step tells the screen itself. The share
-// step comes after the paywall, so it has nothing to go back to.
+// which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
   interests: "opener",
   setup: "interests",
   notifications: "demo",
+  share: "notifications",
 };
 
 export function previousOnboardingStep(

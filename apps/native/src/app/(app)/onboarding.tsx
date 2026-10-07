@@ -29,7 +29,10 @@ import {
   spacesAfterKindToggle,
   type SaveKind,
 } from "@/lib/save-kinds";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import {
+  clearPendingShareOnDevice,
+  markPendingShareOnDevice,
+} from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
 import {
   LiveDemoStep,
@@ -43,7 +46,7 @@ import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
-import { getSharedPayloads } from "expo-sharing";
+import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -66,6 +69,17 @@ function holdIncomingShare() {
     if (getSharedPayloads().length > 0) markPendingShareOnDevice();
   } catch (err) {
     analytics.captureError("onboarding_hold_share_failed", err);
+  }
+}
+
+// Saving is Pro, so the practice link of someone who closed the paywall is
+// let go. Left held, the share screen would ask for Pro again in the app.
+function dropPracticeShare() {
+  try {
+    clearSharedPayloads();
+    clearPendingShareOnDevice();
+  } catch (err) {
+    analytics.captureError("onboarding_drop_share_failed", err);
   }
 }
 
@@ -191,13 +205,12 @@ export default function OnboardingScreen() {
   };
 
   const askPaywall = useOnboardingPaywall({
-    onPro: () => setStep("share"),
-    onDecline: finish,
+    onPro: finish,
+    onDecline: () => {
+      dropPracticeShare();
+      finish();
+    },
   });
-  const leaveReminder = () => {
-    recordCurrentStep();
-    askPaywall();
-  };
 
   if (showSignIn) {
     return (
@@ -312,7 +325,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "notifications" && (
-            <NotificationsStep saved={saved} onAdvance={leaveReminder} />
+            <NotificationsStep saved={saved} onAdvance={advance} />
           )}
 
           {step === "share" && (
@@ -321,7 +334,7 @@ export default function OnboardingScreen() {
                 kinds,
                 getOnboardingProgress().demo?.url ?? null,
               )}
-              onFinish={finish}
+              onFinish={askPaywall}
             />
           )}
         </ScrollView>
