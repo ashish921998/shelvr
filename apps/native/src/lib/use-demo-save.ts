@@ -25,7 +25,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 // saved here once sign-in lands, so one lifecycle owns every first save. A
 // previewed sample has already played the reading steps, so its save goes
 // straight on to the reveal instead of playing them again, and picking it
-// again after "Not now" returns to the sign-in ask without a replay. The
+// again after going back returns to the sign-in ask without a replay. The
 // persisted request survives an app kill mid-OAuth and stays through reveal
 // so a relaunch re-attaches to the same server item; finish() drops it. A
 // relaunch resumes into "auth", which is where a preview ends too.

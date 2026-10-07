@@ -266,7 +266,7 @@ type AnalyticsEventProperties = {
   onboarding_demo_picked: { sample: boolean; signed_in: boolean };
   // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
   // the screen after a previewed sample. "dismissed" is the sheet's scrim or
-  // back, or that screen's "Not now"; a sign-in itself shows as auth_started.
+  // back, or that screen's back button; a sign-in itself shows as auth_started.
   onboarding_signin_prompt: {
     surface: "demo_sheet" | "sample_preview";
     action: "shown" | "dismissed";

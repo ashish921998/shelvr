@@ -3,7 +3,6 @@ import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { GhostButton } from "@/components/onboarding/parts";
 import { SampleCard } from "@/components/onboarding/sample-card";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { useEffect } from "react";
@@ -11,22 +10,20 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 /** A previewed sample, signed out: the sample as it would be filed, then
- * "Save your shelf". Signing in lets the demo step save it for real. */
+ * "Save your shelf". Signing in lets the demo step save it for real; the
+ * screen's back button is the way out. */
 export function SampleSignIn({
   sample,
   space,
   saving,
-  onNotNow,
 }: {
   sample: DemoSample;
   space: string | null;
   /** Signed in and the save is landing: nothing here takes a tap. */
   saving: boolean;
-  onNotNow: () => void;
 }) {
   useAppLocale();
   const oauth = useOAuthSignIn("sample_preview");
-  const busy = saving || oauth.pendingProvider !== null;
 
   useEffect(() => {
     analytics.capture("onboarding_signin_prompt", {
@@ -34,14 +31,6 @@ export function SampleSignIn({
       action: "shown",
     });
   }, []);
-
-  const notNow = () => {
-    analytics.capture("onboarding_signin_prompt", {
-      surface: "sample_preview",
-      action: "dismissed",
-    });
-    onNotNow();
-  };
 
   return (
     <View style={styles.wrap}>
@@ -71,11 +60,6 @@ export function SampleSignIn({
         <View pointerEvents={saving ? "none" : "auto"}>
           <SignInButtons oauth={oauth} />
         </View>
-        <GhostButton
-          label={t("common.notNow")}
-          onPress={notNow}
-          disabled={busy}
-        />
       </View>
     </View>
   );

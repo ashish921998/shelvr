@@ -510,7 +510,7 @@ describe("useDemoSave", () => {
     expect(onAdvance).toHaveBeenCalledTimes(1);
   });
 
-  it("returns to the sign-in ask without a replay when a previewed sample is picked again after Not now", () => {
+  it("returns to the sign-in ask without a replay when a previewed sample is picked again after going back", () => {
     mock.authenticated = false;
     const { result } = renderDemo();
     act(() => result.current.submitUrl("https://sample.test/ready-made"));

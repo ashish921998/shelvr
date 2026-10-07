@@ -76,8 +76,8 @@ export function LiveDemoStep({
     onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
 
-  // The sign-in ask after a previewed sample goes back to the picker, the
-  // same as its "Not now", and the picker goes back a step while nobody is
+  // The sign-in ask after a previewed sample goes back to the picker, and
+  // the picker goes back a step while nobody is
   // signed in and nothing is saving. Nothing else here has a way back.
   const cancelAuthRef = useRef(demo.cancelAuth);
   useEffect(() => {
@@ -151,7 +151,6 @@ export function LiveDemoStep({
         sample={authSample}
         space={demo.authRequest?.destination ?? null}
         saving={demo.isAuthenticated}
-        onNotNow={demo.cancelAuth}
       />
     );
   }
