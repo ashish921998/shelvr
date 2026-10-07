@@ -67,6 +67,16 @@ crons.interval(
   {},
 );
 
+// Drop browser-extension pairing codes nobody redeemed. They expire in ten
+// minutes and are checked on redemption, so this is housekeeping rather than a
+// guard; bounded to 200 rows per run.
+crons.interval(
+  "cleanup expired extension pairings",
+  { hours: 1 },
+  internal.extension.cleanupExpiredPairings,
+  {},
+);
+
 // Consider each due user for one save reminder: an unread article or a recipe
 // to cook, at the hour that user tends to save. Hourly, because each user's
 // hour is their own; a user is only due once a day.
