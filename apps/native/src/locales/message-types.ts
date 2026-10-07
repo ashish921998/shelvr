@@ -353,6 +353,16 @@ export type MessageParams = {
   "interests.interiorDesign": undefined;
   "interests.architecture": undefined;
   "interests.books": undefined;
+  "interests.money": undefined;
+  "interests.productivity": undefined;
+  "interests.design": undefined;
+  "interests.photography": undefined;
+  "interests.films": undefined;
+  "interests.anime": undefined;
+  "interests.music": undefined;
+  "interests.gaming": undefined;
+  "interests.science": undefined;
+  "interests.wellness": undefined;
   "albums.allPhotos": undefined;
   "appearance.system": undefined;
   "appearance.light": undefined;

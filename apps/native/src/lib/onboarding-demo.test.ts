@@ -38,6 +38,17 @@ describe("samples for picked topics", () => {
     expect(featuredDemoKind(["Fitness"], ["Coffee"])).toBe("Articles");
   });
 
+  it("shows a page once when a kind and a topic both offer it", () => {
+    const domains = orderDemoSamples(["Travel"], ["Travel", "Anime"]).map(
+      (s) => s.domain,
+    );
+    expect(domains).toEqual([
+      "lonelyplanet.com",
+      "myanimelist.net",
+      "bbcgoodfood.com",
+    ]);
+  });
+
   it("files a topic's sample into that topic's space when it was kept", () => {
     const url = "https://www.jameshoffmann.co.uk/weird-coffee-science";
     expect(demoDestination(url, ["Coffee", "Articles"])).toBe("Coffee");

@@ -22,6 +22,9 @@ const INTEREST_IMAGES: Partial<Record<Interest, number>> = {
   Coffee: require("../../../assets/onboarding/espresso.jpg"),
   "Interior design": require("../../../assets/onboarding/sofa.jpg"),
   Books: require("../../../assets/onboarding/book.jpg"),
+  Films: require("../../../assets/onboarding/videos.jpg"),
+  Travel: require("../../../assets/onboarding/demo-travel.jpg"),
+  Fitness: require("../../../assets/onboarding/fitness.jpg"),
 };
 
 function sampleImage(sample: DemoSample): number {

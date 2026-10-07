@@ -79,12 +79,19 @@ export function orderDemoSamples(
   const topical = interests.flatMap((interest) =>
     INTEREST_SAMPLES.filter((sample) => sample.interest === interest),
   );
-  return [
+  const ordered = [
     ...lead.slice(0, 1),
     ...topical,
     ...lead.slice(1),
     ...byKind.filter((sample) => !kinds.includes(sample.kind)),
-  ].slice(0, SAMPLE_COUNT);
+  ];
+  // A topic can offer the same page as a kind; it shows once.
+  return ordered
+    .filter(
+      (sample, index) =>
+        ordered.findIndex((other) => other.url === sample.url) === index,
+    )
+    .slice(0, SAMPLE_COUNT);
 }
 
 /** The kind the picker's headline names: the leading sample's, when setup
