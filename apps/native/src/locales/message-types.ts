@@ -450,6 +450,7 @@ export type MessageParams = {
   "onboarding.notifyTitle": undefined;
   "onboarding.notifyBody": undefined;
   "onboarding.notifyNote": undefined;
+  "onboarding.notifyNow": undefined;
   "onboarding.notifyAllow": undefined;
   "onboarding.sourceFriend": undefined;
   "onboarding.sourceSharedLink": undefined;

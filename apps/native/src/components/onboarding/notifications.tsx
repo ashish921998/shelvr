@@ -101,11 +101,26 @@ export function NotificationsStep({ onAdvance }: { onAdvance: () => void }) {
       </Text>
       <Text style={styles.support}>{t("onboarding.notifyBody")}</Text>
 
-      <NotificationPreview body={t("weekly.previewFallback")} />
-
-      <Text style={styles.note}>{t("onboarding.notifyNote")}</Text>
+      {/* What actually arrives, in the real notification copy. */}
+      <View style={styles.stage}>
+        <View style={styles.lockScreen}>
+          <NotificationPreview
+            style={styles.card}
+            title={t("reminder.cookTitle")}
+            body={t("reminder.cookBody", {
+              title: t("onboarding.sampleRamen"),
+            })}
+            when={t("onboarding.notifyNow")}
+          />
+          <NotificationPreview
+            style={styles.card}
+            body={t("weekly.previewFallback")}
+          />
+        </View>
+      </View>
 
       <View style={styles.foot}>
+        <Text style={styles.note}>{t("onboarding.notifyNote")}</Text>
         <CtaButton
           label={t("onboarding.notifyAllow")}
           onPress={() => void turnOn()}
@@ -138,14 +153,30 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 21,
     color: theme.colors.muted,
   },
+  stage: {
+    flex: 1,
+    justifyContent: "center",
+    paddingVertical: theme.gap(2),
+  },
+  lockScreen: {
+    gap: theme.gap(1),
+    padding: theme.gap(2),
+    paddingVertical: theme.gap(4),
+    borderRadius: theme.radius.xl,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  card: {
+    backgroundColor: theme.colors.surface,
+  },
   note: {
     fontFamily: theme.fonts.regular,
     fontSize: 13,
     lineHeight: 18,
+    textAlign: "center",
     color: theme.colors.muted,
   },
   foot: {
-    marginTop: "auto",
     gap: theme.gap(1),
   },
 }));

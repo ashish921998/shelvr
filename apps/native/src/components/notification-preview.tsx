@@ -1,6 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { Image } from "expo-image";
-import { Text, View } from "react-native";
+import { type StyleProp, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 const APP_ICON = require("../../assets/icon.png");
@@ -13,14 +13,16 @@ export function NotificationPreview({
   body,
   title,
   when,
+  style,
 }: {
   body: string;
   title?: string;
   when?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   useAppLocale();
   return (
-    <View style={styles.push} accessible>
+    <View style={[styles.push, style]} accessible>
       <Image source={APP_ICON} style={styles.icon} />
       <View style={styles.text}>
         <View style={styles.top}>
