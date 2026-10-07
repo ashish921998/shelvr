@@ -86,6 +86,39 @@ describe("native Google sign-in with an ID token", () => {
     expect(accounts).toHaveLength(1);
   });
 
+  it("links to a user who signed in with Apple using the same email", async () => {
+    const backend = await setup();
+    const userId = await backend.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {
+        email: "ana@example.com",
+        emailVerificationTime: 1,
+      });
+      await ctx.db.insert("authAccounts", {
+        userId: id,
+        provider: "apple",
+        providerAccountId: "apple-sub-1",
+      });
+      return id;
+    });
+
+    await backend.action(api.auth.signIn, {
+      provider: "google-id-token",
+      params: { idToken: await idToken({}) },
+    });
+
+    const { users, google } = await backend.run(async (ctx) => ({
+      users: await ctx.db.query("users").collect(),
+      google: await ctx.db
+        .query("authAccounts")
+        .withIndex("providerAndAccountId", (q) =>
+          q.eq("provider", "google").eq("providerAccountId", "google-sub-1"),
+        )
+        .unique(),
+    }));
+    expect(users.map((u) => u._id)).toEqual([userId]);
+    expect(google?.userId).toBe(userId);
+  });
+
   it("creates a new user with a google account on first sign-in", async () => {
     const backend = await setup();
 
