@@ -1,7 +1,7 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
-import { demoDestination } from "@/lib/onboarding-demo";
+import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -17,19 +17,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
-// Every path is real. The save runs through api.demo.createDemoItem (one per
-// user, no Pro needed) and the actual pipeline. Before auth, the pending save
-// is persisted so an app kill mid-OAuth resumes it. The record stays through
-// reveal so a relaunch re-attaches to the same server item; finish() drops it.
+// Signed in, every path is real: the save runs through api.demo.createDemoItem
+// (one per user, no Pro needed) and the actual pipeline. Signed out, a
+// ready-made sample is previewed instead: the step plays the reading steps
+// and the reveal shows the sample, then asks for sign-in, after which the
+// reveal saves the persisted request for real. A pasted or typed link has
+// nothing to preview, so it still asks for sign-in here. The persisted
+// request survives an app kill mid-OAuth and stays through reveal so a
+// relaunch re-attaches to the same server item; finish() drops it.
 
 const TIMEOUT_MS = 15_000;
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
-type DemoView = "share" | "auth" | "reading" | "failed";
+type DemoView = "share" | "auth" | "preview" | "reading" | "failed";
 
 /** "saved" watches the server item; the reading/failed view mirrors its status. */
-type StoredPhase = "share" | "auth" | "saved";
+type StoredPhase = "share" | "auth" | "preview" | "saved";
 
 type DemoSaveState = {
   phase: StoredPhase;
@@ -50,6 +54,8 @@ type DemoSaveAction =
       type: "submit";
       request: PendingDemo;
       authenticated: boolean;
+      /** A signed-out sample: preview it instead of asking for sign-in. */
+      preview: boolean;
       lost: boolean;
     }
   | { type: "saved"; itemId: Id<"items"> }
@@ -98,8 +104,11 @@ export function demoSaveReducer(
         error: null,
         savingUrl: action.request.url,
       };
-      return action.authenticated
-        ? { ...next, authRequest: null, submitting: true }
+      if (action.authenticated) {
+        return { ...next, authRequest: null, submitting: true };
+      }
+      return action.preview
+        ? { ...next, authRequest: null, phase: "preview" }
         : { ...next, authRequest: action.request, phase: "auth" };
     }
     case "saved":
@@ -247,11 +256,19 @@ export function useDemoSave({
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
       const trimmed = { ...request, url };
+      const sample = isDemoSample(url);
+      // Fires before any sign-in, so the funnel shows a pick that never got
+      // past the sign-in sheet.
+      analytics.capture("onboarding_demo_picked", {
+        sample,
+        signed_in: isAuthenticated,
+      });
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
         request: trimmed,
         authenticated: isAuthenticated,
+        preview: sample,
         lost,
       });
       if (!isAuthenticated) return;

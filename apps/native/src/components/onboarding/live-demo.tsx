@@ -13,6 +13,7 @@ import { useIncomingShareUrl } from "@/lib/use-incoming-share-url";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
 import {
   DemoLinkRow,
+  DemoPreviewView,
   DemoReadingView,
 } from "@/components/onboarding/demo-reading-view";
 import { GhostButton } from "@/components/onboarding/parts";
@@ -73,7 +74,7 @@ export function LiveDemoStep({
     onSaved,
     onAdvance,
   });
-  const { shareSheetOpen, shareSample } = useIncomingShareUrl({
+  const { shareSheetOpen } = useIncomingShareUrl({
     canAccept: demo.canAcceptShare,
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
@@ -84,7 +85,7 @@ export function LiveDemoStep({
   const { view, setError } = demo;
 
   useEffect(() => {
-    onReadingChange(view === "reading");
+    onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
 
   // A paste saves at once when it holds a link and shows just that link.
@@ -107,6 +108,20 @@ export function LiveDemoStep({
       setError("demo.clipboardNoLink");
     }
   };
+
+  if (view === "preview") {
+    const url = demo.savingUrl ?? "";
+    return (
+      <DemoPreviewView
+        title={
+          DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
+          displayHost(url)
+        }
+        url={url}
+        onDone={demo.advance}
+      />
+    );
+  }
 
   if (view === "reading" || view === "failed") {
     const failed = view === "failed";
@@ -133,7 +148,7 @@ export function LiveDemoStep({
       <Text style={styles.error}>{t(demo.error)}</Text>
     );
   // An error about the link field sits under the field; everything else
-  // (a dismissed share sheet, a failed save) stays by the control it came from.
+  // (a failed save) stays by the control it came from.
   const inputError =
     demo.error === "demo.clipboardNoLink" || demo.error === "demo.notALink";
 
@@ -205,24 +220,13 @@ export function LiveDemoStep({
 
   return (
     <View style={styles.wrap}>
-      {Platform.OS === "ios" ? (
-        <SharePicker
-          samples={samples}
-          disabled={demo.submitting}
-          error={inputError ? null : errorLine}
-          pasteRow={pasteRow}
-          retry={demo.error === "demo.shareDismissed"}
-          onShare={(url) => void shareSample(url)}
-        />
-      ) : (
-        <PastePicker
-          samples={samples}
-          disabled={demo.submitting}
-          error={inputError ? null : errorLine}
-          pasteRow={pasteRow}
-          onPick={demo.submitUrl}
-        />
-      )}
+      <SamplePicker
+        samples={samples}
+        disabled={demo.submitting}
+        error={inputError ? null : errorLine}
+        pasteRow={pasteRow}
+        onPick={demo.submitUrl}
+      />
 
       {footer === null ? null : <View style={styles.foot}>{footer}</View>}
 
@@ -242,75 +246,10 @@ type PickerProps = {
   pasteRow: ReactNode;
 };
 
-/** iOS: the first save goes through the real share sheet, Matter-style. */
-function SharePicker({
-  samples,
-  disabled,
-  error,
-  pasteRow,
-  retry,
-  onShare,
-}: PickerProps & { retry: boolean; onShare: (url: string) => void }) {
-  useAppLocale();
-  const { theme } = useUnistyles();
-  const [featured] = samples;
-  const [pasting, setPasting] = useState(false);
-  const shareLabel = t(retry ? "demo.shareRetry" : "demo.shareThis");
-  return (
-    <>
-      <View style={styles.head}>
-        <Text
-          style={styles.headline}
-          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-        >
-          {t("demo.shareTitle")}
-        </Text>
-        <Text style={styles.support}>{t("demo.shareSupport")}</Text>
-      </View>
-
-      {featured === undefined ? null : (
-        <>
-          <SharePost sample={featured} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${shareLabel}, ${featured.pageHeading}, ${featured.domain}`}
-            disabled={disabled}
-            onPress={() => onShare(featured.url)}
-            style={({ pressed }) => [
-              styles.shareButton,
-              disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
-            ]}
-          >
-            <AppSymbolIcon
-              name="square.and.arrow.up"
-              size={18}
-              tintColor={theme.colors.primaryForeground}
-            />
-            <Text style={[styles.inputActionText, styles.shareLabel]}>
-              {shareLabel}
-            </Text>
-          </Pressable>
-        </>
-      )}
-
-      {error}
-
-      {pasting ? (
-        <View style={styles.samples}>
-          <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
-          {pasteRow}
-        </View>
-      ) : (
-        <GhostButton
-          label={t("demo.pasteOwn")}
-          onPress={() => setPasting(true)}
-        />
-      )}
-    </>
-  );
-}
-
-function PastePicker({
+/** The first save is one tap on a sample matched to the kinds picked in
+ * setup. The share sheet is taught after it, once the first save has landed
+ * (see share-practice.tsx). */
+function SamplePicker({
   samples,
   disabled,
   error,
@@ -318,6 +257,7 @@ function PastePicker({
   onPick,
 }: PickerProps & { onPick: (url: string) => void }) {
   useAppLocale();
+  const [featured, ...others] = samples;
   return (
     <>
       <View style={styles.head}>
@@ -330,29 +270,42 @@ function PastePicker({
         <Text style={styles.support}>{t("demo.pickHelp")}</Text>
       </View>
 
-      <ShareHint />
-
-      {pasteRow}
-
-      <View style={styles.samples}>
-        <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
-        {samples.map((candidate) => (
-          <SampleRow
-            key={candidate.url}
-            sample={candidate}
-            disabled={disabled}
-            onPress={() => onPick(candidate.url)}
-          />
-        ))}
-      </View>
+      {featured === undefined ? null : (
+        <SampleCard
+          sample={featured}
+          action="save"
+          disabled={disabled}
+          onPress={() => onPick(featured.url)}
+        />
+      )}
 
       {error}
+
+      {others.length === 0 ? null : (
+        <View style={styles.samples}>
+          <Text style={styles.samplesLabel}>{t("demo.samplesOr")}</Text>
+          {others.map((candidate) => (
+            <SampleRow
+              key={candidate.url}
+              sample={candidate}
+              icon="plus"
+              disabled={disabled}
+              onPress={() => onPick(candidate.url)}
+            />
+          ))}
+        </View>
+      )}
+
+      <View style={styles.samples}>
+        <Text style={styles.samplesLabel}>{t("demo.pasteOwn")}</Text>
+        {pasteRow}
+      </View>
     </>
   );
 }
 
 /** An illustration of the share gesture, not a control. */
-function ShareHint() {
+export function ShareHint() {
   useAppLocale();
   const { theme } = useUnistyles();
   return (
@@ -381,10 +334,38 @@ function ShareHint() {
   );
 }
 
-/** The sample post the share sheet opens over. Not a control. */
-function SharePost({ sample }: { sample: DemoSample }) {
+/** A large sample card. "save" saves it in one tap; "share" opens the real
+ * share sheet over it, so the save goes through the Shelvr tile; "preview"
+ * only shows it. */
+export function SampleCard({
+  sample,
+  action,
+  disabled,
+  onPress,
+}: {
+  sample: DemoSample;
+  action: "save" | "share" | "preview";
+  disabled: boolean;
+  onPress?: () => void;
+}) {
+  const { theme } = useUnistyles();
+  const share = action === "share";
+  const preview = action === "preview";
   return (
-    <View style={styles.post}>
+    <Pressable
+      accessibilityRole={preview ? undefined : "button"}
+      accessibilityLabel={
+        preview
+          ? `${sample.pageHeading}, ${sample.domain}`
+          : `${t(share ? "demo.shareThis" : "demo.save")}, ${sample.pageHeading}, ${sample.domain}`
+      }
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.post,
+        disabled ? { opacity: 0.4 } : pressed && { opacity: 0.85 },
+      ]}
+    >
       <Image
         source={SAMPLE_IMAGES[sample.kind]}
         contentFit="cover"
@@ -399,17 +380,28 @@ function SharePost({ sample }: { sample: DemoSample }) {
             {sample.domain}
           </Text>
         </View>
+        {preview ? null : (
+          <View style={styles.hintShare}>
+            <AppSymbolIcon
+              name={share ? "square.and.arrow.up" : "plus"}
+              size={18}
+              tintColor={theme.colors.primaryForeground}
+            />
+          </View>
+        )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 function SampleRow({
   sample,
+  icon,
   disabled,
   onPress,
 }: {
   sample: DemoSample;
+  icon: "plus" | "square.and.arrow.up";
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -438,7 +430,7 @@ function SampleRow({
           {sample.domain}
         </Text>
       </View>
-      <AppSymbolIcon name="plus" size={16} tintColor={theme.colors.primary} />
+      <AppSymbolIcon name={icon} size={16} tintColor={theme.colors.primary} />
     </Pressable>
   );
 }
@@ -453,10 +445,24 @@ function DemoAuthSheet({
   onCancel: () => void;
 }) {
   useAppLocale();
-  const { theme } = useUnistyles();
-  const { signInWith, pendingProvider, lastError, interrupted } =
-    useOAuthSignIn("demo_sheet");
-  const busy = pendingProvider !== null;
+  const oauth = useOAuthSignIn("demo_sheet");
+  const busy = oauth.pendingProvider !== null;
+
+  useEffect(() => {
+    if (!visible) return;
+    analytics.capture("onboarding_signin_prompt", {
+      surface: "demo_sheet",
+      action: "shown",
+    });
+  }, [visible]);
+
+  const dismiss = () => {
+    analytics.capture("onboarding_signin_prompt", {
+      surface: "demo_sheet",
+      action: "dismissed",
+    });
+    onCancel();
+  };
   const pageHeading =
     DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
     displayHost(url);
@@ -464,20 +470,16 @@ function DemoAuthSheet({
   // A cancel keeps the sheet open: the auth session reports its own failures
   // as cancels, and closing on them reads as a button that does nothing.
   // Back and the scrim still close it.
-  const signIn = (provider: OAuthProvider) => {
-    void signInWith(provider);
-  };
-
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={busy ? undefined : onCancel}
+      onRequestClose={busy ? undefined : dismiss}
     >
       <Pressable
         style={styles.scrim}
-        onPress={busy ? undefined : onCancel}
+        onPress={busy ? undefined : dismiss}
         accessibilityRole="button"
         accessibilityLabel={t("common.back")}
       />
@@ -488,56 +490,79 @@ function DemoAuthSheet({
 
         <DemoLinkRow title={pageHeading} url={url} />
 
-        {!busy && (lastError !== null || interrupted) ? (
-          <Text style={styles.error}>{t("demo.signInFailed")}</Text>
-        ) : null}
+        <SignInButtons oauth={oauth} />
+      </View>
+    </Modal>
+  );
+}
 
-        {Platform.OS === "ios" ? (
-          <Pressable
-            onPress={() => signIn("apple")}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.authBtn,
-              styles.authBtnApple,
-              busy && { opacity: 0.4 },
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            {pendingProvider === "apple" ? (
-              <ActivityIndicator color={theme.colors.background} />
-            ) : (
-              <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
-                {t("account.apple")}
-              </Text>
-            )}
-          </Pressable>
-        ) : null}
+/** Apple (iOS), Google and the dev login, with the failure line and the
+ * privacy note. The caller owns the OAuth state, so a sheet can stay open
+ * while a sign-in is in flight. */
+export function SignInButtons({
+  oauth,
+}: {
+  oauth: ReturnType<typeof useOAuthSignIn>;
+}) {
+  useAppLocale();
+  const { theme } = useUnistyles();
+  const { signInWith, pendingProvider, lastError, interrupted } = oauth;
+  const busy = pendingProvider !== null;
+  const signIn = (provider: OAuthProvider) => {
+    void signInWith(provider);
+  };
+
+  return (
+    <>
+      {!busy && (lastError !== null || interrupted) ? (
+        <Text style={styles.error}>{t("demo.signInFailed")}</Text>
+      ) : null}
+
+      {Platform.OS === "ios" ? (
         <Pressable
-          onPress={() => signIn("google")}
+          onPress={() => signIn("apple")}
           disabled={busy}
           style={({ pressed }) => [
             styles.authBtn,
+            styles.authBtnApple,
             busy && { opacity: 0.4 },
             pressed && { opacity: 0.85 },
           ]}
         >
-          {pendingProvider === "google" ? (
-            <ActivityIndicator color={theme.colors.foreground} />
+          {pendingProvider === "apple" ? (
+            <ActivityIndicator color={theme.colors.background} />
           ) : (
-            <Text style={styles.authBtnText}>{t("account.google")}</Text>
+            <Text style={[styles.authBtnText, styles.authBtnTextApple]}>
+              {t("account.apple")}
+            </Text>
           )}
         </Pressable>
-        {isAnonymousAuthEnabled() ? (
-          <GhostButton
-            label={t("account.anonymous")}
-            onPress={() => signIn("anonymous")}
-            disabled={busy}
-            testID="onboarding-dev-login"
-          />
-        ) : null}
-        <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
-      </View>
-    </Modal>
+      ) : null}
+      <Pressable
+        onPress={() => signIn("google")}
+        disabled={busy}
+        style={({ pressed }) => [
+          styles.authBtn,
+          busy && { opacity: 0.4 },
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        {pendingProvider === "google" ? (
+          <ActivityIndicator color={theme.colors.foreground} />
+        ) : (
+          <Text style={styles.authBtnText}>{t("account.google")}</Text>
+        )}
+      </Pressable>
+      {isAnonymousAuthEnabled() ? (
+        <GhostButton
+          label={t("account.anonymous")}
+          onPress={() => signIn("anonymous")}
+          disabled={busy}
+          testID="onboarding-dev-login"
+        />
+      ) : null}
+      <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
+    </>
   );
 }
 
@@ -591,22 +616,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  shareButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.gap(1),
-    minHeight: 52,
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  shareLabel: {
-    flexShrink: 1,
-    textAlign: "center",
   },
   hintIcon: {
     width: 36,

@@ -464,6 +464,9 @@ export type MessageParams = {
   "demo.eitherWay": undefined;
   "reveal.title": undefined;
   "reveal.subtitle": undefined;
+  "reveal.previewTitle": undefined;
+  "reveal.previewSubtitle": undefined;
+  "reveal.saveShelf": undefined;
   "reveal.filedIn": { space: string };
   "reveal.explainer": undefined;
   "reveal.emptyTitle": undefined;
@@ -502,10 +505,16 @@ export type MessageParams = {
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;
-  "demo.shareTitle": undefined;
-  "demo.shareSupport": undefined;
   "demo.pasteOwn": undefined;
   "demo.pickShelvr": undefined;
+  "sharePractice.title": undefined;
+  "sharePractice.body": undefined;
+  "sharePractice.tipIos": undefined;
+  "sharePractice.tipAndroid": undefined;
+  "sharePractice.savedTitle": undefined;
+  "sharePractice.savedBody": undefined;
+  "sharePractice.toShelf": undefined;
+  "sharePractice.later": undefined;
   "demo.shareThis": undefined;
   "demo.shareDismissed": undefined;
   "demo.shareRetry": undefined;

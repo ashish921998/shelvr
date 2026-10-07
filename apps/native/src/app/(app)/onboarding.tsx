@@ -1,7 +1,7 @@
 import { useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
-import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
+import { orderDemoSamples, practiceShareSample } from "@/lib/onboarding-demo";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -31,12 +31,13 @@ import {
 import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
+import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { SourceStep } from "@/components/onboarding/source";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, View, useWindowDimensions } from "react-native";
+import { ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -45,7 +46,8 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   source: 0.125,
   setup: 0.25,
   demo: 0.5,
-  reveal: 1,
+  reveal: 0.85,
+  share: 1,
 };
 const READING_PROGRESS = 0.625;
 
@@ -240,11 +242,7 @@ export default function OnboardingScreen() {
 
           {step === "demo" && (
             <LiveDemoStep
-              samples={
-                Platform.OS === "ios"
-                  ? orderShareDemoSamples(kinds)
-                  : orderDemoSamples(kinds)
-              }
+              samples={orderDemoSamples(kinds)}
               spaces={spaces}
               resume={initialStep === "demo" ? initialProgress.demo : null}
               onSaved={setSaved}
@@ -258,6 +256,17 @@ export default function OnboardingScreen() {
               saved={saved}
               restored={initialStep === "reveal"}
               onSaved={setSaved}
+              onContinue={advance}
+              onFinish={finish}
+            />
+          )}
+
+          {step === "share" && (
+            <SharePracticeStep
+              sample={practiceShareSample(
+                kinds,
+                getOnboardingProgress().demo?.url ?? null,
+              )}
               onFinish={finish}
             />
           )}

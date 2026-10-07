@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-// The iOS share step: one Share button, and the paste field tucked behind a
-// text link. The save hooks are stubbed, so these tests pin what the step
-// itself owns: what is visible, and what each control hands to the hooks.
+// The first-save picker: a featured sample saved in one tap, the other
+// samples below it, and the paste field. The save hooks are stubbed, so these
+// tests pin what the step itself owns: what is visible, and what each control
+// hands to the hooks.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -119,6 +120,7 @@ vi.mock("@/components/onboarding/parts", () => ({
 }));
 vi.mock("@/components/onboarding/demo-reading-view", () => ({
   DemoLinkRow: mock.nothing,
+  DemoPreviewView: mock.reading,
   DemoReadingView: mock.reading,
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -163,7 +165,6 @@ const props = {
   onAdvance: vi.fn(),
 };
 const step = () => <LiveDemoStep {...props} />;
-const pasteLink = () => screen.getByRole("button", { name: "demo.pasteOwn" });
 const linkField = () =>
   screen.queryByLabelText("demo.linkLabel") as HTMLInputElement | null;
 
@@ -175,23 +176,31 @@ beforeEach(() => {
   mock.actions.canAcceptShare.mockReturnValue(true);
 });
 
-describe("iOS share step", () => {
-  it("shares the featured sample from the one Share button", () => {
+describe("first-save picker", () => {
+  it("saves the featured sample in one tap", () => {
     render(step());
-    fireEvent.click(screen.getByRole("button", { name: /^demo\.shareThis/ }));
-    expect(mock.shareSample).toHaveBeenCalledWith(DEMO_SAMPLES[0].url);
+    fireEvent.click(screen.getByRole("button", { name: /^demo\.save, / }));
+    expect(mock.actions.submitUrl).toHaveBeenCalledWith(DEMO_SAMPLES[0].url);
   });
 
-  it("keeps the paste field hidden until its link is tapped", () => {
+  it("saves another sample from its row", () => {
     render(step());
-    expect(linkField()).toBeNull();
-    fireEvent.click(pasteLink());
+    const second = DEMO_SAMPLES[1];
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `${second.pageHeading}, ${second.domain}`,
+      }),
+    );
+    expect(mock.actions.submitUrl).toHaveBeenCalledWith(second.url);
+  });
+
+  it("shows the paste field without an extra tap", () => {
+    render(step());
     expect(linkField()).not.toBeNull();
   });
 
   it("saves a typed link", () => {
     render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
     fireEvent.click(screen.getByRole("button", { name: "demo.save" }));
     expect(mock.actions.submitTyped).toHaveBeenCalledWith("https://a.test/p");
@@ -199,7 +208,6 @@ describe("iOS share step", () => {
 
   it("keeps the field and its text after the sign-in sheet is cancelled", () => {
     const { rerender } = render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "https://a.test/p" } });
 
     mock.demo.view = "auth";
@@ -213,37 +221,23 @@ describe("iOS share step", () => {
   });
 
   it("clears an old error as soon as the user edits the field", () => {
-    mock.demo.error = "demo.shareDismissed";
+    mock.demo.error = "demo.saveFailed";
     render(step());
-    fireEvent.click(pasteLink());
     fireEvent.change(linkField()!, { target: { value: "h" } });
     expect(mock.actions.setError).toHaveBeenCalledWith(null);
   });
 
-  it("relabels the Share button, visibly and for screen readers, after a dismissed sheet", () => {
-    mock.demo.error = "demo.shareDismissed";
-    render(step());
-    expect(
-      screen.getByRole("button", { name: /^demo\.shareRetry/ }),
-    ).not.toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /^demo\.shareThis/ }),
-    ).toBeNull();
-    expect(screen.getByText("demo.shareDismissed")).not.toBeNull();
-  });
-
-  it("keeps a link-field error next to the field, and a share error away from it", () => {
+  it("keeps a link-field error next to the field, and a save error away from it", () => {
     mock.demo.error = "demo.clipboardNoLink";
     const { rerender } = render(step());
-    fireEvent.click(pasteLink());
     const fieldBlock = linkField()!.parentElement!.parentElement!;
     expect(fieldBlock.contains(screen.getByText("demo.clipboardNoLink"))).toBe(
       true,
     );
 
-    mock.demo.error = "demo.shareDismissed";
+    mock.demo.error = "demo.saveFailed";
     rerender(step());
-    expect(fieldBlock.contains(screen.getByText("demo.shareDismissed"))).toBe(
+    expect(fieldBlock.contains(screen.getByText("demo.saveFailed"))).toBe(
       false,
     );
   });
