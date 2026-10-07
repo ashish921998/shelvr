@@ -36,7 +36,11 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
+  useUnistyles: () => ({ theme: { colors: {} } }),
 }));
+vi.mock("react-native-reanimated", () => ({ default: { View: mock.view } }));
+vi.mock("@/lib/motion", () => ({ fadeIn: {} }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mock.nothing }));
 vi.mock("expo-haptics", () => ({
   notificationAsync: mock.haptic,
   NotificationFeedbackType: { Success: "success" },
@@ -64,6 +68,9 @@ vi.mock("@/components/onboarding/parts", () => ({
 }));
 vi.mock("@/components/onboarding/sample-card", () => ({
   SampleCard: mock.card,
+  SampleRow: ({ sample }: { sample: { pageHeading: string } }) => (
+    <div>{sample.pageHeading}</div>
+  ),
   ShareHint: mock.nothing,
 }));
 
@@ -94,6 +101,8 @@ describe("share practice", () => {
     act(() => mock.arrive?.());
     expect(received()).toHaveLength(1);
     expect(screen.getByText("sharePractice.savedTitle")).toBeTruthy();
+    // The done screen names the link that was just shared.
+    expect(screen.getByText(DEMO_SAMPLES[1].pageHeading)).toBeTruthy();
   });
 
   it("counts one share once when the listener and the sheet both see it", async () => {

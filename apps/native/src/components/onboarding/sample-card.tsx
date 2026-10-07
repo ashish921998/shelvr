@@ -113,9 +113,9 @@ export function SampleRow({
   onPress,
 }: {
   sample: DemoSample;
-  icon: "plus" | "square.and.arrow.up";
+  icon: "plus" | "square.and.arrow.up" | "checkmark";
   disabled: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const { theme } = useUnistyles();
   return (

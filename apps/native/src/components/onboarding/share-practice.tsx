@@ -5,12 +5,19 @@ import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { presentShareSheet, useShareArrival } from "@/lib/share/share-sheet";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
-import { SampleCard, ShareHint } from "@/components/onboarding/sample-card";
+import {
+  SampleCard,
+  SampleRow,
+  ShareHint,
+} from "@/components/onboarding/sample-card";
+import { AppSymbolIcon } from "@/components/symbol";
+import { fadeIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import Animated from "react-native-reanimated";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** "received" means the share reached Shelvr and waits for the share
  * screen, which saves it after onboarding; nothing is saved here. */
@@ -40,6 +47,7 @@ export function SharePracticeStep({
   onFinish: () => void;
 }) {
   useAppLocale();
+  const { theme } = useUnistyles();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
@@ -109,6 +117,39 @@ export function SharePracticeStep({
     onFinish();
   };
 
+  if (received) {
+    return (
+      <View style={styles.wrap}>
+        <Animated.View entering={fadeIn} style={styles.done}>
+          <View style={styles.badge}>
+            <AppSymbolIcon
+              name="checkmark"
+              size={28}
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+          <Text
+            style={[styles.headline, styles.center]}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
+            {t("sharePractice.savedTitle")}
+          </Text>
+          <Text style={[styles.support, styles.center]}>
+            {t("sharePractice.savedBody")}
+          </Text>
+          {/* The link they just shared, so "it lands on your shelf" has
+              something to point at. */}
+          {sample === undefined ? null : (
+            <View style={styles.shared} pointerEvents="none">
+              <SampleRow sample={sample} icon="checkmark" disabled={false} />
+            </View>
+          )}
+        </Animated.View>
+        <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -116,47 +157,37 @@ export function SharePracticeStep({
           style={styles.headline}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         >
-          {t(received ? "sharePractice.savedTitle" : "sharePractice.title")}
+          {t("sharePractice.title")}
         </Text>
-        <Text style={styles.support}>
-          {t(received ? "sharePractice.savedBody" : "sharePractice.body")}
-        </Text>
+        <Text style={styles.support}>{t("sharePractice.body")}</Text>
       </View>
 
-      {received ? null : (
-        <>
-          {sample === undefined ? null : (
-            <SampleCard
-              sample={sample}
-              action="share"
-              disabled={sheetOpen}
-              onPress={() => void share()}
-            />
-          )}
-          {wrongApp ? (
-            <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
-          ) : null}
-          <ShareHint />
-          <Text style={styles.tip}>
-            {t(
-              Platform.OS === "ios"
-                ? "sharePractice.tipIos"
-                : "sharePractice.tipAndroid",
-            )}
-          </Text>
-        </>
+      {sample === undefined ? null : (
+        <SampleCard
+          sample={sample}
+          action="share"
+          disabled={sheetOpen}
+          onPress={() => void share()}
+        />
       )}
+      {wrongApp ? (
+        <Text style={styles.error}>{t("demo.pickShelvr")}</Text>
+      ) : null}
+      <ShareHint />
+      <Text style={styles.tip}>
+        {t(
+          Platform.OS === "ios"
+            ? "sharePractice.tipIos"
+            : "sharePractice.tipAndroid",
+        )}
+      </Text>
 
       <View style={styles.foot}>
-        {received ? (
-          <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
-        ) : (
-          <GhostButton
-            label={t("sharePractice.later")}
-            onPress={skip}
-            disabled={sheetOpen}
-          />
-        )}
+        <GhostButton
+          label={t("sharePractice.later")}
+          onPress={skip}
+          disabled={sheetOpen}
+        />
       </View>
     </View>
   );
@@ -196,5 +227,27 @@ const styles = StyleSheet.create((theme) => ({
   foot: {
     marginTop: "auto",
     gap: theme.gap(1),
+  },
+  done: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(1.5),
+  },
+  badge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.gap(1),
+    backgroundColor: theme.colors.primarySoft,
+  },
+  center: {
+    textAlign: "center",
+  },
+  shared: {
+    alignSelf: "stretch",
+    marginTop: theme.gap(2),
   },
 }));
