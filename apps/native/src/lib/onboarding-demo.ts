@@ -127,7 +127,8 @@ export function isDemoSample(url: string): boolean {
   return findSample(url) !== undefined;
 }
 
-function findSample(url: string): DemoSample | undefined {
+/** The ready-made sample behind a URL, a kind's or a topic's. */
+export function findSample(url: string): DemoSample | undefined {
   return [...DEMO_SAMPLES, ...INTEREST_SAMPLES].find(
     (sample) => sample.url === url,
   );

@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
-  DEMO_SAMPLES,
+  findSample,
   isDemoSample,
   type DemoKind,
   type DemoSample,
@@ -146,10 +146,7 @@ export function LiveDemoStep({
     const url = demo.savingUrl ?? "";
     return (
       <DemoPreviewView
-        title={
-          DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
-          displayHost(url)
-        }
+        title={findSample(url)?.pageHeading ?? displayHost(url)}
         url={url}
         onDone={demo.previewed}
       />
@@ -159,10 +156,7 @@ export function LiveDemoStep({
   // A previewed sample (or one restored after a relaunch) asks for sign-in
   // on its own screen. A previewed one keeps that screen up while its save
   // lands, then goes to the reveal; a restored one reads here like any other.
-  const authSample =
-    view === "auth"
-      ? DEMO_SAMPLES.find((sample) => sample.url === demo.authUrl)
-      : undefined;
+  const authSample = view === "auth" ? findSample(demo.authUrl) : undefined;
   if (authSample !== undefined) {
     return (
       <SampleSignIn
@@ -386,9 +380,7 @@ function DemoAuthSheet({
     });
     onCancel();
   };
-  const pageHeading =
-    DEMO_SAMPLES.find((sample) => sample.url === url)?.pageHeading ??
-    displayHost(url);
+  const pageHeading = findSample(url)?.pageHeading ?? displayHost(url);
 
   // A cancel keeps the sheet open: the auth session reports its own failures
   // as cancels, and closing on them reads as a button that does nothing.

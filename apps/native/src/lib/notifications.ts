@@ -1,4 +1,5 @@
 import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
@@ -96,17 +97,26 @@ export function NotificationSessionProvider({
             weeklyShelfEnabled: enabled,
             timezone: getNotificationTimezone(),
           }),
-        setSaveReminders: (enabled) =>
-          setSaveReminders({ enabled, timezone: getNotificationTimezone() }),
+        setSaveReminders: async (enabled) => {
+          await setSaveReminders({
+            enabled,
+            timezone: getNotificationTimezone(),
+          });
+          // The onboarding reminder is a save reminder too, so the switch
+          // turns it off with the rest.
+          if (!enabled) await clearFirstSaveReminder();
+        },
         signOut: async () => {
           // Before signOut, while the session can still authenticate it.
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearExitOfferReminder();
+          await clearFirstSaveReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
           await clearExitOfferReminder();
+          await clearFirstSaveReminder();
         },
         clearWidget: clearRecentSavesWidget,
         // Fallback for a failed post-deletion sign-out: no auth edge may fire

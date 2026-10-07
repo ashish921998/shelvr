@@ -5,7 +5,7 @@ import {
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
-import { DEMO_SAMPLES } from "@/lib/onboarding-demo";
+import { findSample } from "@/lib/onboarding-demo";
 import { getOnboardingProgress } from "@/lib/pending-onboarding";
 import {
   noteDeclinedDuringOnboarding,
@@ -142,8 +142,8 @@ export function RevealStep({
   // Its sample card stands in until then, so the result the preview showed
   // does not turn into a loading card.
   const sample =
-    item?.status === "processing"
-      ? DEMO_SAMPLES.find((candidate) => candidate.url === item.url)
+    item?.status === "processing" && item.url !== undefined
+      ? findSample(item.url)
       : undefined;
 
   return (

@@ -3,16 +3,17 @@ export const ONBOARDING_STEPS = [
   "interests",
   "setup",
   "demo",
+  "notifications",
   "reveal",
   "share",
 ] as const;
 // Sent with every step event. step_index means different steps in different
-// flows, so funnels split by this or filter on step_id. 3 added the source step.
-// 4 made the first save one tap on every platform, previews a ready-made
-// sample before sign-in, and added the share step. 5 dropped the source step,
-// and a previewed sample goes from sign-in straight to the reveal. 6 added
-// the interests step after the opener.
-export const ONBOARDING_FLOW_VERSION = 6;
+// flows, so funnels split by this or filter on step_id. 3 added the source step,
+// 4 the notifications step. 5 and 6 never shipped. 7 dropped the source step,
+// added the interests step after the opener and the share step at the end,
+// made the first save one tap on every platform, previews a ready-made sample
+// before sign-in, and takes a previewed sample from sign-in straight on.
+export const ONBOARDING_FLOW_VERSION = 7;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -23,6 +24,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   setup: "setup",
   interests: "interests",
   demo: "live_demo",
+  notifications: "notifications",
   reveal: "reveal",
   share: "share_practice",
 };
@@ -32,7 +34,8 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
   interests: "opener",
   setup: "interests",
-  reveal: "demo",
+  notifications: "demo",
+  reveal: "notifications",
   share: "reveal",
 };
 
