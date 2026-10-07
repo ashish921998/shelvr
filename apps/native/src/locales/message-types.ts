@@ -447,6 +447,10 @@ export type MessageParams = {
   "onboarding.newSpace": undefined;
   "onboarding.newSpacePlaceholder": undefined;
   "onboarding.sourceTitle": undefined;
+  "onboarding.notifyTitle": undefined;
+  "onboarding.notifyBody": undefined;
+  "onboarding.notifyNote": undefined;
+  "onboarding.notifyAllow": undefined;
   "onboarding.sourceFriend": undefined;
   "onboarding.sourceSharedLink": undefined;
   "onboarding.sourceAi": undefined;

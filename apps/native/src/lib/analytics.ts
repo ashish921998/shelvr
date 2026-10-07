@@ -278,6 +278,12 @@ type AnalyticsEventProperties = {
     misses: number;
     fallback: boolean;
   };
+  // The onboarding notifications step's answer. `granted` is what the OS
+  // reported after the tap; a skipped step (nothing to ask) sends nothing.
+  onboarding_notifications: {
+    action: "turn_on" | "not_now";
+    granted: boolean;
+  };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
