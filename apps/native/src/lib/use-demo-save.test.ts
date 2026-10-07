@@ -178,6 +178,8 @@ describe("useDemoSave", () => {
     expect(captured("onboarding_demo_result")).toEqual([
       ["onboarding_demo_result", { outcome: "error" }],
     ]);
+    // Saving after sign-in resumes the pick; it is not a second one.
+    expect(captured("onboarding_demo_picked")).toHaveLength(1);
 
     mock.setPendingDemo.mockClear();
     act(() => result.current.skip());

@@ -262,17 +262,19 @@ export function useDemoSave({
   const timedOut = watching && state.timedOutKey === deadlineKey;
 
   const submit = useCallback(
-    async (request: PendingDemo) => {
+    async (request: PendingDemo, resumed = false) => {
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
       const trimmed = { ...request, url };
       const sample = isDemoSample(url);
       // Fires before any sign-in, so the funnel shows a pick that never got
-      // past the sign-in sheet.
-      analytics.capture("onboarding_demo_picked", {
-        sample,
-        signed_in: isAuthenticated,
-      });
+      // past the sign-in sheet. Resuming after sign-in is not a new pick.
+      if (!resumed) {
+        analytics.capture("onboarding_demo_picked", {
+          sample,
+          signed_in: isAuthenticated,
+        });
+      }
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
@@ -363,7 +365,7 @@ export function useDemoSave({
   const awaitingAuth = state.phase === "auth";
   useEffect(() => {
     if (!isAuthenticated || !awaitingAuth || authRequest === null) return;
-    void submit(authRequest);
+    void submit(authRequest, true);
   }, [isAuthenticated, awaitingAuth, authRequest, submit]);
 
   const setError = useCallback(

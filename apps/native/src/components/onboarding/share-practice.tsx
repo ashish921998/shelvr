@@ -16,12 +16,12 @@ import { StyleSheet } from "react-native-unistyles";
  * screen, which saves it after onboarding; nothing is saved here. */
 type Outcome = "received" | "other_app" | "skipped" | "sheet_failed";
 
-function hasIncomingShare(): boolean {
+function sharedPayloadCount(): number {
   try {
-    return getSharedPayloads().length > 0;
+    return getSharedPayloads().length;
   } catch (err) {
     analytics.captureError("onboarding_share_practice_read_failed", err);
-    return false;
+    return 0;
   }
 }
 
@@ -44,6 +44,14 @@ export function SharePracticeStep({
   const [received, setReceived] = useState(false);
   const [wrongApp, setWrongApp] = useState(false);
   const reported = useRef(false);
+  const receivedRef = useRef(false);
+  // A share still waiting from before this step (one the demo left for the
+  // share screen) is not this practice share; only a new payload counts.
+  const [waiting] = useState(sharedPayloadCount);
+  const hasIncomingShare = useCallback(
+    () => sharedPayloadCount() > waiting,
+    [waiting],
+  );
 
   const report = useCallback((outcome: Outcome) => {
     if (outcome !== "other_app") {
@@ -53,7 +61,10 @@ export function SharePracticeStep({
     analytics.capture("onboarding_share_practice", { outcome });
   }, []);
 
+  // The foreground listener and the share result can both see one share.
   const markReceived = useCallback(() => {
+    if (receivedRef.current) return;
+    receivedRef.current = true;
     try {
       markPendingShareOnDevice();
     } catch (err) {
@@ -71,8 +82,8 @@ export function SharePracticeStep({
   // noticed when the app comes back rather than from the share result.
   useShareArrival(
     useCallback(() => {
-      if (!received && hasIncomingShare()) markReceived();
-    }, [received, markReceived]),
+      if (hasIncomingShare()) markReceived();
+    }, [hasIncomingShare, markReceived]),
     false,
   );
 
