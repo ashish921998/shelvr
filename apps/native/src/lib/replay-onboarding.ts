@@ -21,7 +21,7 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 
-// The onboarding reveal opens its own paywall. A purchase there can finish
+// Onboarding opens its own paywall after the reminder step. A purchase there can finish
 // onboarding before the webhook marks the user entitled, so replay must wait
 // for the entitlement instead of showing the paywall a second time. A user
 // who declined it there shouldn't see it again the moment Home appears; the

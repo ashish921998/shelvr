@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
+import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { isInterest } from "@/lib/onboarding-interests";
 import {
   featuredDemoKind,
@@ -37,7 +38,6 @@ import {
 import { InterestsStep } from "@/components/onboarding/interests";
 import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
-import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
 import { SharePracticeStep } from "@/components/onboarding/share-practice";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -55,7 +55,6 @@ const PROGRESS: Record<OnboardingStep, number | null> = {
   setup: 0.35,
   demo: 0.5,
   notifications: 0.75,
-  reveal: 0.88,
   share: 1,
 };
 const READING_PROGRESS = 0.625;
@@ -191,6 +190,15 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
+  const askPaywall = useOnboardingPaywall({
+    onPro: () => setStep("share"),
+    onDecline: finish,
+  });
+  const leaveReminder = () => {
+    recordCurrentStep();
+    askPaywall();
+  };
+
   if (showSignIn) {
     return (
       <SignInView
@@ -304,17 +312,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "notifications" && (
-            <NotificationsStep saved={saved} onAdvance={advance} />
-          )}
-
-          {step === "reveal" && (
-            <RevealStep
-              saved={saved}
-              restored={initialStep === "reveal"}
-              onSaved={setSaved}
-              onContinue={advance}
-              onFinish={finish}
-            />
+            <NotificationsStep saved={saved} onAdvance={leaveReminder} />
           )}
 
           {step === "share" && (

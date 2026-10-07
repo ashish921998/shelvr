@@ -159,6 +159,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow before the source step", { progressVersion: 2 }],
     ["the flow that had the source step", { progressVersion: 3 }],
     ["the flow before the interests step", { progressVersion: 4 }],
+    ["the flow that had the reveal step", { progressVersion: 5 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -182,7 +183,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 5,
+        progressVersion: 6,
         saveKinds: ["Travel"],
         step: 2,
         demo: { url: "https://example.com/trip", destination: null },

@@ -212,7 +212,6 @@ export type MessageParams = {
   "demo.repeatedFailure": undefined;
   "demo.tryLater": undefined;
   "demo.retryFailed": undefined;
-  "demo.partial": undefined;
   "demo.linkSaved": undefined;
   "demo.notFoundHelp": undefined;
   "demo.processingFailed": undefined;
@@ -492,16 +491,10 @@ export type MessageParams = {
   "demo.stepFiling": undefined;
   "demo.keepsGoing": undefined;
   "demo.eitherWay": undefined;
-  "reveal.title": undefined;
-  "reveal.subtitle": undefined;
   "reveal.previewTitle": undefined;
   "reveal.previewSubtitle": undefined;
   "reveal.saveShelf": undefined;
   "reveal.filedIn": { space: string };
-  "reveal.explainer": undefined;
-  "reveal.emptyTitle": undefined;
-  "reveal.emptySubtitle": undefined;
-  "reveal.emptyExplainer": undefined;
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;
   "weekly.previewTime": undefined;
