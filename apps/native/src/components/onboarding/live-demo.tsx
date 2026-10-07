@@ -39,6 +39,7 @@ export function LiveDemoStep({
   onSaved,
   onReadingChange,
   onBackChange,
+  onExit,
   onAdvance,
 }: {
   /** Ready-made links, the picked kinds first. */
@@ -51,6 +52,8 @@ export function LiveDemoStep({
   onReadingChange: (reading: boolean) => void;
   /** Hands the screen's back button what to do here, or null to hide it. */
   onBackChange: (back: (() => void) | null) => void;
+  /** Back from the picker: leave this step for the one before it. */
+  onExit: () => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -74,24 +77,31 @@ export function LiveDemoStep({
   }, [view, onReadingChange]);
 
   // The sign-in ask after a previewed sample goes back to the picker, the
-  // same as its "Not now". Nothing else in this step has a way back.
+  // same as its "Not now", and the picker goes back a step while nobody is
+  // signed in and nothing is saving. Nothing else here has a way back.
   const cancelAuthRef = useRef(demo.cancelAuth);
   useEffect(() => {
     cancelAuthRef.current = demo.cancelAuth;
   });
   const signInAsk =
     view === "auth" && !demo.isAuthenticated && isDemoSample(demo.authUrl);
+  const picking = view === "share" && !demo.isAuthenticated && !demo.submitting;
   useEffect(() => {
-    if (!signInAsk) return;
-    onBackChange(() => {
-      analytics.capture("onboarding_signin_prompt", {
-        surface: "sample_preview",
-        action: "dismissed",
+    if (signInAsk) {
+      onBackChange(() => {
+        analytics.capture("onboarding_signin_prompt", {
+          surface: "sample_preview",
+          action: "dismissed",
+        });
+        cancelAuthRef.current();
       });
-      cancelAuthRef.current();
-    });
+    } else if (picking) {
+      onBackChange(onExit);
+    } else {
+      return;
+    }
     return () => onBackChange(null);
-  }, [signInAsk, onBackChange]);
+  }, [signInAsk, picking, onBackChange, onExit]);
 
   // A paste saves at once when it holds a link and shows just that link.
   // Otherwise the text stays in the field so the user sees what was pasted.

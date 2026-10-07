@@ -87,6 +87,7 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
+  const exitDemo = useCallback(() => setStep("setup"), []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -275,6 +276,7 @@ export default function OnboardingScreen() {
               onSaved={setSaved}
               onReadingChange={setReading}
               onBackChange={changeDemoBack}
+              onExit={exitDemo}
               onAdvance={advance}
             />
           )}

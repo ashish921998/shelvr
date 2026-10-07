@@ -165,6 +165,7 @@ const props = {
   onSaved: vi.fn(),
   onReadingChange: vi.fn(),
   onBackChange: vi.fn(),
+  onExit: vi.fn(),
   onAdvance: vi.fn(),
 };
 const step = () => <LiveDemoStep {...props} />;
@@ -258,9 +259,11 @@ describe("first-save picker", () => {
     expect(screen.queryByText("sample-sign-in")).toBeNull();
     expect(screen.getByText("demo.signInTitle")).toBeTruthy();
   });
-  it("gives the screen a way back from a sample's sign-in ask, and none from the picker", () => {
+  it("gives the screen a way back from the picker and from a sample's sign-in ask, and none while reading", () => {
+    mock.demo.view = "share";
     const { rerender } = render(step());
-    expect(props.onBackChange).not.toHaveBeenCalled();
+    // From the picker, back leaves the step.
+    expect(props.onBackChange).toHaveBeenLastCalledWith(props.onExit);
 
     mock.demo.view = "auth";
     mock.demo.authUrl = DEMO_SAMPLES[0].url;
@@ -270,8 +273,7 @@ describe("first-save picker", () => {
     back?.();
     expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
 
-    // Back on the picker, the button goes away again.
-    mock.demo.view = "pick";
+    mock.demo.view = "reading";
     mock.demo.authUrl = "";
     rerender(step());
     expect(props.onBackChange).toHaveBeenLastCalledWith(null);
