@@ -102,3 +102,12 @@ export async function scheduleFirstSaveReminder({
     },
   });
 }
+
+/**
+ * Drops the reminder, scheduled or already shown. It names a save, so it must
+ * not outlive the account that made it.
+ */
+export async function clearFirstSaveReminder(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(FIRST_SAVE_REMINDER_ID);
+  await Notifications.dismissNotificationAsync(FIRST_SAVE_REMINDER_ID);
+}

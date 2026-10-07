@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearFirstSaveReminder,
   FIRST_SAVE_REMINDER_ID,
   reminderOptions,
   scheduleFirstSaveReminder,
@@ -7,10 +8,12 @@ import {
 
 const notifications = vi.hoisted(() => ({
   cancel: vi.fn(),
+  dismiss: vi.fn(),
   schedule: vi.fn(),
 }));
 vi.mock("expo-notifications", () => ({
   cancelScheduledNotificationAsync: notifications.cancel,
+  dismissNotificationAsync: notifications.dismiss,
   scheduleNotificationAsync: notifications.schedule,
   SchedulableTriggerInputTypes: { DATE: "date" },
 }));
@@ -98,5 +101,13 @@ describe("scheduleFirstSaveReminder", () => {
       },
       trigger: { type: "date", date: at(7, 20), channelId: "save-reminders" },
     });
+  });
+});
+
+describe("clearFirstSaveReminder", () => {
+  it("cancels the scheduled reminder and removes a delivered one", async () => {
+    await clearFirstSaveReminder();
+    expect(notifications.cancel).toHaveBeenCalledWith(FIRST_SAVE_REMINDER_ID);
+    expect(notifications.dismiss).toHaveBeenCalledWith(FIRST_SAVE_REMINDER_ID);
   });
 });

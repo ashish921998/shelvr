@@ -1,4 +1,5 @@
 import { clearExitOfferReminder } from "@/lib/exit-offer-reminder";
+import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
@@ -103,10 +104,12 @@ export function NotificationSessionProvider({
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
           await clearExitOfferReminder();
+          await clearFirstSaveReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
           await clearExitOfferReminder();
+          await clearFirstSaveReminder();
         },
         clearWidget: clearRecentSavesWidget,
         // Fallback for a failed post-deletion sign-out: no auth edge may fire
