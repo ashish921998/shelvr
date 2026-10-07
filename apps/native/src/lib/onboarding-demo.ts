@@ -1,3 +1,8 @@
+import {
+  INTEREST_PAGES,
+  INTERESTS,
+  type Interest,
+} from "@/lib/onboarding-interests";
 import { SPACE_PRESETS, type SaveKind } from "@/lib/save-kinds";
 
 // Real pages, checked to fetch with a 200 and an og:title, so the demo runs the
@@ -10,6 +15,8 @@ export type DemoKind = Extract<
 
 export type DemoSample = {
   kind: DemoKind;
+  /** Set on a topic's sample, which files into that topic's space. */
+  interest?: Interest;
   url: string;
   pageHeading: string;
   domain: string;
@@ -48,25 +55,48 @@ export const DEMO_SAMPLES: readonly DemoSample[] = [
   },
 ];
 
+const INTEREST_SAMPLES: readonly DemoSample[] = INTERESTS.map((interest) => ({
+  kind: "Articles",
+  interest,
+  ...INTEREST_PAGES[interest],
+}));
+
 const SAMPLE_COUNT = 3;
 
-/** The demo's ready-made links: the picked kinds' samples first. */
-export function orderDemoSamples(kinds: readonly SaveKind[]): DemoSample[] {
+/** The demo's ready-made links. The first picked kind's sample leads, the
+ * picked topics' samples follow it, then the other picked kinds, then the
+ * rest, so both setup answers show on a three-link screen. */
+export function orderDemoSamples(
+  kinds: readonly SaveKind[],
+  interests: readonly Interest[] = [],
+): DemoSample[] {
   const rank = (sample: DemoSample) => {
     const index = kinds.indexOf(sample.kind);
     return index === -1 ? kinds.length : index;
   };
-  return [...DEMO_SAMPLES]
-    .sort((a, b) => rank(a) - rank(b))
-    .slice(0, SAMPLE_COUNT);
+  const byKind = [...DEMO_SAMPLES].sort((a, b) => rank(a) - rank(b));
+  const lead = byKind.filter((sample) => kinds.includes(sample.kind));
+  const topical = interests.flatMap((interest) =>
+    INTEREST_SAMPLES.filter((sample) => sample.interest === interest),
+  );
+  return [
+    ...lead.slice(0, 1),
+    ...topical,
+    ...lead.slice(1),
+    ...byKind.filter((sample) => !kinds.includes(sample.kind)),
+  ].slice(0, SAMPLE_COUNT);
 }
 
 /** The kind the picker's headline names: the leading sample's, when setup
  * picked it. Null when nothing picked has a sample, and the headline says
  * "link". */
-export function featuredDemoKind(kinds: readonly SaveKind[]): DemoKind | null {
-  const featured = orderDemoSamples(kinds)[0];
-  return featured !== undefined && kinds.includes(featured.kind)
+export function featuredDemoKind(
+  kinds: readonly SaveKind[],
+  interests: readonly Interest[] = [],
+): DemoKind | null {
+  const featured = orderDemoSamples(kinds, interests)[0];
+  if (featured === undefined) return null;
+  return featured.interest !== undefined || kinds.includes(featured.kind)
     ? featured.kind
     : null;
 }
@@ -87,17 +117,27 @@ export function practiceShareSample(
 
 /** A ready-made sample, which the demo can preview before sign-in. */
 export function isDemoSample(url: string): boolean {
-  return DEMO_SAMPLES.some((sample) => sample.url === url);
+  return findSample(url) !== undefined;
 }
 
-/** A sample files into its kind's first preset space when the user kept that
- * space. Any other link is left to the classifier. */
+function findSample(url: string): DemoSample | undefined {
+  return [...DEMO_SAMPLES, ...INTEREST_SAMPLES].find(
+    (sample) => sample.url === url,
+  );
+}
+
+/** A topic's sample files into that topic's space, and any other sample into
+ * its kind's first preset space, when the user kept that space. Any other
+ * link is left to the classifier. */
 export function demoDestination(
   url: string,
   spaces: readonly string[],
 ): string | null {
-  const sample = DEMO_SAMPLES.find((candidate) => candidate.url === url);
+  const sample = findSample(url);
   if (!sample) return null;
+  if (sample.interest !== undefined && spaces.includes(sample.interest)) {
+    return sample.interest;
+  }
   const preset = SPACE_PRESETS[sample.kind][0];
   return spaces.includes(preset) ? preset : null;
 }

@@ -21,6 +21,14 @@ const LABELS: Record<string, TextMessageKey> = {
   Workouts: "presets.workouts",
   Ideas: "presets.ideas",
   "Watch later": "presets.watchLater",
+  Coffee: "interests.coffee",
+  AI: "interests.ai",
+  Tech: "interests.tech",
+  Startups: "interests.startups",
+  Business: "interests.business",
+  "Interior design": "interests.interiorDesign",
+  Architecture: "interests.architecture",
+  Books: "interests.books",
 };
 
 export function onboardingLabel(id: string): string {

@@ -343,6 +343,16 @@ export type MessageParams = {
   "presets.workouts": undefined;
   "presets.ideas": undefined;
   "presets.watchLater": undefined;
+  "interests.title": undefined;
+  "interests.help": undefined;
+  "interests.coffee": undefined;
+  "interests.ai": undefined;
+  "interests.tech": undefined;
+  "interests.startups": undefined;
+  "interests.business": undefined;
+  "interests.interiorDesign": undefined;
+  "interests.architecture": undefined;
+  "interests.books": undefined;
   "albums.allPhotos": undefined;
   "appearance.system": undefined;
   "appearance.light": undefined;

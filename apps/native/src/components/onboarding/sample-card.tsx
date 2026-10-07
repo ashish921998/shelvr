@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { DemoKind, DemoSample } from "@/lib/onboarding-demo";
+import type { Interest } from "@/lib/onboarding-interests";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
@@ -16,6 +17,20 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   Videos: require("../../../assets/onboarding/videos.jpg"),
 };
+// Topics with a picture of their own; the rest use their kind's.
+const INTEREST_IMAGES: Partial<Record<Interest, number>> = {
+  Coffee: require("../../../assets/onboarding/espresso.jpg"),
+  "Interior design": require("../../../assets/onboarding/sofa.jpg"),
+  Books: require("../../../assets/onboarding/book.jpg"),
+};
+
+function sampleImage(sample: DemoSample): number {
+  return (
+    (sample.interest === undefined
+      ? undefined
+      : INTEREST_IMAGES[sample.interest]) ?? SAMPLE_IMAGES[sample.kind]
+  );
+}
 
 /** An illustration of the share gesture, not a control. */
 export function ShareHint() {
@@ -80,7 +95,7 @@ export function SampleCard({
       ]}
     >
       <Image
-        source={SAMPLE_IMAGES[sample.kind]}
+        source={sampleImage(sample)}
         contentFit="cover"
         style={styles.postImage}
       />
@@ -131,7 +146,7 @@ export function SampleRow({
       ]}
     >
       <Image
-        source={SAMPLE_IMAGES[sample.kind]}
+        source={sampleImage(sample)}
         contentFit="cover"
         style={styles.sampleThumb}
       />

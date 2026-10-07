@@ -238,6 +238,8 @@ type AnalyticsEventProperties = {
     save_pileup: string[];
     // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
+    // The interests step's picked topics. Each is also one of the spaces.
+    interests: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];

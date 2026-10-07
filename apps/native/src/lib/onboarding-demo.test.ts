@@ -22,6 +22,30 @@ describe("orderDemoSamples", () => {
   });
 });
 
+describe("samples for picked topics", () => {
+  it("follows the first picked kind's sample with the topics' samples", () => {
+    expect(
+      orderDemoSamples(["Recipes", "Travel"], ["AI", "Coffee"]).map(
+        (s) => s.domain,
+      ),
+    ).toEqual(["bbcgoodfood.com", "anthropic.com", "jameshoffmann.co.uk"]);
+  });
+
+  it("leads with a topic when no picked kind has a sample", () => {
+    expect(orderDemoSamples(["Fitness"], ["Coffee"])[0]?.domain).toBe(
+      "jameshoffmann.co.uk",
+    );
+    expect(featuredDemoKind(["Fitness"], ["Coffee"])).toBe("Articles");
+  });
+
+  it("files a topic's sample into that topic's space when it was kept", () => {
+    const url = "https://www.jameshoffmann.co.uk/weird-coffee-science";
+    expect(demoDestination(url, ["Coffee", "Articles"])).toBe("Coffee");
+    expect(demoDestination(url, ["Articles"])).toBe("Articles");
+    expect(demoDestination(url, [])).toBeNull();
+  });
+});
+
 describe("featuredDemoKind", () => {
   it("names the leading sample's kind when setup picked it", () => {
     expect(featuredDemoKind(["Fitness", "Videos", "Recipes"])).toBe("Videos");

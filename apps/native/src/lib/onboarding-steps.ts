@@ -1,6 +1,7 @@
 export const ONBOARDING_STEPS = [
   "opener",
   "setup",
+  "interests",
   "demo",
   "reveal",
   "share",
@@ -9,8 +10,9 @@ export const ONBOARDING_STEPS = [
 // flows, so funnels split by this or filter on step_id. 3 added the source step.
 // 4 made the first save one tap on every platform, previews a ready-made
 // sample before sign-in, and added the share step. 5 dropped the source step,
-// and a previewed sample goes from sign-in straight to the reveal.
-export const ONBOARDING_FLOW_VERSION = 5;
+// and a previewed sample goes from sign-in straight to the reveal. 6 added
+// the interests step after setup.
+export const ONBOARDING_FLOW_VERSION = 6;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -19,6 +21,7 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
   setup: "setup",
+  interests: "interests",
   demo: "live_demo",
   reveal: "reveal",
   share: "share_practice",
@@ -28,6 +31,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
 // which of its screens is up, so the step tells the screen itself.
 const PREVIOUS_STEP: Partial<Record<OnboardingStep, OnboardingStep>> = {
   setup: "opener",
+  interests: "setup",
   reveal: "demo",
   share: "reveal",
 };

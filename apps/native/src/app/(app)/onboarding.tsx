@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
+import { isInterest } from "@/lib/onboarding-interests";
 import {
   featuredDemoKind,
   orderDemoSamples,
@@ -33,6 +34,7 @@ import {
   LiveDemoStep,
   type DemoSaved,
 } from "@/components/onboarding/live-demo";
+import { InterestsStep } from "@/components/onboarding/interests";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
@@ -48,7 +50,8 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  setup: 0.25,
+  setup: 0.2,
+  interests: 0.35,
   demo: 0.5,
   reveal: 0.85,
   share: 1,
@@ -91,12 +94,14 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
-  const exitDemo = useCallback(() => setStep("setup"), []);
+  const exitDemo = useCallback(() => setStep("interests"), []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+  // A picked topic is a picked space, so the topics need no state of their own.
+  const interests = spaces.filter(isInterest);
 
   useEffect(() => {
     setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
@@ -172,6 +177,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_completed", {
       save_pileup: [],
       save_types: kinds,
+      interests,
       space_count: spaces.length,
       space_names: spaces.filter(isPresetSpace),
       custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
@@ -272,10 +278,18 @@ export default function OnboardingScreen() {
             />
           )}
 
+          {step === "interests" && (
+            <InterestsStep
+              picked={interests}
+              onToggle={toggleSpace}
+              onAdvance={advance}
+            />
+          )}
+
           {step === "demo" && (
             <LiveDemoStep
-              samples={orderDemoSamples(kinds)}
-              titleKind={featuredDemoKind(kinds)}
+              samples={orderDemoSamples(kinds, interests)}
+              titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
               resume={initialStep === "demo" ? initialProgress.demo : null}
               alreadySaved={saved !== null}
