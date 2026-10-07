@@ -1,6 +1,10 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
-import { DEMO_SAMPLES, type DemoSample } from "@/lib/onboarding-demo";
+import {
+  DEMO_SAMPLES,
+  isDemoSample,
+  type DemoSample,
+} from "@/lib/onboarding-demo";
 import type { PendingDemo } from "@/lib/pending-onboarding";
 import { displayHost } from "@/lib/url";
 import { useDemoSave, linkFromText, type DemoSaved } from "@/lib/use-demo-save";
@@ -18,7 +22,7 @@ import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import * as Clipboard from "expo-clipboard";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -34,6 +38,7 @@ export function LiveDemoStep({
   resume,
   onSaved,
   onReadingChange,
+  onBackChange,
   onAdvance,
 }: {
   /** Ready-made links, the picked kinds first. */
@@ -44,6 +49,8 @@ export function LiveDemoStep({
   resume: PendingDemo | null;
   onSaved: (saved: DemoSaved) => void;
   onReadingChange: (reading: boolean) => void;
+  /** Hands the screen's back button what to do here, or null to hide it. */
+  onBackChange: (back: (() => void) | null) => void;
   onAdvance: () => void;
 }) {
   useAppLocale();
@@ -65,6 +72,26 @@ export function LiveDemoStep({
   useEffect(() => {
     onReadingChange(view === "reading" || view === "preview");
   }, [view, onReadingChange]);
+
+  // The sign-in ask after a previewed sample goes back to the picker, the
+  // same as its "Not now". Nothing else in this step has a way back.
+  const cancelAuthRef = useRef(demo.cancelAuth);
+  useEffect(() => {
+    cancelAuthRef.current = demo.cancelAuth;
+  });
+  const signInAsk =
+    view === "auth" && !demo.isAuthenticated && isDemoSample(demo.authUrl);
+  useEffect(() => {
+    if (!signInAsk) return;
+    onBackChange(() => {
+      analytics.capture("onboarding_signin_prompt", {
+        surface: "sample_preview",
+        action: "dismissed",
+      });
+      cancelAuthRef.current();
+    });
+    return () => onBackChange(null);
+  }, [signInAsk, onBackChange]);
 
   // A paste saves at once when it holds a link and shows just that link.
   // Otherwise the text stays in the field so the user sees what was pasted.

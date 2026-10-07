@@ -164,6 +164,7 @@ const props = {
   resume: null,
   onSaved: vi.fn(),
   onReadingChange: vi.fn(),
+  onBackChange: vi.fn(),
   onAdvance: vi.fn(),
 };
 const step = () => <LiveDemoStep {...props} />;
@@ -256,5 +257,23 @@ describe("first-save picker", () => {
     rerender(step());
     expect(screen.queryByText("sample-sign-in")).toBeNull();
     expect(screen.getByText("demo.signInTitle")).toBeTruthy();
+  });
+  it("gives the screen a way back from a sample's sign-in ask, and none from the picker", () => {
+    const { rerender } = render(step());
+    expect(props.onBackChange).not.toHaveBeenCalled();
+
+    mock.demo.view = "auth";
+    mock.demo.authUrl = DEMO_SAMPLES[0].url;
+    rerender(step());
+    const back = props.onBackChange.mock.lastCall?.[0] as (() => void) | null;
+    expect(back).toBeTypeOf("function");
+    back?.();
+    expect(mock.actions.cancelAuth).toHaveBeenCalledTimes(1);
+
+    // Back on the picker, the button goes away again.
+    mock.demo.view = "pick";
+    mock.demo.authUrl = "";
+    rerender(step());
+    expect(props.onBackChange).toHaveBeenLastCalledWith(null);
   });
 });

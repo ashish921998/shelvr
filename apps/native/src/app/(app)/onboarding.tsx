@@ -82,6 +82,11 @@ export default function OnboardingScreen() {
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [demoBack, setDemoBack] = useState<(() => void) | null>(null);
+  const changeDemoBack = useCallback(
+    (back: (() => void) | null) => setDemoBack(() => back),
+    [],
+  );
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -185,13 +190,18 @@ export default function OnboardingScreen() {
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
   const previous = previousOnboardingStep(step);
+  const goBack = previous
+    ? () => setStep(previous)
+    : step === "demo"
+      ? demoBack
+      : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        {previous ? (
+        {goBack ? (
           <Pressable
-            onPress={() => setStep(previous)}
+            onPress={goBack}
             accessibilityRole="button"
             accessibilityLabel={t("common.back")}
             hitSlop={12}
@@ -264,6 +274,7 @@ export default function OnboardingScreen() {
               resume={initialStep === "demo" ? initialProgress.demo : null}
               onSaved={setSaved}
               onReadingChange={setReading}
+              onBackChange={changeDemoBack}
               onAdvance={advance}
             />
           )}
