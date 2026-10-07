@@ -500,7 +500,7 @@
   "onboarding.newSpace": "+ New",
   "onboarding.newSpacePlaceholder": "Space name",
   "demo.shareHelp": "Later, in any app: tap Share, then Shelvr.",
-  "demo.privacyNote": "We never post anything or read your messages.",
+  "demo.privacyNote": "We only use this to sign you in.",
   "demo.stepSaved": "Saved to your shelf",
   "demo.stepReading": "Reading the post",
   "demo.stepTitling": "Titling and tagging",
