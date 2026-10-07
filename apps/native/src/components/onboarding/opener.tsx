@@ -137,14 +137,7 @@ export function OpenerStep({
       style={styles.foot}
       onLayout={(event) => setFootHeight(event.nativeEvent.layout.height)}
     >
-      <View style={[styles.proLine, largeText && styles.proLineStacked]}>
-        <View style={styles.proPill}>
-          <Text style={styles.proPillText}>Pro</Text>
-        </View>
-        <Text style={[styles.proText, largeText && styles.proTextStacked]}>
-          {t("onboarding.proLine")}
-        </Text>
-      </View>
+      <Text style={styles.proText}>{t("onboarding.proLine")}</Text>
       <CtaButton label={t("onboarding.startYours")} onPress={onStart} />
       {largeText ? null : signIn}
     </View>
@@ -312,36 +305,11 @@ const styles = StyleSheet.create((theme) => ({
   foot: {
     gap: theme.gap(1.5),
   },
-  proLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.gap(1),
-  },
-  proLineStacked: {
-    flexDirection: "column",
-  },
-  proPill: {
-    paddingHorizontal: theme.gap(0.75),
-    paddingVertical: 2,
-    borderRadius: 50,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  proPillText: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 11,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: theme.colors.primaryText,
-  },
   proText: {
-    flexShrink: 1,
     fontFamily: theme.fonts.regular,
     fontSize: 13,
-    color: theme.colors.muted,
-  },
-  proTextStacked: {
     textAlign: "center",
+    color: theme.colors.muted,
   },
   signIn: {
     minHeight: 44,
