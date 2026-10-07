@@ -9,7 +9,7 @@ import {
   notificationPermissionState,
   requestNotificationPermission,
 } from "@/lib/notification-token";
-import { GhostButton, HoldButton } from "@/components/onboarding/parts";
+import { CtaButton, GhostButton } from "@/components/onboarding/parts";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
@@ -239,18 +239,14 @@ export function NotificationsStep({
       </View>
 
       <View style={styles.foot}>
-        {/* The person's own promise, held to agree. Shelvr schedules nothing
-            for Sundays here, so the line promises nothing on the app's side. */}
+        {/* The person's own promise. Shelvr schedules nothing for Sundays
+            here, so the line promises nothing on the app's side. */}
         <Text style={styles.pledge}>{t("onboarding.remindPledge")}</Text>
-        <HoldButton
-          // A refreshed or changed choice starts a fresh hold.
-          key={choice.at.getTime()}
+        <CtaButton
           label={t(SLOT_CTA[choice.slot])}
-          hint={t("onboarding.remindHoldHint")}
-          onComplete={() => void remind()}
+          onPress={() => void remind()}
           busy={busy}
         />
-        <Text style={styles.holdHint}>{t("onboarding.remindHoldHint")}</Text>
         <GhostButton
           label={t("onboarding.remindSkip")}
           onPress={skip}
@@ -367,12 +363,6 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     color: theme.colors.foreground,
     marginBottom: theme.gap(0.5),
-  },
-  holdHint: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    textAlign: "center",
-    color: theme.colors.muted,
   },
   foot: {
     marginTop: "auto",

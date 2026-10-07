@@ -28,11 +28,6 @@ const mock = vi.hoisted(() => ({
       {label}
     </button>
   ),
-  hold: ({ label, onComplete }: { label: string; onComplete: () => void }) => (
-    <button type="button" onClick={onComplete}>
-      {label}
-    </button>
-  ),
   empty: () => null,
 }));
 
@@ -68,7 +63,7 @@ vi.mock("@/lib/first-save-reminder", async (importOriginal) => ({
   scheduleFirstSaveReminder: mock.schedule,
 }));
 vi.mock("@/components/onboarding/parts", () => ({
-  HoldButton: mock.hold,
+  CtaButton: mock.button,
   GhostButton: mock.button,
 }));
 vi.mock("@convex/_generated/api", () => ({
