@@ -27,6 +27,9 @@ const mock = vi.hoisted(() => ({
     </button>
   ),
   nothing: () => null,
+  row: ({ sample }: { sample: { pageHeading: string } }) => (
+    <div>{sample.pageHeading}</div>
+  ),
 }));
 
 vi.mock("react-native", () => ({
@@ -68,9 +71,7 @@ vi.mock("@/components/onboarding/parts", () => ({
 }));
 vi.mock("@/components/onboarding/sample-card", () => ({
   SampleCard: mock.card,
-  SampleRow: ({ sample }: { sample: { pageHeading: string } }) => (
-    <div>{sample.pageHeading}</div>
-  ),
+  SampleRow: mock.row,
   ShareHint: mock.nothing,
 }));
 
