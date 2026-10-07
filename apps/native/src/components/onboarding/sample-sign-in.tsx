@@ -56,9 +56,8 @@ export function SampleSignIn({
         >
           {t("reveal.saveShelf")}
         </Text>
-        <Text style={styles.support}>{t("demo.signInHelp")}</Text>
-        <View pointerEvents={saving ? "none" : "auto"}>
-          <SignInButtons oauth={oauth} />
+        <View style={styles.buttons} pointerEvents={saving ? "none" : "auto"}>
+          <SignInButtons oauth={oauth} privacyNote={false} />
         </View>
       </View>
     </View>
@@ -91,15 +90,12 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     color: theme.colors.primaryText,
   },
-  support: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
-    color: theme.colors.muted,
-  },
   foot: {
     marginTop: "auto",
-    gap: theme.gap(1),
+    gap: theme.gap(2),
+  },
+  buttons: {
+    gap: theme.gap(1.5),
   },
   saveShelf: {
     fontFamily: theme.fonts.display,

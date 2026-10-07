@@ -5,13 +5,15 @@ import { GhostButton } from "@/components/onboarding/parts";
 import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Apple (iOS), Google and the dev login, with the failure line and the
- * privacy note. The caller owns the OAuth state, so a sheet can stay open
- * while a sign-in is in flight. */
+/** Apple (iOS), Google and the dev login, with the failure line and, unless
+ * the caller leaves it out, the privacy note. The caller owns the OAuth
+ * state, so a sheet can stay open while a sign-in is in flight. */
 export function SignInButtons({
   oauth,
+  privacyNote = true,
 }: {
   oauth: ReturnType<typeof useOAuthSignIn>;
+  privacyNote?: boolean;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -70,7 +72,9 @@ export function SignInButtons({
           testID="onboarding-dev-login"
         />
       ) : null}
-      <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
+      {privacyNote ? (
+        <Text style={styles.privacy}>{t("demo.privacyNote")}</Text>
+      ) : null}
     </>
   );
 }
