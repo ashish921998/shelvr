@@ -43,7 +43,7 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("react-native-reanimated", () => ({
   default: { View: mock.view, Text: mock.text },
 }));
-vi.mock("@/lib/motion", () => ({ riseIn: () => ({}) }));
+vi.mock("@/lib/motion", () => ({ settleIn: () => ({}) }));
 vi.mock("@/components/onboarding/celebration", () => ({
   CelebrationBadge: mock.nothing,
 }));

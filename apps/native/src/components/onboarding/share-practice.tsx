@@ -11,7 +11,7 @@ import {
   ShareHint,
 } from "@/components/onboarding/sample-card";
 import { CelebrationBadge } from "@/components/onboarding/celebration";
-import { riseIn } from "@/lib/motion";
+import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
@@ -19,12 +19,12 @@ import { Platform, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-// The done screen arrives in beats: the badge pops, then the words, then the
+// The done screen arrives in beats: the badge settles, then the words, then the
 // shared link lands, then the way on.
-const RISE_TITLE = riseIn(260);
-const RISE_BODY = riseIn(380);
-const RISE_ROW = riseIn(620);
-const RISE_CTA = riseIn(900);
+const SETTLE_TITLE = settleIn(200);
+const SETTLE_BODY = settleIn(350);
+const SETTLE_ROW = settleIn(600);
+const SETTLE_CTA = settleIn(850);
 
 /** "received" means the share reached Shelvr and waits for the share
  * screen, which saves it after onboarding; nothing is saved here. */
@@ -129,14 +129,14 @@ export function SharePracticeStep({
         <View style={styles.done}>
           <CelebrationBadge />
           <Animated.Text
-            entering={RISE_TITLE}
+            entering={SETTLE_TITLE}
             style={[styles.doneTitle, styles.center]}
             maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
           >
             {t("sharePractice.savedTitle")}
           </Animated.Text>
           <Animated.Text
-            entering={RISE_BODY}
+            entering={SETTLE_BODY}
             style={[styles.support, styles.center]}
           >
             {t("sharePractice.savedBody")}
@@ -145,7 +145,7 @@ export function SharePracticeStep({
               something to point at. */}
           {sample === undefined ? null : (
             <Animated.View
-              entering={RISE_ROW}
+              entering={SETTLE_ROW}
               style={styles.shared}
               pointerEvents="none"
             >
@@ -153,7 +153,7 @@ export function SharePracticeStep({
             </Animated.View>
           )}
         </View>
-        <Animated.View entering={RISE_CTA}>
+        <Animated.View entering={SETTLE_CTA}>
           <CtaButton label={t("sharePractice.toShelf")} onPress={onFinish} />
         </Animated.View>
       </View>
