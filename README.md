@@ -177,7 +177,7 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 
 `apps/e2e` drives the development build through four flows with the
 [e2e](https://github.com/tester-army/e2e) framework: save a link, save a photo,
-create a space, and search. Save-a-link is scripted with plain locators; the other three reach their goal through an `agent.act` step. It is not part of `pnpm run check` or CI yet.
+create a space, and search. Search and create-a-space use plain locators and need no model. Save-a-link uses locators for its steps and one model call to read the result. Save-a-photo reaches its goal through an `agent.act` step, because the system photo picker is not in the accessibility tree. It is not part of `pnpm run check` or CI yet.
 
 It needs a booted iOS simulator with the development build
 (`app.shelvr.save.dev`) installed, `apps/native/.env.local` pointing at the dev
