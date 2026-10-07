@@ -404,6 +404,9 @@ export function useDemoSave({
     }
   };
 
+  // Stable, since the preview's step timer restarts when its onDone changes.
+  const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
+
   const continueAfterTimeout = () => {
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
@@ -447,7 +450,7 @@ export function useDemoSave({
     cancelAuth,
     retry,
     submitSharedUrl,
-    previewed: () => dispatch({ type: "previewed" }),
+    previewed,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

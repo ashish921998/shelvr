@@ -426,6 +426,11 @@ describe("useDemoSave", () => {
 
     expect(mock.create).not.toHaveBeenCalled();
 
+    // The preview's step timer depends on this staying the same.
+    const previewed = result.current.previewed;
+    rerender();
+    expect(result.current.previewed).toBe(previewed);
+
     // The preview ends on the sign-in ask, with the same request.
     act(() => result.current.previewed());
     expect(result.current.view).toBe("auth");
