@@ -15,24 +15,37 @@ const SAMPLE_IMAGES: Record<DemoKind, number> = {
   Recipes: require("../../../assets/onboarding/demo-recipe.jpg"),
   Products: require("../../../assets/onboarding/demo-product.jpg"),
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
-  Videos: require("../../../assets/onboarding/videos.jpg"),
+  Videos: require("../../../assets/onboarding/topic-talk.jpg"),
 };
-// Topics with a picture of their own; the rest use their kind's.
-const INTEREST_IMAGES: Partial<Record<Interest, number>> = {
-  Coffee: require("../../../assets/onboarding/espresso.jpg"),
+// Each topic's picture. The topic photos are from Unsplash, under its free
+// licence.
+const INTEREST_IMAGES: Record<Interest, number> = {
+  AI: require("../../../assets/onboarding/topic-ai.jpg"),
+  Tech: require("../../../assets/onboarding/topic-tech.jpg"),
+  Startups: require("../../../assets/onboarding/topic-startups.jpg"),
+  Business: require("../../../assets/onboarding/topic-business.jpg"),
+  Money: require("../../../assets/onboarding/topic-money.jpg"),
+  Productivity: require("../../../assets/onboarding/topic-productivity.jpg"),
+  Design: require("../../../assets/onboarding/topic-design.jpg"),
   "Interior design": require("../../../assets/onboarding/sofa.jpg"),
-  Books: require("../../../assets/onboarding/book.jpg"),
+  Architecture: require("../../../assets/onboarding/topic-architecture.jpg"),
+  Photography: require("../../../assets/onboarding/topic-photography.jpg"),
   Films: require("../../../assets/onboarding/videos.jpg"),
+  Anime: require("../../../assets/onboarding/topic-anime.jpg"),
+  Music: require("../../../assets/onboarding/topic-music.jpg"),
+  Gaming: require("../../../assets/onboarding/topic-gaming.jpg"),
+  Books: require("../../../assets/onboarding/book.jpg"),
+  Science: require("../../../assets/onboarding/topic-science.jpg"),
+  Coffee: require("../../../assets/onboarding/espresso.jpg"),
   Travel: require("../../../assets/onboarding/demo-travel.jpg"),
   Fitness: require("../../../assets/onboarding/fitness.jpg"),
+  Wellness: require("../../../assets/onboarding/topic-wellness.jpg"),
 };
 
 function sampleImage(sample: DemoSample): number {
-  return (
-    (sample.interest === undefined
-      ? undefined
-      : INTEREST_IMAGES[sample.interest]) ?? SAMPLE_IMAGES[sample.kind]
-  );
+  return sample.interest === undefined
+    ? SAMPLE_IMAGES[sample.kind]
+    : INTEREST_IMAGES[sample.interest];
 }
 
 /** An illustration of the share gesture, not a control. */
