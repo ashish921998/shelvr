@@ -10,14 +10,13 @@ import {
   requestNotificationPermission,
 } from "@/lib/notification-token";
 import { CtaButton, GhostButton } from "@/components/onboarding/parts";
+import { SaveSummary } from "@/components/onboarding/save-summary";
 import type { DemoSaved } from "@/components/onboarding/live-demo";
-import { AppSymbolIcon } from "@/components/symbol";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -180,38 +179,16 @@ export function NotificationsStep({
         </Text>
       </Text>
 
-      <View style={styles.save}>
-        <View style={styles.thumb}>
-          {image ? (
-            <Image
-              source={image}
-              style={styles.thumbImage}
-              contentFit="cover"
-            />
-          ) : (
-            <AppSymbolIcon
-              name="link"
-              size={18}
-              tintColor={theme.colors.primaryText}
-            />
-          )}
-        </View>
-        <View style={styles.saveText}>
-          <Text style={styles.saveTitle} numberOfLines={2}>
-            {title || t("onboarding.remindFallbackTitle")}
-          </Text>
-          <Text style={styles.saveMeta} numberOfLines={1}>
-            {host
-              ? `${host} · ${t("onboarding.remindSavedNow")}`
-              : t("onboarding.remindSavedNow")}
-          </Text>
-          {tag ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
+      <SaveSummary
+        image={image}
+        title={title || t("onboarding.remindFallbackTitle")}
+        meta={
+          host
+            ? `${host} · ${t("onboarding.remindSavedNow")}`
+            : t("onboarding.remindSavedNow")
+        }
+        tag={tag}
+      />
 
       <View
         accessibilityRole="radiogroup"
@@ -276,59 +253,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   headlineAccent: {
     color: theme.colors.primaryText,
-  },
-  save: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(2),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  thumb: {
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primarySoft,
-  },
-  thumbImage: {
-    width: "100%",
-    height: "100%",
-  },
-  saveText: {
-    flex: 1,
-    gap: theme.gap(0.5),
-  },
-  saveTitle: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: theme.colors.foreground,
-  },
-  saveMeta: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 13,
-    color: theme.colors.muted,
-  },
-  tag: {
-    alignSelf: "flex-start",
-    marginTop: theme.gap(0.5),
-    paddingHorizontal: theme.gap(1.25),
-    paddingVertical: theme.gap(0.5),
-    borderRadius: 999,
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  tagText: {
-    fontFamily: theme.fonts.medium,
-    fontSize: 13,
-    color: theme.colors.muted,
   },
   options: {
     gap: theme.gap(1),

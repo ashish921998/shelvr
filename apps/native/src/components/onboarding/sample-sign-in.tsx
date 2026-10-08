@@ -3,15 +3,20 @@ import { analytics } from "@/lib/analytics";
 import type { DemoSample } from "@/lib/onboarding-demo";
 import { useOAuthSignIn } from "@/lib/oauth-sign-in";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import { SampleCard } from "@/components/onboarding/sample-card";
+import { sampleImage } from "@/components/onboarding/sample-card";
+import { SaveSummary } from "@/components/onboarding/save-summary";
 import { SignInButtons } from "@/components/onboarding/sign-in-buttons";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** A previewed sample, signed out: the sample as it would be filed, then
- * "Save your shelf". Signing in lets the demo step save it for real; the
- * screen's back button is the way out. */
+/** A previewed sample, signed out: the sample as a filed save, then "Save your
+ * shelf". Signing in lets the demo step save it for real; the screen's back
+ * button is the way out.
+ *
+ * Nothing has read the page yet, so the save shows only what is already
+ * known: the page's own heading, its site, and the space it goes to. Tags come
+ * from the classifier and appear on the step after sign-in. */
 export function SampleSignIn({
   sample,
   space,
@@ -39,9 +44,11 @@ export function SampleSignIn({
         <Text style={styles.verdictMuted}>{t("reveal.previewSubtitle")}</Text>
       </Text>
 
-      <View pointerEvents="none">
-        <SampleCard sample={sample} action="preview" disabled={false} />
-      </View>
+      <SaveSummary
+        image={sampleImage(sample)}
+        title={sample.pageHeading}
+        meta={sample.domain}
+      />
 
       {space ? (
         <View style={styles.dest}>
@@ -50,12 +57,15 @@ export function SampleSignIn({
       ) : null}
 
       <View style={styles.foot}>
-        <Text
-          style={styles.saveShelf}
-          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-        >
-          {t("reveal.saveShelf")}
-        </Text>
+        <View style={styles.pitch}>
+          <Text
+            style={styles.saveShelf}
+            maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          >
+            {t("reveal.saveShelf")}
+          </Text>
+          <Text style={styles.reason}>{t("reveal.saveShelfReason")}</Text>
+        </View>
         <View style={styles.buttons} pointerEvents={saving ? "none" : "auto"}>
           <SignInButtons oauth={oauth} privacyNote={false} />
         </View>
@@ -102,5 +112,14 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 22,
     lineHeight: 28,
     color: theme.colors.foreground,
+  },
+  pitch: {
+    gap: theme.gap(0.5),
+  },
+  reason: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 15,
+    lineHeight: 20,
+    color: theme.colors.muted,
   },
 }));

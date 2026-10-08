@@ -530,6 +530,7 @@
   "reveal.previewTitle": "읽고, 제목을 붙이고, 정리했어요.",
   "reveal.previewSubtitle": "로그인하면 그대로 보관돼요.",
   "reveal.saveShelf": "내 책장 저장하기",
+  "reveal.saveShelfReason": "저장한 것을 모든 기기에서 볼 수 있어요.",
   "reveal.filedIn": "지정한 대로 %{space}에 정리했어요",
   "reveal.keepSaving": "Pro로 계속 저장하기",
   "reveal.trialNote": "처음 구독하는 분은 연간 플랜에서 7일 무료 체험을 받을 수 있어요. 체험이 끝나기 전에 해지하면 요금이 청구되지 않아요.",

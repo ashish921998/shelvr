@@ -548,6 +548,7 @@
   "reveal.previewTitle": "Gelesen, benannt und einsortiert.",
   "reveal.previewSubtitle": "Melde dich an, um es zu behalten.",
   "reveal.saveShelf": "Sichere dein Regal",
+  "reveal.saveShelfReason": "Damit deine gespeicherten Dinge auf jedem Gerät sind.",
   "reveal.filedIn": "Einsortiert in %{space}, wo du es haben wolltest",
   "reveal.keepSaving": "Mit Pro weiter speichern",
   "reveal.trialNote": "Neue Abonnenten erhalten beim Jahresabo eine 7-tägige kostenlose Testphase. Kündige vor ihrem Ende, dann zahlst du nichts.",

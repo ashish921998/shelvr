@@ -530,6 +530,7 @@
   "reveal.previewTitle": "読み取り、タイトルを付けて、整理しました。",
   "reveal.previewSubtitle": "サインインすると保存できます。",
   "reveal.saveShelf": "シェルフを保存",
+  "reveal.saveShelfReason": "保存したものをどのデバイスでも見られます。",
   "reveal.filedIn": "指定したとおり%{space}に整理しました",
   "reveal.keepSaving": "Proで保存を続ける",
   "reveal.trialNote": "年額プランは、初めての方なら7日間の無料トライアル付きです。終了前に解約すれば料金はかかりません。",
