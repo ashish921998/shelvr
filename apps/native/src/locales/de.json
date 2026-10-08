@@ -584,8 +584,8 @@
     "other": "%{formattedCount} früher gespeicherte Inhalte passen zu dem, was du gerade hinzugefügt hast."
   },
   "home.nextUpTitle": "Als Nächstes öffnen",
-  "home.nextUpRead": "Du hast das zum Lesen gespeichert.",
-  "home.nextUpCook": "Du hast das zum Kochen gespeichert.",
+  "home.nextUpRead": "Zum Lesen gespeichert",
+  "home.nextUpCook": "Zum Kochen gespeichert",
   "demo.pickHelp": "Shelvr liest ihn, gibt ihm einen Titel und sortiert ihn für dich ein.",
   "demo.clipboardNoLink": "In deiner Zwischenablage ist kein Link. Kopiere einen oder probier einen von diesen.",
   "demo.samplesOr": "Oder probier einen von diesen",

@@ -565,8 +565,8 @@
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
   },
   "home.nextUpTitle": "次はこれを開く",
-  "home.nextUpRead": "読むために保存したものです。",
-  "home.nextUpCook": "作るために保存したものです。",
+  "home.nextUpRead": "読むために保存",
+  "home.nextUpCook": "作るために保存",
   "demo.pickHelp": "Shelvr が読み込み、タイトルを付けて整理します。",
   "demo.clipboardNoLink": "クリップボードにリンクがありません。リンクをコピーするか、下のリンクを試してください。",
   "demo.samplesOr": "または、このリンクで試す",
