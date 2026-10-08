@@ -121,20 +121,6 @@ describe("share practice", () => {
     expect(received()).toHaveLength(1);
   });
 
-  it.each([
-    ["the only share held", [], true],
-    ["held beside an earlier share", [{ value: "https://old.test" }], false],
-  ])("says whether the practice share is %s", (_name, waiting, only) => {
-    mock.payloads = waiting;
-    const onFinish = vi.fn();
-    render(<SharePracticeStep sample={DEMO_SAMPLES[1]} onFinish={onFinish} />);
-    mock.payloads = [...waiting, { value: "https://new.test" }];
-    act(() => mock.arrive?.());
-
-    fireEvent.click(screen.getByText("sharePractice.toShelf"));
-    expect(onFinish).toHaveBeenCalledWith(only);
-  });
-
   it("counts one share once when the listener and the sheet both see it", async () => {
     let finish!: (result: string) => void;
     mock.present.mockReturnValue(

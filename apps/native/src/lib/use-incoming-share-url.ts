@@ -24,6 +24,15 @@ export function decideShareIntake(
   return url === null ? { kind: "hold" } : { kind: "consume", url };
 }
 
+/** True when the one share held is the practice link itself. Anything else
+ * held, beside it or in its place, is the user's own and must be kept. */
+export function holdsOnlyPracticeShare(
+  payloads: RawSharePayload[],
+  practiceUrl: string,
+): boolean {
+  return payloads.length === 1 && firstSharedUrl(payloads) === practiceUrl;
+}
+
 /**
  * Saves a link shared into the demo from another app. The payload is read
  * directly: useIncomingShare caches its state and would not refresh after a

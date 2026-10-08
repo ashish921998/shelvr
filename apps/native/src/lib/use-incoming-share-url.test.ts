@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawSharePayload } from "@/lib/share/storage";
 import {
   decideShareIntake,
+  holdsOnlyPracticeShare,
   useIncomingShareUrl,
 } from "./use-incoming-share-url";
 
@@ -180,5 +181,23 @@ describe("useIncomingShareUrl", () => {
       "onboarding_hold_share_failed",
       expect.any(Error),
     );
+  });
+});
+
+describe("holdsOnlyPracticeShare", () => {
+  const practice = "https://sample.test/practice";
+
+  it.each([
+    ["the practice link alone", [link(practice)], true],
+    ["nothing", [], false],
+    ["the user's own link in its place", [link("https://mine.test")], false],
+    [
+      "the practice link beside the user's own",
+      [link(practice), link("https://mine.test")],
+      false,
+    ],
+    ["a photo", [{ value: "ph://IMG_1", shareType: "image" }], false],
+  ])("%s", (_, payloads, expected) => {
+    expect(holdsOnlyPracticeShare(payloads, practice)).toBe(expected);
   });
 });

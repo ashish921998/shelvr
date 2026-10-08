@@ -56,10 +56,8 @@ export function SharePracticeStep({
 }: {
   /** A sample other than the one saved in the demo. */
   sample: DemoSample | undefined;
-  /** Leaves onboarding; the screen puts the paywall in front of the app.
-   * `onlyPracticeShare` is true when the practice share is the one share
-   * held, so letting it go loses nothing the user shared on their own. */
-  onFinish: (onlyPracticeShare: boolean) => void;
+  /** Leaves onboarding; the screen puts the paywall in front of the app. */
+  onFinish: () => void;
 }) {
   useAppLocale();
   const { entitled, loading: entitlementLoading } = useEntitlement();
@@ -123,13 +121,13 @@ export function SharePracticeStep({
       report("other_app");
     } else if (result === "failed") {
       report("sheet_failed");
-      onFinish(false);
+      onFinish();
     }
   };
 
   const skip = () => {
     report("skipped");
-    onFinish(false);
+    onFinish();
   };
 
   if (received) {
@@ -170,7 +168,7 @@ export function SharePracticeStep({
                 ? "sharePractice.toShelf"
                 : "reveal.keepSaving",
             )}
-            onPress={() => onFinish(waiting === "")}
+            onPress={onFinish}
           />
         </Animated.View>
       </View>

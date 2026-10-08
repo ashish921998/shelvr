@@ -2,6 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
+import { holdsOnlyPracticeShare } from "@/lib/use-incoming-share-url";
 import { isInterest } from "@/lib/onboarding-interests";
 import {
   featuredDemoKind,
@@ -74,10 +75,12 @@ function holdIncomingShare() {
 
 // Saving is Pro, so the practice link of someone who closed the paywall is
 // let go. Left held, the share screen would ask for Pro again in the app.
-// expo-sharing clears every held share at once, so this runs only when the
-// practice link is the one share held.
-function dropPracticeShare() {
+// expo-sharing clears every held share at once, so the held batch is read
+// here and cleared only when it is the practice link and nothing else.
+function dropPracticeShare(practiceUrl: string | undefined) {
   try {
+    if (practiceUrl === undefined) return;
+    if (!holdsOnlyPracticeShare(getSharedPayloads(), practiceUrl)) return;
     clearSharedPayloads();
     clearPendingShareOnDevice();
   } catch (err) {
@@ -112,7 +115,6 @@ export default function OnboardingScreen() {
     [],
   );
   const exitDemo = useCallback(() => setStep("setup"), []);
-  const onlyPracticeShareRef = useRef(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -207,17 +209,17 @@ export default function OnboardingScreen() {
     completeOnboarding();
   };
 
+  const practiceSample = practiceShareSample(
+    kinds,
+    getOnboardingProgress().demo?.url ?? null,
+  );
   const askPaywall = useOnboardingPaywall({
     onPro: finish,
     onDecline: () => {
-      if (onlyPracticeShareRef.current) dropPracticeShare();
+      dropPracticeShare(practiceSample?.url);
       finish();
     },
   });
-  const leaveShare = (onlyPracticeShare: boolean) => {
-    onlyPracticeShareRef.current = onlyPracticeShare;
-    askPaywall();
-  };
 
   if (showSignIn) {
     return (
@@ -339,13 +341,7 @@ export default function OnboardingScreen() {
           )}
 
           {step === "share" && (
-            <SharePracticeStep
-              sample={practiceShareSample(
-                kinds,
-                getOnboardingProgress().demo?.url ?? null,
-              )}
-              onFinish={leaveShare}
-            />
+            <SharePracticeStep sample={practiceSample} onFinish={askPaywall} />
           )}
         </ScrollView>
       )}
