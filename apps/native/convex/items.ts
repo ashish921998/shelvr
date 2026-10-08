@@ -58,6 +58,8 @@ import {
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { aiAllowed } from "./aiConsent";
+import { aiConsentRequiredError } from "./model/aiConsent";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -2055,6 +2057,9 @@ export const findLinks = mutation({
         return null;
       }
     }
+    if (!(await aiAllowed(ctx, userId))) {
+      throw aiConsentRequiredError();
+    }
     await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
     await ctx.db.patch(item._id, { productsStatus: "searching" });
     await ctx.scheduler.runAfter(0, internal.ai.findProductLinks, {
@@ -2194,6 +2199,42 @@ export const createShareLink = mutation({
     ).join("");
     await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
     return token;
+  },
+});
+
+// A cancelled share may only take back the link it just minted. Links from
+// app versions that never confirm a share look unconfirmed forever, so an old
+// one must survive a later cancelled share.
+const UNCONFIRMED_SHARE_LINK_GRACE_MS = 10 * 60 * 1000;
+
+/** Reports how the share sheet ended for a link minted just before it opened.
+ * A completed share confirms the item's link for good; a cancelled one
+ * withdraws the link only if it was never confirmed and is fresh. */
+export const settleShareLink = mutation({
+  args: { itemId: v.id("items"), shared: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    const now = Date.now();
+    const links = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .take(10);
+    for (const link of links) {
+      if (link.confirmedAt !== undefined) {
+        continue;
+      }
+      if (args.shared) {
+        await ctx.db.patch(link._id, { confirmedAt: now });
+      } else if (now - link._creationTime <= UNCONFIRMED_SHARE_LINK_GRACE_MS) {
+        await ctx.db.delete(link._id);
+      }
+    }
+    return null;
   },
 });
 
@@ -2388,7 +2429,9 @@ export const finalizeItem = internalMutation({
     // queued before this argument existed still validate; every new schedule
     // passes it.
     runId: v.optional(v.string()),
-    title: v.string(),
+    // Absent when the save was finished without the model and the source
+    // offered no title; clients already render an untitled save.
+    title: v.optional(v.string()),
     // An edited note's quiet refresh: a title the note already has stays, so
     // re-classifying new words doesn't rename the note on every edit. A note
     // with no title (its typed title was just cleared) still takes this one.
@@ -2557,7 +2600,15 @@ export const deleteStorageIfUnreferenced = internalMutation({
  */
 export const listItemsNeedingEmbeddingInternal = internalQuery({
   args: { limit: v.number() },
-  returns: v.array(v.object({ itemId: v.id("items"), text: v.string() })),
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      text: v.string(),
+      // The owner declined AI processing: the caller must not send `text`
+      // anywhere, only stamp the row so it leaves the range.
+      aiDeclined: v.optional(v.boolean()),
+    }),
+  ),
   handler: async (ctx, args) => {
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
@@ -2572,11 +2623,18 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
           .eq("status", "ready")
           .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
       );
-    const page: { itemId: Id<"items">; text: string }[] = [];
+    const page: { itemId: Id<"items">; text: string; aiDeclined?: true }[] = [];
+    const allowedByUser = new Map<string, boolean>();
     let bytes = 0;
     for await (const item of rows) {
+      let allowed = allowedByUser.get(item.userId);
+      if (allowed === undefined) {
+        allowed = await aiAllowed(ctx, item.userId);
+        allowedByUser.set(item.userId, allowed);
+      }
       page.push({
         itemId: item._id,
+        ...(allowed ? {} : { aiDeclined: true as const }),
         text: buildEmbeddingText({
           title: item.title,
           description: item.description,
@@ -2609,6 +2667,8 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
  * vector, and nothing would ever revisit them.
  */
 const embeddingOutcomeValidator = v.union(
+  // The owner declined AI processing; nothing was sent for this row.
+  v.literal("ai_declined"),
   // A usable vector came back.
   v.literal("embedded"),
   // The item has no embeddable text at all, so it is finished either way.
@@ -2684,6 +2744,17 @@ export const setEmbeddingsInternal = internalMutation({
         nextSearchText === item.searchText
           ? {}
           : { searchText: nextSearchText };
+
+      if (entry.outcome === "ai_declined") {
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embedding: undefined,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          embeddingAttempts: undefined,
+        });
+        stamped++;
+        continue;
+      }
 
       // Staleness fence. The version guard above catches a pipeline run that
       // embedded successfully, but not one that re-classified this item and

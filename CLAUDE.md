@@ -91,6 +91,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `cancelSurveys` — one next-visit cancel-survey ask per user; the first recorded outcome wins
   - `captureTokens` — hashed per-device tokens the iOS App Intents use in place of a JWT
   - `onboardingDemos` — the one pre-payment demo save each user is allowed
+  - `aiConsents` — one row per user: their answer to the third-party AI processing
+    disclosure (`granted` or `declined`) and the disclosure version it answered
+  - `appleTokens` — the latest Sign in with Apple refresh token per user, kept only to
+    revoke it on account deletion; never returned to a client or logged
+
+  `schema.ts` also redeclares Convex Auth's `users` table with one optional field,
+  `appleRefreshToken`. Convex Auth writes the Apple profile onto that row, and
+  `keepAppleRefreshToken` (`model/appleTokens.ts`) moves the token to `appleTokens` in the
+  same transaction, so no stored users row carries it.
 
   `items` has `by_user`, `by_user_and_type`, and `by_storage` indexes plus a `search_text`
   full-text search index (filtered by `userId`).
@@ -106,7 +115,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   work. Successful upload retries return the same storage ID.
   Other public mutations are
   `createLinkItem`, `createNoteItem`, `findLinks` (user-triggered product search),
-  `reprocessItem` (retry a failed or partially enriched save), and `deleteItem`. The rest of the
+  `reprocessItem` (retry a failed or partially enriched save), `deleteItem`, and the share
+  link pair `createShareLink` / `settleShareLink` (a cancelled share sheet withdraws a
+  fresh, never-confirmed link). The rest of the
   file is internal helpers the AI action calls (`finalizeItem`, `failItem`, `setSpacesForItem`,
   `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
   `storageId` to an `imageUrl` at read time.
@@ -118,6 +129,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `transferOwners`, and `reconcileTransfer` internals are driven by the
   RevenueCat webhook.
+- **`aiConsent.ts`** — consent to third-party AI processing (App Store guideline 5.1.2(i)):
+  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
+  every path sending user content to Gemini or SerpAPI asks first. Only an explicit decline
+  blocks; a user who has not answered stays allowed, because builds without the consent card
+  must keep working. A declined user's saves still finish `ready` from what Shelvr read
+  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
+  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+- **`appleRevoke.ts`** (`"use node"` action) — revokes a Sign in with Apple refresh token
+  after `deleteCurrentUserAccount` hands it over. Best effort: it never throws, skips with
+  one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
+  could not be reached.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.
@@ -165,7 +187,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `SERPAPI_KEY`), and `sweepItemEmbeddings` (the embedding sweep cron; see
   [embeddings](docs/architecture/embeddings.md)).
 - **`model/pageRead.ts`** — everything about reading a saved link's page. `readPage(url)` is the
-  one entry point: it picks the reader for the host (TikTok oEmbed, X syndication, Instagram
+  one entry point: it picks the reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
   embed, Pinterest, or a plain HTML page), then extracts the title, OpenGraph metadata, hero
   image, readable body (Mozilla **Readability** via `linkedom`, with a regex fallback) and any
   schema.org recipe. Host-specific knowledge stays in this file, not in `ai.ts`.
@@ -293,6 +315,10 @@ needed at runtime by the features that use them:
 - `APPLE_RETENTION_MESSAGE_ID` — id of the Apple-approved retention message
   `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
   the default message configured for the product
+- `APPLE_REVOKE_PRIVATE_KEY` / `APPLE_REVOKE_KEY_ID` / `APPLE_REVOKE_TEAM_ID` — the Sign in
+  with Apple key (`.p8` contents), its key id, and the Apple team id. `appleRevoke.ts` signs
+  the client secret with them to revoke a deleted account's Apple token. All optional:
+  without them deletion still completes and the revocation is skipped with a log line
 - `AUTH_ENABLE_ANONYMOUS` — set to `"true"` on the dev deployment only to enable passwordless
   dev sign-in and the fixture reset in `devFixtures.ts`
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Google AI Studio API key for classification (used directly by

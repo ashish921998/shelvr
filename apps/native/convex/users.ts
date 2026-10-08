@@ -7,6 +7,8 @@ import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
+import { takeAppleRefreshToken } from "./model/appleTokens";
+import { logEvent } from "./model/log";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -51,6 +53,8 @@ export const getCurrentUser = query({
  *  - onboardingDemos (the demo allowance row and its item reference)
  *  - subscriptions
  *  - cancelSurveys (the one-time cancel-survey ask row)
+ *  - aiConsents (the AI processing answer)
+ *  - appleTokens (the Sign in with Apple refresh token, revoked with Apple)
  *  - feedbackSubmissions (in-app feedback rows and their messages)
  *  - Convex Auth sessions, refresh tokens, accounts, and the users row
  *
@@ -70,10 +74,36 @@ export const deleteCurrentUserAccount = mutation({
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     await revoke(ctx, userId, true);
+    await scheduleAppleRevoke(ctx, userId);
     await deleteAccountBatch(ctx, userId);
     return null;
   },
 });
+
+/** Apple requires an app that offers Sign in with Apple to revoke the user's
+ * token when the account is deleted. The token leaves with the scheduled job,
+ * so the revocation does not depend on a row this deletion removes. */
+async function scheduleAppleRevoke(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const refreshToken = await takeAppleRefreshToken(ctx, userId);
+  if (refreshToken !== null) {
+    await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, {
+      refreshToken,
+    });
+    return;
+  }
+  const appleAccount = await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) =>
+      q.eq("userId", userId).eq("provider", "apple"),
+    )
+    .first();
+  if (appleAccount !== null) {
+    logEvent("info", "apple_revoke_skipped", { code: "no_token" });
+  }
+}
 
 /** Continuation worker for batched account deletion. Internal-only: userId is
  * trusted here because the public mutation derived it from auth. */
@@ -221,6 +251,8 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(sub._id);
   }
 
+  await deleteAiConsent(ctx, userKey);
+
   // The cancel-survey ask row is user-owned state; drain it with the rest.
   const survey = await ctx.db
     .query("cancelSurveys")
@@ -230,6 +262,19 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(survey._id);
   }
   return true;
+}
+
+async function deleteAiConsent(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<void> {
+  const row = await ctx.db
+    .query("aiConsents")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .unique();
+  if (row !== null) {
+    await ctx.db.delete(row._id);
+  }
 }
 
 /** Deletes up to one batch each of the user's weekly digests and save
