@@ -438,6 +438,17 @@ describe("nextUp", () => {
     expect(next?.item).not.toHaveProperty("content");
   });
 
+  it("finds an unread article behind many opened ones", async () => {
+    const t = await as("next-reader");
+    const ids = await seedFeed(t, "next-reader", 12);
+    for (const id of ids.slice(1)) {
+      await markOpened(t, "next-reader", id, Date.now());
+    }
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.item._id).toBe(ids[0]);
+  });
+
   it("waits a day before suggesting a fresh save", async () => {
     const t = await as("next-fresh");
     await seedFeed(t, "next-fresh", 1);

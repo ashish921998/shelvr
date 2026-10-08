@@ -89,10 +89,6 @@ export const RECENT_ITEMS_MAX = 20;
  * bodies make item rows large, and Home subscribes to this query. */
 const NEXT_UP_SCAN_ROWS = 100;
 const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
-/** Candidates of each kind checked against read state per call. Each opened
- * one spends a check, so this bounds the point reads, and a long read list
- * never hides every recipe. */
-const NEXT_UP_CHECKS_PER_KIND = 10;
 /** Saves the client has said "not now" to, skipped by `nextUp`. */
 export const NEXT_UP_SKIP_MAX = 50;
 
@@ -473,10 +469,9 @@ export const nextUp = query({
         .order("desc"),
       { maxRows: NEXT_UP_SCAN_ROWS, maxBytes: NEXT_UP_SCAN_BYTES },
     );
-    const checks = { read: 0, cook: 0 };
+    // One read-state point read per candidate, so the scan bounds these too.
     for (const candidate of reminderCandidates(rows, args.now, undefined)) {
       if (skip.has(candidate.item._id)) continue;
-      if (checks[candidate.kind]++ >= NEXT_UP_CHECKS_PER_KIND) continue;
       const read = await ctx.db
         .query("itemReads")
         .withIndex("by_user_and_item", (q) =>
