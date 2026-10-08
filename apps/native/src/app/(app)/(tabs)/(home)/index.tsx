@@ -12,6 +12,7 @@ import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card"
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { NextUpCard } from "@/components/home/next-up-card";
+import { PmfSurveyCard } from "@/components/home/pmf-survey-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
 import { useNextUp } from "@/lib/next-up";
+import { usePmfSurvey } from "@/lib/pmf-survey";
 import {
   useBusySaving,
   useFeedbackInvitation,
@@ -187,11 +189,17 @@ export default function HomeScreen() {
   const recall = useSaveRecall(items, { defer: progress.deferLater });
   const laterDeferred = laterPromptsDeferred(progress, recall);
   const welcomeSeen = useWelcomeSeen(user?._id);
-  const feedback = useFeedbackInvitation(items, { defer: laterDeferred });
+  // The PMF question comes after recall and before the feedback invitation.
+  // It waits out an account's first session, like the rating prompt.
+  const pmf = usePmfSurvey(user?._id, items, {
+    defer: pmfDeferred(laterDeferred, progress, entitlement.entitled),
+  });
+  const afterPmfDeferred = [laterDeferred, pmf.visible].some(Boolean);
+  const feedback = useFeedbackInvitation(items, { defer: afterPmfDeferred });
   useReviewPrompt(items, {
     defer: useReviewDeferred(
       user?._id,
-      laterDeferred,
+      afterPmfDeferred,
       progress,
       feedback,
       welcomeSeen,
@@ -237,6 +245,7 @@ export default function HomeScreen() {
         progress.nudgeReady,
         cancelSurvey.visible,
         recall.visible,
+        pmf.visible,
         feedback.invitationVisible,
       )}
       welcomeSeen={welcomeSeen}
@@ -298,14 +307,15 @@ export default function HomeScreen() {
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS and the invitation scrolls with the content. The
         // cancel survey claims the slot first, then the save progress card,
-        // then the save recall card, then the feedback invitation. "Open
-        // this next" is the standing default when none of them is up.
+        // then the save recall card, then the PMF question, then the
+        // feedback invitation. "Open this next" is the standing default when
+        // none of them is up.
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
           progressCard ??
           recallCard ??
-          lastHeader(feedback, busySaving, nextUpCard)
+          lastHeader(pmf, feedback, busySaving, nextUpCard)
         }
       />
       <HeaderScrim />
@@ -317,13 +327,28 @@ export default function HomeScreen() {
   );
 }
 
-/** The end of the header chain: the feedback invitation, else "Open this
- * next", the standing default when no prompt holds the slot. */
+/** The PMF question waits behind earlier cards, sits out an account's
+ * first session, and needs Pro, since only Pro accounts use Shelvr. */
+function pmfDeferred(
+  laterDeferred: boolean,
+  progress: { firstSession: boolean },
+  entitled: boolean,
+): boolean {
+  return laterDeferred || progress.firstSession || !entitled;
+}
+
+/** The end of the header chain: the PMF question, then the feedback
+ * invitation, else "Open this next", the standing default when no prompt
+ * holds the slot. */
 function lastHeader(
+  pmf: ReturnType<typeof usePmfSurvey>,
   feedback: ReturnType<typeof useFeedbackInvitation>,
   busySaving: boolean,
   nextUpCard: ReactElement | undefined,
 ): ReactElement | undefined {
+  if (pmf.visible) {
+    return <PmfSurveyCard onAnswer={pmf.answer} onDismiss={pmf.dismiss} />;
+  }
   if (feedback.invitationVisible && !busySaving) {
     return (
       <FeedbackInvitation

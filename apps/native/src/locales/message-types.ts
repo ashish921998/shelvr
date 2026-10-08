@@ -530,6 +530,11 @@ export type MessageParams = {
   "home.nextUpTitle": undefined;
   "home.nextUpRead": undefined;
   "home.nextUpCook": undefined;
+  "home.pmfQuestion": undefined;
+  "home.pmfBody": undefined;
+  "home.pmfVery": undefined;
+  "home.pmfSomewhat": undefined;
+  "home.pmfNot": undefined;
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;

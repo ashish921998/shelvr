@@ -340,6 +340,17 @@ type AnalyticsEventProperties = {
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
   };
+  // PostHog's own survey events, for the PMF question on Home
+  // (lib/pmf-survey.ts). PostHog Surveys reads these names and keys.
+  "survey shown": { $survey_id: string };
+  "survey sent": {
+    $survey_id: string;
+    $survey_questions: { id: string; question: string; response: string }[];
+    $survey_completed: true;
+    $set: Record<string, true>;
+    [response: `$survey_response_${string}`]: string;
+  };
+  "survey dismissed": { $survey_id: string; $set: Record<string, true> };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
   cancel_survey_submitted: {
