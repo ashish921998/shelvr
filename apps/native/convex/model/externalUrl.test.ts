@@ -371,6 +371,9 @@ describe("linkSource", () => {
     expect(linkSource("https://m.youtube.com/shorts/abc")).toBe("youtube");
     expect(linkSource("https://notyoutube.com/watch?v=abc")).toBeUndefined();
     expect(
+      linkSource("https://studio.youtube.com/channel/abc"),
+    ).toBeUndefined();
+    expect(
       linkSource("https://www.pinterest.com/cook/dinners/"),
     ).toBeUndefined();
     expect(linkSource("https://example.com/post")).toBeUndefined();

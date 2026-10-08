@@ -322,18 +322,21 @@ export function linkSource(url: string | undefined): LinkSource | undefined {
   return undefined;
 }
 
+const YOUTUBE_HOSTS = new Set([
+  "youtu.be",
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+]);
+
 /** True for a YouTube video link: youtube.com (www, m, music) and the youtu.be
  * short host. YouTube often answers a server's page load with a consent or
  * bot-check page that has no video metadata, so these go to its oEmbed. */
 export function isYouTubeUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return (
-      host === "youtu.be" ||
-      host === "youtube.com" ||
-      host.endsWith(".youtube.com")
-    );
+    return YOUTUBE_HOSTS.has(new URL(url).hostname.toLowerCase());
   } catch {
     return false;
   }
