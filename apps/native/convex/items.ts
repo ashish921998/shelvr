@@ -28,6 +28,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
   enrichmentValidator,
@@ -246,7 +247,11 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   // The single chokepoint every client-facing item read shares.
-  return { ...stripEmbedding(item), imageUrl };
+  return {
+    ...stripEmbedding(item),
+    imageUrl,
+    heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
+  };
 }
 
 async function toItemCard(
@@ -392,25 +397,17 @@ export const listItemsPage = query({
   },
 });
 
-/** The newest `ready` saves for the Pro-only home-screen widget. The status
- * index reads exactly `limit` ready rows, so a burst of fresh imports still
- * processing can never push older ready saves out of view.
- *
- * Pro is checked without ever reading the wall clock (a query is not rerun
- * as time advances, so a Date.now() read could serve stale access). A
- * caller that sends its refreshed clock gets an exact expiry check; a
- * build that predates the `now` argument keeps its saves while the stored
- * subscription status is active, and the RevenueCat webhook lapses that
- * status when a subscription actually expires. */
+/** Pro widget access follows server-maintained subscription status. Client time
+ * may narrow access, but cannot extend it past server expiry. */
 export const listRecentItems = query({
   args: { limit: v.number(), now: v.optional(v.number()) },
   returns: v.array(itemCardValidator),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const entitled =
-      args.now === undefined
-        ? await hasProEntitlementStatus(ctx, userId)
-        : await hasProEntitlementAt(ctx, userId, args.now);
+      (await hasProEntitlementStatus(ctx, userId)) &&
+      (args.now === undefined ||
+        (await hasProEntitlementAt(ctx, userId, args.now)));
     if (!entitled) return [];
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
@@ -774,12 +771,10 @@ async function saveIntoSpace(
 //   attach -> records the storageId on the pending operation
 //   finalize -> validates metadata and atomically inserts the item + completes
 //
-// Correctness goal is idempotency + compensation, NOT upload+DB atomicity: a
-// process can crash after the upload succeeds but before `attach` records the
-// storageId. In that gap the blob's id was never written anywhere, so nothing
-// — including the stale-pending cleanup cron, which only sees storageIds
-// recorded on ledger rows — can ever reclaim it. That narrow window leaks the
-// blob permanently; it is documented and accepted, not eliminated.
+// The upload receiver records the storageId before acknowledging the upload.
+// A crash between storage.store and that transaction can still leave a blob;
+// the independent sweep reclaims it after a grace period, checking both item
+// and operation references atomically.
 
 /** Operation IDs are opaque client UUIDs (optionally prefixed for logs). This
  * bounds length so a stray empty/huge string can't pollute the index. */
@@ -974,8 +969,37 @@ export async function beginImageImportForUser(
   // Every remaining path creates, recycles, or refreshes work — gate once.
   // Quota here saves the client an upload it could never finalize.
   await requireProEntitlement(ctx, userId);
-  await requirePhotoQuota(ctx, userId);
+  const photoCount = await requirePhotoQuota(ctx, userId);
+  if (
+    op?.status === "pending" &&
+    op.uploadUrl &&
+    op.uploadUrlIssuedAt !== undefined &&
+    now - op.uploadUrlIssuedAt < 55 * 60 * 1000
+  ) {
+    return { kind: "upload", uploadUrl: op.uploadUrl };
+  }
+  await rateLimiter.limit(ctx, "imageBegin", { key: userId, throws: true });
+  if (op?.status !== "pending") {
+    const pending = await ctx.db
+      .query("itemOperations")
+      .withIndex("by_user_and_kind_and_status", (q) =>
+        q.eq("userId", userId).eq("kind", "image").eq("status", "pending"),
+      )
+      .take(30);
+    if (pending.length >= 30) throw new Error("Too many pending image imports");
+    if (photoCount + pending.length >= MAX_PHOTOS_PER_ACCOUNT)
+      throw saveError("photo_limit");
+  }
 
+  // Use an unexposed platform capability as unpredictable entropy; mutation
+  // Math.random is deterministic. Never hand the unbounded storage URL out.
+  const platformUrl = await ctx.storage.generateUploadUrl();
+  const uploadToken = await sha256Hex(platformUrl);
+  const uploadTokenHash = await sha256Hex(uploadToken);
+  const siteOrigin =
+    process.env.CONVEX_SITE_URL ??
+    new URL(platformUrl).origin.replace(".convex.cloud", ".convex.site");
+  const uploadUrl = `${siteOrigin.replace(/\/+$/, "")}/image-upload?token=${uploadToken}`;
   if (op === null) {
     // (userId, operationId) uniqueness is enforced by Convex's serializable
     // transactions: if two begins race on an empty index range, only one
@@ -989,10 +1013,13 @@ export async function beginImageImportForUser(
       kind: "image",
       status: "pending",
       updatedAt: now,
+      uploadUrl,
+      uploadUrlIssuedAt: now,
+      uploadTokenHash,
     });
     return {
       kind: "upload",
-      uploadUrl: await ctx.storage.generateUploadUrl(),
+      uploadUrl,
     };
   }
 
@@ -1015,22 +1042,29 @@ export async function beginImageImportForUser(
       itemId: undefined,
       storageId: undefined,
       updatedAt: now,
+      uploadUrl,
+      uploadUrlIssuedAt: now,
+      uploadTokenHash,
+      uploadClaimedAt: undefined,
     });
     return {
       kind: "upload",
-      uploadUrl: await ctx.storage.generateUploadUrl(),
+      uploadUrl,
     };
   }
 
-  // Pending: refresh updatedAt (a begin is active interest) and hand back a
-  // fresh URL. A retry that re-uploads is correct-by-design — attach keeps
-  // the first storageId and discards the redundant blob. A lapsed user
-  // retrying a pending op must not mint a fresh upload URL or refresh
-  // updatedAt (which would keep the row alive past the cleanup cron).
-  await ctx.db.patch(op._id, { updatedAt: now });
+  // Refresh an expired capability for a pending operation. The receiver
+  // reuses an already-recorded blob, so a retry cannot create extra uploads.
+  await ctx.db.patch(op._id, {
+    updatedAt: now,
+    uploadUrl,
+    uploadUrlIssuedAt: now,
+    uploadTokenHash,
+    uploadClaimedAt: undefined,
+  });
   return {
     kind: "upload",
-    uploadUrl: await ctx.storage.generateUploadUrl(),
+    uploadUrl,
   };
 }
 
@@ -1046,6 +1080,80 @@ export const attachImageUpload = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     return await attachImageUploadForUser(ctx, userId, args);
+  },
+});
+
+/** Single active receiver per capability, before reading any upload bytes. */
+export const claimImageUpload = internalMutation({
+  args: { tokenHash: v.string() },
+  returns: v.union(
+    v.object({
+      kind: v.literal("accept"),
+      operationId: v.id("itemOperations"),
+      claimTime: v.number(),
+    }),
+    v.object({ kind: v.literal("stored"), storageId: v.id("_storage") }),
+    v.object({ kind: v.literal("busy") }),
+    v.object({ kind: v.literal("reject") }),
+  ),
+  handler: async (ctx, { tokenHash }) => {
+    const op = await ctx.db
+      .query("itemOperations")
+      .withIndex("by_upload_token_hash", (q) =>
+        q.eq("uploadTokenHash", tokenHash),
+      )
+      .unique();
+    const now = Date.now();
+    if (
+      !op ||
+      op.kind !== "image" ||
+      now - (op.uploadUrlIssuedAt ?? 0) >= 60 * 60 * 1000
+    )
+      return { kind: "reject" as const };
+    const userId = ctx.db.normalizeId("users", op.userId);
+    if (!userId) return { kind: "reject" as const };
+    await requireProEntitlement(ctx, userId);
+    if (op.storageId)
+      return { kind: "stored" as const, storageId: op.storageId };
+    if (op.status !== "pending") return { kind: "reject" as const };
+    if (op.uploadClaimedAt !== undefined && now - op.uploadClaimedAt < 60_000)
+      return { kind: "busy" as const };
+    await rateLimiter.limit(ctx, "imageUpload", {
+      key: op.userId,
+      throws: true,
+    });
+    await ctx.db.patch(op._id, { uploadClaimedAt: now, updatedAt: now });
+    return { kind: "accept" as const, operationId: op._id, claimTime: now };
+  },
+});
+
+/** Record the blob before acknowledging its receipt. Concurrent expired
+ * claims lose and delete their own blob; the storage sweep covers a crash. */
+export const finishImageUpload = internalMutation({
+  args: {
+    operationId: v.id("itemOperations"),
+    claimTime: v.number(),
+    storageId: v.optional(v.id("_storage")),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.operationId);
+    if (
+      !op ||
+      op.status !== "pending" ||
+      op.uploadClaimedAt !== args.claimTime ||
+      op.storageId
+    ) {
+      if (args.storageId && (await isStorageUnreferenced(ctx, args.storageId)))
+        await safeDeleteStorage(ctx, args.storageId);
+      return false;
+    }
+    await ctx.db.patch(op._id, {
+      storageId: args.storageId,
+      uploadClaimedAt: undefined,
+      updatedAt: Date.now(),
+    });
+    return true;
   },
 });
 
@@ -1352,6 +1460,32 @@ export const cleanupStaleImageImports = internalMutation({
   },
 });
 
+/** Includes uploads abandoned before attach. Storage has a creation-time
+ * index; paginate it in bounded transactions and preserve every live owner. */
+export const cleanupOrphanStorage = internalMutation({
+  args: { cursor: v.optional(v.string()), cutoff: v.optional(v.number()) },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const cutoff = args.cutoff ?? Date.now() - 2 * STALE_IMPORT_CUTOFF_MS;
+    const page = await ctx.db.system
+      .query("_storage")
+      .withIndex("by_creation_time", (q) => q.lt("_creationTime", cutoff))
+      .paginate({ cursor: args.cursor ?? null, numItems: CLEANUP_PAGE_SIZE });
+    for (const blob of page.page) {
+      if (await isStorageUnreferenced(ctx, blob._id)) {
+        await safeDeleteStorage(ctx, blob._id);
+      }
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.cleanupOrphanStorage, {
+        cursor: page.continueCursor,
+        cutoff,
+      });
+    }
+    return null;
+  },
+});
+
 /**
  * Idempotent completion for a link/note operation. When a durable `operationId`
  * is supplied, (userId, operationId) is the unique key: a repeat with the same
@@ -1462,6 +1596,9 @@ function validateLinkOrNotePayload(
   }
   if (!("note" in payload) || payload.note.trim() === "") {
     throw new Error("Note text is empty");
+  }
+  if (payload.note.length > MAX_NOTE_TEXT_CHARS) {
+    throw new Error("Note text is too long");
   }
 }
 
@@ -2110,7 +2247,7 @@ export const getSharePreview = internalQuery({
       type: item.type,
       title: item.title ?? "A save from Shelvr",
       description: item.description,
-      imageUrl: imageUrl ?? item.heroImageUrl,
+      imageUrl: imageUrl ?? undefined,
       sourceUrl: item.type === "link" ? item.url : undefined,
       noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
     };

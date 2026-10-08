@@ -1,3 +1,4 @@
 {
-  "buildCommand": "turbo run build"
+  "buildCommand": "turbo run build",
+  "ignoreCommand": "npx turbo-ignore@2.9.14"
 }

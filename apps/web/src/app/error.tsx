@@ -18,7 +18,7 @@ export default function Error({
 
   return (
     <main className="bg-paper min-h-screen">
-      <div className="container max-w-3xl py-10 sm:py-16">
+      <div className="container max-w-2xl py-10 sm:py-16">
         <h1 className="font-display text-3xl text-ink sm:text-4xl">
           Something went wrong
         </h1>

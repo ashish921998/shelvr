@@ -1,5 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { clampRatio } from "@/lib/aspect-ratio";
+import { isEmptySpace } from "@/lib/empty-space";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -11,11 +12,11 @@ import { FlashList } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -175,6 +176,53 @@ function emptySpaceIcon(name: string) {
   return "rectangle.stack";
 }
 
+/**
+ * Spaces that hold nothing yet, as one line of name chips instead of grid
+ * cards. Each joins the grid once a save lands in it, and a tap still opens
+ * it, and a long press deletes it. Plain Pressables with router.push: no
+ * Link asChild style trap (#197).
+ */
+function EmptySpaces({
+  spaces,
+  onDelete,
+}: {
+  spaces: { _id: Id<"spaces">; name: string }[];
+  /** Long-press deletes, like the grid cards' menu. */
+  onDelete: (id: Id<"spaces">) => void;
+}) {
+  useAppLocale();
+  const router = useRouter();
+  return (
+    <View style={styles.emptySection} testID="empty-spaces">
+      <Text style={styles.emptyHeading}>{t("spaces.waitingTitle")}</Text>
+      <Text style={styles.emptyHelp}>{t("spaces.waitingBody")}</Text>
+      <View style={styles.chips}>
+        {spaces.map((space) => (
+          <Pressable
+            key={space._id}
+            accessibilityRole="button"
+            onPress={() => router.push(`/space/${space._id}`)}
+            onLongPress={() => onDelete(space._id)}
+            accessibilityActions={[
+              { name: "delete", label: t("common.delete") },
+            ]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === "delete") {
+                onDelete(space._id);
+              }
+            }}
+            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          >
+            <Text style={styles.chipText} numberOfLines={1}>
+              {space.name}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function SpacesScreen() {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -217,10 +265,34 @@ export default function SpacesScreen() {
     );
   }
 
+  // Empty spaces stay out of the masonry grid: a pile with no cover read as
+  // a bare label under the header, so they wait in a chip row below it.
+  const filled = spaces.filter((space) => !isEmptySpace(space));
+  const empty = spaces.filter(isEmptySpace);
+  const emptySpaces =
+    empty.length > 0 ? (
+      <EmptySpaces spaces={empty} onDelete={confirmDelete} />
+    ) : null;
+
+  if (filled.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+        >
+          {emptySpaces}
+        </ScrollView>
+        <HeaderScrim />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlashList
-        data={spaces}
+        data={filled}
+        ListFooterComponent={emptySpaces}
         masonry
         numColumns={2}
         optimizeItemArrangement
@@ -399,6 +471,45 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fonts.bold,
     fontSize: 10,
     lineHeight: 12,
+    color: theme.colors.foreground,
+  },
+  emptySection: {
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(1),
+    paddingVertical: theme.gap(2),
+  },
+  emptyHeading: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: theme.colors.faint,
+  },
+  emptyHelp: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.gap(1),
+    paddingTop: theme.gap(0.5),
+  },
+  chip: {
+    minHeight: 36,
+    maxWidth: "100%",
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  chipText: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 14,
     color: theme.colors.foreground,
   },
   menuButton: {

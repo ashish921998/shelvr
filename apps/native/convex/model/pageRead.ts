@@ -2,8 +2,8 @@
 
 /**
  * Reading a saved link's page: fetch it through the safe fetcher, pick the
- * reader for the host (TikTok oEmbed, X syndication, Instagram embed, or a
- * plain HTML page), extract the title, meta, hero image, readable body and any
+ * reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
+ * embed, or a plain HTML page), extract the title, meta, hero image, readable body and any
  * schema.org recipe, and follow a caption's link to its recipe page.
  *
  * `readPage(url)` is the one entry point the classifier needs. Host knowledge
@@ -34,6 +34,7 @@ import {
   pinterestPinId,
   shortFormSource,
   xStatusId,
+  normalizeExternalUrl,
   type LinkSource,
 } from "./externalUrl";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
@@ -369,6 +370,62 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
     heroImageUrl: str("thumbnail_url"),
     heroAspectRatio: width > 0 && height > 0 ? width / height : 9 / 16,
     content: caption,
+  };
+}
+
+/** oEmbed statuses that mean "not a video it will describe", not a hiccup. */
+const OEMBED_REFUSALS = new Set([400, 401, 403, 404]);
+
+/**
+ * YouTube often answers a server's page load with a consent or bot-check page,
+ * so the save came back as a bare "YouTube Video" with no picture. Its public
+ * oEmbed endpoint answers with the title, channel, and thumbnail. A link
+ * oEmbed refuses (a channel page, a private or embed-blocked video) falls back
+ * to the plain page read, so nothing is marked gone on oEmbed's word alone.
+ * After a transient oEmbed failure the page read is marked incomplete, so the
+ * save can be retried for the real title and thumbnail.
+ */
+async function fetchYouTube(url: string): Promise<PageData> {
+  const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
+  const result = await safeFetch(endpoint, {
+    timeoutMs: 15000,
+    maxBytes: 64 * 1024,
+    allowContentType: (ct) => ct.startsWith("application/json"),
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+  });
+  let data: Record<string, unknown> | undefined;
+  if (result.ok) {
+    try {
+      const parsed: unknown = parseJson(result.bytes);
+      if (typeof parsed === "object" && parsed !== null) {
+        data = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Unreadable answer; read the page instead.
+    }
+  }
+  const str = (key: string) => {
+    const value = data?.[key];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const title = str("title");
+  if (!title) {
+    if (!result.ok && OEMBED_REFUSALS.has(result.status ?? 0)) {
+      return await fetchPage(url);
+    }
+    logEvent("warn", "youtube_oembed_failed", {
+      error_category: result.ok ? "unreadable" : result.code,
+    });
+    return { ...(await fetchPage(url)), incomplete: true };
+  }
+  const width = Number(data?.thumbnail_width);
+  const height = Number(data?.thumbnail_height);
+  return {
+    title,
+    siteName: "YouTube",
+    author: str("author_name"),
+    heroImageUrl: str("thumbnail_url"),
+    heroAspectRatio: width > 0 && height > 0 ? width / height : undefined,
   };
 }
 
@@ -918,11 +975,15 @@ export async function fetchXPost(url: string): Promise<PageData> {
  * a square-cropped `og:image`. Its captioned embed adds the caption and the
  * uncropped poster. Parsed apart from the fetch so it is testable.
  */
-export function parseInstagramEmbed(html: string): {
+type InstagramEmbedFields = {
   caption?: string;
   username?: string;
   posterUrl?: string;
-} {
+  /** The embed shows Instagram's "this post may have been removed" box. */
+  brokenMedia?: true;
+};
+
+export function parseInstagramEmbed(html: string): InstagramEmbedFields {
   const block = html.match(
     /<div class="Caption">([\s\S]*?)<div class="CaptionComments">/i,
   )?.[1];
@@ -948,6 +1009,9 @@ export function parseInstagramEmbed(html: string): {
     caption: caption || undefined,
     username: username ? decodeEntities(username) : undefined,
     posterUrl: src ? decodeEntities(src) : undefined,
+    ...(/class="[^"]*\bEmbedBrokenMedia\b/.test(html)
+      ? { brokenMedia: true as const }
+      : {}),
   };
 }
 
@@ -1003,61 +1067,121 @@ async function fetchInstagramEmbed(url: string): Promise<InstagramEmbed> {
     : { status: "missing" };
 }
 
-/**
- * Read an Instagram post or reel. The page fetch decides gone/unreadable like
- * any link; the embed is best-effort. Shell markup is never article content:
- * the only content is the caption. When Instagram shares nothing, the result
- * is a bare "Instagram" page and the item still classifies from its URL. A
- * transiently failed embed marks the read incomplete so the save can retry.
- */
-export async function fetchInstagram(url: string): Promise<PageData> {
+type InstagramCard = {
+  title?: string;
+  image?: string;
+  description?: string;
+  /** The card calls the post a video or reel, whatever the URL says. */
+  video?: true;
+};
+
+/** The link-preview card Instagram serves the crawler, or undefined for the
+ * login shell, which titles itself just "Instagram" and names no post. */
+function instagramCard(html: string): InstagramCard | undefined {
+  const title = [
+    extractMetaContent(html, "twitter:title"),
+    extractMetaContent(html, "og:title"),
+  ].find((candidate) => candidate !== undefined && candidate !== "Instagram");
+  const image =
+    extractMetaContent(html, "og:image") ??
+    extractMetaContent(html, "twitter:image");
+  if (title === undefined && image === undefined) {
+    return undefined;
+  }
+  return {
+    title,
+    image,
+    description: extractMetaContent(html, "og:description"),
+    video: /•\s*Instagram (?:video|reel)\b/i.test(title ?? "")
+      ? true
+      : undefined,
+  };
+}
+
+/** An Instagram link whose shortcode is known: a direct link, or a share
+ * link once its redirect named the post. */
+type InstagramPost = { kind: "reel" | "p" | "tv"; shortcode: string };
+
+type InstagramMedia = ReturnType<typeof instagramMedia>;
+
+function isInstagramPost(media: InstagramMedia): media is InstagramPost {
+  return media?.shortcode !== undefined;
+}
+
+/** The post's plain address. The `/reels/` alias sends the crawler to the
+ * login page, so even a direct link is read here. */
+function instagramPostUrl(post: InstagramPost): string {
+  return `https://www.instagram.com/${post.kind}/${post.shortcode}/`;
+}
+
+/** Fetch a post's page and its captioned embed. A direct link reads both at
+ * once; a share link only names its post after the page fetch follows the
+ * redirect, so its embed waits for the page. */
+async function fetchInstagramPost(url: string) {
   const linked = instagramMedia(url);
-  const embedFor = (media: { kind: string; shortcode?: string } | undefined) =>
-    media?.shortcode
-      ? fetchInstagramEmbed(
-          `https://www.instagram.com/${media.kind}/${media.shortcode}/embed/captioned/`,
-        )
+  const direct = isInstagramPost(linked) ? linked : undefined;
+  const embedFor = (post: InstagramPost | undefined) =>
+    post
+      ? fetchInstagramEmbed(`${instagramPostUrl(post)}embed/captioned/`)
       : Promise.resolve<InstagramEmbed>({ status: "missing" });
-  // A direct link names its shortcode, so the embed is read alongside the
-  // page. A share link only names it after the page fetch follows the
-  // redirect, so its embed waits for the page.
   const [page, directEmbed] = await Promise.all([
-    fetchInstagramHtml(url),
-    linked?.shortcode ? embedFor(linked) : Promise.resolve(undefined),
+    fetchInstagramHtml(direct ? instagramPostUrl(direct) : url),
+    direct ? embedFor(direct) : Promise.resolve(undefined),
   ]);
   if (!page.ok) {
     throw new PageFetchError(page.code, page.status);
   }
   const html = decodeWithContentType(page.bytes, page.contentType);
-  const media = linked?.shortcode
-    ? linked
-    : ([
-        page.finalUrl,
-        extractMetaContent(html, "og:url"),
-        extractCanonical(html),
-      ]
-        .map((candidate) => instagramMedia(candidate, page.finalUrl))
-        .find((candidate) => candidate?.shortcode) ?? linked);
-  const embed = directEmbed ?? (await embedFor(media));
+  const post =
+    direct ??
+    [page.finalUrl, extractMetaContent(html, "og:url"), extractCanonical(html)]
+      .map((candidate) => instagramMedia(candidate, page.finalUrl))
+      .find(isInstagramPost);
+  const embed = directEmbed ?? (await embedFor(post));
   if (embed.status === "transient") {
     logEvent("warn", "instagram_caption_fetch_failed", {
       error_category: embed.errorCategory,
     });
   }
-  const embedded = embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
-  const cardTitle =
-    extractMetaContent(html, "twitter:title") ??
-    extractMetaContent(html, "og:title");
+  return { page, html, kind: (post ?? linked)?.kind, embed };
+}
+
+/**
+ * Read an Instagram post or reel. The page fetch decides gone/unreadable like
+ * any link; the embed is best-effort. Shell markup is never article content:
+ * the only content is the caption. A post Instagram calls broken is gone; any
+ * other post it shares nothing about is a bare "Instagram" page that still
+ * classifies from its URL. A transiently failed embed marks the read
+ * incomplete so the save can retry.
+ */
+export async function fetchInstagram(url: string): Promise<PageData> {
+  const { page, html, kind, embed } = await fetchInstagramPost(url);
+  const embedded: InstagramEmbedFields =
+    embed.status === "ok" ? parseInstagramEmbed(embed.html) : {};
+  const card = instagramCard(html);
+  const truncated =
+    page.truncated === true || (embed.status === "ok" && embed.truncated);
+  // Instagram answers 200 for a deleted or made-up post. The only "gone"
+  // signal is that nothing about the post was read and the embed shows its
+  // broken-media box, so that pair fails the save instead of saving it blank.
+  // A cut read is no proof the metadata is missing, and may end before the
+  // box, so a cut read with nothing in it is marked incomplete instead, so the
+  // save can retry.
+  const readNothing =
+    card === undefined &&
+    embedded.caption === undefined &&
+    embedded.posterUrl === undefined;
+  if (readNothing && embedded.brokenMedia === true && !truncated) {
+    throw new PageFetchError("http_error", 404);
+  }
+  const cardTitle = card?.title;
   const handle =
     embedded.username ?? cardTitle?.match(/\(@([A-Za-z0-9._]+)\)/)?.[1];
-  const heroImageUrl =
-    embedded.posterUrl ??
-    extractMetaContent(html, "og:image") ??
-    extractMetaContent(html, "twitter:image");
+  const heroImageUrl = embedded.posterUrl ?? card?.image;
   const caption = embedded.caption?.slice(0, MAX_STORED_CONTENT_CHARS);
   const heroAspectRatio = heroImageUrl
     ? ((await fetchImageAspectRatio(heroImageUrl)) ??
-      (media?.kind === "p" ? 1 : 9 / 16))
+      (kind === "p" ? 1 : 9 / 16))
     : undefined;
   return {
     title:
@@ -1066,18 +1190,17 @@ export async function fetchInstagram(url: string): Promise<PageData> {
         .join("") || cardTitle,
     // With a caption the card names the creator; without one the card is
     // already the title, so the page's own description is the only new text.
-    description: caption
-      ? cardTitle
-      : extractMetaContent(html, "og:description"),
+    description: caption ? cardTitle : card?.description,
     siteName: "Instagram",
     author: handle ? `@${handle}` : undefined,
     heroImageUrl,
     heroAspectRatio,
     content: caption,
-    ...(page.truncated || (embed.status === "ok" && embed.truncated)
-      ? { truncated: true as const }
+    video: card?.video,
+    ...(truncated ? { truncated: true as const } : {}),
+    ...(embed.status === "transient" || (readNothing && truncated)
+      ? { incomplete: true as const }
       : {}),
-    ...(embed.status === "transient" ? { incomplete: true as const } : {}),
   };
 }
 
@@ -1139,22 +1262,29 @@ async function resolvePinterestUrl(
   if (id !== undefined || !isPinterestShortUrl(url)) {
     return { id, url };
   }
+  // Only the landing URL matters, but keep the page cap: a live read showed a
+  // smaller cap stalling past the deadline while the rest of a pin page is
+  // drained, and every pin.it link timing out.
   const result = await safeFetch(url, {
     ...PAGE_FETCH_OPTIONS,
-    // Only the landing URL matters, not the page.
-    maxBytes: 64 * 1024,
     // pin.it hops through api.pinterest.com and a /sent/ share URL.
     maxRedirects: 5,
   });
   if (!result.ok) {
     throw new PageFetchError(result.code, result.status);
   }
-  // A code Pinterest does not know redirects to its home page rather than
-  // 404ing. Saving that page would save Pinterest itself, so it is gone.
-  if (new URL(result.finalUrl).pathname === "/") {
+  if (isPinterestHomePage(result.finalUrl)) {
     throw new PageFetchError("http_error", 404);
   }
   return { id: pinterestPinId(result.finalUrl), url: result.finalUrl };
+}
+
+/** Pinterest answers a pin.it code it does not know, and a deleted pin's
+ * page, with a 200 redirect to its home page rather than a 404. Saving that
+ * page would save Pinterest itself, so a read that lands there is gone. */
+function isPinterestHomePage(url: string): boolean {
+  const parsed = new URL(url);
+  return isPinterestHost(parsed.hostname) && parsed.pathname === "/";
 }
 
 async function readPinterestWidget(id: string): Promise<PinterestWidget> {
@@ -1240,6 +1370,18 @@ function pinterestSourceLink(
 /** The pin as a page. Its description is the caption and the only content;
  * the board, video flag, and source page title travel as their own fields
  * for the prompt to render. */
+/** A pinner's display name. Pinterest encodes some names more than once
+ * ("A &amp;amp; B"), so entities are decoded until the name stops changing. */
+function pinterestName(name: string | null | undefined): string | undefined {
+  let decoded = name?.trim();
+  for (let pass = 0; decoded && pass < 3; pass++) {
+    const next = decodeEntities(decoded);
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded || undefined;
+}
+
 export function pinterestPage(pin: PinterestPin): PageData | undefined {
   const image = pinterestImage(pin.images);
   const description = pin.description
@@ -1254,7 +1396,8 @@ export function pinterestPage(pin: PinterestPin): PageData | undefined {
   return {
     title: title ? decodeEntities(title) : undefined,
     siteName: "Pinterest",
-    author: pin.pinner?.full_name?.trim() || pin.pinner?.username || undefined,
+    author:
+      pinterestName(pin.pinner?.full_name) || pin.pinner?.username || undefined,
     heroImageUrl: image?.url,
     heroAspectRatio: image?.aspectRatio,
     content: description || undefined,
@@ -1288,15 +1431,18 @@ async function fetchPinterestPin(url: string): Promise<PageData> {
     logEvent("warn", "pinterest_widget_failed", {
       error_category: widget.errorCategory,
     });
-    return { ...(await fetchPage(resolved.url)), incomplete: true };
+    return {
+      ...(await fetchPage(resolved.url, isPinterestHomePage)),
+      incomplete: true,
+    };
   }
-  return fetchPage(resolved.url);
+  return fetchPage(resolved.url, isPinterestHomePage);
 }
 
 /**
- * Copy a poster into Convex storage. TikTok and Instagram poster URLs are
- * signed and expire, so the card would go blank without this. Best-effort:
- * a blocked or oversized image leaves the (short-lived) URL as the fallback.
+ * Copy a preview into Convex storage through the connection-bound URL policy.
+ * Clients receive only the stored copy. A refused or oversized image leaves
+ * the save without a cover rather than exposing the remote URL to clients.
  */
 export async function storePoster(
   ctx: { storage: { store: (blob: Blob) => Promise<Id<"_storage">> } },
@@ -1472,12 +1618,19 @@ async function withLinkedRecipe(page: PageData): Promise<PageData> {
   }
 }
 
-async function fetchPage(url: string): Promise<PageData> {
+async function fetchPage(
+  url: string,
+  /** A landing URL that means the page is gone despite a 200. */
+  isGone?: (finalUrl: string) => boolean,
+): Promise<PageData> {
   const result = await safeFetch(url, PAGE_FETCH_OPTIONS);
   if (!result.ok) {
     // Surface only the policy code (+ status for http_error); readPage decides
     // whether the item can still be saved.
     throw new PageFetchError(result.code, result.status);
+  }
+  if (isGone?.(result.finalUrl)) {
+    throw new PageFetchError("http_error", 404);
   }
   const finalUrl = result.finalUrl;
   const html = decodeWithContentType(result.bytes, result.contentType);
@@ -1493,7 +1646,9 @@ async function fetchPage(url: string): Promise<PageData> {
     extractMetaContent(html, "twitter:image");
   if (heroImageUrl) {
     try {
-      heroImageUrl = new URL(heroImageUrl, finalUrl).toString();
+      heroImageUrl = normalizeExternalUrl(
+        new URL(heroImageUrl, finalUrl).toString(),
+      );
     } catch {
       heroImageUrl = undefined;
     }
@@ -1616,6 +1771,7 @@ const SOURCE_READERS = {
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
   instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
   pinterest: fetchPinterestPin,
+  youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
 
 export async function readPage(url: string): Promise<PageRead> {
@@ -1624,7 +1780,13 @@ export async function readPage(url: string): Promise<PageRead> {
     const page = source
       ? await SOURCE_READERS[source](url)
       : await fetchPage(url);
-    const shortForm = shortFormSource(url);
+    const urlShortForm = shortFormSource(url);
+    // The URL marks reels and TikToks as video; the reader also knows an
+    // Instagram `/p/` post that is a video.
+    const shortForm = urlShortForm && {
+      ...urlShortForm,
+      video: urlShortForm.video || page.video === true,
+    };
     return {
       status: "ok",
       page,

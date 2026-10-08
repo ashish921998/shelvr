@@ -1,6 +1,7 @@
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
+import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
 import { getSpacePresets, SAVE_KINDS, type SaveKind } from "@/lib/save-kinds";
 import { MAX_SPACE_NAME_LENGTH } from "@convex/model/spaceName";
@@ -37,6 +38,9 @@ export function SetupStep({
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  // At the accessibility sizes two cards no longer fit a label across, so the
+  // grid drops to one column instead of breaking words.
+  const oneColumn = useLargeText();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -51,7 +55,9 @@ export function SetupStep({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.headline}>{t("onboarding.setupTitle")}</Text>
+      <Text style={styles.headline} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {t("onboarding.setupTitle")}
+      </Text>
 
       <View style={styles.grid}>
         {SAVE_KINDS.map((kind) => {
@@ -64,6 +70,7 @@ export function SetupStep({
               onPress={() => onToggleKind(kind)}
               style={({ pressed }) => [
                 styles.kind,
+                oneColumn && styles.kindFull,
                 active && styles.kindActive,
                 pressed && { opacity: 0.85 },
               ]}
@@ -75,7 +82,6 @@ export function SetupStep({
               />
               <Text
                 style={[styles.kindLabel, active && styles.kindLabelActive]}
-                numberOfLines={1}
               >
                 {onboardingLabel(kind)}
               </Text>
@@ -178,10 +184,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(2),
   },
   headline: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.4,
+    fontFamily: theme.fonts.display,
+    fontSize: 28,
+    lineHeight: 34,
     color: theme.colors.foreground,
   },
   grid: {
@@ -198,6 +203,9 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 2,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  kindFull: {
+    flexBasis: "100%",
   },
   kindActive: {
     borderColor: theme.colors.primary,
@@ -255,7 +263,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(0.75),
   },
   chip: {
-    minHeight: 40,
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(0.75),

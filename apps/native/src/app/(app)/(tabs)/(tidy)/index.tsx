@@ -323,7 +323,11 @@ const PermissionGate: FC<{
   return (
     <View style={styles.gate}>
       <EmptyState title={t("tidy.introTitle")} message={t("tidy.introBody")} />
-      <Pressable style={styles.gateButton} onPress={handlePress}>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.gateButton}
+        onPress={handlePress}
+      >
         <Text style={styles.gateButtonText}>
           {permission.canAskAgain
             ? t("permissions.allowPhotos")
@@ -379,6 +383,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gateButton: {
     alignSelf: "center",
+    justifyContent: "center",
+    minHeight: theme.control.minHeight,
     marginBottom: theme.gap(6),
     paddingHorizontal: theme.gap(3),
     paddingVertical: theme.gap(1.5),
@@ -389,6 +395,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   gateButtonText: {
     fontFamily: theme.fonts.bold,
     fontSize: 16,
-    color: "white",
+    color: theme.colors.onTint,
   },
 }));

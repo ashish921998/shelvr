@@ -81,6 +81,7 @@ const styles = StyleSheet.create((theme) => ({
   ctaText: {
     fontFamily: theme.fonts.bold,
     fontSize: 17,
+    textAlign: "center",
     color: theme.colors.primaryForeground,
   },
   ghost: {

@@ -30,9 +30,11 @@ export function IntentChip({
   const icon = ICONS[kind] ?? "sparkles";
   return (
     <Pressable
+      accessibilityRole="button"
       style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
       onPress={onPress}
-      hitSlop={6}
+      // The pill stays compact; the slop brings the touch target to 48.
+      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
     >
       <AppSymbolIcon
         name={icon}
@@ -52,8 +54,8 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 6,
     backgroundColor: theme.colors.primarySoft,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
     borderRadius: 50,
   },
   chipPressed: {

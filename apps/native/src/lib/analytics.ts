@@ -42,7 +42,7 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * apart, because the onboarding route renders both the full-page view and the
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
-export type OAuthSurface = "sign_in_view" | "demo_sheet";
+export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -78,10 +78,15 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 type SaveKind = "link" | "note" | "image";
 
 type AnalyticsEventProperties = {
-  onboarding_step_viewed: { step_id: string; step_index: number };
+  onboarding_step_viewed: {
+    step_id: string;
+    step_index: number;
+    flow_version: number;
+  };
   onboarding_step_completed: {
     step_id: string;
     step_index: number;
+    flow_version: number;
     duration_ms: number;
   };
   // The four OAuth flow events share one `auth_attempt_id` per
@@ -233,6 +238,8 @@ type AnalyticsEventProperties = {
     save_pileup: string[];
     // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
+    // The interests step's picked topics. Each is also one of the spaces.
+    interests: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
@@ -256,6 +263,29 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
+  // A first-save pick, before any sign-in. `sample` is a ready-made link
+  // (previewed when signed out); otherwise a pasted, typed or shared one.
+  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
+  // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
+  // the screen after a previewed sample. "dismissed" is the sheet's scrim or
+  // back, or that screen's back button; a sign-in itself shows as auth_started.
+  onboarding_signin_prompt: {
+    surface: "demo_sheet" | "sample_preview";
+    action: "shown" | "dismissed";
+  };
+  // The share-sheet practice before the paywall (onboarding/share-practice.tsx).
+  // "received" is a share that reached Shelvr, saved later by the share
+  // screen. "other_app" can repeat; the other outcomes fire once per mount.
+  onboarding_share_practice: {
+    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
+  };
+  // The onboarding notifications step's answer. `granted` is what the OS
+  // reported after the tap; a skipped step (nothing to ask) sends nothing.
+  onboarding_reminder: {
+    action: "remind" | "skip";
+    slot: "tonight" | "tomorrow" | "weekend" | "nextWeek";
+    granted: boolean;
+  };
   onboarding_demo_result: {
     outcome: "ready" | "failed" | "timeout" | "error" | "already_used";
   };
@@ -268,8 +298,24 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
+  // per account per launch. `saved` is the real-save count, demo excluded.
+  save_progress_card_shown: { saved: number };
+  save_progress_card_action: {
+    action: "photos" | "note" | "dismiss";
+    saved: number;
+  };
+  // Once per account, when a shelf this device watched below the goal
+  // reaches it (lib/save-goal.ts). `hours_since_start` counts from that
+  // first sighting, so "3+ saves in 48h" is `hours_since_start <= 48`.
+  save_goal_reached: {
+    goal: number;
+    hours_since_start: number;
+    card_dismissed: boolean;
+  };
   review_prompted: { ready_count: number };
   trial_reminder_permission: { granted: boolean };
+  trial_reminder_primer: { outcome: "accepted" | "declined" };
   // Post-purchase save handoff on Home (lib/welcome-save.ts).
   welcome_save_shown: { trial: boolean };
   welcome_save_action: { action: "save" | "dismiss"; trial: boolean };

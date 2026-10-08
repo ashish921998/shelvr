@@ -3,8 +3,9 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawSharePayload } from "@/lib/share/storage";
 import {
-  SHARE_SHEET_DISMISS_MS,
   decideShareIntake,
+  holdsOnlyLink,
+  releaseSavedShare,
   useIncomingShareUrl,
 } from "./use-incoming-share-url";
 
@@ -13,7 +14,9 @@ const mock = vi.hoisted(() => ({
   getSharedPayloads: vi.fn(),
   clearSharedPayloads: vi.fn(),
   markPendingShareOnDevice: vi.fn(),
+  clearPendingShareOnDevice: vi.fn(),
   captureError: vi.fn(),
+  capture: vi.fn(),
   share: vi.fn(),
   appStateListener: null as null | ((state: string) => void),
   urlListener: null as null | ((event: { url: string }) => void),
@@ -25,9 +28,13 @@ vi.mock("expo-sharing", () => ({
 }));
 vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice: mock.markPendingShareOnDevice,
+  clearPendingShareOnDevice: mock.clearPendingShareOnDevice,
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), captureError: mock.captureError },
+  analytics: {
+    capture: mock.capture,
+    captureError: mock.captureError,
+  },
 }));
 vi.mock("react-native", () => ({
   AppState: {
@@ -52,27 +59,23 @@ function renderShare({
   readOnMount = true,
 }: { accepting?: boolean; readOnMount?: boolean } = {}) {
   const onSharedUrl = vi.fn();
-  const onDirectUrl = vi.fn();
-  const onError = vi.fn();
   const canAccept = vi.fn(() => accepting);
   const hook = renderHook(() =>
-    useIncomingShareUrl({
-      canAccept,
-      readOnMount,
-      onSharedUrl,
-      onDirectUrl,
-      onError,
-    }),
+    useIncomingShareUrl({ canAccept, readOnMount, onSharedUrl }),
   );
-  return { ...hook, onSharedUrl, onDirectUrl, onError, canAccept };
+  return { ...hook, onSharedUrl, canAccept };
 }
 
 beforeEach(() => {
   mock.payloads = [];
   mock.getSharedPayloads.mockReset().mockImplementation(() => mock.payloads);
+  // An empty read forgets the link the hook last handed over.
+  renderShare().unmount();
+  mock.getSharedPayloads.mockClear();
   mock.clearSharedPayloads.mockReset();
   mock.markPendingShareOnDevice.mockReset();
   mock.captureError.mockReset();
+  mock.capture.mockReset();
   mock.share.mockReset();
 });
 
@@ -121,12 +124,39 @@ describe("decideShareIntake", () => {
 });
 
 describe("useIncomingShareUrl", () => {
-  it("saves a single shared link on mount and clears it", () => {
+  it("hands a single shared link to the demo and keeps holding it", () => {
     mock.payloads = [link("https://a.test/x")];
     const { onSharedUrl } = renderShare();
     expect(onSharedUrl).toHaveBeenCalledWith("https://a.test/x");
-    expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
+    // Nothing is cleared until the server says this link was saved.
+    expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
     expect(mock.markPendingShareOnDevice).not.toHaveBeenCalled();
+  });
+
+  it("hands the same held link over once, across foregrounds and remounts", () => {
+    mock.payloads = [link("https://a.test/x")];
+    const first = renderShare();
+    act(() => mock.appStateListener?.("active"));
+    expect(first.onSharedUrl).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = renderShare();
+    expect(second.onSharedUrl).not.toHaveBeenCalled();
+
+    // A different link shared afterwards is a new share.
+    mock.payloads = [link("https://b.test/y")];
+    act(() => mock.appStateListener?.("active"));
+    expect(second.onSharedUrl).toHaveBeenCalledWith("https://b.test/y");
+  });
+
+  it("lets go of a held link only once that link is the one saved", () => {
+    mock.payloads = [link("https://mine.test/new")];
+    releaseSavedShare("https://sample.test/old-demo");
+    expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
+
+    releaseSavedShare("https://mine.test/new");
+    expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
+    expect(mock.clearPendingShareOnDevice).toHaveBeenCalledTimes(1);
   });
 
   it("leaves a share for the share screen once the demo moved on", () => {
@@ -185,84 +215,32 @@ describe("useIncomingShareUrl", () => {
       expect.any(Error),
     );
   });
+});
 
-  describe("shareSample", () => {
-    async function runSample(
-      result: { action: string; activityType?: string },
-      payloads: RawSharePayload[],
-    ) {
-      vi.useFakeTimers();
-      mock.share.mockResolvedValue(result);
-      const hook = renderShare({ readOnMount: false });
-      let done!: Promise<void>;
-      act(() => {
-        done = hook.result.current.shareSample("https://sample.test/a");
-      });
-      expect(hook.result.current.shareSheetOpen).toBe(true);
-      mock.payloads = payloads;
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(SHARE_SHEET_DISMISS_MS);
-        await done;
-      });
-      expect(hook.result.current.shareSheetOpen).toBe(false);
-      return hook;
-    }
+describe("holdsOnlyLink", () => {
+  const practice = "https://sample.test/practice";
 
-    it("saves the link Shelvr received", async () => {
-      const { onSharedUrl, onDirectUrl } = await runSample(
-        { action: "sharedAction" },
-        [link("https://sample.test/a")],
-      );
-      expect(onSharedUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
-    });
-
-    it("falls back to the sample when the extension's payload is not readable", async () => {
-      const { onSharedUrl, onDirectUrl } = await runSample(
-        {
-          action: "sharedAction",
-          activityType: "app.shelvr.save.expo-sharing-extension",
-        },
-        [],
-      );
-      expect(onSharedUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(onDirectUrl).not.toHaveBeenCalled();
-    });
-
-    it("asks for Shelvr when another app was picked", async () => {
-      const { onSharedUrl, onDirectUrl, onError } = await runSample(
-        {
-          action: "sharedAction",
-          activityType: "com.apple.UIKit.activity.CopyToPasteboard",
-        },
-        [],
-      );
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenLastCalledWith("demo.pickShelvr");
-    });
-
-    it("does nothing when the sheet was dismissed", async () => {
-      const { onSharedUrl, onDirectUrl, onError } = await runSample(
-        { action: "dismissedAction" },
-        [],
-      );
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(null);
-    });
-
-    it("saves the sample directly when the sheet cannot open", async () => {
-      mock.share.mockRejectedValue(new Error("sheet"));
-      const { result, onSharedUrl, onDirectUrl } = renderShare({
-        readOnMount: false,
-      });
-      await act(() => result.current.shareSample("https://sample.test/a"));
-      expect(onSharedUrl).not.toHaveBeenCalled();
-      expect(onDirectUrl).toHaveBeenCalledWith("https://sample.test/a");
-      expect(result.current.shareSheetOpen).toBe(false);
-    });
+  it.each([
+    ["the practice link alone", [link(practice)], true],
+    ["nothing", [], false],
+    ["the user's own link in its place", [link("https://mine.test")], false],
+    [
+      "the practice link beside the user's own",
+      [link(practice), link("https://mine.test")],
+      false,
+    ],
+    ["a photo", [{ value: "ph://IMG_1", shareType: "image" }], false],
+    [
+      "the practice link with a caption",
+      [{ value: `Read this ${practice}`, shareType: "text" }],
+      true,
+    ],
+    [
+      "the practice link and a second link in one text",
+      [{ value: `${practice} https://mine.test`, shareType: "text" }],
+      false,
+    ],
+  ])("%s", (_, payloads, expected) => {
+    expect(holdsOnlyLink(payloads, practice)).toBe(expected);
   });
 });

@@ -1,3 +1,4 @@
+import { shareBatchAllowed } from "@/lib/share/storage";
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { recordShareSaved } from "@/lib/first-share";
 import {
@@ -38,6 +39,7 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -128,7 +130,12 @@ export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const entitlement = useEntitlement();
+  const { entitled } = entitlement;
+  // A purchase made in onboarding reaches Convex by webhook a moment later.
+  // Until it does, a held share waits instead of asking for Pro again.
+  const awaitingPurchase = useAwaitingOnboardingPurchase(entitled);
+  const entitlementLoading = entitlement.loading || awaitingPurchase;
   const {
     sharedPayloads,
     resolvedSharedPayloads,
@@ -182,7 +189,7 @@ export default function ShareScreen() {
    * processor payloads and the reconcile effect run against the same list. */
   const rawPayloads = useMemo<RawSharePayload[]>(
     () =>
-      sharedPayloads.map((p) => ({
+      (shareBatchAllowed(sharedPayloads) ? sharedPayloads : []).map((p) => ({
         value: p.value,
         shareType: p.shareType,
         mimeType: p.mimeType,
@@ -257,9 +264,41 @@ export default function ShareScreen() {
   // the raw payloads (see processorPayloads) and entries the fallback cannot
   // resolve surface as failed entries on the partial screen.
   const nothingResolved =
-    !isResolving && sharedPayloads.length === 0 && phase.kind === "idle";
+    !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
   // --- Phase render ---------------------------------------------------------
+
+  if (phase.kind === "confirm") {
+    return (
+      <PhaseSurface key={phase.session.sessionId} phaseKey="confirm">
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        >
+          {rawPayloads.map((payload, index) => (
+            <Text key={index} style={styles.subtitle(theme)} numberOfLines={4}>
+              {/^(file|content):/i.test(payload.value)
+                ? t("capture.photos")
+                : payload.value}
+            </Text>
+          ))}
+        </ScrollView>
+        <View style={styles.actions}>
+          <Button
+            label={t("common.cancel")}
+            theme={theme}
+            onPress={() => dispatch({ type: "cancel" })}
+          />
+          <Button
+            label={t("common.save")}
+            theme={theme}
+            primary
+            onPress={() => dispatch({ type: "confirm" })}
+          />
+        </View>
+      </PhaseSurface>
+    );
+  }
 
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts

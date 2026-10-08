@@ -74,3 +74,19 @@ describe("web analytics", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+it("redacts capability URLs even when event properties try to override them", () => {
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-token");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://example.com");
+  window.history.replaceState({}, "", "/i/private-capability?input=private");
+  const spy = vi.fn().mockResolvedValue(new Response());
+  vi.stubGlobal("fetch", spy);
+  captureWebException(new Error("render failed"), {
+    $current_url: "https://example.com/i/private-capability",
+  });
+  const body = JSON.parse(spy.mock.calls[0][1].body);
+  expect(body.properties.$current_url).toBe(
+    `${window.location.origin}/i/[token]`,
+  );
+  window.history.replaceState({}, "", "/");
+});

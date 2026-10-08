@@ -11,6 +11,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { TERMS_VERSION } from "@convex/model/legalConsent";
+import { SettingCard } from "@/components/ui/setting-card";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { analytics } from "@/lib/analytics";
@@ -110,41 +111,38 @@ export function LegalConsentPreference() {
   };
   if (reviewing)
     return <LegalConsentReview onComplete={() => setReviewing(false)} />;
+  // A SettingCard like its neighbours on Settings, so it reads as one more
+  // setting rather than loose text between the cards.
   return (
-    <View style={styles.preference}>
-      <Text style={styles.heading}>{t("refundConsent.setting")}</Text>
-      <Text style={styles.body}>
-        {t(
+    <SettingCard
+      title={t("refundConsent.setting")}
+      description={t(
+        consent?.refundSharing
+          ? "refundConsent.enabled"
+          : "refundConsent.disabled",
+      )}
+      action={{
+        label: t(
           consent?.refundSharing
-            ? "refundConsent.enabled"
-            : "refundConsent.disabled",
-        )}
-      </Text>
-      {consent?.syncPending ? (
-        <Text style={styles.body}>{t("refundConsent.syncPending")}</Text>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        disabled={pending || consent === undefined}
-        style={styles.secondary}
-        onPress={() =>
-          consent?.refundSharing ? void turnOff() : setReviewing(true)
-        }
-      >
-        <Text style={styles.link}>
-          {t(
-            consent?.refundSharing
-              ? "refundConsent.withdraw"
-              : "refundConsent.review",
-          )}
-        </Text>
-      </Pressable>
-      {failed ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {t("refundConsent.error")}
-        </Text>
-      ) : null}
-    </View>
+            ? "refundConsent.withdraw"
+            : "refundConsent.review",
+        ),
+        disabled: consent === undefined,
+        busy: pending,
+        onPress: () =>
+          consent?.refundSharing ? void turnOff() : setReviewing(true),
+      }}
+      // Each message stays its own translated sentence on its own line, and
+      // a failed withdrawal still shows a sync the server reports as pending.
+      note={
+        [
+          failed ? t("refundConsent.error") : null,
+          consent?.syncPending ? t("refundConsent.syncPending") : null,
+        ]
+          .filter(Boolean)
+          .join("\n") || null
+      }
+    />
   );
 }
 
@@ -161,11 +159,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   title: {
     fontFamily: theme.fonts.display,
     fontSize: 28,
-    color: theme.colors.foreground,
-  },
-  heading: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 16,
     color: theme.colors.foreground,
   },
   body: {
@@ -200,7 +193,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     padding: theme.gap(1),
   },
-  preference: { padding: theme.gap(2), gap: theme.gap(1) },
   error: {
     fontFamily: theme.fonts.regular,
     fontSize: 14,

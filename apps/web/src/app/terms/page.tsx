@@ -9,12 +9,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage
-      title="Terms of Service"
-      lastUpdated="September 19, 2026"
-      footerHref="/privacy"
-      footerLabel="Privacy Policy"
-    >
+    <LegalPage title="Terms of Service" lastUpdated="September 19, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">1. The service</h2>
         <p className="mt-2">

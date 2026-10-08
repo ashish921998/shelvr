@@ -15,12 +15,16 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 // Older flows stored `step` as an index into a different step list, under the
 // same key. Their step and answers are ignored so progress restarts at the
 // opener; the replay fields (operationId, spaces, demoUrl) still apply.
-const PROGRESS_VERSION = 2;
+// Version 3 inserted the acquisition source step after the opener, 4 the
+// notifications step before the reveal. 5 removed the source step, inserted
+// the interests step after the opener and added the share step. 6 removed
+// the reveal step.
+const PROGRESS_VERSION = 6;
 
 /** The demo step's in-flight save, so an app kill mid-OAuth (or a relaunch
  * while the save is still processing) resumes the exact save the user asked
- * for. It is kept after the demo step advances so a relaunch on the reveal
- * step can re-attach to the same item. Cancelling the demo's sign-in clears
+ * for. It is kept after the demo step advances so the share practice can
+ * avoid offering the same link again. Cancelling the demo's sign-in clears
  * it, and `setPendingSpaces` (the finish path) drops it, so a completed save
  * is never replayed or left behind in SecureStore. */
 export type PendingDemo = {

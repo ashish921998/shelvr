@@ -18,6 +18,62 @@ workflow described there.
 - `apps/web` is the marketing site and its server-backed waitlist routes.
 - `apps/native/convex` is the backend source of truth.
 
+### Where things live
+
+Check here before searching. Paths that start with `src/` or `convex/` are
+under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
+`.github/` are relative to the repository root.
+
+- **No `hooks/` or `features/` directory.** Hooks and feature logic sit flat in
+  `src/lib` as kebab-case files. Standalone hooks are named `use-*.ts`; a hook
+  that belongs to one feature is exported from that feature's module
+  (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
+  so search for the hook name, not the filename. Subfolders exist only for
+  `src/lib/share`, `src/lib/splash` and `src/lib/tidy`.
+- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
+  primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`,
+  `app-tab-bar.tsx`). See `docs/architecture/design-system.md`.
+- **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
+  `openPaywall`, `openExitOffer`, `usePaywallGuard` and `restorePurchases`.
+  Around it: `exit-offer*.ts`, `trial-reminder.ts`, `paywall-funnel.ts`,
+  `paywall-telemetry.ts`, `revenuecat-*.ts`, and `src/components/pro-gate.tsx`.
+  The server side is `convex/subscriptions.ts`.
+- **Home feed:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`);
+  cards in `src/components/item-card.tsx` and `src/components/home`.
+- **Item detail:** route `src/app/(app)/item/[id].tsx`, body
+  `src/components/item-detail.tsx`.
+- **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
+  images in `src/lib/use-save-image.ts` and `use-save-image-batch.ts`; pasted
+  link lists in `src/lib/import-links.ts`.
+- **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
+  `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
+  `onboarding-steps.ts` and `pending-onboarding.ts`.
+- **Copy:** `src/locales/en.json` is the source catalog; `t()` and
+  `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
+  `src/locales/message-types.ts` and
+  `convex/model/notificationTranslations.json` are written by
+  `pnpm localization:generate` (a root script). Do not edit them by hand.
+- **Analytics:** `src/lib/analytics.ts` holds the typed client event map
+  (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
+  those rather than grepping call sites.
+- **Link reading:** `convex/model/pageRead.ts` (`readPage`, per-host readers) on
+  top of `convex/model/safeFetch.ts` and `convex/model/externalUrl.ts`.
+  `convex/ai.ts` only orchestrates the model call.
+- **Large files:** `convex/items.ts` (about 2,800 lines), `convex/ai.ts` and
+  `convex/model/pageRead.ts` (about 1,650 each). Search for the export name
+  first and read that range, not the whole file.
+- **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
+  subscription for the anonymous dev user.
+- **Tests:** co-located `*.test.ts(x)`; shared setup in `src/test.setup.ts` and
+  `convex/test.setup.ts`. Never put a test file under `src/app`: Expo Router
+  bundles that tree.
+- **Design handoffs, marketing assets and store media** are not in this repo.
+  They live in the separate `shelvr-notes` repo.
+- **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
+  setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
+  paywall.
+- **Pull requests:** fill in `.github/pull_request_template.md`.
+
 ## Naming conventions
 
 ESLint enforces file and identifier naming (`eslint-plugin-check-file` and

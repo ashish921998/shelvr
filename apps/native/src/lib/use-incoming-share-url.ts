@@ -1,15 +1,13 @@
-import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
 import { firstSharedUrl } from "@/lib/share/process-share";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import {
+  clearPendingShareOnDevice,
+  markPendingShareOnDevice,
+} from "@/lib/share/pending-share-store";
+import { useShareArrival } from "@/lib/share/share-sheet";
 import type { RawSharePayload } from "@/lib/share/storage";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking, Share } from "react-native";
-
-const SHARE_EXTENSION_SUFFIX = ".expo-sharing-extension";
-// iOS ignores a modal presented while the share sheet is still animating out.
-export const SHARE_SHEET_DISMISS_MS = 500;
+import { useCallback } from "react";
 
 type ShareIntake =
   | { kind: "none" }
@@ -17,8 +15,9 @@ type ShareIntake =
   | { kind: "consume"; url: string };
 
 /** The demo saves exactly one shared link, and only while it is still asking
- * for one. Anything else stays in expo-sharing for the share screen, so no
- * payload is cleared that the demo does not save. */
+ * for one. Anything else stays in expo-sharing for the share screen. A link
+ * the demo takes stays there too, until `releaseSavedShare` hears from the
+ * server that this link is the one saved. */
 export function decideShareIntake(
   payloads: RawSharePayload[],
   accepting: boolean,
@@ -29,37 +28,63 @@ export function decideShareIntake(
   return url === null ? { kind: "hold" } : { kind: "consume", url };
 }
 
+/** True when the one share held is this link. Anything else held, beside it
+ * or in its place, is a different share and must be kept. That includes a
+ * second link inside the same text; a caption around the one link is fine. */
+export function holdsOnlyLink(
+  payloads: RawSharePayload[],
+  url: string,
+): boolean {
+  if (payloads.length !== 1 || firstSharedUrl(payloads) !== url) return false;
+  return (payloads[0].value.match(/https?:\/\//gi) ?? []).length <= 1;
+}
+
+// The link last handed to the demo and still held. The app coming back to the
+// foreground reads the same payload again; it is handed over once. Kept
+// outside the hook so going back and forth between steps does not re-ask.
+let handedUrl: string | null = null;
+
 /**
- * Reads links shared into the demo. The share extension relaunches the app
- * with an expo-sharing URL. The payload is read directly: useIncomingShare
- * caches its state and would not refresh after a clear followed by a second
- * share of the same link.
+ * Lets go of a shared link once the server has saved that very link. Until
+ * then it stays held, so a save that is cancelled, fails, or comes back as an
+ * earlier demo item leaves the link for the share screen instead of losing it.
+ */
+export function releaseSavedShare(url: string) {
+  try {
+    if (!holdsOnlyLink(getSharedPayloads(), url)) return;
+    clearSharedPayloads();
+    // A foreground while the save was on its way flags the held link for the
+    // share screen. Nothing is held any more, so the flag goes with it.
+    clearPendingShareOnDevice();
+    handedUrl = null;
+  } catch (err) {
+    analytics.captureError("onboarding_share_release_failed", err);
+  }
+}
+
+/**
+ * Hands a link shared into the demo from another app to its save. The
+ * payload is read directly: useIncomingShare caches its state and would not
+ * refresh after a clear followed by a second share of the same link.
  */
 export function useIncomingShareUrl({
   canAccept,
   readOnMount,
   onSharedUrl,
-  onDirectUrl,
-  onError,
 }: {
   /** Read at intake time, so it sees in-flight refs as well as render state. */
   canAccept: () => boolean;
   readOnMount: boolean;
   /** A URL the share extension actually delivered to Shelvr. */
   onSharedUrl: (url: string) => void;
-  /** A sample saved only because the system share sheet failed to open. */
-  onDirectUrl: (url: string) => void;
-  onError: (error: TextMessageKey | null) => void;
 }) {
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
-
-  const consumeShare = useCallback((): boolean => {
+  const consumeShare = useCallback(() => {
     let intake: ShareIntake;
     try {
       intake = decideShareIntake(getSharedPayloads(), canAccept());
     } catch (err) {
       analytics.captureError("onboarding_share_read_failed", err);
-      return false;
+      return;
     }
     if (intake.kind === "hold") {
       // Before onboarding, +native-intent leaves the resume flag unset, so a
@@ -70,60 +95,11 @@ export function useIncomingShareUrl({
         analytics.captureError("onboarding_hold_share_failed", err);
       }
     }
-    if (intake.kind !== "consume") return false;
-    clearSharedPayloads();
+    if (intake.kind === "none") handedUrl = null;
+    if (intake.kind !== "consume" || intake.url === handedUrl) return;
+    handedUrl = intake.url;
     onSharedUrl(intake.url);
-    return true;
   }, [canAccept, onSharedUrl]);
 
-  // iOS opens the real share sheet over a sample, so the first save goes
-  // through the same Shelvr tile the user will tap in other apps.
-  const shareSample = useCallback(
-    async (url: string) => {
-      onError(null);
-      setShareSheetOpen(true);
-      let result: Awaited<ReturnType<typeof Share.share>>;
-      try {
-        result = await Share.share({ url });
-      } catch (err) {
-        analytics.captureError("onboarding_share_sheet_failed", err);
-        setShareSheetOpen(false);
-        onDirectUrl(url);
-        return;
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, SHARE_SHEET_DISMISS_MS),
-      );
-      setShareSheetOpen(false);
-      if (result.action !== Share.sharedAction) return;
-      if (consumeShare()) return;
-      if (result.activityType?.endsWith(SHARE_EXTENSION_SUFFIX)) {
-        onSharedUrl(url);
-      } else {
-        onError("demo.pickShelvr");
-      }
-    },
-    [consumeShare, onDirectUrl, onError, onSharedUrl],
-  );
-
-  const consumeShareRef = useRef(consumeShare);
-  useEffect(() => {
-    consumeShareRef.current = consumeShare;
-  }, [consumeShare]);
-
-  useEffect(() => {
-    if (readOnMount) consumeShareRef.current();
-    const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active") consumeShareRef.current();
-    });
-    const links = Linking.addEventListener("url", ({ url }) => {
-      if (url.includes("expo-sharing")) consumeShareRef.current();
-    });
-    return () => {
-      appState.remove();
-      links.remove();
-    };
-  }, [readOnMount]);
-
-  return { shareSheetOpen, shareSample };
+  useShareArrival(consumeShare, readOnMount);
 }

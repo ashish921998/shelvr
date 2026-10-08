@@ -62,7 +62,7 @@ export default function Faq() {
               >
                 <span>{faq.q}</span>
                 <span
-                  className={`flex size-7 flex-none items-center justify-center rounded-full bg-paper-deep transition-transform duration-250 ${isOpen ? "rotate-45" : ""}`}
+                  className={`flex size-7 flex-none items-center justify-center rounded-full bg-paper-deep transition-transform duration-250 motion-reduce:transition-none ${isOpen ? "rotate-45" : ""}`}
                 >
                   <PlusIcon aria-hidden className="size-4" strokeWidth={2} />
                 </span>

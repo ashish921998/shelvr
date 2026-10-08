@@ -122,10 +122,11 @@ export function ProductsSection({
   return (
     <View style={styles.findLinksRow}>
       <Pressable
+        accessibilityRole="button"
         style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }]}
         onPress={findLinks}
         disabled={disabled}
-        hitSlop={6}
+        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       >
         {finding ? (
           <ActivityIndicator size="small" color={theme.colors.primaryText} />

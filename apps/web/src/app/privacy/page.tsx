@@ -9,12 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage
-      title="Privacy Policy"
-      lastUpdated="September 19, 2026"
-      footerHref="/terms"
-      footerLabel="Terms of Service"
-    >
+    <LegalPage title="Privacy Policy" lastUpdated="September 19, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">

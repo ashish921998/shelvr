@@ -22,6 +22,10 @@
       "project": ["**/*.{js,mjs,ts,tsx}"],
       "ignore": ["convex/_generated/**"]
     },
+    "apps/e2e": {
+      "entry": ["e2e.config.ts", "tests/**/*.e2e.ts"],
+      "project": ["**/*.ts"]
+    },
     "apps/web": {
       "entry": ["src/app/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}"],
@@ -34,6 +38,8 @@
         "tools/main-module.test.mjs",
         "tools/measure-header-morph.mjs",
         "tools/release-guards.test.mjs",
+        "tools/verify-agent-docs.mjs",
+        "tools/verify-agent-docs.test.mjs",
         "tools/verify-ci.cjs",
         "tools/verify-convex-api.mjs",
         "tools/verify-convex-api.test.mjs",
