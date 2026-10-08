@@ -583,6 +583,9 @@
     "one": "%{formattedCount} earlier save goes with what you just added.",
     "other": "%{formattedCount} earlier saves go with what you just added."
   },
+  "home.nextUpTitle": "Open this next",
+  "home.nextUpRead": "You saved this to read.",
+  "home.nextUpCook": "You saved this to cook.",
   "demo.pickHelp": "Shelvr reads it, titles it and files it for you.",
   "demo.clipboardNoLink": "Your clipboard has no link. Copy one, or try one of these.",
   "demo.samplesOr": "Or try one of these",

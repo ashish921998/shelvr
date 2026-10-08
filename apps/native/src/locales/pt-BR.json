@@ -602,6 +602,9 @@
     "many": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar.",
     "other": "%{formattedCount} conteúdos salvos antes combinam com o que você acabou de adicionar."
   },
+  "home.nextUpTitle": "Abra este agora",
+  "home.nextUpRead": "Você salvou isto para ler.",
+  "home.nextUpCook": "Você salvou isto para cozinhar.",
   "demo.pickHelp": "O Shelvr lê, dá um título e organiza para você.",
   "demo.clipboardNoLink": "Não há link na área de transferência. Copie um ou experimente um destes.",
   "demo.samplesOr": "Ou experimente um destes",

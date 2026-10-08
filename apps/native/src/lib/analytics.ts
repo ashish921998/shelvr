@@ -298,6 +298,11 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
+  // save's title or URL.
+  next_up_shown: { kind: "read" | "cook" };
+  next_up_opened: { kind: "read" | "cook" };
+  next_up_dismissed: { kind: "read" | "cook" };
   // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
   // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };

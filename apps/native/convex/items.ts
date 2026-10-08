@@ -58,6 +58,7 @@ import {
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { openedTooRecently, reminderCandidates } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -83,6 +84,15 @@ const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
+
+/** The newest ready saves `nextUp` reads, bounded by count and bytes: article
+ * bodies make item rows large, and Home subscribes to this query. */
+const NEXT_UP_SCAN_ROWS = 100;
+const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
+/** Candidates of each kind checked against read state per call. Each opened
+ * one spends a check, so this bounds the point reads, and a long read list
+ * never hides every recipe. */
+const NEXT_UP_CHECKS_PER_KIND = 10;
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -421,6 +431,53 @@ export const listRecentItems = query({
       .order("desc")
       .take(limit);
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+  },
+});
+
+/**
+ * The one save Home suggests opening next: an article the user has not read
+ * yet, or a recipe they have not looked at lately. It picks with the save
+ * reminder rules (`model/saveReminders.ts`), so the card and the push agree
+ * on what is worth bringing back. `now` comes from the client, since a query
+ * is not rerun as time passes; the client rounds it so the cache holds.
+ */
+export const nextUp = query({
+  args: { now: v.number() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      kind: v.union(v.literal("read"), v.literal("cook")),
+      item: itemCardValidator,
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const { rows } = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", userId).eq("status", "ready"),
+        )
+        .order("desc"),
+      { maxRows: NEXT_UP_SCAN_ROWS, maxBytes: NEXT_UP_SCAN_BYTES },
+    );
+    const checks = { read: 0, cook: 0 };
+    for (const candidate of reminderCandidates(rows, args.now, undefined)) {
+      if (checks[candidate.kind]++ >= NEXT_UP_CHECKS_PER_KIND) continue;
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", userId).eq("itemId", candidate.item._id),
+        )
+        .unique();
+      if (openedTooRecently(candidate.kind, read?.lastOpenedAt, args.now))
+        continue;
+      return {
+        kind: candidate.kind,
+        item: await toItemCard(ctx, candidate.item),
+      };
+    }
+    return null;
   },
 });
 

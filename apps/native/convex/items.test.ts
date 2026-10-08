@@ -404,6 +404,91 @@ describe("listRecentItems", () => {
   });
 });
 
+describe("nextUp", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // Seeded saves are made "now", so the clock the client sends is moved
+  // forward: an article has to be a day old before Home suggests it.
+  const later = (days: number) => Date.now() + days * DAY;
+
+  async function markOpened(
+    t: TestCtx,
+    userId: string,
+    itemId: Id<"items">,
+    at: number,
+  ) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("itemReads", {
+        userId,
+        itemId,
+        firstOpenedAt: at,
+        lastOpenedAt: at,
+      });
+    });
+  }
+
+  it("suggests the newest article the user has not opened", async () => {
+    const t = await as("next-user");
+    const ids = await seedFeed(t, "next-user", 3);
+    await markOpened(t, "next-user", ids[2], Date.now());
+
+    const next = await t.query(api.items.nextUp, { now: later(2) });
+    expect(next?.kind).toBe("read");
+    expect(next?.item._id).toBe(ids[1]);
+    // Card shape only: the article body never rides along.
+    expect(next?.item).not.toHaveProperty("content");
+  });
+
+  it("waits a day before suggesting a fresh save", async () => {
+    const t = await as("next-fresh");
+    await seedFeed(t, "next-fresh", 1);
+
+    await expect(
+      t.query(api.items.nextUp, { now: Date.now() }),
+    ).resolves.toBeNull();
+  });
+
+  it("suggests a recipe not looked at in the last week", async () => {
+    const t = await as("next-cook");
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-cook",
+        type: "link",
+        status: "ready",
+        title: "Lasagna page",
+        url: "https://example.com/lasagna",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "lasagna",
+      }),
+    );
+    const now = later(10);
+    await markOpened(t, "next-cook", recipeId, now - 2 * DAY);
+    await expect(t.query(api.items.nextUp, { now })).resolves.toBeNull();
+
+    await t.run(async (ctx) => {
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", "next-cook").eq("itemId", recipeId),
+        )
+        .unique();
+      await ctx.db.patch(read!._id, { lastOpenedAt: now - 8 * DAY });
+    });
+    const next = await t.query(api.items.nextUp, { now });
+    expect(next?.kind).toBe("cook");
+    expect(next?.item._id).toBe(recipeId);
+  });
+
+  it("never suggests another account's saves", async () => {
+    const t = await as("next-owner");
+    await seedFeed(t, "someone-else", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2) }),
+    ).resolves.toBeNull();
+  });
+});
+
 describe("listLocatedItems", () => {
   it("returns only the caller's photos that carry coordinates", async () => {
     const t = await as("map-user");
