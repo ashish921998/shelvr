@@ -77,6 +77,8 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 /** The funnel stage vocabulary for `save_kind`. */
 type SaveKind = "link" | "note" | "image";
 
+type NextUpKind = "read" | "cook" | "watch" | "open";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
@@ -300,9 +302,9 @@ type AnalyticsEventProperties = {
   save_recall_dismissed: { match_count: number };
   // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
   // save's title or URL.
-  next_up_shown: { kind: "read" | "cook" };
-  next_up_opened: { kind: "read" | "cook" };
-  next_up_dismissed: { kind: "read" | "cook" };
+  next_up_shown: { kind: NextUpKind };
+  next_up_opened: { kind: NextUpKind };
+  next_up_dismissed: { kind: NextUpKind };
   // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
   // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };

@@ -9,7 +9,7 @@ import { AppState } from "react-native";
 import { analytics } from "@/lib/analytics";
 
 // The "Open this next" card on Home: one save worth going back to, picked on
-// the server with the save reminder rules (an unread article, or a recipe not
+// the server (the newest save of any kind not opened yet, or a recipe not
 // looked at lately). It stays until the person opens it or says not now.
 
 const HOUR_MS = 60 * 60 * 1000;

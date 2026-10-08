@@ -523,6 +523,51 @@ describe("nextUp", () => {
     expect(next?.subject).toBe("Lasagna");
   });
 
+  it("suggests every kind of save, newest first", async () => {
+    const t = await as("next-kinds");
+    const base = {
+      userId: "next-kinds",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+    };
+    const [note, photo, video, reel] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "A scarf",
+      }),
+      await ctx.db.insert("items", { ...base, type: "image", title: "Menu" }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "How to fold a shirt",
+        url: "https://www.youtube.com/watch?v=abc",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "A reel",
+        url: "https://www.instagram.com/reel/abc/",
+        media: [
+          { kind: "video", imageUrl: "https://x.test/a.jpg", aspectRatio: 1 },
+        ],
+      }),
+    ]);
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "watch", id: reel });
+    expect(await pick([reel])).toEqual({ kind: "watch", id: video });
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: photo });
+    await markOpened(t, "next-kinds", photo, now);
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: note });
+  });
+
   it("suggests nothing without Pro", async () => {
     const t = newConvexTest().withIdentity({
       subject: "next-free|session-1",

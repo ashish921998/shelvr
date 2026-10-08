@@ -606,6 +606,8 @@
   "home.nextUpTitle": "Ábrelo ahora",
   "home.nextUpRead": "Guardado para leer",
   "home.nextUpCook": "Guardado para cocinar",
+  "home.nextUpWatch": "Guardado para ver",
+  "home.nextUpOpen": "Guardado para después",
   "demo.pickHelp": "Shelvr lo lee, le pone título y lo archiva por ti.",
   "demo.clipboardNoLink": "No hay ningún enlace en el portapapeles. Copia uno o prueba uno de estos.",
   "demo.samplesOr": "O prueba uno de estos",
