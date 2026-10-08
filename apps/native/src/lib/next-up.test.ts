@@ -115,6 +115,18 @@ describe("useNextUp", () => {
     expect(mock.lastArgs).toMatchObject({ skip: ["item-1"] });
   });
 
+  it("does not carry one account's dismissals into another", () => {
+    store.failWrites = true;
+    const { result, rerender } = renderHook(
+      ({ userId }) => useNextUp(userId, true),
+      { initialProps: { userId: "user-1" } },
+    );
+    act(() => result.current.dismiss());
+    rerender({ userId: "user-2" });
+    expect(mock.lastArgs).toMatchObject({ skip: [] });
+    expect(result.current.next?.item._id).toBe("item-1");
+  });
+
   it("keeps dismissals per account", () => {
     const first = renderHook(() => useNextUp("user-1", true));
     act(() => first.result.current.dismiss());

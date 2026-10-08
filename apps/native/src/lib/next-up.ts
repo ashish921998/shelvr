@@ -70,12 +70,16 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
   }, [refreshNow]);
   // Dismissed while Home is mounted, kept here too in case the store write
   // failed.
-  const [dismissedNow, setDismissedNow] = useState<Id<"items">[]>([]);
+  const [dismissedNow, setDismissedNow] = useState<{
+    userId: string;
+    ids: Id<"items">[];
+  } | null>(null);
 
   const skip = useMemo(() => {
     if (!userId) return [];
     const stored = readDismissedNextUp(userId);
-    const added = dismissedNow.filter((id) => !stored.includes(id));
+    const session = dismissedNow?.userId === userId ? dismissedNow.ids : [];
+    const added = session.filter((id) => !stored.includes(id));
     return [...stored, ...added].slice(-DISMISSED_LIMIT);
   }, [userId, dismissedNow]);
   // gcTime ends an old subscription soon after the hour or the skip list
@@ -109,7 +113,10 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     if (!userId || !nextId || !kind) return;
     analytics.capture("next_up_dismissed", { kind });
     writeDismissedNextUp(userId, nextId);
-    setDismissedNow((ids) => [...ids, nextId]);
+    setDismissedNow((current) => ({
+      userId,
+      ids: [...(current?.userId === userId ? current.ids : []), nextId],
+    }));
   }, [userId, nextId, kind]);
 
   return { next, shown, opened, dismiss };
