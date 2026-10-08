@@ -25,6 +25,7 @@ import type * as items from "../items.js";
 import type * as legalConsent from "../legalConsent.js";
 import type * as legalConsentSync from "../legalConsentSync.js";
 import type * as model_accountCreated from "../model/accountCreated.js";
+import type * as model_appleIdToken from "../model/appleIdToken.js";
 import type * as model_appleJws from "../model/appleJws.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   legalConsent: typeof legalConsent;
   legalConsentSync: typeof legalConsentSync;
   "model/accountCreated": typeof model_accountCreated;
+  "model/appleIdToken": typeof model_appleIdToken;
   "model/appleJws": typeof model_appleJws;
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
