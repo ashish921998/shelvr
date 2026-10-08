@@ -38,6 +38,10 @@ const mock = vi.hoisted(() => ({
   sharedPayloads: [] as RawPayload[],
   resolvedSharedPayloads: [] as unknown[],
   isResolving: false,
+  // When set, the hook mock behaves like the real one: the raw batch is there
+  // on the first render with isResolving false, and resolution starts in a
+  // mount effect and settles when this promise does.
+  resolution: null as Promise<unknown[]> | null,
   openPaywall: vi.fn(),
   createLinkItem: vi.fn(),
   createNoteItem: vi.fn(),
@@ -108,18 +112,35 @@ vi.mock("expo-crypto", () => ({
   randomUUID: () => `session-${++mock.uuid}`,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => mock.router }));
-vi.mock("expo-sharing", () => ({
-  useIncomingShare: () => ({
-    sharedPayloads: mock.sharedPayloads,
-    resolvedSharedPayloads: mock.resolvedSharedPayloads,
-    isResolving: mock.isResolving,
-    error: null,
-    clearSharedPayloads: mock.clearSharedPayloads,
-  }),
-  // The native store the resume path reads. Clears are mocked, so it keeps
-  // whatever batch the test put there.
-  getSharedPayloads: () => mock.sharedPayloads,
-}));
+vi.mock("expo-sharing", async () => {
+  const { useEffect, useState } = await import("react");
+  return {
+    useIncomingShare: () => {
+      const [resolved, setResolved] = useState<unknown[]>([]);
+      const [resolving, setResolving] = useState(false);
+      useEffect(() => {
+        const resolution = mock.resolution;
+        if (resolution === null) return;
+        setResolving(true);
+        void resolution.then((payloads) => {
+          setResolved(payloads);
+          setResolving(false);
+        });
+      }, []);
+      const real = mock.resolution !== null;
+      return {
+        sharedPayloads: mock.sharedPayloads,
+        resolvedSharedPayloads: real ? resolved : mock.resolvedSharedPayloads,
+        isResolving: real ? resolving : mock.isResolving,
+        error: null,
+        clearSharedPayloads: mock.clearSharedPayloads,
+      };
+    },
+    // The native store the resume path reads. Clears are mocked, so it keeps
+    // whatever batch the test put there.
+    getSharedPayloads: () => mock.sharedPayloads,
+  };
+});
 vi.mock("react-native-mmkv", () => ({
   createMMKV: () => ({
     getString: (key: string) => mock.store.get(key),
@@ -189,6 +210,7 @@ beforeEach(() => {
   mock.sharedPayloads = [link];
   mock.resolvedSharedPayloads = [];
   mock.isResolving = false;
+  mock.resolution = null;
   mock.store.clear();
   mock.secure.clear();
   mock.uuid = 0;
@@ -219,6 +241,41 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   });
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
+});
+
+it("waits for the first resolution before saving a shared image", async () => {
+  // The hook hands over the raw batch before it has started resolving. With
+  // auth and Pro already cached, a save that starts then sees no resolved
+  // URI and marks the image failed for good.
+  mock.entitled = true;
+  mock.saveImages.mockResolvedValue([{ status: "saved", itemId: "item-1" }]);
+  const image: RawPayload = {
+    value: "content://media/1",
+    shareType: "image",
+    mimeType: "image/jpeg",
+  };
+  mock.sharedPayloads = [image];
+  let settleResolution: (payloads: unknown[]) => void = () => {};
+  mock.resolution = new Promise((resolve) => {
+    settleResolution = resolve;
+  });
+  render(<ShareScreen />);
+  await settle();
+  expect(mock.saveImages).not.toHaveBeenCalled();
+  expect(screen.queryByText("capture.retryFailed")).toBeNull();
+
+  await act(async () => {
+    settleResolution([
+      {
+        contentType: "image",
+        value: image.value,
+        contentUri: "file:///cache/1.jpg",
+        contentMimeType: image.mimeType,
+      },
+    ]);
+  });
+  await waitFor(() => expect(mock.saveImages).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 });
 
 it("gates a retry again when the entitlement lapses after a locked session ran", async () => {
