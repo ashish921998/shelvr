@@ -465,12 +465,16 @@ export function useDemoSave({
     advance();
   };
 
+  // The phase, not the view: a previewed sample's sign-in screen stays up
+  // after its save exists, and the one demo save is spent by then. A share
+  // arriving on that screen is held for the share screen, never consumed.
+  const { phase } = state;
   const canAcceptShare = useCallback(
     () =>
       !inFlightRef.current &&
       !advancedRef.current &&
-      (view === "share" || view === "auth"),
-    [view],
+      (view === "share" || (view === "auth" && phase === "auth")),
+    [view, phase],
   );
 
   return {

@@ -509,6 +509,9 @@ describe("useDemoSave", () => {
     });
     // Still being read: leaving now would drop the retry a failure needs.
     expect(onAdvance).not.toHaveBeenCalled();
+    // The demo save is spent, so a share arriving now is held, not consumed.
+    expect(result.current.view).toBe("auth");
+    expect(result.current.canAcceptShare()).toBe(false);
 
     mock.query = {
       data: { status: "ready" },
