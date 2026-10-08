@@ -31,12 +31,16 @@ const SETTLE_CTA = settleIn(850);
  * screen, which saves it after onboarding; nothing is saved here. */
 type Outcome = "received" | "other_app" | "skipped" | "sheet_failed";
 
-function sharedPayloadCount(): number {
+/** The shares expo-sharing holds, as one comparable value; "" for none.
+ * Android replaces the held batch instead of adding to it, so a new share
+ * shows as a different batch, not always as a longer one. */
+function heldShares(): string {
   try {
-    return getSharedPayloads().length;
+    const payloads = getSharedPayloads();
+    return payloads.length === 0 ? "" : JSON.stringify(payloads);
   } catch (err) {
     analytics.captureError("onboarding_share_practice_read_failed", err);
-    return 0;
+    return "";
   }
 }
 
@@ -52,8 +56,10 @@ export function SharePracticeStep({
 }: {
   /** A sample other than the one saved in the demo. */
   sample: DemoSample | undefined;
-  /** Leaves onboarding; the screen puts the paywall in front of the app. */
-  onFinish: () => void;
+  /** Leaves onboarding; the screen puts the paywall in front of the app.
+   * `onlyPracticeShare` is true when the practice share is the one share
+   * held, so letting it go loses nothing the user shared on their own. */
+  onFinish: (onlyPracticeShare: boolean) => void;
 }) {
   useAppLocale();
   const { entitled, loading: entitlementLoading } = useEntitlement();
@@ -64,11 +70,11 @@ export function SharePracticeStep({
   const receivedRef = useRef(false);
   // A share still waiting from before this step (one the demo left for the
   // share screen) is not this practice share; only a new payload counts.
-  const [waiting] = useState(sharedPayloadCount);
-  const hasIncomingShare = useCallback(
-    () => sharedPayloadCount() > waiting,
-    [waiting],
-  );
+  const [waiting] = useState(heldShares);
+  const hasIncomingShare = useCallback(() => {
+    const held = heldShares();
+    return held !== "" && held !== waiting;
+  }, [waiting]);
 
   const report = useCallback((outcome: Outcome) => {
     if (outcome !== "other_app") {
@@ -117,13 +123,13 @@ export function SharePracticeStep({
       report("other_app");
     } else if (result === "failed") {
       report("sheet_failed");
-      onFinish();
+      onFinish(false);
     }
   };
 
   const skip = () => {
     report("skipped");
-    onFinish();
+    onFinish(false);
   };
 
   if (received) {
@@ -164,7 +170,7 @@ export function SharePracticeStep({
                 ? "sharePractice.toShelf"
                 : "reveal.keepSaving",
             )}
-            onPress={onFinish}
+            onPress={() => onFinish(waiting === "")}
           />
         </Animated.View>
       </View>

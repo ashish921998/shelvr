@@ -74,6 +74,8 @@ function holdIncomingShare() {
 
 // Saving is Pro, so the practice link of someone who closed the paywall is
 // let go. Left held, the share screen would ask for Pro again in the app.
+// expo-sharing clears every held share at once, so this runs only when the
+// practice link is the one share held.
 function dropPracticeShare() {
   try {
     clearSharedPayloads();
@@ -110,6 +112,7 @@ export default function OnboardingScreen() {
     [],
   );
   const exitDemo = useCallback(() => setStep("setup"), []);
+  const onlyPracticeShareRef = useRef(false);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -207,10 +210,14 @@ export default function OnboardingScreen() {
   const askPaywall = useOnboardingPaywall({
     onPro: finish,
     onDecline: () => {
-      dropPracticeShare();
+      if (onlyPracticeShareRef.current) dropPracticeShare();
       finish();
     },
   });
+  const leaveShare = (onlyPracticeShare: boolean) => {
+    onlyPracticeShareRef.current = onlyPracticeShare;
+    askPaywall();
+  };
 
   if (showSignIn) {
     return (
@@ -337,7 +344,7 @@ export default function OnboardingScreen() {
                 kinds,
                 getOnboardingProgress().demo?.url ?? null,
               )}
-              onFinish={askPaywall}
+              onFinish={leaveShare}
             />
           )}
         </ScrollView>

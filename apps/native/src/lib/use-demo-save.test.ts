@@ -479,7 +479,7 @@ describe("useDemoSave", () => {
     });
   });
 
-  it("takes a previewed sample from sign-in straight on, without reading it a second time", async () => {
+  it("keeps a previewed sample's sign-in screen up until the item is read, then moves on", async () => {
     mock.authenticated = false;
     const { result, rerender, onAdvance, onSaved } = renderDemo();
     act(() => result.current.submitUrl("https://sample.test/ready-made"));
@@ -501,13 +501,43 @@ describe("useDemoSave", () => {
     expect(onAdvance).not.toHaveBeenCalled();
 
     await flush(() => resolve(saved()));
-    expect(views).toEqual(["auth"]);
+    views.push(result.current.view);
     expect(mock.create).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalledWith({
       itemId: ITEM_ID,
       savedSpaceNames: [],
     });
+    // Still being read: leaving now would drop the retry a failure needs.
+    expect(onAdvance).not.toHaveBeenCalled();
+
+    mock.query = {
+      data: { status: "ready" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    views.push(result.current.view);
+    expect(views).toEqual(["auth", "auth", "auth"]);
     expect(onAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the retry when a previewed sample fails after sign-in", async () => {
+    mock.authenticated = false;
+    const { result, rerender, onAdvance } = renderDemo();
+    act(() => result.current.submitUrl("https://sample.test/ready-made"));
+    act(() => result.current.previewed());
+    mock.create.mockResolvedValueOnce(saved());
+    mock.authenticated = true;
+    await flush(() => rerender());
+
+    mock.query = {
+      data: { status: "failed" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    expect(result.current.view).toBe("failed");
+    expect(onAdvance).not.toHaveBeenCalled();
   });
 
   it("returns to the sign-in ask without a replay when a previewed sample is picked again after going back", () => {

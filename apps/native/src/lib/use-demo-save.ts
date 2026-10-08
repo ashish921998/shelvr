@@ -138,7 +138,9 @@ export function demoSaveReducer(
       return {
         ...state,
         phase: "saved",
-        authRequest: null,
+        // A previewed sample's sign-in screen stays up until the item is
+        // read, and it still shows the request's space.
+        authRequest: alreadyPreviewed(state) ? state.authRequest : null,
         itemId: action.itemId,
         submitting: false,
       };
@@ -178,6 +180,10 @@ type ItemSnapshot = {
   status: "processing" | "ready" | "failed";
 } | null;
 
+function deadlineKeyOf(state: DemoSaveState): string {
+  return `${state.itemId}:${state.deadlineNonce}`;
+}
+
 /** The save in flight is for a sample whose reading steps already played. */
 function alreadyPreviewed(state: DemoSaveState): boolean {
   return state.previewedUrl !== null && state.previewedUrl === state.savingUrl;
@@ -208,6 +214,13 @@ export function deriveDemoView(
   if (query.isSuccess && item === null) {
     return { view: "share", lostError: "demo.saveGone" };
   }
+  // Saved from a previewed sample's sign-in screen (the request is kept only
+  // then): the reading steps already played, so that screen waits for the
+  // item instead. A slow read falls back to the reading view,
+  // which is where waiting longer or moving on is offered.
+  const slow = state.timedOutKey === deadlineKeyOf(state);
+  if (state.authRequest !== null && !slow)
+    return { view: "auth", lostError: null };
   return { view: "reading", lostError: null };
 }
 
@@ -277,8 +290,11 @@ export function useDemoSave({
   }, [status, advance]);
 
   // Only flips the slow flag. The user, never a timer, decides to move on.
-  const deadlineKey = `${itemId}:${state.deadlineNonce}`;
-  const watching = itemId !== null && view === "reading";
+  const deadlineKey = deadlineKeyOf(state);
+  const watching =
+    itemId !== null &&
+    state.phase === "saved" &&
+    (view === "reading" || view === "auth");
   useEffect(() => {
     if (!watching) return;
     const id = setTimeout(
@@ -295,7 +311,6 @@ export function useDemoSave({
       if (url === "" || inFlightRef.current) return;
       const trimmed = { ...request, url };
       const sample = isDemoSample(url);
-      const skipReading = resumed && state.previewedUrl === url;
       // Fires before any sign-in, so the funnel shows a pick that never got
       // past the sign-in sheet. Resuming after sign-in is not a new pick.
       if (!resumed) {
@@ -344,7 +359,6 @@ export function useDemoSave({
           itemId: result.itemId,
           savedSpaceNames: result.savedSpaceNames,
         });
-        if (skipReading) advance();
       } catch (err) {
         // Structured ConvexError data, never `err.message`: production
         // redacts a plain server Error to "Server Error".
@@ -358,14 +372,7 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [
-      advance,
-      createDemoItem,
-      isAuthenticated,
-      lost,
-      onSaved,
-      state.previewedUrl,
-    ],
+    [createDemoItem, isAuthenticated, lost, onSaved],
   );
 
   const submitUrl = useCallback(
