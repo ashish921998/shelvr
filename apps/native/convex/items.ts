@@ -93,6 +93,8 @@ const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
  * one spends a check, so this bounds the point reads, and a long read list
  * never hides every recipe. */
 const NEXT_UP_CHECKS_PER_KIND = 10;
+/** Saves the client has said "not now" to, skipped by `nextUp`. */
+export const NEXT_UP_SKIP_MAX = 50;
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -440,18 +442,28 @@ export const listRecentItems = query({
  * reminder rules (`model/saveReminders.ts`), so the card and the push agree
  * on what is worth bringing back. `now` comes from the client, since a query
  * is not rerun as time passes; the client rounds it so the cache holds.
+ * `skip` names saves the user said "not now" to, so the next one is offered.
+ * Pro only, like every other way back into the library.
  */
 export const nextUp = query({
-  args: { now: v.number() },
+  args: { now: v.number(), skip: v.array(v.id("items")) },
   returns: v.union(
     v.null(),
     v.object({
       kind: v.union(v.literal("read"), v.literal("cook")),
+      /** The dish for a recipe, else the title: what the card calls it. */
+      subject: v.string(),
       item: itemCardValidator,
     }),
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    if (
+      !(await hasProEntitlementStatus(ctx, userId)) ||
+      !(await hasProEntitlementAt(ctx, userId, args.now))
+    )
+      return null;
+    const skip = new Set<string>(args.skip.slice(-NEXT_UP_SKIP_MAX));
     const { rows } = await takeWithinBytes(
       ctx.db
         .query("items")
@@ -463,6 +475,7 @@ export const nextUp = query({
     );
     const checks = { read: 0, cook: 0 };
     for (const candidate of reminderCandidates(rows, args.now, undefined)) {
+      if (skip.has(candidate.item._id)) continue;
       if (checks[candidate.kind]++ >= NEXT_UP_CHECKS_PER_KIND) continue;
       const read = await ctx.db
         .query("itemReads")
@@ -474,6 +487,7 @@ export const nextUp = query({
         continue;
       return {
         kind: candidate.kind,
+        subject: candidate.subject,
         item: await toItemCard(ctx, candidate.item),
       };
     }

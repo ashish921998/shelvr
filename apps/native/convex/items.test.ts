@@ -431,7 +431,7 @@ describe("nextUp", () => {
     const ids = await seedFeed(t, "next-user", 3);
     await markOpened(t, "next-user", ids[2], Date.now());
 
-    const next = await t.query(api.items.nextUp, { now: later(2) });
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
     expect(next?.kind).toBe("read");
     expect(next?.item._id).toBe(ids[1]);
     // Card shape only: the article body never rides along.
@@ -443,7 +443,7 @@ describe("nextUp", () => {
     await seedFeed(t, "next-fresh", 1);
 
     await expect(
-      t.query(api.items.nextUp, { now: Date.now() }),
+      t.query(api.items.nextUp, { now: Date.now(), skip: [] }),
     ).resolves.toBeNull();
   });
 
@@ -463,7 +463,9 @@ describe("nextUp", () => {
     );
     const now = later(10);
     await markOpened(t, "next-cook", recipeId, now - 2 * DAY);
-    await expect(t.query(api.items.nextUp, { now })).resolves.toBeNull();
+    await expect(
+      t.query(api.items.nextUp, { now, skip: [] }),
+    ).resolves.toBeNull();
 
     await t.run(async (ctx) => {
       const read = await ctx.db
@@ -474,9 +476,51 @@ describe("nextUp", () => {
         .unique();
       await ctx.db.patch(read!._id, { lastOpenedAt: now - 8 * DAY });
     });
-    const next = await t.query(api.items.nextUp, { now });
+    const next = await t.query(api.items.nextUp, { now, skip: [] });
     expect(next?.kind).toBe("cook");
     expect(next?.item._id).toBe(recipeId);
+  });
+
+  it("moves on to the next save when told to skip one", async () => {
+    const t = await as("next-skip");
+    const ids = await seedFeed(t, "next-skip", 3);
+
+    const next = await t.query(api.items.nextUp, {
+      now: later(2),
+      skip: [ids[2]],
+    });
+    expect(next?.item._id).toBe(ids[1]);
+  });
+
+  it("names a recipe by its dish", async () => {
+    const t = await as("next-dish");
+    await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-dish",
+        type: "link",
+        status: "ready",
+        url: "https://example.com/dish",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "dish",
+      }),
+    );
+    const next = await t.query(api.items.nextUp, {
+      now: later(4),
+      skip: [],
+    });
+    expect(next?.subject).toBe("Lasagna");
+  });
+
+  it("suggests nothing without Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "next-free|session-1",
+    });
+    await seedFeed(t, "next-free", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
   });
 
   it("never suggests another account's saves", async () => {
@@ -484,7 +528,7 @@ describe("nextUp", () => {
     await seedFeed(t, "someone-else", 2);
 
     await expect(
-      t.query(api.items.nextUp, { now: later(2) }),
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
     ).resolves.toBeNull();
   });
 });

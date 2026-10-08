@@ -31,7 +31,7 @@ export function NextUpCard({
   useEffect(onShown, [onShown]);
   const { item } = next;
   const imageUri = item.imageUrl ?? item.heroImageUrl;
-  const title = item.title ?? t("item.untitledItem");
+  const title = next.subject;
   const host = item.url ? displayHost(item.url) : undefined;
   return (
     <InlineCard

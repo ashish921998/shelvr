@@ -1,5 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -20,22 +21,22 @@ export function hourFloor(now: number): number {
 
 // Keyed per account, like the other Home prompts.
 const dismissedKey = (userId: string) => `shelvr.nextUpDismissed.${userId}`;
-const DISMISSED_LIMIT = 50;
+const DISMISSED_LIMIT = 50; // NEXT_UP_SKIP_MAX on the server
 
-function readDismissedNextUp(userId: string): string[] {
+function readDismissedNextUp(userId: string): Id<"items">[] {
   const raw = SecureStore.getItem(dismissedKey(userId));
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((id): id is string => typeof id === "string")
+      ? parsed.filter((id): id is Id<"items"> => typeof id === "string")
       : [];
   } catch {
     return [];
   }
 }
 
-function writeDismissedNextUp(userId: string, itemId: string): void {
+function writeDismissedNextUp(userId: string, itemId: Id<"items">): void {
   const dismissed = readDismissedNextUp(userId).filter((id) => id !== itemId);
   dismissed.push(itemId);
   SecureStore.setItem(
@@ -46,21 +47,27 @@ function writeDismissedNextUp(userId: string, itemId: string): void {
 
 /**
  * The save the card names, or null. `enabled` is false while Pro is not
- * active, so a locked account never subscribes to it. A dismissed save stays
- * hidden; the card comes back when the server picks a different one.
+ * active, so a locked account never subscribes to it. Dismissed saves go to
+ * the server as `skip`, so "Not now" moves the card on to the next save.
  */
 export function useNextUp(userId: string | undefined, enabled: boolean) {
   const [now, setNow] = useState(() => hourFloor(Date.now()));
   useFocusEffect(useCallback(() => setNow(hourFloor(Date.now())), []));
   const [, setDismissedVersion] = useState(0);
 
-  const { data } = useQuery(
-    convexQuery(api.items.nextUp, userId && enabled ? { now } : "skip"),
-  );
-  const next =
-    data && userId && !readDismissedNextUp(userId).includes(data.item._id)
-      ? data
-      : null;
+  const skip = userId ? readDismissedNextUp(userId) : [];
+  // gcTime ends an old subscription soon after the hour or the skip list
+  // moves on, instead of keeping each one alive for the default day.
+  const { data } = useQuery({
+    ...convexQuery(
+      api.items.nextUp,
+      userId && enabled ? { now, skip } : "skip",
+    ),
+    gcTime: 30_000,
+  });
+  // The previous answer can still name the save just dismissed until the
+  // new one arrives.
+  const next = data && userId && !skip.includes(data.item._id) ? data : null;
 
   // Reported by the card as it renders, not here: another Home card can hold
   // the slot while this save is picked. Once per save per Home mount.

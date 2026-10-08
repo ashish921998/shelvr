@@ -11,7 +11,7 @@ vi.mock("expo-secure-store", () => ({
 
 const mock = vi.hoisted(() => ({
   data: undefined as
-    | { kind: "read" | "cook"; item: { _id: string } }
+    | { kind: "read" | "cook"; subject: string; item: { _id: string } }
     | null
     | undefined,
   lastArgs: undefined as unknown,
@@ -25,7 +25,7 @@ vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (_ref: unknown, args: unknown) => ({ args }),
 }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: ({ args }: { args: unknown }) => {
+  useQuery: ({ args }: { args: unknown; gcTime?: number }) => {
     mock.lastArgs = args;
     return { data: args === "skip" ? undefined : mock.data };
   },
@@ -34,7 +34,7 @@ vi.mock("@tanstack/react-query", () => ({
 beforeEach(() => {
   storage.clear();
   mock.capture.mockClear();
-  mock.data = { kind: "read", item: { _id: "item-1" } };
+  mock.data = { kind: "read", subject: "Save 1", item: { _id: "item-1" } };
 });
 
 describe("hourFloor", () => {
@@ -63,7 +63,7 @@ describe("useNextUp", () => {
     });
   });
 
-  it("hides a dismissed save until the server picks another", () => {
+  it("skips a dismissed save on the server and shows the next one", () => {
     const { result, rerender } = renderHook(() => useNextUp("user-1", true));
     act(() => result.current.dismiss());
     expect(result.current.next).toBeNull();
@@ -71,7 +71,9 @@ describe("useNextUp", () => {
       kind: "read",
     });
 
-    mock.data = { kind: "cook", item: { _id: "item-2" } };
+    // The server is asked to skip it and answers with the next save.
+    expect(mock.lastArgs).toMatchObject({ skip: ["item-1"] });
+    mock.data = { kind: "cook", subject: "Lasagna", item: { _id: "item-2" } };
     rerender();
     expect(result.current.next?.item._id).toBe("item-2");
   });
