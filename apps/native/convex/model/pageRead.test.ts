@@ -423,6 +423,7 @@ describe("readPage for YouTube videos", () => {
 
   it("falls back to the page when oEmbed refuses the link", async () => {
     serve({
+      [oEmbedUrl]: { ok: false, code: "http_error", status: 401 },
       [videoUrl]: html(
         videoUrl,
         '<html><head><meta property="og:title" content="A private video"></head><body></body></html>',
@@ -431,6 +432,26 @@ describe("readPage for YouTube videos", () => {
     await expect(readPage(videoUrl)).resolves.toMatchObject({
       status: "ok",
       page: { title: "A private video" },
+    });
+    const read = await readPage(videoUrl);
+    expect(read.status === "ok" && read.page.incomplete).toBeFalsy();
+  });
+
+  it.each([
+    ["times out", { ok: false, code: "timeout" }],
+    ["is rate limited", { ok: false, code: "http_error", status: 429 }],
+    ["answers without a title", json(oEmbedUrl, {})],
+  ])("keeps the save retryable when oEmbed %s", async (_, answer) => {
+    serve({
+      [oEmbedUrl]: answer,
+      [videoUrl]: html(
+        videoUrl,
+        "<html><head><title>Before you continue to YouTube</title></head><body></body></html>",
+      ),
+    });
+    await expect(readPage(videoUrl)).resolves.toMatchObject({
+      status: "ok",
+      page: { incomplete: true },
     });
   });
 });

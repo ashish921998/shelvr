@@ -373,12 +373,17 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
   };
 }
 
+/** oEmbed statuses that mean "not a video it will describe", not a hiccup. */
+const OEMBED_REFUSALS = new Set([400, 401, 403, 404]);
+
 /**
  * YouTube often answers a server's page load with a consent or bot-check page,
  * so the save came back as a bare "YouTube Video" with no picture. Its public
  * oEmbed endpoint answers with the title, channel, and thumbnail. A link
  * oEmbed refuses (a channel page, a private or embed-blocked video) falls back
  * to the plain page read, so nothing is marked gone on oEmbed's word alone.
+ * After a transient oEmbed failure the page read is marked incomplete, so the
+ * save can be retried for the real title and thumbnail.
  */
 async function fetchYouTube(url: string): Promise<PageData> {
   const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
@@ -405,7 +410,13 @@ async function fetchYouTube(url: string): Promise<PageData> {
   };
   const title = str("title");
   if (!title) {
-    return await fetchPage(url);
+    if (!result.ok && OEMBED_REFUSALS.has(result.status ?? 0)) {
+      return await fetchPage(url);
+    }
+    logEvent("warn", "youtube_oembed_failed", {
+      error_category: result.ok ? "unreadable" : result.code,
+    });
+    return { ...(await fetchPage(url)), incomplete: true };
   }
   const width = Number(data?.thumbnail_width);
   const height = Number(data?.thumbnail_height);
