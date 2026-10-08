@@ -15,7 +15,7 @@ import { CelebrationBadge } from "@/components/onboarding/celebration";
 import { settleIn } from "@/lib/motion";
 import * as Haptics from "expo-haptics";
 import { getSharedPayloads } from "expo-sharing";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
@@ -52,10 +52,13 @@ function heldShares(): string {
  */
 export function SharePracticeStep({
   sample,
+  leaving,
   onFinish,
 }: {
   /** A sample other than the one saved in the demo. */
   sample: DemoSample | undefined;
+  /** `onFinish` ran and the paywall is on its way: nothing here takes taps. */
+  leaving: boolean;
   /** Leaves onboarding; the screen puts the paywall in front of the app. */
   onFinish: () => void;
 }) {
@@ -66,13 +69,11 @@ export function SharePracticeStep({
   const [wrongApp, setWrongApp] = useState(false);
   const reported = useRef(false);
   const receivedRef = useRef(false);
-  // A share still waiting from before this step (one the demo left for the
-  // share screen) is not this practice share; only a new payload counts.
+  // A share held from before this step (one the demo left for the share
+  // screen). The practice only runs when there is none, so any share that
+  // shows up during it is the practice share.
   const [waiting] = useState(heldShares);
-  const hasIncomingShare = useCallback(() => {
-    const held = heldShares();
-    return held !== "" && held !== waiting;
-  }, [waiting]);
+  const hasIncomingShare = useCallback(() => heldShares() !== "", []);
 
   const report = useCallback((outcome: Outcome) => {
     if (outcome !== "other_app") {
@@ -130,6 +131,19 @@ export function SharePracticeStep({
     onFinish();
   };
 
+  // A share is already held for the share screen, and a practice share would
+  // replace it. Someone who shared to Shelvr on their own needs no practice.
+  const finishRef = useRef(onFinish);
+  useEffect(() => {
+    finishRef.current = onFinish;
+  });
+  useEffect(() => {
+    if (waiting === "") return;
+    report("skipped");
+    finishRef.current();
+  }, [waiting, report]);
+  if (waiting !== "") return null;
+
   if (received) {
     return (
       <View style={styles.wrap}>
@@ -169,6 +183,7 @@ export function SharePracticeStep({
                 : "reveal.keepSaving",
             )}
             onPress={onFinish}
+            busy={leaving}
           />
         </Animated.View>
       </View>
@@ -191,7 +206,7 @@ export function SharePracticeStep({
         <SampleCard
           sample={sample}
           action="share"
-          disabled={sheetOpen}
+          disabled={sheetOpen || leaving}
           onPress={() => void share()}
         />
       )}
@@ -211,7 +226,7 @@ export function SharePracticeStep({
         <GhostButton
           label={t("sharePractice.later")}
           onPress={skip}
-          disabled={sheetOpen}
+          disabled={sheetOpen || leaving}
         />
       </View>
     </View>

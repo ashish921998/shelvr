@@ -83,7 +83,9 @@ export function LiveDemoStep({
     onAdvance,
   });
   useIncomingShareUrl({
-    canAccept: demo.canAcceptShare,
+    // The one demo save is spent once a first save exists. Coming back to
+    // this step must not consume a share it can no longer save.
+    canAccept: () => !alreadySaved && demo.canAcceptShare(),
     readOnMount: resume === null,
     onSharedUrl: demo.submitSharedUrl,
   });

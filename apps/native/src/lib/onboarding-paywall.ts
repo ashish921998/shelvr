@@ -8,6 +8,8 @@ import { useConvexAuth } from "convex/react";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const ENTITLEMENT_WAIT_MS = 5000;
+
 /**
  * The paywall at the end of onboarding, after the share practice. `ask` waits
  * for the entitlement to load, then lets a Pro or signed-out account through
@@ -20,11 +22,19 @@ export function useOnboardingPaywall({
 }: {
   onPro: () => void;
   onDecline: () => void;
-}): () => void {
+}): { ask: () => void; asked: boolean } {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
   const { entitled, loading } = useEntitlement();
   const [asked, setAsked] = useState(false);
+  // Offline the entitlement never loads. Past this wait the account is
+  // treated as not Pro, so the step cannot hang on a spinner.
+  const [waitedOut, setWaitedOut] = useState(false);
+  useEffect(() => {
+    if (!asked || !loading) return;
+    const id = setTimeout(() => setWaitedOut(true), ENTITLEMENT_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [asked, loading]);
   const started = useRef(false);
   const handlers = useRef({ onPro, onDecline });
   useEffect(() => {
@@ -32,7 +42,7 @@ export function useOnboardingPaywall({
   });
 
   useEffect(() => {
-    if (!asked || loading || started.current) return;
+    if (!asked || (loading && !waitedOut) || started.current) return;
     started.current = true;
     // Skipping the first save skips sign-in too, and a purchase needs an
     // account. The app asks for both once onboarding is done.
@@ -56,7 +66,8 @@ export function useOnboardingPaywall({
         analytics.captureError("onboarding_paywall_failed", error);
         decline();
       });
-  }, [asked, loading, entitled, isAuthenticated, router]);
+  }, [asked, loading, waitedOut, entitled, isAuthenticated, router]);
 
-  return useCallback(() => setAsked(true), []);
+  const ask = useCallback(() => setAsked(true), []);
+  return { ask, asked };
 }

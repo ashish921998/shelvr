@@ -157,7 +157,9 @@ export function demoSaveReducer(
     case "cancelAuth":
       return { ...state, authRequest: null, savingUrl: null, phase: "share" };
     case "retryStarted":
-      return { ...state, submitting: true, error: null };
+      // A retry or a slow read is watched on the reading view from then on,
+      // not on the sign-in screen the save was made from.
+      return { ...state, submitting: true, error: null, authRequest: null };
     case "retried":
       return {
         ...state,
@@ -172,7 +174,7 @@ export function demoSaveReducer(
     case "keepWaiting":
       return { ...state, deadlineNonce: state.deadlineNonce + 1 };
     case "timedOut":
-      return { ...state, timedOutKey: action.key };
+      return { ...state, timedOutKey: action.key, authRequest: null };
   }
 }
 
@@ -216,11 +218,9 @@ export function deriveDemoView(
   }
   // Saved from a previewed sample's sign-in screen (the request is kept only
   // then): the reading steps already played, so that screen waits for the
-  // item instead. A slow read falls back to the reading view,
-  // which is where waiting longer or moving on is offered.
-  const slow = state.timedOutKey === deadlineKeyOf(state);
-  if (state.authRequest !== null && !slow)
-    return { view: "auth", lostError: null };
+  // item instead. A slow read or a retry drops the request, and with it
+  // this screen, for the reading view.
+  if (state.authRequest !== null) return { view: "auth", lostError: null };
   return { view: "reading", lostError: null };
 }
 
@@ -468,13 +468,14 @@ export function useDemoSave({
   // The phase, not the view: a previewed sample's sign-in screen stays up
   // after its save exists, and the one demo save is spent by then. A share
   // arriving on that screen is held for the share screen, never consumed.
-  const { phase } = state;
+  const { phase, demoUsed } = state;
   const canAcceptShare = useCallback(
     () =>
       !inFlightRef.current &&
       !advancedRef.current &&
+      !demoUsed &&
       (view === "share" || (view === "auth" && phase === "auth")),
-    [view, phase],
+    [view, phase, demoUsed],
   );
 
   return {

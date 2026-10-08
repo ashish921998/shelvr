@@ -97,28 +97,35 @@ beforeEach(() => {
 });
 
 describe("share practice", () => {
-  it("ignores a share that was already waiting when the step opened", () => {
-    mock.payloads = [{ value: "https://old.test", shareType: "url" }];
-    render(<SharePracticeStep sample={DEMO_SAMPLES[1]} onFinish={vi.fn()} />);
-    act(() => mock.arrive?.());
-    expect(received()).toHaveLength(0);
-    expect(screen.getByText("sharePractice.title")).toBeTruthy();
+  it("skips the practice when a share is already held, so it is not replaced", () => {
+    mock.payloads = [{ value: "https://mine.test", shareType: "url" }];
+    const onFinish = vi.fn();
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={onFinish}
+      />,
+    );
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("share-sample")).toBeNull();
+    expect(mock.present).not.toHaveBeenCalled();
+  });
 
-    mock.payloads = [...mock.payloads, { value: "https://new.test" }];
+  it("notices the practice share when it arrives", () => {
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
+    mock.payloads = [{ value: "https://new.test" }];
     act(() => mock.arrive?.());
     expect(received()).toHaveLength(1);
     expect(screen.getByText("sharePractice.savedTitle")).toBeTruthy();
     // The done screen names the link that was just shared.
     expect(screen.getByText(DEMO_SAMPLES[1].pageHeading)).toBeTruthy();
-  });
-
-  it("notices a share that replaces the one already waiting", () => {
-    mock.payloads = [{ value: "https://old.test" }];
-    render(<SharePracticeStep sample={DEMO_SAMPLES[1]} onFinish={vi.fn()} />);
-
-    mock.payloads = [{ value: "https://new.test" }];
-    act(() => mock.arrive?.());
-    expect(received()).toHaveLength(1);
   });
 
   it("counts one share once when the listener and the sheet both see it", async () => {
@@ -128,7 +135,13 @@ describe("share practice", () => {
         finish = resolve;
       }),
     );
-    render(<SharePracticeStep sample={DEMO_SAMPLES[1]} onFinish={vi.fn()} />);
+    render(
+      <SharePracticeStep
+        sample={DEMO_SAMPLES[1]}
+        leaving={false}
+        onFinish={vi.fn()}
+      />,
+    );
     fireEvent.click(screen.getByText("share-sample"));
 
     mock.payloads = [{ value: "https://sample.test" }];

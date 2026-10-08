@@ -31,7 +31,7 @@ async function ask(entitlement: { entitled: boolean; loading: boolean }) {
   const onDecline = vi.fn();
   const hook = renderHook(() => useOnboardingPaywall({ onPro, onDecline }));
   await act(async () => {
-    hook.result.current();
+    hook.result.current.ask();
     await Promise.resolve();
   });
   return { onPro, onDecline, hook };

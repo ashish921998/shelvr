@@ -524,6 +524,30 @@ describe("useDemoSave", () => {
     expect(onAdvance).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves the sign-in screen for good once a previewed sample's read is slow", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.authenticated = false;
+      const { result, rerender } = renderDemo();
+      act(() => result.current.submitUrl("https://sample.test/ready-made"));
+      act(() => result.current.previewed());
+      mock.create.mockResolvedValueOnce(saved());
+      mock.authenticated = true;
+      rerender();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.view).toBe("auth");
+
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(result.current.view).toBe("reading");
+      act(() => result.current.keepWaiting());
+      expect(result.current.view).toBe("reading");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offers the retry when a previewed sample fails after sign-in", async () => {
     mock.authenticated = false;
     const { result, rerender, onAdvance } = renderDemo();
@@ -541,6 +565,17 @@ describe("useDemoSave", () => {
     rerender();
     expect(result.current.view).toBe("failed");
     expect(onAdvance).not.toHaveBeenCalled();
+
+    // Retrying watches the item on the reading view, not the sign-in screen.
+    mock.retry.mockResolvedValueOnce(null);
+    await flush(() => void result.current.retry());
+    mock.query = {
+      data: { status: "processing" },
+      isError: false,
+      isSuccess: true,
+    };
+    rerender();
+    expect(result.current.view).toBe("reading");
   });
 
   it("returns to the sign-in ask without a replay when a previewed sample is picked again after going back", () => {

@@ -32,6 +32,11 @@ export function notePurchasedDuringOnboarding() {
   onboardingPaywall = "purchased";
 }
 
+/** A purchase made in onboarding whose entitlement may not have landed. */
+export function purchasedDuringOnboarding(): boolean {
+  return onboardingPaywall === "purchased";
+}
+
 export function noteDeclinedDuringOnboarding() {
   onboardingPaywall = "declined";
 }

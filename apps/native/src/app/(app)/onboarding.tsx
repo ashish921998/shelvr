@@ -114,7 +114,15 @@ export default function OnboardingScreen() {
     (back: (() => void) | null) => setDemoBack(() => back),
     [],
   );
-  const exitDemo = useCallback(() => setStep("setup"), []);
+  // The save a relaunch left unfinished is resumed once. Leaving the demo
+  // step either way drops it, so coming back starts from the picker.
+  const [resumeDemo, setResumeDemo] = useState(() =>
+    initialStep === "demo" ? initialProgress.demo : null,
+  );
+  const exitDemo = useCallback(() => {
+    setResumeDemo(null);
+    setStep("setup");
+  }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
   const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
@@ -213,7 +221,7 @@ export default function OnboardingScreen() {
     kinds,
     getOnboardingProgress().demo?.url ?? null,
   );
-  const askPaywall = useOnboardingPaywall({
+  const paywall = useOnboardingPaywall({
     onPro: finish,
     onDecline: () => {
       dropPracticeShare(practiceSample?.url);
@@ -236,11 +244,13 @@ export default function OnboardingScreen() {
   // from the share step has to clear it too.
   const previous =
     step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
-  const goBack = previous
-    ? () => setStep(previous)
-    : step === "demo"
-      ? demoBack
-      : null;
+  const goBack = paywall.asked
+    ? null
+    : previous
+      ? () => setStep(previous)
+      : step === "demo"
+        ? demoBack
+        : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -326,13 +336,16 @@ export default function OnboardingScreen() {
               samples={orderDemoSamples(kinds, interests)}
               titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
-              resume={initialStep === "demo" ? initialProgress.demo : null}
+              resume={resumeDemo}
               alreadySaved={saved !== null}
               onSaved={setSaved}
               onReadingChange={setReading}
               onBackChange={changeDemoBack}
               onExit={exitDemo}
-              onAdvance={advance}
+              onAdvance={() => {
+                setResumeDemo(null);
+                advance();
+              }}
             />
           )}
 
@@ -341,7 +354,11 @@ export default function OnboardingScreen() {
           )}
 
           {step === "share" && (
-            <SharePracticeStep sample={practiceSample} onFinish={askPaywall} />
+            <SharePracticeStep
+              sample={practiceSample}
+              leaving={paywall.asked}
+              onFinish={paywall.ask}
+            />
           )}
         </ScrollView>
       )}

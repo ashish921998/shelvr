@@ -39,6 +39,7 @@ const mock = vi.hoisted(() => {
       continueAfterTimeout: vi.fn(),
       previewed: vi.fn(),
     },
+    intake: { canAccept: (): boolean => true },
     nothing: () => null,
     view: ({ children }: Children) => <div>{children}</div>,
     text: ({ children }: Children) => <span>{children}</span>,
@@ -149,7 +150,9 @@ vi.mock("@/lib/use-demo-save", () => ({
   useDemoSave: () => ({ ...mock.demo, ...mock.actions }),
 }));
 vi.mock("@/lib/use-incoming-share-url", () => ({
-  useIncomingShareUrl: () => undefined,
+  useIncomingShareUrl: (options: { canAccept: () => boolean }) => {
+    mock.intake.canAccept = options.canAccept;
+  },
 }));
 vi.mock("@/components/onboarding/sample-sign-in", () => ({
   SampleSignIn: mock.sampleSignIn,
@@ -285,6 +288,17 @@ describe("first-save picker", () => {
     render(step());
     fireEvent.click(screen.getByText("demo.skip"));
     expect(mock.actions.skip).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops taking shared links once the first save exists", () => {
+    mock.demo.view = "share";
+    const { rerender } = render(step());
+    expect(mock.intake.canAccept()).toBe(true);
+
+    // Back from a later step: the one demo save is spent, so a held share
+    // is left for the share screen.
+    rerender(<LiveDemoStep {...props} alreadySaved />);
+    expect(mock.intake.canAccept()).toBe(false);
   });
 
   it("offers the way on when the first save already exists", () => {
