@@ -230,6 +230,16 @@ describe("holdsOnlyLink", () => {
       false,
     ],
     ["a photo", [{ value: "ph://IMG_1", shareType: "image" }], false],
+    [
+      "the practice link with a caption",
+      [{ value: `Read this ${practice}`, shareType: "text" }],
+      true,
+    ],
+    [
+      "the practice link and a second link in one text",
+      [{ value: `${practice} https://mine.test`, shareType: "text" }],
+      false,
+    ],
   ])("%s", (_, payloads, expected) => {
     expect(holdsOnlyLink(payloads, practice)).toBe(expected);
   });

@@ -29,12 +29,14 @@ export function decideShareIntake(
 }
 
 /** True when the one share held is this link. Anything else held, beside it
- * or in its place, is a different share and must be kept. */
+ * or in its place, is a different share and must be kept. That includes a
+ * second link inside the same text; a caption around the one link is fine. */
 export function holdsOnlyLink(
   payloads: RawSharePayload[],
   url: string,
 ): boolean {
-  return payloads.length === 1 && firstSharedUrl(payloads) === url;
+  if (payloads.length !== 1 || firstSharedUrl(payloads) !== url) return false;
+  return (payloads[0].value.match(/https?:\/\//gi) ?? []).length <= 1;
 }
 
 // The link last handed to the demo and still held. The app coming back to the

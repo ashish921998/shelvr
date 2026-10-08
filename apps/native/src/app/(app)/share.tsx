@@ -39,7 +39,7 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
-import { purchasedDuringOnboarding } from "@/lib/replay-onboarding";
+import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -134,8 +134,8 @@ export default function ShareScreen() {
   const { entitled } = entitlement;
   // A purchase made in onboarding reaches Convex by webhook a moment later.
   // Until it does, a held share waits instead of asking for Pro again.
-  const entitlementLoading =
-    entitlement.loading || (!entitled && purchasedDuringOnboarding());
+  const awaitingPurchase = useAwaitingOnboardingPurchase(entitled);
+  const entitlementLoading = entitlement.loading || awaitingPurchase;
   const {
     sharedPayloads,
     resolvedSharedPayloads,
