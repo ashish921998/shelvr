@@ -2,8 +2,8 @@
 
 /**
  * Reading a saved link's page: fetch it through the safe fetcher, pick the
- * reader for the host (TikTok oEmbed, X syndication, Instagram embed, or a
- * plain HTML page), extract the title, meta, hero image, readable body and any
+ * reader for the host (TikTok and YouTube oEmbed, X syndication, Instagram
+ * embed, or a plain HTML page), extract the title, meta, hero image, readable body and any
  * schema.org recipe, and follow a caption's link to its recipe page.
  *
  * `readPage(url)` is the one entry point the classifier needs. Host knowledge
@@ -370,6 +370,62 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
     heroImageUrl: str("thumbnail_url"),
     heroAspectRatio: width > 0 && height > 0 ? width / height : 9 / 16,
     content: caption,
+  };
+}
+
+/** oEmbed statuses that mean "not a video it will describe", not a hiccup. */
+const OEMBED_REFUSALS = new Set([400, 401, 403, 404]);
+
+/**
+ * YouTube often answers a server's page load with a consent or bot-check page,
+ * so the save came back as a bare "YouTube Video" with no picture. Its public
+ * oEmbed endpoint answers with the title, channel, and thumbnail. A link
+ * oEmbed refuses (a channel page, a private or embed-blocked video) falls back
+ * to the plain page read, so nothing is marked gone on oEmbed's word alone.
+ * After a transient oEmbed failure the page read is marked incomplete, so the
+ * save can be retried for the real title and thumbnail.
+ */
+async function fetchYouTube(url: string): Promise<PageData> {
+  const endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
+  const result = await safeFetch(endpoint, {
+    timeoutMs: 15000,
+    maxBytes: 64 * 1024,
+    allowContentType: (ct) => ct.startsWith("application/json"),
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+  });
+  let data: Record<string, unknown> | undefined;
+  if (result.ok) {
+    try {
+      const parsed: unknown = parseJson(result.bytes);
+      if (typeof parsed === "object" && parsed !== null) {
+        data = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Unreadable answer; read the page instead.
+    }
+  }
+  const str = (key: string) => {
+    const value = data?.[key];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const title = str("title");
+  if (!title) {
+    if (!result.ok && OEMBED_REFUSALS.has(result.status ?? 0)) {
+      return await fetchPage(url);
+    }
+    logEvent("warn", "youtube_oembed_failed", {
+      error_category: result.ok ? "unreadable" : result.code,
+    });
+    return { ...(await fetchPage(url)), incomplete: true };
+  }
+  const width = Number(data?.thumbnail_width);
+  const height = Number(data?.thumbnail_height);
+  return {
+    title,
+    siteName: "YouTube",
+    author: str("author_name"),
+    heroImageUrl: str("thumbnail_url"),
+    heroAspectRatio: width > 0 && height > 0 ? width / height : undefined,
   };
 }
 
@@ -1715,6 +1771,7 @@ const SOURCE_READERS = {
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
   instagram: async (url) => withLinkedRecipe(await fetchInstagram(url)),
   pinterest: fetchPinterestPin,
+  youtube: fetchYouTube,
 } satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
 
 export async function readPage(url: string): Promise<PageRead> {
