@@ -273,7 +273,7 @@ type AnalyticsEventProperties = {
     surface: "demo_sheet" | "sample_preview";
     action: "shown" | "dismissed";
   };
-  // The share-sheet practice after the paywall (onboarding/share-practice.tsx).
+  // The share-sheet practice before the paywall (onboarding/share-practice.tsx).
   // "received" is a share that reached Shelvr, saved later by the share
   // screen. "other_app" can repeat; the other outcomes fire once per mount.
   onboarding_share_practice: {
