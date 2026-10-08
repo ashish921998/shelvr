@@ -35,6 +35,8 @@
   "notifications.trialChannel": "Recordatorios de la prueba",
   "notifications.trialEndingTitle": "Tu prueba gratuita termina en 2 días",
   "notifications.trialEndingBody": "Quédate con Shelvr Pro o cancela cuando quieras desde el Perfil antes de que se renueve.",
+  "notifications.trialLastDayTitle": "Tu prueba gratuita termina mañana",
+  "notifications.trialLastDayBody": "Si no has cancelado, Shelvr Pro se renueva entonces. Gestiónalo desde el Perfil.",
   "notifications.trialPrimerTitle": "¿Te avisamos antes del cobro?",
   "notifications.trialPrimerBody": "Te recordaremos 2 días antes de que termine tu prueba, para que nunca se renueve por sorpresa. Puedes cancelar cuando quieras desde Perfil.",
   "notifications.trialPrimerAllow": "Avísame",
