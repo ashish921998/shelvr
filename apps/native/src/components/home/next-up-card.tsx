@@ -86,14 +86,19 @@ export function NextUpCard({
         accessibilityRole="button"
         accessibilityLabel={t("common.notNow")}
         testID="next-up-dismiss"
-        hitSlop={theme.control.pressRetentionOffset}
         onPress={onDismiss}
         style={({ pressed }) => [
           styles.dismiss,
           pressed && { opacity: theme.opacity.pressed },
         ]}
       >
-        <AppSymbolIcon name="xmark" size={12} tintColor={theme.colors.muted} />
+        <View style={styles.dismissDot}>
+          <AppSymbolIcon
+            name="xmark"
+            size={14}
+            tintColor={theme.colors.muted}
+          />
+        </View>
       </Pressable>
     </View>
   );
@@ -113,7 +118,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
     padding: theme.gap(1.5),
     // Room for the dismiss button in the top corner.
-    paddingRight: theme.gap(4),
+    paddingRight: theme.gap(5),
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
@@ -151,10 +156,17 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.caption,
     color: theme.colors.muted,
   },
+  // A full-size tap target around the small visible circle.
   dismiss: {
     position: "absolute",
-    top: theme.gap(1),
-    right: theme.gap(1),
+    top: 0,
+    right: 0,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismissDot: {
     width: 24,
     height: 24,
     borderRadius: 12,
