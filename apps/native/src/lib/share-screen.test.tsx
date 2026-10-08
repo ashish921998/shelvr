@@ -182,11 +182,6 @@ const resolvedLink = {
 // before a negative assertion.
 const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
 
-async function confirmShare() {
-  await waitFor(() => expect(screen.getByText("common.save")).toBeDefined());
-  fireEvent.click(screen.getByText("common.save"));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   mock.entitled = false;
@@ -204,7 +199,6 @@ beforeEach(() => {
 
 it("presents one paywall per session across effect re-runs and saves once entitled", async () => {
   const view = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
   expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
   expect(screen.getByText("pro.unlockShelvr")).toBeDefined();
@@ -227,25 +221,9 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
 });
 
-it("previews new and resumed Android shares without saving until confirmed", async () => {
-  mock.entitled = true;
-  const first = render(<ShareScreen />);
-  await waitFor(() => expect(screen.getByText(link.value)).toBeDefined());
-  await settle();
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  expect(mock.saveImages).not.toHaveBeenCalled();
-  first.unmount();
-  render(<ShareScreen />);
-  await waitFor(() => expect(screen.getByText("common.save")).toBeDefined());
-  expect(mock.createLinkItem).not.toHaveBeenCalled();
-  await confirmShare();
-  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
-});
-
 it("gates a retry again when the entitlement lapses after a locked session ran", async () => {
   mock.createLinkItem.mockRejectedValue(new Error("save failed"));
   const view = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
 
   mock.entitled = true;
@@ -310,7 +288,6 @@ it("keeps the tombstone when the native clear fails and the user cancels", async
     throw new Error("clear failed");
   });
   const first = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("share.finishFailed")).toBeDefined(),
   );
@@ -343,7 +320,6 @@ it("records the discard when Cancel's native clear throws, so the leftover is no
     throw new Error("clear failed");
   });
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
@@ -364,7 +340,6 @@ it("clears the pending flag and the discard record once a share completes", asyn
     fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
   );
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
 
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
@@ -378,7 +353,6 @@ it("still resumes and saves a different batch after a discard", async () => {
     throw new Error("clear failed");
   });
   const first = render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() =>
     expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
   );
@@ -399,7 +373,6 @@ it("still resumes and saves a different batch after a discard", async () => {
   mock.entitled = true;
   mock.router.replace.mockClear();
   render(<ShareScreen />);
-  await confirmShare();
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith("/"));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
