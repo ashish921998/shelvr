@@ -91,11 +91,10 @@ vi.mock("@/lib/feedback", async (importOriginal) => ({
   markNativeReviewPrompted: mock.markNativeReviewPrompted,
 }));
 
-type Status = "processing" | "ready" | "failed";
-let nextId = 0;
-const item = (overrides: Partial<{ status: Status }> = {}) => ({
-  _id: `item-${nextId++}`,
-  status: "ready" as Status,
+const item = (
+  overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {},
+) => ({
+  status: "ready" as const,
   ...overrides,
 });
 const threeReady = () => [item(), item(), item()];
@@ -235,19 +234,12 @@ describe("useReviewPrompt", () => {
   const flush = () => vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS);
 
   type Feed = ReturnType<typeof threeReady>;
-  /** Mounts the hook across a win: the first render shows the first save
-   * still processing, and every later render shows the feed as it is. */
+  /** Mounts the hook across a win: the first render is on an opened save,
+   * and every later render is back on Home. */
   const mountFiled = (getItems: () => Feed, run: (feed: Feed) => void) => {
-    let watching = true;
-    react.mount(() => {
-      const items = getItems();
-      run(
-        watching
-          ? [{ ...items[0], status: "processing" as Status }, ...items.slice(1)]
-          : items,
-      );
-    });
-    watching = false;
+    mock.segments = ["(app)", "item", "[id]"];
+    react.mount(() => run(getItems()));
+    mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
   };
 
@@ -467,7 +459,7 @@ describe("useReviewPrompt", () => {
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
   });
 
-  it("never asks when the app opens onto a full Home with no save filed", async () => {
+  it("never asks when the app opens onto a full Home with no save opened", async () => {
     const items = threeReady();
     react.mount(() => useReviewPrompt(items));
     await flush();
@@ -475,30 +467,26 @@ describe("useReviewPrompt", () => {
     expect(isNativeReviewAttemptInFlight()).toBe(false);
   });
 
-  it("does not count a save that fails as a win", async () => {
-    const saving = item({ status: "processing" });
-    let items = [...threeReady(), saving];
+  it("does not count coming back from a screen that is not a save", async () => {
+    const items = threeReady();
+    mock.segments = ["(app)", "settings"];
     react.mount(() => useReviewPrompt(items));
-    items = [...items.slice(0, 3), { ...saving, status: "failed" }];
+    mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
     await flush();
     expect(mock.hasAction).not.toHaveBeenCalled();
   });
 
-  it("asks back on Home when the save was filed while item detail was open", async () => {
+  it("lets the moment pass once another screen comes between the save and Home", async () => {
     const items = threeReady();
     mock.segments = ["(app)", "item", "[id]"];
-    mountFiled(
-      () => items,
-      (feed) => useReviewPrompt(feed),
-    );
-    await flush();
-    expect(mock.hasAction).not.toHaveBeenCalled();
-
+    react.mount(() => useReviewPrompt(items));
+    mock.segments = ["(app)", "settings"];
+    react.rerender();
     mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
     await flush();
-    expect(mock.requestReview).toHaveBeenCalledOnce();
+    expect(mock.hasAction).not.toHaveBeenCalled();
   });
 
   it("waits out a trip to the background, then settles again on return", async () => {

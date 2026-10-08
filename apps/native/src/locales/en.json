@@ -36,7 +36,7 @@
   "notifications.trialEndingTitle": "Your free trial ends in 2 days",
   "notifications.trialEndingBody": "Keep Shelvr Pro, or cancel anytime from Profile before it renews.",
   "notifications.trialLastDayTitle": "Your free trial ends tomorrow",
-  "notifications.trialLastDayBody": "Shelvr Pro renews then, and your saves stay with you. To stop it, cancel from Profile today.",
+  "notifications.trialLastDayBody": "Unless you've cancelled, Shelvr Pro renews then. Manage it from Profile.",
   "notifications.trialPrimerTitle": "Want a heads-up before you're charged?",
   "notifications.trialPrimerBody": "We'll remind you 2 days before your trial ends, so it never renews by surprise. You can cancel anytime from Profile.",
   "notifications.trialPrimerAllow": "Remind me",

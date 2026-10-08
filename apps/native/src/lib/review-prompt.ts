@@ -25,34 +25,28 @@ const READY_ITEM_THRESHOLD = 3;
  */
 export const REVIEW_PROMPT_SETTLE_MS = 1500;
 
-/** A feed item the prompt can follow from processing to ready. */
-type ReviewFeedItem = FeedbackFeedItem & { _id: string };
-
 /**
- * Asks for a rating right after a win: a save the user watched arrive in this
- * session has just been read, titled and filed. Opening the app onto an
- * already-full Home is not a win, so it never asks then. `defer` holds the
- * prompt back, e.g. through an account's first session: asking for a rating
- * before real use is what people resent.
+ * Asks for a rating right after a win: coming back to Home from a save the
+ * user opened, the "saved it, came back to it" moment. That works whichever
+ * way the save arrived. Opening the app onto a full Home is not a win, so it
+ * never asks then. `defer` holds the prompt back, e.g. through an account's
+ * first session: asking for a rating before real use is what people resent.
  */
 export function useReviewPrompt(
-  items: ReviewFeedItem[] | undefined,
+  items: FeedbackFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
 ) {
-  // Saves seen processing this session, and whether one has since turned
-  // ready. Tracked on every feed change, Home or not, so a save that finishes
-  // while item detail is open still counts once the user is back on Home.
-  const seenProcessing = useRef(new Set<string>());
-  const [filed, setFiled] = useState(false);
+  const segments: readonly string[] = useSegments();
+  const home = isHomeRootRoute(segments);
+  const onSave = segments[1] === "item";
+  // Whether the screen before this visit to Home was a save. Any other screen
+  // in between ends the moment, so the ask never lands long after the win.
+  const cameFromSave = useRef(false);
+  const [returned, setReturned] = useState(false);
   useEffect(() => {
-    if (!items || filed) return;
-    for (const item of items) {
-      if (item.status === "processing") seenProcessing.current.add(item._id);
-      else if (item.status === "ready" && seenProcessing.current.has(item._id))
-        setFiled(true);
-    }
-  }, [items, filed]);
-  const home = isHomeRootRoute(useSegments());
+    if (home) setReturned(cameFromSave.current);
+    else cameFromSave.current = onSave;
+  }, [onSave, home]);
   const homeRef = useRef(home);
   useEffect(() => {
     homeRef.current = home;
@@ -70,7 +64,7 @@ export function useReviewPrompt(
   // pushing the prompt back until the feed is quiet: Home must hold still.
   useEffect(() => {
     if (
-      !filed ||
+      !returned ||
       !home ||
       defer ||
       keyboardVisible ||
@@ -130,5 +124,5 @@ export function useReviewPrompt(
         if (!cancelled) setNativeReviewAttemptInFlight(false);
       }
     }
-  }, [items, filed, home, defer, keyboardVisible, appState]);
+  }, [items, returned, home, defer, keyboardVisible, appState]);
 }
