@@ -2190,7 +2190,15 @@ export const createShareLink = mutation({
       .query("shareLinks")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .first();
-    if (existing !== null) return existing.token;
+    if (existing !== null) {
+      // A link that outlived an earlier share attempt may already be in
+      // someone's hands (older builds never confirm), so a cancel of this
+      // attempt must not withdraw it.
+      if (existing.confirmedAt === undefined) {
+        await ctx.db.patch(existing._id, { confirmedAt: Date.now() });
+      }
+      return existing.token;
+    }
 
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
@@ -2462,6 +2470,9 @@ export const finalizeItem = internalMutation({
   returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
+    // Checked in the committing transaction: a vector made just before the
+    // owner turned AI off must not land after their vectors were cleared.
+    const embedAllowed = item !== null && (await aiAllowed(ctx, item.userId));
     if (item === null) {
       return "missing";
     }
@@ -2518,7 +2529,9 @@ export const finalizeItem = internalMutation({
       // rejects a vector whose width differs from the index at write time, and
       // that would fail this whole transaction — losing the classification
       // over a field that is optional by design.
-      ...(args.embedding !== undefined && isValidEmbedding(args.embedding)
+      ...(embedAllowed &&
+      args.embedding !== undefined &&
+      isValidEmbedding(args.embedding)
         ? {
             embedding: args.embedding,
             embeddingVersion: CURRENT_EMBEDDING_VERSION,
@@ -2746,6 +2759,9 @@ export const setEmbeddingsInternal = internalMutation({
           : { searchText: nextSearchText };
 
       if (entry.outcome === "ai_declined") {
+        // Turned back on since the action read it: leave the row for the
+        // next sweep to embed rather than stamping it as done.
+        if (await aiAllowed(ctx, item.userId)) continue;
         await ctx.db.patch(entry.itemId, {
           ...reindex,
           embedding: undefined,

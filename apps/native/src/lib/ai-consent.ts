@@ -34,7 +34,7 @@ function savesBlocked(
 }
 
 export function useAiConsent() {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useConvexAuth();
   // The React Query adapter, not convex/react: a read that fails during a
   // token refresh must not throw into the layout that renders this.
   const { data } = useQuery(
@@ -48,9 +48,10 @@ export function useAiConsent() {
   const answered = status === "granted" || status === "declined";
   useEffect(() => {
     if (answered) store.set(ANSWERED_KEY, true);
-    else if (status === "unset" || status === "signed-out")
+    // Auth still restoring reads as signed out; that must not forget the answer.
+    else if (status === "unset" || (status === "signed-out" && !isLoading))
       store.remove(ANSWERED_KEY);
-  }, [answered, status]);
+  }, [answered, status, isLoading]);
 
   /** Rejects when the answer was not recorded; the caller shows that. */
   const answer = useCallback(

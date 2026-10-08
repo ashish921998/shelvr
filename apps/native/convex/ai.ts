@@ -547,6 +547,40 @@ function unclassified(
   return { title, description, tags: [], spaceNames: [], intents: [] };
 }
 
+/** The answer as it stands now, after the page read and the model call: a
+ * withdrawal mid-run stops the embedding and the suggestions. */
+async function stillAllowed(
+  ctx: ActionCtx,
+  allowedAtStart: boolean,
+  userId: string,
+): Promise<boolean> {
+  return (
+    allowedAtStart &&
+    (await ctx.runQuery(internal.aiConsent.isAllowed, { userId }))
+  );
+}
+
+/** Without the model there is nothing new to say about the save, so a retry
+ * or a note edit keeps what an earlier, allowed run wrote. */
+function classifiedFields(
+  aiAllowed: boolean,
+  result: Classification["result"],
+  item: Doc<"items">,
+) {
+  if (aiAllowed) {
+    return {
+      tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
+      description: result.description,
+      intents: sanitizeIntents(result.intents),
+    };
+  }
+  return {
+    tags: item.tags,
+    description: result.description || (item.description ?? ""),
+    intents: item.intents ?? [],
+  };
+}
+
 const MAX_NOTE_LINE_TITLE_CHARS = 80;
 
 function firstLine(note: string): string | undefined {
@@ -644,7 +678,12 @@ async function analyzeLinkItem(
     });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
-  if (!aiAllowed) {
+  // Asked again: the page read can take seconds, and the owner may have
+  // turned AI off meanwhile.
+  if (
+    !aiAllowed ||
+    !(await ctx.runQuery(internal.aiConsent.isAllowed, { userId: item.userId }))
+  ) {
     return {
       result: unclassified(page?.title, page?.description),
       page,
@@ -980,7 +1019,7 @@ export const processItem = internalAction({
       const spaces = allSpaces.filter((s) => s.dynamic === true);
       const spacesBlock = spacesPromptBlock(spaces);
 
-      const aiAllowed = await ctx.runQuery(internal.aiConsent.isAllowed, {
+      const allowedAtStart = await ctx.runQuery(internal.aiConsent.isAllowed, {
         userId: item.userId,
       });
       let outcome: AnalysisOutcome;
@@ -991,27 +1030,28 @@ export const processItem = internalAction({
           item,
           spacesBlock,
           startedAt,
-          aiAllowed,
+          allowedAtStart,
         );
       } else if (item.type === "image") {
         outcome = await analyzeImageItem(
           ctx,
           item,
           spacesBlock,
-          aiAllowed,
+          allowedAtStart,
           args.captureContext,
         );
       } else {
         outcome = await analyzeNoteItem(
           item,
           spacesBlock,
-          aiAllowed,
+          allowedAtStart,
           args.captureContext,
         );
       }
       if ("terminal" in outcome) {
         return null;
       }
+      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item.userId);
       // The link's page-read outcome, if any: it decides the enrichment flag
       // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
       // Only links fetch a page, so images/notes leave this undefined and
@@ -1025,9 +1065,11 @@ export const processItem = internalAction({
         ? await storePoster(ctx, page.heroImageUrl)
         : undefined;
 
-      const tags = result.tags
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
+      const { tags, description, intents } = classifiedFields(
+        aiAllowed,
+        result,
+        item,
+      );
       // `page` is undefined for anything that is not a link, so these need no
       // type guard. Hoisted so the embedded text is exactly the stored text.
       const pageContent = page?.content;
@@ -1037,7 +1079,7 @@ export const processItem = internalAction({
             item,
             refresh: args.refresh === true,
             title: result.title,
-            description: result.description,
+            description,
             tags,
             siteName: pageSiteName,
             content: pageContent,
@@ -1049,7 +1091,7 @@ export const processItem = internalAction({
         runId: args.runId,
         title: result.title,
         keepTitle: args.refresh === true,
-        description: result.description,
+        description,
         tags,
         content: pageContent,
         siteName: pageSiteName,
@@ -1062,7 +1104,7 @@ export const processItem = internalAction({
         // client captured on upload (patching undefined would drop the field).
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-        intents: sanitizeIntents(result.intents),
+        intents,
         recipe: finalRecipe(page, result),
         enrichment: linkEnrichment(linkRead),
         status: "ready",
@@ -1080,11 +1122,13 @@ export const processItem = internalAction({
         }
         return null;
       }
-      await ctx.runMutation(internal.items.setSpacesForItem, {
-        itemId: args.itemId,
-        spaceIds,
-        runId: args.runId,
-      });
+      if (aiAllowed) {
+        await ctx.runMutation(internal.items.setSpacesForItem, {
+          itemId: args.itemId,
+          spaceIds,
+          runId: args.runId,
+        });
+      }
 
       if (args.refresh === true || !aiAllowed) {
         // An edited note: search and suggestions are updated. Steering and

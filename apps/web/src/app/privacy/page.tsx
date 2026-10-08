@@ -103,10 +103,9 @@ export default function PrivacyPage() {
           To organize your saves, Shelvr sends content from its server to
           Google’s Gemini API (a generation model and Gemini embeddings). This
           is used to write titles, descriptions, and tags, suggest spaces, and
-          power search. What is sent: link addresses and up to about 6,000
+          power search. What is sent: link addresses and up to about 8,000
           characters of extracted page text, note text, saved photos (the image
-          content), the names and descriptions of your spaces, and your search
-          queries.
+          content), and the names and descriptions of your spaces.
         </p>
         <p className="mt-2">
           You can decline AI processing when the app asks, and change your

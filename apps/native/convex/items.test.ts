@@ -3359,6 +3359,19 @@ describe("share links", () => {
     expect(next).not.toBe(token);
   });
 
+  it("keeps a link an older build already handed out when a later share is cancelled", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    // An older build mints and shares without ever settling.
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
   it("keeps a link the owner really shared when a later share is cancelled", async () => {
     const t = await as("share-user");
     const itemId = await seedItem(t, "share-user");

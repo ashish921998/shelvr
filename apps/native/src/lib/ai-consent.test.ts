@@ -5,13 +5,17 @@ import { useAiConsent } from "./ai-consent";
 
 const mocks = vi.hoisted(() => ({
   authenticated: true,
+  authLoading: false,
   data: undefined as { status: string; version: number } | undefined,
   queryArgs: undefined as unknown,
   setConsent: vi.fn(),
   capture: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: mocks.authenticated }),
+  useConvexAuth: () => ({
+    isAuthenticated: mocks.authenticated,
+    isLoading: mocks.authLoading,
+  }),
   useMutation: () => mocks.setConsent,
 }));
 vi.mock("@convex/_generated/api", () => ({
@@ -39,6 +43,7 @@ vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 beforeEach(() => {
   kv.clear();
   mocks.authenticated = true;
+  mocks.authLoading = false;
   mocks.data = undefined;
   mocks.setConsent.mockReset();
   mocks.capture.mockReset();
@@ -100,4 +105,18 @@ it("records an answer, and reports it only once the server has it", async () => 
   mocks.setConsent.mockRejectedValue(new Error("offline"));
   await expect(result.current.answer(true, "card")).rejects.toThrow();
   expect(mocks.capture).not.toHaveBeenCalled();
+});
+
+it("keeps the recorded answer while a cold launch is still restoring auth", () => {
+  mocks.data = { status: "granted", version: 1 };
+  const { rerender, result } = renderHook(() => useAiConsent());
+  mocks.authenticated = false;
+  mocks.authLoading = true;
+  mocks.data = undefined;
+  rerender();
+  mocks.authenticated = true;
+  mocks.authLoading = false;
+  rerender();
+  expect(result.current.status).toBe("loading");
+  expect(result.current.savesBlocked).toBe(false);
 });

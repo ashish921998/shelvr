@@ -278,6 +278,32 @@ describe("a user who declined", () => {
     await expectNoThirdPartyCall();
   });
 
+  it("keeps the tags and description an earlier, allowed run wrote", async () => {
+    const t = await declined();
+    const itemId = await processing(t, {
+      type: "note",
+      note: "Buy lentils and a lemon",
+    });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "ready",
+        tags: ["groceries"],
+        description: "A short shopping list",
+      }),
+    );
+    await t.action(internal.ai.processItem, {
+      itemId,
+      runId: "run-1",
+      refresh: true,
+    });
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      status: "ready",
+      tags: ["groceries"],
+      description: "A short shopping list",
+    });
+    await expectNoThirdPartyCall();
+  });
+
   it("saves a photo untitled, without sending the image anywhere", async () => {
     const t = await declined();
     const itemId = await t.run(async (ctx) =>
