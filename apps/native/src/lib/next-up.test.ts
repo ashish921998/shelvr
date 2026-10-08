@@ -18,6 +18,17 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
 }));
 vi.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
+const appState = vi.hoisted(() => ({
+  listeners: [] as ((state: string) => void)[],
+}));
+vi.mock("react-native", () => ({
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      appState.listeners.push(listener);
+      return { remove: () => undefined };
+    },
+  },
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: vi.fn() },
 }));
@@ -45,6 +56,19 @@ describe("hourFloor", () => {
 });
 
 describe("useNextUp", () => {
+  it("moves its clock on when the app returns to the foreground", () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 8, 22, 30) });
+    try {
+      renderHook(() => useNextUp("user-1", true));
+      expect(mock.lastArgs).toMatchObject({ now: Date.UTC(2026, 9, 8, 22) });
+      vi.setSystemTime(Date.UTC(2026, 9, 9, 8, 5));
+      act(() => appState.listeners.forEach((listener) => listener("active")));
+      expect(mock.lastArgs).toMatchObject({ now: Date.UTC(2026, 9, 9, 8) });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not subscribe for a locked account", () => {
     const { result } = renderHook(() => useNextUp("user-1", false));
     expect(mock.lastArgs).toBe("skip");

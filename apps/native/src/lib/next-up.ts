@@ -4,7 +4,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { analytics } from "@/lib/analytics";
 
 // The "Open this next" card on Home: one save worth going back to, picked on
@@ -52,7 +53,16 @@ function writeDismissedNextUp(userId: string, itemId: Id<"items">): void {
  */
 export function useNextUp(userId: string | undefined, enabled: boolean) {
   const [now, setNow] = useState(() => hourFloor(Date.now()));
-  useFocusEffect(useCallback(() => setNow(hourFloor(Date.now())), []));
+  const refreshNow = useCallback(() => setNow(hourFloor(Date.now())), []);
+  // Home gaining focus, and the app returning to the foreground: Home can sit
+  // in the background overnight without ever losing focus.
+  useFocusEffect(refreshNow);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshNow();
+    });
+    return () => subscription.remove();
+  }, [refreshNow]);
   const [, setDismissedVersion] = useState(0);
 
   const skip = userId ? readDismissedNextUp(userId) : [];
