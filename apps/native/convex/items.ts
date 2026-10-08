@@ -27,7 +27,11 @@ import {
   getMembership,
   insertMembership,
 } from "./model/memberships";
-import { linkSource, normalizeExternalUrl } from "./model/externalUrl";
+import {
+  isYouTubeUrl,
+  normalizeExternalUrl,
+  shortFormSource,
+} from "./model/externalUrl";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -114,14 +118,14 @@ function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
   const reminder = reminderKind(item);
   if (reminder === "cook") return age >= COOK_MIN_AGE_MS ? "cook" : undefined;
   if (age < READ_MIN_AGE_MS || age > READ_MAX_AGE_MS) return undefined;
-  if (reminder === "read") return "read";
-  const source = linkSource(item.url);
+  // Before the article check: a TikTok or reel keeps its caption as content.
   if (
-    source === "youtube" ||
-    source === "tiktok" ||
+    isYouTubeUrl(item.url) ||
+    shortFormSource(item.url)?.video ||
     item.media?.some((media) => media.kind === "video")
   )
     return "watch";
+  if (reminder === "read") return "read";
   return "open";
 }
 
@@ -507,10 +511,15 @@ export const nextUp = query({
         .order("desc"),
       { maxRows: NEXT_UP_SCAN_ROWS, maxBytes: NEXT_UP_SCAN_BYTES },
     );
+    // The onboarding sample is the app's pick, not something they saved.
+    const demo = await ctx.db
+      .query("onboardingDemos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
     // Newest first across every kind. One read-state point read per
     // candidate, so the scan bounds these too.
     for (const item of rows) {
-      if (skip.has(item._id)) continue;
+      if (skip.has(item._id) || item._id === demo?.itemId) continue;
       const kind = nextUpKind(item, args.now);
       if (kind === undefined) continue;
       const reminder = kind === "cook" ? "cook" : "read";

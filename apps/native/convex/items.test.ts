@@ -531,7 +531,13 @@ describe("nextUp", () => {
       tags: [],
       searchText: "",
     };
-    const [note, photo, video, reel] = await t.run(async (ctx) => [
+    const [demo, note, photo, video, reel] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "The sample",
+        url: "https://example.com/sample",
+      }),
       await ctx.db.insert("items", {
         ...base,
         type: "note",
@@ -550,11 +556,19 @@ describe("nextUp", () => {
         type: "link",
         title: "A reel",
         url: "https://www.instagram.com/reel/abc/",
+        content: "The caption",
         media: [
           { kind: "video", imageUrl: "https://x.test/a.jpg", aspectRatio: 1 },
         ],
       }),
     ]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingDemos", {
+        userId: "next-kinds",
+        itemId: demo,
+        createdAt: Date.now(),
+      });
+    });
     const now = later(2);
     const pick = async (skip: Id<"items">[]) => {
       const next = await t.query(api.items.nextUp, { now, skip });
@@ -566,6 +580,8 @@ describe("nextUp", () => {
     expect(await pick([reel, video])).toEqual({ kind: "open", id: photo });
     await markOpened(t, "next-kinds", photo, now);
     expect(await pick([reel, video])).toEqual({ kind: "open", id: note });
+    await markOpened(t, "next-kinds", note, now);
+    expect(await pick([reel, video])).toBeNull();
   });
 
   it("suggests nothing without Pro", async () => {
