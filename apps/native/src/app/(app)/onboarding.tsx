@@ -1,11 +1,19 @@
-import { useAppLocale } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
-import { orderDemoSamples, orderShareDemoSamples } from "@/lib/onboarding-demo";
+import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
+import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
+import { isInterest } from "@/lib/onboarding-interests";
+import {
+  featuredDemoKind,
+  orderDemoSamples,
+  practiceShareSample,
+} from "@/lib/onboarding-demo";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
+  previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
@@ -22,32 +30,36 @@ import {
   spacesAfterKindToggle,
   type SaveKind,
 } from "@/lib/save-kinds";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import {
+  clearPendingShareOnDevice,
+  markPendingShareOnDevice,
+} from "@/lib/share/pending-share-store";
 import { SignInView } from "@/components/sign-in-view";
 import {
   LiveDemoStep,
   type DemoSaved,
 } from "@/components/onboarding/live-demo";
+import { InterestsStep } from "@/components/onboarding/interests";
 import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
-import { RevealStep } from "@/components/onboarding/reveal";
 import { SetupStep } from "@/components/onboarding/setup";
-import { SourceStep } from "@/components/onboarding/source";
+import { SharePracticeStep } from "@/components/onboarding/share-practice";
+import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import * as Haptics from "expo-haptics";
-import { getSharedPayloads } from "expo-sharing";
+import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PROGRESS: Record<OnboardingStep, number | null> = {
   opener: null,
-  source: 0.125,
-  setup: 0.25,
+  interests: 0.2,
+  setup: 0.35,
   demo: 0.5,
-  notifications: 0.8,
-  reveal: 1,
+  notifications: 0.75,
+  share: 1,
 };
 const READING_PROGRESS = 0.625;
 
@@ -58,6 +70,21 @@ function holdIncomingShare() {
     if (getSharedPayloads().length > 0) markPendingShareOnDevice();
   } catch (err) {
     analytics.captureError("onboarding_hold_share_failed", err);
+  }
+}
+
+// Saving is Pro, so the practice link of someone who closed the paywall is
+// let go. Left held, the share screen would ask for Pro again in the app.
+// expo-sharing clears every held share at once, so the held batch is read
+// here and cleared only when it is the practice link and nothing else.
+function dropPracticeShare(practiceUrl: string | undefined) {
+  try {
+    if (practiceUrl === undefined) return;
+    if (!holdsOnlyLink(getSharedPayloads(), practiceUrl)) return;
+    clearSharedPayloads();
+    clearPendingShareOnDevice();
+  } catch (err) {
+    analytics.captureError("onboarding_drop_share_failed", err);
   }
 }
 
@@ -82,10 +109,27 @@ export default function OnboardingScreen() {
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [demoBack, setDemoBack] = useState<(() => void) | null>(null);
+  const changeDemoBack = useCallback(
+    (back: (() => void) | null) => setDemoBack(() => back),
+    [],
+  );
+  // The save a relaunch left unfinished is resumed once. Leaving the demo
+  // step either way drops it, so coming back starts from the picker.
+  const [resumeDemo, setResumeDemo] = useState(() =>
+    initialStep === "demo" ? initialProgress.demo : null,
+  );
+  const exitDemo = useCallback(() => {
+    setResumeDemo(null);
+    setStep("setup");
+  }, []);
   const trackedStepsRef = useRef(new Set<OnboardingStep>());
+  const viewedStepsRef = useRef(new Set<OnboardingStep>());
   const stepEnteredAt = useRef(0);
   const viewedStep = useRef<OnboardingStep | null>(null);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+  // A picked topic is a picked space, so the topics need no state of their own.
+  const interests = spaces.filter(isInterest);
 
   useEffect(() => {
     setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
@@ -95,6 +139,9 @@ export default function OnboardingScreen() {
     if (viewedStep.current === step) return;
     viewedStep.current = step;
     stepEnteredAt.current = Date.now();
+    // Going back re-enters a step; the funnel counts the first entry only.
+    if (viewedStepsRef.current.has(step)) return;
+    viewedStepsRef.current.add(step);
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: stepIndex,
@@ -158,6 +205,7 @@ export default function OnboardingScreen() {
     analytics.capture("onboarding_completed", {
       save_pileup: [],
       save_types: kinds,
+      interests,
       space_count: spaces.length,
       space_names: spaces.filter(isPresetSpace),
       custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
@@ -168,6 +216,18 @@ export default function OnboardingScreen() {
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     completeOnboarding();
   };
+
+  const practiceSample = practiceShareSample(
+    kinds,
+    getOnboardingProgress().demo?.url ?? null,
+  );
+  const paywall = useOnboardingPaywall({
+    onPro: finish,
+    onDecline: () => {
+      dropPracticeShare(practiceSample?.url);
+      finish();
+    },
+  });
 
   if (showSignIn) {
     return (
@@ -180,22 +240,49 @@ export default function OnboardingScreen() {
 
   const progress =
     step === "demo" && reading ? READING_PROGRESS : PROGRESS[step];
+  // With no first save the reminder step passes itself by, so going back
+  // from the share step has to clear it too.
+  const previous =
+    step === "share" && saved === null ? "demo" : previousOnboardingStep(step);
+  const goBack = paywall.asked
+    ? null
+    : previous
+      ? () => setStep(previous)
+      : step === "demo"
+        ? demoBack
+        : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={[styles.barWrap, progress === null && styles.barHidden]}>
-        <View
-          style={[
-            styles.bar,
-            { width: `${Math.round((progress ?? 0) * 100)}%` },
-          ]}
-        />
+      <View style={styles.header}>
+        {goBack ? (
+          <Pressable
+            onPress={goBack}
+            accessibilityRole="button"
+            accessibilityLabel={t("common.back")}
+            hitSlop={12}
+            style={styles.back}
+          >
+            <AppSymbolIcon
+              name="chevron.left"
+              size={20}
+              tintColor={theme.colors.foreground}
+            />
+          </Pressable>
+        ) : null}
+        <View style={[styles.barWrap, progress === null && styles.barHidden]}>
+          <View
+            style={[
+              styles.bar,
+              { width: `${Math.round((progress ?? 0) * 100)}%` },
+            ]}
+          />
+        </View>
       </View>
 
-      {step === "opener" || step === "source" ? (
-        // A static frame, not the shared ScrollView. The source list scrolls
-        // inside it so Skip stays on screen on small phones and at large text
-        // sizes.
+      {step === "opener" ? (
+        // A static frame, not the shared ScrollView: the opener lays out its
+        // own scrolling wall and pinned buttons.
         <View
           style={[
             styles.content,
@@ -203,19 +290,15 @@ export default function OnboardingScreen() {
             { paddingBottom: insets.bottom + theme.gap(1) },
           ]}
         >
-          {step === "opener" ? (
-            <OpenerStep
-              // On iOS, a live text-size change can leave native text
-              // measurements stale (react-native#57512), so the expected
-              // onLayout updates never arrive. Remounting forces fresh
-              // measurement.
-              key={fontScale}
-              onStart={advance}
-              onSignIn={() => setShowSignIn(true)}
-            />
-          ) : (
-            <SourceStep onAdvance={advance} />
-          )}
+          <OpenerStep
+            // On iOS, a live text-size change can leave native text
+            // measurements stale (react-native#57512), so the expected
+            // onLayout updates never arrive. Remounting forces fresh
+            // measurement.
+            key={fontScale}
+            onStart={advance}
+            onSignIn={() => setShowSignIn(true)}
+          />
         </View>
       ) : (
         <ScrollView
@@ -240,18 +323,29 @@ export default function OnboardingScreen() {
             />
           )}
 
+          {step === "interests" && (
+            <InterestsStep
+              picked={interests}
+              onToggle={toggleSpace}
+              onAdvance={advance}
+            />
+          )}
+
           {step === "demo" && (
             <LiveDemoStep
-              samples={
-                Platform.OS === "ios"
-                  ? orderShareDemoSamples(kinds)
-                  : orderDemoSamples(kinds)
-              }
+              samples={orderDemoSamples(kinds, interests)}
+              titleKind={featuredDemoKind(kinds, interests)}
               spaces={spaces}
-              resume={initialStep === "demo" ? initialProgress.demo : null}
+              resume={resumeDemo}
+              alreadySaved={saved !== null}
               onSaved={setSaved}
               onReadingChange={setReading}
-              onAdvance={advance}
+              onBackChange={changeDemoBack}
+              onExit={exitDemo}
+              onAdvance={() => {
+                setResumeDemo(null);
+                advance();
+              }}
             />
           )}
 
@@ -259,12 +353,11 @@ export default function OnboardingScreen() {
             <NotificationsStep saved={saved} onAdvance={advance} />
           )}
 
-          {step === "reveal" && (
-            <RevealStep
-              saved={saved}
-              restored={initialStep === "reveal"}
-              onSaved={setSaved}
-              onFinish={finish}
+          {step === "share" && (
+            <SharePracticeStep
+              sample={practiceSample}
+              leaving={paywall.asked}
+              onFinish={paywall.ask}
             />
           )}
         </ScrollView>
@@ -279,7 +372,24 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.gap(3),
   },
+  // Tall enough to hold the back button and take its taps. The negative
+  // margins give back all but the bar's own 3pt, so no step's content moves.
+  header: {
+    height: 28,
+    marginTop: -12,
+    marginBottom: -13,
+    // The step below overlaps this row by that margin. Stay on top of it, or
+    // the lower half of the back button stops taking taps.
+    zIndex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+  },
+  back: {
+    padding: theme.gap(0.5),
+  },
   barWrap: {
+    flex: 1,
     height: 3,
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: 2,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   demoDestination,
+  featuredDemoKind,
   orderDemoSamples,
-  orderShareDemoSamples,
+  practiceShareSample,
 } from "./onboarding-demo";
 
 describe("orderDemoSamples", () => {
@@ -13,7 +14,7 @@ describe("orderDemoSamples", () => {
   });
 
   it("offers three samples when no picked kind has one", () => {
-    expect(orderDemoSamples(["Videos"]).map((s) => s.domain)).toEqual([
+    expect(orderDemoSamples(["Fitness"]).map((s) => s.domain)).toEqual([
       "bbcgoodfood.com",
       "apple.com",
       "lonelyplanet.com",
@@ -21,17 +22,71 @@ describe("orderDemoSamples", () => {
   });
 });
 
-describe("orderShareDemoSamples", () => {
-  it("leads with the reading article, then the picked kinds", () => {
+describe("samples for picked topics", () => {
+  it("follows the first picked kind's sample with the topics' samples", () => {
     expect(
-      orderShareDemoSamples(["Recipes", "Travel"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "bbcgoodfood.com", "lonelyplanet.com"]);
+      orderDemoSamples(["Recipes", "Travel"], ["AI", "Coffee"]).map(
+        (s) => s.domain,
+      ),
+    ).toEqual(["bbcgoodfood.com", "anthropic.com", "jameshoffmann.co.uk"]);
   });
 
-  it("does not repeat the article when Articles was picked", () => {
+  it("leads with a topic when no picked kind has a sample", () => {
+    expect(orderDemoSamples(["Fitness"], ["Coffee"])[0]?.domain).toBe(
+      "jameshoffmann.co.uk",
+    );
+    expect(featuredDemoKind(["Fitness"], ["Coffee"])).toBe("Articles");
+  });
+
+  it("shows a page once when a kind and a topic both offer it", () => {
+    const domains = orderDemoSamples(["Travel"], ["Travel", "Anime"]).map(
+      (s) => s.domain,
+    );
+    expect(domains).toEqual([
+      "lonelyplanet.com",
+      "myanimelist.net",
+      "bbcgoodfood.com",
+    ]);
+  });
+
+  it("files a topic's sample into that topic's space when it was kept", () => {
+    const url = "https://www.jameshoffmann.co.uk/weird-coffee-science";
+    expect(demoDestination(url, ["Coffee", "Articles"])).toBe("Coffee");
+    expect(demoDestination(url, ["Articles"])).toBe("Articles");
+    expect(demoDestination(url, [])).toBeNull();
+  });
+});
+
+describe("featuredDemoKind", () => {
+  it("names the leading sample's kind when setup picked it", () => {
+    expect(featuredDemoKind(["Fitness", "Videos", "Recipes"])).toBe("Videos");
+  });
+
+  it("is null when nothing picked has a sample", () => {
+    expect(featuredDemoKind(["Fitness"])).toBeNull();
+    expect(featuredDemoKind([])).toBeNull();
+  });
+});
+
+describe("practiceShareSample", () => {
+  it("uses the reading article when the demo saved something else", () => {
     expect(
-      orderShareDemoSamples(["Articles", "Products"]).map((s) => s.domain),
-    ).toEqual(["fs.blog", "apple.com", "bbcgoodfood.com"]);
+      practiceShareSample(
+        ["Recipes"],
+        "https://www.bbcgoodfood.com/recipes/classic-lasagne",
+      )?.domain,
+    ).toBe("fs.blog");
+  });
+
+  it("uses the reading article when nothing was saved", () => {
+    expect(practiceShareSample(["Travel"], null)?.domain).toBe("fs.blog");
+  });
+
+  it("falls back to a picked kind when the article was the demo save", () => {
+    expect(
+      practiceShareSample(["Travel", "Recipes"], "https://fs.blog/reading/")
+        ?.domain,
+    ).toBe("lonelyplanet.com");
   });
 });
 

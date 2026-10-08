@@ -105,6 +105,14 @@ export const fadeOut = FadeOut.duration(duration.exit)
   .easing(easing.out)
   .reduceMotion(ReduceMotion.Never);
 
+/** A staged entrance: a slow, plain fade, one beat after another. It moves
+ * nothing, so it stays on with Reduce Motion. */
+export const settleIn = (delay: number) =>
+  FadeIn.delay(delay)
+    .duration(520)
+    .easing(easing.out)
+    .reduceMotion(ReduceMotion.Never);
+
 // Reduced motion keeps the state change legible without translation or scale.
 export const REDUCED_FADE_IN = FadeIn.duration(duration.feedback)
   .easing(easing.out)

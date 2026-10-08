@@ -3,7 +3,6 @@ import {
   posthog,
   resetIfIdentified as resetClientIfIdentified,
 } from "@/lib/posthog";
-import type { AcquisitionSource } from "@/lib/acquisition-source";
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
@@ -43,7 +42,7 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * apart, because the onboarding route renders both the full-page view and the
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
-export type OAuthSurface = "sign_in_view" | "demo_sheet";
+export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -239,6 +238,8 @@ type AnalyticsEventProperties = {
     save_pileup: string[];
     // The setup step's "What do you save?" kinds, which seed the space presets.
     save_types: string[];
+    // The interests step's picked topics. Each is also one of the spaces.
+    interests: string[];
     space_count: number;
     // Preset identities only. Typed names are user content and are counted.
     space_names: string[];
@@ -247,15 +248,6 @@ type AnalyticsEventProperties = {
     // segmentation after the (later) sign-in identify merges the anon person.
     $set: { save_pileup: string[]; save_types: string[] };
   };
-  // Onboarding "How did you hear about Shelvr?" (lib/acquisition-source.ts).
-  // `source` is a fixed id; `position` is the row it sat in (0-based), since
-  // the social rows are shuffled. The person property keeps the first answer.
-  acquisition_source_answered: {
-    source: AcquisitionSource;
-    position: number;
-    $set_once: { acquisition_source: AcquisitionSource };
-  };
-  acquisition_source_skipped: Record<string, never>;
   // Feedback events never carry message text; see lib/feedback.ts. The
   // submission event fires only after Convex acknowledges persistence — the
   // message itself lives in Convex and the support inbox, never in PostHog.
@@ -271,12 +263,21 @@ type AnalyticsEventProperties = {
   // space names — only the outcome of the user's one real demo save.
   onboarding_demo_submitted: Record<string, never>;
   onboarding_demo_skipped: Record<string, never>;
-  // The share sheet closed without Shelvr receiving the sample. `fallback` is
-  // true when this miss saved the sample directly instead of asking again.
-  onboarding_share_missed: {
-    reason: "dismissed" | "other_app";
-    misses: number;
-    fallback: boolean;
+  // A first-save pick, before any sign-in. `sample` is a ready-made link
+  // (previewed when signed out); otherwise a pasted, typed or shared one.
+  onboarding_demo_picked: { sample: boolean; signed_in: boolean };
+  // The onboarding sign-in ask: the demo's sheet (a pasted or typed link) or
+  // the screen after a previewed sample. "dismissed" is the sheet's scrim or
+  // back, or that screen's back button; a sign-in itself shows as auth_started.
+  onboarding_signin_prompt: {
+    surface: "demo_sheet" | "sample_preview";
+    action: "shown" | "dismissed";
+  };
+  // The share-sheet practice before the paywall (onboarding/share-practice.tsx).
+  // "received" is a share that reached Shelvr, saved later by the share
+  // screen. "other_app" can repeat; the other outcomes fire once per mount.
+  onboarding_share_practice: {
+    outcome: "received" | "other_app" | "skipped" | "sheet_failed";
   };
   // The onboarding notifications step's answer. `granted` is what the OS
   // reported after the tap; a skipped step (nothing to ask) sends nothing.
