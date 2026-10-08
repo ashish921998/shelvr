@@ -4,9 +4,13 @@ import { act, renderHook } from "@testing-library/react";
 import { hourFloor, useNextUp } from "./next-up";
 
 const storage = vi.hoisted(() => new Map<string, string>());
+const store = vi.hoisted(() => ({ failWrites: false }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
+  setItem: (key: string, value: string) => {
+    if (store.failWrites) throw new Error("keychain unavailable");
+    storage.set(key, value);
+  },
 }));
 
 const mock = vi.hoisted(() => ({
@@ -44,6 +48,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 beforeEach(() => {
   storage.clear();
+  store.failWrites = false;
   mock.capture.mockClear();
   mock.data = { kind: "read", subject: "Save 1", item: { _id: "item-1" } };
 });
@@ -100,6 +105,14 @@ describe("useNextUp", () => {
     mock.data = { kind: "cook", subject: "Lasagna", item: { _id: "item-2" } };
     rerender();
     expect(result.current.next?.item._id).toBe("item-2");
+  });
+
+  it("still skips a dismissed save when the store write fails", () => {
+    store.failWrites = true;
+    const { result } = renderHook(() => useNextUp("user-1", true));
+    act(() => result.current.dismiss());
+    expect(result.current.next).toBeNull();
+    expect(mock.lastArgs).toMatchObject({ skip: ["item-1"] });
   });
 
   it("keeps dismissals per account", () => {

@@ -4,8 +4,8 @@ import { displayHost } from "@/lib/url";
 import type { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -31,7 +31,8 @@ export function NextUpCard({
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  useEffect(onShown, [onShown]);
+  // Counted while Home is on screen, not while another screen covers it.
+  useFocusEffect(useCallback(() => onShown(), [onShown]));
   const { item } = next;
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const host = item.url ? displayHost(item.url) : undefined;

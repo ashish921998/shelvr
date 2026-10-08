@@ -4,7 +4,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { analytics } from "@/lib/analytics";
 
@@ -40,10 +40,15 @@ function readDismissedNextUp(userId: string): Id<"items">[] {
 function writeDismissedNextUp(userId: string, itemId: Id<"items">): void {
   const dismissed = readDismissedNextUp(userId).filter((id) => id !== itemId);
   dismissed.push(itemId);
-  SecureStore.setItem(
-    dismissedKey(userId),
-    JSON.stringify(dismissed.slice(-DISMISSED_LIMIT)),
-  );
+  try {
+    SecureStore.setItem(
+      dismissedKey(userId),
+      JSON.stringify(dismissed.slice(-DISMISSED_LIMIT)),
+    );
+  } catch (error) {
+    // useNextUp still skips it while Home is mounted.
+    analytics.captureError("next_up_dismiss_store_failed", error);
+  }
 }
 
 /**
@@ -63,9 +68,16 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     });
     return () => subscription.remove();
   }, [refreshNow]);
-  const [, setDismissedVersion] = useState(0);
+  // Dismissed while Home is mounted, kept here too in case the store write
+  // failed.
+  const [dismissedNow, setDismissedNow] = useState<Id<"items">[]>([]);
 
-  const skip = userId ? readDismissedNextUp(userId) : [];
+  const skip = useMemo(() => {
+    if (!userId) return [];
+    const stored = readDismissedNextUp(userId);
+    const added = dismissedNow.filter((id) => !stored.includes(id));
+    return [...stored, ...added].slice(-DISMISSED_LIMIT);
+  }, [userId, dismissedNow]);
   // gcTime ends an old subscription soon after the hour or the skip list
   // moves on, instead of keeping each one alive for the default day.
   const { data } = useQuery({
@@ -97,7 +109,7 @@ export function useNextUp(userId: string | undefined, enabled: boolean) {
     if (!userId || !nextId || !kind) return;
     analytics.capture("next_up_dismissed", { kind });
     writeDismissedNextUp(userId, nextId);
-    setDismissedVersion((version) => version + 1);
+    setDismissedNow((ids) => [...ids, nextId]);
   }, [userId, nextId, kind]);
 
   return { next, shown, opened, dismiss };
