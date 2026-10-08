@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import AppStoreButton from "@/components/AppStoreButton";
 import SharePageView from "@/components/SharePageView";
 import Logo from "@/components/common/Logo";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import { fetchSharePreview, loadSharePreview } from "@/lib/sharePreview";
 
 type PageProps = { params: Promise<{ token: string }> };
@@ -106,6 +107,17 @@ export default async function SharedItemPage({ params }: PageProps) {
         <p className="mt-8 text-sm text-muted">
           Shelvr is a save-it-for-later app for links, images, and notes.
           {!preview && " This save may have moved or is no longer shared."}
+        </p>
+        <p className="mt-3 text-xs text-muted">
+          <a
+            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+              `Report Shelvr share page /i/${token}`,
+            )}`}
+            className="underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
+          >
+            Report this page
+          </a>{" "}
+          or email <span className="select-all">{SUPPORT_EMAIL}</span>
         </p>
       </div>
     </main>

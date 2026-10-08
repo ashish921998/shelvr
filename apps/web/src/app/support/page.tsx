@@ -43,7 +43,7 @@ export default function SupportPage() {
           <section>
             <h2 className="text-lg font-semibold text-ink">Account deletion</h2>
             <p className="mt-2">
-              Open Profile and choose Delete account. This permanently removes
+              Open Settings and choose Delete account. This permanently removes
               your Shelvr account and saved content; it does not cancel an App
               Store subscription.
             </p>
@@ -54,6 +54,16 @@ export default function SupportPage() {
             <p className="mt-2">
               Email us to request access, correction, export, or deletion of
               personal data not covered by the in-app deletion flow.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold text-ink">
+              Copyright and abuse reports
+            </h2>
+            <p className="mt-2">
+              To report a Shelvr share page, email {SUPPORT_EMAIL} with the page
+              address and the reason.
             </p>
           </section>
         </div>

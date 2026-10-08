@@ -22,7 +22,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 7. **Paywall:** “Keep saving with Pro” on that screen (or skipping the practice) opens the RevenueCat paywall. Closing it goes to Home; new saves stay Pro-gated.
 8. **Home:** a card teaches saving from the share sheet. After the first share-sheet save, Home asks once whether to turn on the weekly shelf notification.
 9. Camera and Photo Library are **not** requested during onboarding. They are requested only when the reviewer opens Camera or imports/Tidy photos.
-10. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has accumulated at least three successfully processed saves, and it is requested at most once by Shelvr.
+10. Shelvr does **not** request an App Store rating during onboarding. The system rating prompt is eligible only after the user has at least three successfully processed saves, and only at the moment they return to Home from a save they opened. It never appears on launch or during an account's first session, and Shelvr requests it at most once.
 
 ## Core save loop
 
@@ -37,26 +37,26 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - Lapsed subscribers keep **read-only** access to existing library content.
 - Present paywall from any gated action or Profile → View Pro plans.
 - **Cancellation** of the paywall returns to the previous screen (not an error).
-- **Restore Purchases** is available directly in Profile and on the RevenueCat paywall. Subscription management is available through Profile → Pro / View Pro plans.
+- **Restore Purchases** is available in Profile → Settings and on the RevenueCat paywall. Subscription management is available through Profile → Pro / View Pro plans.
 - Verify sandbox products show localized price, trial, renewal text, Terms, Privacy, and Restore.
 - Backend entitlement is Convex `subscriptions` updated by the RevenueCat webhook; brief delay after purchase is expected — pull to refresh / reopen Profile if needed.
 
 ## Previous App Review issues
 
 - **Build 9 — Guideline 2.1(a):** Sign in with Apple was unresponsive and Google sign-in ended in an error. Authentication now uses the production `shelvr://auth/callback` OAuth return path for both providers.
-- **Build 13 — Guideline 5.6.3:** onboarding asked for an App Store rating before the user experienced the product. The onboarding rating step was removed. The system prompt is now eligible only after three successfully processed saves.
-- **Builds 14 and 16 — Guideline 2.1(b):** Apple's sandbox purchase flow displayed RevenueCat Error 23. The rejected build 14 artifact contained a different RevenueCat public SDK key from the current App Store app. Production builds now fail before compilation unless EAS supplies an `appl_` App Store key and an HTTPS Convex URL. Before resubmission, inspect the new IPA and complete a clean sandbox purchase on iPhone and iPad.
+- **Build 13 — Guideline 5.6.3:** onboarding asked for an App Store rating before the user experienced the product. The onboarding rating step was removed. The system prompt is now eligible only after three successfully processed saves, when the user returns to Home from a save they opened.
+- **Builds 14 and 16 — Guideline 2.1(b):** Apple's sandbox purchase flow displayed RevenueCat Error 23. The rejected build 14 artifact contained a different RevenueCat public SDK key from the current App Store app. Production builds now fail before compilation unless EAS supplies an `appl_` App Store key and an HTTPS Convex URL. Before resubmission, inspect the new IPA and complete a clean sandbox purchase on iPhone, and on iPad in iPhone compatibility mode (`supportsTablet` is false, so there is no native iPad layout).
 
 ## Account deletion
 
-- Profile → **Delete account**.
-- Confirmation explains what is deleted (saves, spaces, uploads, identity) and that **App Store subscriptions are not cancelled** by account deletion.
+- Profile → Settings → **Delete account**.
+- Confirmation explains what is deleted (saves, spaces, uploads, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
 - After success the user is signed out.
 
 ## Legal and support
 
 - Sign-in: tappable **Terms** and **Privacy Policy** (https://shelvr-web.vercel.app/terms, https://shelvr-web.vercel.app/privacy).
-- Profile: Contact Support, Restore Purchases, Terms, and Privacy.
+- Profile → Settings: Contact Support, Restore Purchases, Terms, and Privacy.
 - Paywall fallback (only on SDK/network failure): Terms and Privacy links plus retry.
 
 ## Permissions
@@ -103,7 +103,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 ## Paste-ready App Review notes
 
-Shelvr is a private save-it-for-later app for links, notes, and images. It uses AI to generate titles, descriptions, tags, and private Spaces. It has no public feed, messaging, or user-generated content shared between users.
+Shelvr is a private save-it-for-later app for links, notes, and images. It uses AI to generate titles, descriptions, tags, and private Spaces. It has no feed and no messaging. A user can share one save through an unlisted link, which goes away when the save is deleted or the share sheet is cancelled.
 
 Account access:
 
@@ -118,7 +118,7 @@ Subscription testing:
 1. On "When should it come back?", pick a time or tap "Don't remind me". Then, after the share practice, tap "Keep saving with Pro" (or "I'll try it later") to open the RevenueCat paywall in Apple's sandbox environment. Closing it goes to Home; new saves then ask for Pro.
 2. Monthly and Annual auto-renewing subscriptions are available. The Annual plan includes a 7-day free trial.
 3. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the paywall.
-4. Restore Purchases is also available from Profile.
+4. Restore Purchases is also available from Profile > Settings.
 5. If subscription status takes a moment to refresh after purchase or restore, close the paywall and reopen Profile.
 
 Core review flow:
@@ -130,9 +130,20 @@ Core review flow:
 5. Camera permission is requested only after choosing Camera. Photo Library access is requested only after importing a photo or opening Tidy.
 6. The Map uses only GPS metadata embedded in photos the user selects; Shelvr does not request or track live device location.
 
+Share extension, Siri and widget:
+
+1. In Safari, open any page, tap Share, and choose Shelvr. The link is saved without leaving Safari.
+2. In the Shortcuts app, open Shelvr and run "Save a Link". The same action works through Siri.
+3. Add the "Recent Saves" widget to the Home Screen to see the latest saves.
+
+Third-party AI:
+
+Saves are sent to Google Gemini to generate titles, summaries, and tags. The app asks for permission before the first save, and Settings has a switch to turn this off.
+
 Account and support controls:
 
-- Profile contains Contact Support, Restore Purchases, subscription management, Terms of Service, Privacy Policy, Sign out, and Delete account.
+- Profile contains subscription management and Sign out. Profile > Settings contains Contact Support, Restore Purchases, Terms of Service, Privacy Policy, and Delete account.
+- To delete an account: Profile > Settings > Delete account.
 - Delete account permanently removes the user's saves, spaces, uploads, subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
 
-Internet access is required for sign-in, subscriptions, cloud sync, and AI organization. Shelvr does not request an App Store rating during onboarding.
+Internet access is required for sign-in, subscriptions, cloud sync, and AI organization. Shelvr does not request an App Store rating during onboarding. It may ask once, after at least three saves, when the user returns to Home from a save they opened.
