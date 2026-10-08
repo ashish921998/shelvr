@@ -35,6 +35,8 @@
   "notifications.trialChannel": "Erinnerungen an die Testphase",
   "notifications.trialEndingTitle": "Deine kostenlose Testphase endet in 2 Tagen",
   "notifications.trialEndingBody": "Behalte Shelvr Pro oder kündige jederzeit im Profil, bevor es sich verlängert.",
+  "notifications.trialLastDayTitle": "Deine kostenlose Testphase endet morgen",
+  "notifications.trialLastDayBody": "Dann verlängert sich Shelvr Pro, und deine Speicherungen bleiben bei dir. Wenn du das nicht willst, kündige heute im Profil.",
   "notifications.trialPrimerTitle": "Sollen wir dich vor der Abbuchung erinnern?",
   "notifications.trialPrimerBody": "Wir erinnern dich 2 Tage vor Ende deiner Testphase, damit sie sich nie überraschend verlängert. Du kannst jederzeit im Profil kündigen.",
   "notifications.trialPrimerAllow": "Erinnere mich",

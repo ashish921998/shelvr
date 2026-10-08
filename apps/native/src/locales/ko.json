@@ -35,6 +35,8 @@
   "notifications.trialChannel": "체험 알림",
   "notifications.trialEndingTitle": "무료 체험이 2일 후에 끝나요",
   "notifications.trialEndingBody": "Shelvr Pro를 계속 사용하거나, 갱신 전에 프로필에서 언제든 해지할 수 있어요.",
+  "notifications.trialLastDayTitle": "무료 체험이 내일 끝나요",
+  "notifications.trialLastDayBody": "그때 Shelvr Pro가 갱신되고, 저장한 항목은 그대로 남아요. 원하지 않으면 오늘 프로필에서 해지하세요.",
   "notifications.trialPrimerTitle": "결제 전에 미리 알려 드릴까요?",
   "notifications.trialPrimerBody": "체험이 끝나기 2일 전에 알려 드려서 모르는 사이에 갱신되는 일이 없어요. 언제든 프로필에서 취소할 수 있어요.",
   "notifications.trialPrimerAllow": "알림 받기",

@@ -25,12 +25,33 @@ const READY_ITEM_THRESHOLD = 3;
  */
 export const REVIEW_PROMPT_SETTLE_MS = 1500;
 
-/** `defer` holds the prompt back, e.g. through an account's first session:
- * asking for a rating before real use is what people resent. */
+/** A feed item the prompt can follow from processing to ready. */
+type ReviewFeedItem = FeedbackFeedItem & { _id: string };
+
+/**
+ * Asks for a rating right after a win: a save the user watched arrive in this
+ * session has just been read, titled and filed. Opening the app onto an
+ * already-full Home is not a win, so it never asks then. `defer` holds the
+ * prompt back, e.g. through an account's first session: asking for a rating
+ * before real use is what people resent.
+ */
 export function useReviewPrompt(
-  items: FeedbackFeedItem[] | undefined,
+  items: ReviewFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
 ) {
+  // Saves seen processing this session, and whether one has since turned
+  // ready. Tracked on every feed change, Home or not, so a save that finishes
+  // while item detail is open still counts once the user is back on Home.
+  const seenProcessing = useRef(new Set<string>());
+  const [filed, setFiled] = useState(false);
+  useEffect(() => {
+    if (!items || filed) return;
+    for (const item of items) {
+      if (item.status === "processing") seenProcessing.current.add(item._id);
+      else if (item.status === "ready" && seenProcessing.current.has(item._id))
+        setFiled(true);
+    }
+  }, [items, filed]);
   const home = isHomeRootRoute(useSegments());
   const homeRef = useRef(home);
   useEffect(() => {
@@ -49,6 +70,7 @@ export function useReviewPrompt(
   // pushing the prompt back until the feed is quiet: Home must hold still.
   useEffect(() => {
     if (
+      !filed ||
       !home ||
       defer ||
       keyboardVisible ||
@@ -108,5 +130,5 @@ export function useReviewPrompt(
         if (!cancelled) setNativeReviewAttemptInFlight(false);
       }
     }
-  }, [items, home, defer, keyboardVisible, appState]);
+  }, [items, filed, home, defer, keyboardVisible, appState]);
 }

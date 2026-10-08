@@ -91,10 +91,11 @@ vi.mock("@/lib/feedback", async (importOriginal) => ({
   markNativeReviewPrompted: mock.markNativeReviewPrompted,
 }));
 
-const item = (
-  overrides: Partial<{ status: "processing" | "ready" | "failed" }> = {},
-) => ({
-  status: "ready" as const,
+type Status = "processing" | "ready" | "failed";
+let nextId = 0;
+const item = (overrides: Partial<{ status: Status }> = {}) => ({
+  _id: `item-${nextId++}`,
+  status: "ready" as Status,
   ...overrides,
 });
 const threeReady = () => [item(), item(), item()];
@@ -233,6 +234,23 @@ describe("useReviewPrompt", () => {
   // Home must hold still for the settle window before the sheet may appear.
   const flush = () => vi.advanceTimersByTimeAsync(REVIEW_PROMPT_SETTLE_MS);
 
+  type Feed = ReturnType<typeof threeReady>;
+  /** Mounts the hook across a win: the first render shows the first save
+   * still processing, and every later render shows the feed as it is. */
+  const mountFiled = (getItems: () => Feed, run: (feed: Feed) => void) => {
+    let watching = true;
+    react.mount(() => {
+      const items = getItems();
+      run(
+        watching
+          ? [{ ...items[0], status: "processing" as Status }, ...items.slice(1)]
+          : items,
+      );
+    });
+    watching = false;
+    react.rerender();
+  };
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -242,7 +260,10 @@ describe("useReviewPrompt", () => {
 
   it("records the prompt only once the guards pass, right before requesting the review", async () => {
     const items = threeReady();
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     // Home has not settled yet: nothing may be claimed.
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
@@ -266,7 +287,10 @@ describe("useReviewPrompt", () => {
       mock.paywallPending = true;
       return true;
     });
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
@@ -285,7 +309,10 @@ describe("useReviewPrompt", () => {
   it("records nothing when the platform has no review action", async () => {
     const items = threeReady();
     mock.hasAction.mockResolvedValueOnce(false);
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
@@ -295,7 +322,10 @@ describe("useReviewPrompt", () => {
   it("waits while deferred, as in an account's first session", async () => {
     const items = threeReady();
     let defer = true;
-    react.mount(() => useReviewPrompt(items, { defer }));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed, { defer }),
+    );
     await flush();
     expect(mock.hasAction).not.toHaveBeenCalled();
     expect(mock.requestReview).not.toHaveBeenCalled();
@@ -310,7 +340,10 @@ describe("useReviewPrompt", () => {
     const items = threeReady();
     // Add was just closed with its keyboard still sliding away.
     setKeyboard(true);
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
     expect(mock.hasAction).not.toHaveBeenCalled();
 
@@ -333,7 +366,10 @@ describe("useReviewPrompt", () => {
   it("cancels an attempt when the keyboard shows while hasAction() is pending", async () => {
     const items = threeReady();
     const resolveHasAction = pendingHasAction();
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
     expect(mock.hasAction).toHaveBeenCalledOnce();
 
@@ -354,7 +390,10 @@ describe("useReviewPrompt", () => {
     const items = threeReady();
     let defer = false;
     const resolveHasAction = pendingHasAction();
-    react.mount(() => useReviewPrompt(items, { defer }));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed, { defer }),
+    );
     await flush();
 
     // The feedback form opens during the check.
@@ -373,7 +412,10 @@ describe("useReviewPrompt", () => {
   it("cancels an attempt when Home is left and re-entered while hasAction() is pending", async () => {
     const items = threeReady();
     const resolveHasAction = pendingHasAction();
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
 
     mock.segments = ["(app)", "item", "[id]"];
@@ -395,7 +437,10 @@ describe("useReviewPrompt", () => {
 
   it("holds the feedback invitation through the settle window and releases it when Home is left", async () => {
     const items = threeReady();
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     expect(isNativeReviewAttemptInFlight()).toBe(true);
 
     mock.segments = ["(app)", "item", "[id]"];
@@ -413,15 +458,55 @@ describe("useReviewPrompt", () => {
       mock.keyboard.visible = true;
       return true;
     });
-    react.mount(() => useReviewPrompt(items));
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     await flush();
     expect(mock.requestReview).not.toHaveBeenCalled();
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
   });
 
-  it("waits out a trip to the background, then settles again on return", async () => {
+  it("never asks when the app opens onto a full Home with no save filed", async () => {
     const items = threeReady();
     react.mount(() => useReviewPrompt(items));
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+    expect(isNativeReviewAttemptInFlight()).toBe(false);
+  });
+
+  it("does not count a save that fails as a win", async () => {
+    const saving = item({ status: "processing" });
+    let items = [...threeReady(), saving];
+    react.mount(() => useReviewPrompt(items));
+    items = [...items.slice(0, 3), { ...saving, status: "failed" }];
+    react.rerender();
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+  });
+
+  it("asks back on Home when the save was filed while item detail was open", async () => {
+    const items = threeReady();
+    mock.segments = ["(app)", "item", "[id]"];
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
+    await flush();
+    expect(mock.hasAction).not.toHaveBeenCalled();
+
+    mock.segments = ["(app)", "(tabs)", "(home)"];
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
+  it("waits out a trip to the background, then settles again on return", async () => {
+    const items = threeReady();
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
     setAppState("background");
     await flush();
     expect(mock.hasAction).not.toHaveBeenCalled();
