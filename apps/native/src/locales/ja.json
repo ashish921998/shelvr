@@ -35,6 +35,8 @@
   "notifications.trialChannel": "トライアルのリマインダー",
   "notifications.trialEndingTitle": "無料トライアルはあと2日で終了します",
   "notifications.trialEndingBody": "Shelvr Proを続けるか、更新前ならプロフィールからいつでも解約できます。",
+  "notifications.trialLastDayTitle": "無料トライアルは明日で終了します",
+  "notifications.trialLastDayBody": "解約していない場合、その時点でShelvr Proが更新されます。プロフィールから管理できます。",
   "notifications.trialPrimerTitle": "課金の前にお知らせしましょうか？",
   "notifications.trialPrimerBody": "トライアル終了の2日前にお知らせするので、知らないうちに更新されることはありません。キャンセルはプロフィールからいつでもできます。",
   "notifications.trialPrimerAllow": "お知らせを受け取る",

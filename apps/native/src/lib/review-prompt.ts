@@ -25,13 +25,28 @@ const READY_ITEM_THRESHOLD = 3;
  */
 export const REVIEW_PROMPT_SETTLE_MS = 1500;
 
-/** `defer` holds the prompt back, e.g. through an account's first session:
- * asking for a rating before real use is what people resent. */
+/**
+ * Asks for a rating right after a win: coming back to Home from a save the
+ * user opened, the "saved it, came back to it" moment. That works whichever
+ * way the save arrived. Opening the app onto a full Home is not a win, so it
+ * never asks then. `defer` holds the prompt back, e.g. through an account's
+ * first session: asking for a rating before real use is what people resent.
+ */
 export function useReviewPrompt(
   items: FeedbackFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
 ) {
-  const home = isHomeRootRoute(useSegments());
+  const segments: readonly string[] = useSegments();
+  const home = isHomeRootRoute(segments);
+  const onSave = segments[1] === "item";
+  // Whether the screen before this visit to Home was a save. Any other screen
+  // in between ends the moment, so the ask never lands long after the win.
+  const cameFromSave = useRef(false);
+  const [returned, setReturned] = useState(false);
+  useEffect(() => {
+    if (home) setReturned(cameFromSave.current);
+    else cameFromSave.current = onSave;
+  }, [onSave, home]);
   const homeRef = useRef(home);
   useEffect(() => {
     homeRef.current = home;
@@ -49,6 +64,7 @@ export function useReviewPrompt(
   // pushing the prompt back until the feed is quiet: Home must hold still.
   useEffect(() => {
     if (
+      !returned ||
       !home ||
       defer ||
       keyboardVisible ||
@@ -108,5 +124,5 @@ export function useReviewPrompt(
         if (!cancelled) setNativeReviewAttemptInFlight(false);
       }
     }
-  }, [items, home, defer, keyboardVisible, appState]);
+  }, [items, returned, home, defer, keyboardVisible, appState]);
 }
