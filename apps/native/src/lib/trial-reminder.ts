@@ -177,7 +177,9 @@ export async function scheduleTrialReminder(
   nudges = false,
 ): Promise<boolean> {
   const fireAt = trialReminderAt(expiresAt, now);
-  if (fireAt === null) {
+  // Within two days of the end only the last-day reminder may still apply.
+  const lastDayAt = trialLastDayAt(expiresAt, now);
+  if (fireAt === null && lastDayAt === null) {
     await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
     await cancelTrialNudges();
     return false;
@@ -202,27 +204,28 @@ export async function scheduleTrialReminder(
   if (!canNotify(permission) || !isCurrent()) return false;
 
   await Notifications.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
-  await Notifications.scheduleNotificationAsync({
-    identifier: TRIAL_REMINDER_ID,
-    content: {
-      title: t("notifications.trialEndingTitle"),
-      body: t("notifications.trialEndingBody"),
-      // `kind` and `notificationId` ride along so `notification_opened` can
-      // attribute the tap to this reminder, the same way push notifications
-      // carry theirs. Without them the open records as kind `unknown`.
-      data: {
-        url: "/profile",
-        kind: "trial_reminder",
-        notificationId: TRIAL_REMINDER_ID,
+  if (fireAt !== null) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: TRIAL_REMINDER_ID,
+      content: {
+        title: t("notifications.trialEndingTitle"),
+        body: t("notifications.trialEndingBody"),
+        // `kind` and `notificationId` ride along so `notification_opened` can
+        // attribute the tap to this reminder, the same way push notifications
+        // carry theirs. Without them the open records as kind `unknown`.
+        data: {
+          url: "/profile",
+          kind: "trial_reminder",
+          notificationId: TRIAL_REMINDER_ID,
+        },
       },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(fireAt),
-      channelId: CHANNEL_ID,
-    },
-  });
-  const lastDayAt = trialLastDayAt(expiresAt, now);
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(fireAt),
+        channelId: CHANNEL_ID,
+      },
+    });
+  }
   if (lastDayAt !== null) {
     // Like the day-5 reminder, it is about the charge, so it does not follow
     // the Save reminders switch.

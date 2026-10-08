@@ -274,6 +274,21 @@ describe("last-day reminder", () => {
     expect(trialLastDayAt(expiresAt, NOW)).toBeNull();
   });
 
+  it("still schedules on day 6, after the day-5 reminder has passed", async () => {
+    const noon = new Date(2027, 0, 4, 12, 0).getTime();
+    expect(
+      await scheduleTrialReminder(
+        noon + 7 * DAY,
+        noon + 5 * DAY + 60_000,
+        false,
+      ),
+    ).toBe(true);
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_LAST_DAY_ID]);
+  });
+
   it("opens Profile and records as a trial reminder", async () => {
     const noon = new Date(2027, 0, 4, 12, 0).getTime();
     await scheduleTrialReminder(noon + 7 * DAY, noon, false);
