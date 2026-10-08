@@ -771,7 +771,13 @@ export async function openPaywallKeepingExitOffer(
   const { outcome, owned } = await presentPaywall(placement, () =>
     presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
-  if (owned && shouldOpenPaywallFallback(outcome)) {
+  // Onboarding finishes whatever the outcome, which swaps the screens under
+  // a pushed fallback. The app's own Pro gates offer the paywall again.
+  if (
+    owned &&
+    shouldOpenPaywallFallback(outcome) &&
+    placement !== "onboarding"
+  ) {
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");

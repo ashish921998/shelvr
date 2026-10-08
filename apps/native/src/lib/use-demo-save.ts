@@ -1,7 +1,8 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
-import { demoDestination } from "@/lib/onboarding-demo";
+import { releaseSavedShare } from "@/lib/use-incoming-share-url";
+import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
   resolveOnboardingSpaceName,
@@ -17,24 +18,34 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
-// Every path is real. The save runs through api.demo.createDemoItem (one per
-// user, no Pro needed) and the actual pipeline. Before auth, the pending save
-// is persisted so an app kill mid-OAuth resumes it. The record stays through
-// reveal so a relaunch re-attaches to the same server item; finish() drops it.
+// Signed in, every path is real: the save runs through api.demo.createDemoItem
+// (one per user, no Pro needed) and the actual pipeline. Signed out, a
+// ready-made sample is previewed first (the reading steps play with no save),
+// then the step asks for sign-in; a pasted or typed link has nothing to
+// preview, so it asks at once. Either way the request waits in "auth" and is
+// saved here once sign-in lands, so one lifecycle owns every first save. A
+// previewed sample has already played the reading steps, so its save goes
+// straight on to the reveal instead of playing them again, and picking it
+// again after going back returns to the sign-in ask without a replay. The
+// persisted request survives an app kill mid-OAuth and stays through reveal
+// so a relaunch re-attaches to the same server item; finish() drops it. A
+// relaunch resumes into "auth", which is where a preview ends too.
 
 const TIMEOUT_MS = 15_000;
 
 export type DemoSaved = { itemId: Id<"items">; savedSpaceNames: string[] };
 
-type DemoView = "share" | "auth" | "reading" | "failed";
+type DemoView = "share" | "auth" | "preview" | "reading" | "failed";
 
 /** "saved" watches the server item; the reading/failed view mirrors its status. */
-type StoredPhase = "share" | "auth" | "saved";
+type StoredPhase = "share" | "auth" | "preview" | "saved";
 
 type DemoSaveState = {
   phase: StoredPhase;
   authRequest: PendingDemo | null;
   savingUrl: string | null;
+  /** The sample whose preview has played to the end, so it never replays. */
+  previewedUrl: string | null;
   itemId: Id<"items"> | null;
   submitting: boolean;
   error: TextMessageKey | null;
@@ -50,8 +61,11 @@ type DemoSaveAction =
       type: "submit";
       request: PendingDemo;
       authenticated: boolean;
+      /** A signed-out sample: preview it instead of asking for sign-in. */
+      preview: boolean;
       lost: boolean;
     }
+  | { type: "previewed" }
   | { type: "saved"; itemId: Id<"items"> }
   | { type: "submitFailed"; used: boolean }
   | { type: "cancelAuth" }
@@ -69,6 +83,7 @@ export function initialDemoSaveState(
     phase: resume ? "auth" : "share",
     authRequest: resume,
     savingUrl: null,
+    previewedUrl: null,
     itemId: null,
     submitting: false,
     error: null,
@@ -98,15 +113,35 @@ export function demoSaveReducer(
         error: null,
         savingUrl: action.request.url,
       };
-      return action.authenticated
-        ? { ...next, authRequest: null, submitting: true }
-        : { ...next, authRequest: action.request, phase: "auth" };
+      if (action.authenticated) {
+        // A previewed sample keeps its sign-in screen up while the save
+        // lands, and that screen shows the request's space.
+        return {
+          ...next,
+          authRequest: alreadyPreviewed(next) ? state.authRequest : null,
+          submitting: true,
+        };
+      }
+      return {
+        ...next,
+        authRequest: action.request,
+        phase:
+          action.preview && state.previewedUrl !== action.request.url
+            ? "preview"
+            : "auth",
+      };
     }
+    case "previewed":
+      return state.phase === "preview"
+        ? { ...state, phase: "auth", previewedUrl: state.savingUrl }
+        : state;
     case "saved":
       return {
         ...state,
         phase: "saved",
-        authRequest: null,
+        // A previewed sample's sign-in screen stays up until the item is
+        // read, and it still shows the request's space.
+        authRequest: alreadyPreviewed(state) ? state.authRequest : null,
         itemId: action.itemId,
         submitting: false,
       };
@@ -114,6 +149,7 @@ export function demoSaveReducer(
       return {
         ...state,
         submitting: false,
+        authRequest: null,
         demoUsed: action.used,
         saveFailed: state.saveFailed || !action.used,
         error: action.used ? "demo.alreadyUsed" : "demo.saveFailed",
@@ -122,7 +158,9 @@ export function demoSaveReducer(
     case "cancelAuth":
       return { ...state, authRequest: null, savingUrl: null, phase: "share" };
     case "retryStarted":
-      return { ...state, submitting: true, error: null };
+      // A retry or a slow read is watched on the reading view from then on,
+      // not on the sign-in screen the save was made from.
+      return { ...state, submitting: true, error: null, authRequest: null };
     case "retried":
       return {
         ...state,
@@ -137,13 +175,22 @@ export function demoSaveReducer(
     case "keepWaiting":
       return { ...state, deadlineNonce: state.deadlineNonce + 1 };
     case "timedOut":
-      return { ...state, timedOutKey: action.key };
+      return { ...state, timedOutKey: action.key, authRequest: null };
   }
 }
 
 type ItemSnapshot = {
   status: "processing" | "ready" | "failed";
 } | null;
+
+function deadlineKeyOf(state: DemoSaveState): string {
+  return `${state.itemId}:${state.deadlineNonce}`;
+}
+
+/** The save in flight is for a sample whose reading steps already played. */
+function alreadyPreviewed(state: DemoSaveState): boolean {
+  return state.previewedUrl !== null && state.previewedUrl === state.savingUrl;
+}
 
 /** What the step shows, derived from local state and the watched item. */
 export function deriveDemoView(
@@ -154,6 +201,15 @@ export function deriveDemoView(
     isSuccess: boolean;
   },
 ): { view: DemoView; lostError: TextMessageKey | null } {
+  // Signed in from the auth view: the save is on its way, so show it reading,
+  // unless the preview already did; then the sign-in ask stays up until the
+  // save lands and the step moves on.
+  if (state.phase === "auth" && state.submitting) {
+    return {
+      view: alreadyPreviewed(state) ? "auth" : "reading",
+      lostError: null,
+    };
+  }
   if (state.phase !== "saved") return { view: state.phase, lostError: null };
   const { item } = query;
   if (item?.status === "failed") return { view: "failed", lostError: null };
@@ -161,6 +217,11 @@ export function deriveDemoView(
   if (query.isSuccess && item === null) {
     return { view: "share", lostError: "demo.saveGone" };
   }
+  // Saved from a previewed sample's sign-in screen (the request is kept only
+  // then): the reading steps already played, so that screen waits for the
+  // item instead. A slow read or a retry drops the request, and with it
+  // this screen, for the reading view.
+  if (state.authRequest !== null) return { view: "auth", lostError: null };
   return { view: "reading", lostError: null };
 }
 
@@ -230,8 +291,11 @@ export function useDemoSave({
   }, [status, advance]);
 
   // Only flips the slow flag. The user, never a timer, decides to move on.
-  const deadlineKey = `${itemId}:${state.deadlineNonce}`;
-  const watching = itemId !== null && view === "reading";
+  const deadlineKey = deadlineKeyOf(state);
+  const watching =
+    itemId !== null &&
+    state.phase === "saved" &&
+    (view === "reading" || view === "auth");
   useEffect(() => {
     if (!watching) return;
     const id = setTimeout(
@@ -243,15 +307,25 @@ export function useDemoSave({
   const timedOut = watching && state.timedOutKey === deadlineKey;
 
   const submit = useCallback(
-    async (request: PendingDemo) => {
+    async (request: PendingDemo, resumed = false) => {
       const url = request.url.trim();
       if (url === "" || inFlightRef.current) return;
       const trimmed = { ...request, url };
+      const sample = isDemoSample(url);
+      // Fires before any sign-in, so the funnel shows a pick that never got
+      // past the sign-in sheet. Resuming after sign-in is not a new pick.
+      if (!resumed) {
+        analytics.capture("onboarding_demo_picked", {
+          sample,
+          signed_in: isAuthenticated,
+        });
+      }
       setPendingDemo(trimmed);
       dispatch({
         type: "submit",
         request: trimmed,
         authenticated: isAuthenticated,
+        preview: sample,
         lost,
       });
       if (!isAuthenticated) return;
@@ -275,6 +349,9 @@ export function useDemoSave({
         });
         clearLegacyDemoUrlIfSaved(result.url);
         if (sharedUrlSaved) {
+          // Only now is the shared link safe to let go of: the server saved
+          // this very link, not an earlier demo item.
+          releaseSavedShare(url);
           try {
             recordShareSaved(result.userId);
           } catch (err) {
@@ -336,7 +413,7 @@ export function useDemoSave({
   const awaitingAuth = state.phase === "auth";
   useEffect(() => {
     if (!isAuthenticated || !awaitingAuth || authRequest === null) return;
-    void submit(authRequest);
+    void submit(authRequest, true);
   }, [isAuthenticated, awaitingAuth, authRequest, submit]);
 
   const setError = useCallback(
@@ -375,6 +452,9 @@ export function useDemoSave({
     }
   };
 
+  // Stable, since the preview's step timer restarts when its onDone changes.
+  const previewed = useCallback(() => dispatch({ type: "previewed" }), []);
+
   const continueAfterTimeout = () => {
     analytics.capture("onboarding_demo_result", { outcome: "timeout" });
     advance();
@@ -389,12 +469,17 @@ export function useDemoSave({
     advance();
   };
 
+  // The phase, not the view: a previewed sample's sign-in screen stays up
+  // after its save exists, and the one demo save is spent by then. A share
+  // arriving on that screen is held for the share screen, never consumed.
+  const { phase, demoUsed } = state;
   const canAcceptShare = useCallback(
     () =>
       !inFlightRef.current &&
       !advancedRef.current &&
-      (view === "share" || view === "auth"),
-    [view],
+      !demoUsed &&
+      (view === "share" || (view === "auth" && phase === "auth")),
+    [view, phase, demoUsed],
   );
 
   return {
@@ -402,6 +487,7 @@ export function useDemoSave({
     item,
     isAuthenticated,
     savingUrl: state.savingUrl,
+    authRequest: state.authRequest,
     authUrl: state.authRequest?.url ?? state.savingUrl ?? "",
     submitting: state.submitting,
     error: state.error ?? lostError,
@@ -417,6 +503,7 @@ export function useDemoSave({
     cancelAuth,
     retry,
     submitSharedUrl,
+    previewed,
     keepWaiting: () => dispatch({ type: "keepWaiting" }),
     continueAfterTimeout,
   };

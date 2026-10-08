@@ -193,7 +193,7 @@ export default function AppLayout() {
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
-        {/* The onboarding reveal opens the paywall fallback before onboarding
+        {/* Onboarding opens the paywall fallback before onboarding
             completes. Keep it last: the first available screen is the initial
             route, so it must be (tabs) or onboarding. */}
         <Stack.Screen
