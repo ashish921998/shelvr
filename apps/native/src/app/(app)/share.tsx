@@ -151,6 +151,7 @@ export default function ShareScreen() {
   // two presses landing before a re-render both see the first one's guards.
   const owner = useRef(initialIncomingShare(Platform.OS === "android"));
   const [phase, setPhase] = useState<SharePhase>(owner.current.phase);
+  const [resolutionStarted, setResolutionStarted] = useState(false);
 
   /** The injected save operations, built once. Both the initial run and a
    * "Retry failed" press share this so the deps object is never rebuilt. Each
@@ -247,6 +248,15 @@ export default function ShareScreen() {
   // deferred-share flag is cleared on completion or discard, NOT here, so a
   // process death mid-share still resumes on next launch.
   useEffect(() => {
+    // useIncomingShare hands over the raw batch on the first render and only
+    // starts resolving it in its own mount effect, so on this first pass
+    // isResolving is still false and nothing is resolved yet. A save started
+    // now marks a shared image failed for want of its resolved URI. Skip the
+    // pass: the re-render this causes carries the hook's isResolving.
+    if (!resolutionStarted) {
+      setResolutionStarted(true);
+      return;
+    }
     // No authenticated user yet (Convex Auth still loading): nothing to reconcile.
     if (user === null || user === undefined) return;
     if (isResolving || sharedPayloads.length === 0) return;
@@ -256,7 +266,14 @@ export default function ShareScreen() {
     // Deferred out of the synchronous effect body so the phase the owner
     // returns is not set during the effect (a cascading render).
     void Promise.resolve().then(() => dispatch({ type: "reconciled", result }));
-  }, [user, sharedPayloads, rawPayloads, isResolving, dispatch]);
+  }, [
+    resolutionStarted,
+    user,
+    sharedPayloads,
+    rawPayloads,
+    isResolving,
+    dispatch,
+  ]);
 
   // --- Derived resolution state (pure functions of hook props) --------------
 
@@ -267,38 +284,6 @@ export default function ShareScreen() {
     !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
   // --- Phase render ---------------------------------------------------------
-
-  if (phase.kind === "confirm") {
-    return (
-      <PhaseSurface key={phase.session.sessionId} phaseKey="confirm">
-        <ScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-        >
-          {rawPayloads.map((payload, index) => (
-            <Text key={index} style={styles.subtitle(theme)} numberOfLines={4}>
-              {/^(file|content):/i.test(payload.value)
-                ? t("capture.photos")
-                : payload.value}
-            </Text>
-          ))}
-        </ScrollView>
-        <View style={styles.actions}>
-          <Button
-            label={t("common.cancel")}
-            theme={theme}
-            onPress={() => dispatch({ type: "cancel" })}
-          />
-          <Button
-            label={t("common.save")}
-            theme={theme}
-            primary
-            onPress={() => dispatch({ type: "confirm" })}
-          />
-        </View>
-      </PhaseSurface>
-    );
-  }
 
   // Entitlement is still loading — don't fall through to the idle/complete
   // render. The effect also blocks on entitlementLoading, so no save starts
