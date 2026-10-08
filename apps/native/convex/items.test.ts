@@ -3305,6 +3305,27 @@ describe("share links", () => {
     });
   });
 
+  it("names the sender by first name only", async () => {
+    const base = newConvexTest();
+    const named = await base.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "  Ashish Huddar ",
+        email: "a@example.com",
+      }),
+    );
+    const unnamed = await base.run((ctx) => ctx.db.insert("users", {}));
+    const previewFor = async (userId: string) => {
+      const t = base.withIdentity({ subject: `${userId}|session-1` });
+      await seedPro(t, userId);
+      const itemId = await seedItem(t, userId);
+      const token = await t.mutation(api.items.createShareLink, { itemId });
+      return await t.query(internal.items.getSharePreview, { token: token! });
+    };
+
+    expect((await previewFor(named))?.senderName).toBe("Ashish");
+    expect((await previewFor(unnamed))?.senderName).toBeUndefined();
+  });
+
   it("does not treat an item id as a token", async () => {
     const t = await as("share-user");
     const itemId = await seedItem(t, "share-user");
