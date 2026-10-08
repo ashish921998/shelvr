@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawSharePayload } from "@/lib/share/storage";
 import {
   decideShareIntake,
-  holdsOnlyPracticeShare,
+  holdsOnlyLink,
+  releaseSavedShare,
   useIncomingShareUrl,
 } from "./use-incoming-share-url";
 
@@ -13,6 +14,7 @@ const mock = vi.hoisted(() => ({
   getSharedPayloads: vi.fn(),
   clearSharedPayloads: vi.fn(),
   markPendingShareOnDevice: vi.fn(),
+  clearPendingShareOnDevice: vi.fn(),
   captureError: vi.fn(),
   capture: vi.fn(),
   share: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock("expo-sharing", () => ({
 }));
 vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice: mock.markPendingShareOnDevice,
+  clearPendingShareOnDevice: mock.clearPendingShareOnDevice,
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: {
@@ -66,6 +69,9 @@ function renderShare({
 beforeEach(() => {
   mock.payloads = [];
   mock.getSharedPayloads.mockReset().mockImplementation(() => mock.payloads);
+  // An empty read forgets the link the hook last handed over.
+  renderShare().unmount();
+  mock.getSharedPayloads.mockClear();
   mock.clearSharedPayloads.mockReset();
   mock.markPendingShareOnDevice.mockReset();
   mock.captureError.mockReset();
@@ -118,12 +124,39 @@ describe("decideShareIntake", () => {
 });
 
 describe("useIncomingShareUrl", () => {
-  it("saves a single shared link on mount and clears it", () => {
+  it("hands a single shared link to the demo and keeps holding it", () => {
     mock.payloads = [link("https://a.test/x")];
     const { onSharedUrl } = renderShare();
     expect(onSharedUrl).toHaveBeenCalledWith("https://a.test/x");
-    expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
+    // Nothing is cleared until the server says this link was saved.
+    expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
     expect(mock.markPendingShareOnDevice).not.toHaveBeenCalled();
+  });
+
+  it("hands the same held link over once, across foregrounds and remounts", () => {
+    mock.payloads = [link("https://a.test/x")];
+    const first = renderShare();
+    act(() => mock.appStateListener?.("active"));
+    expect(first.onSharedUrl).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = renderShare();
+    expect(second.onSharedUrl).not.toHaveBeenCalled();
+
+    // A different link shared afterwards is a new share.
+    mock.payloads = [link("https://b.test/y")];
+    act(() => mock.appStateListener?.("active"));
+    expect(second.onSharedUrl).toHaveBeenCalledWith("https://b.test/y");
+  });
+
+  it("lets go of a held link only once that link is the one saved", () => {
+    mock.payloads = [link("https://mine.test/new")];
+    releaseSavedShare("https://sample.test/old-demo");
+    expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
+
+    releaseSavedShare("https://mine.test/new");
+    expect(mock.clearSharedPayloads).toHaveBeenCalledTimes(1);
+    expect(mock.clearPendingShareOnDevice).toHaveBeenCalledTimes(1);
   });
 
   it("leaves a share for the share screen once the demo moved on", () => {
@@ -184,7 +217,7 @@ describe("useIncomingShareUrl", () => {
   });
 });
 
-describe("holdsOnlyPracticeShare", () => {
+describe("holdsOnlyLink", () => {
   const practice = "https://sample.test/practice";
 
   it.each([
@@ -198,6 +231,6 @@ describe("holdsOnlyPracticeShare", () => {
     ],
     ["a photo", [{ value: "ph://IMG_1", shareType: "image" }], false],
   ])("%s", (_, payloads, expected) => {
-    expect(holdsOnlyPracticeShare(payloads, practice)).toBe(expected);
+    expect(holdsOnlyLink(payloads, practice)).toBe(expected);
   });
 });

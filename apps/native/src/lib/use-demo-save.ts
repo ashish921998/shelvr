@@ -1,6 +1,7 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
+import { releaseSavedShare } from "@/lib/use-incoming-share-url";
 import { demoDestination, isDemoSample } from "@/lib/onboarding-demo";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -348,6 +349,9 @@ export function useDemoSave({
         });
         clearLegacyDemoUrlIfSaved(result.url);
         if (sharedUrlSaved) {
+          // Only now is the shared link safe to let go of: the server saved
+          // this very link, not an earlier demo item.
+          releaseSavedShare(url);
           try {
             recordShareSaved(result.userId);
           } catch (err) {

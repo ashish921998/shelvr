@@ -2,7 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { useOnboarding } from "@/lib/onboarding";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
-import { holdsOnlyPracticeShare } from "@/lib/use-incoming-share-url";
+import { holdsOnlyLink } from "@/lib/use-incoming-share-url";
 import { isInterest } from "@/lib/onboarding-interests";
 import {
   featuredDemoKind,
@@ -80,7 +80,7 @@ function holdIncomingShare() {
 function dropPracticeShare(practiceUrl: string | undefined) {
   try {
     if (practiceUrl === undefined) return;
-    if (!holdsOnlyPracticeShare(getSharedPayloads(), practiceUrl)) return;
+    if (!holdsOnlyLink(getSharedPayloads(), practiceUrl)) return;
     clearSharedPayloads();
     clearPendingShareOnDevice();
   } catch (err) {

@@ -28,6 +28,7 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   setPendingDemo: vi.fn(),
   recordShareSaved: vi.fn(),
+  releaseSavedShare: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -71,6 +72,9 @@ vi.mock("@/lib/onboarding-demo", () => ({
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
+}));
+vi.mock("@/lib/use-incoming-share-url", () => ({
+  releaseSavedShare: mock.releaseSavedShare,
 }));
 
 const ITEM_ID = "item-1";
@@ -330,6 +334,31 @@ describe("useDemoSave", () => {
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
     expect(mock.recordShareSaved.mock.invocationCallOrder[0]).toBeLessThan(
       onSaved.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("lets go of a shared link only when the server saved that link", async () => {
+    mock.releaseSavedShare.mockReset();
+    // The demo save was already spent: the server hands back the old item.
+    mock.create.mockResolvedValue({
+      ...saved(),
+      reused: true,
+      urlMatchesRequest: false,
+    });
+    const spent = renderDemo();
+    await flush(() =>
+      spent.result.current.submitSharedUrl("https://mine.test/new"),
+    );
+    expect(mock.releaseSavedShare).not.toHaveBeenCalled();
+    spent.unmount();
+
+    mock.create.mockResolvedValue(saved());
+    const fresh = renderDemo();
+    await flush(() =>
+      fresh.result.current.submitSharedUrl("https://mine.test/new"),
+    );
+    expect(mock.releaseSavedShare).toHaveBeenCalledWith(
+      "https://mine.test/new",
     );
   });
 

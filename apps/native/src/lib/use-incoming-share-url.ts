@@ -1,6 +1,9 @@
 import { analytics } from "@/lib/analytics";
 import { firstSharedUrl } from "@/lib/share/process-share";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import {
+  clearPendingShareOnDevice,
+  markPendingShareOnDevice,
+} from "@/lib/share/pending-share-store";
 import { useShareArrival } from "@/lib/share/share-sheet";
 import type { RawSharePayload } from "@/lib/share/storage";
 import { clearSharedPayloads, getSharedPayloads } from "expo-sharing";
@@ -12,8 +15,9 @@ type ShareIntake =
   | { kind: "consume"; url: string };
 
 /** The demo saves exactly one shared link, and only while it is still asking
- * for one. Anything else stays in expo-sharing for the share screen, so no
- * payload is cleared that the demo does not save. */
+ * for one. Anything else stays in expo-sharing for the share screen. A link
+ * the demo takes stays there too, until `releaseSavedShare` hears from the
+ * server that this link is the one saved. */
 export function decideShareIntake(
   payloads: RawSharePayload[],
   accepting: boolean,
@@ -24,19 +28,42 @@ export function decideShareIntake(
   return url === null ? { kind: "hold" } : { kind: "consume", url };
 }
 
-/** True when the one share held is the practice link itself. Anything else
- * held, beside it or in its place, is the user's own and must be kept. */
-export function holdsOnlyPracticeShare(
+/** True when the one share held is this link. Anything else held, beside it
+ * or in its place, is a different share and must be kept. */
+export function holdsOnlyLink(
   payloads: RawSharePayload[],
-  practiceUrl: string,
+  url: string,
 ): boolean {
-  return payloads.length === 1 && firstSharedUrl(payloads) === practiceUrl;
+  return payloads.length === 1 && firstSharedUrl(payloads) === url;
+}
+
+// The link last handed to the demo and still held. The app coming back to the
+// foreground reads the same payload again; it is handed over once. Kept
+// outside the hook so going back and forth between steps does not re-ask.
+let handedUrl: string | null = null;
+
+/**
+ * Lets go of a shared link once the server has saved that very link. Until
+ * then it stays held, so a save that is cancelled, fails, or comes back as an
+ * earlier demo item leaves the link for the share screen instead of losing it.
+ */
+export function releaseSavedShare(url: string) {
+  try {
+    if (!holdsOnlyLink(getSharedPayloads(), url)) return;
+    clearSharedPayloads();
+    // A foreground while the save was on its way flags the held link for the
+    // share screen. Nothing is held any more, so the flag goes with it.
+    clearPendingShareOnDevice();
+    handedUrl = null;
+  } catch (err) {
+    analytics.captureError("onboarding_share_release_failed", err);
+  }
 }
 
 /**
- * Saves a link shared into the demo from another app. The payload is read
- * directly: useIncomingShare caches its state and would not refresh after a
- * clear followed by a second share of the same link.
+ * Hands a link shared into the demo from another app to its save. The
+ * payload is read directly: useIncomingShare caches its state and would not
+ * refresh after a clear followed by a second share of the same link.
  */
 export function useIncomingShareUrl({
   canAccept,
@@ -66,8 +93,9 @@ export function useIncomingShareUrl({
         analytics.captureError("onboarding_hold_share_failed", err);
       }
     }
-    if (intake.kind !== "consume") return;
-    clearSharedPayloads();
+    if (intake.kind === "none") handedUrl = null;
+    if (intake.kind !== "consume" || intake.url === handedUrl) return;
+    handedUrl = intake.url;
     onSharedUrl(intake.url);
   }, [canAccept, onSharedUrl]);
 
