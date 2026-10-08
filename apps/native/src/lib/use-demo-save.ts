@@ -1,4 +1,5 @@
 import type { TextMessageKey } from "@/locales/message-types";
+import { useAiConsent } from "@/lib/ai-consent";
 import { analytics } from "@/lib/analytics";
 import { recordShareSaved } from "@/lib/first-share";
 import { releaseSavedShare } from "@/lib/use-incoming-share-url";
@@ -250,6 +251,11 @@ export function useDemoSave({
   onAdvance: () => void;
 }) {
   const { isAuthenticated } = useConvexAuth();
+  // Signed in is not enough to save: the AI consent answer comes first. Until
+  // it is in, a request waits in "auth" exactly as it does for sign-in, and
+  // the resume effect below sends it once the answer lands.
+  const { savesBlocked } = useAiConsent();
+  const canSave = isAuthenticated && !savesBlocked;
   const createDemoItem = useMutation(api.demo.createDemoItem);
   const retryDemoItem = useMutation(api.demo.retryDemoItem);
   const [state, dispatch] = useReducer(
@@ -324,11 +330,11 @@ export function useDemoSave({
       dispatch({
         type: "submit",
         request: trimmed,
-        authenticated: isAuthenticated,
+        authenticated: canSave,
         preview: sample,
         lost,
       });
-      if (!isAuthenticated) return;
+      if (!canSave) return;
 
       inFlightRef.current = true;
       try {
@@ -376,7 +382,7 @@ export function useDemoSave({
         inFlightRef.current = false;
       }
     },
-    [createDemoItem, isAuthenticated, lost, onSaved],
+    [createDemoItem, isAuthenticated, canSave, lost, onSaved],
   );
 
   const submitUrl = useCallback(
@@ -412,9 +418,9 @@ export function useDemoSave({
   const { authRequest } = state;
   const awaitingAuth = state.phase === "auth";
   useEffect(() => {
-    if (!isAuthenticated || !awaitingAuth || authRequest === null) return;
+    if (!canSave || !awaitingAuth || authRequest === null) return;
     void submit(authRequest, true);
-  }, [isAuthenticated, awaitingAuth, authRequest, submit]);
+  }, [canSave, awaitingAuth, authRequest, submit]);
 
   const setError = useCallback(
     (error: TextMessageKey | null) =>

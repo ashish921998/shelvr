@@ -184,16 +184,10 @@ describe("trial nudges", () => {
     expect(trialNudgeAt(noon + 5 * DAY, 1, noon)).toBeNull();
   });
 
-  it("follows the Save reminders switch, not a missing preferences row", () => {
-    expect(
-      trialNudgesAllowed({ remindersEnabled: false, timezone: null }),
-    ).toBe(true);
-    expect(
-      trialNudgesAllowed({ remindersEnabled: true, timezone: "Asia/Kolkata" }),
-    ).toBe(true);
-    expect(
-      trialNudgesAllowed({ remindersEnabled: false, timezone: "Asia/Kolkata" }),
-    ).toBe(false);
+  it("needs Save reminders on, and a missing preferences row means no", () => {
+    // `getPreferences` reports reminders off for a user with no row.
+    expect(trialNudgesAllowed({ remindersEnabled: false })).toBe(false);
+    expect(trialNudgesAllowed({ remindersEnabled: true })).toBe(true);
   });
 
   it("schedules both nudges with the reminder when allowed", async () => {

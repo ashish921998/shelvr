@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -56,6 +57,26 @@ export function useShareLink() {
       }
     },
     [createShareLink],
+  );
+}
+
+/**
+ * Tells the server how a share that minted the public link ended. The link is
+ * published before the sheet opens, so a dismissed or failed share would
+ * leave a public page behind; `shared: false` lets the server take it back,
+ * and `shared: true` marks it as one that went out. Every surface that
+ * shares reports here. Never awaited: the share is over either way.
+ */
+export function useSettleShareLink() {
+  const settle = useMutation(api.items.settleShareLink);
+  return useCallback(
+    (itemId: string, shared: boolean): void => {
+      settle({ itemId: itemId as Id<"items">, shared }).catch(
+        (error: unknown) =>
+          analytics.captureError("share_link_settle_failed", error),
+      );
+    },
+    [settle],
   );
 }
 

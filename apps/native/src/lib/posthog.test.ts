@@ -241,7 +241,7 @@ describe("posthog exception autocapture gate", () => {
 });
 
 describe("posthog session replay gate", () => {
-  it("records a production build with masking and sampling intact", async () => {
+  const replayOptionsFor = async (variant: string) => {
     vi.resetModules();
     vi.doMock("expo-constants", () => ({
       default: {
@@ -249,16 +249,26 @@ describe("posthog session replay gate", () => {
           extra: {
             posthogProjectToken: "phc_test",
             posthogHost: "https://test.i.posthog.com",
-            variant: "production",
+            variant,
           },
         },
       },
     }));
     await import("./posthog");
-    const options = posthogCtor.options as {
+    vi.doUnmock("expo-constants");
+    return posthogCtor.options as {
       enableSessionReplay: boolean;
       sessionReplayConfig: Record<string, unknown>;
     };
+  };
+
+  it("never records a production build", async () => {
+    const options = await replayOptionsFor("production");
+    expect(options.enableSessionReplay).toBe(false);
+  });
+
+  it("records a preview build with masking intact", async () => {
+    const options = await replayOptionsFor("preview");
     expect(options.enableSessionReplay).toBe(true);
     expect(options.sessionReplayConfig).toMatchObject({
       maskAllTextInputs: true,
@@ -268,7 +278,6 @@ describe("posthog session replay gate", () => {
       captureNetworkTelemetry: false,
       sampleRate: 1,
     });
-    vi.doUnmock("expo-constants");
   });
 
   it("stays off when the build declares no variant", async () => {

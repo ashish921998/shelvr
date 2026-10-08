@@ -486,6 +486,7 @@ export type MessageParams = {
   "onboarding.remindSavedNow": undefined;
   "onboarding.remindFallbackTitle": undefined;
   "onboarding.remindPledge": undefined;
+  "onboarding.remindConsent": undefined;
   "demo.shareHelp": undefined;
   "demo.privacyNote": undefined;
   "demo.stepSaved": undefined;
@@ -554,6 +555,13 @@ export type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
+  "aiConsent.title": undefined;
+  "aiConsent.body": undefined;
+  "aiConsent.changeLater": undefined;
+  "aiConsent.allow": undefined;
+  "aiConsent.setting": undefined;
+  "aiConsent.settingHelp": undefined;
+  "aiConsent.findLinksOff": undefined;
   "exitOffer.title": undefined;
   "exitOffer.endsIn": { time: string };
   "exitOffer.cta": undefined;

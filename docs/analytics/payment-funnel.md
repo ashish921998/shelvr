@@ -106,15 +106,17 @@ Recorded 13 September 2026 from RevenueCat's cancellation-flow guidance, Apple t
 - **Apple sends no cancel reasons.** An empty `cancel_reason` is Apple's normal state, not a bug; the `unknown` category is the expected iOS mode. The only source of a stated reason on iOS is this survey (or an out-of-band channel like email).
 - **The `trial_cancelled` → `cancel_survey_shown` drop-off is the never-return rate** — cancellers who do not open the app again during the trial window. No in-app survey (ours or RC's) can reach them; only email/push win-back can, which additionally requires enabling `$process_person_profile` on the cancellation events (kept off for cost). Roadmap order: measure this drop-off first, add win-back email or Apple win-back offers (iOS 18+) only if the rate justifies it, and reason-keyed offers (`too_expensive` → targeted offer) only with response volume.
 
-For failure recordings, open **Paywall attempt to actual payment**, click the dropped-off people at the payment step, then inspect their matching recordings. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
+To study failures, open **Paywall attempt to actual payment** and click the dropped-off people at the payment step. Production builds do not record sessions, so read their event timelines; recordings exist only for preview and development builds. A user who started a free trial yesterday is not yet a failed payer. For immediate checkout abandonment, inspect `paywall_cancelled` or `paywall_failed` events; unmatched presentation attempts also include force-quits and pending sheets. The paid-user journey is person-level; use the separate Useful returns dashboard for matching the same saved item across sessions.
 
-Native replay was disabled for the production build variant from 1.0.2 until
-visual masking was verified on a signed preview build on 2026-09-28. Production,
-preview and development builds now all record. Replay samples 20% of sessions, masks all text, images, and sandboxed
-system views, disables logs/network telemetry, and captures at most one snapshot
-per second. Not every failed journey will have a recording. Native dead-tap
-detection is not promised. Replay requires a rebuilt native binary; an OTA
-JavaScript update cannot add the plugin.
+Production session replay is off. Apple's guideline 2.5.14 requires explicit
+consent and a visible indicator for recording user activity, and the app has
+neither, so `REPLAY_VARIANTS` in `src/lib/posthog.ts` holds only the preview and
+development variants. Production recorded from 2026-09-28 until that gate was
+narrowed in October 2026. On preview and development builds replay records every
+session, masks all text, images, and sandboxed system views, disables
+logs/network telemetry, and captures at most one snapshot per second. Native
+dead-tap detection is not promised. Turning production replay back on needs an
+in-app consent step and a recording indicator first.
 
 Website identities remain separate from app identities. Do not interpret these charts as a stitched landing-page-to-App-Store-install funnel.
 

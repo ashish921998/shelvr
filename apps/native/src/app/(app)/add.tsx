@@ -38,9 +38,10 @@ type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
  * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
 
-/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
- * iOS-only, so Android reads the raw string and keeps it only when it parses as
- * an http(s) URL. A failed read resolves to null instead of rejecting. */
+/** Read a link from the clipboard, only ever from a tap on the fallback paste
+ * button. `getUrlAsync` is iOS-only, so Android reads the raw string and keeps
+ * it only when it parses as an http(s) URL. A failed read resolves to null
+ * instead of rejecting. */
 async function readClipboardUrl(): Promise<string | null> {
   try {
     if (Platform.OS === "ios") {
@@ -84,6 +85,50 @@ function ActionButton({
         />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Fills the link field from the clipboard, and only when tapped: reading the
+ * clipboard as the composer opens would take what the user copied without
+ * being asked. The system paste button is the tap iOS treats as consent, so
+ * it pastes with no permission banner; where it is unavailable (Android, iOS
+ * before 16) a plain button reads the clipboard on press.
+ */
+function PasteLinkButton({ onPaste }: { onPaste: (text: string) => void }) {
+  const { theme } = useUnistyles();
+  if (Clipboard.isPasteButtonAvailable) {
+    return (
+      <Clipboard.ClipboardPasteButton
+        testID="add-article-paste"
+        acceptedContentTypes={["url", "plain-text"]}
+        displayMode="iconAndLabel"
+        cornerStyle="large"
+        backgroundColor={theme.colors.primary}
+        foregroundColor={theme.colors.primaryForeground}
+        style={styles.pasteControl}
+        onPress={(data) => {
+          if (data.type === "text") onPaste(data.text.trim());
+        }}
+      />
+    );
+  }
+  return (
+    <Pressable
+      testID="add-article-paste"
+      accessibilityRole="button"
+      onPress={() =>
+        void readClipboardUrl().then((url) => {
+          if (url) onPaste(url);
+        })
+      }
+      style={({ pressed }) => [
+        styles.pasteFallback,
+        pressed && { opacity: 0.85 },
+      ]}
+    >
+      <Text style={styles.pasteFallbackText}>{t("common.paste")}</Text>
     </Pressable>
   );
 }
@@ -186,18 +231,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
-
-  // Prefill the article field with a link already on the clipboard.
-  useEffect(() => {
-    if (mode !== "article") return;
-    let active = true;
-    readClipboardUrl().then((url) => {
-      if (active && url) setValue((current) => current || url);
-    });
-    return () => {
-      active = false;
-    };
-  }, [mode]);
 
   // Android's Material sheet resizes to the composer over ~300ms, and a
   // keyboard opened mid-resize can land behind it, so focus once it settles.
@@ -384,7 +417,11 @@ function AddContent({ close, openCamera }: AddContentProps) {
           onSubmitEditing={isArticle ? save : undefined}
           editable={!saving}
         />
-      ) : (
+      ) : null}
+      {isArticle && value === "" ? (
+        <PasteLinkButton onPaste={setValue} />
+      ) : null}
+      {isComposer ? null : (
         <View style={styles.actions}>
           <ActionButton
             testID="add-option-note"
@@ -535,6 +572,26 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 12,
     color: theme.colors.foreground,
     textAlign: "center",
+  },
+  pasteControl: {
+    width: 104,
+    height: 48,
+  },
+  pasteFallback: {
+    alignSelf: "flex-start",
+    minWidth: 88,
+    height: 48,
+    paddingHorizontal: theme.gap(2),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pasteFallbackText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.primaryForeground,
   },
   noteInput: {
     fontFamily: theme.fonts.regular,

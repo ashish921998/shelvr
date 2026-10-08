@@ -335,6 +335,10 @@ type AnalyticsEventProperties = {
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
   };
+  // Third-party AI consent (lib/ai-consent.ts). `shown` is the card;
+  // `answered` also covers the Settings switch.
+  ai_consent_shown: Record<string, never>;
+  ai_consent_answered: { granted: boolean; surface: "card" | "settings" };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;
   cancel_survey_submitted: {
