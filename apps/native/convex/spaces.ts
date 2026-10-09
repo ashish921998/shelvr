@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
+import { aiAllowed } from "./aiConsent";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -825,6 +826,11 @@ export const setMembershipIntentsInternal = internalMutation({
   handler: async (ctx, args) => {
     const row = await getMembership(ctx, args.itemId, args.spaceId);
     if (row === null || effectiveStatus(row) !== "saved") {
+      return null;
+    }
+    // Asked in the committing transaction: the model call that produced these
+    // can outlast the owner turning AI off.
+    if (!(await aiAllowed(ctx, row.userId))) {
       return null;
     }
     await ctx.db.patch(row._id, { intents: args.intents });

@@ -269,6 +269,20 @@ describe("revoke", () => {
     expect(await tokenRows(t)).toEqual([]);
   });
 
+  it("keeps the token and tries again when Apple rate limits the request", async () => {
+    await configure();
+    fetchMock.mockResolvedValue(new Response(null, { status: 429 }));
+    const t = newConvexTest();
+    const { tokenId } = await tokenRow(t);
+
+    await t.action(internal.appleRevoke.revoke, { tokenId });
+
+    expect((await scheduledRevokes(t))[0].args).toEqual([
+      { tokenId, attempt: 2 },
+    ]);
+    expect(await tokenRows(t)).toHaveLength(1);
+  });
+
   it("tries again later when Apple is unreachable, a bounded number of times", async () => {
     await configure();
     fetchMock.mockRejectedValue(new Error("network down"));

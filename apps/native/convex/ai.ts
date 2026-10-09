@@ -1101,6 +1101,7 @@ export const processItem = internalAction({
         content: pageContent,
         siteName: pageSiteName,
         embedding,
+        classified: aiAllowed,
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
@@ -1613,6 +1614,11 @@ export const findProductLinks = internalAction({
           throw new StoredImageError("not_found");
         }
         const image = await readStoredImage(ctx.storage, item.storageId);
+        // The read can be slow; the image goes nowhere if AI went off meanwhile.
+        if (!(await stillAllowed(ctx, true, item))) {
+          await fail();
+          return null;
+        }
         const { object } = await generateObject({
           model: MODEL,
           ...modelCallOptions(SMALL_TIMEOUT_MS),

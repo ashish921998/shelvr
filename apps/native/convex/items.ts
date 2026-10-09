@@ -2489,6 +2489,9 @@ export const finalizeItem = internalMutation({
     // and the sweeper fills the vector in later. Never `null` — absent means
     // "this run produced none".
     embedding: v.optional(v.array(v.float64())),
+    // True when the title, description, tags and intents came from the model.
+    // Optional so runs queued before this argument existed still validate.
+    classified: v.optional(v.boolean()),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
@@ -2501,6 +2504,12 @@ export const finalizeItem = internalMutation({
     if (item === null) {
       return "missing";
     }
+    // The same answer decides the model's words: the owner can turn AI off
+    // while the embedding call is still out, after the action last asked.
+    const withdrawn = args.classified === true && !embedAllowed;
+    const description = withdrawn ? (item.description ?? "") : args.description;
+    const tags = withdrawn ? item.tags : args.tags;
+    const intents = withdrawn ? item.intents : args.intents;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
     // result with ours (or flip a newer `processing` back to `ready` with
@@ -2518,19 +2527,21 @@ export const finalizeItem = internalMutation({
       (item.titleSource === "user" || args.keepTitle === true) &&
       item.title !== undefined
         ? item.title
-        : args.title;
+        : // A run with no title to offer (AI off, nothing readable) keeps the
+          // one the save already has; patching undefined would remove it.
+          ((withdrawn ? undefined : args.title) ?? item.title);
     const searchText = buildSearchText({
       title,
-      description: args.description,
-      tags: args.tags,
+      description,
+      tags,
       siteName: args.siteName,
       note: item.note,
       content: args.content,
     });
     await ctx.db.patch(args.itemId, {
       title,
-      description: args.description,
-      tags: args.tags,
+      description,
+      tags,
       content: args.content,
       recipe: args.recipe,
       siteName: args.siteName,
@@ -2540,7 +2551,7 @@ export const finalizeItem = internalMutation({
       articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
-      intents: args.intents,
+      intents,
       status: args.status,
       // Always written so a successful retry clears a previous "partial" flag
       // and a previous failureReason (patching undefined removes the field).
@@ -3075,7 +3086,9 @@ export const suggestItemsForSpace = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const space = await ctx.db.get(args.spaceId);
-    if (space === null) {
+    // Asked in the committing transaction: the model call that produced these
+    // can outlast the owner turning AI off.
+    if (space === null || !(await aiAllowed(ctx, space.userId))) {
       return null;
     }
     // Any existing row blocks a new suggestion — saved and dismissed are

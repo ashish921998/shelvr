@@ -504,3 +504,61 @@ describe("account deletion", () => {
     );
   });
 });
+
+describe("a decline that lands while a run is still out", () => {
+  it("keeps the save's title, tags and description when the model's result arrives late", async () => {
+    const t = signedIn();
+    const itemId = await ready(t);
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      title: "Model title",
+      description: "Model description.",
+      tags: ["model"],
+      classified: true,
+      status: "ready",
+    });
+
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
+      title: "Lentil soup",
+      description: "A weeknight soup",
+      tags: ["food"],
+    });
+  });
+
+  it("keeps an existing title when a run without the model has none to offer", async () => {
+    const t = signedIn();
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+    const itemId = await ready(t);
+
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      description: "",
+      tags: ["food"],
+      status: "ready",
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.title).toBe(
+      "Lentil soup",
+    );
+  });
+
+  it("drops suggestions the model made for a new space", async () => {
+    const t = signedIn();
+    const itemId = await ready(t);
+    const spaceId = await t.run((ctx) =>
+      ctx.db.insert("spaces", { userId: USER, name: "Recipes" }),
+    );
+    await t.mutation(api.aiConsent.setConsent, { granted: false });
+
+    await t.mutation(internal.items.suggestItemsForSpace, {
+      spaceId,
+      itemIds: [itemId],
+    });
+
+    expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
+      [],
+    );
+  });
+});

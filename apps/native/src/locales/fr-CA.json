@@ -642,7 +642,7 @@
   "aiConsent.setting": "Titres, étiquettes et suggestions par IA",
   "aiConsent.settingHelp": "Envoie ce que vous enregistrez à Gemini, l’IA de Google. Désactivé : vos enregistrements ne gardent que le titre de la page.",
   "aiConsent.findLinksOff": "Activez l’IA dans Paramètres pour rechercher des liens.",
-  "aiConsent.signInNote": "Shelvr utilise Gemini AI de Google pour titrer et classer vos enregistrements. En continuant, vous l'autorisez. Vous pouvez le désactiver dans les Réglages.",
+  "aiConsent.signInNote": "Shelvr utilise Gemini AI de Google pour titrer et classer vos enregistrements. En continuant, vous l'autorisez. Vous pouvez le désactiver dans Paramètres.",
   "exitOffer.title": "Votre première année à prix réduit",
   "exitOffer.endsIn": "L’offre se termine dans %{time}",
   "exitOffer.cta": "Voir l’offre",

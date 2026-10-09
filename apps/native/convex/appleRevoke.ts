@@ -122,7 +122,9 @@ export const revoke = internalAction({
     } catch {
       status = undefined;
     }
-    if (status !== undefined && status < 500) {
+    // 429 is Apple asking us to slow down, not a refusal: keep the token and
+    // take the bounded retry path.
+    if (status !== undefined && status < 500 && status !== 429) {
       logEvent(status === 200 ? "info" : "error", "apple_revoke_finished", {
         status,
       });
