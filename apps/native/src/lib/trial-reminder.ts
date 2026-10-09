@@ -96,10 +96,18 @@ export function trialReminderAt(expiresAt: number, now: number): number | null {
  */
 export function trialLastDayAt(expiresAt: number, now: number): number | null {
   const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
+  const ends = new Date(expiresAt);
   const dayBefore = new Date(expiresAt);
   dayBefore.setDate(dayBefore.getDate() - 1);
   if (at.toDateString() !== dayBefore.toDateString()) return null;
-  if (at.getHours() < NUDGE_EARLIEST_HOUR) return null;
+  // A trial ending at 11 am or later always gets one. The night clocks
+  // spring forward, 25 hours before an 11 am end reads 9 am, so the morning
+  // cutoff gives way there rather than skip the reminder.
+  if (
+    at.getHours() < NUDGE_EARLIEST_HOUR &&
+    ends.getHours() < NUDGE_EARLIEST_HOUR + 1
+  )
+    return null;
   if (at.getHours() >= NUDGE_LATEST_HOUR)
     at.setHours(NUDGE_LATEST_HOUR, 0, 0, 0);
   const fireAt = at.getTime();
