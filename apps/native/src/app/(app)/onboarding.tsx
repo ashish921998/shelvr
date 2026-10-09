@@ -105,7 +105,8 @@ export default function OnboardingScreen() {
     initialProgress.saveKinds.filter(isSaveKind),
   );
   const [spaces, setSpaces] = useState<string[]>(initialProgress.spaces);
-  const [saved, setSaved] = useState<DemoSaved | null>(null);
+  // Restored so a relaunch on the reminder step still offers to remind.
+  const [saved, setSaved] = useState<DemoSaved | null>(initialProgress.saved);
   const [reading, setReading] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -132,8 +133,8 @@ export default function OnboardingScreen() {
   const interests = spaces.filter(isInterest);
 
   useEffect(() => {
-    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex });
-  }, [kinds, spaces, stepIndex]);
+    setOnboardingProgress({ saveKinds: kinds, spaces, step: stepIndex, saved });
+  }, [kinds, spaces, stepIndex, saved]);
 
   useEffect(() => {
     if (viewedStep.current === step) return;
@@ -227,6 +228,8 @@ export default function OnboardingScreen() {
       dropPracticeShare(practiceSample?.url);
       finish();
     },
+    // Not a decline: the practice share stays held for the share screen.
+    onUnavailable: finish,
   });
 
   if (showSignIn) {

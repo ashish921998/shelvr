@@ -6,7 +6,7 @@ import { useOnboardingPaywall } from "./onboarding-paywall";
 const state = vi.hoisted(() => ({
   signedIn: true,
   entitlement: { entitled: false, loading: false },
-  open: vi.fn<() => Promise<boolean>>(),
+  open: vi.fn<() => Promise<"success" | "cancelled" | "unavailable">>(),
   purchased: vi.fn(),
   declined: vi.fn(),
 }));
@@ -29,12 +29,15 @@ async function ask(entitlement: { entitled: boolean; loading: boolean }) {
   state.entitlement = entitlement;
   const onPro = vi.fn();
   const onDecline = vi.fn();
-  const hook = renderHook(() => useOnboardingPaywall({ onPro, onDecline }));
+  const onUnavailable = vi.fn();
+  const hook = renderHook(() =>
+    useOnboardingPaywall({ onPro, onDecline, onUnavailable }),
+  );
   await act(async () => {
     hook.result.current.ask();
     await Promise.resolve();
   });
-  return { onPro, onDecline, hook };
+  return { onPro, onDecline, onUnavailable, hook };
 }
 
 describe("useOnboardingPaywall", () => {
@@ -58,7 +61,7 @@ describe("useOnboardingPaywall", () => {
   });
 
   it("goes on after a purchase", async () => {
-    state.open.mockResolvedValue(true);
+    state.open.mockResolvedValue("success");
     const { onPro, onDecline } = await ask({ entitled: false, loading: false });
     await vi.waitFor(() => expect(onPro).toHaveBeenCalledOnce());
     expect(state.purchased).toHaveBeenCalledOnce();
@@ -66,15 +69,38 @@ describe("useOnboardingPaywall", () => {
   });
 
   it("leaves for the app when the paywall is closed", async () => {
-    state.open.mockResolvedValue(false);
+    state.open.mockResolvedValue("cancelled");
     const { onPro, onDecline } = await ask({ entitled: false, loading: false });
     await vi.waitFor(() => expect(onDecline).toHaveBeenCalledOnce());
     expect(state.declined).toHaveBeenCalledOnce();
     expect(onPro).not.toHaveBeenCalled();
   });
 
+  it("does not count a paywall that could not show as a decline", async () => {
+    state.open.mockResolvedValue("unavailable");
+    const { onPro, onDecline, onUnavailable } = await ask({
+      entitled: false,
+      loading: false,
+    });
+    await vi.waitFor(() => expect(onUnavailable).toHaveBeenCalledOnce());
+    expect(state.declined).not.toHaveBeenCalled();
+    expect(onDecline).not.toHaveBeenCalled();
+    expect(onPro).not.toHaveBeenCalled();
+  });
+
+  it("does not count a paywall that threw as a decline", async () => {
+    state.open.mockRejectedValue(new Error("not configured"));
+    const { onDecline, onUnavailable } = await ask({
+      entitled: false,
+      loading: false,
+    });
+    await vi.waitFor(() => expect(onUnavailable).toHaveBeenCalledOnce());
+    expect(state.declined).not.toHaveBeenCalled();
+    expect(onDecline).not.toHaveBeenCalled();
+  });
+
   it("waits for the entitlement, then shows the paywall once", async () => {
-    state.open.mockResolvedValue(false);
+    state.open.mockResolvedValue("cancelled");
     const { onDecline, hook } = await ask({ entitled: false, loading: true });
     expect(state.open).not.toHaveBeenCalled();
     state.entitlement = { entitled: false, loading: false };
