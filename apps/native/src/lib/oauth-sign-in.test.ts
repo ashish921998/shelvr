@@ -432,28 +432,96 @@ describe("useOAuthSignIn", () => {
       });
     });
 
-    it("fails on any other sheet error", async () => {
+    const events = (name: string) =>
+      mock.capture.mock.calls
+        .filter(([event]) => event === name)
+        .map(([, properties]) => properties);
+
+    it("falls back to the web session when the sheet fails, and signs in there", async () => {
       mock.appleSignIn.mockRejectedValueOnce(
         Object.assign(new Error("unknown"), { code: "ERR_REQUEST_UNKNOWN" }),
       );
+      mock.signIn
+        .mockResolvedValueOnce({ signingIn: false, redirect })
+        .mockResolvedValueOnce({ signingIn: true });
+      endSession({ type: "success", url: "shelvr://auth/callback?code=abc" });
 
-      const { outcome } = await run("apple");
+      const { hook, outcome } = await run("apple");
 
-      expect(outcome).toBe("failed");
+      expect(outcome).toBe("completed");
+      expect(mock.signIn).toHaveBeenLastCalledWith("apple", { code: "abc" });
+      expect(hook.result.current.lastError).toBeNull();
+      // Two attempts, each with its own id and its own outcome.
+      expect(events("auth_started").map((e) => e.method)).toEqual([
+        "native",
+        "web",
+      ]);
       expect(captured("auth_failed")).toMatchObject({
         method: "native",
         stage: "browser",
+        error_code: "ERR_REQUEST_UNKNOWN",
       });
+      expect(captured("auth_succeeded")).toMatchObject({ method: "web" });
+      expect(captured("auth_succeeded").auth_attempt_id).not.toBe(
+        captured("auth_failed").auth_attempt_id,
+      );
     });
 
-    it("fails when the backend rejects the identity token", async () => {
+    it("falls back when the backend rejects the identity token", async () => {
       mock.appleSignIn.mockResolvedValueOnce(credential);
-      mock.signIn.mockResolvedValueOnce({ signingIn: false });
+      mock.signIn
+        .mockResolvedValueOnce({ signingIn: false })
+        .mockResolvedValueOnce({ signingIn: false, redirect })
+        .mockResolvedValueOnce({ signingIn: true });
+      endSession({ type: "success", url: "shelvr://auth/callback?code=abc" });
 
       const { outcome } = await run("apple");
 
+      expect(outcome).toBe("completed");
+      expect(captured("auth_failed")).toMatchObject({
+        method: "native",
+        stage: "exchange",
+      });
+      expect(captured("auth_failed")).not.toHaveProperty("error_code");
+    });
+
+    it("reports the web attempt's own failure when both fail", async () => {
+      mock.appleSignIn.mockRejectedValueOnce(
+        Object.assign(new Error("unknown"), { code: "ERR_REQUEST_UNKNOWN" }),
+      );
+      mock.signIn.mockRejectedValueOnce(new Error("backend down"));
+
+      const { hook, outcome } = await run("apple");
+
       expect(outcome).toBe("failed");
-      expect(captured("auth_failed")).toMatchObject({ stage: "exchange" });
+      expect(events("auth_failed").map((e) => e.method)).toEqual([
+        "native",
+        "web",
+      ]);
+      expect(hook.result.current.lastError).toContain("backend down");
+      expect(hook.result.current.pendingProvider).toBeNull();
+    });
+
+    it("keeps anything but a module's own code out of the failure event", async () => {
+      mock.appleSignIn.mockRejectedValueOnce(
+        Object.assign(new Error("x"), { code: "someone@example.com" }),
+      );
+      mock.signIn.mockRejectedValueOnce(new Error("backend down"));
+
+      await run("apple");
+
+      expect(events("auth_failed")[0]).not.toHaveProperty("error_code");
+    });
+
+    it("does not open the web session after a person closes the sheet", async () => {
+      mock.appleSignIn.mockRejectedValueOnce(
+        Object.assign(new Error("canceled"), { code: "ERR_REQUEST_CANCELED" }),
+      );
+
+      await run("apple");
+
+      expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
+      expect(events("auth_started")).toHaveLength(1);
     });
 
     it("keeps the web session where the sheet is unavailable", async () => {

@@ -127,6 +127,9 @@ type AnalyticsEventProperties = {
     method: AuthMethod;
     auto_retry?: true;
     stage: "request" | "browser" | "exchange";
+    // The native module's own code (ERR_REQUEST_FAILED and the like), when the
+    // failure came from one. A fixed vocabulary, never a message.
+    error_code?: string;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
