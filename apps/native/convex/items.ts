@@ -2510,6 +2510,7 @@ export const finalizeItem = internalMutation({
     const description = withdrawn ? (item.description ?? "") : args.description;
     const tags = withdrawn ? item.tags : args.tags;
     const intents = withdrawn ? item.intents : args.intents;
+    const recipe = withdrawn ? item.recipe : args.recipe;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
     // result with ours (or flip a newer `processing` back to `ready` with
@@ -2543,7 +2544,7 @@ export const finalizeItem = internalMutation({
       description,
       tags,
       content: args.content,
-      recipe: args.recipe,
+      recipe,
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,

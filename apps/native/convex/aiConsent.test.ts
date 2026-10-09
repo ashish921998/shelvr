@@ -564,7 +564,12 @@ describe("a decline that lands while a run is still out", () => {
 
     expect(embedMany).not.toHaveBeenCalled();
     const item = await t.run((ctx) => ctx.db.get(itemId));
-    expect(item).toMatchObject({ status: "ready", tags: [] });
+    expect(item).toMatchObject({
+      status: "ready",
+      title: "Buy lentils",
+      description: "",
+      tags: [],
+    });
     expect(item?.embedding).toBeUndefined();
     expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
       [],

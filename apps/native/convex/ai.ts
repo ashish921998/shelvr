@@ -547,6 +547,17 @@ function unclassified(
   return { title, description, tags: [], spaceNames: [], intents: [] };
 }
 
+/** What each kind of save can say for itself with no model involved. */
+function withoutModel(
+  item: Doc<"items">,
+  page: { title?: string; description?: string } | undefined,
+): Classification["result"] {
+  if (item.type === "note") {
+    return unclassified(firstLine(item.note ?? ""));
+  }
+  return unclassified(page?.title, page?.description);
+}
+
 /** The answer as it stands now, after the page read and the model call: a
  * withdrawal mid-run stops the embedding and the suggestions. */
 async function stillAllowed(
@@ -1058,10 +1069,7 @@ export const processItem = internalAction({
       // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
       // Only links fetch a page, so images/notes leave this undefined and
       // stay fully enriched.
-      const { result, page, linkRead } = outcome;
-
-      // Map returned space names back to ids (case-insensitive, trimmed).
-      const spaceIds = spaceNameIds(result.spaceNames, spaces);
+      const { page, linkRead } = outcome;
 
       posterStorageId = page?.heroImageUrl
         ? await storePoster(ctx, page.heroImageUrl)
@@ -1069,6 +1077,14 @@ export const processItem = internalAction({
 
       // Asked last, after every slow step, and right before the embedding.
       const aiAllowed = await stillAllowed(ctx, allowedAtStart, item);
+      // A decline that landed while the model was answering: its answer is
+      // dropped whole, and the save finishes as if it had never been asked.
+      const result =
+        allowedAtStart && !aiAllowed
+          ? withoutModel(item, page)
+          : outcome.result;
+      // Map returned space names back to ids (case-insensitive, trimmed).
+      const spaceIds = spaceNameIds(result.spaceNames, spaces);
 
       const { tags, description, intents } = classifiedFields(
         aiAllowed,
