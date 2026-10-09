@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { AiConsentCard, AiConsentSetting } from "./ai-consent";
+import { beat, HERO_BEATS } from "./ai-consent-hero";
 
 const mocks = vi.hoisted(() => ({
   status: "unset",
@@ -11,8 +12,20 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   openURL: vi.fn(),
   saves: undefined as
-    | { page: { status: string; title?: string; tags: string[] }[] }
+    | {
+        page: {
+          type?: string;
+          status: string;
+          title?: string;
+          url?: string;
+          tags: string[];
+        }[];
+      }
     | undefined,
+  reducedMotion: false,
+  timing: vi.fn(),
+  initialProgress: [] as number[],
+  noIcon: () => null,
 }));
 vi.mock("@/lib/ai-consent", () => ({
   useAiConsent: () => ({ status: mocks.status, answer: mocks.answer }),
@@ -39,6 +52,23 @@ vi.mock("@/components/ui/themed-text", () => ({
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   useUnistyles: () => ({ theme: { colors: {} } }),
+}));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: mocks.noIcon }));
+vi.mock("react-native-reanimated", () => ({
+  default: {
+    View: vi.fn(({ children }: { children: ReactNode }) => (
+      <div>{children}</div>
+    )),
+  },
+  Easing: { linear: "linear" },
+  interpolateColor: () => "",
+  useAnimatedStyle: (style: () => object) => style(),
+  useReducedMotion: () => mocks.reducedMotion,
+  useSharedValue: (value: number) => {
+    mocks.initialProgress.push(value);
+    return { value };
+  },
+  withTiming: mocks.timing,
 }));
 vi.mock("react-native", () => ({
   Linking: { openURL: mocks.openURL },
@@ -91,6 +121,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.status = "unset";
   mocks.answer.mockResolvedValue(undefined);
+  mocks.reducedMotion = false;
+  mocks.initialProgress = [];
+  mocks.saves = { page: [] };
 });
 
 it.each([
@@ -162,28 +195,63 @@ it("shows the new value while it saves, and the recorded one if that fails", asy
   expect(mocks.captureError).toHaveBeenCalled();
 });
 
-it("shows one of the person's own titled saves as the example, when there is one", () => {
+it("plays the hero over one of the person's own titled saves, when there is one", () => {
   mocks.saves = {
     page: [
       { status: "processing", tags: [] },
-      { status: "ready", title: "Lentil soup", tags: ["dinner", "vegan"] },
+      {
+        type: "link",
+        status: "ready",
+        title: "Lentil soup",
+        url: "https://example.com/soup",
+        tags: ["dinner", "vegan"],
+      },
     ],
   };
-  try {
-    render(<AiConsentCard />);
-    expect(screen.getByText("Lentil soup")).toBeTruthy();
-    expect(screen.getByText("dinner")).toBeTruthy();
-  } finally {
-    mocks.saves = undefined;
-  }
+  render(<AiConsentCard />);
+  expect(screen.getByText("aiConsent.example")).toBeTruthy();
+  expect(screen.getByText("Lentil soup")).toBeTruthy();
+  expect(screen.getByText("example.com/soup")).toBeTruthy();
+  expect(screen.getByText("dinner")).toBeTruthy();
+  expect(screen.queryByText("onboarding.sampleRamen")).toBeNull();
 });
 
-it("shows no example for someone with nothing titled yet", () => {
+it("plays the hero over the built-in example for someone with nothing titled yet", () => {
   mocks.saves = { page: [{ status: "ready", tags: [] }] };
-  try {
-    render(<AiConsentCard />);
-    expect(screen.queryByText("aiConsent.example")).toBeNull();
-  } finally {
-    mocks.saves = undefined;
-  }
+  render(<AiConsentCard />);
+  expect(screen.queryByText("aiConsent.example")).toBeNull();
+  expect(screen.getByText("onboarding.sampleRamen")).toBeTruthy();
+  expect(screen.getByText("aiConsent.heroTagDinner")).toBeTruthy();
+});
+
+it("draws nothing in the hero's place until the person's saves have been read", () => {
+  mocks.saves = undefined;
+  render(<AiConsentCard />);
+  expect(screen.queryByText("onboarding.sampleRamen")).toBeNull();
+  expect(mocks.timing).not.toHaveBeenCalled();
+});
+
+it("starts the hero from the beginning and plays it once", () => {
+  render(<AiConsentCard />);
+  expect(mocks.initialProgress).toContain(0);
+  expect(mocks.timing).toHaveBeenCalledTimes(1);
+});
+
+it("rests on the finished save with Reduce Motion on", () => {
+  mocks.reducedMotion = true;
+  render(<AiConsentCard />);
+  expect(mocks.initialProgress).toContain(1);
+  expect(mocks.timing).not.toHaveBeenCalled();
+});
+
+it("keeps every beat inside the hero's one run, in order", () => {
+  const [scanFrom, scanTo] = HERO_BEATS.scan;
+  const [revealFrom, revealTo] = HERO_BEATS.reveal;
+  const [lastFrom, lastTo] = HERO_BEATS.tag(2);
+  expect(0 < scanFrom && scanFrom < scanTo).toBe(true);
+  expect(revealFrom < revealTo && revealTo < lastFrom).toBe(true);
+  expect(lastTo).toBeLessThanOrEqual(1);
+  expect(beat(0, scanFrom, scanTo)).toBe(0);
+  expect(beat(1, lastFrom, lastTo)).toBe(1);
+  expect(beat((scanFrom + scanTo) / 2, scanFrom, scanTo)).toBeGreaterThan(0.5);
 });

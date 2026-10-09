@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, Switch, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { AiConsentHero, builtInSave } from "@/components/ai-consent-hero";
 import { SettingCard } from "@/components/ui/setting-card";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useAiConsent } from "@/lib/ai-consent";
@@ -18,39 +19,29 @@ function reportSaveFailed() {
   );
 }
 
-const EXAMPLE_TAGS = 3;
-
-/** One of the person's own saves that the model already titled and tagged:
- * the plainest way to say what the permission is for. Nothing renders when
- * there is none, or while the read is in flight or has failed. */
-function OwnSaveExample() {
+/** The hero plays over one of the person's own saves that the model already
+ * titled and tagged: the plainest way to say what the permission is for.
+ * While the read is in flight, or when there is none, it plays over a
+ * built-in example instead. */
+function Hero() {
   const { data } = useQuery(
     convexQuery(api.items.listItemsPage, {
       paginationOpts: { numItems: 10, cursor: null },
     }),
   );
   const save = data?.page.find(
-    (item) => item.status === "ready" && item.title && item.tags.length > 0,
+    (item): item is typeof item & { title: string } =>
+      item.status === "ready" && !!item.title && item.tags.length > 0,
   );
-  if (!save) return null;
+  // The hero draws its first frame once, so it waits for the read rather
+  // than restarting when the person's own save arrives.
+  if (data === undefined) return <View style={styles.heroHold} />;
   return (
-    <View style={styles.example}>
-      <ThemedText variant="caption" style={styles.body}>
-        {t("aiConsent.example")}
-      </ThemedText>
-      <ThemedText variant="subheadStrong" numberOfLines={2}>
-        {save.title}
-      </ThemedText>
-      <View style={styles.tags}>
-        {save.tags.slice(0, EXAMPLE_TAGS).map((tag) => (
-          <View key={tag} style={styles.tag}>
-            <ThemedText variant="caption" style={styles.body}>
-              {tag}
-            </ThemedText>
-          </View>
-        ))}
-      </View>
-    </View>
+    <AiConsentHero
+      save={save ?? builtInSave()}
+      own={save !== undefined}
+      key={save === undefined ? "built-in" : "own"}
+    />
   );
 }
 
@@ -87,10 +78,14 @@ export function AiConsentCard() {
       contentContainerStyle={styles.content}
       accessibilityViewIsModal
     >
-      <ThemedText variant="sheetTitle" accessibilityRole="header">
+      <Hero />
+      <ThemedText
+        variant="sheetTitle"
+        accessibilityRole="header"
+        style={styles.title}
+      >
         {t("aiConsent.title")}
       </ThemedText>
-      <OwnSaveExample />
       <ThemedText style={styles.body}>{t("aiConsent.body")}</ThemedText>
       <ThemedText style={styles.body}>{t("aiConsent.changeLater")}</ThemedText>
       <Pressable
@@ -190,23 +185,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom + theme.gap(3),
     gap: theme.gap(2),
   },
+  // Roughly the hero's resting height, so the page does not jump when the
+  // read lands.
+  heroHold: { height: 184 },
+  title: { marginTop: theme.gap(1) },
   body: { color: theme.colors.muted },
-  example: {
-    gap: theme.gap(1),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: theme.gap(1) },
-  tag: {
-    paddingHorizontal: theme.gap(1.25),
-    paddingVertical: theme.gap(0.5),
-    borderRadius: 999,
-    backgroundColor: theme.colors.surfaceMuted,
-  },
   linkRow: { minHeight: theme.control.minHeight, justifyContent: "center" },
   link: {
     color: theme.colors.primaryText,

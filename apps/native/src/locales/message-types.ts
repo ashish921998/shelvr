@@ -561,6 +561,9 @@ export type MessageParams = {
   "aiConsent.allow": undefined;
   "aiConsent.turnOff": undefined;
   "aiConsent.example": undefined;
+  "aiConsent.heroTagDinner": undefined;
+  "aiConsent.heroTagNoodles": undefined;
+  "aiConsent.heroTagWeeknight": undefined;
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
