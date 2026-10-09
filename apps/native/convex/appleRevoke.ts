@@ -4,65 +4,12 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { env, internalAction, type ActionCtx } from "./_generated/server";
+import { clientSecret } from "./model/appleClient";
 import { errorName, logEvent } from "./model/log";
 
 const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5 * 60_000;
-
-function base64Url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function encodeJson(value: unknown): string {
-  return base64Url(new TextEncoder().encode(JSON.stringify(value)));
-}
-
-/** Apple's client secret: a short-lived ES256 JWT signed with the team's .p8
- * key. WebCrypto's ECDSA signature is already the raw r||s form a JWT wants. */
-async function clientSecret(config: {
-  clientId: string;
-  privateKey: string;
-  keyId: string;
-  teamId: string;
-}): Promise<string> {
-  const der = Uint8Array.from(
-    atob(
-      config.privateKey
-        // An env var pasted on one line carries its newlines as "\n".
-        .replace(/\\n/g, "")
-        .replace(/-----[A-Z ]+-----/g, "")
-        .replace(/\s+/g, ""),
-    ),
-    (c) => c.charCodeAt(0),
-  );
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    der,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const signed = `${encodeJson({ alg: "ES256", kid: config.keyId })}.${encodeJson(
-    {
-      iss: config.teamId,
-      iat: issuedAt,
-      exp: issuedAt + 300,
-      aud: "https://appleid.apple.com",
-      sub: config.clientId,
-    },
-  )}`;
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    new TextEncoder().encode(signed),
-  );
-  return `${signed}.${base64Url(new Uint8Array(signature))}`;
-}
 
 async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
   await ctx.runMutation(internal.users.forgetAppleToken, { tokenId });
@@ -78,13 +25,16 @@ export const revoke = internalAction({
   args: { tokenId: v.id("appleTokens"), attempt: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const refreshToken = await ctx.runQuery(
-      internal.users.appleTokenForRevoke,
-      { tokenId: args.tokenId },
-    );
-    if (refreshToken === null) return null;
-    // Convex Auth's own variable, so it is not declared in convex.config.ts.
-    const clientId = process.env.AUTH_APPLE_ID;
+    const stored = await ctx.runQuery(internal.users.appleTokenForRevoke, {
+      tokenId: args.tokenId,
+    });
+    if (stored === null) return null;
+    const { refreshToken } = stored;
+    // Apple revokes a token only for the client it was issued to: the app's
+    // bundle id for the native sheet, the Service ID for the web flow. The
+    // Service ID is Convex Auth's own variable, so it is not declared in
+    // convex.config.ts.
+    const clientId = stored.clientId ?? process.env.AUTH_APPLE_ID;
     const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
     const keyId = env.APPLE_REVOKE_KEY_ID;
     const teamId = env.APPLE_REVOKE_TEAM_ID;

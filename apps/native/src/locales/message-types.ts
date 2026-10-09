@@ -498,6 +498,7 @@ export type MessageParams = {
   "reveal.previewTitle": undefined;
   "reveal.previewSubtitle": undefined;
   "reveal.saveShelf": undefined;
+  "reveal.saveShelfReason": undefined;
   "reveal.filedIn": { space: string };
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;

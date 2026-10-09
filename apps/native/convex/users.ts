@@ -12,7 +12,7 @@ import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
-import { appleTokenId } from "./model/appleTokens";
+import { appleTokenId, storeAppleToken } from "./model/appleTokens";
 import { logEvent } from "./model/log";
 
 /**
@@ -123,9 +123,35 @@ async function scheduleAppleRevoke(
 /** The refresh token the revoke job was pointed at, or null once it is gone. */
 export const appleTokenForRevoke = internalQuery({
   args: { tokenId: v.id("appleTokens") },
-  returns: v.union(v.string(), v.null()),
-  handler: async (ctx, args) =>
-    (await ctx.db.get(args.tokenId))?.refreshToken ?? null,
+  returns: v.union(
+    v.object({ refreshToken: v.string(), clientId: v.optional(v.string()) }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.tokenId);
+    if (row === null) return null;
+    return { refreshToken: row.refreshToken, clientId: row.clientId };
+  },
+});
+
+/** Stores the refresh token the native Apple sheet's code was traded for.
+ * Internal-only: the sign-in that calls it has just verified the user. */
+export const keepNativeAppleToken = internalMutation({
+  args: {
+    userId: v.id("users"),
+    refreshToken: v.string(),
+    clientId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // The account can be deleted while Apple is still answering.
+    if ((await ctx.db.get(args.userId)) === null) return null;
+    await storeAppleToken(ctx, args.userId, {
+      refreshToken: args.refreshToken,
+      clientId: args.clientId,
+    });
+    return null;
+  },
 });
 
 /** Drops the token row once the revoke job has no further use for it. */

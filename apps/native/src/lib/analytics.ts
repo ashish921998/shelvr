@@ -43,6 +43,9 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
 export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+/** How a sign-in ran: the system's Sign in with Apple sheet on iOS, or a web
+ * session, which is every other provider and Apple where the sheet is missing. */
+export type AuthMethod = "native" | "web";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -96,11 +99,16 @@ type AnalyticsEventProperties = {
   // ended it and count repeat starts by one person without guessing on time.
   auth_started: {
     provider: string;
+    method: AuthMethod;
     surface: OAuthSurface;
     auth_attempt_id: string;
   };
   auth_cancelled: {
     provider: string;
+    method: AuthMethod;
+    // Set when a web session ended before its sheet could have shown and was
+    // reopened once. The outcome is the second session's.
+    auto_retry?: true;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
@@ -116,6 +124,8 @@ type AnalyticsEventProperties = {
   };
   auth_failed: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     stage: "request" | "browser" | "exchange";
     elapsed_ms: number;
     surface: OAuthSurface;
@@ -125,6 +135,8 @@ type AnalyticsEventProperties = {
   // identify-time signal and also fires on every signed-in cold start.
   auth_succeeded: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
