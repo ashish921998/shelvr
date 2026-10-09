@@ -53,7 +53,7 @@
     },
     {
       "category": "CRASH_DATA",
-      "purposes": ["ANALYTICS"],
+      "purposes": ["APP_FUNCTIONALITY", "ANALYTICS"],
       "dataProtections": ["DATA_LINKED_TO_YOU"]
     }
   ]
