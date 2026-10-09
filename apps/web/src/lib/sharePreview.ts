@@ -8,6 +8,8 @@ type SharePreview = {
   imageUrl?: string;
   sourceUrl?: string;
   noteText?: string;
+  /** The sharer's first name, when their account has one. */
+  senderName?: string;
 };
 
 /** `missing` is an unknown or revoked token; `unavailable` is a
