@@ -532,6 +532,8 @@ export type MessageParams = {
   "home.nextUpTitle": undefined;
   "home.nextUpRead": undefined;
   "home.nextUpCook": undefined;
+  "home.nextUpWatch": undefined;
+  "home.nextUpOpen": undefined;
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;

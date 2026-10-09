@@ -483,7 +483,7 @@ describe("exit offer after a paywall close", () => {
     // First tap: paywall, then the exit offer on close.
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
 
@@ -491,7 +491,7 @@ describe("exit offer after a paywall close", () => {
     mock.presentExitSheet.mockResolvedValueOnce("PURCHASED");
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(true);
+    ).resolves.toBe("success");
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(2);
     expect(mock.capture).toHaveBeenCalledWith(
@@ -515,7 +515,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(true);
+    ).resolves.toBe("success");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
@@ -532,7 +532,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
@@ -547,7 +547,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
@@ -563,7 +563,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", false),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentExitSheet).toHaveBeenCalledTimes(1);
     expect(mock.presentPaywall).not.toHaveBeenCalled();
@@ -579,7 +579,7 @@ describe("exit offer after a paywall close", () => {
 
     await expect(
       openPaywallKeepingExitOffer(router, "onboarding", true),
-    ).resolves.toBe(false);
+    ).resolves.toBe("cancelled");
 
     expect(mock.presentPaywall).toHaveBeenCalledTimes(1);
     expect(mock.presentExitSheet).not.toHaveBeenCalled();
@@ -587,6 +587,18 @@ describe("exit offer after a paywall close", () => {
       "paywall_requested",
       expect.objectContaining({ placement: "onboarding" }),
     );
+  });
+
+  it("tells onboarding when its paywall could not show, without routing", async () => {
+    const { openPaywallKeepingExitOffer } = await loadReady();
+    mock.presentPaywall.mockResolvedValue("ERROR");
+
+    await expect(
+      openPaywallKeepingExitOffer(router, "onboarding", false),
+    ).resolves.toBe("unavailable");
+
+    expect(mock.presentExitSheet).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("holds the sheet latch until the exit sheet has slid away", async () => {

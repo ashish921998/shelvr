@@ -569,6 +569,8 @@
   "home.nextUpTitle": "다음으로 열어 보기",
   "home.nextUpRead": "읽으려고 저장함",
   "home.nextUpCook": "요리하려고 저장함",
+  "home.nextUpWatch": "보려고 저장함",
+  "home.nextUpOpen": "나중에 보려고 저장함",
   "demo.pickHelp": "Shelvr가 읽고 제목을 붙여 정리해 드려요.",
   "demo.clipboardNoLink": "클립보드에 링크가 없어요. 링크를 복사하거나 아래 링크로 해 보세요.",
   "demo.samplesOr": "또는 이 링크로 해 보기",

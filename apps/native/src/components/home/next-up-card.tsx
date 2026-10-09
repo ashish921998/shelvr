@@ -11,6 +11,14 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type NextUp = NonNullable<FunctionReturnType<typeof api.items.nextUp>>;
 
+/** Why the save is offered, and the glyph shown when it has no picture. */
+const KINDS = {
+  read: { reason: "home.nextUpRead", symbol: "doc.text" },
+  cook: { reason: "home.nextUpCook", symbol: "fork.knife" },
+  watch: { reason: "home.nextUpWatch", symbol: "play.rectangle" },
+  open: { reason: "home.nextUpOpen", symbol: "rectangle.stack" },
+} as const satisfies Record<NextUp["kind"], object>;
+
 /**
  * The "Open this next" card on Home: one save worth going back to, as a
  * single tappable row on the warm tint, set apart from the feed below it.
@@ -36,8 +44,7 @@ export function NextUpCard({
   const { item } = next;
   const imageUri = item.imageUrl ?? item.heroImageUrl;
   const host = item.url ? displayHost(item.url) : undefined;
-  const reason =
-    next.kind === "cook" ? t("home.nextUpCook") : t("home.nextUpRead");
+  const { reason, symbol } = KINDS[next.kind];
   return (
     <View style={styles.wrap} testID="next-up-card">
       {/* No `Link asChild`: its Slot drops a Pressable style function. */}
@@ -64,7 +71,7 @@ export function NextUpCard({
             />
           ) : (
             <AppSymbolIcon
-              name={next.kind === "cook" ? "fork.knife" : "doc.text"}
+              name={symbol}
               size={24}
               tintColor={theme.colors.primaryText}
             />
@@ -78,7 +85,7 @@ export function NextUpCard({
             {next.subject}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
-            {host ? `${reason} · ${host}` : reason}
+            {host ? `${t(reason)} · ${host}` : t(reason)}
           </Text>
         </View>
       </Pressable>
