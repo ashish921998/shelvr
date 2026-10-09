@@ -15,7 +15,11 @@ vi.mock("expo-secure-store", () => ({
 
 const mock = vi.hoisted(() => ({
   data: undefined as
-    | { kind: "read" | "cook"; subject: string; item: { _id: string } }
+    | {
+        kind: "read" | "cook" | "watch" | "open";
+        subject: string;
+        item: { _id: string };
+      }
     | null
     | undefined,
   lastArgs: undefined as unknown,

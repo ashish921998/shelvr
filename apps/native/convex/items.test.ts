@@ -523,6 +523,99 @@ describe("nextUp", () => {
     expect(next?.subject).toBe("Lasagna");
   });
 
+  it("suggests every kind of save, newest first", async () => {
+    const t = await as("next-kinds");
+    const base = {
+      userId: "next-kinds",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+    };
+    const [demo, note, photo, video, reel] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "The sample",
+        url: "https://example.com/sample",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "A scarf",
+      }),
+      await ctx.db.insert("items", { ...base, type: "image", title: "Menu" }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "How to fold a shirt",
+        url: "https://www.youtube.com/watch?v=abc",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "A reel",
+        url: "https://www.instagram.com/reel/abc/",
+        content: "The caption",
+        media: [
+          { kind: "video", imageUrl: "https://x.test/a.jpg", aspectRatio: 1 },
+        ],
+      }),
+    ]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingDemos", {
+        userId: "next-kinds",
+        itemId: demo,
+        createdAt: Date.now(),
+      });
+    });
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "watch", id: reel });
+    expect(await pick([reel])).toEqual({ kind: "watch", id: video });
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: photo });
+    await markOpened(t, "next-kinds", photo, now);
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: note });
+    await markOpened(t, "next-kinds", note, now);
+    expect(await pick([reel, video])).toBeNull();
+  });
+
+  it("calls a captioned social post a save for later, not an article", async () => {
+    const t = await as("next-social");
+    const base = {
+      userId: "next-social",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+      type: "link" as const,
+      content: "The caption",
+    };
+    const [post, photo] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A post",
+        url: "https://x.com/someone/status/123",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A photo",
+        url: "https://www.instagram.com/p/abc/",
+      }),
+    ]);
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "open", id: photo });
+    expect(await pick([photo])).toEqual({ kind: "open", id: post });
+  });
+
   it("suggests nothing without Pro", async () => {
     const t = newConvexTest().withIdentity({
       subject: "next-free|session-1",
