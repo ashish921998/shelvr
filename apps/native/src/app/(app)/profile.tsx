@@ -8,10 +8,10 @@ import { APPEARANCE_LABELS, APPEARANCE_MODES } from "@/lib/appearance";
 import { useAppearanceMode } from "@/lib/appearance-runtime";
 import {
   openPaywall,
-  presentCustomerCenter,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import { manageSubscription } from "@/lib/manage-subscription";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
@@ -21,15 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
-import {
-  Alert,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function ProfileScreen() {
@@ -77,40 +69,21 @@ export default function ProfileScreen() {
   // a new purchase, so that row opens the paywall rather than Customer Center.
   const opensPaywall = status === "none" || status === "lapsed";
 
-  // RevenueCat UI (paywall / Customer Center) presents from the root view
-  // controller, and UIKit refuses to present while this profile sheet is up
-  // ("already presenting RNSScreen"). Dismiss the sheet first, let it settle,
-  // then route: an active subscriber to Customer Center (cancel/refund/
-  // change-plan/restore), a `none` or lapsed user to the paywall.
-  const manageSubscription = async () => {
+  // An active subscriber goes to Customer Center, which can only present
+  // once this profile sheet is gone; a `none` or lapsed user to the paywall,
+  // after the same dismissal.
+  const openSubscription = async () => {
     if (loading) return;
+    if (!opensPaywall) {
+      await manageSubscription(() => router.back());
+      return;
+    }
     router.back();
     await waitForSheetTransition();
-    if (!opensPaywall) {
-      const presented = await presentCustomerCenter();
-      // Customer Center isn't linked/configured, or identity sync timed out —
-      // fall back to the platform's own subscription management page rather
-      // than leaving the tap with no visible effect.
-      if (!presented) {
-        Alert.alert(t("pro.manage"), t("pro.manageHelp"), [
-          { text: t("common.cancel"), style: "cancel" },
-          {
-            text: t("pro.openStore"),
-            onPress: () =>
-              void Linking.openURL(
-                Platform.OS === "ios"
-                  ? "https://apps.apple.com/account/subscriptions"
-                  : "https://play.google.com/store/account/subscriptions",
-              ),
-          },
-        ]);
-      }
-    } else {
-      void openPaywall(
-        router,
-        status === "lapsed" ? "profile_lapsed" : "profile",
-      );
-    }
+    void openPaywall(
+      router,
+      status === "lapsed" ? "profile_lapsed" : "profile",
+    );
   };
 
   const handleSignOut = async () => {
@@ -163,7 +136,7 @@ export default function ProfileScreen() {
             loading && { opacity: 0.4 },
           ]}
           disabled={loading}
-          onPress={manageSubscription}
+          onPress={openSubscription}
         >
           <AppSymbolIcon
             name="sparkles"

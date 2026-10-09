@@ -1,3 +1,4 @@
+import { markAiDisclosedAtSignIn } from "@/lib/ai-consent";
 import { analytics, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { makeRedirectUri } from "expo-auth-session";
@@ -90,6 +91,8 @@ export function useOAuthSignIn(surface: OAuthSurface) {
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
       // One id per attempt, shared by the start, cancel, failure, and success
       // events, so a funnel can pair each start with the outcome that ended it.
+      // Every screen that offers sign-in shows the AI disclosure beside it.
+      markAiDisclosedAtSignIn();
       const attemptId = randomUUID();
       analytics.capture("auth_started", {
         provider,

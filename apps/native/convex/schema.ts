@@ -30,6 +30,35 @@ export default defineSchema({
   // include a session suffix.
   ...authTables,
 
+  // Convex Auth's own users table with one field added; the indexes must stay
+  // the ones `authTables` declares. Convex Auth writes everything the Apple
+  // profile callback returns onto this row, so the refresh token has to be a
+  // legal field for that write. `keepAppleRefreshToken` moves it to
+  // `appleTokens` in the same transaction, so no stored row carries it.
+  users: defineTable({
+    ...authTables.users.validator.fields,
+    appleRefreshToken: v.optional(v.string()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
+
+  // The latest Sign in with Apple refresh token per user, kept only to revoke
+  // it when the account is deleted. Never returned to a client or logged.
+  appleTokens: defineTable({
+    userId: v.id("users"),
+    refreshToken: v.string(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // One row per user: their answer to the third-party AI processing
+  // disclosure. No row means they have not answered.
+  aiConsents: defineTable({
+    userId: v.string(),
+    status: v.union(v.literal("granted"), v.literal("declined")),
+    version: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   legalConsents: defineTable({
     userId: v.id("users"),
     reviewedVersion: v.string(),
@@ -471,6 +500,10 @@ export default defineSchema({
     token: v.string(),
     userId: v.string(),
     itemId: v.id("items"),
+    // Set once the owner completed a share of this link. Absent on a link
+    // whose share sheet is still open, and on every link minted before the
+    // field existed.
+    confirmedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
     .index("by_item", ["itemId"])
