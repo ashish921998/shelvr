@@ -138,7 +138,7 @@ Share extension, Siri and widget:
 
 Third-party AI:
 
-Saves are sent to Google Gemini to generate titles, summaries, and tags. The app asks for permission before the first save, and Settings has a switch to turn this off.
+Saves are sent to Google Gemini to generate titles, summaries, and tags. The sign-in screen says so and that continuing allows it, so permission is given before the first save. People who were already signed in when this shipped are asked once on launch instead. Settings has a switch, "AI titles, tags and suggestions", to turn it off.
 
 Account and support controls:
 

@@ -108,9 +108,9 @@ export default function PrivacyPage() {
           content), and the names and descriptions of your spaces.
         </p>
         <p className="mt-2">
-          You can decline AI processing when the app asks, and change your
-          choice later in Settings. If you decline, saves are stored without AI
-          titles and tags.
+          The app tells you this when you sign in, and signing in allows it. You
+          can turn AI processing off at any time in Settings. If you decline,
+          saves are stored without AI titles and tags.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that
