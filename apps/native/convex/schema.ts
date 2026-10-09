@@ -504,6 +504,10 @@ export default defineSchema({
     // whose share sheet is still open, and on every link minted before the
     // field existed.
     confirmedAt: v.optional(v.number()),
+    // True while the share sheet this link was minted for is still open, on
+    // a client that reports how the sheet ended. Only such a link can be
+    // withdrawn by a cancel.
+    pending: v.optional(v.boolean()),
   })
     .index("by_token", ["token"])
     .index("by_item", ["itemId"])

@@ -41,6 +41,9 @@ function savesBlocked(
   return status === "unset" || (status === "loading" && !answeredBefore);
 }
 
+// The sign-in yes is written once, whichever screen's hook sees it first.
+let grantInFlight = false;
+
 export function useAiConsent() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   // The React Query adapter, not convex/react: a read that fails during a
@@ -66,19 +69,24 @@ export function useAiConsent() {
   const [, rerender] = useState(0);
   useEffect(() => {
     if (answered) store.remove(DISCLOSED_KEY);
-    if (status !== "unset" || !disclosed) return;
-    setConsent({ granted: true }).then(
-      () =>
-        analytics.capture("ai_consent_answered", {
-          granted: true,
-          surface: "sign_in",
-        }),
-      // Not recorded: fall back to asking with the card.
-      () => {
-        store.remove(DISCLOSED_KEY);
-        rerender((n) => n + 1);
-      },
-    );
+    if (status !== "unset" || !disclosed || grantInFlight) return;
+    grantInFlight = true;
+    setConsent({ granted: true })
+      .finally(() => {
+        grantInFlight = false;
+      })
+      .then(
+        () =>
+          analytics.capture("ai_consent_answered", {
+            granted: true,
+            surface: "sign_in",
+          }),
+        // Not recorded: fall back to asking with the card.
+        () => {
+          store.remove(DISCLOSED_KEY);
+          rerender((n) => n + 1);
+        },
+      );
   }, [answered, status, disclosed, setConsent]);
 
   /** Rejects when the answer was not recorded; the caller shows that. */

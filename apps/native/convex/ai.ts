@@ -1465,6 +1465,15 @@ export const recommendForSpace = internalAction({
       if (items.length === 0) {
         return null;
       }
+      // Asked again: picking the candidates embeds the space, which is slow,
+      // and the next call sends their titles, descriptions and tags.
+      if (
+        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
+          userId: space.userId,
+        }))
+      ) {
+        return null;
+      }
 
       const itemLines = items
         .map((item, i) => {

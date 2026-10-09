@@ -87,6 +87,23 @@ it("records a yes, with no card, for someone who just signed in past the disclos
   expect(result.current.asking).toBe(true);
 });
 
+it("writes the sign-in yes once when two screens watch for it", async () => {
+  let recorded: (value: null) => void = () => {};
+  mocks.setConsent.mockReturnValue(
+    new Promise<null>((resolve) => {
+      recorded = resolve;
+    }),
+  );
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "unset", version: 1 };
+  renderHook(() => useAiConsent());
+  renderHook(() => useAiConsent());
+  expect(mocks.setConsent).toHaveBeenCalledTimes(1);
+
+  recorded(null);
+  await vi.waitFor(() => expect(mocks.capture).toHaveBeenCalledTimes(1));
+});
+
 it("never overrides a no: signing in again keeps AI off", () => {
   markAiDisclosedAtSignIn();
   mocks.data = { status: "declined", version: 1 };
