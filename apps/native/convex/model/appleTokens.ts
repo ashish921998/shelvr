@@ -39,13 +39,12 @@ export const keepAppleRefreshToken = async (
   }
 };
 
-/** Removes and returns the user's stored refresh token, or null. */
-export async function takeAppleRefreshToken(
+/** The id of the user's stored refresh token row, or null. The row outlives
+ * the account until the revoke job has used it, so the token itself never
+ * travels in a scheduled job's arguments. */
+export async function appleTokenId(
   ctx: MutationCtx,
   userId: Id<"users">,
-): Promise<string | null> {
-  const row = await tokenRow(ctx, userId);
-  if (row === null) return null;
-  await ctx.db.delete(row._id);
-  return row.refreshToken;
+): Promise<Id<"appleTokens"> | null> {
+  return (await tokenRow(ctx, userId))?._id ?? null;
 }

@@ -1,13 +1,18 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
-import { takeAppleRefreshToken } from "./model/appleTokens";
+import { appleTokenId } from "./model/appleTokens";
 import { logEvent } from "./model/log";
 
 /**
@@ -81,17 +86,17 @@ export const deleteCurrentUserAccount = mutation({
 });
 
 /** Apple requires an app that offers Sign in with Apple to revoke the user's
- * token when the account is deleted. The token leaves with the scheduled job,
- * so the revocation does not depend on a row this deletion removes. */
+ * token when the account is deleted. The job gets the token row's id, not the
+ * token: job arguments stay readable in the dashboard long after they run.
+ * The row is the one thing this deletion leaves behind, and the job removes
+ * it once Apple has answered or the attempts run out. */
 async function scheduleAppleRevoke(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<void> {
-  const refreshToken = await takeAppleRefreshToken(ctx, userId);
-  if (refreshToken !== null) {
-    await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, {
-      refreshToken,
-    });
+  const tokenId = await appleTokenId(ctx, userId);
+  if (tokenId !== null) {
+    await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, { tokenId });
     return;
   }
   const appleAccount = await ctx.db
@@ -104,6 +109,26 @@ async function scheduleAppleRevoke(
     logEvent("info", "apple_revoke_skipped", { code: "no_token" });
   }
 }
+
+/** The refresh token the revoke job was pointed at, or null once it is gone. */
+export const appleTokenForRevoke = internalQuery({
+  args: { tokenId: v.id("appleTokens") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) =>
+    (await ctx.db.get(args.tokenId))?.refreshToken ?? null,
+});
+
+/** Drops the token row once the revoke job has no further use for it. */
+export const forgetAppleToken = internalMutation({
+  args: { tokenId: v.id("appleTokens") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if ((await ctx.db.get(args.tokenId)) !== null) {
+      await ctx.db.delete(args.tokenId);
+    }
+    return null;
+  },
+});
 
 /** Continuation worker for batched account deletion. Internal-only: userId is
  * trusted here because the public mutation derived it from auth. */

@@ -2,7 +2,8 @@
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { env, internalAction } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { env, internalAction, type ActionCtx } from "./_generated/server";
 import { errorName, logEvent } from "./model/log";
 
 const REVOKE_URL = "https://appleid.apple.com/auth/revoke";
@@ -63,6 +64,10 @@ async function clientSecret(config: {
   return `${signed}.${base64Url(new Uint8Array(signature))}`;
 }
 
+async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
+  await ctx.runMutation(internal.users.forgetAppleToken, { tokenId });
+}
+
 /**
  * Revokes a Sign in with Apple refresh token after its account was deleted.
  * Best effort by design: it never throws, so nothing about the deletion
@@ -70,9 +75,14 @@ async function clientSecret(config: {
  * a refusal (an already revoked token, a bad key) would be refused again.
  */
 export const revoke = internalAction({
-  args: { refreshToken: v.string(), attempt: v.optional(v.number()) },
+  args: { tokenId: v.id("appleTokens"), attempt: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const refreshToken = await ctx.runQuery(
+      internal.users.appleTokenForRevoke,
+      { tokenId: args.tokenId },
+    );
+    if (refreshToken === null) return null;
     // Convex Auth's own variable, so it is not declared in convex.config.ts.
     const clientId = process.env.AUTH_APPLE_ID;
     const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
@@ -80,6 +90,7 @@ export const revoke = internalAction({
     const teamId = env.APPLE_REVOKE_TEAM_ID;
     if (!clientId || !privateKey || !keyId || !teamId) {
       logEvent("info", "apple_revoke_skipped", { code: "unconfigured" });
+      await forget(ctx, args.tokenId);
       return null;
     }
     let secret: string;
@@ -90,6 +101,7 @@ export const revoke = internalAction({
         code: "bad_signing_key",
         error: errorName(error),
       });
+      await forget(ctx, args.tokenId);
       return null;
     }
     const attempt = args.attempt ?? 1;
@@ -101,7 +113,7 @@ export const revoke = internalAction({
         body: new URLSearchParams({
           client_id: clientId,
           client_secret: secret,
-          token: args.refreshToken,
+          token: refreshToken,
           token_type_hint: "refresh_token",
         }).toString(),
         signal: AbortSignal.timeout(15_000),
@@ -114,6 +126,7 @@ export const revoke = internalAction({
       logEvent(status === 200 ? "info" : "error", "apple_revoke_finished", {
         status,
       });
+      await forget(ctx, args.tokenId);
       return null;
     }
     const willRetry = attempt < MAX_ATTEMPTS;
@@ -126,8 +139,10 @@ export const revoke = internalAction({
       await ctx.scheduler.runAfter(
         RETRY_DELAY_MS * attempt,
         internal.appleRevoke.revoke,
-        { refreshToken: args.refreshToken, attempt: attempt + 1 },
+        { tokenId: args.tokenId, attempt: attempt + 1 },
       );
+    } else {
+      await forget(ctx, args.tokenId);
     }
     return null;
   },

@@ -72,6 +72,16 @@ async function appleUser(t: T, refreshToken?: string) {
   });
 }
 
+async function tokenRow(t: Backend) {
+  const userId = await appleUser(t as T, "r.token");
+  const row = await t.run((ctx) => ctx.db.query("appleTokens").first());
+  return { userId, tokenId: row!._id };
+}
+
+async function tokenRows(t: Backend) {
+  return await t.run((ctx) => ctx.db.query("appleTokens").collect());
+}
+
 function as(t: Backend, userId: Id<"users">): T {
   return t.withIdentity({ subject: `${userId}|session-1` });
 }
@@ -160,18 +170,16 @@ describe("capturing Apple's refresh token at sign-in", () => {
 });
 
 describe("deleting an account that signed in with Apple", () => {
-  it("hands the token to the revoke job and removes its row", async () => {
+  it("points the revoke job at the token row, never at the token itself", async () => {
     const t = newConvexTest();
-    const userId = await appleUser(t, "r.token");
+    const { userId, tokenId } = await tokenRow(t);
 
     await as(t, userId).mutation(api.users.deleteCurrentUserAccount, {});
 
     const jobs = await scheduledRevokes(t);
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].args).toEqual([{ refreshToken: "r.token" }]);
-    expect(await t.run((ctx) => ctx.db.query("appleTokens").collect())).toEqual(
-      [],
-    );
+    expect(jobs[0].args).toEqual([{ tokenId }]);
+    expect(JSON.stringify(jobs[0].args)).not.toContain("r.token");
     expect(await t.run((ctx) => ctx.db.get(userId))).toBeNull();
   });
 
@@ -190,10 +198,12 @@ describe("revoke", () => {
   it("posts the token to Apple with a client secret signed by the team key", async () => {
     const key = await configure();
     const t = newConvexTest();
+    const { tokenId } = await tokenRow(t);
 
-    await t.action(internal.appleRevoke.revoke, { refreshToken: "r.token" });
+    await t.action(internal.appleRevoke.revoke, { tokenId });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await tokenRows(t)).toEqual([]);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://appleid.apple.com/auth/revoke");
     expect(init.method).toBe("POST");
@@ -225,37 +235,43 @@ describe("revoke", () => {
   it("does nothing when the signing key is not configured", async () => {
     vi.stubEnv("AUTH_APPLE_ID", "app.shelvr.signin");
     const t = newConvexTest();
-    await t.action(internal.appleRevoke.revoke, { refreshToken: "r.token" });
+    const { tokenId } = await tokenRow(t);
+    await t.action(internal.appleRevoke.revoke, { tokenId });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await scheduledRevokes(t)).toEqual([]);
+    expect(await tokenRows(t)).toEqual([]);
   });
 
   it("does not throw on a malformed key or a refusal from Apple", async () => {
     await configure();
     vi.stubEnv("APPLE_REVOKE_PRIVATE_KEY", "not a key");
     const t = newConvexTest();
-    await t.action(internal.appleRevoke.revoke, { refreshToken: "r.token" });
+    const first = await tokenRow(t);
+    await t.action(internal.appleRevoke.revoke, { tokenId: first.tokenId });
     expect(fetchMock).not.toHaveBeenCalled();
 
     await configure();
     fetchMock.mockResolvedValue(new Response(null, { status: 400 }));
-    await t.action(internal.appleRevoke.revoke, { refreshToken: "r.token" });
+    const second = await tokenRow(t);
+    await t.action(internal.appleRevoke.revoke, { tokenId: second.tokenId });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(await scheduledRevokes(t)).toEqual([]);
+    expect(await tokenRows(t)).toEqual([]);
   });
 
   it("tries again later when Apple is unreachable, a bounded number of times", async () => {
     await configure();
     fetchMock.mockRejectedValue(new Error("network down"));
     const t = newConvexTest();
+    const { tokenId } = await tokenRow(t);
 
-    await t.action(internal.appleRevoke.revoke, { refreshToken: "r.token" });
+    await t.action(internal.appleRevoke.revoke, { tokenId });
     const [retry] = await scheduledRevokes(t);
-    expect(retry.args).toEqual([{ refreshToken: "r.token", attempt: 2 }]);
+    expect(retry.args).toEqual([{ tokenId, attempt: 2 }]);
+    expect(await tokenRows(t)).toHaveLength(1);
 
-    await t.action(internal.appleRevoke.revoke, {
-      refreshToken: "r.token",
-      attempt: 3,
-    });
+    await t.action(internal.appleRevoke.revoke, { tokenId, attempt: 3 });
     expect(await scheduledRevokes(t)).toHaveLength(1);
+    expect(await tokenRows(t)).toEqual([]);
   });
 });

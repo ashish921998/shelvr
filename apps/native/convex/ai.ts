@@ -732,6 +732,9 @@ async function analyzeImageItem(
     return { result: unclassified(undefined) };
   }
   const image = await readStoredImage(ctx.storage, item.storageId);
+  if (!(await stillAllowed(ctx, aiAllowed, item.userId))) {
+    return { result: unclassified(undefined) };
+  }
   const { object } = await generateObject({
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
@@ -1051,7 +1054,6 @@ export const processItem = internalAction({
       if ("terminal" in outcome) {
         return null;
       }
-      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item.userId);
       // The link's page-read outcome, if any: it decides the enrichment flag
       // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
       // Only links fetch a page, so images/notes leave this undefined and
@@ -1064,6 +1066,9 @@ export const processItem = internalAction({
       posterStorageId = page?.heroImageUrl
         ? await storePoster(ctx, page.heroImageUrl)
         : undefined;
+
+      // Asked last, after every slow step, and right before the embedding.
+      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item.userId);
 
       const { tags, description, intents } = classifiedFields(
         aiAllowed,

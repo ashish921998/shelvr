@@ -2802,6 +2802,9 @@ export const setEmbeddingsInternal = internalMutation({
         isValidEmbedding(entry.embedding);
 
       if (usable) {
+        // Turned off since the action embedded it: the vector must not land
+        // after the owner's vectors were cleared. The next sweep stamps it.
+        if (!(await aiAllowed(ctx, item.userId))) continue;
         await ctx.db.patch(entry.itemId, {
           ...reindex,
           embedding: entry.embedding,
@@ -2995,6 +2998,9 @@ export const setSpacesForItem = internalMutation({
     ) {
       return null;
     }
+    // Only AI passes call this, so an owner who has turned AI off since the
+    // pass started gets no new suggestions from it.
+    if (!(await aiAllowed(ctx, item.userId))) return null;
     const wanted = new Set(args.spaceIds);
     const existing = await ctx.db
       .query("spaceItems")
