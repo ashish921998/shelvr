@@ -5,6 +5,7 @@ import { convexAuth, type AuthProviderConfig } from "@convex-dev/auth/server";
 import { env } from "./_generated/server";
 import { normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
+import { keepAppleRefreshToken } from "./model/appleTokens";
 
 // Google and Apple are configured via @auth/core providers. Their client
 // id/secret come from the AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET and
@@ -25,7 +26,10 @@ if (env.AUTH_ENABLE_ANONYMOUS === "true") {
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers,
   callbacks: {
-    afterUserCreatedOrUpdated: recordAccountCreated,
+    afterUserCreatedOrUpdated: async (ctx, args) => {
+      await keepAppleRefreshToken(ctx, args);
+      await recordAccountCreated(ctx, args);
+    },
     redirect: async ({ redirectTo }) => {
       const allowed =
         process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===

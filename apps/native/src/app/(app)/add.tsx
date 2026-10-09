@@ -12,7 +12,6 @@ import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -37,22 +36,6 @@ type AndroidDismissAction = { type: "camera"; spaceId?: Id<"spaces"> } | null;
 /** Shared by the up-front guard and by the server's `pro_required` refusal, so
  * both land in the same paywall funnel. */
 const PAYWALL_PLACEMENT = "add";
-
-/** Read a link from the clipboard for the article prefill. `getUrlAsync` is
- * iOS-only, so Android reads the raw string and keeps it only when it parses as
- * an http(s) URL. A failed read resolves to null instead of rejecting. */
-async function readClipboardUrl(): Promise<string | null> {
-  try {
-    if (Platform.OS === "ios") {
-      return (await Clipboard.getUrlAsync()) ?? null;
-    }
-    const text = (await Clipboard.getStringAsync()).trim();
-    if (text === "") return null;
-    return new URL(text).protocol.startsWith("http") ? text : null;
-  } catch {
-    return null;
-  }
-}
 
 function ActionButton({
   icon,
@@ -186,18 +169,6 @@ function AddContent({ close, openCamera }: AddContentProps) {
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
-
-  // Prefill the article field with a link already on the clipboard.
-  useEffect(() => {
-    if (mode !== "article") return;
-    let active = true;
-    readClipboardUrl().then((url) => {
-      if (active && url) setValue((current) => current || url);
-    });
-    return () => {
-      active = false;
-    };
-  }, [mode]);
 
   // Android's Material sheet resizes to the composer over ~300ms, and a
   // keyboard opened mid-resize can land behind it, so focus once it settles.
@@ -384,7 +355,8 @@ function AddContent({ close, openCamera }: AddContentProps) {
           onSubmitEditing={isArticle ? save : undefined}
           editable={!saving}
         />
-      ) : (
+      ) : null}
+      {isComposer ? null : (
         <View style={styles.actions}>
           <ActionButton
             testID="add-option-note"

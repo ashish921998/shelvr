@@ -524,7 +524,9 @@ function spacesPromptBlock(
  * finalize step needs (always undefined for images and notes, which are fully
  * enriched by definition). */
 type Classification = {
-  result: z.infer<typeof itemAnalysisSchema> & {
+  result: Omit<z.infer<typeof itemAnalysisSchema>, "title"> & {
+    /** Absent only for a save finished without the model. */
+    title?: string;
     /** Present only when the source was classified with the recipe schema. */
     recipe?: z.infer<typeof recipeSchema>;
   };
@@ -535,6 +537,70 @@ type Classification = {
 /** Either a classification, or `terminal` when the item was already failed
  * here (a gone URL) and the pipeline must stop. */
 type AnalysisOutcome = Classification | { terminal: true };
+
+/** What a save carries when its owner declined AI processing: only what
+ * Shelvr read itself, with no tags, suggestions or actions. */
+function unclassified(
+  title: string | undefined,
+  description = "",
+): Classification["result"] {
+  return { title, description, tags: [], spaceNames: [], intents: [] };
+}
+
+/** What each kind of save can say for itself with no model involved. */
+function withoutModel(
+  item: Doc<"items">,
+  page: { title?: string; description?: string } | undefined,
+): Classification["result"] {
+  if (item.type === "note") {
+    return unclassified(firstLine(item.note ?? ""));
+  }
+  return unclassified(page?.title, page?.description);
+}
+
+/** The answer as it stands now, after the page read and the model call: a
+ * withdrawal mid-run stops the embedding and the suggestions. */
+async function stillAllowed(
+  ctx: ActionCtx,
+  allowedAtStart: boolean,
+  item: Pick<Doc<"items">, "_id" | "userId">,
+): Promise<boolean> {
+  return (
+    allowedAtStart &&
+    (await ctx.runQuery(internal.aiConsent.isAllowed, {
+      userId: item.userId,
+      itemId: item._id,
+    }))
+  );
+}
+
+/** Without the model there is nothing new to say about the save, so a retry
+ * or a note edit keeps what an earlier, allowed run wrote. */
+function classifiedFields(
+  aiAllowed: boolean,
+  result: Classification["result"],
+  item: Doc<"items">,
+) {
+  if (aiAllowed) {
+    return {
+      tags: result.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
+      description: result.description,
+      intents: sanitizeIntents(result.intents),
+    };
+  }
+  return {
+    tags: item.tags,
+    description: result.description || (item.description ?? ""),
+    intents: item.intents ?? [],
+  };
+}
+
+const MAX_NOTE_LINE_TITLE_CHARS = 80;
+
+function firstLine(note: string): string | undefined {
+  const line = note.split("\n").find((l) => l.trim() !== "");
+  return line?.trim().slice(0, MAX_NOTE_LINE_TITLE_CHARS);
+}
 
 /** How the prompt introduces a page's content: a short-form social link only
  * carries its caption. */
@@ -596,6 +662,7 @@ async function analyzeLinkItem(
   item: Doc<"items">,
   spacesBlock: string,
   startedAt: number,
+  aiAllowed: boolean,
 ): Promise<AnalysisOutcome> {
   if (!item.url) {
     throw new Error("Link item has no url");
@@ -625,6 +692,15 @@ async function analyzeLinkItem(
     });
   }
   const page = read.status === "unreadable" ? undefined : read.page;
+  // Asked again: the page read can take seconds, and the owner may have
+  // turned AI off meanwhile.
+  if (!(await stillAllowed(ctx, aiAllowed, item))) {
+    return {
+      result: unclassified(page?.title, page?.description),
+      page,
+      linkRead: read,
+    };
+  }
   const askForRecipe = read.status === "ok" && read.askForRecipe;
   const call = {
     model: MODEL,
@@ -657,12 +733,19 @@ async function analyzeImageItem(
   ctx: ActionCtx,
   item: Doc<"items">,
   spacesBlock: string,
+  aiAllowed: boolean,
   captureContext?: string,
 ): Promise<Classification> {
   if (!item.storageId) {
     throw new StoredImageError("not_found");
   }
+  if (!aiAllowed) {
+    return { result: unclassified(undefined) };
+  }
   const image = await readStoredImage(ctx.storage, item.storageId);
+  if (!(await stillAllowed(ctx, aiAllowed, item))) {
+    return { result: unclassified(undefined) };
+  }
   const { object } = await generateObject({
     model: MODEL,
     ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
@@ -697,10 +780,14 @@ async function analyzeImageItem(
 async function analyzeNoteItem(
   item: Doc<"items">,
   spacesBlock: string,
+  aiAllowed: boolean,
   captureContext?: string,
 ): Promise<Classification> {
   if (!item.note) {
     throw new Error("Note item has no text");
+  }
+  if (!aiAllowed) {
+    return { result: unclassified(firstLine(item.note)) };
   }
   const { object } = await generateObject({
     model: MODEL,
@@ -880,7 +967,7 @@ async function refreshClaimed(
 async function embedForRun(params: {
   item: { title?: string; titleSource?: "user"; note?: string };
   refresh: boolean;
-  title: string;
+  title?: string;
   description: string;
   tags: string[];
   siteName?: string;
@@ -946,6 +1033,9 @@ export const processItem = internalAction({
       const spaces = allSpaces.filter((s) => s.dynamic === true);
       const spacesBlock = spacesPromptBlock(spaces);
 
+      const allowedAtStart = await ctx.runQuery(internal.aiConsent.isAllowed, {
+        userId: item.userId,
+      });
       let outcome: AnalysisOutcome;
       if (item.type === "link") {
         outcome = await analyzeLinkItem(
@@ -954,16 +1044,23 @@ export const processItem = internalAction({
           item,
           spacesBlock,
           startedAt,
+          allowedAtStart,
         );
       } else if (item.type === "image") {
         outcome = await analyzeImageItem(
           ctx,
           item,
           spacesBlock,
+          allowedAtStart,
           args.captureContext,
         );
       } else {
-        outcome = await analyzeNoteItem(item, spacesBlock, args.captureContext);
+        outcome = await analyzeNoteItem(
+          item,
+          spacesBlock,
+          allowedAtStart,
+          args.captureContext,
+        );
       }
       if ("terminal" in outcome) {
         return null;
@@ -972,52 +1069,64 @@ export const processItem = internalAction({
       // at finalize, the "URL alone" prompt nudge, and the telemetry outcome.
       // Only links fetch a page, so images/notes leave this undefined and
       // stay fully enriched.
-      const { result, page, linkRead } = outcome;
-
-      // Map returned space names back to ids (case-insensitive, trimmed).
-      const spaceIds = spaceNameIds(result.spaceNames, spaces);
+      const { page, linkRead } = outcome;
 
       posterStorageId = page?.heroImageUrl
         ? await storePoster(ctx, page.heroImageUrl)
         : undefined;
 
-      const tags = result.tags
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
+      // Asked last, after every slow step, and right before the embedding.
+      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item);
+      // A decline that landed while the model was answering: its answer is
+      // dropped whole, and the save finishes as if it had never been asked.
+      const result =
+        allowedAtStart && !aiAllowed
+          ? withoutModel(item, page)
+          : outcome.result;
+      // Map returned space names back to ids (case-insensitive, trimmed).
+      const spaceIds = spaceNameIds(result.spaceNames, spaces);
+
+      const { tags, description, intents } = classifiedFields(
+        aiAllowed,
+        result,
+        item,
+      );
       // `page` is undefined for anything that is not a link, so these need no
       // type guard. Hoisted so the embedded text is exactly the stored text.
       const pageContent = page?.content;
       const pageSiteName = page?.siteName;
-      const embedding = await embedForRun({
-        item,
-        refresh: args.refresh === true,
-        title: result.title,
-        description: result.description,
-        tags,
-        siteName: pageSiteName,
-        content: pageContent,
-      });
+      const embedding = aiAllowed
+        ? await embedForRun({
+            item,
+            refresh: args.refresh === true,
+            title: result.title,
+            description,
+            tags,
+            siteName: pageSiteName,
+            content: pageContent,
+          })
+        : undefined;
 
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
         title: result.title,
         keepTitle: args.refresh === true,
-        description: result.description,
+        description,
         tags,
         content: pageContent,
         siteName: pageSiteName,
         embedding,
+        classified: aiAllowed,
         author: page?.author,
         heroImageUrl: page?.heroImageUrl,
         media: page?.media,
-        articleMedia: page?.articleMedia,
         storageId: posterStorageId,
         // Links: the OG image's shape. Images/notes: preserve the ratio the
         // client captured on upload (patching undefined would drop the field).
         aspectRatio:
           item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-        intents: sanitizeIntents(result.intents),
+        intents,
         recipe: finalRecipe(page, result),
         enrichment: linkEnrichment(linkRead),
         status: "ready",
@@ -1035,15 +1144,18 @@ export const processItem = internalAction({
         }
         return null;
       }
-      await ctx.runMutation(internal.items.setSpacesForItem, {
-        itemId: args.itemId,
-        spaceIds,
-        runId: args.runId,
-      });
+      if (aiAllowed) {
+        await ctx.runMutation(internal.items.setSpacesForItem, {
+          itemId: args.itemId,
+          spaceIds,
+          runId: args.runId,
+        });
+      }
 
-      if (args.refresh === true) {
+      if (args.refresh === true || !aiAllowed) {
         // An edited note: search and suggestions are updated. Steering and
         // categorization telemetry already ran when the note was saved.
+        // A save finished without the model has nothing to steer or count.
         return null;
       }
       // If the user filed this item straight into spaces while it was still
@@ -1117,8 +1229,9 @@ export const sweepItemEmbeddings = internalAction({
     if (pending.length === 0) {
       return { scanned: 0, written: 0 };
     }
+    // A declined owner's text is never sent: an empty slot is skipped.
     const { vectors, callFailed } = await embedTexts(
-      pending.map((entry) => entry.text),
+      pending.map((entry) => (entry.aiDeclined ? "" : entry.text)),
     );
 
     // Whether the provider answered at all, taken from the call itself rather
@@ -1138,8 +1251,9 @@ export const sweepItemEmbeddings = internalAction({
           itemId: entry.itemId,
           text: entry.text,
           embedding: vectors[index],
-          outcome:
-            vectors[index] !== undefined
+          outcome: entry.aiDeclined
+            ? ("ai_declined" as const)
+            : vectors[index] !== undefined
               ? ("embedded" as const)
               : entry.text.length === 0
                 ? ("nothing_to_embed" as const)
@@ -1334,7 +1448,12 @@ export const recommendForSpace = internalAction({
       const space = await ctx.runQuery(internal.spaces.getSpaceInternal, {
         spaceId: args.spaceId,
       });
-      if (space === null) {
+      if (
+        space === null ||
+        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
+          userId: space.userId,
+        }))
+      ) {
         return null;
       }
       const memberIds = new Set(
@@ -1483,6 +1602,16 @@ export const findProductLinks = internalAction({
       if (item === null) {
         return null;
       }
+      // findLinks refuses a declined user up front; this covers a decline
+      // that landed after the search was scheduled.
+      if (
+        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
+          userId: item.userId,
+        }))
+      ) {
+        await fail();
+        return null;
+      }
       const apiKey = env.SERPAPI_KEY;
       if (!apiKey) {
         logEvent("error", "find_product_links_unconfigured", {
@@ -1501,6 +1630,11 @@ export const findProductLinks = internalAction({
           throw new StoredImageError("not_found");
         }
         const image = await readStoredImage(ctx.storage, item.storageId);
+        // The read can be slow; the image goes nowhere if AI went off meanwhile.
+        if (!(await stillAllowed(ctx, true, item))) {
+          await fail();
+          return null;
+        }
         const { object } = await generateObject({
           model: MODEL,
           ...modelCallOptions(SMALL_TIMEOUT_MS),
@@ -1549,6 +1683,14 @@ export const findProductLinks = internalAction({
           products: [],
           productsStatus: "ready",
         });
+        return null;
+      }
+
+      // Asked again: the model call above took a while, and the query it
+      // wrote is derived from the save. A decline or a deletion since then
+      // stops the search here.
+      if (!(await stillAllowed(ctx, true, item))) {
+        await fail();
         return null;
       }
 
@@ -1634,7 +1776,14 @@ export const steerItemForSpace = internalAction({
           spaceId: args.spaceId,
         }),
       ]);
-      if (item === null || space === null || item.status !== "ready") {
+      if (
+        item === null ||
+        space === null ||
+        item.status !== "ready" ||
+        !(await ctx.runQuery(internal.aiConsent.isAllowed, {
+          userId: item.userId,
+        }))
+      ) {
         return null;
       }
 
