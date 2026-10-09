@@ -14,6 +14,7 @@ import {
 
 const mock = vi.hoisted(() => ({
   authenticated: true,
+  consentBlocked: false,
   create: vi.fn(),
   retry: vi.fn(),
   query: {
@@ -34,6 +35,9 @@ const mock = vi.hoisted(() => ({
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mock.authenticated }),
   useMutation: (ref: string) => (ref === "create" ? mock.create : mock.retry),
+}));
+vi.mock("@/lib/ai-consent", () => ({
+  useAiConsent: () => ({ savesBlocked: mock.consentBlocked }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -116,6 +120,7 @@ function captured(event: string) {
 
 beforeEach(() => {
   mock.authenticated = true;
+  mock.consentBlocked = false;
   mock.create.mockReset();
   mock.retry.mockReset();
   mock.capture.mockReset();
@@ -405,6 +410,37 @@ describe("useDemoSave", () => {
     rerender();
     await waitFor(() => expect(result.current.view).toBe("reading"));
     expect(mock.recordShareSaved).toHaveBeenCalledWith("user_1");
+  });
+
+  it("holds a signed-in save until the AI consent answer, then sends it once", async () => {
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+
+    await flush(() => result.current.submitUrl("https://example.com/"));
+    expect(result.current.view).toBe("auth");
+    expect(mock.create).not.toHaveBeenCalled();
+
+    mock.consentBlocked = false;
+    rerender();
+    await waitFor(() => expect(result.current.view).toBe("reading"));
+    expect(mock.create).toHaveBeenCalledTimes(1);
+    expect(mock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/" }),
+    );
+  });
+
+  it("does not send a save resumed after sign-in while the answer is missing", async () => {
+    mock.authenticated = false;
+    mock.consentBlocked = true;
+    mock.create.mockResolvedValue(saved());
+    const { result, rerender } = renderDemo();
+    act(() => result.current.submitUrl("https://example.com/"));
+
+    mock.authenticated = true;
+    rerender();
+    await flush(() => {});
+    expect(mock.create).not.toHaveBeenCalled();
   });
 
   it("records a resumed share on a fresh mount, including a reused save", async () => {

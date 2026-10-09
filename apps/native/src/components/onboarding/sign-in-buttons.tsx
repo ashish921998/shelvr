@@ -29,6 +29,8 @@ export function SignInButtons({
         <Text style={styles.error}>{t("demo.signInFailed")}</Text>
       ) : null}
 
+      <Text style={styles.aiNote}>{t("aiConsent.signInNote")}</Text>
+
       {Platform.OS === "ios" ? (
         <Pressable
           onPress={() => signIn("apple")}
@@ -106,6 +108,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   authBtnTextApple: {
     color: theme.colors.background,
+  },
+  aiNote: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.colors.muted,
   },
   privacy: {
     fontFamily: theme.fonts.regular,

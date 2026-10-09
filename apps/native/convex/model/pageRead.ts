@@ -29,7 +29,6 @@ import {
   instagramMedia,
   isPinterestHost,
   isPinterestShortUrl,
-  isXHost,
   linkSource,
   pinterestPinId,
   shortFormSource,
@@ -37,7 +36,7 @@ import {
   normalizeExternalUrl,
   type LinkSource,
 } from "./externalUrl";
-import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
+import type { PostMedia, Recipe } from "./itemFields";
 import { logEvent } from "./log";
 import { extractRecipeMarkup, sanitizeRecipe } from "./recipeMarkup";
 import { readImageSize } from "./imageSize";
@@ -45,6 +44,16 @@ import { readImageSize } from "./imageSize";
 // How much of the article body to store & render. Kept well under Convex's
 // 1MB document limit; long-form essays run tens of thousands of chars.
 const MAX_STORED_CONTENT_CHARS = 100000;
+
+// Plain pages are read as a browser would read them: ordinary sites serve
+// their link preview markup to browsers, and many refuse unknown agents.
+const BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+/** What Shelvr says it is to the platforms it reads by name (TikTok, YouTube,
+ * X, Instagram, Pinterest). */
+const SHELVR_USER_AGENT = "Shelvr/1.0 (+https://shelvr-web.vercel.app)";
+
 // How much page text the classifier prompt actually carries. Anything longer
 // is cut, so the model never sees the tail.
 export const PROMPT_CONTENT_CHARS = 6000;
@@ -141,8 +150,7 @@ async function fetchImageAspectRatio(
       ct.startsWith("image/webp;") ||
       ct.startsWith("image/jpeg;"),
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "User-Agent": BROWSER_USER_AGENT,
       Range: "bytes=0-131071",
     },
   });
@@ -279,7 +287,6 @@ export type PageData = {
    * an Article preview. Internal only. */
   truncated?: true;
   media?: PostMedia[];
-  articleMedia?: ArticleMedia[];
   /** The recipe the page declares in schema.org markup (or, for a caption
    * source, the recipe page its caption links to). Already sanitized. */
   recipe?: Recipe;
@@ -334,9 +341,6 @@ export function firstLinkedUrl(text: string | undefined): string | undefined {
   return undefined;
 }
 
-const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-
 /**
  * TikTok refuses bot page loads, but its public oEmbed endpoint answers with
  * the caption, creator, and a 9:16 poster — everything the card needs. TikTok
@@ -349,7 +353,7 @@ async function fetchTikTokOEmbed(url: string): Promise<PageData> {
     timeoutMs: 15000,
     maxBytes: 64 * 1024,
     allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+    headers: { "User-Agent": SHELVR_USER_AGENT, Accept: "application/json" },
   });
   if (!result.ok) {
     throw new PageFetchError(result.code, result.status);
@@ -391,7 +395,7 @@ async function fetchYouTube(url: string): Promise<PageData> {
     timeoutMs: 15000,
     maxBytes: 64 * 1024,
     allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+    headers: { "User-Agent": SHELVR_USER_AGENT, Accept: "application/json" },
   });
   let data: Record<string, unknown> | undefined;
   if (result.ok) {
@@ -443,7 +447,7 @@ export async function fetchXoEmbed(url: string): Promise<PageData> {
     timeoutMs: 15000,
     maxBytes: 64 * 1024,
     allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+    headers: { "User-Agent": SHELVR_USER_AGENT, Accept: "application/json" },
   });
   if (!result.ok) {
     throw new PageFetchError(result.code, result.status);
@@ -569,13 +573,7 @@ function xPostText(
   return post.note_tweet ? `${text}…` : text;
 }
 
-type XSyndicationRead = {
-  page: PageData;
-  isArticle: boolean;
-  sensitive: boolean;
-};
-
-function parseXSyndication(body: unknown): XSyndicationRead | undefined {
+function parseXSyndication(body: unknown): PageData | undefined {
   const parsed = xSyndicationSchema.safeParse(body);
   if (!parsed.success) {
     return undefined;
@@ -587,25 +585,19 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
     ? undefined
     : post.article?.cover_media?.media_info;
   if (post.article) {
-    // Syndication cuts the preview mid-sentence; X's web app loads the rest
-    // from its private API.
+    // Syndication cuts the preview mid-sentence, and the preview is all an
+    // Article save keeps.
     const preview = post.article.preview_text?.trim();
     return {
-      isArticle: true,
-      sensitive: post.possibly_sensitive === true,
-      page: {
-        title: post.article.title,
-        siteName: "X",
-        author,
-        content: preview ? `${preview}…` : undefined,
-        // The preview is a cut copy; withXArticleBody swaps in the whole body
-        // when X's private API answers.
-        ...(preview ? { truncated: true as const } : {}),
-        heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
-        heroAspectRatio: cover
-          ? cover.original_img_width / cover.original_img_height
-          : undefined,
-      },
+      title: post.article.title,
+      siteName: "X",
+      author,
+      content: preview ? `${preview}…` : undefined,
+      ...(preview ? { truncated: true as const } : {}),
+      heroImageUrl: cover ? xLargeImage(cover.original_img_url) : undefined,
+      heroAspectRatio: cover
+        ? cover.original_img_width / cover.original_img_height
+        : undefined,
     };
   }
   const content = xPostText(post);
@@ -627,303 +619,19 @@ function parseXSyndication(body: unknown): XSyndicationRead | undefined {
     return undefined;
   }
   return {
-    isArticle: false,
-    sensitive: post.possibly_sensitive === true,
-    page: {
-      title: content ? Array.from(content).slice(0, 100).join("") : undefined,
-      siteName: "X",
-      author,
-      content,
-      ...(post.note_tweet ? { truncated: true as const } : {}),
-      ...(media.length > 0
-        ? {
-            heroImageUrl: media[0].imageUrl,
-            heroAspectRatio: media[0].aspectRatio,
-            media,
-          }
-        : {}),
-    },
+    title: content ? Array.from(content).slice(0, 100).join("") : undefined,
+    siteName: "X",
+    author,
+    content,
+    ...(post.note_tweet ? { truncated: true as const } : {}),
+    ...(media.length > 0
+      ? {
+          heroImageUrl: media[0].imageUrl,
+          heroAspectRatio: media[0].aspectRatio,
+          media,
+        }
+      : {}),
   };
-}
-
-// fxtwitter mirrors the Draft.js blocks X's web app renders an Article from.
-// Entity offsets count code points, not UTF-16 units.
-const fxArticleSchema = z.object({
-  status: z.object({
-    id: z.string(),
-    article: z.object({
-      content: z.object({
-        blocks: z.array(
-          z.object({
-            type: z.string(),
-            text: z.string(),
-            entityRanges: z
-              .array(
-                z.object({
-                  key: z.coerce.string(),
-                  offset: z.number().int().nonnegative(),
-                  length: z.number().int().positive(),
-                }),
-              )
-              .default([]),
-          }),
-        ),
-        entityMap: z.array(
-          z.object({
-            key: z.string(),
-            value: z.object({
-              type: z.string(),
-              data: z.object({
-                url: z.string().optional(),
-                // Parsed in blockMedia, so an odd shape skips the image
-                // rather than the whole body.
-                mediaItems: z.unknown().optional(),
-              }),
-            }),
-          }),
-        ),
-      }),
-      // Parsed one entry at a time (see articleMediaById), so a media type
-      // this schema does not know cannot cost the whole body.
-      media_entities: z.array(z.unknown()).default([]),
-    }),
-  }),
-});
-
-const fxMediaItemsSchema = z.array(
-  z.object({ mediaId: z.union([z.string(), z.number()]).transform(String) }),
-);
-
-const fxImageInfo = z.object({
-  original_img_url: z.url(),
-  original_img_width: xDimensions.width,
-  original_img_height: xDimensions.height,
-});
-
-const fxMediaEntitySchema = z.object({
-  media_id: z.coerce.string(),
-  media_info: z.discriminatedUnion("__typename", [
-    fxImageInfo.extend({ __typename: z.literal("ApiImage") }),
-    z.object({
-      __typename: z.enum(["ApiVideo", "ApiGif"]),
-      preview_image: fxImageInfo,
-    }),
-  ]),
-});
-
-type FxArticle = z.infer<typeof fxArticleSchema>["status"]["article"];
-type FxArticleContent = FxArticle["content"];
-
-const FXTWITTER_USER_AGENT = "Shelvr/1.0 (+https://shelvr.app)";
-
-/** An external link's URL, for the reader to see where "HERE" goes. Links to
- * X itself (mentions, cashtags, subscribe buttons) read fine as their text. */
-function externalLinkUrl(url: string | undefined): string | undefined {
-  if (url === undefined) {
-    return undefined;
-  }
-  try {
-    const parsed = new URL(url);
-    const web = parsed.protocol === "https:" || parsed.protocol === "http:";
-    return web && !isXHost(parsed.hostname) ? parsed.href : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function articleBlockText(
-  block: FxArticleContent["blocks"][number],
-  links: Map<string, string>,
-): string {
-  const chars = Array.from(block.text);
-  const ranges = [...block.entityRanges].sort((a, b) => b.offset - a.offset);
-  for (const range of ranges) {
-    const url = links.get(range.key);
-    const end = range.offset + range.length;
-    if (url === undefined || end > chars.length) {
-      continue;
-    }
-    const anchor = chars.slice(range.offset, end).join("");
-    if (!anchor.includes(url)) {
-      chars.splice(end, 0, ` (${url})`);
-    }
-  }
-  return chars
-    .join("")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
-}
-
-/** Where to show an Article's images and videos, keyed by media id. */
-function articleMediaById(
-  entities: unknown[],
-): Map<string, Omit<ArticleMedia, "paragraph">> {
-  const byId = new Map<string, Omit<ArticleMedia, "paragraph">>();
-  for (const entity of entities) {
-    const parsed = fxMediaEntitySchema.safeParse(entity);
-    if (!parsed.success) {
-      continue;
-    }
-    const info = parsed.data.media_info;
-    const image = info.__typename === "ApiImage" ? info : info.preview_image;
-    byId.set(parsed.data.media_id, {
-      kind:
-        info.__typename === "ApiImage"
-          ? "photo"
-          : info.__typename === "ApiVideo"
-            ? "video"
-            : "gif",
-      imageUrl: xLargeImage(image.original_img_url),
-      aspectRatio: image.original_img_width / image.original_img_height,
-    });
-  }
-  return byId;
-}
-
-/** The readable media an atomic block points at. */
-function blockMedia(
-  block: FxArticleContent["blocks"][number],
-  content: FxArticleContent,
-  mediaById: Map<string, Omit<ArticleMedia, "paragraph">>,
-): Omit<ArticleMedia, "paragraph">[] {
-  return block.entityRanges.flatMap((range) => {
-    const entity = content.entityMap.find((e) => e.key === range.key);
-    const items = fxMediaItemsSchema.safeParse(entity?.value.data.mediaItems);
-    return (items.success ? items.data : []).flatMap((item) => {
-      const found = mediaById.get(item.mediaId);
-      return found ? [found] : [];
-    });
-  });
-}
-
-const MAX_ARTICLE_MEDIA = 50;
-
-type ArticleBody = { text: string; media: ArticleMedia[] };
-
-/** The plain-text body the reader view renders, one paragraph per text
- * block, and the images and videos that sit between those paragraphs.
- * Embedded posts and dividers are atomic blocks the reader cannot show, so
- * they are left out rather than marked. */
-function articleBody(article: FxArticle): ArticleBody | undefined {
-  const { content } = article;
-  const mediaById = articleMediaById(article.media_entities);
-  const links = new Map<string, string>();
-  for (const entity of content.entityMap) {
-    const url =
-      entity.value.type === "LINK"
-        ? externalLinkUrl(entity.value.data.url)
-        : undefined;
-    if (url !== undefined) {
-      links.set(entity.key, url);
-    }
-  }
-  const paragraphs: string[] = [];
-  const media: ArticleMedia[] = [];
-  let listNumber = 0;
-  for (const block of content.blocks) {
-    if (block.type === "atomic") {
-      for (const found of blockMedia(block, content, mediaById)) {
-        media.push({ ...found, paragraph: paragraphs.length });
-      }
-    }
-    const text = block.type === "atomic" ? "" : articleBlockText(block, links);
-    if (text === "") {
-      continue;
-    }
-    listNumber = block.type === "ordered-list-item" ? listNumber + 1 : 0;
-    paragraphs.push(
-      block.type === "unordered-list-item"
-        ? `- ${text}`
-        : block.type === "ordered-list-item"
-          ? `${listNumber}. ${text}`
-          : text,
-    );
-  }
-  const joined = paragraphs.join("\n\n");
-  const text = joined.slice(0, MAX_STORED_CONTENT_CHARS);
-  if (text === "") {
-    return undefined;
-  }
-  // A cut body loses its last paragraphs, and the media after them.
-  const kept =
-    text.length === joined.length
-      ? paragraphs.length
-      : text.split("\n\n").length - 1;
-  return {
-    text,
-    media: media.filter((m) => m.paragraph <= kept).slice(0, MAX_ARTICLE_MEDIA),
-  };
-}
-
-type ArticleBodyRead =
-  | { ok: true; body: ArticleBody }
-  | { ok: false; category: string };
-
-async function readXArticleBody(id: string): Promise<ArticleBodyRead> {
-  const result = await safeFetch(`https://api.fxtwitter.com/2/status/${id}`, {
-    timeoutMs: 5000,
-    maxBytes: 2 * 1024 * 1024,
-    maxRedirects: 0,
-    allowContentType: (ct) => ct.startsWith("application/json"),
-    headers: { "User-Agent": FXTWITTER_USER_AGENT, Accept: "application/json" },
-  });
-  if (!result.ok) {
-    return {
-      ok: false,
-      category:
-        result.status === undefined
-          ? `fetch:${result.code}`
-          : `fetch:${result.code}:${result.status}`,
-    };
-  }
-  let json: unknown;
-  try {
-    json = parseJson(result.bytes);
-  } catch {
-    return { ok: false, category: "unreadable_json" };
-  }
-  const parsed = fxArticleSchema.safeParse(json);
-  if (!parsed.success) {
-    return { ok: false, category: "schema_mismatch" };
-  }
-  if (parsed.data.status.id !== id) {
-    return { ok: false, category: "id_mismatch" };
-  }
-  const body = articleBody(parsed.data.status.article);
-  return body === undefined
-    ? { ok: false, category: "empty_body" }
-    : { ok: true, body };
-}
-
-/** fxtwitter is an unofficial mirror of X's private web API, so the full body
- * is a bonus: any failure keeps the syndication preview. */
-async function withXArticleBody(
-  id: string,
-  page: PageData,
-  sensitive: boolean,
-): Promise<PageData> {
-  const read = await readXArticleBody(id);
-  if (read.ok) {
-    // Sensitive media stays hidden, as for posts. An Article that opens
-    // with its cover would show it twice.
-    const media = sensitive
-      ? []
-      : read.body.media.filter(
-          (m) => m.paragraph > 0 || m.imageUrl !== page.heroImageUrl,
-        );
-    // The whole body replaces the cut preview, so the read is no longer short
-    // of its source.
-    const { truncated: _preview, ...whole } = page;
-    return {
-      ...whole,
-      content: read.body.text,
-      ...(media.length > 0 ? { articleMedia: media } : {}),
-    };
-  }
-  logEvent("warn", "x_article_body_fallback", {
-    error_category: read.category,
-  });
-  return page;
 }
 
 /** react-tweet's token for the syndication endpoint, derived from the id. */
@@ -945,10 +653,10 @@ export async function fetchXPost(url: string): Promise<PageData> {
       timeoutMs: 10000,
       maxBytes: 256 * 1024,
       allowContentType: (ct) => ct.startsWith("application/json"),
-      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+      headers: { "User-Agent": SHELVR_USER_AGENT, Accept: "application/json" },
     },
   );
-  let read: XSyndicationRead | undefined;
+  let read: PageData | undefined;
   if (result.ok) {
     try {
       read = parseXSyndication(parseJson(result.bytes));
@@ -957,9 +665,7 @@ export async function fetchXPost(url: string): Promise<PageData> {
     }
   }
   if (read) {
-    return read.isArticle
-      ? await withXArticleBody(id, read.page, read.sensitive)
-      : read.page;
+    return read;
   }
   logEvent("warn", "x_syndication_fallback", {
     error_category: result.ok
@@ -970,10 +676,11 @@ export async function fetchXPost(url: string): Promise<PageData> {
 }
 
 /**
- * Instagram serves browsers a login shell with no metadata, but answers a link
- * preview crawler with `twitter:title` ("Name (@handle) • Instagram reel") and
- * a square-cropped `og:image`. Its captioned embed adds the caption and the
- * uncropped poster. Parsed apart from the fetch so it is testable.
+ * Instagram's post page can carry a link-preview card: `twitter:title`
+ * ("Name (@handle) • Instagram reel") and a square-cropped `og:image`. Its
+ * captioned embed adds the caption and the uncropped poster. Shelvr asks as
+ * itself, so Instagram may answer with its login shell instead and the save
+ * keeps only its URL. Parsed apart from the fetch so it is testable.
  */
 type InstagramEmbedFields = {
   caption?: string;
@@ -1015,8 +722,6 @@ export function parseInstagramEmbed(html: string): InstagramEmbedFields {
   };
 }
 
-const LINK_PREVIEW_USER_AGENT = "facebookexternalhit/1.1";
-
 async function fetchInstagramHtml(url: string) {
   return await safeFetch(url, {
     timeoutMs: 15000,
@@ -1024,7 +729,7 @@ async function fetchInstagramHtml(url: string) {
     onOverflow: "truncate",
     allowContentType: (ct) => ct.startsWith("text/html"),
     headers: {
-      "User-Agent": LINK_PREVIEW_USER_AGENT,
+      "User-Agent": SHELVR_USER_AGENT,
       Accept: "text/html",
       "Accept-Language": "en-US,en;q=0.9",
     },
@@ -1075,7 +780,7 @@ type InstagramCard = {
   video?: true;
 };
 
-/** The link-preview card Instagram serves the crawler, or undefined for the
+/** The link-preview card on Instagram's post page, or undefined for the
  * login shell, which titles itself just "Instagram" and names no post. */
 function instagramCard(html: string): InstagramCard | undefined {
   const title = [
@@ -1297,7 +1002,7 @@ async function readPinterestWidget(id: string): Promise<PinterestWidget> {
         maxBytes: 256 * 1024,
         allowContentType: (ct) => ct.startsWith("application/json"),
         headers: {
-          "User-Agent": BROWSER_USER_AGENT,
+          "User-Agent": SHELVR_USER_AGENT,
           Accept: "application/json",
         },
       },
