@@ -552,11 +552,14 @@ function unclassified(
 async function stillAllowed(
   ctx: ActionCtx,
   allowedAtStart: boolean,
-  userId: string,
+  item: Pick<Doc<"items">, "_id" | "userId">,
 ): Promise<boolean> {
   return (
     allowedAtStart &&
-    (await ctx.runQuery(internal.aiConsent.isAllowed, { userId }))
+    (await ctx.runQuery(internal.aiConsent.isAllowed, {
+      userId: item.userId,
+      itemId: item._id,
+    }))
   );
 }
 
@@ -680,10 +683,7 @@ async function analyzeLinkItem(
   const page = read.status === "unreadable" ? undefined : read.page;
   // Asked again: the page read can take seconds, and the owner may have
   // turned AI off meanwhile.
-  if (
-    !aiAllowed ||
-    !(await ctx.runQuery(internal.aiConsent.isAllowed, { userId: item.userId }))
-  ) {
+  if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return {
       result: unclassified(page?.title, page?.description),
       page,
@@ -732,7 +732,7 @@ async function analyzeImageItem(
     return { result: unclassified(undefined) };
   }
   const image = await readStoredImage(ctx.storage, item.storageId);
-  if (!(await stillAllowed(ctx, aiAllowed, item.userId))) {
+  if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return { result: unclassified(undefined) };
   }
   const { object } = await generateObject({
@@ -1068,7 +1068,7 @@ export const processItem = internalAction({
         : undefined;
 
       // Asked last, after every slow step, and right before the embedding.
-      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item.userId);
+      const aiAllowed = await stillAllowed(ctx, allowedAtStart, item);
 
       const { tags, description, intents } = classifiedFields(
         aiAllowed,
@@ -1661,6 +1661,14 @@ export const findProductLinks = internalAction({
           products: [],
           productsStatus: "ready",
         });
+        return null;
+      }
+
+      // Asked again: the model call above took a while, and the query it
+      // wrote is derived from the save. A decline or a deletion since then
+      // stops the search here.
+      if (!(await stillAllowed(ctx, true, item))) {
+        await fail();
         return null;
       }
 

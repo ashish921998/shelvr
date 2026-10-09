@@ -197,6 +197,25 @@ describe("a user who has not answered", () => {
   });
 });
 
+describe("a save that is gone", () => {
+  it("is not allowed to be sent, whatever the consent answer", async () => {
+    const t = signedIn();
+    const itemId = await processing(t, { type: "note", note: "Buy lentils" });
+    expect(
+      await t.query(internal.aiConsent.isAllowed, { userId: USER, itemId }),
+    ).toBe(true);
+
+    await t.run((ctx) => ctx.db.delete(itemId));
+
+    expect(
+      await t.query(internal.aiConsent.isAllowed, { userId: USER, itemId }),
+    ).toBe(false);
+    expect(await t.query(internal.aiConsent.isAllowed, { userId: USER })).toBe(
+      true,
+    );
+  });
+});
+
 describe("a user who declined", () => {
   async function declined() {
     const t = signedIn();
