@@ -180,6 +180,16 @@ describe("deleting an account that signed in with Apple", () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0].args).toEqual([{ tokenId }]);
     expect(JSON.stringify(jobs[0].args)).not.toContain("r.token");
+
+    // Even if the revoke job never runs, the token does not outlive the hour.
+    const fallback = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    ).find((job) => job.name === "users:forgetAppleToken");
+    expect(fallback?.args).toEqual([{ tokenId }]);
+    await t.mutation(internal.users.forgetAppleToken, { tokenId });
+    expect(await tokenRows(t)).toEqual([]);
     expect(await t.run((ctx) => ctx.db.get(userId))).toBeNull();
   });
 

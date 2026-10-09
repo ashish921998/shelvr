@@ -70,7 +70,7 @@ async function forget(ctx: ActionCtx, tokenId: Id<"appleTokens">) {
 
 /**
  * Revokes a Sign in with Apple refresh token after its account was deleted.
- * Best effort by design: it never throws, so nothing about the deletion
+ * Best effort by design: nothing about the deletion
  * depends on Apple answering. Only "Apple could not be reached" is retried;
  * a refusal (an already revoked token, a bad key) would be refused again.
  */

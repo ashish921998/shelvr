@@ -85,6 +85,8 @@ export const deleteCurrentUserAccount = mutation({
   },
 });
 
+const APPLE_TOKEN_MAX_LIFE_MS = 60 * 60_000;
+
 /** Apple requires an app that offers Sign in with Apple to revoke the user's
  * token when the account is deleted. The job gets the token row's id, not the
  * token: job arguments stay readable in the dashboard long after they run.
@@ -97,6 +99,14 @@ async function scheduleAppleRevoke(
   const tokenId = await appleTokenId(ctx, userId);
   if (tokenId !== null) {
     await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, { tokenId });
+    // The action normally removes the row itself. A scheduled mutation is
+    // the guarantee: it runs even if the action died before cleaning up, and
+    // it is set past the action's last retry.
+    await ctx.scheduler.runAfter(
+      APPLE_TOKEN_MAX_LIFE_MS,
+      internal.users.forgetAppleToken,
+      { tokenId },
+    );
     return;
   }
   const appleAccount = await ctx.db
