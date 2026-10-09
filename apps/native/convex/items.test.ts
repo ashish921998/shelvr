@@ -584,6 +584,38 @@ describe("nextUp", () => {
     expect(await pick([reel, video])).toBeNull();
   });
 
+  it("calls a captioned social post a save for later, not an article", async () => {
+    const t = await as("next-social");
+    const base = {
+      userId: "next-social",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+      type: "link" as const,
+      content: "The caption",
+    };
+    const [post, photo] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A post",
+        url: "https://x.com/someone/status/123",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A photo",
+        url: "https://www.instagram.com/p/abc/",
+      }),
+    ]);
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "open", id: photo });
+    expect(await pick([photo])).toEqual({ kind: "open", id: post });
+  });
+
   it("suggests nothing without Pro", async () => {
     const t = newConvexTest().withIdentity({
       subject: "next-free|session-1",

@@ -29,6 +29,7 @@ import {
 } from "./model/memberships";
 import {
   isYouTubeUrl,
+  linkSource,
   normalizeExternalUrl,
   shortFormSource,
 } from "./model/externalUrl";
@@ -125,7 +126,9 @@ function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
     item.media?.some((media) => media.kind === "video")
   )
     return "watch";
-  if (reminder === "read") return "read";
+  // A captioned photo or text post keeps its caption as content too, but it
+  // is not an article.
+  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
   return "open";
 }
 
