@@ -618,6 +618,7 @@
   "aiConsent.setting": "AI titles, tags and suggestions",
   "aiConsent.settingHelp": "Sends what you save to Google's Gemini AI. Off: saves keep only the page's own title.",
   "aiConsent.findLinksOff": "Turn on AI in Settings to find links.",
+  "aiConsent.signInNote": "Shelvr uses Google's Gemini AI to title and file your saves. Continuing allows this. You can turn it off in Settings.",
   "exitOffer.title": "Your discounted first year",
   "exitOffer.endsIn": "Offer ends in %{time}",
   "exitOffer.cta": "See the offer",

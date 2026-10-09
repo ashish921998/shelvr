@@ -618,6 +618,7 @@
   "aiConsent.setting": "KI-Titel, Schlagwörter und Vorschläge",
   "aiConsent.settingHelp": "Sendet das, was du speicherst, an Googles Gemini AI. Aus: Gespeichertes behält nur den Titel der Seite.",
   "aiConsent.findLinksOff": "Aktiviere KI in den Einstellungen, um Links zu suchen.",
+  "aiConsent.signInNote": "Shelvr nutzt Googles Gemini AI, um deine Saves zu betiteln und einzuordnen. Mit dem Fortfahren erlaubst du das. Du kannst es in den Einstellungen ausschalten.",
   "exitOffer.title": "Dein vergünstigtes erstes Jahr",
   "exitOffer.endsIn": "Angebot endet in %{time}",
   "exitOffer.cta": "Angebot ansehen",

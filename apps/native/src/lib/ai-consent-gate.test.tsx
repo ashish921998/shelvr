@@ -9,6 +9,7 @@ import AppLayout from "@/app/(app)/_layout";
 const mocks = vi.hoisted(() => ({
   onboarded: true,
   status: "unset",
+  grantOnItsWay: false,
   replay: vi.fn(),
   resumeShare: vi.fn(),
 }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/ai-consent", () => ({
   useAiConsent: () => ({
     status: mocks.status,
     savesBlocked: mocks.status === "loading" || mocks.status === "unset",
+    asking: mocks.status === "unset" && !mocks.grantOnItsWay,
   }),
 }));
 vi.mock("@/components/ai-consent", () => ({
@@ -121,4 +123,18 @@ it("shows a signed-out user no card", () => {
   render(<AppLayout />);
   expect(shows("app-stack")).toBe(true);
   expect(shows("consent-card")).toBe(false);
+});
+
+it("shows no card while the yes given at sign-in is being recorded", () => {
+  mocks.status = "unset";
+  mocks.grantOnItsWay = true;
+  mocks.onboarded = true;
+  try {
+    render(<AppLayout />);
+    expect(shows("consent-card")).toBe(false);
+    expect(shows("app-stack")).toBe(false);
+    expect(shows("loader")).toBe(true);
+  } finally {
+    mocks.grantOnItsWay = false;
+  }
 });

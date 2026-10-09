@@ -3,7 +3,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createMMKV } from "react-native-mmkv";
 
 // Remembers that this install has an answer on record, so a launch does not
@@ -11,6 +11,14 @@ import { createMMKV } from "react-native-mmkv";
 // already chose. The server still decides what happens to each save.
 const store = createMMKV({ id: "ai-consent" });
 const ANSWERED_KEY = "answered";
+// Set when a sign-in starts from a screen that carries the AI disclosure
+// (every sign-in surface does). Signing in there is the user's yes, so the
+// separate card is only for people who were already signed in.
+const DISCLOSED_KEY = "disclosed-at-sign-in";
+
+export function markAiDisclosedAtSignIn(): void {
+  store.set(DISCLOSED_KEY, true);
+}
 
 type AiConsentStatus =
   | "signed-out"
@@ -53,6 +61,26 @@ export function useAiConsent() {
       store.remove(ANSWERED_KEY);
   }, [answered, status, isLoading]);
 
+  // Read every render: MMKV is synchronous, and the effect below clears it.
+  const disclosed = store.getBoolean(DISCLOSED_KEY) === true;
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    if (answered) store.remove(DISCLOSED_KEY);
+    if (status !== "unset" || !disclosed) return;
+    setConsent({ granted: true }).then(
+      () =>
+        analytics.capture("ai_consent_answered", {
+          granted: true,
+          surface: "sign_in",
+        }),
+      // Not recorded: fall back to asking with the card.
+      () => {
+        store.remove(DISCLOSED_KEY);
+        rerender((n) => n + 1);
+      },
+    );
+  }, [answered, status, disclosed, setConsent]);
+
   /** Rejects when the answer was not recorded; the caller shows that. */
   const answer = useCallback(
     async (granted: boolean, surface: "card" | "settings") => {
@@ -64,6 +92,8 @@ export function useAiConsent() {
 
   return {
     status,
+    /** True when the card should be shown: no answer, and none on its way. */
+    asking: status === "unset" && !disclosed,
     savesBlocked: savesBlocked(status, store.getBoolean(ANSWERED_KEY) === true),
     answer,
   };

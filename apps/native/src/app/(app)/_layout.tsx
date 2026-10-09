@@ -35,7 +35,7 @@ export default function AppLayout() {
   useAppLocale();
   const { onboarded } = useOnboarding();
   const consent = useAiConsent();
-  const asking = consent.status === "unset";
+  const { asking } = consent;
 
   if (onboarded && consent.savesBlocked) {
     return asking ? (

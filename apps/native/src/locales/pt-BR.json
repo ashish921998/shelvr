@@ -637,6 +637,7 @@
   "aiConsent.setting": "Títulos, etiquetas e sugestões com IA",
   "aiConsent.settingHelp": "Envia o que você salva para o Gemini, a IA do Google. Desativado: o que você salva mantém apenas o título da página.",
   "aiConsent.findLinksOff": "Ative a IA em Configurações para buscar links.",
+  "aiConsent.signInNote": "O Shelvr usa o Gemini AI do Google para dar título e organizar o que você salva. Ao continuar, você permite isso. Você pode desativar nos Ajustes.",
   "exitOffer.title": "Seu primeiro ano com desconto",
   "exitOffer.endsIn": "A oferta termina em %{time}",
   "exitOffer.cta": "Ver a oferta",

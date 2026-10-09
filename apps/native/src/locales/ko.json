@@ -599,6 +599,7 @@
   "aiConsent.setting": "AI 제목, 태그 및 제안",
   "aiConsent.settingHelp": "저장한 내용을 Google의 Gemini AI로 보냅니다. 끄면 저장 항목에 페이지 자체의 제목만 남아요.",
   "aiConsent.findLinksOff": "링크를 찾으려면 설정에서 AI를 켜세요.",
+  "aiConsent.signInNote": "Shelvr는 Google의 Gemini AI로 저장한 항목에 제목을 붙이고 정리합니다. 계속하면 이를 허용하게 됩니다. 설정에서 끌 수 있습니다.",
   "exitOffer.title": "할인된 첫 1년",
   "exitOffer.endsIn": "오퍼 종료까지 %{time}",
   "exitOffer.cta": "오퍼 보기",

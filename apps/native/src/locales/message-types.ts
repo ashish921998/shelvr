@@ -562,6 +562,7 @@ export type MessageParams = {
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;
+  "aiConsent.signInNote": undefined;
   "exitOffer.title": undefined;
   "exitOffer.endsIn": { time: string };
   "exitOffer.cta": undefined;

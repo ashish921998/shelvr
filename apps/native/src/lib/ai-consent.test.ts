@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { useAiConsent } from "./ai-consent";
+import { markAiDisclosedAtSignIn, useAiConsent } from "./ai-consent";
 
 const mocks = vi.hoisted(() => ({
   authenticated: true,
@@ -55,6 +55,51 @@ it("leaves a signed-out user alone and asks the server nothing", () => {
   expect(result.current.status).toBe("signed-out");
   expect(result.current.savesBlocked).toBe(false);
   expect(mocks.queryArgs).toBe("skip");
+});
+
+it("asks with the card when someone already signed in has not answered", () => {
+  mocks.data = { status: "unset", version: 1 };
+  const { result } = renderHook(() => useAiConsent());
+  expect(result.current.asking).toBe(true);
+  expect(mocks.setConsent).not.toHaveBeenCalled();
+});
+
+it("records a yes, with no card, for someone who just signed in past the disclosure", async () => {
+  mocks.setConsent.mockResolvedValue(null);
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "unset", version: 1 };
+  const { result, rerender } = renderHook(() => useAiConsent());
+  expect(result.current.asking).toBe(false);
+  expect(result.current.savesBlocked).toBe(true);
+  await vi.waitFor(() =>
+    expect(mocks.capture).toHaveBeenCalledWith("ai_consent_answered", {
+      granted: true,
+      surface: "sign_in",
+    }),
+  );
+  expect(mocks.setConsent).toHaveBeenCalledExactlyOnceWith({ granted: true });
+
+  // A later sign-out and an already signed-in session start from scratch.
+  mocks.data = { status: "granted", version: 1 };
+  rerender();
+  mocks.data = { status: "unset", version: 1 };
+  rerender();
+  expect(result.current.asking).toBe(true);
+});
+
+it("never overrides a no: signing in again keeps AI off", () => {
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "declined", version: 1 };
+  renderHook(() => useAiConsent());
+  expect(mocks.setConsent).not.toHaveBeenCalled();
+});
+
+it("falls back to the card when the yes could not be recorded", async () => {
+  mocks.setConsent.mockRejectedValue(new Error("offline"));
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "unset", version: 1 };
+  const { result } = renderHook(() => useAiConsent());
+  await vi.waitFor(() => expect(result.current.asking).toBe(true));
 });
 
 it.each([
