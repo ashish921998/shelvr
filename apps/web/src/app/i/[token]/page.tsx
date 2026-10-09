@@ -22,6 +22,15 @@ function previewSummary(
     : preview.description || preview.noteText;
 }
 
+/** "Ashish wanted you to see this", or the generic kicker without a name. */
+function senderLine(
+  preview: Awaited<ReturnType<typeof fetchSharePreview>>,
+): string | undefined {
+  return preview?.senderName
+    ? `${preview.senderName} wanted you to see this`
+    : undefined;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -29,7 +38,10 @@ export async function generateMetadata({
   const preview = await fetchSharePreview(token);
 
   const title = preview?.title || FALLBACK_TITLE;
-  const description = previewSummary(preview) || FALLBACK_DESCRIPTION;
+  const summary = previewSummary(preview) || FALLBACK_DESCRIPTION;
+  // The link preview in a chat is where the name matters most.
+  const sender = senderLine(preview);
+  const description = sender ? `${sender}. ${summary}` : summary;
 
   return {
     title: `${title} — Shelvr`,
@@ -77,7 +89,7 @@ export default async function SharedItemPage({ params }: PageProps) {
           )}
           <div className="p-6 sm:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-shelf">
-              Saved with Shelvr
+              {senderLine(preview) ?? "Saved with Shelvr"}
             </p>
             <h1 className="mt-2 font-display text-2xl text-ink sm:text-3xl">
               {preview?.title || FALLBACK_TITLE}
