@@ -43,6 +43,9 @@ export type ImageSaveFailureReason = "photo_limit" | "too_large" | "other";
  * demo sheet, and only the sheet runs the flow from inside a native modal.
  */
 export type OAuthSurface = "sign_in_view" | "demo_sheet" | "sample_preview";
+/** How a sign-in ran: the system's Sign in with Apple sheet on iOS, or a web
+ * session, which is every other provider and Apple where the sheet is missing. */
+export type AuthMethod = "native" | "web";
 
 /** What RevenueCat's `checkTrialOrIntroductoryPriceEligibility` said about the
  * products on the presented offering, folded to one bounded word: the trial is
@@ -77,6 +80,8 @@ type PaywallOutcomeProperties = PaywallAttemptProperties & {
 /** The funnel stage vocabulary for `save_kind`. */
 type SaveKind = "link" | "note" | "image";
 
+type NextUpKind = "read" | "cook" | "watch" | "open";
+
 type AnalyticsEventProperties = {
   onboarding_step_viewed: {
     step_id: string;
@@ -94,11 +99,16 @@ type AnalyticsEventProperties = {
   // ended it and count repeat starts by one person without guessing on time.
   auth_started: {
     provider: string;
+    method: AuthMethod;
     surface: OAuthSurface;
     auth_attempt_id: string;
   };
   auth_cancelled: {
     provider: string;
+    method: AuthMethod;
+    // Set when a web session ended before its sheet could have shown and was
+    // reopened once. The outcome is the second session's.
+    auto_retry?: true;
     elapsed_ms: number;
     browser_ms: number;
     surface: OAuthSurface;
@@ -114,7 +124,12 @@ type AnalyticsEventProperties = {
   };
   auth_failed: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     stage: "request" | "browser" | "exchange";
+    // The native module's own code (ERR_REQUEST_FAILED and the like), when the
+    // failure came from one. A fixed vocabulary, never a message.
+    error_code?: string;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -123,6 +138,8 @@ type AnalyticsEventProperties = {
   // identify-time signal and also fires on every signed-in cold start.
   auth_succeeded: {
     provider: string;
+    method: AuthMethod;
+    auto_retry?: true;
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -298,6 +315,11 @@ type AnalyticsEventProperties = {
   save_recall_shown: { match_count: number };
   save_recall_opened: { match_count: number };
   save_recall_dismissed: { match_count: number };
+  // "Open this next" card on Home (lib/next-up.ts). The kind only: never the
+  // save's title or URL.
+  next_up_shown: { kind: NextUpKind };
+  next_up_opened: { kind: NextUpKind };
+  next_up_dismissed: { kind: NextUpKind };
   // "Save your next two" card on Home (lib/use-save-progress.ts). Shown once
   // per account per launch. `saved` is the real-save count, demo excluded.
   save_progress_card_shown: { saved: number };

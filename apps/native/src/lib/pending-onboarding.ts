@@ -1,3 +1,4 @@
+import type { Id } from "@convex/_generated/dataModel";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -35,6 +36,13 @@ export type PendingDemo = {
   source: "direct" | "share";
 };
 
+/** The demo's finished save, so a relaunch on the reminder step still has
+ * the save to remind about. Dropped with the demo when onboarding finishes. */
+type PendingSaved = {
+  itemId: Id<"items">;
+  savedSpaceNames: string[];
+};
+
 type PendingRecord = {
   operationId: string;
   spaces: string[];
@@ -44,6 +52,8 @@ type PendingRecord = {
   saveKinds: string[];
   step: number | null;
   demo: PendingDemo | null;
+  /** Absent on records written before the save was kept. */
+  saved: PendingSaved | null;
   spaceNames: Record<string, string>;
 };
 
@@ -53,6 +63,7 @@ type OnboardingProgress = {
   spaces: string[];
   step: number | null;
   demo: PendingDemo | null;
+  saved: PendingSaved | null;
 };
 
 let revision = 0;
@@ -128,11 +139,24 @@ function readPendingRecord(): PendingRecord | null {
       saveKinds,
       step,
       demo,
+      saved: readSaved(record.saved),
       spaceNames: readSpaceNames(record.spaceNames),
     };
   } catch {
     return null;
   }
+}
+
+function readSaved(value: unknown): PendingSaved | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { itemId, savedSpaceNames } = value as Partial<PendingSaved>;
+  if (typeof itemId !== "string" || itemId === "") return null;
+  if (
+    !Array.isArray(savedSpaceNames) ||
+    !savedSpaceNames.every((name) => typeof name === "string")
+  )
+    return null;
+  return { itemId, savedSpaceNames };
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -164,6 +188,7 @@ function ensureOperationId(): string {
     saveKinds: [],
     step: null,
     demo: null,
+    saved: null,
     spaceNames: {},
   });
   return operationId;
@@ -176,6 +201,7 @@ function writePendingSpaces(
   spaces: string[],
   refreshOperationId: boolean,
   demo: PendingDemo | null,
+  saved: PendingSaved | null,
 ) {
   const existing = readPendingRecord();
   const operationId =
@@ -190,6 +216,7 @@ function writePendingSpaces(
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    saved,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
@@ -200,11 +227,17 @@ function writePendingSpaces(
  * completed save would outlive onboarding in SecureStore (`hasPending` ignores
  * it, so nothing downstream would ever clear it). */
 export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true, null);
+  writePendingSpaces(spaces, true, null, null);
 }
 
 export function updatePendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, false, readPendingRecord()?.demo ?? null);
+  const existing = readPendingRecord();
+  writePendingSpaces(
+    spaces,
+    false,
+    existing?.demo ?? null,
+    existing?.saved ?? null,
+  );
 }
 
 export function getPendingSpaces(): string[] {
@@ -244,13 +277,14 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { saveKinds: [], spaces: [], step: null, demo: null };
+    return { saveKinds: [], spaces: [], step: null, demo: null, saved: null };
   }
   return {
     saveKinds: record.saveKinds,
     spaces: record.spaces,
     step: record.step,
     demo: record.demo,
+    saved: record.saved,
   };
 }
 
@@ -258,6 +292,7 @@ export function setOnboardingProgress(progress: {
   saveKinds: string[];
   spaces: string[];
   step: number;
+  saved?: PendingSaved | null;
 }) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
@@ -270,6 +305,7 @@ export function setOnboardingProgress(progress: {
     step: progress.step,
     // An older flow's in-flight demo belongs to a step this flow restarted.
     demo: isCurrentProgress(existing) ? (existing?.demo ?? null) : null,
+    saved: progress.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();
@@ -287,6 +323,7 @@ export function setPendingDemo(demo: PendingDemo | null) {
     saveKinds: existing?.saveKinds ?? [],
     step: existing?.step ?? null,
     demo,
+    saved: existing?.saved ?? null,
     spaceNames: existing?.spaceNames ?? {},
   });
   notifyChanged();

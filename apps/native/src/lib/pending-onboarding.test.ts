@@ -1,3 +1,4 @@
+import type { Id } from "@convex/_generated/dataModel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearLegacyDemoUrlIfSaved,
@@ -90,6 +91,7 @@ describe("onboarding recovery", () => {
         destination: "Inspiration",
         source: "share",
       },
+      saved: null,
     });
     setPendingDemo(null);
     expect(getOnboardingProgress().demo).toBeNull();
@@ -131,8 +133,60 @@ describe("onboarding recovery", () => {
   });
 });
 
+describe("the demo's finished save", () => {
+  const saved = {
+    itemId: "item-1" as Id<"items">,
+    savedSpaceNames: ["Recipes"],
+  };
+
+  it("survives a relaunch, so the reminder step still has a save", () => {
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 4, saved });
+    setPendingDemo({
+      url: "https://example.com/recipe",
+      destination: null,
+      source: "direct",
+    });
+    expect(getOnboardingProgress().saved).toEqual(saved);
+    expect(getOnboardingProgress().step).toBe(4);
+  });
+
+  it("is dropped with the demo when onboarding finishes", () => {
+    setOnboardingProgress({ saveKinds: [], spaces: [], step: 5, saved });
+    setPendingSpaces(["Recipes"]);
+    updatePendingSpaces([]);
+    expect(getOnboardingProgress().saved).toBeNull();
+  });
+
+  it.each([
+    ["no item id", { savedSpaceNames: [] }],
+    ["an empty item id", { itemId: "", savedSpaceNames: [] }],
+    ["space names that are not strings", { itemId: "x", savedSpaceNames: [1] }],
+    ["a string", "item-1"],
+  ])("ignores a stored save with %s", (_name, stored) => {
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        operationId: "op",
+        spaces: [],
+        demoUrl: null,
+        progressVersion: 6,
+        saveKinds: [],
+        step: 4,
+        saved: stored,
+      }),
+    );
+    expect(getOnboardingProgress().saved).toBeNull();
+  });
+});
+
 describe("progress written by an older onboarding flow", () => {
-  const fresh = { saveKinds: [], spaces: [], step: null, demo: null };
+  const fresh = {
+    saveKinds: [],
+    spaces: [],
+    step: null,
+    demo: null,
+    saved: null,
+  };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
     "restarts a record at old step %i with fresh progress",
@@ -199,6 +253,7 @@ describe("progress written by an older onboarding flow", () => {
         destination: null,
         source: "direct",
       },
+      saved: null,
     });
   });
 
@@ -219,6 +274,7 @@ describe("progress written by an older onboarding flow", () => {
       spaces: [],
       step: 0,
       demo: null,
+      saved: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

@@ -167,6 +167,28 @@ describe("capturing Apple's refresh token at sign-in", () => {
       refreshToken: "second",
     });
   });
+
+  it("drops the native sheet's client id when a web sign-in replaces its token", async () => {
+    const t = newConvexTest();
+    await signIn(t, "web-first");
+    const row = (await tokenRows(t))[0];
+    await t.mutation(internal.users.keepNativeAppleToken, {
+      userId: row.userId,
+      refreshToken: "native",
+      clientId: "app.shelvr.save",
+    });
+    expect((await tokenRows(t))[0]).toMatchObject({
+      refreshToken: "native",
+      clientId: "app.shelvr.save",
+    });
+
+    await signIn(t, "web-again");
+
+    const tokens = await tokenRows(t);
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({ refreshToken: "web-again" });
+    expect(tokens[0]).not.toHaveProperty("clientId");
+  });
 });
 
 describe("deleting an account that signed in with Apple", () => {
@@ -240,6 +262,25 @@ describe("revoke", () => {
         new TextEncoder().encode(`${header}.${payload}`),
       ),
     ).toBe(true);
+  });
+
+  it("revokes a native-sheet token as the app it was issued to, not the web Service ID", async () => {
+    await configure();
+    const t = newConvexTest();
+    const { tokenId } = await tokenRow(t);
+    await t.run((ctx) =>
+      ctx.db.patch(tokenId, { clientId: "app.shelvr.save" }),
+    );
+
+    await t.action(internal.appleRevoke.revoke, { tokenId });
+
+    const body = new URLSearchParams(String(fetchMock.mock.calls[0][1].body));
+    expect(body.get("client_id")).toBe("app.shelvr.save");
+    const payload = body.get("client_secret")!.split(".")[1];
+    expect(
+      JSON.parse(new TextDecoder().decode(base64Url(payload))),
+    ).toMatchObject({ sub: "app.shelvr.save" });
+    expect(await tokenRows(t)).toEqual([]);
   });
 
   it("does nothing when the signing key is not configured", async () => {

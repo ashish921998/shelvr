@@ -533,6 +533,7 @@
   "reveal.previewTitle": "읽고, 제목을 붙이고, 정리했어요.",
   "reveal.previewSubtitle": "로그인하면 그대로 보관돼요.",
   "reveal.saveShelf": "내 책장 저장하기",
+  "reveal.saveShelfReason": "저장한 것을 모든 기기에서 볼 수 있어요.",
   "reveal.filedIn": "지정한 대로 %{space}에 정리했어요",
   "reveal.keepSaving": "Pro로 계속 저장하기",
   "reveal.trialNote": "처음 구독하는 분은 연간 플랜에서 7일 무료 체험을 받을 수 있어요. 체험이 끝나기 전에 해지하면 요금이 청구되지 않아요.",
@@ -565,6 +566,11 @@
   "home.recallBody": {
     "other": "방금 추가한 항목과 관련된 이전 저장 항목이 %{formattedCount}개 있어요."
   },
+  "home.nextUpTitle": "다음으로 열어 보기",
+  "home.nextUpRead": "읽으려고 저장함",
+  "home.nextUpCook": "요리하려고 저장함",
+  "home.nextUpWatch": "보려고 저장함",
+  "home.nextUpOpen": "나중에 보려고 저장함",
   "demo.pickHelp": "Shelvr가 읽고 제목을 붙여 정리해 드려요.",
   "demo.clipboardNoLink": "클립보드에 링크가 없어요. 링크를 복사하거나 아래 링크로 해 보세요.",
   "demo.samplesOr": "또는 이 링크로 해 보기",

@@ -498,6 +498,7 @@ export type MessageParams = {
   "reveal.previewTitle": undefined;
   "reveal.previewSubtitle": undefined;
   "reveal.saveShelf": undefined;
+  "reveal.saveShelfReason": undefined;
   "reveal.filedIn": { space: string };
   "reveal.keepSaving": undefined;
   "reveal.trialNote": undefined;
@@ -528,6 +529,11 @@ export type MessageParams = {
   "home.progressNote": undefined;
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
+  "home.nextUpTitle": undefined;
+  "home.nextUpRead": undefined;
+  "home.nextUpCook": undefined;
+  "home.nextUpWatch": undefined;
+  "home.nextUpOpen": undefined;
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;

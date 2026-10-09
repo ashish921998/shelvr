@@ -404,6 +404,239 @@ describe("listRecentItems", () => {
   });
 });
 
+describe("nextUp", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // Seeded saves are made "now", so the clock the client sends is moved
+  // forward: an article has to be a day old before Home suggests it.
+  const later = (days: number) => Date.now() + days * DAY;
+
+  async function markOpened(
+    t: TestCtx,
+    userId: string,
+    itemId: Id<"items">,
+    at: number,
+  ) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("itemReads", {
+        userId,
+        itemId,
+        firstOpenedAt: at,
+        lastOpenedAt: at,
+      });
+    });
+  }
+
+  it("suggests the newest article the user has not opened", async () => {
+    const t = await as("next-user");
+    const ids = await seedFeed(t, "next-user", 3);
+    await markOpened(t, "next-user", ids[2], Date.now());
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.kind).toBe("read");
+    expect(next?.item._id).toBe(ids[1]);
+    // Card shape only: the article body never rides along.
+    expect(next?.item).not.toHaveProperty("content");
+  });
+
+  it("finds an unread article behind many opened ones", async () => {
+    const t = await as("next-reader");
+    const ids = await seedFeed(t, "next-reader", 12);
+    for (const id of ids.slice(1)) {
+      await markOpened(t, "next-reader", id, Date.now());
+    }
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.item._id).toBe(ids[0]);
+  });
+
+  it("waits a day before suggesting a fresh save", async () => {
+    const t = await as("next-fresh");
+    await seedFeed(t, "next-fresh", 1);
+
+    await expect(
+      t.query(api.items.nextUp, { now: Date.now(), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("suggests a recipe not looked at in the last week", async () => {
+    const t = await as("next-cook");
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-cook",
+        type: "link",
+        status: "ready",
+        title: "Lasagna page",
+        url: "https://example.com/lasagna",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "lasagna",
+      }),
+    );
+    const now = later(10);
+    await markOpened(t, "next-cook", recipeId, now - 2 * DAY);
+    await expect(
+      t.query(api.items.nextUp, { now, skip: [] }),
+    ).resolves.toBeNull();
+
+    await t.run(async (ctx) => {
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", "next-cook").eq("itemId", recipeId),
+        )
+        .unique();
+      await ctx.db.patch(read!._id, { lastOpenedAt: now - 8 * DAY });
+    });
+    const next = await t.query(api.items.nextUp, { now, skip: [] });
+    expect(next?.kind).toBe("cook");
+    expect(next?.item._id).toBe(recipeId);
+  });
+
+  it("moves on to the next save when told to skip one", async () => {
+    const t = await as("next-skip");
+    const ids = await seedFeed(t, "next-skip", 3);
+
+    const next = await t.query(api.items.nextUp, {
+      now: later(2),
+      skip: [ids[2]],
+    });
+    expect(next?.item._id).toBe(ids[1]);
+  });
+
+  it("names a recipe by its dish", async () => {
+    const t = await as("next-dish");
+    await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-dish",
+        type: "link",
+        status: "ready",
+        url: "https://example.com/dish",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "dish",
+      }),
+    );
+    const next = await t.query(api.items.nextUp, {
+      now: later(4),
+      skip: [],
+    });
+    expect(next?.subject).toBe("Lasagna");
+  });
+
+  it("suggests every kind of save, newest first", async () => {
+    const t = await as("next-kinds");
+    const base = {
+      userId: "next-kinds",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+    };
+    const [demo, note, photo, video, reel] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "The sample",
+        url: "https://example.com/sample",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "note",
+        title: "Gift ideas",
+        note: "A scarf",
+      }),
+      await ctx.db.insert("items", { ...base, type: "image", title: "Menu" }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "How to fold a shirt",
+        url: "https://www.youtube.com/watch?v=abc",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        type: "link",
+        title: "A reel",
+        url: "https://www.instagram.com/reel/abc/",
+        content: "The caption",
+        media: [
+          { kind: "video", imageUrl: "https://x.test/a.jpg", aspectRatio: 1 },
+        ],
+      }),
+    ]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingDemos", {
+        userId: "next-kinds",
+        itemId: demo,
+        createdAt: Date.now(),
+      });
+    });
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "watch", id: reel });
+    expect(await pick([reel])).toEqual({ kind: "watch", id: video });
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: photo });
+    await markOpened(t, "next-kinds", photo, now);
+    expect(await pick([reel, video])).toEqual({ kind: "open", id: note });
+    await markOpened(t, "next-kinds", note, now);
+    expect(await pick([reel, video])).toBeNull();
+  });
+
+  it("calls a captioned social post a save for later, not an article", async () => {
+    const t = await as("next-social");
+    const base = {
+      userId: "next-social",
+      status: "ready" as const,
+      tags: [],
+      searchText: "",
+      type: "link" as const,
+      content: "The caption",
+    };
+    const [post, photo] = await t.run(async (ctx) => [
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A post",
+        url: "https://x.com/someone/status/123",
+      }),
+      await ctx.db.insert("items", {
+        ...base,
+        title: "A photo",
+        url: "https://www.instagram.com/p/abc/",
+      }),
+    ]);
+    const now = later(2);
+    const pick = async (skip: Id<"items">[]) => {
+      const next = await t.query(api.items.nextUp, { now, skip });
+      return next && { kind: next.kind, id: next.item._id };
+    };
+
+    expect(await pick([])).toEqual({ kind: "open", id: photo });
+    expect(await pick([photo])).toEqual({ kind: "open", id: post });
+  });
+
+  it("suggests nothing without Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "next-free|session-1",
+    });
+    await seedFeed(t, "next-free", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("never suggests another account's saves", async () => {
+    const t = await as("next-owner");
+    await seedFeed(t, "someone-else", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
+  });
+});
+
 describe("listLocatedItems", () => {
   it("returns only the caller's photos that carry coordinates", async () => {
     const t = await as("map-user");

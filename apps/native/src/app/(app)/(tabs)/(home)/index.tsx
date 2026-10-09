@@ -11,6 +11,7 @@ import { MasonryFeed } from "@/components/masonry-feed";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
+import { NextUpCard } from "@/components/home/next-up-card";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import {
@@ -24,6 +25,7 @@ import {
   weeklyNudge,
 } from "@/lib/first-share";
 import { useHomeFeed } from "@/lib/home-feed";
+import { useNextUp } from "@/lib/next-up";
 import {
   useBusySaving,
   useFeedbackInvitation,
@@ -35,7 +37,12 @@ import { useSaveRecall } from "@/lib/use-save-recall";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { welcomeSave } from "@/lib/welcome-save";
 import { useFocusEffect } from "expo-router";
-import { type ReactNode, useCallback, useState } from "react";
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useState,
+} from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -191,6 +198,7 @@ export default function HomeScreen() {
     ),
   });
   const busySaving = useBusySaving(items);
+  const nextUp = useNextUp(user?._id, entitlement.entitled);
   // The share screen records the first save while Home stays mounted below
   // it, so re-read the flag on focus.
   const [, setFocusCount] = useState(0);
@@ -262,6 +270,15 @@ export default function HomeScreen() {
     />
   ) : null;
 
+  const nextUpCard = nextUp.next ? (
+    <NextUpCard
+      next={nextUp.next}
+      onShown={nextUp.shown}
+      onOpen={nextUp.opened}
+      onDismiss={nextUp.dismiss}
+    />
+  ) : undefined;
+
   const howToHeader =
     proCard || showHowTo ? (
       <View style={styles.howToHeader}>
@@ -281,18 +298,14 @@ export default function HomeScreen() {
         // Inside the feed so contentInsetAdjustmentBehavior clears the blur
         // header on iOS and the invitation scrolls with the content. The
         // cancel survey claims the slot first, then the save progress card,
-        // then the save recall card.
+        // then the save recall card, then the feedback invitation. "Open
+        // this next" is the standing default when none of them is up.
         ListHeaderComponent={
           cancelSurveyCard ??
           howToHeader ??
           progressCard ??
           recallCard ??
-          (feedback.invitationVisible && !busySaving ? (
-            <FeedbackInvitation
-              onSendFeedback={feedback.openFeedbackFromInvitation}
-              onDismiss={feedback.dismissInvitation}
-            />
-          ) : undefined)
+          lastHeader(feedback, busySaving, nextUpCard)
         }
       />
       <HeaderScrim />
@@ -302,6 +315,24 @@ export default function HomeScreen() {
       ) : null}
     </View>
   );
+}
+
+/** The end of the header chain: the feedback invitation, else "Open this
+ * next", the standing default when no prompt holds the slot. */
+function lastHeader(
+  feedback: ReturnType<typeof useFeedbackInvitation>,
+  busySaving: boolean,
+  nextUpCard: ReactElement | undefined,
+): ReactElement | undefined {
+  if (feedback.invitationVisible && !busySaving) {
+    return (
+      <FeedbackInvitation
+        onSendFeedback={feedback.openFeedbackFromInvitation}
+        onDismiss={feedback.dismissInvitation}
+      />
+    );
+  }
+  return nextUpCard;
 }
 
 /** The save progress card covers sharing too, so it replaces the share

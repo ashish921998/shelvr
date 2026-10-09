@@ -761,13 +761,14 @@ export async function openExitOffer(
  * the offer is not shown the higher price on their next tap. With
  * `paywallOnDecline`, declining it there opens the regular paywall: right for
  * a tap, too much for a sheet nobody asked for. Otherwise it is `openPaywall`,
- * exit offer on close included.
+ * exit offer on close included. Returns the outcome itself, so onboarding can
+ * tell a paywall that never showed from one that was closed.
  */
 export async function openPaywallKeepingExitOffer(
   router: ReturnType<typeof useRouter>,
   placement: string,
   paywallOnDecline: boolean,
-): Promise<boolean> {
+): Promise<PaywallOutcome> {
   const { outcome, owned } = await presentPaywall(placement, () =>
     presentOpenExitOfferImpl(placement, placement, paywallOnDecline),
   );
@@ -781,7 +782,7 @@ export async function openPaywallKeepingExitOffer(
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
-  return outcome === "success";
+  return outcome;
 }
 
 // ---------------------------------------------------------------------------

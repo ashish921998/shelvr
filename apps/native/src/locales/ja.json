@@ -533,6 +533,7 @@
   "reveal.previewTitle": "読み取り、タイトルを付けて、整理しました。",
   "reveal.previewSubtitle": "サインインすると保存できます。",
   "reveal.saveShelf": "シェルフを保存",
+  "reveal.saveShelfReason": "保存したものをどのデバイスでも見られます。",
   "reveal.filedIn": "指定したとおり%{space}に整理しました",
   "reveal.keepSaving": "Proで保存を続ける",
   "reveal.trialNote": "年額プランは、初めての方なら7日間の無料トライアル付きです。終了前に解約すれば料金はかかりません。",
@@ -565,6 +566,11 @@
   "home.recallBody": {
     "other": "今追加したものに関連する以前の保存項目が%{formattedCount}件あります。"
   },
+  "home.nextUpTitle": "次はこれを開く",
+  "home.nextUpRead": "読むために保存",
+  "home.nextUpCook": "作るために保存",
+  "home.nextUpWatch": "見るために保存",
+  "home.nextUpOpen": "あとで見るために保存",
   "demo.pickHelp": "Shelvr が読み込み、タイトルを付けて整理します。",
   "demo.clipboardNoLink": "クリップボードにリンクがありません。リンクをコピーするか、下のリンクを試してください。",
   "demo.samplesOr": "または、このリンクで試す",

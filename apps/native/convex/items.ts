@@ -27,7 +27,12 @@ import {
   getMembership,
   insertMembership,
 } from "./model/memberships";
-import { normalizeExternalUrl } from "./model/externalUrl";
+import {
+  isYouTubeUrl,
+  linkSource,
+  normalizeExternalUrl,
+  shortFormSource,
+} from "./model/externalUrl";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -60,6 +65,14 @@ import {
 import { saveError } from "./model/saveErrors";
 import { aiAllowed } from "./aiConsent";
 import { aiConsentRequiredError } from "./model/aiConsent";
+import {
+  COOK_MIN_AGE_MS,
+  openedTooRecently,
+  READ_MAX_AGE_MS,
+  READ_MIN_AGE_MS,
+  reminderKind,
+  reminderSubject,
+} from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -85,6 +98,39 @@ const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
+
+/** The newest ready saves `nextUp` reads, bounded by count and bytes: article
+ * bodies make item rows large, and Home subscribes to this query. */
+const NEXT_UP_SCAN_ROWS = 100;
+const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
+/** Saves the client has said "not now" to, skipped by `nextUp`. */
+export const NEXT_UP_SKIP_MAX = 50;
+
+type NextUpKind = "read" | "cook" | "watch" | "open";
+
+/**
+ * What Home would call this save, or `undefined` when it is too new or too
+ * old to bring back. Every kind of save qualifies, unlike the push reminder,
+ * which names only articles and recipes: a push has to earn the interruption,
+ * a card on Home does not.
+ */
+function nextUpKind(item: Doc<"items">, now: number): NextUpKind | undefined {
+  const age = now - item._creationTime;
+  const reminder = reminderKind(item);
+  if (reminder === "cook") return age >= COOK_MIN_AGE_MS ? "cook" : undefined;
+  if (age < READ_MIN_AGE_MS || age > READ_MAX_AGE_MS) return undefined;
+  // Before the article check: a TikTok or reel keeps its caption as content.
+  if (
+    isYouTubeUrl(item.url) ||
+    shortFormSource(item.url)?.video ||
+    item.media?.some((media) => media.kind === "video")
+  )
+    return "watch";
+  // A captioned photo or text post keeps its caption as content too, but it
+  // is not an article.
+  if (reminder === "read" && linkSource(item.url) === undefined) return "read";
+  return "open";
+}
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -423,6 +469,76 @@ export const listRecentItems = query({
       .order("desc")
       .take(limit);
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+  },
+});
+
+/**
+ * The one save Home suggests opening next: the newest save of any kind the
+ * user has not gone back to (`nextUpKind`). A recipe comes back a week after
+ * it was last opened; anything else is offered only until it is opened.
+ * `now` comes from the client, since a query is not rerun as time passes;
+ * the client rounds it so the cache holds.
+ * `skip` names saves the user said "not now" to, so the next one is offered.
+ * Pro only, like every other way back into the library.
+ */
+export const nextUp = query({
+  args: { now: v.number(), skip: v.array(v.id("items")) },
+  returns: v.union(
+    v.null(),
+    v.object({
+      kind: v.union(
+        v.literal("read"),
+        v.literal("cook"),
+        v.literal("watch"),
+        v.literal("open"),
+      ),
+      /** The dish for a recipe, else the title: what the card calls it. */
+      subject: v.string(),
+      item: itemCardValidator,
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    if (
+      !(await hasProEntitlementStatus(ctx, userId)) ||
+      !(await hasProEntitlementAt(ctx, userId, args.now))
+    )
+      return null;
+    const skip = new Set<string>(args.skip.slice(-NEXT_UP_SKIP_MAX));
+    const { rows } = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", userId).eq("status", "ready"),
+        )
+        .order("desc"),
+      { maxRows: NEXT_UP_SCAN_ROWS, maxBytes: NEXT_UP_SCAN_BYTES },
+    );
+    // The onboarding sample is the app's pick, not something they saved.
+    const demo = await ctx.db
+      .query("onboardingDemos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    // Newest first across every kind. One read-state point read per
+    // candidate, so the scan bounds these too.
+    for (const item of rows) {
+      if (skip.has(item._id) || item._id === demo?.itemId) continue;
+      const kind = nextUpKind(item, args.now);
+      if (kind === undefined) continue;
+      const reminder = kind === "cook" ? "cook" : "read";
+      const subject = reminderSubject(item, reminder);
+      if (subject === undefined) continue;
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", userId).eq("itemId", item._id),
+        )
+        .unique();
+      // Anything but a recipe is done with once it has been opened.
+      if (openedTooRecently(reminder, read?.lastOpenedAt, args.now)) continue;
+      return { kind, subject, item: await toItemCard(ctx, item) };
+    }
+    return null;
   },
 });
 
