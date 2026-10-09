@@ -50,6 +50,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 ## Account deletion
 
 - Profile → Settings → **Delete account**.
+- Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. Shelvr started keeping that token with this release, so an account that last signed in before it has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
 - Confirmation explains what is deleted (saves, spaces, uploads, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
 - After success the user is signed out.
 

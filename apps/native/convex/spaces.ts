@@ -463,6 +463,10 @@ async function scheduleSteering(
   if (!(await hasProEntitlement(ctx, userId))) {
     return false;
   }
+  // Nothing would run, so nothing is drawn from the budget.
+  if (!(await aiAllowed(ctx, userId))) {
+    return false;
+  }
   const { ok } = await rateLimiter.limit(ctx, "steerItem", {
     key: userId,
     throws: options.throws,

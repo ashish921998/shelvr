@@ -544,6 +544,49 @@ describe("a decline that lands while a run is still out", () => {
     );
   });
 
+  it("discards the model's answer and skips the embedding when AI goes off mid-save", async () => {
+    const t = signedIn();
+    const itemId = await processing(t, { type: "note", note: "Buy lentils" });
+    generateObject.mockImplementationOnce(async () => {
+      await t.mutation(api.aiConsent.setConsent, { granted: false });
+      return {
+        object: {
+          title: "Model title",
+          description: "Model description.",
+          tags: ["model"],
+          spaceNames: [],
+          intents: [],
+        },
+      };
+    });
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    expect(embedMany).not.toHaveBeenCalled();
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ status: "ready", tags: [] });
+    expect(item?.embedding).toBeUndefined();
+    expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
+      [],
+    );
+  });
+
+  it("discards the model's answer when AI goes off during the embedding call", async () => {
+    const t = signedIn();
+    const itemId = await processing(t, { type: "note", note: "Buy lentils" });
+    embedMany.mockImplementationOnce(async () => {
+      await t.mutation(api.aiConsent.setConsent, { granted: false });
+      return { embeddings: [VECTOR] };
+    });
+
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ status: "ready", tags: [] });
+    expect(item?.title).not.toBe("Model title");
+    expect(item?.embedding).toBeUndefined();
+  });
+
   it("drops suggestions the model made for a new space", async () => {
     const t = signedIn();
     const itemId = await ready(t);
