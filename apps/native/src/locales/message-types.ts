@@ -528,6 +528,9 @@ export type MessageParams = {
   "home.progressNote": undefined;
   "home.recallTitle": undefined;
   "home.recallBody": { count: number };
+  "home.nextUpTitle": undefined;
+  "home.nextUpRead": undefined;
+  "home.nextUpCook": undefined;
   "demo.pickHelp": undefined;
   "demo.clipboardNoLink": undefined;
   "demo.samplesOr": undefined;

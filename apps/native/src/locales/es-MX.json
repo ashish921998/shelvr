@@ -603,6 +603,9 @@
     "many": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de agregar.",
     "other": "%{formattedCount} contenidos guardados antes encajan con lo que acabas de agregar."
   },
+  "home.nextUpTitle": "Ábrelo ahora",
+  "home.nextUpRead": "Guardado para leer",
+  "home.nextUpCook": "Guardado para cocinar",
   "demo.pickHelp": "Shelvr lo lee, le pone título y lo archiva por ti.",
   "demo.clipboardNoLink": "No hay ningún enlace en el portapapeles. Copia uno o prueba uno de estos.",
   "demo.samplesOr": "O prueba uno de estos",
