@@ -559,6 +559,8 @@ export type MessageParams = {
   "aiConsent.body": undefined;
   "aiConsent.changeLater": undefined;
   "aiConsent.allow": undefined;
+  "aiConsent.turnOff": undefined;
+  "aiConsent.example": undefined;
   "aiConsent.setting": undefined;
   "aiConsent.settingHelp": undefined;
   "aiConsent.findLinksOff": undefined;

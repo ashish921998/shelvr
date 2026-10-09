@@ -10,9 +10,19 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   openURL: vi.fn(),
+  saves: undefined as
+    | { page: { status: string; title?: string; tags: string[] }[] }
+    | undefined,
 }));
 vi.mock("@/lib/ai-consent", () => ({
   useAiConsent: () => ({ status: mocks.status, answer: mocks.answer }),
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { items: { listItemsPage: "listItemsPage" } },
+}));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: mocks.saves }),
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
@@ -85,7 +95,7 @@ beforeEach(() => {
 
 it.each([
   ["aiConsent.allow", true],
-  ["common.notNow", false],
+  ["aiConsent.turnOff", false],
 ] as const)("records %s as granted: %s", async (label, granted) => {
   render(<AiConsentCard />);
   expect(mocks.capture).toHaveBeenCalledWith("ai_consent_shown");
@@ -100,7 +110,7 @@ it("offers nothing but the two choices and the privacy link", () => {
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
     "legal.privacy",
     "aiConsent.allow",
-    "common.notNow",
+    "aiConsent.turnOff",
   ]);
   fireEvent.click(screen.getByText("legal.privacy"));
   expect(mocks.openURL).toHaveBeenCalledWith(
@@ -112,7 +122,7 @@ it("offers nothing but the two choices and the privacy link", () => {
 it("says so when the answer could not be saved, and lets the user retry", async () => {
   mocks.answer.mockRejectedValue(new Error("private error"));
   render(<AiConsentCard />);
-  await act(async () => fireEvent.click(screen.getByText("common.notNow")));
+  await act(async () => fireEvent.click(screen.getByText("aiConsent.turnOff")));
   expect(screen.getByText("refundConsent.error")).toBeDefined();
   expect(mocks.captureError).toHaveBeenCalledWith(
     "ai_consent_save_failed",
@@ -150,4 +160,30 @@ it("shows the new value while it saves, and the recorded one if that fails", asy
   await act(async () => fail(new Error("offline")));
   expect(toggle().checked).toBe(true);
   expect(mocks.captureError).toHaveBeenCalled();
+});
+
+it("shows one of the person's own titled saves as the example, when there is one", () => {
+  mocks.saves = {
+    page: [
+      { status: "processing", tags: [] },
+      { status: "ready", title: "Lentil soup", tags: ["dinner", "vegan"] },
+    ],
+  };
+  try {
+    render(<AiConsentCard />);
+    expect(screen.getByText("Lentil soup")).toBeTruthy();
+    expect(screen.getByText("dinner")).toBeTruthy();
+  } finally {
+    mocks.saves = undefined;
+  }
+});
+
+it("shows no example for someone with nothing titled yet", () => {
+  mocks.saves = { page: [{ status: "ready", tags: [] }] };
+  try {
+    render(<AiConsentCard />);
+    expect(screen.queryByText("aiConsent.example")).toBeNull();
+  } finally {
+    mocks.saves = undefined;
+  }
 });

@@ -1,5 +1,8 @@
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, Switch } from "react-native";
+import { Linking, Pressable, ScrollView, Switch, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { SettingCard } from "@/components/ui/setting-card";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -12,6 +15,42 @@ function reportSaveFailed() {
   analytics.captureError(
     "ai_consent_save_failed",
     new Error("ai_consent_save_failed"),
+  );
+}
+
+const EXAMPLE_TAGS = 3;
+
+/** One of the person's own saves that the model already titled and tagged:
+ * the plainest way to say what the permission is for. Nothing renders when
+ * there is none, or while the read is in flight or has failed. */
+function OwnSaveExample() {
+  const { data } = useQuery(
+    convexQuery(api.items.listItemsPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    }),
+  );
+  const save = data?.page.find(
+    (item) => item.status === "ready" && item.title && item.tags.length > 0,
+  );
+  if (!save) return null;
+  return (
+    <View style={styles.example}>
+      <ThemedText variant="caption" style={styles.body}>
+        {t("aiConsent.example")}
+      </ThemedText>
+      <ThemedText variant="subheadStrong" numberOfLines={2}>
+        {save.title}
+      </ThemedText>
+      <View style={styles.tags}>
+        {save.tags.slice(0, EXAMPLE_TAGS).map((tag) => (
+          <View key={tag} style={styles.tag}>
+            <ThemedText variant="caption" style={styles.body}>
+              {tag}
+            </ThemedText>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -51,6 +90,7 @@ export function AiConsentCard() {
       <ThemedText variant="sheetTitle" accessibilityRole="header">
         {t("aiConsent.title")}
       </ThemedText>
+      <OwnSaveExample />
       <ThemedText style={styles.body}>{t("aiConsent.body")}</ThemedText>
       <ThemedText style={styles.body}>{t("aiConsent.changeLater")}</ThemedText>
       <Pressable
@@ -65,7 +105,7 @@ export function AiConsentCard() {
       {(
         [
           [true, "aiConsent.allow"],
-          [false, "common.notNow"],
+          [false, "aiConsent.turnOff"],
         ] as const
       ).map(([granted, label]) => (
         <Pressable
@@ -151,6 +191,22 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.gap(2),
   },
   body: { color: theme.colors.muted },
+  example: {
+    gap: theme.gap(1),
+    padding: theme.gap(2),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: theme.gap(1) },
+  tag: {
+    paddingHorizontal: theme.gap(1.25),
+    paddingVertical: theme.gap(0.5),
+    borderRadius: 999,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
   linkRow: { minHeight: theme.control.minHeight, justifyContent: "center" },
   link: {
     color: theme.colors.primaryText,
