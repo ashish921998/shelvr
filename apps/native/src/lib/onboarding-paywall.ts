@@ -14,14 +14,18 @@ const ENTITLEMENT_WAIT_MS = 5000;
  * The paywall at the end of onboarding, after the share practice. `ask` waits
  * for the entitlement to load, then lets a Pro or signed-out account through
  * and shows everyone else the paywall once. A relaunch lands back on the share step and
- * asks again.
+ * asks again. A paywall that could not show (RevenueCat not ready, offline)
+ * was never declined: `onUnavailable` finishes without saying so, and the
+ * app asks again once Home is up.
  */
 export function useOnboardingPaywall({
   onPro,
   onDecline,
+  onUnavailable,
 }: {
   onPro: () => void;
   onDecline: () => void;
+  onUnavailable: () => void;
 }): { ask: () => void; asked: boolean } {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
@@ -36,9 +40,9 @@ export function useOnboardingPaywall({
     return () => clearTimeout(id);
   }, [asked, loading]);
   const started = useRef(false);
-  const handlers = useRef({ onPro, onDecline });
+  const handlers = useRef({ onPro, onDecline, onUnavailable });
   useEffect(() => {
-    handlers.current = { onPro, onDecline };
+    handlers.current = { onPro, onDecline, onUnavailable };
   });
 
   useEffect(() => {
@@ -57,14 +61,15 @@ export function useOnboardingPaywall({
     // Skipping the practice reaches this without asking for a paywall, so a
     // declined exit offer just closes.
     openPaywallKeepingExitOffer(router, "onboarding", false)
-      .then((purchased) => {
-        if (!purchased) return decline();
+      .then((outcome) => {
+        if (outcome === "unavailable") return handlers.current.onUnavailable();
+        if (outcome === "cancelled") return decline();
         notePurchasedDuringOnboarding();
         handlers.current.onPro();
       })
       .catch((error: unknown) => {
         analytics.captureError("onboarding_paywall_failed", error);
-        decline();
+        handlers.current.onUnavailable();
       });
   }, [asked, loading, waitedOut, entitled, isAuthenticated, router]);
 
