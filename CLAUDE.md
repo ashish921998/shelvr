@@ -139,7 +139,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`appleRevoke.ts`** (`"use node"` action) — revokes a Sign in with Apple refresh token
   after `deleteCurrentUserAccount` hands it over. Best effort: it never throws, skips with
   one log line when the `APPLE_REVOKE_*` variables are unset, and retries only when Apple
-  could not be reached.
+  could not be reached. A token from the native sheet (traded for the sheet's code in
+  `auth.ts`, via `model/appleClient.ts`) carries the bundle id it was issued to as
+  `clientId`, and is revoked as that client instead of the web Service ID.
 - **`legalConsent.ts`**, **`legalConsentSync.ts`** — versioned terms acceptance and optional
   Apple refund-data sharing, delivered to RevenueCat with retries. See
   [refund consent](docs/architecture/refund-consent.md) for policy and rollout requirements.

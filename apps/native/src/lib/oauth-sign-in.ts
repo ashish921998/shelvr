@@ -234,6 +234,10 @@ async function nativeAppleSignIn(
     identityToken: credential.identityToken,
     nonce,
     ...(name ? { name } : {}),
+    // Lets the backend revoke this sign-in with Apple if the account is deleted.
+    ...(credential.authorizationCode
+      ? { authorizationCode: credential.authorizationCode }
+      : {}),
   });
   if (!signingIn) throw new Error("Apple identity token did not sign in");
   return { type: "completed" };

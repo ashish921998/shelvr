@@ -78,7 +78,7 @@ export async function verifyAppleIdToken({
   nonce: string;
   audiences: string[];
   keys?: AppleKeySource;
-}): Promise<{ sub: string; email?: string }> {
+}): Promise<{ sub: string; audience: string; email?: string }> {
   const keySet = createLocalJWKSet(await keys());
   const { payload } = await jwtVerify(identityToken, keySet, {
     issuer: APPLE_ISSUER,
@@ -97,8 +97,13 @@ export async function verifyAppleIdToken({
   // dropped rather than trusted.
   const verified =
     payload.email_verified === true || payload.email_verified === "true";
+  // jose has already required one of `audiences`; name the one it matched.
+  const claimed = [payload.aud ?? []].flat();
+  const audience = audiences.find((allowed) => claimed.includes(allowed));
+  if (audience === undefined) throw new AppleIdTokenError("invalid");
   return {
     sub: payload.sub,
+    audience,
     ...(verified && typeof payload.email === "string"
       ? { email: payload.email }
       : {}),

@@ -68,6 +68,7 @@ describe("verifyAppleIdToken", () => {
   it("returns the subject and verified email of a valid token", async () => {
     await expect(verify(await mint())).resolves.toEqual({
       sub: "apple-sub-1",
+      audience: "app.shelvr.save",
       email: "person@example.com",
     });
   });
@@ -75,7 +76,10 @@ describe("verifyAppleIdToken", () => {
   it("drops an email Apple has not verified", async () => {
     const token = await mint({ claims: { email_verified: "false" } });
 
-    await expect(verify(token)).resolves.toEqual({ sub: "apple-sub-1" });
+    await expect(verify(token)).resolves.toEqual({
+      sub: "apple-sub-1",
+      audience: "app.shelvr.save",
+    });
   });
 
   it.each([

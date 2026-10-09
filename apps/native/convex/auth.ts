@@ -7,19 +7,68 @@ import {
   createAccount,
   type AuthProviderConfig,
 } from "@convex-dev/auth/server";
-import type { DataModel } from "./_generated/dataModel";
-import { env } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { DataModel, Id } from "./_generated/dataModel";
+import { env, type ActionCtx } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
+import { exchangeAuthorizationCode } from "./model/appleClient";
 import { AppleIdTokenError, verifyAppleIdToken } from "./model/appleIdToken";
 import { keepAppleRefreshToken } from "./model/appleTokens";
-import { logEvent } from "./model/log";
+import { errorName, logEvent } from "./model/log";
 
 // The dev deployment serves the development and preview builds; every other
 // deployment serves the store build only.
 const isDevDeployment = () =>
   process.env.CONVEX_SITE_URL?.replace(/\/+$/, "") ===
   "https://amicable-antelope-639.convex.site";
+
+// The native sheet hands the app a one-time code where the web flow hands the
+// backend a refresh token. Trading the code here is what lets account deletion
+// revoke the sign-in with Apple later. Best effort: a person is signed in
+// whether or not Apple answers, and without the signing key nothing is asked.
+async function keepNativeAppleToken(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  clientId: string,
+  code: unknown,
+) {
+  const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
+  const keyId = env.APPLE_REVOKE_KEY_ID;
+  const teamId = env.APPLE_REVOKE_TEAM_ID;
+  if (typeof code !== "string" || !privateKey || !keyId || !teamId) {
+    logEvent("info", "apple_native_token_skipped", {
+      code: typeof code === "string" ? "unconfigured" : "no_code",
+    });
+    return;
+  }
+  try {
+    const { refreshToken, status } = await exchangeAuthorizationCode({
+      code,
+      clientId,
+      privateKey,
+      keyId,
+      teamId,
+    });
+    if (refreshToken === null) {
+      logEvent("error", "apple_native_token_failed", {
+        code: "refused",
+        ...(status !== undefined ? { status } : {}),
+      });
+      return;
+    }
+    await ctx.runMutation(internal.users.keepNativeAppleToken, {
+      userId,
+      refreshToken,
+      clientId,
+    });
+  } catch (error) {
+    logEvent("error", "apple_native_token_failed", {
+      code: "unreachable",
+      error: errorName(error),
+    });
+  }
+}
 
 // The native Sign in with Apple sheet on iOS. Its identity token names the
 // app's bundle id as audience, where the web flow's names the Service ID. The
@@ -30,7 +79,7 @@ const isDevDeployment = () =>
 // overwritten by a later sign-in that carries neither.
 const AppleNative = ConvexCredentials<DataModel>({
   id: "apple-native",
-  authorize: async ({ identityToken, nonce, name }, ctx) => {
+  authorize: async ({ identityToken, nonce, name, authorizationCode }, ctx) => {
     try {
       if (typeof identityToken !== "string" || typeof nonce !== "string")
         throw new AppleIdTokenError("invalid");
@@ -46,6 +95,12 @@ const AppleNative = ConvexCredentials<DataModel>({
         account: { id: token.sub },
         profile: nativeAppleProfile(token, name),
       });
+      await keepNativeAppleToken(
+        ctx,
+        user._id,
+        token.audience,
+        authorizationCode,
+      );
       return { userId: user._id };
     } catch (error) {
       if (!(error instanceof AppleIdTokenError)) throw error;

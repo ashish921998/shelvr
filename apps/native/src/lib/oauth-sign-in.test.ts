@@ -367,6 +367,7 @@ describe("useOAuthSignIn", () => {
   describe("Apple on iOS", () => {
     const credential = {
       identityToken: "apple.identity.token",
+      authorizationCode: "apple.code",
       fullName: { givenName: "Ada", familyName: "Lovelace" },
     };
 
@@ -393,6 +394,8 @@ describe("useOAuthSignIn", () => {
         identityToken: "apple.identity.token",
         nonce,
         name: "Ada Lovelace",
+        // The backend trades this for the token it revokes on deletion.
+        authorizationCode: "apple.code",
       });
       expect(captured("auth_started")).toMatchObject({ method: "native" });
       expect(captured("auth_succeeded")).toMatchObject({

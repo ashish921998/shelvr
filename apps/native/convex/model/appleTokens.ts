@@ -30,14 +30,31 @@ export const keepAppleRefreshToken = async (
   const ctx = authCtx as unknown as MutationCtx;
   const user = userId as Id<"users">;
   await ctx.db.patch(user, { appleRefreshToken: undefined });
-  const existing = await tokenRow(ctx, user);
-  const values = { refreshToken, updatedAt: Date.now() };
+  await storeAppleToken(ctx, user, { refreshToken });
+};
+
+/**
+ * Keeps one refresh token per user, the latest. `clientId` is the bundle id a
+ * native-sheet token was issued to; a web-flow token leaves it unset, which
+ * also clears the one an earlier native sign-in stored.
+ */
+export async function storeAppleToken(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  token: { refreshToken: string; clientId?: string },
+) {
+  const existing = await tokenRow(ctx, userId);
+  const values = {
+    refreshToken: token.refreshToken,
+    clientId: token.clientId,
+    updatedAt: Date.now(),
+  };
   if (existing === null) {
-    await ctx.db.insert("appleTokens", { userId: user, ...values });
+    await ctx.db.insert("appleTokens", { userId, ...values });
   } else {
     await ctx.db.patch(existing._id, values);
   }
-};
+}
 
 /** The id of the user's stored refresh token row, or null. The row outlives
  * the account until the revoke job has used it, so the token itself never

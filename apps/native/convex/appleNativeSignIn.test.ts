@@ -13,6 +13,9 @@ const NONCE = "raw-nonce";
 const SUB = "001234.abcdef.5678";
 
 let appleKey: CryptoKey;
+// What Apple's token endpoint answers the code exchange with.
+let exchange: () => Response;
+const exchanges: URLSearchParams[] = [];
 
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
@@ -65,12 +68,19 @@ beforeEach(async () => {
   };
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: unknown) => {
+    vi.fn(async (url: unknown, init?: { body?: unknown }) => {
+      if (String(url) === "https://appleid.apple.com/auth/token") {
+        exchanges.push(new URLSearchParams(String(init?.body)));
+        return exchange();
+      }
       if (String(url) !== "https://appleid.apple.com/auth/keys")
         throw new Error("Unexpected fetch");
       return Response.json(jwks);
     }),
   );
+  exchanges.length = 0;
+  exchange = () => Response.json({ refresh_token: "r.native" });
+  vi.spyOn(console, "log").mockImplementation(() => {});
   const session = await generateKeyPair("RS256", { extractable: true });
   vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(session.privateKey));
   vi.stubEnv("CONVEX_SITE_URL", "https://example.convex.site");
@@ -79,7 +89,114 @@ beforeEach(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.useRealTimers();
+});
+
+// The .p8 key the deployment signs Apple client secrets with.
+async function configureRevocation() {
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
+  vi.stubEnv(
+    "APPLE_REVOKE_PRIVATE_KEY",
+    `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...der))}\n-----END PRIVATE KEY-----`,
+  );
+  vi.stubEnv("APPLE_REVOKE_KEY_ID", "KEY123");
+  vi.stubEnv("APPLE_REVOKE_TEAM_ID", "TEAM456");
+}
+
+const appleTokens = (backend: ReturnType<typeof newConvexTest>) =>
+  backend.run((ctx) => ctx.db.query("appleTokens").collect());
+
+describe("keeping Apple's refresh token from the native sheet", () => {
+  it("trades the sheet's code as the app and stores the token for revocation", async () => {
+    await configureRevocation();
+    const backend = newConvexTest();
+
+    const result = await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+
+    expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
+    expect(exchanges).toHaveLength(1);
+    expect(Object.fromEntries(exchanges[0])).toMatchObject({
+      client_id: "app.shelvr.save",
+      grant_type: "authorization_code",
+      code: "c.code",
+    });
+    const { users } = await tables(backend);
+    const tokens = await appleTokens(backend);
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({
+      userId: users[0]?._id,
+      refreshToken: "r.native",
+      clientId: "app.shelvr.save",
+    });
+    expect(users[0]).not.toHaveProperty("appleRefreshToken");
+  });
+
+  it.each([
+    ["Apple refuses the code", () => new Response(null, { status: 400 })],
+    ["Apple answers without a token", () => Response.json({})],
+    [
+      "Apple cannot be reached",
+      () => {
+        throw new Error("network down");
+      },
+    ],
+  ])("still signs the person in when %s", async (_case, answer) => {
+    await configureRevocation();
+    exchange = answer;
+    const backend = newConvexTest();
+
+    const result = await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+
+    expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
+    expect(await appleTokens(backend)).toEqual([]);
+  });
+
+  it("asks Apple nothing without a code or without the signing key", async () => {
+    const backend = newConvexTest();
+    await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+    await configureRevocation();
+    await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+    });
+
+    expect(exchanges).toEqual([]);
+    expect(await appleTokens(backend)).toEqual([]);
+  });
+
+  it("never sends a code from a rejected identity token to Apple", async () => {
+    await configureRevocation();
+    const backend = newConvexTest();
+
+    const result = await signIn(backend, {
+      identityToken: await identityToken({ nonce: "x" }),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+
+    expect(result).toEqual({ tokens: null });
+    expect(exchanges).toEqual([]);
+  });
 });
 
 describe("native Sign in with Apple", () => {

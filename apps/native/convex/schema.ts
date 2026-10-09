@@ -47,6 +47,9 @@ export default defineSchema({
   appleTokens: defineTable({
     userId: v.id("users"),
     refreshToken: v.string(),
+    // The client the token was issued to when that is not the web Service ID:
+    // the app's bundle id, for a token from the native sheet.
+    clientId: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
