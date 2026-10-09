@@ -87,6 +87,37 @@ it("records a yes, with no card, for someone who just signed in past the disclos
   expect(result.current.asking).toBe(true);
 });
 
+it("writes the sign-in yes once when two screens watch for it", async () => {
+  let recorded: (value: null) => void = () => {};
+  mocks.setConsent.mockReturnValue(
+    new Promise<null>((resolve) => {
+      recorded = resolve;
+    }),
+  );
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "unset", version: 1 };
+  renderHook(() => useAiConsent());
+  renderHook(() => useAiConsent());
+  expect(mocks.setConsent).toHaveBeenCalledTimes(1);
+
+  recorded(null);
+  await vi.waitFor(() => expect(mocks.capture).toHaveBeenCalledTimes(1));
+});
+
+it("shows the card on every screen when the sign-in yes could not be saved", async () => {
+  mocks.setConsent.mockRejectedValue(new Error("offline"));
+  markAiDisclosedAtSignIn();
+  mocks.data = { status: "unset", version: 1 };
+  // The first hook to mount makes the attempt. The second stands in for the
+  // layout that draws the card, and only hears about the failure.
+  renderHook(() => useAiConsent());
+  const layout = renderHook(() => useAiConsent());
+  expect(layout.result.current.asking).toBe(false);
+
+  await vi.waitFor(() => expect(layout.result.current.asking).toBe(true));
+  expect(mocks.setConsent).toHaveBeenCalledTimes(1);
+});
+
 it("never overrides a no: signing in again keeps AI off", () => {
   markAiDisclosedAtSignIn();
   mocks.data = { status: "declined", version: 1 };

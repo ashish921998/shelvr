@@ -39,24 +39,36 @@ const SHARE_LINK_TIMEOUT_MS = 3000;
  * an image) or the token could not be minted in time, e.g. offline. */
 export function useShareLink() {
   const createShareLink = useMutation(api.items.createShareLink);
+  const settle = useMutation(api.items.settleShareLink);
   return useCallback(
     async (itemId: string): Promise<string | undefined> => {
+      const id = itemId as Id<"items">;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const minting = createShareLink({ itemId: id, settles: true });
       try {
         const token = await Promise.race([
-          createShareLink({ itemId: itemId as Id<"items"> }),
+          minting,
           new Promise<null>((resolve) => {
             timer = setTimeout(() => resolve(null), SHARE_LINK_TIMEOUT_MS);
           }),
         ]);
-        return token === null ? undefined : shareLinkUrl(token);
+        if (token !== null) return shareLinkUrl(token);
+        // Too late to use: the caller shares the source instead. The mint is
+        // still queued, so the link it makes is taken back as soon as it
+        // exists instead of staying published with nobody holding it.
+        minting
+          .then((late) =>
+            late === null ? null : settle({ itemId: id, shared: false }),
+          )
+          .catch(() => {});
+        return undefined;
       } catch {
         return undefined;
       } finally {
         clearTimeout(timer);
       }
     },
-    [createShareLink],
+    [createShareLink, settle],
   );
 }
 

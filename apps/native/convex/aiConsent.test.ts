@@ -592,6 +592,22 @@ describe("a decline that lands while a run is still out", () => {
     expect(item?.embedding).toBeUndefined();
   });
 
+  it("sends no saves for a new space when AI goes off while candidates are picked", async () => {
+    const t = signedIn();
+    await ready(t, { embedding: VECTOR });
+    const spaceId = await t.run((ctx) =>
+      ctx.db.insert("spaces", { userId: USER, name: "Recipes", dynamic: true }),
+    );
+    embedMany.mockImplementationOnce(async () => {
+      await t.mutation(api.aiConsent.setConsent, { granted: false });
+      return { embeddings: [VECTOR] };
+    });
+
+    await t.action(internal.ai.recommendForSpace, { spaceId });
+
+    expect(generateObject).not.toHaveBeenCalled();
+  });
+
   it("drops suggestions the model made for a new space", async () => {
     const t = signedIn();
     const itemId = await ready(t);

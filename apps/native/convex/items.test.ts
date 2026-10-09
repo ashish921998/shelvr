@@ -3513,7 +3513,10 @@ describe("share links", () => {
   it("withdraws a link minted for a share the owner then cancelled", async () => {
     const t = await as("share-user");
     const itemId = await seedItem(t, "share-user");
-    const token = await t.mutation(api.items.createShareLink, { itemId });
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
 
     await t.mutation(api.items.settleShareLink, { itemId, shared: false });
     expect(
@@ -3556,20 +3559,50 @@ describe("share links", () => {
     ).not.toBeNull();
   });
 
-  it("keeps an old link that was never confirmed when a share is cancelled", async () => {
-    // An app version from before confirmation shared this link for real.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const now = new Date("2026-10-08T12:00:00Z").getTime();
-    // convex-test anchors its clock at a context's first write, so the old
-    // link has to be written before the clock moves to now.
-    vi.setSystemTime(now - 11 * 60 * 1000);
-    const t = newConvexTest().withIdentity({
-      subject: "share-old-user|session-1",
-    });
+  it("keeps a link from a client that never reports, when a share is cancelled", async () => {
+    const t = await as("share-old-user");
     const itemId = await seedItem(t, "share-old-user");
+    // An app version from before settling shared this link for real.
     const token = await t.mutation(api.items.createShareLink, { itemId });
 
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("withdraws a cancelled link however late the cancel arrives", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const now = new Date("2026-10-08T12:00:00Z").getTime();
+    // convex-test anchors its clock at a context's first write, so the link
+    // has to be minted before the clock moves on.
+    vi.setSystemTime(now - 3 * 60 * 60 * 1000);
+    const t = newConvexTest().withIdentity({
+      subject: "share-late-user|session-1",
+    });
+    const itemId = await seedItem(t, "share-late-user");
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+
+    // The sheet sat open, or the report waited out a spell offline.
     vi.setSystemTime(now);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+  });
+
+  it("stops treating a link as this attempt's once it has gone out", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+
     await t.mutation(api.items.settleShareLink, { itemId, shared: false });
     expect(
       await t.query(internal.items.getSharePreview, { token: token! }),
