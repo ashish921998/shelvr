@@ -75,7 +75,8 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
 `notification_sent` (once per digest or reminder at a terminal state, with
 its `notification_kind`), `notification_opened`, and `notification_disabled`
 (with the kind switched off). Trial reminders now carry
-`kind: "trial_reminder"` and `notificationId: "shelvr.trial-ending"`; trial
+`kind: "trial_reminder"` and `notificationId: "shelvr.trial-ending"` (two
+days before the end) or `"shelvr.trial-last-day"` (the day before); trial
 nudges carry `kind: "trial_nudge"` and their scheduled identifier, so their
 opens are attributed to a known kind instead of `unknown`.
 

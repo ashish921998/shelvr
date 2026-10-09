@@ -58,6 +58,9 @@ import {
   MAX_PHOTOS_PER_ACCOUNT,
 } from "./model/imagePolicy";
 import { saveError } from "./model/saveErrors";
+import { aiAllowed } from "./aiConsent";
+import { aiConsentRequiredError } from "./model/aiConsent";
+import { openedTooRecently, reminderCandidates } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
 import { safeDeleteStorage } from "./model/storage";
 
@@ -83,6 +86,13 @@ const LIST_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 /** Upper bound on `listRecentItems`. The home-screen widget shows five; the
  * cap keeps a stray client argument from turning it back into a feed query. */
 export const RECENT_ITEMS_MAX = 20;
+
+/** The newest ready saves `nextUp` reads, bounded by count and bytes: article
+ * bodies make item rows large, and Home subscribes to this query. */
+const NEXT_UP_SCAN_ROWS = 100;
+const NEXT_UP_SCAN_BYTES = 2 * 1024 * 1024;
+/** Saves the client has said "not now" to, skipped by `nextUp`. */
+export const NEXT_UP_SKIP_MAX = 50;
 
 const itemTypeValidator = v.union(
   v.literal("image"),
@@ -421,6 +431,64 @@ export const listRecentItems = query({
       .order("desc")
       .take(limit);
     return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+  },
+});
+
+/**
+ * The one save Home suggests opening next: an article the user has not read
+ * yet, or a recipe they have not looked at lately. It picks with the save
+ * reminder rules (`model/saveReminders.ts`), so the card and the push agree
+ * on what is worth bringing back. `now` comes from the client, since a query
+ * is not rerun as time passes; the client rounds it so the cache holds.
+ * `skip` names saves the user said "not now" to, so the next one is offered.
+ * Pro only, like every other way back into the library.
+ */
+export const nextUp = query({
+  args: { now: v.number(), skip: v.array(v.id("items")) },
+  returns: v.union(
+    v.null(),
+    v.object({
+      kind: v.union(v.literal("read"), v.literal("cook")),
+      /** The dish for a recipe, else the title: what the card calls it. */
+      subject: v.string(),
+      item: itemCardValidator,
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    if (
+      !(await hasProEntitlementStatus(ctx, userId)) ||
+      !(await hasProEntitlementAt(ctx, userId, args.now))
+    )
+      return null;
+    const skip = new Set<string>(args.skip.slice(-NEXT_UP_SKIP_MAX));
+    const { rows } = await takeWithinBytes(
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_status", (q) =>
+          q.eq("userId", userId).eq("status", "ready"),
+        )
+        .order("desc"),
+      { maxRows: NEXT_UP_SCAN_ROWS, maxBytes: NEXT_UP_SCAN_BYTES },
+    );
+    // One read-state point read per candidate, so the scan bounds these too.
+    for (const candidate of reminderCandidates(rows, args.now, undefined)) {
+      if (skip.has(candidate.item._id)) continue;
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", userId).eq("itemId", candidate.item._id),
+        )
+        .unique();
+      if (openedTooRecently(candidate.kind, read?.lastOpenedAt, args.now))
+        continue;
+      return {
+        kind: candidate.kind,
+        subject: candidate.subject,
+        item: await toItemCard(ctx, candidate.item),
+      };
+    }
+    return null;
   },
 });
 
@@ -2055,6 +2123,9 @@ export const findLinks = mutation({
         return null;
       }
     }
+    if (!(await aiAllowed(ctx, userId))) {
+      throw aiConsentRequiredError();
+    }
     await rateLimiter.limit(ctx, "findLinks", { key: userId, throws: true });
     await ctx.db.patch(item._id, { productsStatus: "searching" });
     await ctx.scheduler.runAfter(0, internal.ai.findProductLinks, {
@@ -2171,7 +2242,12 @@ export const deleteItem = mutation({
  * shares it and reused after. Null when the item has no preview to show (not
  * ready, or an image, which shares its file instead). */
 export const createShareLink = mutation({
-  args: { itemId: v.id("items") },
+  args: {
+    itemId: v.id("items"),
+    // Sent by clients that call `settleShareLink` once the sheet closes.
+    // Without it the link is taken as handed out and is never withdrawn.
+    settles: v.optional(v.boolean()),
+  },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -2185,15 +2261,66 @@ export const createShareLink = mutation({
       .query("shareLinks")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .first();
-    if (existing !== null) return existing.token;
+    if (existing !== null) {
+      // A link that outlived an earlier share attempt may already be in
+      // someone's hands (older builds never confirm), so a cancel of this
+      // attempt must not withdraw it.
+      if (existing.confirmedAt === undefined || existing.pending === true) {
+        await ctx.db.patch(existing._id, {
+          confirmedAt: existing.confirmedAt ?? Date.now(),
+          pending: undefined,
+        });
+      }
+      return existing.token;
+    }
 
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
     const token = Array.from(bytes, (b) =>
       b.toString(16).padStart(2, "0"),
     ).join("");
-    await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
+    await ctx.db.insert("shareLinks", {
+      token,
+      userId,
+      itemId: item._id,
+      ...(args.settles === true ? { pending: true } : {}),
+    });
     return token;
+  },
+});
+
+/** Reports how the share sheet ended for a link minted just before it opened.
+ * A completed share confirms the item's link for good. A cancelled one
+ * withdraws the link this attempt minted, however late the report arrives:
+ * the link carries `pending` from the mint until a report clears it, so
+ * nothing is inferred from its age. A link with no `pending` mark was minted
+ * by a client that never reports, or has already gone out, and stays. */
+export const settleShareLink = mutation({
+  args: { itemId: v.id("items"), shared: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    const links = await ctx.db
+      .query("shareLinks")
+      .withIndex("by_item", (q) => q.eq("itemId", item._id))
+      .take(10);
+    for (const link of links) {
+      if (args.shared) {
+        if (link.confirmedAt === undefined || link.pending === true) {
+          await ctx.db.patch(link._id, {
+            confirmedAt: link.confirmedAt ?? Date.now(),
+            pending: undefined,
+          });
+        }
+      } else if (link.pending === true && link.confirmedAt === undefined) {
+        await ctx.db.delete(link._id);
+      }
+    }
+    return null;
   },
 });
 
@@ -2230,6 +2357,8 @@ export const getSharePreview = internalQuery({
       imageUrl: v.optional(v.string()),
       sourceUrl: v.optional(v.string()),
       noteText: v.optional(v.string()),
+      /** The sharer's first name, so the page can say who sent it. */
+      senderName: v.optional(v.string()),
     }),
     v.null(),
   ),
@@ -2250,9 +2379,32 @@ export const getSharePreview = internalQuery({
       imageUrl: imageUrl ?? undefined,
       sourceUrl: item.type === "link" ? item.url : undefined,
       noteText: item.type === "note" ? item.note?.slice(0, 500) : undefined,
+      senderName: await senderFirstName(ctx, link.userId),
     };
   },
 });
+
+/** Longest first name a share page shows. Past this it is not a first name. */
+const MAX_SENDER_NAME_CHARS = 40;
+
+/**
+ * The first word of the sharer's account name: enough for "Ashish wanted you
+ * to see this" and nothing more (no surname, email or photo). Undefined when
+ * the account has no usable name, e.g. Apple sign-in with the name withheld,
+ * which leaves the email in its place.
+ */
+async function senderFirstName(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<string | undefined> {
+  const id = ctx.db.normalizeId("users", userId);
+  const user = id === null ? null : await ctx.db.get(id);
+  const first = user?.name?.trim().split(/\s+/)[0];
+  if (!first || first.length > MAX_SENDER_NAME_CHARS || first.includes("@")) {
+    return undefined;
+  }
+  return first;
+}
 
 export const listReadyItemsInternal = internalQuery({
   args: { userId: v.string(), limit: v.number() },
@@ -2388,7 +2540,9 @@ export const finalizeItem = internalMutation({
     // queued before this argument existed still validate; every new schedule
     // passes it.
     runId: v.optional(v.string()),
-    title: v.string(),
+    // Absent when the save was finished without the model and the source
+    // offered no title; clients already render an untitled save.
+    title: v.optional(v.string()),
     // An edited note's quiet refresh: a title the note already has stays, so
     // re-classifying new words doesn't rename the note on every edit. A note
     // with no title (its typed title was just cleared) still takes this one.
@@ -2413,15 +2567,28 @@ export const finalizeItem = internalMutation({
     // and the sweeper fills the vector in later. Never `null` — absent means
     // "this run produced none".
     embedding: v.optional(v.array(v.float64())),
+    // True when the title, description, tags and intents came from the model.
+    // Optional so runs queued before this argument existed still validate.
+    classified: v.optional(v.boolean()),
     status: itemStatusValidator,
     enrichment: v.optional(enrichmentValidator),
   },
   returns: runWriteOutcomeValidator,
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
+    // Checked in the committing transaction: a vector made just before the
+    // owner turned AI off must not land after their vectors were cleared.
+    const embedAllowed = item !== null && (await aiAllowed(ctx, item.userId));
     if (item === null) {
       return "missing";
     }
+    // The same answer decides the model's words: the owner can turn AI off
+    // while the embedding call is still out, after the action last asked.
+    const withdrawn = args.classified === true && !embedAllowed;
+    const description = withdrawn ? (item.description ?? "") : args.description;
+    const tags = withdrawn ? item.tags : args.tags;
+    const intents = withdrawn ? item.intents : args.intents;
+    const recipe = withdrawn ? item.recipe : args.recipe;
     // Race: the user pressed retry while this run was still awaiting the
     // model. The retry owns the item now; writing here would overwrite its
     // result with ours (or flip a newer `processing` back to `ready` with
@@ -2439,21 +2606,23 @@ export const finalizeItem = internalMutation({
       (item.titleSource === "user" || args.keepTitle === true) &&
       item.title !== undefined
         ? item.title
-        : args.title;
+        : // A run with no title to offer (AI off, nothing readable) keeps the
+          // one the save already has; patching undefined would remove it.
+          ((withdrawn ? undefined : args.title) ?? item.title);
     const searchText = buildSearchText({
       title,
-      description: args.description,
-      tags: args.tags,
+      description,
+      tags,
       siteName: args.siteName,
       note: item.note,
       content: args.content,
     });
     await ctx.db.patch(args.itemId, {
       title,
-      description: args.description,
-      tags: args.tags,
+      description,
+      tags,
       content: args.content,
-      recipe: args.recipe,
+      recipe,
       siteName: args.siteName,
       author: args.author,
       heroImageUrl: args.heroImageUrl,
@@ -2461,7 +2630,7 @@ export const finalizeItem = internalMutation({
       articleMedia: args.articleMedia,
       ...(args.storageId !== undefined ? { storageId: args.storageId } : {}),
       aspectRatio: args.aspectRatio,
-      intents: args.intents,
+      intents,
       status: args.status,
       // Always written so a successful retry clears a previous "partial" flag
       // and a previous failureReason (patching undefined removes the field).
@@ -2475,7 +2644,9 @@ export const finalizeItem = internalMutation({
       // rejects a vector whose width differs from the index at write time, and
       // that would fail this whole transaction — losing the classification
       // over a field that is optional by design.
-      ...(args.embedding !== undefined && isValidEmbedding(args.embedding)
+      ...(embedAllowed &&
+      args.embedding !== undefined &&
+      isValidEmbedding(args.embedding)
         ? {
             embedding: args.embedding,
             embeddingVersion: CURRENT_EMBEDDING_VERSION,
@@ -2557,7 +2728,15 @@ export const deleteStorageIfUnreferenced = internalMutation({
  */
 export const listItemsNeedingEmbeddingInternal = internalQuery({
   args: { limit: v.number() },
-  returns: v.array(v.object({ itemId: v.id("items"), text: v.string() })),
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      text: v.string(),
+      // The owner declined AI processing: the caller must not send `text`
+      // anywhere, only stamp the row so it leaves the range.
+      aiDeclined: v.optional(v.boolean()),
+    }),
+  ),
   handler: async (ctx, args) => {
     const limit = Math.min(
       Math.max(1, Math.floor(args.limit)),
@@ -2572,11 +2751,18 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
           .eq("status", "ready")
           .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
       );
-    const page: { itemId: Id<"items">; text: string }[] = [];
+    const page: { itemId: Id<"items">; text: string; aiDeclined?: true }[] = [];
+    const allowedByUser = new Map<string, boolean>();
     let bytes = 0;
     for await (const item of rows) {
+      let allowed = allowedByUser.get(item.userId);
+      if (allowed === undefined) {
+        allowed = await aiAllowed(ctx, item.userId);
+        allowedByUser.set(item.userId, allowed);
+      }
       page.push({
         itemId: item._id,
+        ...(allowed ? {} : { aiDeclined: true as const }),
         text: buildEmbeddingText({
           title: item.title,
           description: item.description,
@@ -2609,6 +2795,8 @@ export const listItemsNeedingEmbeddingInternal = internalQuery({
  * vector, and nothing would ever revisit them.
  */
 const embeddingOutcomeValidator = v.union(
+  // The owner declined AI processing; nothing was sent for this row.
+  v.literal("ai_declined"),
   // A usable vector came back.
   v.literal("embedded"),
   // The item has no embeddable text at all, so it is finished either way.
@@ -2685,6 +2873,20 @@ export const setEmbeddingsInternal = internalMutation({
           ? {}
           : { searchText: nextSearchText };
 
+      if (entry.outcome === "ai_declined") {
+        // Turned back on since the action read it: leave the row for the
+        // next sweep to embed rather than stamping it as done.
+        if (await aiAllowed(ctx, item.userId)) continue;
+        await ctx.db.patch(entry.itemId, {
+          ...reindex,
+          embedding: undefined,
+          embeddingVersion: CURRENT_EMBEDDING_VERSION,
+          embeddingAttempts: undefined,
+        });
+        stamped++;
+        continue;
+      }
+
       // Staleness fence. The version guard above catches a pipeline run that
       // embedded successfully, but not one that re-classified this item and
       // then failed to embed — that clears the stamp, so the row looks
@@ -2715,6 +2917,9 @@ export const setEmbeddingsInternal = internalMutation({
         isValidEmbedding(entry.embedding);
 
       if (usable) {
+        // Turned off since the action embedded it: the vector must not land
+        // after the owner's vectors were cleared. The next sweep stamps it.
+        if (!(await aiAllowed(ctx, item.userId))) continue;
         await ctx.db.patch(entry.itemId, {
           ...reindex,
           embedding: entry.embedding,
@@ -2908,6 +3113,9 @@ export const setSpacesForItem = internalMutation({
     ) {
       return null;
     }
+    // Only AI passes call this, so an owner who has turned AI off since the
+    // pass started gets no new suggestions from it.
+    if (!(await aiAllowed(ctx, item.userId))) return null;
     const wanted = new Set(args.spaceIds);
     const existing = await ctx.db
       .query("spaceItems")
@@ -2957,7 +3165,9 @@ export const suggestItemsForSpace = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const space = await ctx.db.get(args.spaceId);
-    if (space === null) {
+    // Asked in the committing transaction: the model call that produced these
+    // can outlast the owner turning AI off.
+    if (space === null || !(await aiAllowed(ctx, space.userId))) {
       return null;
     }
     // Any existing row blocks a new suggestion — saved and dismissed are

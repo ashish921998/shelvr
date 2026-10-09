@@ -1,3 +1,4 @@
+import { markAiDisclosedAtSignIn } from "@/lib/ai-consent";
 import { analytics, type AuthMethod, type OAuthSurface } from "@/lib/analytics";
 import { useAuthActions } from "@convex-dev/auth/react";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -251,6 +252,8 @@ export function useOAuthSignIn(surface: OAuthSurface) {
 
   const signInWith = useCallback(
     async (provider: OAuthProvider): Promise<OAuthSignInOutcome> => {
+      // Every screen that offers sign-in shows the AI disclosure beside it.
+      markAiDisclosedAtSignIn();
       setPendingProvider(provider);
       setLastError(null);
       setInterrupted(false);

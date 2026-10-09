@@ -12,6 +12,7 @@ import { env } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
 import { AppleIdTokenError, verifyAppleIdToken } from "./model/appleIdToken";
+import { keepAppleRefreshToken } from "./model/appleTokens";
 import { logEvent } from "./model/log";
 
 // The dev deployment serves the development and preview builds; every other
@@ -74,7 +75,10 @@ if (env.AUTH_ENABLE_ANONYMOUS === "true") {
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers,
   callbacks: {
-    afterUserCreatedOrUpdated: recordAccountCreated,
+    afterUserCreatedOrUpdated: async (ctx, args) => {
+      await keepAppleRefreshToken(ctx, args);
+      await recordAccountCreated(ctx, args);
+    },
     redirect: async ({ redirectTo }) => {
       const allowed = isDevDeployment()
         ? [

@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   deleteAccount: vi.fn(),
   setWeeklyShelf: vi.fn(),
   setSaveReminders: vi.fn(),
+  manageSubscription: vi.fn(),
+  dismissAll: vi.fn(),
+  status: "none",
   preferences: { weeklyShelfEnabled: true, remindersEnabled: true } as
     | { weeklyShelfEnabled: boolean; remindersEnabled: boolean }
     | undefined,
@@ -40,6 +43,10 @@ vi.mock("@/lib/current-user", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   restorePurchases: mocks.restorePurchases,
+  useEntitlement: () => ({ status: mocks.status }),
+}));
+vi.mock("@/lib/manage-subscription", () => ({
+  manageSubscription: mocks.manageSubscription,
 }));
 vi.mock("@/lib/notifications", () => ({
   useNotificationSession: () => ({
@@ -57,9 +64,17 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }));
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ back: vi.fn(), canGoBack: () => true, replace: vi.fn() }),
+  useRouter: () => ({
+    back: vi.fn(),
+    canGoBack: () => true,
+    replace: vi.fn(),
+    dismissAll: mocks.dismissAll,
+  }),
 }));
 // The screen's own flows are under test; its child settings have their own.
+vi.mock("@/components/ai-consent", () => ({
+  AiConsentSetting: vi.fn(() => null),
+}));
 vi.mock("@/components/legal-consent", () => ({
   LegalConsentPreference: vi.fn(() => null),
 }));
@@ -138,6 +153,7 @@ function lastAlert() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.preferences = { weeklyShelfEnabled: true, remindersEnabled: true };
+  mocks.status = "none";
 });
 afterEach(cleanup);
 
@@ -160,6 +176,40 @@ it("deletes the account only after the destructive confirm", async () => {
   });
   expect(mocks.deleteAccount).toHaveBeenCalledTimes(1);
 });
+
+it("offers no subscription button to an account with nothing to cancel", () => {
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("account.delete"));
+  expect(lastAlert().buttons.map((button) => button.text)).toEqual([
+    "common.cancel",
+    "account.delete",
+  ]);
+});
+
+it.each(["trialing", "pro"])(
+  "lets a %s account manage its subscription before deleting",
+  (status) => {
+    mocks.status = status;
+    render(<SettingsScreen />);
+    fireEvent.click(screen.getByText("account.delete"));
+
+    const { buttons } = lastAlert();
+    expect(buttons.map((button) => button.text)).toEqual([
+      "common.cancel",
+      "pro.manage",
+      "account.delete",
+    ]);
+    expect(buttons[0].style).toBe("cancel");
+    expect(buttons[2].style).toBe("destructive");
+
+    buttons[1].onPress?.();
+    expect(mocks.deleteAccount).not.toHaveBeenCalled();
+    // Both sheets go before Customer Center can present.
+    const dismiss = mocks.manageSubscription.mock.calls[0][0] as () => void;
+    dismiss();
+    expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+  },
+);
 
 it("reports a failed deletion and points to support", async () => {
   mocks.deleteAccount.mockRejectedValue(new Error("server"));

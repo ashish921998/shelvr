@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   confirmTrialReminderAsk,
   scheduleTrialReminder,
+  TRIAL_LAST_DAY_ID,
   TRIAL_NUDGES,
   TRIAL_REMINDER_ID,
+  trialLastDayAt,
   trialNudgeAt,
   trialNudgesAllowed,
   trialReminderAt,
@@ -141,8 +143,9 @@ describe("scheduleTrialReminder", () => {
     expect(
       await scheduleTrialReminder(NOW + 7 * DAY, NOW, false, () => current),
     ).toBe(false);
-    expect(mock.cancel.mock.calls.slice(-3).flat()).toEqual([
+    expect(mock.cancel.mock.calls.slice(-4).flat()).toEqual([
       TRIAL_REMINDER_ID,
+      TRIAL_LAST_DAY_ID,
       ...TRIAL_NUDGES.map((nudge) => nudge.id),
     ]);
   });
@@ -181,16 +184,10 @@ describe("trial nudges", () => {
     expect(trialNudgeAt(noon + 5 * DAY, 1, noon)).toBeNull();
   });
 
-  it("follows the Save reminders switch, not a missing preferences row", () => {
-    expect(
-      trialNudgesAllowed({ remindersEnabled: false, timezone: null }),
-    ).toBe(true);
-    expect(
-      trialNudgesAllowed({ remindersEnabled: true, timezone: "Asia/Kolkata" }),
-    ).toBe(true);
-    expect(
-      trialNudgesAllowed({ remindersEnabled: false, timezone: "Asia/Kolkata" }),
-    ).toBe(false);
+  it("needs Save reminders on, and a missing preferences row means no", () => {
+    // `getPreferences` reports reminders off for a user with no row.
+    expect(trialNudgesAllowed({ remindersEnabled: false })).toBe(false);
+    expect(trialNudgesAllowed({ remindersEnabled: true })).toBe(true);
   });
 
   it("schedules both nudges with the reminder when allowed", async () => {
@@ -200,7 +197,7 @@ describe("trial nudges", () => {
     const ids = mock.schedule.mock.calls.map(
       (call) => (call[0] as { identifier: string }).identifier,
     );
-    expect(ids).toEqual([TRIAL_REMINDER_ID, ...nudgeIds]);
+    expect(ids).toEqual([TRIAL_REMINDER_ID, TRIAL_LAST_DAY_ID, ...nudgeIds]);
     expect(mock.schedule).toHaveBeenCalledWith(
       expect.objectContaining({
         identifier: "shelvr.trial-day-1",
@@ -218,7 +215,11 @@ describe("trial nudges", () => {
 
   it("clears the nudges when they are switched off", async () => {
     await scheduleTrialReminder(noon + 7 * DAY, noon, false);
-    expect(mock.schedule).toHaveBeenCalledTimes(1);
+    // The two reminders about the charge stay.
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_REMINDER_ID, TRIAL_LAST_DAY_ID]);
     for (const id of nudgeIds) expect(mock.cancel).toHaveBeenCalledWith(id);
   });
 
@@ -232,6 +233,76 @@ describe("trial nudges", () => {
     mock.permission.mockResolvedValue(undetermined);
     await scheduleTrialReminder(noon + 7 * DAY, noon, false);
     for (const id of nudgeIds) expect(mock.cancel).toHaveBeenCalledWith(id);
+  });
+});
+
+describe("last-day reminder", () => {
+  const at = (expiresAt: Date) => {
+    const fireAt = trialLastDayAt(
+      expiresAt.getTime(),
+      expiresAt.getTime() - 7 * DAY,
+    );
+    return fireAt === null ? null : new Date(fireAt);
+  };
+
+  it("lands the day before, an hour before the store's renewal window", () => {
+    expect(at(new Date(2027, 0, 11, 12, 0))).toEqual(
+      new Date(2027, 0, 10, 11, 0),
+    );
+  });
+
+  it("comes no later than 7 pm", () => {
+    expect(at(new Date(2027, 0, 11, 23, 30))).toEqual(
+      new Date(2027, 0, 10, 19, 0),
+    );
+  });
+
+  it("skips a trial ending in the morning rather than send at night", () => {
+    expect(at(new Date(2027, 0, 11, 8, 0))).toBeNull();
+    // Just past midnight, the window opens two calendar days earlier.
+    expect(at(new Date(2027, 0, 11, 0, 30))).toBeNull();
+  });
+
+  it("skips a moment that has passed", () => {
+    const expiresAt = NOW + 20 * 60 * 60 * 1000;
+    expect(trialLastDayAt(expiresAt, NOW)).toBeNull();
+  });
+
+  it("still schedules on day 6, after the day-5 reminder has passed", async () => {
+    const noon = new Date(2027, 0, 4, 12, 0).getTime();
+    expect(
+      await scheduleTrialReminder(
+        noon + 7 * DAY,
+        noon + 5 * DAY + 60_000,
+        false,
+      ),
+    ).toBe(true);
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
+    );
+    expect(ids).toEqual([TRIAL_LAST_DAY_ID]);
+  });
+
+  it("opens Profile and records as a trial reminder", async () => {
+    const noon = new Date(2027, 0, 4, 12, 0).getTime();
+    await scheduleTrialReminder(noon + 7 * DAY, noon, false);
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: TRIAL_LAST_DAY_ID,
+        content: {
+          title: "notifications.trialLastDayTitle",
+          body: "notifications.trialLastDayBody",
+          data: {
+            url: "/profile",
+            kind: "trial_reminder",
+            notificationId: TRIAL_LAST_DAY_ID,
+          },
+        },
+        trigger: expect.objectContaining({
+          date: new Date(2027, 0, 10, 11, 0),
+        }),
+      }),
+    );
   });
 });
 

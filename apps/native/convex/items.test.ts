@@ -404,6 +404,146 @@ describe("listRecentItems", () => {
   });
 });
 
+describe("nextUp", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // Seeded saves are made "now", so the clock the client sends is moved
+  // forward: an article has to be a day old before Home suggests it.
+  const later = (days: number) => Date.now() + days * DAY;
+
+  async function markOpened(
+    t: TestCtx,
+    userId: string,
+    itemId: Id<"items">,
+    at: number,
+  ) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("itemReads", {
+        userId,
+        itemId,
+        firstOpenedAt: at,
+        lastOpenedAt: at,
+      });
+    });
+  }
+
+  it("suggests the newest article the user has not opened", async () => {
+    const t = await as("next-user");
+    const ids = await seedFeed(t, "next-user", 3);
+    await markOpened(t, "next-user", ids[2], Date.now());
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.kind).toBe("read");
+    expect(next?.item._id).toBe(ids[1]);
+    // Card shape only: the article body never rides along.
+    expect(next?.item).not.toHaveProperty("content");
+  });
+
+  it("finds an unread article behind many opened ones", async () => {
+    const t = await as("next-reader");
+    const ids = await seedFeed(t, "next-reader", 12);
+    for (const id of ids.slice(1)) {
+      await markOpened(t, "next-reader", id, Date.now());
+    }
+
+    const next = await t.query(api.items.nextUp, { now: later(2), skip: [] });
+    expect(next?.item._id).toBe(ids[0]);
+  });
+
+  it("waits a day before suggesting a fresh save", async () => {
+    const t = await as("next-fresh");
+    await seedFeed(t, "next-fresh", 1);
+
+    await expect(
+      t.query(api.items.nextUp, { now: Date.now(), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("suggests a recipe not looked at in the last week", async () => {
+    const t = await as("next-cook");
+    const recipeId = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-cook",
+        type: "link",
+        status: "ready",
+        title: "Lasagna page",
+        url: "https://example.com/lasagna",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "lasagna",
+      }),
+    );
+    const now = later(10);
+    await markOpened(t, "next-cook", recipeId, now - 2 * DAY);
+    await expect(
+      t.query(api.items.nextUp, { now, skip: [] }),
+    ).resolves.toBeNull();
+
+    await t.run(async (ctx) => {
+      const read = await ctx.db
+        .query("itemReads")
+        .withIndex("by_user_and_item", (q) =>
+          q.eq("userId", "next-cook").eq("itemId", recipeId),
+        )
+        .unique();
+      await ctx.db.patch(read!._id, { lastOpenedAt: now - 8 * DAY });
+    });
+    const next = await t.query(api.items.nextUp, { now, skip: [] });
+    expect(next?.kind).toBe("cook");
+    expect(next?.item._id).toBe(recipeId);
+  });
+
+  it("moves on to the next save when told to skip one", async () => {
+    const t = await as("next-skip");
+    const ids = await seedFeed(t, "next-skip", 3);
+
+    const next = await t.query(api.items.nextUp, {
+      now: later(2),
+      skip: [ids[2]],
+    });
+    expect(next?.item._id).toBe(ids[1]);
+  });
+
+  it("names a recipe by its dish", async () => {
+    const t = await as("next-dish");
+    await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: "next-dish",
+        type: "link",
+        status: "ready",
+        url: "https://example.com/dish",
+        recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
+        tags: [],
+        searchText: "dish",
+      }),
+    );
+    const next = await t.query(api.items.nextUp, {
+      now: later(4),
+      skip: [],
+    });
+    expect(next?.subject).toBe("Lasagna");
+  });
+
+  it("suggests nothing without Pro", async () => {
+    const t = newConvexTest().withIdentity({
+      subject: "next-free|session-1",
+    });
+    await seedFeed(t, "next-free", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
+  });
+
+  it("never suggests another account's saves", async () => {
+    const t = await as("next-owner");
+    await seedFeed(t, "someone-else", 2);
+
+    await expect(
+      t.query(api.items.nextUp, { now: later(2), skip: [] }),
+    ).resolves.toBeNull();
+  });
+});
+
 describe("listLocatedItems", () => {
   it("returns only the caller's photos that carry coordinates", async () => {
     const t = await as("map-user");
@@ -3305,6 +3445,35 @@ describe("share links", () => {
     });
   });
 
+  it("names the sender by first name only", async () => {
+    const base = newConvexTest();
+    const named = await base.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "  Ashish Huddar ",
+        email: "a@example.com",
+      }),
+    );
+    const unnamed = await base.run((ctx) => ctx.db.insert("users", {}));
+    // Apple sign-in with the name withheld: the email stands in as the name.
+    const emailOnly = await base.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "private@privaterelay.appleid.com",
+        email: "private@privaterelay.appleid.com",
+      }),
+    );
+    const previewFor = async (userId: string) => {
+      const t = base.withIdentity({ subject: `${userId}|session-1` });
+      await seedPro(t, userId);
+      const itemId = await seedItem(t, userId);
+      const token = await t.mutation(api.items.createShareLink, { itemId });
+      return await t.query(internal.items.getSharePreview, { token: token! });
+    };
+
+    expect((await previewFor(named))?.senderName).toBe("Ashish");
+    expect((await previewFor(unnamed))?.senderName).toBeUndefined();
+    expect((await previewFor(emailOnly))?.senderName).toBeUndefined();
+  });
+
   it("does not treat an item id as a token", async () => {
     const t = await as("share-user");
     const itemId = await seedItem(t, "share-user");
@@ -3339,6 +3508,120 @@ describe("share links", () => {
     await expect(
       other.mutation(api.items.createShareLink, { itemId }),
     ).rejects.toThrow("Item not found");
+  });
+
+  it("withdraws a link minted for a share the owner then cancelled", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+
+    // Settling with no link left is a no-op, and a later share mints anew.
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    const next = await t.mutation(api.items.createShareLink, { itemId });
+    expect(next).toMatch(/^[0-9a-f]{32}$/);
+    expect(next).not.toBe(token);
+  });
+
+  it("keeps a link an older build already handed out when a later share is cancelled", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    // An older build mints and shares without ever settling.
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("keeps a link the owner really shared when a later share is cancelled", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+    expect(await t.mutation(api.items.createShareLink, { itemId })).toBe(token);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("keeps a link from a client that never reports, when a share is cancelled", async () => {
+    const t = await as("share-old-user");
+    const itemId = await seedItem(t, "share-old-user");
+    // An app version from before settling shared this link for real.
+    const token = await t.mutation(api.items.createShareLink, { itemId });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("withdraws a cancelled link however late the cancel arrives", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const now = new Date("2026-10-08T12:00:00Z").getTime();
+    // convex-test anchors its clock at a context's first write, so the link
+    // has to be minted before the clock moves on.
+    vi.setSystemTime(now - 3 * 60 * 60 * 1000);
+    const t = newConvexTest().withIdentity({
+      subject: "share-late-user|session-1",
+    });
+    const itemId = await seedItem(t, "share-late-user");
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+
+    // The sheet sat open, or the report waited out a spell offline.
+    vi.setSystemTime(now);
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).toBeNull();
+  });
+
+  it("stops treating a link as this attempt's once it has gone out", async () => {
+    const t = await as("share-user");
+    const itemId = await seedItem(t, "share-user");
+    const token = await t.mutation(api.items.createShareLink, {
+      itemId,
+      settles: true,
+    });
+    await t.mutation(api.items.settleShareLink, { itemId, shared: true });
+
+    await t.mutation(api.items.settleShareLink, { itemId, shared: false });
+    expect(
+      await t.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
+  });
+
+  it("does not let another user settle a link", async () => {
+    const backend = newConvexTest();
+    const owner = backend.withIdentity({ subject: "share-owner|session-1" });
+    const other = backend.withIdentity({ subject: "share-other|session-1" });
+    const itemId = await seedItem(owner, "share-owner");
+    const token = await owner.mutation(api.items.createShareLink, { itemId });
+
+    await expect(
+      other.mutation(api.items.settleShareLink, { itemId, shared: false }),
+    ).rejects.toThrow("Item not found");
+    expect(
+      await owner.query(internal.items.getSharePreview, { token: token! }),
+    ).not.toBeNull();
   });
 
   it("stops serving the preview once the item is deleted", async () => {

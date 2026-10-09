@@ -235,6 +235,9 @@ export function NotificationsStep({
           onPress={skip}
           disabled={busy}
         />
+        {/* The same permission also lets save reminders arrive, so the screen
+            says so before the OS asks. */}
+        <Text style={styles.consent}>{t("onboarding.remindConsent")}</Text>
       </View>
     </View>
   );
@@ -293,6 +296,13 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     color: theme.colors.foreground,
     marginBottom: theme.gap(0.5),
+  },
+  consent: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
   },
   foot: {
     marginTop: "auto",

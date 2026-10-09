@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="September 19, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="October 8, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">1. The service</h2>
         <p className="mt-2">
@@ -24,7 +24,7 @@ export default function TermsPage() {
         <p className="mt-2">
           You must provide accurate information and keep your account secure.
           You are responsible for activity under your account. You must be at
-          least 13 years old to use Shelvr.
+          least 18 years old to use Shelvr.
         </p>
       </section>
 
@@ -73,11 +73,24 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-ink text-lg">6. Termination</h2>
+        <h2 className="font-semibold text-ink text-lg">
+          6. Copyright and takedown
+        </h2>
         <p className="mt-2">
-          You can stop using Shelvr and delete your account from Profile in the
-          app at any time. Deleting your Shelvr account removes your saves and
-          sign-in identity from our backend (see the Privacy Policy for how
+          If you believe content on a Shelvr share page infringes your copyright
+          or is otherwise abusive, email <strong>{SUPPORT_EMAIL}</strong>.
+          Include the address of the page, what the content is, why you believe
+          it is infringing or abusive, and how to reach you. We remove reported
+          share pages promptly.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">7. Termination</h2>
+        <p className="mt-2">
+          You can stop using Shelvr and delete your account under Settings in
+          the app at any time. Deleting your Shelvr account removes your saves
+          and sign-in identity from our backend (see the Privacy Policy for how
           third-party analytics data is handled); it does not cancel an App
           Store subscription. We may suspend or terminate accounts that violate
           these terms.
@@ -85,7 +98,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-ink text-lg">7. Disclaimers</h2>
+        <h2 className="font-semibold text-ink text-lg">8. Disclaimers</h2>
         <p className="mt-2">
           Shelvr is provided &ldquo;as is.&rdquo; AI-generated titles, tags, and
           classifications can be wrong. To the maximum extent permitted by law,
@@ -95,7 +108,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-ink text-lg">8. Changes</h2>
+        <h2 className="font-semibold text-ink text-lg">9. Changes</h2>
         <p className="mt-2">
           We may update these terms; material changes will be posted on this
           page with an updated date. Continuing to use Shelvr after changes take
@@ -104,7 +117,7 @@ export default function TermsPage() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-ink text-lg">9. Contact</h2>
+        <h2 className="font-semibold text-ink text-lg">10. Contact</h2>
         <p className="mt-2">
           Questions: <strong>{SUPPORT_EMAIL}</strong>
         </p>

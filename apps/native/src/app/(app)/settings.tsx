@@ -1,3 +1,4 @@
+import { AiConsentSetting } from "@/components/ai-consent";
 import { LegalConsentPreference } from "@/components/legal-consent";
 import { UpdateSetting } from "@/components/update-setting";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -6,9 +7,10 @@ import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { restorePurchases } from "@/lib/entitlement";
+import { restorePurchases, useEntitlement } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
+import { manageSubscription } from "@/lib/manage-subscription";
 import { useNotificationSession } from "@/lib/notifications";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -44,6 +46,11 @@ export default function SettingsScreen() {
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
+  const { status: entitlementStatus } = useEntitlement();
+  // Deleting the account leaves a store subscription running, so a current
+  // subscriber gets a way to cancel it from the confirmation itself.
+  const hasLiveSubscription =
+    entitlementStatus === "trialing" || entitlementStatus === "pro";
   const [restoring, setRestoring] = useState(false);
   const [resettingFixtures, setResettingFixtures] = useState(false);
   const fixtureResetEnabled = isAnonymousAuthEnabled();
@@ -149,6 +156,17 @@ export default function SettingsScreen() {
       ].join("\n"),
       [
         { text: t("common.cancel"), style: "cancel" },
+        ...(hasLiveSubscription
+          ? [
+              {
+                text: t("pro.manage"),
+                // Settings sits on the Profile sheet, and Customer Center
+                // presents only once both are gone.
+                onPress: () =>
+                  void manageSubscription(() => router.dismissAll()),
+              },
+            ]
+          : []),
         {
           text: t("account.delete"),
           style: "destructive",
@@ -262,6 +280,8 @@ export default function SettingsScreen() {
       />
 
       <UpdateSetting />
+
+      <AiConsentSetting />
 
       <LegalConsentPreference />
 

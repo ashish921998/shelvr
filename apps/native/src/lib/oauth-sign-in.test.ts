@@ -44,6 +44,9 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture, captureError: mock.captureError },
 }));
 
+const disclosed = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/ai-consent", () => ({ markAiDisclosedAtSignIn: disclosed }));
+
 const redirect = new URL("https://auth.example/start");
 
 beforeEach(() => {
@@ -80,6 +83,12 @@ function captured(event: string) {
 }
 
 describe("useOAuthSignIn", () => {
+  it("notes that the sign-in started from a screen with the AI disclosure", async () => {
+    mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+    await run("google");
+    expect(disclosed).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a cancel visible and times it", async () => {
     mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
     endSession({ type: "cancel" });
