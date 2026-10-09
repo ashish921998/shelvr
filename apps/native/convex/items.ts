@@ -2176,7 +2176,12 @@ export const deleteItem = mutation({
  * shares it and reused after. Null when the item has no preview to show (not
  * ready, or an image, which shares its file instead). */
 export const createShareLink = mutation({
-  args: { itemId: v.id("items") },
+  args: {
+    itemId: v.id("items"),
+    // Sent by clients that call `settleShareLink` once the sheet closes.
+    // Without it the link is taken as handed out and is never withdrawn.
+    settles: v.optional(v.boolean()),
+  },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -2194,8 +2199,11 @@ export const createShareLink = mutation({
       // A link that outlived an earlier share attempt may already be in
       // someone's hands (older builds never confirm), so a cancel of this
       // attempt must not withdraw it.
-      if (existing.confirmedAt === undefined) {
-        await ctx.db.patch(existing._id, { confirmedAt: Date.now() });
+      if (existing.confirmedAt === undefined || existing.pending === true) {
+        await ctx.db.patch(existing._id, {
+          confirmedAt: existing.confirmedAt ?? Date.now(),
+          pending: undefined,
+        });
       }
       return existing.token;
     }
@@ -2205,19 +2213,22 @@ export const createShareLink = mutation({
     const token = Array.from(bytes, (b) =>
       b.toString(16).padStart(2, "0"),
     ).join("");
-    await ctx.db.insert("shareLinks", { token, userId, itemId: item._id });
+    await ctx.db.insert("shareLinks", {
+      token,
+      userId,
+      itemId: item._id,
+      ...(args.settles === true ? { pending: true } : {}),
+    });
     return token;
   },
 });
 
-// A cancelled share may only take back the link it just minted. Links from
-// app versions that never confirm a share look unconfirmed forever, so an old
-// one must survive a later cancelled share.
-const UNCONFIRMED_SHARE_LINK_GRACE_MS = 10 * 60 * 1000;
-
 /** Reports how the share sheet ended for a link minted just before it opened.
- * A completed share confirms the item's link for good; a cancelled one
- * withdraws the link only if it was never confirmed and is fresh. */
+ * A completed share confirms the item's link for good. A cancelled one
+ * withdraws the link this attempt minted, however late the report arrives:
+ * the link carries `pending` from the mint until a report clears it, so
+ * nothing is inferred from its age. A link with no `pending` mark was minted
+ * by a client that never reports, or has already gone out, and stays. */
 export const settleShareLink = mutation({
   args: { itemId: v.id("items"), shared: v.boolean() },
   returns: v.null(),
@@ -2227,18 +2238,19 @@ export const settleShareLink = mutation({
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
     }
-    const now = Date.now();
     const links = await ctx.db
       .query("shareLinks")
       .withIndex("by_item", (q) => q.eq("itemId", item._id))
       .take(10);
     for (const link of links) {
-      if (link.confirmedAt !== undefined) {
-        continue;
-      }
       if (args.shared) {
-        await ctx.db.patch(link._id, { confirmedAt: now });
-      } else if (now - link._creationTime <= UNCONFIRMED_SHARE_LINK_GRACE_MS) {
+        if (link.confirmedAt === undefined || link.pending === true) {
+          await ctx.db.patch(link._id, {
+            confirmedAt: link.confirmedAt ?? Date.now(),
+            pending: undefined,
+          });
+        }
+      } else if (link.pending === true && link.confirmedAt === undefined) {
         await ctx.db.delete(link._id);
       }
     }
