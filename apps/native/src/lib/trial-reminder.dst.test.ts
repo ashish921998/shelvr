@@ -6,7 +6,9 @@ import { trialLastDayAt } from "./trial-reminder";
 // changes its clocks and restores the original zone after.
 const originalTz = process.env.TZ;
 afterAll(() => {
-  process.env.TZ = originalTz;
+  // Assigning undefined would set the string "undefined".
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
 });
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
