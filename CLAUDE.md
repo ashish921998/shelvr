@@ -275,6 +275,12 @@ When editing anything in `convex/`, prefer the `convex-expert` skill — object-
   - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS` — optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
     to show the passwordless dev-login button and fixture reset on development builds
     (release-mode included); preview and production builds never show either
+  - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` — optional, the deployment's `AUTH_GOOGLE_ID`. Set, Android
+    Google sign-in shows the native account sheet (`modules/google-id-token`, Credential Manager)
+    and signs in through the `google-id-token` provider in `convex/model/googleIdToken.ts`, onto
+    the same `google` account row the browser flow writes. Unset, or where the sheet cannot show,
+    it opens the browser. The Android OAuth client for each package and signing SHA-1 lives in
+    Google Cloud
   - `EXPO_PUBLIC_REVENUECAT_TEST_KEY` — RevenueCat Development Test Store key used by
     non-production debug builds only; release-mode dev and preview builds skip RevenueCat
     configuration because the SDK rejects test keys outside debug. `app.config.js` pins it

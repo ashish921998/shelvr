@@ -30,6 +30,7 @@ type Env = {
   readonly APPLE_REVOKE_PRIVATE_KEY: string | undefined;
   readonly APPLE_REVOKE_TEAM_ID: string | undefined;
   readonly AUTH_ENABLE_ANONYMOUS: string | undefined;
+  readonly AUTH_GOOGLE_ID: string | undefined;
   readonly GOOGLE_GENERATIVE_AI_API_KEY: string;
   readonly OBSERVABILITY_ENV: string | undefined;
   readonly POSTHOG_HOST: string | undefined;

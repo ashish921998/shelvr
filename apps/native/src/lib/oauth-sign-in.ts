@@ -5,6 +5,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import Constants from "expo-constants";
 import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
+import { googleIdToken } from "google-id-token";
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 
@@ -38,9 +39,65 @@ const oauthRedirectTo = preferUniversalLinks
 
 export type OAuthProvider = "apple" | "google" | "anonymous";
 
+/**
+ * Android's Google account sheet: Credential Manager hands back a Google ID
+ * token that Convex verifies and signs in with, no browser. Resolves null when
+ * the person dismisses the sheet, and undefined when the sheet is not
+ * available (iOS, builds made before it shipped, no web client id, or no
+ * Google account on the phone), so the caller falls back to the browser.
+ */
+async function googleSheetIdToken(): Promise<string | null | undefined> {
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  if (googleIdToken === null || !webClientId) return undefined;
+  try {
+    return await googleIdToken.getIdToken(webClientId);
+  } catch (err) {
+    analytics.captureError("google_sheet_unavailable", err);
+    return undefined;
+  }
+}
+
 type OAuthSignInOutcome = "completed" | "cancelled" | "failed";
 
-type SignInStage = "request" | "browser" | "exchange";
+type SheetAttempt = {
+  provider: OAuthProvider;
+  surface: OAuthSurface;
+  auth_attempt_id: string;
+  startedAt: number;
+};
+
+/**
+ * Finishes a sign-in from the account sheet: a dismissed sheet is a cancel
+ * (no browser fallback, the person chose to back out), and a token is
+ * exchanged with Convex. Throws when the exchange does not sign in.
+ */
+async function signInWithSheet(
+  signIn: ReturnType<typeof useAuthActions>["signIn"],
+  idToken: string | null,
+  { startedAt, ...attempt }: SheetAttempt,
+): Promise<"completed" | "cancelled"> {
+  if (idToken === null) {
+    const elapsed = Date.now() - startedAt;
+    analytics.capture("auth_cancelled", {
+      ...attempt,
+      result: "dismiss",
+      elapsed_ms: elapsed,
+      browser_ms: elapsed,
+      method: "account_sheet",
+    });
+    return "cancelled";
+  }
+  const { signingIn } = await signIn("google-id-token", { idToken });
+  if (!signingIn) throw new Error("Google ID token did not sign in");
+  analytics.capture("auth_succeeded", {
+    ...attempt,
+    elapsed_ms: Date.now() - startedAt,
+    method: "account_sheet",
+  });
+  return "completed";
+}
+
+type SignInStage = "request" | "sheet" | "browser" | "exchange";
 
 /**
  * The native module resolves every failed auth session with the OS error in
@@ -106,6 +163,19 @@ export function useOAuthSignIn(surface: OAuthSurface) {
       const elapsedMs = () => Date.now() - startedAt;
       let stage: SignInStage = "request";
       try {
+        const idToken =
+          provider === "google" ? await googleSheetIdToken() : undefined;
+        if (idToken !== undefined) {
+          stage = "sheet";
+          const outcome = await signInWithSheet(signIn, idToken, {
+            provider,
+            surface,
+            auth_attempt_id: attemptId,
+            startedAt,
+          });
+          if (outcome === "cancelled") setInterrupted(true);
+          return outcome;
+        }
         // Convex Auth must persist the same return URI that the browser
         // session watches for; otherwise the provider callback can open
         // Shelvr without resolving this promise and the one-time code is

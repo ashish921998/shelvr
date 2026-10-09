@@ -109,12 +109,16 @@ type AnalyticsEventProperties = {
     // description they come from is not sent, because free-form error text is
     // redacted out of this project's telemetry on purpose.
     result: "cancel" | "dismiss";
+    // "account_sheet" marks Android's native Google account sheet; absent
+    // means the browser flow.
+    method?: "account_sheet";
     native_error_domain?: string;
     native_error_code?: number;
   };
   auth_failed: {
     provider: string;
-    stage: "request" | "browser" | "exchange";
+    // "sheet" is the exchange of an Android Google account sheet token.
+    stage: "request" | "sheet" | "browser" | "exchange";
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
@@ -126,6 +130,7 @@ type AnalyticsEventProperties = {
     elapsed_ms: number;
     surface: OAuthSurface;
     auth_attempt_id: string;
+    method?: "account_sheet";
   };
   auth_completed: Record<string, never>;
   // Widget snapshot and file cleanup completed, including signed-out startup

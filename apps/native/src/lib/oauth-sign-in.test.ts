@@ -11,6 +11,12 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   uuid: 0,
+  sheet: null as { getIdToken: ReturnType<typeof vi.fn> } | null,
+}));
+vi.mock("google-id-token", () => ({
+  get googleIdToken() {
+    return mock.sheet;
+  },
 }));
 vi.mock("react-native", () => ({ Platform: { OS: "android", Version: 35 } }));
 vi.mock("expo-constants", () => ({
@@ -39,7 +45,9 @@ const redirect = new URL("https://auth.example/start");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   mock.uuid = 0;
+  mock.sheet = null;
 });
 
 async function run(
@@ -278,6 +286,97 @@ describe("useOAuthSignIn", () => {
     expect(started[1].auth_attempt_id).toBe("attempt-2");
     expect(captured("auth_succeeded")).toMatchObject({
       auth_attempt_id: "attempt-1",
+    });
+  });
+
+  describe("Android Google account sheet", () => {
+    function withSheet(getIdToken: ReturnType<typeof vi.fn>) {
+      vi.stubEnv("EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID", "web-client");
+      mock.sheet = { getIdToken };
+    }
+
+    it("signs in with the sheet's ID token and skips the browser", async () => {
+      withSheet(vi.fn().mockResolvedValue("id-token"));
+      mock.signIn.mockResolvedValueOnce({ signingIn: true });
+
+      const { outcome } = await run("google");
+
+      expect(outcome).toBe("completed");
+      expect(mock.sheet?.getIdToken).toHaveBeenCalledWith("web-client");
+      expect(mock.signIn).toHaveBeenCalledExactlyOnceWith("google-id-token", {
+        idToken: "id-token",
+      });
+      expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
+      expect(captured("auth_succeeded")).toMatchObject({
+        provider: "google",
+        method: "account_sheet",
+      });
+    });
+
+    it("keeps a dismissed sheet visible as a cancel", async () => {
+      withSheet(vi.fn().mockResolvedValue(null));
+
+      const { hook, outcome } = await run("google");
+
+      expect(outcome).toBe("cancelled");
+      expect(hook.result.current.interrupted).toBe(true);
+      expect(mock.signIn).not.toHaveBeenCalled();
+      expect(captured("auth_cancelled")).toMatchObject({
+        method: "account_sheet",
+      });
+    });
+
+    it("reports a token Convex rejects as a sheet failure", async () => {
+      withSheet(vi.fn().mockResolvedValue("id-token"));
+      mock.signIn.mockResolvedValueOnce({ signingIn: false });
+
+      const { outcome } = await run("google");
+
+      expect(outcome).toBe("failed");
+      expect(captured("auth_failed")).toMatchObject({ stage: "sheet" });
+      expect(mock.openAuthSessionAsync).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the browser when the sheet cannot show", async () => {
+      withSheet(vi.fn().mockRejectedValue(new Error("no accounts")));
+      mock.signIn
+        .mockResolvedValueOnce({ signingIn: false, redirect })
+        .mockResolvedValueOnce({ signingIn: true });
+      mock.openAuthSessionAsync.mockResolvedValueOnce({
+        type: "success",
+        url: "shelvr://auth/callback?code=abc",
+      });
+
+      const { outcome } = await run("google");
+
+      expect(outcome).toBe("completed");
+      expect(mock.openAuthSessionAsync).toHaveBeenCalledOnce();
+      expect(mock.captureError).toHaveBeenCalledWith(
+        "google_sheet_unavailable",
+        expect.any(Error),
+      );
+      expect(captured("auth_succeeded")).not.toHaveProperty("method");
+    });
+
+    it("uses the browser when no web client id is configured", async () => {
+      mock.sheet = { getIdToken: vi.fn() };
+      mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+      mock.openAuthSessionAsync.mockResolvedValueOnce({ type: "cancel" });
+
+      await run("google");
+
+      expect(mock.sheet.getIdToken).not.toHaveBeenCalled();
+      expect(mock.openAuthSessionAsync).toHaveBeenCalledOnce();
+    });
+
+    it("leaves Apple on the browser flow", async () => {
+      withSheet(vi.fn());
+      mock.signIn.mockResolvedValueOnce({ signingIn: false, redirect });
+      mock.openAuthSessionAsync.mockResolvedValueOnce({ type: "cancel" });
+
+      await run("apple");
+
+      expect(mock.sheet?.getIdToken).not.toHaveBeenCalled();
     });
   });
 });

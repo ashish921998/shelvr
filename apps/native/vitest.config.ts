@@ -15,6 +15,9 @@ export default defineConfig({
       "recent-saves-widget": fileURLToPath(
         new URL("./modules/recent-saves-widget", import.meta.url),
       ),
+      "google-id-token": fileURLToPath(
+        new URL("./modules/google-id-token", import.meta.url),
+      ),
     },
   },
   test: {
