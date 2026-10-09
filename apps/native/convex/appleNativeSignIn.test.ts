@@ -287,6 +287,54 @@ describe("native Sign in with Apple", () => {
     });
   });
 
+  it("joins the user who already has that verified email from Google", async () => {
+    const backend = newConvexTest();
+    const googleUserId = await backend.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "person@example.com",
+        emailVerificationTime: Date.now(),
+      });
+      await ctx.db.insert("authAccounts", {
+        userId,
+        provider: "google",
+        providerAccountId: "google-1",
+      });
+      return userId;
+    });
+
+    await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+    });
+    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { users, accounts } = await tables(backend);
+    expect(users).toHaveLength(1);
+    expect(users[0]?._id).toBe(googleUserId);
+    expect(accounts.map((account) => account.provider).sort()).toEqual([
+      "apple",
+      "google",
+    ]);
+  });
+
+  it("makes a separate user when Apple has not verified the email", async () => {
+    const backend = newConvexTest();
+    await backend.run((ctx) =>
+      ctx.db.insert("users", {
+        email: "person@example.com",
+        emailVerificationTime: Date.now(),
+      }),
+    );
+
+    await signIn(backend, {
+      identityToken: await identityToken({ email_verified: false }),
+      nonce: NONCE,
+    });
+    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect((await tables(backend)).users).toHaveLength(2);
+  });
+
   it.each([
     ["a token for another app", () => identityToken({}, "app.shelvr.save.dev")],
     ["a token answering another nonce", () => identityToken({ nonce: "x" })],
