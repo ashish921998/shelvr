@@ -313,6 +313,32 @@ describe("restore from the paywall", () => {
   });
 });
 
+describe("trial eligibility for copy", () => {
+  const current = {
+    identifier: "default",
+    availablePackages: [{ product: { identifier: "annual" } }],
+  };
+
+  it.each([
+    ["eligible", 2, true],
+    ["ineligible", 1, false],
+    ["unknown", 0, false],
+  ])("an %s account reads %s", async (_label, status, expected) => {
+    mock.getOfferings.mockResolvedValue({ current, all: {} });
+    mock.checkEligibility.mockResolvedValue({ annual: { status } });
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(expected);
+  });
+
+  it("reads no when the store cannot be reached", async () => {
+    mock.getOfferings.mockRejectedValue(new Error("offline"));
+    const { readTrialEligible } = await loadReady();
+
+    await expect(readTrialEligible()).resolves.toBe(false);
+  });
+});
+
 describe("customer center latch", () => {
   it("refuses the Customer Center while a paywall is live", async () => {
     const { openPaywall, presentCustomerCenter } = await loadReady();

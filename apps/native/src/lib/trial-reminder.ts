@@ -22,10 +22,11 @@ import { Platform } from "react-native";
  * trial feel safe. It is scheduled on the device, so it works without the
  * weekly shelf opt-in or a push token, and it ships over the air.
  *
- * Two earlier nudges ride along with it: day 1 asks for the next save and day
- * 3 points back to the shelf. Trials that ended in cancellation mostly held a
- * single save, so the week has to show the app doing something before the
- * day-5 reminder asks the user to decide.
+ * Two earlier nudges go out only to a user who has Save reminders on: day 1
+ * asks for the next save and day 3 points back to the shelf. Trials that ended
+ * in cancellation mostly held a single save, so the week has to show the app
+ * doing something before the day-5 reminder asks the user to decide. The
+ * primer promises the billing reminder alone, so its yes does not cover them.
  *
  * The decision itself mostly happens on the last day, so one more reminder
  * goes out the day before the trial ends, while cancelling still avoids the
@@ -96,10 +97,18 @@ export function trialReminderAt(expiresAt: number, now: number): number | null {
  */
 export function trialLastDayAt(expiresAt: number, now: number): number | null {
   const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
+  const ends = new Date(expiresAt);
   const dayBefore = new Date(expiresAt);
   dayBefore.setDate(dayBefore.getDate() - 1);
   if (at.toDateString() !== dayBefore.toDateString()) return null;
-  if (at.getHours() < NUDGE_EARLIEST_HOUR) return null;
+  // A trial ending at 11 am or later always gets one. The night clocks
+  // spring forward, 25 hours before an 11 am end reads 9 am, so the morning
+  // cutoff gives way there rather than skip the reminder.
+  if (
+    at.getHours() < NUDGE_EARLIEST_HOUR &&
+    ends.getHours() < NUDGE_EARLIEST_HOUR + 1
+  )
+    return null;
   if (at.getHours() >= NUDGE_LATEST_HOUR)
     at.setHours(NUDGE_LATEST_HOUR, 0, 0, 0);
   const fireAt = at.getTime();
@@ -128,16 +137,16 @@ export function trialNudgeAt(
 }
 
 /**
- * The nudges follow the Save reminders switch in Profile. `getPreferences`
- * reports reminders off both for a user who turned them off and for one with
- * no preferences row yet (no device ever registered), and only the first is
- * an opt-out. A row always carries a timezone, so that tells them apart.
+ * The nudges are opt-in: they follow the Save reminders switch in Settings.
+ * `getPreferences` reports reminders off for a user with no preferences row
+ * (no device ever registered), and that user never agreed to them, so a
+ * missing row means no. The trial primer asks only about the billing
+ * reminder, and its grant must not carry marketing nudges along.
  */
 export function trialNudgesAllowed(preferences: {
   remindersEnabled: boolean;
-  timezone: string | null;
 }): boolean {
-  return preferences.remindersEnabled || preferences.timezone === null;
+  return preferences.remindersEnabled;
 }
 
 // The last-day reminder rides along: every path that clears the nudges
@@ -377,6 +386,17 @@ async function cancelTrialReminder(): Promise<void> {
   // A reminder already delivered is wrong once the trial converts or ends.
   await Notifications.dismissNotificationAsync(TRIAL_REMINDER_ID);
   await Notifications.dismissNotificationAsync(TRIAL_LAST_DAY_ID);
+}
+
+/**
+ * Sign-out and account deletion: nothing about this account's trial may
+ * arrive once it has left the device. The hook below clears on a status
+ * change, but it unmounts with the signed-in screens before it sees one.
+ */
+export async function clearTrialReminder(): Promise<void> {
+  await serial(cancelTrialReminder).catch((error) =>
+    analytics.captureError("trial_reminder_cancel_failed", error),
+  );
 }
 
 /**

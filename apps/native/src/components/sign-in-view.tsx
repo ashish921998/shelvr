@@ -133,6 +133,7 @@ export function SignInView({
         </View>
       </View>
 
+      <Text style={styles.terms}>{t("aiConsent.signInNote")}</Text>
       <Text style={styles.terms}>
         {t("legal.consent", {
           terms: "\uE000",

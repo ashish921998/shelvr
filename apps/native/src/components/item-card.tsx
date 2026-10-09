@@ -16,7 +16,12 @@ import { Link, useRouter } from "expo-router";
 import { Alert, Pressable, Share } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-import { shareRefOf, shareUrl, useShareLink } from "@/lib/share-link";
+import {
+  shareRefOf,
+  shareUrl,
+  useSettleShareLink,
+  useShareLink,
+} from "@/lib/share-link";
 
 export type { FeedItem } from "@/components/item-card-face";
 
@@ -106,11 +111,15 @@ export const ItemCard = memo(function ItemCard({
   const changeSpaces = () =>
     router.push({ pathname: "/manage-spaces", params: { itemId: item._id } });
   const shareLink = useShareLink();
+  const settleShareLink = useSettleShareLink();
   const share = async () => {
     if (!item.url) return;
+    let link: string | undefined;
+    let shared = false;
     try {
-      const link = item.type === "link" ? await shareLink(item._id) : undefined;
+      link = item.type === "link" ? await shareLink(item._id) : undefined;
       const result = await shareUrl(link ?? item.url);
+      shared = result.action === Share.sharedAction;
       if (result.action === Share.sharedAction) {
         const shareRef = await shareRefOf(link);
         analytics.capture("item_shared", {
@@ -130,6 +139,7 @@ export const ItemCard = memo(function ItemCard({
     } catch {
       // A dismissed or failed share is not a completed action.
     }
+    if (link !== undefined) settleShareLink(item._id, shared);
   };
 
   // What a screen reader reads instead of the card's contents. The classifier

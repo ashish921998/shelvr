@@ -872,6 +872,21 @@ export async function readRcTrialCancellation(): Promise<TrialCancellationState>
   return await readFreshTrialCancellation(rc);
 }
 
+/**
+ * Whether the signed-in account can still start the free trial on the current
+ * offering, for copy that promises one. True only on RevenueCat's "eligible":
+ * a pending identity sync, a failed read or an unknown answer all read as no,
+ * so nobody who already used the trial is told they will get it.
+ */
+export async function readTrialEligible(): Promise<boolean> {
+  if (!(await awaitRcSyncReady())) return false;
+  try {
+    return (await readPaywallContext()).trial_eligible === "eligible";
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Paywall guard
 // ---------------------------------------------------------------------------

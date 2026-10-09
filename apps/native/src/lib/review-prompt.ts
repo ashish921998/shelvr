@@ -43,9 +43,15 @@ export function useReviewPrompt(
   // in between ends the moment, so the ask never lands long after the win.
   const cameFromSave = useRef(false);
   const [returned, setReturned] = useState(false);
+  // One try per return. An attempt that ran and was held back (no review
+  // action, a paywall, the keyboard) ends the moment: a later change on the
+  // same visit to Home, like another save landing, is no longer the win.
+  const spent = useRef(false);
   useEffect(() => {
-    if (home) setReturned(cameFromSave.current);
-    else cameFromSave.current = onSave;
+    if (home) {
+      spent.current = false;
+      setReturned(cameFromSave.current);
+    } else cameFromSave.current = onSave;
   }, [onSave, home]);
   const homeRef = useRef(home);
   useEffect(() => {
@@ -65,6 +71,7 @@ export function useReviewPrompt(
   useEffect(() => {
     if (
       !returned ||
+      spent.current ||
       !home ||
       defer ||
       keyboardVisible ||
@@ -120,8 +127,12 @@ export function useReviewPrompt(
       } finally {
         // A cancelled attempt's cleanup already released the hold, and a
         // newer attempt may own it now. A suppressed one (no review action,
-        // keyboard up, paywall) recorded nothing, so a later change retries.
-        if (!cancelled) setNativeReviewAttemptInFlight(false);
+        // keyboard up, paywall) recorded nothing, so the next return from a
+        // save retries.
+        if (!cancelled) {
+          spent.current = true;
+          setNativeReviewAttemptInFlight(false);
+        }
       }
     }
   }, [items, returned, home, defer, keyboardVisible, appState]);

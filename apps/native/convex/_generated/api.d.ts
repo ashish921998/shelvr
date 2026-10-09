@@ -10,9 +10,11 @@
 
 import type * as accountTelemetry from "../accountTelemetry.js";
 import type * as ai from "../ai.js";
+import type * as aiConsent from "../aiConsent.js";
 import type * as analytics from "../analytics.js";
 import type * as appIntents from "../appIntents.js";
 import type * as appleProfile from "../appleProfile.js";
+import type * as appleRevoke from "../appleRevoke.js";
 import type * as auth from "../auth.js";
 import type * as cancelSurvey from "../cancelSurvey.js";
 import type * as crons from "../crons.js";
@@ -25,7 +27,9 @@ import type * as items from "../items.js";
 import type * as legalConsent from "../legalConsent.js";
 import type * as legalConsentSync from "../legalConsentSync.js";
 import type * as model_accountCreated from "../model/accountCreated.js";
+import type * as model_aiConsent from "../model/aiConsent.js";
 import type * as model_appleJws from "../model/appleJws.js";
+import type * as model_appleTokens from "../model/appleTokens.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
 import type * as model_captureRequest from "../model/captureRequest.js";
@@ -83,9 +87,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountTelemetry: typeof accountTelemetry;
   ai: typeof ai;
+  aiConsent: typeof aiConsent;
   analytics: typeof analytics;
   appIntents: typeof appIntents;
   appleProfile: typeof appleProfile;
+  appleRevoke: typeof appleRevoke;
   auth: typeof auth;
   cancelSurvey: typeof cancelSurvey;
   crons: typeof crons;
@@ -98,7 +104,9 @@ declare const fullApi: ApiFromModules<{
   legalConsent: typeof legalConsent;
   legalConsentSync: typeof legalConsentSync;
   "model/accountCreated": typeof model_accountCreated;
+  "model/aiConsent": typeof model_aiConsent;
   "model/appleJws": typeof model_appleJws;
+  "model/appleTokens": typeof model_appleTokens;
   "model/auth": typeof model_auth;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
   "model/captureRequest": typeof model_captureRequest;

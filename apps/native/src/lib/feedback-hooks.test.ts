@@ -272,7 +272,7 @@ describe("useReviewPrompt", () => {
     ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
   });
 
-  it("records nothing when a guard fails after hasAction() resolves, and retries later", async () => {
+  it("records nothing when a guard fails after hasAction() resolves, and retries on the next return from a save", async () => {
     let items = threeReady();
     // A paywall opens while hasAction() is in flight.
     mock.hasAction.mockImplementationOnce(async () => {
@@ -288,14 +288,40 @@ describe("useReviewPrompt", () => {
     expect(mock.secure.has(PROMPTED_KEY)).toBe(false);
     expect(mock.markNativeReviewPrompted).not.toHaveBeenCalled();
 
-    // The paywall closes and the feed changes: the attempt runs again.
+    // The paywall closes and another save lands while Home stays up. That is
+    // no longer the moment of the save, so nothing is asked.
     mock.paywallPending = false;
     items = [...items, item()];
+    react.rerender();
+    await flush();
+    expect(mock.hasAction).toHaveBeenCalledOnce();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+
+    // The next return from a save is a fresh moment: the attempt runs again.
+    mock.segments = ["(app)", "item", "[id]"];
+    react.rerender();
+    mock.segments = ["(app)", "(tabs)", "(home)"];
     react.rerender();
     await flush();
     expect(mock.requestReview).toHaveBeenCalledOnce();
     expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
     expect(mock.markNativeReviewPrompted).toHaveBeenCalledOnce();
+  });
+
+  it("asks nothing when a save lands later on the visit that had no review action", async () => {
+    let items = threeReady();
+    mock.hasAction.mockResolvedValueOnce(false);
+    mountFiled(
+      () => items,
+      (feed) => useReviewPrompt(feed),
+    );
+    await flush();
+    items = [...items, item()];
+    react.rerender();
+    await flush();
+    expect(mock.hasAction).toHaveBeenCalledOnce();
+    expect(mock.requestReview).not.toHaveBeenCalled();
+    expect(isNativeReviewAttemptInFlight()).toBe(false);
   });
 
   it("records nothing when the platform has no review action", async () => {

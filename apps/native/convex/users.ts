@@ -1,12 +1,19 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireUserId } from "./model/auth";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
+import { appleTokenId } from "./model/appleTokens";
+import { logEvent } from "./model/log";
 
 /**
  * Returns the currently signed-in user's id and email, or `null` when
@@ -51,6 +58,8 @@ export const getCurrentUser = query({
  *  - onboardingDemos (the demo allowance row and its item reference)
  *  - subscriptions
  *  - cancelSurveys (the one-time cancel-survey ask row)
+ *  - aiConsents (the AI processing answer)
+ *  - appleTokens (the Sign in with Apple refresh token, revoked with Apple)
  *  - feedbackSubmissions (in-app feedback rows and their messages)
  *  - Convex Auth sessions, refresh tokens, accounts, and the users row
  *
@@ -70,7 +79,63 @@ export const deleteCurrentUserAccount = mutation({
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     await revoke(ctx, userId, true);
+    await scheduleAppleRevoke(ctx, userId);
     await deleteAccountBatch(ctx, userId);
+    return null;
+  },
+});
+
+const APPLE_TOKEN_MAX_LIFE_MS = 60 * 60_000;
+
+/** Apple requires an app that offers Sign in with Apple to revoke the user's
+ * token when the account is deleted. The job gets the token row's id, not the
+ * token: job arguments stay readable in the dashboard long after they run.
+ * The row is the one thing this deletion leaves behind, and the job removes
+ * it once Apple has answered or the attempts run out. */
+async function scheduleAppleRevoke(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const tokenId = await appleTokenId(ctx, userId);
+  if (tokenId !== null) {
+    await ctx.scheduler.runAfter(0, internal.appleRevoke.revoke, { tokenId });
+    // The action normally removes the row itself. A scheduled mutation is
+    // the guarantee: it runs even if the action died before cleaning up, and
+    // it is set past the action's last retry.
+    await ctx.scheduler.runAfter(
+      APPLE_TOKEN_MAX_LIFE_MS,
+      internal.users.forgetAppleToken,
+      { tokenId },
+    );
+    return;
+  }
+  const appleAccount = await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) =>
+      q.eq("userId", userId).eq("provider", "apple"),
+    )
+    .first();
+  if (appleAccount !== null) {
+    logEvent("info", "apple_revoke_skipped", { code: "no_token" });
+  }
+}
+
+/** The refresh token the revoke job was pointed at, or null once it is gone. */
+export const appleTokenForRevoke = internalQuery({
+  args: { tokenId: v.id("appleTokens") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) =>
+    (await ctx.db.get(args.tokenId))?.refreshToken ?? null,
+});
+
+/** Drops the token row once the revoke job has no further use for it. */
+export const forgetAppleToken = internalMutation({
+  args: { tokenId: v.id("appleTokens") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if ((await ctx.db.get(args.tokenId)) !== null) {
+      await ctx.db.delete(args.tokenId);
+    }
     return null;
   },
 });
@@ -221,6 +286,8 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(sub._id);
   }
 
+  await deleteAiConsent(ctx, userKey);
+
   // The cancel-survey ask row is user-owned state; drain it with the rest.
   const survey = await ctx.db
     .query("cancelSurveys")
@@ -230,6 +297,19 @@ async function deleteUserOwnedDataBatch(
     await ctx.db.delete(survey._id);
   }
   return true;
+}
+
+async function deleteAiConsent(
+  ctx: MutationCtx,
+  userKey: string,
+): Promise<void> {
+  const row = await ctx.db
+    .query("aiConsents")
+    .withIndex("by_user", (q) => q.eq("userId", userKey))
+    .unique();
+  if (row !== null) {
+    await ctx.db.delete(row._id);
+  }
 }
 
 /** Deletes up to one batch each of the user's weekly digests and save
