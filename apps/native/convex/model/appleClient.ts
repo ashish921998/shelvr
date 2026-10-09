@@ -66,7 +66,12 @@ export async function exchangeAuthorizationCode(config: {
   privateKey: string;
   keyId: string;
   teamId: string;
-}): Promise<{ refreshToken: string | null; status?: number }> {
+}): Promise<{
+  refreshToken: string | null;
+  /** Names the Apple account the code, and so the refresh token, belongs to. */
+  identityToken: string | null;
+  status?: number;
+}> {
   const { code, ...signing } = config;
   const response = await fetch(TOKEN_URL, {
     method: "POST",
@@ -79,11 +84,16 @@ export async function exchangeAuthorizationCode(config: {
     }).toString(),
     signal: AbortSignal.timeout(8_000),
   });
-  if (!response.ok) return { refreshToken: null, status: response.status };
-  const body = (await response.json()) as { refresh_token?: unknown };
+  if (!response.ok)
+    return { refreshToken: null, identityToken: null, status: response.status };
+  const body = (await response.json()) as {
+    refresh_token?: unknown;
+    id_token?: unknown;
+  };
   return {
     refreshToken:
       typeof body.refresh_token === "string" ? body.refresh_token : null,
+    identityToken: typeof body.id_token === "string" ? body.id_token : null,
     status: response.status,
   };
 }

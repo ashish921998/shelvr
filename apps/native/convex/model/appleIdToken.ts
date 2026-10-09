@@ -10,7 +10,13 @@
  * unchanged, so the claim must equal the hash of the value received. A token
  * that leaks on its own cannot be replayed without the value behind it.
  */
-import { createLocalJWKSet, errors, jwtVerify, type JSONWebKeySet } from "jose";
+import {
+  createLocalJWKSet,
+  errors,
+  jwtVerify,
+  type JSONWebKeySet,
+  type JWTPayload,
+} from "jose";
 
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys";
@@ -67,6 +73,43 @@ function failureOf(error: unknown): AppleIdTokenFailure {
   return "invalid";
 }
 
+/** Checks Apple's signature, issuer, audience and expiry, and nothing else. */
+async function signedClaims(
+  identityToken: string,
+  audiences: string[],
+  keys: AppleKeySource,
+): Promise<JWTPayload & { sub: string }> {
+  const keySet = createLocalJWKSet(await keys());
+  const { payload } = await jwtVerify(identityToken, keySet, {
+    issuer: APPLE_ISSUER,
+    audience: audiences,
+    algorithms: ["RS256"],
+    requiredClaims: ["sub", "exp"],
+  }).catch((error: unknown) => {
+    throw new AppleIdTokenError(failureOf(error));
+  });
+  if (typeof payload.sub !== "string" || payload.sub === "")
+    throw new AppleIdTokenError("invalid");
+  return { ...payload, sub: payload.sub };
+}
+
+/**
+ * The Apple account an identity token from Apple's own token endpoint names.
+ * That token answers a code exchange, not a sign-in the app started, so there
+ * is no nonce of ours to hold it to; the signature and audience still are.
+ */
+export async function appleTokenSubject({
+  identityToken,
+  audience,
+  keys = fetchAppleKeys,
+}: {
+  identityToken: string;
+  audience: string;
+  keys?: AppleKeySource;
+}): Promise<string> {
+  return (await signedClaims(identityToken, [audience], keys)).sub;
+}
+
 export async function verifyAppleIdToken({
   identityToken,
   nonce,
@@ -79,19 +122,9 @@ export async function verifyAppleIdToken({
   audiences: string[];
   keys?: AppleKeySource;
 }): Promise<{ sub: string; audience: string; email?: string }> {
-  const keySet = createLocalJWKSet(await keys());
-  const { payload } = await jwtVerify(identityToken, keySet, {
-    issuer: APPLE_ISSUER,
-    audience: audiences,
-    algorithms: ["RS256"],
-    requiredClaims: ["sub", "exp"],
-  }).catch((error: unknown) => {
-    throw new AppleIdTokenError(failureOf(error));
-  });
+  const payload = await signedClaims(identityToken, audiences, keys);
   if (payload.nonce !== (await sha256Hex(nonce)))
     throw new AppleIdTokenError("wrong_nonce");
-  if (typeof payload.sub !== "string" || payload.sub === "")
-    throw new AppleIdTokenError("invalid");
   // Apple sends `email_verified` as a boolean or the string "true". A new
   // account links to an existing user by email, so an unverified one is
   // dropped rather than trusted.

@@ -40,7 +40,7 @@ async function identityToken(
     .setProtectedHeader({ alg: "RS256", kid: "apple-key" })
     .setIssuer("https://appleid.apple.com")
     .setAudience(audience)
-    .setSubject(SUB)
+    .setSubject(typeof claims.sub === "string" ? claims.sub : SUB)
     .setIssuedAt()
     .setExpirationTime("10m")
     .sign(appleKey);
@@ -79,7 +79,9 @@ beforeEach(async () => {
     }),
   );
   exchanges.length = 0;
-  exchange = () => Response.json({ refresh_token: "r.native" });
+  const owned = await identityToken({ nonce: undefined });
+  exchange = () =>
+    Response.json({ refresh_token: "r.native", id_token: owned });
   vi.spyOn(console, "log").mockImplementation(() => {});
   const session = await generateKeyPair("RS256", { extractable: true });
   vi.stubEnv("JWT_PRIVATE_KEY", await exportPKCS8(session.privateKey));
@@ -155,6 +157,56 @@ describe("keeping Apple's refresh token from the native sheet", () => {
   ])("still signs the person in when %s", async (_case, answer) => {
     await configureRevocation();
     exchange = answer;
+    const backend = newConvexTest();
+
+    const result = await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.code",
+    });
+
+    expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
+    expect(await appleTokens(backend)).toEqual([]);
+  });
+
+  it("drops a token whose code belongs to another Apple account", async () => {
+    await configureRevocation();
+    // Someone sends their own valid sign-in with another account's code.
+    const theirs = await identityToken({
+      sub: "000999.other",
+      nonce: undefined,
+    });
+    exchange = () =>
+      Response.json({ refresh_token: "r.stranger", id_token: theirs });
+    const backend = newConvexTest();
+
+    const result = await signIn(backend, {
+      identityToken: await identityToken(),
+      nonce: NONCE,
+      authorizationCode: "c.stranger",
+    });
+
+    expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
+    expect(await appleTokens(backend)).toEqual([]);
+  });
+
+  it.each([
+    ["no identity token beside it", () => ({ refresh_token: "r.native" })],
+    [
+      "an identity token Apple did not sign",
+      () => ({ refresh_token: "r.native", id_token: "not.a.token" }),
+    ],
+    [
+      "an identity token for another app",
+      async () => ({
+        refresh_token: "r.native",
+        id_token: await identityToken({ nonce: undefined }, "app.other"),
+      }),
+    ],
+  ])("drops a token that arrives with %s", async (_case, answer) => {
+    await configureRevocation();
+    const body = await answer();
+    exchange = () => Response.json(body);
     const backend = newConvexTest();
 
     const result = await signIn(backend, {

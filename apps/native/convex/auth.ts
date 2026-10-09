@@ -13,7 +13,11 @@ import { env, type ActionCtx } from "./_generated/server";
 import { nativeAppleProfile, normalizeAppleProfile } from "./appleProfile";
 import { recordAccountCreated } from "./model/accountCreated";
 import { exchangeAuthorizationCode } from "./model/appleClient";
-import { AppleIdTokenError, verifyAppleIdToken } from "./model/appleIdToken";
+import {
+  AppleIdTokenError,
+  appleTokenSubject,
+  verifyAppleIdToken,
+} from "./model/appleIdToken";
 import { keepAppleRefreshToken } from "./model/appleTokens";
 import { errorName, logEvent } from "./model/log";
 
@@ -30,9 +34,10 @@ const isDevDeployment = () =>
 async function keepNativeAppleToken(
   ctx: ActionCtx,
   userId: Id<"users">,
-  clientId: string,
+  apple: { sub: string; audience: string },
   code: unknown,
 ) {
+  const clientId = apple.audience;
   const privateKey = env.APPLE_REVOKE_PRIVATE_KEY;
   const keyId = env.APPLE_REVOKE_KEY_ID;
   const teamId = env.APPLE_REVOKE_TEAM_ID;
@@ -43,17 +48,35 @@ async function keepNativeAppleToken(
     return;
   }
   try {
-    const { refreshToken, status } = await exchangeAuthorizationCode({
-      code,
-      clientId,
-      privateKey,
-      keyId,
-      teamId,
-    });
+    const { refreshToken, identityToken, status } =
+      await exchangeAuthorizationCode({
+        code,
+        clientId,
+        privateKey,
+        keyId,
+        teamId,
+      });
     if (refreshToken === null) {
       logEvent("error", "apple_native_token_failed", {
         code: "refused",
         ...(status !== undefined ? { status } : {}),
+      });
+      return;
+    }
+    // The code is whatever the caller sent, so it may belong to another Apple
+    // account than the one that just signed in. Apple says whose it is in the
+    // identity token beside the refresh token. Storing a stranger's token
+    // would revoke their sign-in when this account is deleted, and leave this
+    // one's standing.
+    const owner =
+      identityToken === null
+        ? null
+        : await appleTokenSubject({ identityToken, audience: clientId }).catch(
+            () => null,
+          );
+    if (owner !== apple.sub) {
+      logEvent("error", "apple_native_token_failed", {
+        code: owner === null ? "unverified_owner" : "wrong_owner",
       });
       return;
     }
@@ -95,12 +118,7 @@ const AppleNative = ConvexCredentials<DataModel>({
         account: { id: token.sub },
         profile: nativeAppleProfile(token, name),
       });
-      await keepNativeAppleToken(
-        ctx,
-        user._id,
-        token.audience,
-        authorizationCode,
-      );
+      await keepNativeAppleToken(ctx, user._id, token, authorizationCode);
       return { userId: user._id };
     } catch (error) {
       if (!(error instanceof AppleIdTokenError)) throw error;
