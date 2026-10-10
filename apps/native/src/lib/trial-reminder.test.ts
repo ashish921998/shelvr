@@ -104,7 +104,11 @@ describe("scheduleTrialReminder", () => {
     expect(mock.capture).toHaveBeenCalledWith("trial_reminder_permission", {
       granted: true,
     });
-    expect(mock.schedule).toHaveBeenCalledTimes(1);
+    // Not a call count: whether the last-day reminder joins it depends on
+    // the local hour the trial ends.
+    expect(mock.schedule).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: TRIAL_REMINDER_ID }),
+    );
   });
 
   it("creates the Android channel before asking", async () => {
