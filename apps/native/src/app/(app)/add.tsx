@@ -295,7 +295,7 @@ function AddContent({ close, openCamera }: AddContentProps) {
         }}
       />
       {/* Each platform mounts exactly one persistent title so changes cascade
-          between "Save something" / "New note" / "Save an article". */}
+          between "Save something" / "New note" / "Save a link". */}
       {Platform.OS === "ios" ? (
         <Stack.Title asChild>
           <AnimatedText text={title} style={styles.heading} truncate />

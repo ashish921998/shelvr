@@ -85,7 +85,7 @@ only loads bundles whose native fingerprint matches. Rebuild with
   see the real sheet, either sign in with a real account, or temporarily make
   `useEntitlement` return a lapsed, non-entitled state after its effects (so
   hook order is preserved) and revert the patch afterwards. Then Home, "Paste a
-  link", "Article" reaches the Pro gate. "Paste a link" does nothing unless a
+  link", "Link" reaches the Pro gate. "Paste a link" does nothing unless a
   URL is on the device clipboard. `pbcopy` reads standard input:
   `printf '%s' '<url>' | xcrun simctl pbcopy <udid>`.
 - **Reduced motion.**
