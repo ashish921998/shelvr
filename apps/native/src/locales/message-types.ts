@@ -468,6 +468,7 @@ export type MessageParams = {
   "onboarding.sampleSofa": undefined;
   "onboarding.sampleDiner": undefined;
   "onboarding.setupTitle": undefined;
+  "onboarding.setupHint": undefined;
   "onboarding.yourSpaces": undefined;
   "onboarding.spacesChangeable": undefined;
   "onboarding.newSpace": undefined;
