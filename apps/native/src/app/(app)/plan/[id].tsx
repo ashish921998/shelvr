@@ -10,8 +10,8 @@ import { runIntent } from "@/lib/intents";
 import {
   placeLabel,
   planShareText,
-  spinSteps,
   useMakePlan,
+  usePlanPicker,
   type PlanPlace,
 } from "@/lib/make-plan";
 import { api } from "@convex/_generated/api";
@@ -21,7 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Platform, Pressable, ScrollView, Share, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -33,6 +33,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+const tick = () => haptic("tick");
 
 function haptic(kind: "tick" | "done") {
   if (process.env.EXPO_OS !== "ios") return;
@@ -99,13 +101,18 @@ export default function PlanScreen() {
   );
   const { state, retry } = useMakePlan(spaceId, locale);
   const reducedMotion = useReducedMotion();
-  const [highlight, setHighlight] = useState<number | null>(null);
-  const [picked, setPicked] = useState<number | null>(null);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const spinning = useRef(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const places: PlanPlace[] = state.status === "ready" ? state.places : [];
+  const planId = state.status === "ready" ? state.planId : null;
+  const onPicked = useCallback(() => {
+    haptic("done");
+    analytics.capture("plan_picked", { place_count: places.length });
+  }, [places.length]);
+  const { highlight, picked, pickedPlace, isSpinning, pickForMe } =
+    usePlanPicker(places, planId, {
+      reducedMotion,
+      onStep: tick,
+      onPicked,
+    });
 
   const { imageById, titleById } = useMemo(() => {
     const images = new Map<string, string>();
@@ -118,49 +125,8 @@ export default function PlanScreen() {
     return { imageById: images, titleById: titles };
   }, [space]);
 
-  const places: PlanPlace[] = state.status === "ready" ? state.places : [];
-  const pickedPlace = picked === null ? null : (places[picked] ?? null);
-
-  const pickForMe = () => {
-    if (spinning.current || places.length === 0) return;
-    spinning.current = true;
-    setIsSpinning(true);
-    timers.current = [];
-    setPicked(null);
-    const winner = Math.floor(Math.random() * places.length);
-    // Reduce Motion lands straight on the pick instead of cycling cards.
-    const steps = reducedMotion ? [] : spinSteps(places.length, winner);
-    let at = 0;
-    for (const step of steps) {
-      timers.current.push(
-        setTimeout(() => {
-          setHighlight(step.index);
-          haptic("tick");
-        }, at),
-      );
-      at += step.holdMs;
-    }
-    timers.current.push(
-      setTimeout(() => {
-        spinning.current = false;
-        setIsSpinning(false);
-        setPicked(winner);
-        haptic("done");
-        analytics.capture("plan_picked", { place_count: places.length });
-      }, at),
-    );
-  };
-
-  // A fresh plan clears the last pick and any spin still running.
-  const again = () => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    spinning.current = false;
-    setIsSpinning(false);
-    setHighlight(null);
-    setPicked(null);
-    void retry();
-  };
+  // A new plan replaces the old one, its pick and any spin still running.
+  const again = () => void retry();
 
   const share = async () => {
     if (!space || places.length === 0) return;
