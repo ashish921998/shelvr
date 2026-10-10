@@ -21,6 +21,10 @@ import { Alert, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { usePaywallGuard } from "@/lib/entitlement";
+
+/** Saved items a space needs before "Make a plan" shows. */
+const PLAN_MIN_SAVES = 3;
 
 export default function SpaceScreen() {
   useAppLocale();
@@ -32,6 +36,7 @@ export default function SpaceScreen() {
   );
   const deleteSpace = useMutation(api.spaces.deleteSpace);
   const acceptAllSuggestions = useMutation(api.spaces.acceptAllSuggestions);
+  const { guard: planGuard } = usePaywallGuard("make_plan");
 
   // Suggestions lead the feed (they're the ones asking for a decision),
   // wearing the sparkle badge; saved items follow. Item detail rebuilds this
@@ -88,6 +93,29 @@ export default function SpaceScreen() {
   };
 
   const suggestionCount = space.suggestions.length;
+  const canPlan = space.items.length >= PLAN_MIN_SAVES;
+
+  const makePlan = () => {
+    void planGuard(() =>
+      router.push({ pathname: "/plan/[id]", params: { id: space._id } }),
+    );
+  };
+
+  const planPill = canPlan ? (
+    <Pressable
+      accessibilityRole="button"
+      onPress={makePlan}
+      hitSlop={8}
+      style={({ pressed }) => [styles.planPill, pressed && { opacity: 0.7 }]}
+    >
+      <AppSymbolIcon
+        name="sparkles"
+        size={14}
+        tintColor={theme.colors.onTint}
+      />
+      <Text style={styles.planText}>{t("plan.make")}</Text>
+    </Pressable>
+  ) : null;
 
   return (
     <>
@@ -194,28 +222,35 @@ export default function SpaceScreen() {
           source={{ from: "space", spaceId: id }}
           firstItemZoomTarget
           ListHeaderComponent={
-            suggestionCount > 0 ? (
-              <Animated.View
-                entering={FadeIn.duration(250)}
-                exiting={FadeOut.duration(200)}
-                style={styles.suggestionsPill}
-              >
-                <AppSymbolIcon
-                  name="sparkles"
-                  size={14}
-                  tintColor={theme.colors.primaryText}
-                />
-                <Text style={styles.suggestionsText}>
-                  {t("spaces.suggestionCount", { count: suggestionCount })}
-                </Text>
-                <Pressable
-                  onPress={addAll}
-                  hitSlop={8}
-                  style={({ pressed }) => pressed && { opacity: 0.7 }}
-                >
-                  <Text style={styles.addAllText}>{t("spaces.addAll")}</Text>
-                </Pressable>
-              </Animated.View>
+            suggestionCount > 0 || planPill ? (
+              <View style={styles.headerPills}>
+                {planPill}
+                {suggestionCount > 0 ? (
+                  <Animated.View
+                    entering={FadeIn.duration(250)}
+                    exiting={FadeOut.duration(200)}
+                    style={styles.suggestionsPill}
+                  >
+                    <AppSymbolIcon
+                      name="sparkles"
+                      size={14}
+                      tintColor={theme.colors.primaryText}
+                    />
+                    <Text style={styles.suggestionsText}>
+                      {t("spaces.suggestionCount", { count: suggestionCount })}
+                    </Text>
+                    <Pressable
+                      onPress={addAll}
+                      hitSlop={8}
+                      style={({ pressed }) => pressed && { opacity: 0.7 }}
+                    >
+                      <Text style={styles.addAllText}>
+                        {t("spaces.addAll")}
+                      </Text>
+                    </Pressable>
+                  </Animated.View>
+                ) : null}
+              </View>
             ) : undefined
           }
           ListEmptyComponent={
@@ -245,6 +280,26 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.background,
   },
+  headerPills: {
+    alignItems: "center",
+    gap: theme.gap(1),
+    marginTop: theme.gap(0.5),
+    marginBottom: theme.gap(1),
+  },
+  planPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    backgroundColor: theme.colors.primary,
+    borderRadius: 50,
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(2),
+  },
+  planText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
+    color: theme.colors.onTint,
+  },
   suggestionsPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -254,8 +309,6 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 50,
     paddingVertical: theme.gap(1),
     paddingHorizontal: theme.gap(2),
-    marginTop: theme.gap(0.5),
-    marginBottom: theme.gap(1),
   },
   suggestionsText: {
     fontFamily: theme.fonts.medium,

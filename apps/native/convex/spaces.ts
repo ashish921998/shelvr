@@ -10,6 +10,13 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { aiConsentRequiredError } from "./model/aiConsent";
+import {
+  MAX_PLAN_ITEMS,
+  PLAN_CONTENT_CHARS,
+  planSourceValidator,
+  type PlanSource,
+} from "./model/plan";
 import { validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -748,6 +755,72 @@ export const getSpaceInternal = internalQuery({
   returns: v.union(v.object(spaceFields), v.null()),
   handler: async (ctx, args) => {
     return await ctx.db.get(args.spaceId);
+  },
+});
+
+/**
+ * The gate and the input for "Make a plan" (`plans.makePlan`), in one
+ * transaction: the caller owns the space, is Pro, has not declined AI
+ * processing, and has a token left. Returns the space's saved, ready items,
+ * newest filed first and bounded, as the text the model reads. An empty
+ * space spends no token, since no model call follows.
+ */
+export const claimPlanInternal = internalMutation({
+  args: { spaceId: v.id("spaces"), userId: v.id("users") },
+  returns: v.object({
+    spaceName: v.string(),
+    sources: v.array(planSourceValidator),
+  }),
+  handler: async (ctx, args) => {
+    const space = await ctx.db.get(args.spaceId);
+    if (space === null || space.userId !== args.userId) {
+      throw new Error("Space not found");
+    }
+    await requireProEntitlement(ctx, args.userId);
+    if (!(await aiAllowed(ctx, args.userId))) {
+      throw aiConsentRequiredError();
+    }
+    // Saved rows plus legacy rows (no status reads as saved), each newest
+    // filed first and bounded, then merged.
+    const [saved, legacy] = await Promise.all(
+      (["saved", undefined] as const).map((status) =>
+        ctx.db
+          .query("spaceItems")
+          .withIndex("by_space_and_status", (q) =>
+            q.eq("spaceId", args.spaceId).eq("status", status),
+          )
+          .order("desc")
+          .take(MAX_PLAN_ITEMS),
+      ),
+    );
+    const joins = [...saved, ...legacy]
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, MAX_PLAN_ITEMS);
+    const sources: PlanSource[] = [];
+    for (const join of joins) {
+      const item = await ctx.db.get(join.itemId);
+      if (item === null || item.userId !== args.userId) continue;
+      if (item.status !== "ready") continue;
+      sources.push({
+        itemId: item._id,
+        title: item.title,
+        description: item.description,
+        content: item.content?.slice(0, PLAN_CONTENT_CHARS),
+        url: item.url,
+        siteName: item.siteName,
+        author: item.author,
+        places: (item.intents ?? [])
+          .filter((intent) => intent.kind === "open_maps")
+          .map((intent) => intent.value),
+      });
+    }
+    if (sources.length > 0) {
+      await rateLimiter.limit(ctx, "makePlan", {
+        key: args.userId,
+        throws: true,
+      });
+    }
+    return { spaceName: space.name, sources };
   },
 });
 

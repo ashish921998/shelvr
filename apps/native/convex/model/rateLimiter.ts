@@ -46,6 +46,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 10,
   },
+  // "Make a plan" sends up to 60 saves in one prompt and gets 5 places back.
+  // A user re-rolls a few times while deciding; a loop gets cut off.
+  makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   // The onboarding demo's Pro-free retry of a FAILED demo classification.
   // Tighter than reprocessItem: the demo is the one uncapped-price save a
   // non-paying user gets, so retries stay strictly bounded.
