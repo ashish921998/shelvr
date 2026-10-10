@@ -69,13 +69,19 @@ export function planSourceLines(sources: PlanSource[]): string {
     .join("\n\n");
 }
 
-/** Lowercase letters and digits only, accents folded. */
+/** Lowercase letters and digits only, in any script, accents folded. */
 function squash(text: string): string {
   return text
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** Shortest word that proves anything: 3 Latin letters, 2 in scripts like
+ * Japanese or Korean, where a two-character name is common. */
+function distinctive(word: string): boolean {
+  return word.length >= (/^[a-z0-9]+$/.test(word) ? 3 : 2);
 }
 
 // Words that name a kind of place, not a place. A name made only of these
@@ -121,10 +127,10 @@ export function isGrounded(name: string, source: PlanSource): boolean {
   const words = name
     .split(/[\s\-–—&/,.']+/)
     .map(squash)
-    .filter((word) => word.length >= 3 && !GENERIC_WORDS.has(word));
+    .filter((word) => distinctive(word) && !GENERIC_WORDS.has(word));
   if (words.length === 0) {
     const whole = squash(name);
-    return whole.length >= 3 && haystack.includes(whole);
+    return distinctive(whole) && haystack.includes(whole);
   }
   return words.some((word) => haystack.includes(word));
 }

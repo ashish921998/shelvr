@@ -29,6 +29,18 @@ describe("isGrounded", () => {
     ).toBe(true);
   });
 
+  it("matches names in Japanese and Korean", () => {
+    expect(
+      isGrounded("すし匠", source({ content: "四谷のすし匠でおまかせ" })),
+    ).toBe(true);
+    expect(
+      isGrounded("을지로 골뱅이", source({ title: "을지로 노포 맛집" })),
+    ).toBe(true);
+    expect(isGrounded("すし匠", source({ content: "最高のラーメン" }))).toBe(
+      false,
+    );
+  });
+
   it("rejects a name the save never mentions", () => {
     expect(isGrounded("Carbone", source({ title: "Best pasta in NYC" }))).toBe(
       false,
