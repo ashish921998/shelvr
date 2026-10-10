@@ -142,6 +142,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
 
 ## Deployment
 
+- `main` requires pull requests and up-to-date `check` and `convex api contract`
+  checks, including for admins; no approving review is required. The production
+  environment permits only `main` and has no human approval gate.
 - `deploy.yml` runs after CI completes on `main` and deploys Convex
   production, nothing else. No approval gate: CI, each acting job's freshness
   check, and the pull request's public-contract check hold the line. One-time

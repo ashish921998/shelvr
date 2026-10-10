@@ -52,8 +52,8 @@ jobs:
 
   release:
     name: ${{ inputs.mode == 'ota' && 'Publish production OTA' || 'Build' }}
-    # Releases only ever ship from main. The production environment's
-    # required reviewer is the approval gate before anything reaches users.
+    # Releases only ship from main, with successful CI on the current tip.
+    # The production environment restricts branches, not human approvals.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -67,10 +67,8 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
-            // This job is behind the production environment, so this runs after
-            // a human approved it. A commit main has moved past is worth
-            // failing for here rather than skipping: someone is watching, and
-            // what they approved has changed under them.
+            // Fail if main advanced while this manually selected release was
+            // queued. The production environment does not require approval.
             const guard = require('./tools/verify-ci.cjs');
             await guard({ github, context, core });
             await guard.requireTip({ github, context, core });
