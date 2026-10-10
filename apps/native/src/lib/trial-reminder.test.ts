@@ -99,16 +99,17 @@ describe("scheduleTrialReminder", () => {
   it("asks once when a trial has just started", async () => {
     mock.permission.mockResolvedValue(undetermined);
     mock.request.mockResolvedValue(granted);
-    expect(await scheduleTrialReminder(NOW + 7 * DAY, NOW, true)).toBe(true);
+    // Local noon, so the trial ends at the same hour in every timezone.
+    const noon = new Date(2027, 0, 4, 12, 0).getTime();
+    expect(await scheduleTrialReminder(noon + 7 * DAY, noon, true)).toBe(true);
     expect(mock.request).toHaveBeenCalledTimes(1);
     expect(mock.capture).toHaveBeenCalledWith("trial_reminder_permission", {
       granted: true,
     });
-    // Not a call count: whether the last-day reminder joins it depends on
-    // the local hour the trial ends.
-    expect(mock.schedule).toHaveBeenCalledWith(
-      expect.objectContaining({ identifier: TRIAL_REMINDER_ID }),
+    const ids = mock.schedule.mock.calls.map(
+      (call) => (call[0] as { identifier: string }).identifier,
     );
+    expect(ids).toEqual([TRIAL_REMINDER_ID, TRIAL_LAST_DAY_ID]);
   });
 
   it("creates the Android channel before asking", async () => {
