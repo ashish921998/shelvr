@@ -283,6 +283,7 @@
   "plan.pick": "Choisis pour moi",
   "plan.again": "Mélanger de nouveau",
   "plan.tonight": "Ce soir : %{name}",
+  "plan.from": "Tiré de « %{title} »",
   "plan.emptyTitle": "Aucun lieu pour le moment",
   "plan.emptyBody": "Aucun de ces enregistrements ne nomme un lieu. Enregistrez des reels qui mentionnent un restaurant ou un bar, puis réessayez.",
   "plan.emptySpaceBody": "Enregistrez d’abord quelques lieux dans cet espace, puis faites un plan.",

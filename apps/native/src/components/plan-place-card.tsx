@@ -12,6 +12,8 @@ type Props = {
   rank: number;
   /** The save the place came from, shown so the plan reads as yours. */
   sourceImageUrl?: string;
+  /** Shown instead when the save has no image, such as a note. */
+  sourceTitle?: string;
   highlighted: boolean;
   onOpenMaps: () => void;
 };
@@ -21,6 +23,7 @@ export function PlanPlaceCard({
   place,
   rank,
   sourceImageUrl,
+  sourceTitle,
   highlighted,
   onOpenMaps,
 }: Props) {
@@ -50,6 +53,15 @@ export function PlanPlaceCard({
           <ThemedText variant="subhead" style={styles.why}>
             {place.why}
           </ThemedText>
+          {!sourceImageUrl && sourceTitle ? (
+            <ThemedText
+              variant="caption"
+              style={styles.muted}
+              numberOfLines={1}
+            >
+              {t("plan.from", { title: sourceTitle })}
+            </ThemedText>
+          ) : null}
         </View>
         {sourceImageUrl ? (
           <Image

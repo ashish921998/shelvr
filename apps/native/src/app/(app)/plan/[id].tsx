@@ -105,13 +105,15 @@ export default function PlanScreen() {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  const imageById = useMemo(() => {
-    const map = new Map<string, string>();
+  const { imageById, titleById } = useMemo(() => {
+    const images = new Map<string, string>();
+    const titles = new Map<string, string>();
     for (const item of space?.items ?? []) {
       const uri = item.imageUrl ?? item.heroImageUrl;
-      if (uri) map.set(item._id, uri);
+      if (uri) images.set(item._id, uri);
+      if (item.title) titles.set(item._id, item.title);
     }
-    return map;
+    return { imageById: images, titleById: titles };
   }, [space]);
 
   const places: PlanPlace[] = state.status === "ready" ? state.places : [];
@@ -245,6 +247,7 @@ export default function PlanScreen() {
                   place={place}
                   rank={i + 1}
                   sourceImageUrl={imageById.get(place.itemId)}
+                  sourceTitle={titleById.get(place.itemId)}
                   highlighted={(picked ?? highlight) === i}
                   onOpenMaps={() => openMaps(place, i + 1)}
                 />
@@ -284,6 +287,17 @@ export default function PlanScreen() {
               title={t("profile.settings")}
               onPress={() => router.push("/settings")}
             />
+            {/* Back from Settings with AI on, the screen is still mounted. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={again}
+              hitSlop={8}
+              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
+            >
+              <ThemedText variant="secondaryLabel" style={styles.muted}>
+                {t("common.tryAgain")}
+              </ThemedText>
+            </Pressable>
           </View>
         ) : null}
 

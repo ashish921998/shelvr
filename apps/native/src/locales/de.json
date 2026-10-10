@@ -283,6 +283,7 @@
   "plan.pick": "Wähl für mich",
   "plan.again": "Neu mischen",
   "plan.tonight": "Heute Abend: %{name}",
+  "plan.from": "Aus „%{title}“",
   "plan.emptyTitle": "Noch keine Orte",
   "plan.emptyBody": "Keiner dieser Saves nennt einen Ort. Speichere Reels, die ein Restaurant oder eine Bar erwähnen, und versuch es noch einmal.",
   "plan.emptySpaceBody": "Speichere zuerst ein paar Orte in diesem Bereich und erstelle dann einen Plan.",

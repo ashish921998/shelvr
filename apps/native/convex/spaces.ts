@@ -805,7 +805,13 @@ export const claimPlanInternal = internalMutation({
         itemId: item._id,
         title: item.title,
         description: item.description,
-        content: item.content?.slice(0, PLAN_CONTENT_CHARS),
+        // A note's words live in `note`; a link can carry the user's note
+        // too, and either may be what names the place.
+        content:
+          [item.note, item.content]
+            .filter(Boolean)
+            .join("\n")
+            .slice(0, PLAN_CONTENT_CHARS) || undefined,
         url: item.url,
         siteName: item.siteName,
         author: item.author,

@@ -283,6 +283,7 @@
   "plan.pick": "Elige por mí",
   "plan.again": "Volver a mezclar",
   "plan.tonight": "Hoy en la noche: %{name}",
+  "plan.from": "De “%{title}”",
   "plan.emptyTitle": "Todavía no hay lugares",
   "plan.emptyBody": "Ninguno de estos guardados menciona un lugar. Guarda reels que mencionen un restaurante o un bar e inténtalo de nuevo.",
   "plan.emptySpaceBody": "Primero guarda algunos lugares en este espacio y luego haz un plan.",

@@ -285,6 +285,7 @@
   "plan.pick": "대신 골라 줘",
   "plan.again": "다시 섞기",
   "plan.tonight": "오늘 밤: %{name}",
+  "plan.from": "‘%{title}’에서",
   "plan.emptyTitle": "아직 장소가 없어요",
   "plan.emptyBody": "이 저장 항목들에는 장소 이름이 없어요. 식당이나 바가 나오는 릴스를 저장한 뒤 다시 시도해 주세요.",
   "plan.emptySpaceBody": "먼저 이 스페이스에 장소를 몇 개 저장한 다음 계획을 세워 보세요.",

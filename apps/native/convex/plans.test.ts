@@ -19,6 +19,7 @@ vi.mock("ai", () => ({
 type Save = {
   title: string;
   content?: string;
+  note?: string;
   status?: "saved" | "suggested" | "dismissed";
   itemStatus?: "ready" | "processing";
   maps?: string;
@@ -60,6 +61,7 @@ async function setup(
         status: save.itemStatus ?? "ready",
         title: save.title,
         content: save.content,
+        note: save.note,
         url: "https://www.tiktok.com/@someone/video/1",
         tags: [],
         searchText: save.title,
@@ -150,6 +152,26 @@ describe("makePlan", () => {
     expect(prompt).not.toContain("Suggested reel");
     expect(prompt).not.toContain("Dismissed reel");
     expect(prompt).not.toContain("Still reading");
+  });
+
+  it("reads a note's own text", async () => {
+    const { t, spaceId, itemIds } = await setup([
+      { title: "Anniversary ideas", note: "Book Le Coucou for Friday" },
+    ]);
+    generateObject.mockResolvedValue({
+      object: {
+        places: [
+          { saveNumber: 1, name: "Le Coucou", area: "", why: "Our pick" },
+        ],
+      },
+    });
+
+    const plan = await t.action(api.plans.makePlan, { spaceId });
+
+    expect(promptOf()).toContain("Book Le Coucou for Friday");
+    expect(plan.places).toEqual([
+      { name: "Le Coucou", why: "Our pick", itemId: itemIds[0] },
+    ]);
   });
 
   it("skips the model for a space with nothing saved", async () => {

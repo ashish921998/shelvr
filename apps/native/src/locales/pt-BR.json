@@ -283,6 +283,7 @@
   "plan.pick": "Escolhe pra mim",
   "plan.again": "Embaralhar de novo",
   "plan.tonight": "Hoje à noite: %{name}",
+  "plan.from": "De “%{title}”",
   "plan.emptyTitle": "Nenhum lugar ainda",
   "plan.emptyBody": "Nenhum desses itens salvos cita um lugar. Salve reels que mencionem um restaurante ou bar e tente de novo.",
   "plan.emptySpaceBody": "Primeiro salve alguns lugares neste espaço e depois faça um plano.",

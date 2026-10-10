@@ -93,7 +93,10 @@ export default function SpaceScreen() {
   };
 
   const suggestionCount = space.suggestions.length;
-  const canPlan = space.items.length >= PLAN_MIN_SAVES;
+  // The planner reads ready saves only; still-processing ones don't count.
+  const canPlan =
+    space.items.filter((item) => item.status === "ready").length >=
+    PLAN_MIN_SAVES;
 
   const makePlan = () => {
     void planGuard(() =>

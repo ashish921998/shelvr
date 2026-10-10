@@ -283,6 +283,7 @@
   "plan.pick": "Pick for me",
   "plan.again": "Shuffle again",
   "plan.tonight": "Tonight: %{name}",
+  "plan.from": "From “%{title}”",
   "plan.emptyTitle": "No places yet",
   "plan.emptyBody": "None of these saves names a place. Save reels that mention a restaurant or bar, then try again.",
   "plan.emptySpaceBody": "Save a few places to this space first, then make a plan.",

@@ -285,6 +285,7 @@
   "plan.pick": "おまかせで選ぶ",
   "plan.again": "もう一度シャッフル",
   "plan.tonight": "今夜は：%{name}",
+  "plan.from": "「%{title}」より",
   "plan.emptyTitle": "まだ場所がありません",
   "plan.emptyBody": "これらの保存には場所の名前がありません。レストランやバーが出てくるリールを保存して、もう一度お試しください。",
   "plan.emptySpaceBody": "まずこのスペースに場所をいくつか保存してから、プランを作りましょう。",
